@@ -1,0 +1,49 @@
+# Signal API Adapter for Moltbot
+# Translates Moltbot's API format to signal-cli-rest-api format
+#
+# Moltbot expects:     signal-cli-rest-api provides:
+# /api/v1/check    ->  /v1/health
+# /api/v1/events   ->  /v1/receive/{phone}
+
+:8080 {
+    # Health check endpoint translation
+    handle /api/v1/check {
+        rewrite * /v1/health
+        reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Events/receive endpoint - extract account from query and rewrite to path
+    handle /api/v1/events {
+        # Extract the account query parameter and rewrite to /v1/receive/{account}
+        rewrite * /v1/receive/{query.account}
+        reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Pass through /v2/* with v1 rewrite (for backward compatibility)
+    handle /v2/* {
+        uri replace /v2/ /v1/
+        reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Pass through all other requests unchanged
+    handle {
+        reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}
