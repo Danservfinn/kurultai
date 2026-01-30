@@ -103,13 +103,22 @@
       }
     },
 
-    // Signal - Primary channel (uncomment and configure after linking)
+    // Signal - Primary channel (external daemon on Railway)
+    // Configuration compliant with https://docs.openclaw.ai/channels/signal
     "signal": {
       "enabled": true,
-      "allowFrom": [],  // Add your phone number: ["+15555550123"]
+      "account": "+15165643945",
+      "httpUrl": "http://signal-cli-native.railway.internal:8080",
+      "autoStart": false,
+      "dmPolicy": "pairing",
+      "configWrites": false,
+      "allowFrom": ["+15165643945", "+19194133445"],
       "groups": {
         "*": { "requireMention": true }
-      }
+      },
+      "historyLimit": 50,
+      "textChunkLimit": 4000,
+      "ignoreStories": true
     }
 
     // Telegram - Uncomment to enable
