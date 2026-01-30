@@ -113,8 +113,12 @@
       "dmPolicy": "pairing",
       "configWrites": false,
       "allowFrom": ["+15165643945", "+19194133445"],
+      "groupAllowFrom": ["+19194133445"],
       "groups": {
-        "*": { "requireMention": true }
+        "*": {
+          "requireMention": true,
+          "allowFrom": ["+19194133445"]
+        }
       },
       "historyLimit": 50,
       "textChunkLimit": 4000,
