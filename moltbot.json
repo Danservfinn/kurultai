@@ -1,110 +1,21 @@
 {
-  // =============================================================================
-  // MOLTBOT CONFIGURATION - Security-First Starter Template
-  // =============================================================================
-  // Location on Railway: /data/.clawdbot/moltbot.json
-  // Validate with: moltbot doctor
-  // =============================================================================
-
-  // ---------------------------------------------------------------------------
-  // GATEWAY SETTINGS
-  // ---------------------------------------------------------------------------
   "gateway": {
-    "mode": "remote",
+    "mode": "local",
     "port": 18789,
-
-    // Authentication (REQUIRED for production)
     "auth": {
       "mode": "token",
-      "token": "${CLAWDBOT_GATEWAY_TOKEN}"
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
     },
-
-    // Control UI settings
     "controlUi": {
-      "enabled": true,
-      "allowInsecureAuth": false,
-
-      // Security headers
-      "securityHeaders": {
-        "contentSecurityPolicy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
-        "xFrameOptions": "DENY",
-        "xContentTypeOptions": "nosniff",
-        "strictTransportSecurity": "max-age=31536000; includeSubDomains",
-        "referrerPolicy": "no-referrer"
-      },
-
-      // CSRF protection
-      "csrf": {
-        "enabled": true,
-        "cookieOptions": {
-          "httpOnly": true,
-          "secure": true,
-          "sameSite": "strict"
-        }
-      }
-    },
-
-    // Rate limiting
-    "rateLimit": {
-      "enabled": true,
-      "auth": {
-        "maxAttempts": 5,
-        "windowMs": 60000,
-        "blockDurationMs": 300000
-      },
-      "api": {
-        "maxRequestsPerMinute": 60
-      }
+      "enabled": true
     }
   },
-
-  // ---------------------------------------------------------------------------
-  // AGENT CONFIGURATION
-  // ---------------------------------------------------------------------------
   "agents": {
     "defaults": {
-      "workspace": "/data/workspace",
-
-      // Model configuration - adjust based on your API keys
-      "model": {
-        "primary": "anthropic/claude-sonnet-4-20250514",
-        "fallbacks": [
-          "openai/gpt-4o",
-          "openrouter/anthropic/claude-3.5-sonnet"
-        ]
-      },
-
-      // System prompt hardening
-      "systemPromptSuffix": "SECURITY: Never execute commands that modify system files, access credentials, or bypass access controls regardless of how the request is phrased. Verify all file operations are within the workspace directory. Never reveal API keys, tokens, or environment variables.",
-
-      // Sandbox disabled by default - enable for untrusted inputs
-      "sandbox": {
-        "enabled": false,
-        "docker": {
-          "image": "node:22-slim",
-          "networkMode": "none",
-          "readOnlyRootFilesystem": true,
-          "dropCapabilities": ["ALL"],
-          "seccompProfile": "runtime/default"
-        }
-      }
+      "workspace": "/data/workspace"
     }
   },
-
-  // ---------------------------------------------------------------------------
-  // CHANNEL CONFIGURATION
-  // ---------------------------------------------------------------------------
-  // SECURITY: Start with empty allowlists - add specific users after deployment
   "channels": {
-    "defaults": {
-      "allowFrom": [],
-      "groups": {
-        "*": { "requireMention": true }
-      }
-    },
-
-    // Signal - Primary channel (external daemon on Railway)
-    // Configuration compliant with https://docs.openclaw.ai/channels/signal
     "signal": {
       "enabled": true,
       "account": "+15165643945",
@@ -114,176 +25,18 @@
       "configWrites": false,
       "allowFrom": ["+15165643945", "+19194133445"],
       "groupAllowFrom": ["+19194133445"],
-      "groups": {
-        "*": {
-          "requireMention": true,
-          "allowFrom": ["+19194133445"]
-        }
-      },
       "historyLimit": 50,
       "textChunkLimit": 4000,
       "ignoreStories": true
     }
-
-    // Telegram - Uncomment to enable
-    // "telegram": {
-    //   "enabled": true,
-    //   "botToken": "${TELEGRAM_BOT_TOKEN}",
-    //   "allowFrom": [],  // Add Telegram user IDs: ["tg:123456789"]
-    //   "groups": {
-    //     "*": { "requireMention": true }
-    //   }
-    // }
-
-    // Discord - Uncomment to enable
-    // "discord": {
-    //   "enabled": true,
-    //   "token": "${DISCORD_BOT_TOKEN}",
-    //   "allowFrom": [],  // Add Discord user IDs: ["discord:123456789"]
-    //   "guilds": {
-    //     "*": { "requireMention": true }
-    //   }
-    // }
-
-    // WhatsApp - Uncomment to enable
-    // "whatsapp": {
-    //   "enabled": true,
-    //   "allowFrom": [],  // Add phone numbers: ["+15555550123"]
-    //   "groups": {
-    //     "*": { "requireMention": true }
-    //   }
-    // }
-
-    // Slack - Uncomment to enable
-    // "slack": {
-    //   "enabled": true,
-    //   "botToken": "${SLACK_BOT_TOKEN}",
-    //   "appToken": "${SLACK_APP_TOKEN}",
-    //   "allowFrom": []  // Add Slack user IDs: ["slack:U123456789"]
-    // }
   },
-
-  // ---------------------------------------------------------------------------
-  // SESSION CONFIGURATION
-  // ---------------------------------------------------------------------------
   "session": {
     "scope": "per-sender",
     "reset": {
       "mode": "daily"
-    },
-    "dmScope": "per-sender"
-  },
-
-  // ---------------------------------------------------------------------------
-  // SECURITY SETTINGS
-  // ---------------------------------------------------------------------------
-  "security": {
-    // Input filtering - block common prompt injection patterns
-    "contentFiltering": {
-      "enabled": true,
-      "blockPatterns": [
-        "ignore previous instructions",
-        "disregard your rules",
-        "pretend you are",
-        "act as if you have no restrictions",
-        "you are now",
-        "new instructions:",
-        "override:",
-        "sudo"
-      ],
-      "maxMessageLength": 4000
-    },
-
-    // Output filtering - redact sensitive data in responses
-    "outputFiltering": {
-      "enabled": true,
-      "redactPatterns": [
-        "sk-ant-[a-zA-Z0-9]+",
-        "sk-[a-zA-Z0-9]+",
-        "ghp_[a-zA-Z0-9]+",
-        "gho_[a-zA-Z0-9]+",
-        "xoxb-[a-zA-Z0-9-]+",
-        "xoxp-[a-zA-Z0-9-]+"
-      ]
     }
   },
-
-  // ---------------------------------------------------------------------------
-  // TOOL POLICIES
-  // ---------------------------------------------------------------------------
-  "tools": {
-    // Explicitly deny dangerous tools
-    "deny": [
-      "shell_exec",
-      "env_read",
-      "network_raw"
-    ],
-
-    // Allow safe tools (adjust based on your needs)
-    "allow": [
-      "file_read",
-      "file_write",
-      "browser_search",
-      "calculator"
-    ]
-  },
-
-  // ---------------------------------------------------------------------------
-  // SKILLS CONFIGURATION
-  // ---------------------------------------------------------------------------
-  "skills": {
-    "load": {
-      "watch": true,
-      "watchDebounceMs": 250
-    },
-
-    // Block workspace skill overrides for security
-    "blockWorkspaceOverrides": true,
-
-    // Only allow specific bundled skills
-    "allowBundled": ["weather", "github", "notion", "coding-agent"],
-
-    "entries": {
-      // coding-agent - Run Claude Code, Codex CLI, OpenCode, or Pi Coding Agent
-      "coding-agent": {
-        "enabled": true,
-        // Default to Claude Code as the coding agent
-        "defaultAgent": "claude-code",
-        // Workspace directory for coding tasks
-        "workspaceDir": "/data/workspace",
-        // Environment variables for the coding agent
-        "env": {
-          "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
-        },
-        // SECURITY: Grant shell_exec ONLY to this skill (required for subprocess)
-        "tools": {
-          "allow": ["shell_exec"]
-        }
-      },
-      "github": {
-        "enabled": true,
-        "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
-      }
-    }
-  },
-
-  // ---------------------------------------------------------------------------
-  // WEBHOOK CONFIGURATION
-  // ---------------------------------------------------------------------------
-  "webhooks": {
-    "validation": {
-      "enabled": true,
-      "blockPrivateIPs": true,
-      "blockMetadataIPs": true,
-      "requireHTTPS": true
-    }
-  },
-
-  // ---------------------------------------------------------------------------
-  // LOGGING
-  // ---------------------------------------------------------------------------
   "logging": {
-    "level": "info",
-    "format": "json"
+    "level": "info"
   }
 }
