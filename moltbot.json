@@ -246,11 +246,11 @@
         "tools": {
           "allow": ["shell_exec"]
         }
+      },
+      "github": {
+        "enabled": true,
+        "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
       }
-      // "github": {
-      //   "enabled": true,
-      //   "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" }
-      // }
     }
   },
 
