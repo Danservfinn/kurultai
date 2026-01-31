@@ -9,11 +9,13 @@
 ## Quick Reference
 
 ```
-Template URL:    https://railway.com/deploy/moltbot-railway-template
+Template URL:    https://railway.app/template/codetitlan/moltbot-railway-template
 Production URL:  https://bot.kurult.ai/
 Control UI:      https://<your-domain>/?token=<GATEWAY_TOKEN>
 Signal Sidecar:  http://signal-cli-native.railway.internal:8080
 ```
+
+> **Note**: Verify the template URL is current at https://railway.app before deploying.
 
 ---
 
@@ -23,7 +25,7 @@ Signal Sidecar:  http://signal-cli-native.railway.internal:8080
 
 **Option A: One-Click Deploy (Recommended)**
 ```
-Navigate to: https://railway.com/deploy/moltbot-railway-template
+Navigate to: https://railway.app/template/codetitlan/moltbot-railway-template
 Click "Deploy Now"
 Authenticate with GitHub if prompted
 Wait for initial deployment to complete
@@ -36,7 +38,19 @@ railway init --template codetitlan/moltbot-railway-template
 railway up
 ```
 
-### Step 1.2: Generate Security Tokens
+### Step 1.2: Create Persistent Volume
+
+**CRITICAL**: The `/data` volume must exist before the service can start.
+
+1. Railway Dashboard > Your Service > Settings > Volumes
+2. Click "Create Volume" or "+ New Volume"
+3. Mount Path: `/data`
+4. Click "Create"
+5. Wait for volume to provision (1-2 minutes)
+
+Without this volume, the service will crash with "ENOENT: no such file or directory".
+
+### Step 1.3: Generate Security Tokens
 
 Run these commands locally to generate secure tokens:
 
@@ -50,7 +64,7 @@ echo "OPENCLAW_GATEWAY_TOKEN=$(openssl rand -base64 48)"
 
 **Save these values securely** - you'll need them in the next step.
 
-### Step 1.3: Set Environment Variables
+### Step 1.4: Set Environment Variables
 
 In Railway Dashboard > Your Service > Variables tab, add:
 
@@ -68,6 +82,21 @@ CLAWDBOT_WORKSPACE_DIR=/data/workspace
 ```
 
 Click "Deploy" or wait for auto-redeploy.
+
+### Step 1.5: Verify Deployment Success
+
+Wait 2-5 minutes for deployment, then verify:
+
+1. Service shows "Active" status (green indicator)
+2. No crash loops in Railway logs
+3. Check logs for: `Gateway started on port`
+
+**If service crashes repeatedly:**
+- Check Railway logs for missing environment variables
+- Verify volume is mounted at `/data`
+- Ensure all REQUIRED env vars are set
+
+**Do NOT proceed to Phase 2 until the service is stable.**
 
 ---
 
@@ -102,6 +131,22 @@ https://bot.yourdomain.com/
 ```
 
 Should show OpenClaw login page or redirect to setup.
+
+### Step 2.5: Wait for DNS (BLOCKING)
+
+**Do NOT proceed to Phase 3 until DNS is fully propagated.**
+
+Verify with:
+```bash
+curl -I https://bot.yourdomain.com/ 2>&1 | head -5
+```
+
+Expected: `HTTP/2 200` or redirect to `/setup`
+
+If you get SSL errors or DNS failures:
+- Wait 5 minutes and retry
+- Check DNS propagation at: https://dnschecker.org
+- Maximum wait: 48 hours (rare)
 
 ---
 
@@ -143,6 +188,8 @@ Or: Click "Channels" in the sidebar > Select "Signal"
 **Important**: The phone number will be displayed after linking. Note it for the next step.
 
 **Warning**: Consider using a **separate Signal number** dedicated to OpenClaw rather than your personal number. This provides better security isolation and prevents personal messages from being processed by the agent.
+
+> **QR Code Expiration**: Signal QR codes expire after approximately 60 seconds. If the QR code expires before scanning, click "Refresh" or re-initiate the linking process. Do not delay once the QR code is displayed.
 
 ---
 
@@ -293,7 +340,7 @@ Look for:
 - `Signal channel connected`
 - Any error messages
 
-### Step 5.5: Run Security Audit
+### Step 5.5: Run Security Audit (Optional)
 
 Before going live, run the security audit command via Control UI terminal or Railway shell:
 
@@ -306,6 +353,8 @@ This verifies:
 - No secrets exposed in configuration
 - Proper file permissions on credential storage
 - TLS configuration is secure
+
+> **Note**: The `openclaw` CLI may not be available in all container images. If the command is not found, verify security manually using the Security Checklist below.
 
 ---
 
@@ -344,6 +393,8 @@ BRAVE_SEARCH_API_KEY=...
 ---
 
 ## Complete moltbot.json Reference
+
+> **Model IDs**: The model identifiers below (e.g., `claude-sonnet-4-20250514`) may change over time. Check the [Anthropic API docs](https://docs.anthropic.com/claude/docs/models-overview) for current model names.
 
 ```json
 {
@@ -437,8 +488,9 @@ railway logs | grep -i error
 3. Is the linked device still valid?
 
 **Fix**:
+
+Verify `httpUrl` in moltbot.json matches:
 ```json
-// Verify httpUrl in moltbot.json
 "httpUrl": "http://signal-cli-native.railway.internal:8080"
 ```
 
@@ -456,8 +508,9 @@ If device expired, re-link via Channels > Signal > Link Device.
 3. Check logs for "blocked" messages
 
 **Fix**:
+
+Add the phone number to `allowFrom` array:
 ```json
-// Add phone number to allowFrom
 "allowFrom": ["+15165643945", "+1NEW_NUMBER_HERE"]
 ```
 
@@ -488,8 +541,9 @@ If device expired, re-link via Channels > Signal > Link Device.
 2. Does moltbot.json reference the correct env var?
 
 **Fix**:
+
+Ensure auth block references the env var (not a hardcoded token):
 ```json
-// Ensure token references env var
 "auth": {
   "mode": "token",
   "token": "${OPENCLAW_GATEWAY_TOKEN}"
@@ -587,6 +641,10 @@ Before going live, verify:
 
 ```bash
 # Via Railway shell
+# First, ensure backup directory exists
+mkdir -p /data/backups
+
+# Create timestamped backup
 tar -czf /data/backups/moltbot-$(date +%Y%m%d).tar.gz \
   /data/.clawdbot \
   /data/workspace
@@ -600,25 +658,28 @@ For AI agents following this guide, here's the execution checklist:
 
 ```
 □ Phase 1: Deploy Template
-  □ Deploy from https://railway.com/deploy/moltbot-railway-template
+  □ Deploy from https://railway.app/template/codetitlan/moltbot-railway-template
+  □ Create /data volume in Railway (Settings > Volumes)
   □ Generate SETUP_PASSWORD (openssl rand -base64 24)
   □ Generate OPENCLAW_GATEWAY_TOKEN (openssl rand -base64 48)
   □ Set required environment variables in Railway
   □ Wait for deployment to complete
+  □ VERIFY: Service shows "Active" (no crash loops)
 
 □ Phase 2: Configure Domain
   □ Add custom domain in Railway Settings
   □ Copy CNAME value
   □ Add DNS record at provider
   □ Wait for verification (green checkmark)
-  □ Verify HTTPS access works
+  □ VERIFY: curl https://bot.yourdomain.com/ returns 200
+  □ DO NOT proceed until DNS verified
 
 □ Phase 3: Link Signal
   □ Access /setup with SETUP_PASSWORD
   □ Complete setup wizard
   □ Navigate to Channels > Signal
-  □ Generate QR code
-  □ Scan with phone's Signal app
+  □ Generate QR code (expires in ~60 seconds!)
+  □ Scan immediately with phone's Signal app
   □ Note the linked phone number
 
 □ Phase 4: Configure moltbot.json
@@ -633,7 +694,8 @@ For AI agents following this guide, here's the execution checklist:
   □ Verify Signal shows "Connected"
   □ Send test message from allowlisted phone
   □ Confirm response received
-  □ Run security audit: openclaw security audit --deep
+  □ Run security audit (if CLI available): openclaw security audit --deep
+  □ Complete Security Checklist (manual verification)
   □ Document final configuration
 ```
 
@@ -643,9 +705,9 @@ For AI agents following this guide, here's the execution checklist:
 
 | File | Purpose | Location |
 |------|---------|----------|
-| ARCHITECTURE.md | System design documentation | `/Users/kurultai/molt/ARCHITECTURE.md` |
-| moltbot.json | Runtime configuration | `/data/.clawdbot/moltbot.json` |
-| env.example | Environment variable template | `/Users/kurultai/molt/env.example` |
+| ARCHITECTURE.md | System design documentation | Same directory as this guide |
+| moltbot.json | Runtime configuration | `/data/.clawdbot/moltbot.json` (on Railway) |
+| env.example | Environment variable template | Same directory as this guide |
 
 ---
 
