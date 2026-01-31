@@ -1,7 +1,7 @@
 # OpenClaw/Moltbot Architecture
 
 **Deployment**: Railway Pro
-**Domain**: `bot.kurult.ai`
+**Domain**: `kublai.kurult.ai`
 **Channel**: Signal
 **Owner**: Kurultai LLC
 **Last Updated**: 2026-01-30
@@ -25,7 +25,7 @@ This document describes the production deployment of OpenClaw (Moltbot) on Railw
 ┌──────────────┐                    │  │       │                       │  │
 │              │  HTTPS             │  │       ▼                       │  │
 │  Control UI  │◄──────────────────►│  │  ┌─────────┐                  │  │
-│  (Browser)   │  bot.kurult.ai     │  │  │ Volume  │                  │  │
+│  (Browser)   │  kublai.kurult.ai  │  │  │ Volume  │                  │  │
 │              │                    │  │  │ /data   │                  │  │
 └──────────────┘                    │  │  └─────────┘                  │  │
                                     │  └───────────────────────────────┘  │
@@ -60,7 +60,7 @@ This document describes the production deployment of OpenClaw (Moltbot) on Railw
 | Port (External) | 8080 |
 | Port (Internal Gateway) | 18789 |
 | Volume | `/data` (persistent) |
-| Custom Domain | `bot.kurult.ai` |
+| Custom Domain | `kublai.kurult.ai` |
 
 #### 2. signal-cli-native (Sidecar)
 
@@ -74,11 +74,11 @@ This document describes the production deployment of OpenClaw (Moltbot) on Railw
 
 ## DNS Configuration
 
-### Domain: bot.kurult.ai
+### Domain: kublai.kurult.ai
 
 | Record Type | Name | Value | TTL |
 |-------------|------|-------|-----|
-| CNAME | `bot` | `xod4zi0r.up.railway.app` | 600 |
+| CNAME | `kublai` | `xod4zi0r.up.railway.app` | 600 |
 
 **DNS Provider**: GoDaddy
 **SSL**: Auto-provisioned by Railway (Let's Encrypt)
@@ -222,7 +222,7 @@ Also committed locally at: `/Users/kurultai/molt/moltbot.json`
 
 ### Linking New Device
 
-1. Access Control UI: `https://bot.kurult.ai/`
+1. Access Control UI: `https://kublai.kurult.ai/`
 2. Navigate to Channels > Signal
 3. Click "Link Device" to generate QR code
 4. On phone: Signal > Settings > Linked Devices > Link New Device
@@ -236,13 +236,13 @@ Also committed locally at: `/Users/kurultai/molt/moltbot.json`
 
 | Type | URL |
 |------|-----|
-| Base URL | `https://bot.kurult.ai/` |
-| Tokenized URL | `https://bot.kurult.ai/?token=<GATEWAY_TOKEN>` |
-| Chat | `https://bot.kurult.ai/chat` |
-| Channels | `https://bot.kurult.ai/channels` |
-| Sessions | `https://bot.kurult.ai/sessions` |
-| Settings | `https://bot.kurult.ai/settings` |
-| Skills | `https://bot.kurult.ai/skills` |
+| Base URL | `https://kublai.kurult.ai/` |
+| Tokenized URL | `https://kublai.kurult.ai/?token=<GATEWAY_TOKEN>` |
+| Chat | `https://kublai.kurult.ai/chat` |
+| Channels | `https://kublai.kurult.ai/channels` |
+| Sessions | `https://kublai.kurult.ai/sessions` |
+| Settings | `https://kublai.kurult.ai/settings` |
+| Skills | `https://kublai.kurult.ai/skills` |
 
 ### Railway Dashboard
 
@@ -305,17 +305,17 @@ CLAWDBOT_WORKSPACE_DIR=/data/workspace
 ### 3. Configure Custom Domain
 
 1. Railway > Service > Settings > Networking > Custom Domain
-2. Add: `bot.kurult.ai`
+2. Add: `kublai.kurult.ai`
 3. Copy CNAME value
 4. Add DNS record at GoDaddy:
    - Type: CNAME
-   - Name: `bot`
+   - Name: `kublai`
    - Value: `<railway-cname>.up.railway.app`
 5. Wait for verification (5-15 minutes)
 
 ### 4. Link Signal Account
 
-1. Access: `https://bot.kurult.ai/setup`
+1. Access: `https://kublai.kurult.ai/setup`
 2. Enter SETUP_PASSWORD
 3. Complete setup wizard
 4. Navigate to Channels > Signal

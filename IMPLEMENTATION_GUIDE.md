@@ -1,6 +1,6 @@
 # OpenClaw + Signal on Railway: One-Shot Implementation Guide
 
-**Purpose**: Step-by-step guide for an AI agent to deploy OpenClaw (Moltbot) on Railway Pro with Signal integration, exactly replicating the production deployment at `bot.kurult.ai`.
+**Purpose**: Step-by-step guide for an AI agent to deploy OpenClaw (Moltbot) on Railway Pro with Signal integration, exactly replicating the production deployment at `kublai.kurult.ai`.
 
 **Prerequisites**: Railway Pro account, Anthropic API key, Signal account on phone, custom domain (optional)
 
@@ -10,7 +10,7 @@
 
 ```
 Template URL:    https://railway.app/template/codetitlan/moltbot-railway-template
-Production URL:  https://bot.kurult.ai/
+Production URL:  https://kublai.kurult.ai/
 Control UI:      https://<your-domain>/?token=<GATEWAY_TOKEN>
 Signal Sidecar:  http://signal-cli-native.railway.internal:8080
 ```
@@ -590,7 +590,7 @@ Ensure auth block references the env var (not a hardcoded token):
                            ▼
                   ┌─────────────────┐
                   │   Custom Domain  │
-                  │ bot.kurult.ai   │
+                  │ kublai.kurult.ai   │
                   └─────────────────┘
                            │
             ┌──────────────┼──────────────┐
@@ -712,5 +712,5 @@ For AI agents following this guide, here's the execution checklist:
 ---
 
 *Last Updated: 2026-01-30*
-*Deployment: bot.kurult.ai*
+*Deployment: kublai.kurult.ai*
 *Owner: Kurultai LLC*
