@@ -344,6 +344,57 @@ The file uses JSON5 format, which allows:
 }
 ```
 
+## OpenClaw Configuration (openclaw.json)
+
+In addition to `moltbot.json`, there is a separate `openclaw.json` for model provider configuration. This is managed through Control UI > Settings > OpenClaw.
+
+**Location:** `/data/.clawdbot/openclaw.json`
+
+### Model Provider Schema (CRITICAL)
+
+When configuring custom model providers, the `models` array is **REQUIRED**:
+
+```json5
+{
+  "auth": {
+    "profiles": {
+      "anthropic:default": {
+        "mode": "api_key"
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "api": "anthropic-messages",        // Required: protocol type
+        "apiKey": "${ANTHROPIC_API_KEY}",   // Required: API key env var
+        "baseUrl": "${ANTHROPIC_BASE_URL}", // Required for custom endpoints
+        "models": [                          // REQUIRED: at least one model
+          {
+            "id": "claude-sonnet-4-20250514",  // Required: model identifier
+            "name": "Claude Sonnet 4",          // Required: display name
+            "reasoning": false,                 // Optional: reasoning support
+            "input": ["text"],                  // Optional: input types
+            "cost": {                           // Optional: token costs
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Common Issue:** Missing `models` array causes LLM to never be called (empty responses, 0 tokens).
+
+**Fix:** Via Control UI > Settings > OpenClaw > Form > Models > Providers > [provider] > Models > "+ Add"
+
+See ARCHITECTURE.md "OpenClaw Configuration" section for full details.
+
 ## Configuration Validation
 
 Run `moltbot doctor` to validate configuration:
@@ -357,6 +408,7 @@ Common validation errors:
 - Invalid types (string where number expected)
 - Missing required fields
 - Invalid model names
+- **Missing `models` array in provider config** (causes "Error: invalid config")
 
 ## Hot Reloading
 

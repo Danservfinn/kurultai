@@ -163,8 +163,30 @@ Enter your `SETUP_PASSWORD` when prompted.
 ### Step 3.2: Complete Initial Setup
 
 1. Select AI provider (Anthropic recommended)
-2. Skip channel configuration for now (we'll do it manually)
-3. Complete the wizard
+2. **IMPORTANT**: During setup, ensure the model provider is fully configured (see Phase 3.3)
+3. Skip channel configuration for now (we'll do it manually)
+4. Complete the wizard
+
+### Step 3.3: Verify LLM Provider Configuration (CRITICAL)
+
+**This step is often missed and causes "empty response" issues.**
+
+After completing the setup wizard, verify the model provider is fully configured:
+
+1. Navigate to Settings > OpenClaw
+2. Switch to "Form" view
+3. Go to Models > Providers > anthropic (or your provider)
+4. **Check the "Models" section** - it should show at least 1 item
+5. If "Models" shows "0 items":
+   - Click "+ Add"
+   - Enter Id: `claude-sonnet-4-20250514`
+   - Enter Name: `Claude Sonnet 4`
+   - Click Save
+   - Click Apply
+
+**Why this matters:** The OpenClaw provider configuration requires a `models` array. Without it, the LLM will never be called and all responses will be empty.
+
+See ARCHITECTURE.md "OpenClaw Configuration" section for full schema details.
 
 ### Step 3.3: Navigate to Signal Channel
 
@@ -532,6 +554,34 @@ Add the phone number to `allowFrom` array:
 
 ---
 
+### Problem: LLM Not Called (Empty Responses)
+
+**Symptoms**: Agent runs complete in <100ms, 0 tokens used, empty assistant responses
+
+**This is the most common deployment issue.**
+
+**Check**:
+1. Settings > OpenClaw > Form view > Models > Providers > anthropic
+2. Look at the "Models" section - does it show "0 items"?
+
+**Root Cause**: The provider configuration is missing the required `models` array.
+
+**Fix**:
+
+1. Settings > OpenClaw > Form view
+2. Models > Providers > anthropic (expand)
+3. Find "Models" section (likely shows "0 items")
+4. Click "+ Add"
+5. Fill in:
+   - **Id**: `claude-sonnet-4-20250514`
+   - **Name**: `Claude Sonnet 4`
+6. Click Save
+7. Click Apply
+
+**Full configuration reference**: See ARCHITECTURE.md "OpenClaw Configuration" section.
+
+---
+
 ### Problem: "Gateway Token Mismatch"
 
 **Symptoms**: Control UI shows token error
@@ -674,13 +724,21 @@ For AI agents following this guide, here's the execution checklist:
   □ VERIFY: curl https://bot.yourdomain.com/ returns 200
   □ DO NOT proceed until DNS verified
 
-□ Phase 3: Link Signal
+□ Phase 3: Setup & Link Signal
   □ Access /setup with SETUP_PASSWORD
   □ Complete setup wizard
+  □ CRITICAL: Verify LLM provider config (see Phase 3.5)
   □ Navigate to Channels > Signal
   □ Generate QR code (expires in ~60 seconds!)
   □ Scan immediately with phone's Signal app
   □ Note the linked phone number
+
+□ Phase 3.5: Verify LLM Provider Config (CRITICAL - Often Missed!)
+  □ Settings > OpenClaw > Form view
+  □ Models > Providers > anthropic
+  □ Check "Models" section - MUST show at least 1 item
+  □ If "0 items": Click "+ Add", enter model id/name, Save, Apply
+  □ VERIFY: Test chat returns non-empty response
 
 □ Phase 4: Configure moltbot.json
   □ Copy template configuration
@@ -711,6 +769,6 @@ For AI agents following this guide, here's the execution checklist:
 
 ---
 
-*Last Updated: 2026-01-30*
+*Last Updated: 2026-01-31*
 *Deployment: kublai.kurult.ai*
 *Owner: Kurultai LLC*

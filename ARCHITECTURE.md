@@ -4,7 +4,7 @@
 **Domain**: `kublai.kurult.ai`
 **Channel**: Signal
 **Owner**: Kurultai LLC
-**Last Updated**: 2026-01-30
+**Last Updated**: 2026-01-31
 
 ---
 
@@ -360,6 +360,90 @@ tar -czf /data/backups/moltbot-$(date +%Y%m%d).tar.gz \
 
 ---
 
+## OpenClaw Configuration (openclaw.json)
+
+In addition to `moltbot.json`, OpenClaw uses a separate configuration file for model providers and authentication profiles.
+
+### Location
+
+`/data/.clawdbot/openclaw.json` (on Railway volume) or `~/.openclaw/openclaw.json` locally
+
+This configuration is typically managed through the Control UI at Settings > OpenClaw.
+
+### Model Provider Configuration
+
+**CRITICAL**: When configuring custom model providers (including overriding built-in providers like Anthropic), the `models` array is **REQUIRED**. Without it, the provider configuration is invalid and the LLM will not be called.
+
+#### Working Provider Configuration Example
+
+```json
+{
+  "auth": {
+    "profiles": {
+      "anthropic:default": {
+        "mode": "api_key"
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "api": "anthropic-messages",
+        "apiKey": "${ANTHROPIC_API_KEY}",
+        "baseUrl": "${ANTHROPIC_BASE_URL}",
+        "models": [
+          {
+            "id": "claude-sonnet-4-20250514",
+            "name": "Claude Sonnet 4",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+#### Required Provider Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `api` | Yes | Protocol type: `anthropic-messages`, `openai-completions`, etc. |
+| `apiKey` | Yes | API key using env var syntax `${VARIABLE_NAME}` |
+| `baseUrl` | Yes* | API endpoint URL (*required for custom endpoints) |
+| `models` | **Yes** | Array of available models - **MUST have at least one entry** |
+
+#### Model Entry Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | Yes | Model identifier (e.g., `claude-sonnet-4-20250514`) |
+| `name` | Yes | Display name (e.g., `Claude Sonnet 4`) |
+| `reasoning` | No | Whether model supports reasoning traces |
+| `input` | No | Supported input types array: `["text"]`, `["text", "image"]` |
+| `cost` | No | Token cost configuration (set to 0 for flat-rate/proxy APIs) |
+
+#### Using a Proxy API (Z.AI, LiteLLM, etc.)
+
+When using an API proxy that wraps Anthropic's API:
+
+```bash
+# Environment Variables (Railway)
+ANTHROPIC_API_KEY=your-proxy-api-key
+ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+```
+
+The `baseUrl` must point to your proxy endpoint while keeping the `api` type as `anthropic-messages`.
+
+---
+
 ## Troubleshooting
 
 ### Gateway Won't Start
@@ -389,6 +473,70 @@ railway variables
 1. Verify DNS CNAME record
 2. Check Railway domain verification status
 3. Wait for SSL certificate provisioning
+
+### LLM Not Being Called (Empty Responses)
+
+**Symptoms:**
+- Chatbot returns empty assistant responses
+- Agent runs complete in <100ms with 0 tokens used
+- No errors in logs but LLM is clearly not invoked
+
+**Root Cause:** The `models.providers` configuration is missing the required `models` array.
+
+**Diagnosis:**
+1. Access Control UI > Settings > OpenClaw > Raw JSON
+2. Check if `models.providers.anthropic` (or your provider) has a `models` array
+3. If `models` is missing or empty, this is the issue
+
+**Fix via Control UI:**
+1. Settings > OpenClaw > Form view
+2. Navigate to Models > Providers > anthropic (or your provider)
+3. Scroll to "Models" section (shows "0 items" if broken)
+4. Click "+ Add" to add a model entry
+5. Fill in required fields:
+   - **Id**: `claude-sonnet-4-20250514` (or your model)
+   - **Name**: `Claude Sonnet 4` (display name)
+6. Click Save
+7. Click Apply to restart with new config
+
+**Fix via Raw JSON:**
+Add the `models` array to your provider config:
+```json
+"models": {
+  "providers": {
+    "anthropic": {
+      "api": "anthropic-messages",
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "baseUrl": "${ANTHROPIC_BASE_URL}",
+      "models": [
+        {
+          "id": "claude-sonnet-4-20250514",
+          "name": "Claude Sonnet 4"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Important:** The `models` array is REQUIRED for custom provider configurations, even when using built-in provider types like "anthropic".
+
+### Config Won't Save ("Error: invalid config")
+
+**Symptoms:**
+- Raw JSON editor shows "valid" badge but save fails
+- Form view changes don't persist
+- Multiple save attempts all fail
+
+**Common Causes:**
+1. Missing required `models` array in provider config
+2. Invalid JSON syntax (extra commas, missing quotes)
+3. Unknown configuration keys
+
+**Fix:**
+1. Check the browser console (F12) for detailed validation errors
+2. Verify provider config has all required fields (see Model Provider Configuration section)
+3. Use Form view to add missing fields rather than manual JSON editing
 
 ---
 
