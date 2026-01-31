@@ -2,6 +2,7 @@
   "gateway": {
     "mode": "local",
     "port": 18789,
+    "trustedProxies": ["loopback", "uniquelocal"],
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"

@@ -1,49 +1,87 @@
 # Signal API Adapter for Moltbot
-# Translates Moltbot's API format to signal-cli-rest-api format
-#
-# Moltbot expects:     signal-cli-rest-api provides:
-# /api/v1/check    ->  /v1/health
-# /api/v1/events   ->  /v1/receive/{phone}
+# Translates Moltbot's expected API format to signal-cli-rest-api format
 
 :8080 {
-    # Health check endpoint translation
+    # Health check endpoint
+    # Moltbot calls: /api/v1/check
+    # signal-cli-rest-api provides: /v1/about (not /v1/health which doesn't exist)
     handle /api/v1/check {
-        rewrite * /v1/health
+        rewrite * /v1/about
         reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
             header_up Host {upstream_hostport}
-            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
         }
     }
 
-    # Events/receive endpoint - extract account from query and rewrite to path
+    # Events/receive endpoint (supports SSE streaming)
+    # Moltbot calls: /api/v1/events?account=+15165643945
+    # signal-cli-rest-api provides: /v1/receive/+15165643945
+    # Note: Using direct path rewrite since there's only one account
     handle /api/v1/events {
-        # Extract the account query parameter and rewrite to /v1/receive/{account}
-        rewrite * /v1/receive/{query.account}
+        rewrite * /v1/receive/%2B15165643945
         reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
             header_up Host {upstream_hostport}
-            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
+            flush_interval -1
+            transport http {
+                read_timeout 0
+            }
         }
     }
 
-    # Pass through /v2/* with v1 rewrite (for backward compatibility)
+    # Send message endpoint
+    # Moltbot calls: /api/v1/send
+    # signal-cli-rest-api provides: /v2/send
+    handle /api/v1/send {
+        rewrite * /v2/send
+        reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Host {host}
+        }
+    }
+
+    # Pass through any other v1 requests
+    handle /v1/* {
+        reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Host {host}
+        }
+    }
+
+    # Pass through any other v2 requests
     handle /v2/* {
-        uri replace /v2/ /v1/
         reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
             header_up Host {upstream_hostport}
-            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
         }
     }
 
-    # Pass through all other requests unchanged
-    handle {
+    # RPC endpoint stub - signal-cli-rest-api doesn't have RPC
+    # Return a JSON stub response for Moltbot compatibility
+    handle /api/v1/rpc {
+        header Content-Type application/json
+        respond `{"jsonrpc":"2.0","result":null,"id":null}` 200
+    }
+
+    # Catch-all for /api/v1/* - rewrite to /v1/* and proxy
+    # This handles any Moltbot API calls not explicitly mapped above
+    handle /api/v1/* {
+        uri strip_prefix /api
         reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
             header_up Host {upstream_hostport}
-            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
         }
+    }
+
+    # Default handler - return JSON for API compatibility
+    handle {
+        header Content-Type application/json
+        respond `{"status":"ok","service":"signal-api-proxy"}` 200
     }
 
     log {
         output stdout
         format console
+        level INFO
     }
 }
