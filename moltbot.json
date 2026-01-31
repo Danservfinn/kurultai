@@ -2,7 +2,7 @@
   "gateway": {
     "mode": "local",
     "port": 18789,
-    "trustedProxies": ["loopback", "uniquelocal"],
+    "trustedProxies": ["*"],
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
@@ -21,7 +21,7 @@
       "enabled": true,
       "account": "+15165643945",
       "httpUrl": "http://signal-cli-native.railway.internal:8080",
-      "autoStart": false,
+      "autoStart": true,
       "dmPolicy": "pairing",
       "configWrites": false,
       "allowFrom": ["+15165643945", "+19194133445"],
