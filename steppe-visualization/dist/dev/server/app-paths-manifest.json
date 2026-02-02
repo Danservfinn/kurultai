@@ -1,0 +1,5 @@
+{
+  "/api/deliverables/route": "app/api/deliverables/route.js",
+  "/mission-control/page": "app/mission-control/page.js",
+  "/page": "app/page.js"
+}

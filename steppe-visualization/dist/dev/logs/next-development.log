@@ -1,0 +1,16 @@
+[00:00:00.701] Server  LOG     ✓ Ready in 520ms
+[00:00:04.837] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:52.398] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[00:03:02.119] Browser LOG     THREE.WebGLRenderer: Context Lost.
