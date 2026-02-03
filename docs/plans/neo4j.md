@@ -77,8 +77,8 @@ Kublai marks task complete, synthesizes response
 | `main` | Kublai | Squad Lead / Router | `moonshot/kimi-k2.5` | `/data/.clawdbot/agents/main` |
 | `researcher` | Möngke | Researcher | `zai/glm-4.5` | `/data/.clawdbot/agents/researcher` |
 | `writer` | Chagatai | Content Writer | `moonshot/kimi-k2.5` | `/data/.clawdbot/agents/writer` |
-| `developer` | Temüjin | Developer | `zai/glm-4.7` | `/data/.clawdbot/agents/developer` |
-| `analyst` | Jochi | Analyst | `zai/glm-4.5` | `/data/.clawdbot/agents/analyst` |
+| `developer` | Temüjin | Developer/Security | `zai/glm-4.7` | `/data/.clawdbot/agents/developer` |
+| `analyst` | Jochi | Analyst/Performance | `zai/glm-4.5` | `/data/.clawdbot/agents/analyst` |
 | `ops` | Ögedei | Operations | `zai/glm-4.5` | `/data/.clawdbot/agents/ops` |
 
 **Note**: Chagatai = Writer, Ögedei = Operations (commonly confused).
@@ -237,10 +237,13 @@ Kublai marks task complete, synthesizes response
 (:Task {
   type,
   description,
-  status,  // "pending" | "in_progress" | "completed" | "blocked"
+  status,  // "pending" | "in_progress" | "completed" | "blocked" | "escalated"
   assigned_to,
   delegated_by,
-  quality_score
+  quality_score,
+  blocked_reason,    // populated when status="blocked"
+  blocked_at,        // datetime
+  escalation_count   // int, increments on each escalation
 })
 
 // Session context for persistence across daily resets
@@ -253,7 +256,7 @@ Kublai marks task complete, synthesizes response
   created_at   // datetime of first creation
 })
 
-// Notifications for task completion
+// Notifications for task completion (with TTL)
 (:Notification {
   id,
   type,        // "task_complete" | "task_blocked" | "insight"
@@ -261,7 +264,8 @@ Kublai marks task complete, synthesizes response
   from_agent,
   summary,
   created_at,
-  read         // boolean
+  read,        // boolean
+  ttl_hours    // int, default 168 (7 days) - auto-expire after this
 })
 ```
 
@@ -284,9 +288,11 @@ Kublai marks task complete, synthesizes response
 (Task)-[:SPAWNED]->(Task)
 (Task)-[:ASSIGNED_TO]->(Agent)
 
-// Collaboration tracking
-(Agent)-[:LEARNED {knowledge_id, timestamp}]->(Agent)
+// Collaboration tracking (acyclic - prevents circular learning loops)
+(Agent)-[:LEARNED {knowledge_id, timestamp, depth}]->(Agent)
 (Agent)-[:COLLABORATES_WITH {domain}]->(Agent)
+
+// Depth limit constraint: depth <= 5 prevents infinite recursion
 
 // Approval workflow
 (WorkflowImprovement)-[:APPROVED_BY]->(Agent {id: "main"})
@@ -313,6 +319,8 @@ CREATE INDEX agent_knowledge FOR (n) ON (n.agent, n.created_at)
   WHERE n:Research OR n:Content OR n:Application;
 
 CREATE INDEX task_status FOR (t:Task) ON (t.assigned_to, t.status);
+
+CREATE INDEX notification_read FOR (n:Notification) ON (n.read, n.created_at);
 
 CREATE FULLTEXT INDEX knowledge_content
   FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
@@ -440,15 +448,15 @@ CREATE (a3:Agent {
   last_active: datetime()
 })
 CREATE (a4:Agent {
-  id: 'developer', name: 'Temüjin', role: 'Developer',
-  primary_capabilities: ['coding', 'security_audit', 'architecture'],
-  personality: 'Pragmatic builder with security focus',
+  id: 'developer', name: 'Temüjin', role: 'Developer/Security Lead',
+  primary_capabilities: ['coding', 'security_audit', 'architecture', 'vulnerability_assessment', 'secure_coding'],
+  personality: 'Pragmatic builder with security focus. Proactively reviews all code for injection risks, auth flaws, and data exposure.',
   last_active: datetime()
 })
 CREATE (a5:Agent {
-  id: 'analyst', name: 'Jochi', role: 'Analyst',
-  primary_capabilities: ['data_analysis', 'metrics', 'insights'],
-  personality: 'Detail-oriented pattern finder',
+  id: 'analyst', name: 'Jochi', role: 'Analyst/Performance Lead',
+  primary_capabilities: ['data_analysis', 'metrics', 'insights', 'performance_monitoring', 'anomaly_detection'],
+  personality: 'Detail-oriented pattern finder. Monitors for bottlenecks, memory leaks, and race conditions.',
   last_active: datetime()
 })
 CREATE (a6:Agent {
@@ -626,18 +634,41 @@ class OperationalMemory:
             result = session.run(query, topic=topic, min_score=min_confidence)
             return [dict(record) for record in result]
 
+    def _detect_cycle(self, from_agent: str, to_agent: str) -> bool:
+        """Detect if adding LEARNED relationship would create a cycle."""
+        query = """
+        MATCH path = (to:Agent {id: $to_agent})-[:LEARNED*1..10]->(from:Agent {id: $from_agent})
+        RETURN length(path) as cycle_length
+        LIMIT 1
+        """
+        with self.driver.session() as session:
+            result = session.run(query, from_agent=from_agent, to_agent=to_agent)
+            return result.single() is not None
+
     def record_collaboration(self, from_agent: str, to_agent: str,
                            knowledge_id: UUID) -> bool:
-        """Track that one agent learned from another's output."""
+        """Track that one agent learned from another's output.
+
+        Prevents circular learning loops by checking for existing path.
+        """
         if self.fallback_mode:
             return True
+
+        # Prevent self-learning
+        if from_agent == to_agent:
+            return False
+
+        # Detect cycle before creating relationship
+        if self._detect_cycle(from_agent, to_agent):
+            print(f"[WARN] Cycle detected: {to_agent} already learns from {from_agent}")
+            return False
 
         query = """
         MATCH (from:Agent {id: $from_agent})
         MATCH (to:Agent {id: $to_agent})
         MATCH (k {id: $knowledge_id})
         CREATE (from)-[:LEARNED {knowledge_id: $knowledge_id,
-                               timestamp: datetime()}]->(to)
+                               timestamp: datetime(), depth: 1}]->(to)
         CREATE (to)-[:BUILT_ON]->(k)
         """
         with self.driver.session() as session:
@@ -677,25 +708,105 @@ class OperationalMemory:
         return task_id
 
     def claim_task(self, agent: str) -> Optional[Dict[str, Any]]:
-        """Claim next pending task for an agent."""
+        """Claim next pending task for an agent (atomic, race-condition safe)."""
         if self.fallback_mode:
+            # In fallback mode, use simple locking
             tasks = self._local_store.get('tasks', [])
             for t in tasks:
                 if t['assigned_to'] == agent and t['status'] == 'pending':
+                    # Check if being processed by another agent
+                    if t.get('claiming'):
+                        continue
+                    t['claiming'] = True  # Mark as being claimed
                     t['status'] = 'in_progress'
+                    t['claimed_at'] = datetime.now().isoformat()
+                    del t['claiming']
                     return t
             return None
 
+        # Atomic claim using single MATCH-SET-RETURN
+        # This prevents race conditions under concurrent load
         query = """
         MATCH (t:Task {status: 'pending'})-[:ASSIGNED_TO]->(a:Agent {id: $agent})
-        SET t.status = 'in_progress', t.started_at = datetime()
+        WITH t LIMIT 1
+        SET t.status = 'in_progress',
+            t.started_at = datetime(),
+            t.claimed_by = $agent
         RETURN t.id as id, t.type as type, t.description as description
-        LIMIT 1
         """
         with self.driver.session() as session:
-            result = session.run(query, agent=agent)
+            # Use write transaction for atomicity
+            with session.begin_transaction() as tx:
+                result = tx.run(query, agent=agent)
+                record = result.single()
+                tx.commit()
+                return dict(record) if record else None
+
+    def block_task(self, task_id: UUID, reason: str,
+                   auto_escalate: bool = True) -> bool:
+        """Mark task as blocked with reason. Optionally auto-escalate to Kublai."""
+        if self.fallback_mode:
+            for t in self._local_store.get('tasks', []):
+                if t['id'] == str(task_id):
+                    t['status'] = 'blocked'
+                    t['blocked_reason'] = reason
+                    t['blocked_at'] = datetime.now().isoformat()
+                    return True
+            return False
+
+        query = """
+        MATCH (t:Task {id: $task_id})
+        SET t.status = 'blocked',
+            t.blocked_reason = $reason,
+            t.blocked_at = datetime()
+        RETURN t.delegated_by as delegator_id
+        """
+        with self.driver.session() as session:
+            result = session.run(query, task_id=str(task_id), reason=reason)
             record = result.single()
-            return dict(record) if record else None
+
+            if record and auto_escalate:
+                # Create escalation notification for Kublai
+                self._escalate_blocked_task(task_id, record['delegator_id'], reason)
+        return True
+
+    def _escalate_blocked_task(self, task_id: UUID, delegator_id: str, reason: str):
+        """Escalate blocked task to Kublai for reassignment."""
+        query = """
+        MATCH (kublai:Agent {id: 'main'})
+        CREATE (n:Notification {
+            id: $notification_id,
+            type: 'task_blocked',
+            task_id: $task_id,
+            from_agent: $delegator_id,
+            summary: $reason,
+            created_at: datetime(),
+            read: false,
+            ttl_hours: 24
+        })
+        CREATE (kublai)-[:HAS_NOTIFICATION]->(n)
+        """
+        with self.driver.session() as session:
+            session.run(query, notification_id=str(uuid4()),
+                       task_id=str(task_id), delegator_id=delegator_id,
+                       reason=f"Task blocked: {reason[:100]}")
+
+    def reassign_blocked_task(self, task_id: UUID, new_agent: str) -> bool:
+        """Reassign a blocked task to a different agent (Kublai use)."""
+        query = """
+        MATCH (t:Task {id: $task_id, status: 'blocked'})
+        MATCH (new:Agent {id: $new_agent})
+        MATCH (t)-[r:ASSIGNED_TO]->(old:Agent)
+        DELETE r
+        CREATE (t)-[:ASSIGNED_TO]->(new)
+        SET t.status = 'pending',
+            t.escalation_count = coalesce(t.escalation_count, 0) + 1,
+            t.reassigned_at = datetime()
+        RETURN t.id as id
+        """
+        with self.driver.session() as session:
+            result = session.run(query, task_id=str(task_id), new_agent=new_agent)
+            return result.single() is not None
 
     def complete_task(self, task_id: UUID, results: Dict[str, Any],
                      notify_delegator: bool = True) -> bool:
@@ -747,7 +858,8 @@ class OperationalMemory:
             from_agent: $assignee_id,
             summary: $summary,
             created_at: datetime(),
-            read: false
+            read: false,
+            ttl_hours: 168
         })
         CREATE (delegator)-[:HAS_NOTIFICATION]->(n)
         """
@@ -756,6 +868,23 @@ class OperationalMemory:
             session.run(query, delegator_id=delegator_id,
                        notification_id=str(uuid4()), task_id=str(task_id),
                        assignee_id=assignee_id, summary=summary)
+
+    def cleanup_expired_notifications(self, max_age_hours: int = 168) -> int:
+        """Remove notifications older than TTL. Call periodically (e.g., daily)."""
+        if self.fallback_mode:
+            return 0
+
+        query = """
+        MATCH (n:Notification)
+        WHERE n.created_at < datetime() - duration({hours: $max_age_hours})
+        WITH n LIMIT 1000
+        DETACH DELETE n
+        RETURN count(n) as deleted
+        """
+        with self.driver.session() as session:
+            result = session.run(query, max_age_hours=max_age_hours)
+            record = result.single()
+            return record['deleted'] if record else 0
 
     def get_pending_notifications(self, agent_id: str) -> List[Dict[str, Any]]:
         """Get unread notifications for an agent (call this when agent becomes active)."""
@@ -838,7 +967,84 @@ class OperationalMemory:
 
 **Step 3.2**: Add memory tools to agent capabilities
 
-### Phase 4: Kublai Delegation Protocol
+### Phase 4: Security Audit Protocol (Temüjin)
+
+Add security review requirements to Temüjin's SOUL.md:
+
+```markdown
+## Security Audit Responsibilities
+
+As Security Lead, you proactively review all code and queries for:
+
+1. **Injection Attacks**
+   - Cypher injection in full-text search queries
+   - Unparameterized queries with user input
+   - Required: All user input must be parameterized
+
+2. **Data Exposure**
+   - PII leaking to operational memory
+   - API keys in logs or error messages
+   - Required: Verify _sanitize_for_sharing() called before all writes
+
+3. **Access Control**
+   - Agent permissions on sensitive operations
+   - Required: Validate agent identity before task claims
+
+4. **Audit Triggers**
+   Review immediately when:
+   - New Cypher queries added
+   - User input passed to database
+   - Error messages returned to users
+   - New agent capabilities added
+
+## Security Review Workflow
+
+When assigned security review:
+1. Scan code for injection patterns (regex: `query.*\$\{`, `\.run\(.*\+`)
+2. Verify all user inputs are parameterized
+3. Check for hardcoded credentials
+4. Test error handling (ensure no stack traces leak)
+5. Document findings in SecurityAudit node
+6. If critical: notify Kublai immediately via agentToAgent
+```
+
+### Phase 5: Jochi-Temüjin Collaboration Protocol
+
+Define how analyst and developer work together:
+
+```markdown
+## Performance & Security Collaboration (Jochi ↔ Temüjin)
+
+### Jochi's Role (Analyst)
+- Monitor: Query performance, memory usage, notification growth
+- Detect: Race conditions, bottlenecks, anomalies
+- Report: Metrics with severity (info/warning/critical)
+
+### Temüjin's Role (Developer)
+- Fix: Implementation issues identified by Jochi
+- Secure: Review all code for vulnerabilities
+- Optimize: Based on Jochi's performance analysis
+
+### Handoff Protocol
+
+When Jochi detects issue:
+```
+Jochi creates Analysis node with:
+  - type: "performance_issue" | "security_concern"
+  - findings: detailed description
+  - metrics: before/after numbers
+  - severity: "warning" | "critical"
+  - recommended_fix: specific approach
+
+Jochi notifies Kublai: "Issue #X requires Temüjin review"
+```
+
+Kublai delegates to Temüjin with Analysis node ID.
+Temüjin fixes, stores results, marks Analysis as resolved.
+Jochi validates fix with metrics.
+```
+
+### Phase 6: Kublai Delegation Protocol
 
 Update Kublai's SOUL.md with:
 
@@ -956,6 +1162,12 @@ Health endpoint returns:
 - [ ] Fallback mode works when Neo4j unavailable
 - [ ] Session context persists across daily resets
 - [ ] Health check endpoint returns 200 OK
+- [ ] Cycle detection prevents circular LEARNED relationships
+- [ ] Notification cleanup removes expired nodes
+- [ ] Atomic task claim prevents race conditions
+- [ ] Blocked tasks auto-escalate to Kublai
+- [ ] Temüjin security audit protocol active
+- [ ] Jochi-Temüjin collaboration protocol working
 
 ---
 
