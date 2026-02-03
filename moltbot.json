@@ -13,16 +13,19 @@
   },
   "agents": {
     "defaults": {
-      "workspace": "/data/workspace"
+      "workspace": "/data/workspace",
+      "sandbox": {
+        "mode": "off"
+      }
     }
   },
   "channels": {
     "signal": {
       "enabled": true,
       "account": "+15165643945",
-      "httpUrl": "http://signal-cli-native.railway.internal:8080",
       "autoStart": true,
       "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
       "configWrites": false,
       "allowFrom": ["+15165643945", "+19194133445"],
       "groupAllowFrom": ["+19194133445"],
@@ -39,5 +42,11 @@
   },
   "logging": {
     "level": "info"
+  },
+  "browser": {
+    "enabled": false
+  },
+  "tools": {
+    "profile": "coding"
   }
 }

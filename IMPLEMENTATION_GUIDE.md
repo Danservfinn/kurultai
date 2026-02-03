@@ -242,7 +242,7 @@ Copy this configuration, replacing placeholders:
   "gateway": {
     "mode": "local",
     "port": 18789,
-    "trustedProxies": ["loopback", "uniquelocal"],
+    "trustedProxies": ["*"],
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
@@ -253,7 +253,10 @@ Copy this configuration, replacing placeholders:
   },
   "agents": {
     "defaults": {
-      "workspace": "/data/workspace"
+      "workspace": "/data/workspace",
+      "sandbox": {
+        "mode": "off"
+      }
     }
   },
   "channels": {
@@ -280,9 +283,28 @@ Copy this configuration, replacing placeholders:
   },
   "logging": {
     "level": "info"
+  },
+  "browser": {
+    "enabled": false
+  },
+  "tools": {
+    "profile": "coding"
   }
 }
 ```
+
+### Railway-Critical Settings (DO NOT SKIP)
+
+These settings are **required** for Railway deployment. Without them, the gateway will crash:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `agents.defaults.sandbox.mode` | `"off"` | Railway has no Docker-in-Docker |
+| `browser.enabled` | `false` | Cannot spawn browser containers |
+| `tools.profile` | `"coding"` | Excludes browser/computer tools that require Docker |
+| `gateway.trustedProxies` | `["*"]` | Railway routes through proxies |
+
+**Failure mode if not set**: Gateway crashes with `Error: spawn docker ENOENT` when processing messages.
 
 ### Step 4.3: Configuration Placeholders
 
@@ -300,7 +322,10 @@ Replace these values:
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `gateway.mode` | `local` | Gateway behind Railway's proxy |
-| `gateway.trustedProxies` | `["loopback", "uniquelocal"]` | Trust Railway's internal network |
+| `gateway.trustedProxies` | `["*"]` | **REQUIRED**: Trust Railway's proxy headers |
+| `agents.defaults.sandbox.mode` | `"off"` | **CRITICAL**: Railway has no Docker |
+| `browser.enabled` | `false` | **REQUIRED**: No browser containers on Railway |
+| `tools.profile` | `"coding"` | **REQUIRED**: Excludes browser/computer tools |
 | `channels.signal.httpUrl` | Internal Railway URL | Signal CLI sidecar connection |
 | `channels.signal.dmPolicy` | `pairing` | How DMs are handled (pairing/allowlist/open/disabled) |
 | `channels.signal.groupPolicy` | `allowlist` | Group message handling policy |
@@ -423,7 +448,7 @@ BRAVE_SEARCH_API_KEY=...
   "gateway": {
     "mode": "local",
     "port": 18789,
-    "trustedProxies": ["loopback", "uniquelocal"],
+    "trustedProxies": ["*"],
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
@@ -435,6 +460,9 @@ BRAVE_SEARCH_API_KEY=...
   "agents": {
     "defaults": {
       "workspace": "/data/workspace",
+      "sandbox": {
+        "mode": "off"
+      },
       "model": {
         "primary": "anthropic/claude-sonnet-4-20250514",
         "fallbacks": ["openai/gpt-4o"]
@@ -466,6 +494,12 @@ BRAVE_SEARCH_API_KEY=...
   "logging": {
     "level": "info"
   },
+  "browser": {
+    "enabled": false
+  },
+  "tools": {
+    "profile": "coding"
+  },
   "skills": {
     "load": {
       "watch": true
@@ -474,6 +508,15 @@ BRAVE_SEARCH_API_KEY=...
   }
 }
 ```
+
+### Railway-Required Settings Explained
+
+| Setting | Value | What Happens If Wrong |
+|---------|-------|----------------------|
+| `gateway.trustedProxies` | `["*"]` | "Proxy headers from untrusted address" warnings; local client detection fails |
+| `agents.defaults.sandbox.mode` | `"off"` | `spawn docker ENOENT` crash when agent processes messages |
+| `browser.enabled` | `false` | Attempts to spawn browser container, crashes with Docker error |
+| `tools.profile` | `"coding"` | Browser/computer tools may be invoked, causing Docker errors |
 
 ---
 
@@ -579,6 +622,82 @@ Add the phone number to `allowFrom` array:
 7. Click Apply
 
 **Full configuration reference**: See ARCHITECTURE.md "OpenClaw Configuration" section.
+
+---
+
+### Problem: Signal "Untrusted Identity" Error
+
+**Symptoms**: Messages from a user are rejected with error in logs:
+```
+receive exception: Untrusted identity: <uuid>
+```
+
+**Cause**: The sender reinstalled Signal or changed devices, generating a new identity key.
+
+**Fix**: Trust the identity via signal-cli JSON-RPC API:
+
+```bash
+curl -X POST "https://signal-cli-native-production.up.railway.app/api/v1/rpc" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "trust",
+    "params": {
+      "account": "+1YOUR_BOT_NUMBER",
+      "recipient": "+1USER_PHONE_NUMBER",
+      "trustAllKnownKeys": true
+    },
+    "id": 1
+  }'
+```
+
+Replace:
+- `+1YOUR_BOT_NUMBER` with your linked Signal account
+- `+1USER_PHONE_NUMBER` with the phone number showing the untrusted identity error
+- Update the URL to match your signal-cli-native public domain
+
+**Expected Response**: `{"jsonrpc":"2.0","result":{},"id":1}`
+
+**Verify**: List identities to confirm trust status:
+```bash
+curl -X POST "https://signal-cli-native-production.up.railway.app/api/v1/rpc" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"listIdentities","params":{"account":"+1YOUR_BOT_NUMBER"},"id":2}'
+```
+
+Look for `"trustLevel": "TRUSTED_UNVERIFIED"` for the recipient.
+
+---
+
+### Problem: Gateway Crashes with "spawn docker ENOENT"
+
+**Symptoms**: Gateway crashes when processing any message, logs show:
+```
+Uncaught exception: Error: spawn docker ENOENT
+```
+
+**Cause**: Agent sandboxing is attempting to use Docker, which Railway doesn't support.
+
+**Fix**: Add these settings to moltbot.json:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "sandbox": { "mode": "off" }
+    }
+  },
+  "browser": { "enabled": false },
+  "tools": { "profile": "coding" }
+}
+```
+
+**Via Control UI**:
+1. Go to Config > Raw JSON
+2. Find (or add) `agents.defaults.sandbox.mode` and set to `"off"`
+3. Find (or add) `browser.enabled` and set to `false`
+4. Find (or add) `tools.profile` and set to `"coding"`
+5. Save and Apply
 
 ---
 
@@ -744,6 +863,11 @@ For AI agents following this guide, here's the execution checklist:
   □ Copy template configuration
   □ Replace phone number placeholders
   □ Set allowFrom with authorized numbers
+  □ CRITICAL: Verify these Railway-required settings:
+    □ agents.defaults.sandbox.mode = "off"
+    □ browser.enabled = false
+    □ tools.profile = "coding"
+    □ gateway.trustedProxies = ["*"]
   □ Write to /data/.clawdbot/moltbot.json
   □ Restart service or wait for hot reload
 

@@ -85,6 +85,51 @@ This document describes the production deployment of OpenClaw (Moltbot) on Railw
 
 ---
 
+## Railway Platform Constraints
+
+**CRITICAL**: Railway's container environment has specific limitations that affect OpenClaw configuration.
+
+### No Docker-in-Docker
+
+Railway containers cannot run Docker. This affects:
+
+| Feature | Impact | Required Setting |
+|---------|--------|------------------|
+| Agent Sandboxing | Cannot use Docker sandbox | `agents.defaults.sandbox.mode: "off"` |
+| Browser Tools | Cannot spawn browser containers | `browser.enabled: false` |
+| Computer Use | Cannot use desktop automation | `tools.profile: "coding"` |
+
+**If sandbox mode is not disabled**, the gateway will crash with:
+```
+Error: spawn docker ENOENT
+```
+
+### Proxy Headers
+
+Railway routes all traffic through edge proxies. The gateway must trust these proxies:
+
+```json
+"gateway": {
+  "trustedProxies": ["*"]
+}
+```
+
+Without this, you'll see warnings:
+```
+Proxy headers detected from untrusted address. Connection will not be treated as local.
+```
+
+### Required Railway Configuration
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `agents.defaults.sandbox.mode` | `"off"` | No Docker available |
+| `browser.enabled` | `false` | No browser containers |
+| `tools.profile` | `"coding"` | Excludes browser/computer tools |
+| `gateway.trustedProxies` | `["*"]` | Accept Railway proxy headers |
+
+---
+
 ## Environment Variables
 
 ### Required Variables (Railway Dashboard)
@@ -144,7 +189,7 @@ Also committed locally at: `/Users/kurultai/molt/moltbot.json`
   "gateway": {
     "mode": "local",
     "port": 18789,
-    "trustedProxies": ["loopback", "uniquelocal"],
+    "trustedProxies": ["*"],  // Required: Railway proxy headers
     "auth": {
       "mode": "token",
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
@@ -155,7 +200,10 @@ Also committed locally at: `/Users/kurultai/molt/moltbot.json`
   },
   "agents": {
     "defaults": {
-      "workspace": "/data/workspace"
+      "workspace": "/data/workspace",
+      "sandbox": {
+        "mode": "off"  // CRITICAL: Railway has no Docker-in-Docker
+      }
     }
   },
   "channels": {
@@ -181,6 +229,12 @@ Also committed locally at: `/Users/kurultai/molt/moltbot.json`
   },
   "logging": {
     "level": "info"
+  },
+  "browser": {
+    "enabled": false  // Disable browser tools on Railway
+  },
+  "tools": {
+    "profile": "coding"  // Limit to coding tools (excludes browser)
   }
 }
 ```
@@ -191,15 +245,19 @@ Also committed locally at: `/Users/kurultai/molt/moltbot.json`
 |---------|---------|---------|
 | `gateway.mode` | `local` | Gateway runs behind Railway's proxy |
 | `gateway.port` | `18789` | Internal gateway port |
+| `gateway.trustedProxies` | `["*"]` | Trust Railway's proxy headers (prevents "untrusted address" warnings) |
 | `gateway.auth.mode` | `token` | Token-based authentication |
 | `gateway.controlUi.enabled` | `true` | Web UI at root URL |
 | `agents.defaults.workspace` | `/data/workspace` | Persistent file storage |
+| `agents.defaults.sandbox.mode` | `off` | **CRITICAL**: Railway has no Docker - sandbox must be disabled |
 | `channels.signal.account` | `+15165643945` | Linked Signal phone number |
 | `channels.signal.httpUrl` | Internal Railway URL | Signal CLI sidecar |
 | `channels.signal.allowFrom` | Phone numbers | Allowlisted users |
 | `channels.signal.dmPolicy` | `pairing` | DM handling mode |
 | `session.scope` | `per-sender` | Separate sessions per user |
 | `session.reset.mode` | `daily` | Reset sessions daily |
+| `browser.enabled` | `false` | Browser tools disabled on Railway |
+| `tools.profile` | `coding` | Limit to coding tools (excludes browser/computer tools) |
 
 ---
 
@@ -467,6 +525,75 @@ railway variables
 1. Verify sender phone in `allowFrom` list
 2. Check logs for blocked messages
 3. Ensure Signal linked device is still active
+
+### Signal "Untrusted Identity" Error
+
+**Symptoms**: Messages received but rejected with error:
+```
+receive exception: Untrusted identity: <uuid>
+```
+
+**Cause**: The sender's Signal identity key has changed (reinstalled Signal, new device, etc.)
+
+**Fix via JSON-RPC API**:
+
+```bash
+# Trust the identity (replace phone numbers as needed)
+curl -X POST "https://signal-cli-native-production.up.railway.app/api/v1/rpc" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "trust",
+    "params": {
+      "account": "+15165643945",
+      "recipient": "+19194133445",
+      "trustAllKnownKeys": true
+    },
+    "id": 1
+  }'
+```
+
+**Verify trust status**:
+
+```bash
+curl -X POST "https://signal-cli-native-production.up.railway.app/api/v1/rpc" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "listIdentities",
+    "params": { "account": "+15165643945" },
+    "id": 2
+  }'
+```
+
+Look for `"trustLevel": "TRUSTED_UNVERIFIED"` for the recipient.
+
+**Note**: The signal-cli-native service exposes JSON-RPC at `/api/v1/rpc` on its public Railway URL.
+
+### Gateway Crashes with "spawn docker ENOENT"
+
+**Symptoms**: Gateway crashes when processing messages, logs show:
+```
+Uncaught exception: Error: spawn docker ENOENT
+```
+
+**Cause**: `agents.defaults.sandbox.mode` is set to `"all"` or `"non-main"`, attempting Docker sandboxing on Railway where Docker isn't available.
+
+**Fix**: Set sandbox mode to "off" in moltbot.json:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "sandbox": {
+        "mode": "off"
+      }
+    }
+  }
+}
+```
+
+Also set `tools.profile: "coding"` and `browser.enabled: false` to prevent browser tools from being invoked.
 
 ### Domain Not Working
 

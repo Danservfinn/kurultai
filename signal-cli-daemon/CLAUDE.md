@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #26402 | 8:45 PM | 🔵 | Biometric Authentication & Infrastructure Readiness Assessment | ~631 |
+| #26382 | 8:37 PM | 🔵 | Domain and Infrastructure Configuration for bot.kurult.ai | ~505 |
 | #26346 | 11:52 AM | 🔵 | Moltbot Configuration and Deployment Status Assessment | ~638 |
 | #26337 | 11:51 AM | 🔵 | Signal CLI Daemon Docker Configuration | ~254 |
 </claude-mem-context>

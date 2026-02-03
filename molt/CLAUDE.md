@@ -17,9 +17,6 @@
 | #26140 | 9:47 PM | 🔵 | Skill CLAUDE.md Metadata File | ~209 |
 | #26139 | " | 🔵 | Molt Skill Architecture Review Completed | ~643 |
 | #26126 | 9:46 PM | 🟣 | Security-First Philosophy Integrated Throughout Molt Skill | ~879 |
-| #26120 | 9:43 PM | 🟣 | Security-First Philosophy Integrated into Molt Skill | ~908 |
-| #26119 | 9:42 PM | ✅ | Skill Metadata Updated to Reflect "molt" Naming | ~251 |
-| #26117 | 9:41 PM | ✅ | Skill Metadata Updated to Reflect Renamed Skill | ~214 |
 
 ### Jan 29, 2026
 

@@ -7,7 +7,18 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #26406 | 8:49 PM | ⚖️ | Biometric Authentication Implementation Plan for kublai.kurult.ai | ~643 |
+| #26402 | 8:45 PM | 🔵 | Biometric Authentication & Infrastructure Readiness Assessment | ~631 |
 | #26346 | 11:52 AM | 🔵 | Moltbot Configuration and Deployment Status Assessment | ~638 |
 | #26339 | 11:51 AM | 🔵 | Biometric Authentication Plan for Moltbot Control UI | ~444 |
 | #26334 | 11:15 AM | ⚖️ | Plan: Biometric Authentication for Moltbot Control UI via Cloudflare Access | ~386 |
+
+### Feb 1, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #26515 | 11:06 PM | ⚖️ | Standing Orders Document Transmitted to Kublai via Signal | ~478 |
+| #26512 | 10:40 PM | ✅ | Agent Standing Orders Documentation Created | ~562 |
+| #26511 | 10:38 PM | 🔵 | Multi-Agent Architecture Plan Discovered: Mission Control Framework | ~510 |
+| #26510 | " | 🔵 | Multi-Agent Mission Control Architecture for Kublai | ~430 |
 </claude-mem-context>
