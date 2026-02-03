@@ -243,7 +243,8 @@ Kublai marks task complete, synthesizes response
   quality_score,
   blocked_reason,    // populated when status="blocked"
   blocked_at,        // datetime
-  escalation_count   // int, increments on each escalation
+  escalation_count,  // int, increments on each escalation
+  results_json       // JSON string of task results (safe serialization)
 })
 
 // Session context for persistence across daily resets
@@ -321,6 +322,8 @@ CREATE INDEX agent_knowledge FOR (n) ON (n.agent, n.created_at)
 CREATE INDEX task_status FOR (t:Task) ON (t.assigned_to, t.status);
 
 CREATE INDEX notification_read FOR (n:Notification) ON (n.read, n.created_at);
+
+CREATE INDEX notification_created_at FOR (n:Notification) ON (n.created_at);
 
 CREATE FULLTEXT INDEX knowledge_content
   FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
@@ -410,6 +413,7 @@ NEO4J_URI=bolt://neo4j.railway.internal:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=<generate-secure-password>
 SIGNAL_ACCOUNT_NUMBER=+15165643945
+SENTENCE_TRANSFORMERS_CACHE=/data/cache/sentence-transformers
 ```
 
 Add to `requirements.txt`:
@@ -481,6 +485,7 @@ from uuid import uuid4, UUID
 from datetime import datetime
 from neo4j import GraphDatabase, Driver
 from neo4j.exceptions import ServiceUnavailable, AuthError
+import threading
 
 class OperationalMemory:
     """Neo4j-backed operational memory with fallback mode."""
@@ -488,6 +493,8 @@ class OperationalMemory:
     def __init__(self):
         self.driver: Optional[Driver] = None
         self.fallback_mode = False
+        self._local_store: Dict[str, List[Dict]] = {}
+        self._fallback_lock = threading.Lock()  # Thread-safety for fallback mode
         self._connect()
 
     def _connect(self):
@@ -502,7 +509,6 @@ class OperationalMemory:
         except (ServiceUnavailable, AuthError) as e:
             print(f"[WARN] Neo4j unavailable, running in fallback mode: {e}")
             self.fallback_mode = True
-            self._local_store: Dict[str, List[Dict]] = {}
 
     def _sanitize_for_sharing(self, text: str, agent_context: Dict[str, Any] = None) -> str:
         """Strip personal identifiers before storing to shared memory.
@@ -590,7 +596,13 @@ class OperationalMemory:
         try:
             from sentence_transformers import SentenceTransformer
             if not hasattr(self, '_embedding_model'):
-                self._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+                # Use persistent cache path for containerized environments
+                cache_dir = os.getenv('SENTENCE_TRANSFORMERS_CACHE', '/data/cache/sentence-transformers')
+                os.makedirs(cache_dir, exist_ok=True)
+                self._embedding_model = SentenceTransformer(
+                    'all-MiniLM-L6-v2',
+                    cache_folder=cache_dir
+                )
             return self._embedding_model.encode(text).tolist()
         except ImportError:
             # Fallback: return empty list to trigger full-text search
@@ -710,22 +722,18 @@ class OperationalMemory:
     def claim_task(self, agent: str) -> Optional[Dict[str, Any]]:
         """Claim next pending task for an agent (atomic, race-condition safe)."""
         if self.fallback_mode:
-            # In fallback mode, use simple locking
-            tasks = self._local_store.get('tasks', [])
-            for t in tasks:
-                if t['assigned_to'] == agent and t['status'] == 'pending':
-                    # Check if being processed by another agent
-                    if t.get('claiming'):
-                        continue
-                    t['claiming'] = True  # Mark as being claimed
-                    t['status'] = 'in_progress'
-                    t['claimed_at'] = datetime.now().isoformat()
-                    del t['claiming']
-                    return t
-            return None
+            # Thread-safe fallback mode with locking
+            with self._fallback_lock:
+                tasks = self._local_store.get('tasks', [])
+                for t in tasks:
+                    if t['assigned_to'] == agent and t['status'] == 'pending':
+                        t['status'] = 'in_progress'
+                        t['claimed_at'] = datetime.now().isoformat()
+                        return t
+                return None
 
         # Atomic claim using single MATCH-SET-RETURN
-        # This prevents race conditions under concurrent load
+        # Neo4j session.run() handles transactions automatically
         query = """
         MATCH (t:Task {status: 'pending'})-[:ASSIGNED_TO]->(a:Agent {id: $agent})
         WITH t LIMIT 1
@@ -735,12 +743,9 @@ class OperationalMemory:
         RETURN t.id as id, t.type as type, t.description as description
         """
         with self.driver.session() as session:
-            # Use write transaction for atomicity
-            with session.begin_transaction() as tx:
-                result = tx.run(query, agent=agent)
-                record = result.single()
-                tx.commit()
-                return dict(record) if record else None
+            result = session.run(query, agent=agent)
+            record = result.single()
+            return dict(record) if record else None
 
     def block_task(self, task_id: UUID, reason: str,
                    auto_escalate: bool = True) -> bool:
@@ -824,11 +829,13 @@ class OperationalMemory:
         MATCH (t)-[:ASSIGNED_TO]->(assignee:Agent)
         MATCH (delegator:Agent)-[:CREATED]->(t)
         SET t.status = 'completed', t.completed_at = datetime(),
-            t.results = $results, t.quality_score = $quality_score
+            t.results_json = $results_json, t.quality_score = $quality_score
         RETURN delegator.id as delegator_id, assignee.id as assignee_id
         """
+        import json
         with self.driver.session() as session:
-            result = session.run(query, task_id=str(task_id), results=str(results),
+            result = session.run(query, task_id=str(task_id),
+                       results_json=json.dumps(results, default=str),
                        quality_score=results.get('quality_score', 0.8))
             record = result.single()
 
@@ -944,6 +951,19 @@ class OperationalMemory:
             result = session.run(query, sender_id=sender_id, session_date=today)
             record = result.single()
             return dict(record) if record else None
+
+    def update_agent_last_active(self, agent_id: str) -> bool:
+        """Update agent's last_active timestamp. Call after any agent action."""
+        if self.fallback_mode:
+            return True
+
+        query = """
+        MATCH (a:Agent {id: $agent_id})
+        SET a.last_active = datetime()
+        """
+        with self.driver.session() as session:
+            session.run(query, agent_id=agent_id)
+        return True
 
     def health_check(self) -> Dict[str, Any]:
         """Check Neo4j health status."""
