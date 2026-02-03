@@ -47,6 +47,10 @@
     "enabled": false
   },
   "tools": {
-    "profile": "coding"
+    "profile": "coding",
+    "agentToAgent": {
+      "enabled": true,
+      "allow": ["main", "researcher", "writer", "developer", "analyst", "ops"]
+    }
   }
 }
