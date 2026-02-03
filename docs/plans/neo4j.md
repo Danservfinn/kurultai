@@ -42,27 +42,29 @@ Möngke Chagatai Temüjin Jochi Ögedei
 | **Personal** | Files (Kublai's workspace) | Kublai only | User preferences, personal history, friend names |
 | **Operational** | Neo4j (shared) | All 6 agents | Research, code patterns, analysis, process insights |
 
-**Privacy Rule**: Kublai strips personal identifiers before delegating. "My friend Sarah's startup" → "a startup in X sector".
+**Privacy Rule**: Kublai reviews content for private information before delegating. "My friend Sarah's startup" → "a startup in X sector". LLM-based review is preferred; pattern-based fallback handles common PII (phones, emails, SSNs, API keys).
 
-### Task Queue Delegation Pattern
+### Delegation Pattern: agentToAgent with Neo4j Task Tracking
 
-To prevent Kublai from becoming a bottleneck, use Neo4j as the task queue instead of direct agentToAgent delegation:
+Use OpenClaw's native `agentToAgent` messaging for delegation, with Neo4j tracking task state:
 
 ```
 User Request
      ↓
-Kublai creates Task node in Neo4j
+Kublai creates Task node in Neo4j (status: pending)
      ↓
-Specialist agents poll for tasks
+Kublai delegates via agentToAgent to specialist
      ↓
-Agent claims task (status: pending → in_progress)
+Specialist claims task (status: in_progress)
      ↓
-Agent completes work, stores results
+Specialist completes work, stores results
      ↓
-Kublai notified, synthesizes response
+Specialist notifies Kublai via agentToAgent
+     ↓
+Kublai marks task complete, synthesizes response
 ```
 
-This decouples Kublai from waiting on specialist responses and enables async processing.
+**Why not Task Queue polling?** OpenClaw agents don't have a built-in polling mechanism. Using agentToAgent leverages OpenClaw's native messaging while Neo4j provides audit trail and state management.
 
 ---
 
@@ -244,10 +246,22 @@ This decouples Kublai from waiting on specialist responses and enables async pro
 // Session context for persistence across daily resets
 (:SessionContext {
   sender_id,
-  session_date,
+  session_date,  // Store as string 'YYYY-MM-DD' to survive midnight
   active_tasks,
   pending_delegations,
-  conversation_summary
+  conversation_summary,
+  created_at   // datetime of first creation
+})
+
+// Notifications for task completion
+(:Notification {
+  id,
+  type,        // "task_complete" | "task_blocked" | "insight"
+  task_id,
+  from_agent,
+  summary,
+  created_at,
+  read         // boolean
 })
 ```
 
@@ -278,7 +292,18 @@ This decouples Kublai from waiting on specialist responses and enables async pro
 (WorkflowImprovement)-[:APPROVED_BY]->(Agent {id: "main"})
 
 // Knowledge provenance (CREATED relationship for all knowledge nodes)
-(Agent)-[:CREATED {timestamp}]->(Research|Content|Application|Analysis|Insight|SecurityAudit|CodeReview|ProcessUpdate|WorkflowImprovement|Synthesis|Concept|Task)
+(Agent)-[:CREATED {timestamp}]->(Research)
+(Agent)-[:CREATED {timestamp}]->(Content)
+(Agent)-[:CREATED {timestamp}]->(Application)
+(Agent)-[:CREATED {timestamp}]->(Analysis)
+(Agent)-[:CREATED {timestamp}]->(Insight)
+(Agent)-[:CREATED {timestamp}]->(SecurityAudit)
+(Agent)-[:CREATED {timestamp}]->(CodeReview)
+(Agent)-[:CREATED {timestamp}]->(ProcessUpdate)
+(Agent)-[:CREATED {timestamp}]->(WorkflowImprovement)
+(Agent)-[:CREATED {timestamp}]->(Synthesis)
+(Agent)-[:CREATED {timestamp}]->(Concept)
+(Agent)-[:CREATED {timestamp}]->(Task)
 ```
 
 ### Indexes
@@ -324,22 +349,24 @@ RUN mkdir -p /data/.clawdbot/agents/{main,researcher,writer,developer,analyst,op
 const agentIds = ['main', 'researcher', 'writer', 'developer', 'analyst', 'ops'];
 const agentsDir = path.join(STATE_DIR, 'agents');
 
-function createAgentDirWithRetry(agentDir, maxRetries = 3) {
+async function createAgentDirWithRetry(agentDir, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       fs.mkdirSync(agentDir, { recursive: true });
       return;
     } catch (err) {
       if (i === maxRetries - 1) throw err;
-      setTimeout(() => {}, 100 * (i + 1));
+      await new Promise(r => setTimeout(r, 100 * (i + 1)));
     }
   }
 }
 
-for (const agentId of agentIds) {
-  const agentDir = path.join(agentsDir, agentId);
-  createAgentDirWithRetry(agentDir);
-}
+(async () => {
+  for (const agentId of agentIds) {
+    const agentDir = path.join(agentsDir, agentId);
+    await createAgentDirWithRetry(agentDir);
+  }
+})();
 ```
 
 **Step 1.3**: Deploy and verify all 6 agents appear in Control UI
@@ -367,8 +394,9 @@ services:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
 ```
 
-**Step 2.2**: Set environment variables
+**Step 2.2**: Set environment variables and add Python dependencies
 
+Environment variables:
 ```
 NEO4J_URI=bolt://neo4j.railway.internal:7687
 NEO4J_USER=neo4j
@@ -376,7 +404,61 @@ NEO4J_PASSWORD=<generate-secure-password>
 SIGNAL_ACCOUNT_NUMBER=+15165643945
 ```
 
+Add to `requirements.txt`:
+```
+neo4j-python-driver>=5.14.0
+sentence-transformers>=2.2.2
+```
+
+Or install directly:
+```bash
+pip install neo4j-python-driver sentence-transformers
+```
+
 **Step 2.3**: Create schema and indexes
+
+First, create the Agent nodes:
+
+```cypher
+// Create Agent nodes (run once during setup)
+CREATE (a1:Agent {
+  id: 'main', name: 'Kublai', role: 'Squad Lead / Router',
+  primary_capabilities: ['orchestration', 'delegation', 'synthesis'],
+  personality: 'Strategic leader with broad oversight',
+  last_active: datetime()
+})
+CREATE (a2:Agent {
+  id: 'researcher', name: 'Möngke', role: 'Researcher',
+  primary_capabilities: ['deep_research', 'fact_checking', 'synthesis'],
+  personality: 'Thorough and methodical investigator',
+  last_active: datetime()
+})
+CREATE (a3:Agent {
+  id: 'writer', name: 'Chagatai', role: 'Content Writer',
+  primary_capabilities: ['content_creation', 'editing', 'storytelling'],
+  personality: 'Articulate and creative communicator',
+  last_active: datetime()
+})
+CREATE (a4:Agent {
+  id: 'developer', name: 'Temüjin', role: 'Developer',
+  primary_capabilities: ['coding', 'security_audit', 'architecture'],
+  personality: 'Pragmatic builder with security focus',
+  last_active: datetime()
+})
+CREATE (a5:Agent {
+  id: 'analyst', name: 'Jochi', role: 'Analyst',
+  primary_capabilities: ['data_analysis', 'metrics', 'insights'],
+  personality: 'Detail-oriented pattern finder',
+  last_active: datetime()
+})
+CREATE (a6:Agent {
+  id: 'ops', name: 'Ögedei', role: 'Operations',
+  primary_capabilities: ['process_management', 'task_coordination', 'monitoring'],
+  personality: 'Efficient organizer and process optimizer',
+  last_active: datetime()
+})
+RETURN a1.id, a2.id, a3.id, a4.id, a5.id, a6.id;
+```
 
 ### Phase 3: Memory Module
 
@@ -414,16 +496,55 @@ class OperationalMemory:
             self.fallback_mode = True
             self._local_store: Dict[str, List[Dict]] = {}
 
-    def _sanitize_for_sharing(self, text: str) -> str:
-        """Strip personal identifiers before storing to shared memory."""
-        # Phone numbers
-        text = re.sub(r'\+?1?\d{10,15}', '[PHONE]', text)
+    def _sanitize_for_sharing(self, text: str, agent_context: Dict[str, Any] = None) -> str:
+        """Strip personal identifiers before storing to shared memory.
+
+        Uses LLM-based review for comprehensive PII detection.
+        Falls back to pattern matching if LLM unavailable.
+        """
+        # Try LLM-based sanitization first
+        try:
+            sanitized = self._llm_sanitize(text, agent_context)
+            if sanitized:
+                return sanitized
+        except Exception:
+            pass  # Fall through to pattern-based
+
+        # Fallback: pattern-based sanitization
+        return self._pattern_sanitize(text)
+
+    def _llm_sanitize(self, text: str, agent_context: Dict[str, Any] = None) -> Optional[str]:
+        """Use LLM to identify and redact private information.
+
+        This method should be called by an agent with LLM access.
+        The agent reviews content and returns sanitized version.
+        """
+        # This is a stub - actual implementation depends on agent capabilities
+        # Agent should call something like:
+        #   sanitized = await agent.review_for_privacy(text)
+        #   return sanitized if sanitized.has_changes else text
+        return None  # Signal to use pattern fallback
+
+    def _pattern_sanitize(self, text: str) -> str:
+        """Pattern-based PII sanitization (fallback method)."""
+        import re
+
+        # Phone numbers (various formats)
+        text = re.sub(r'\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', '[PHONE]', text)
+        text = re.sub(r'\+?\d{10,15}', '[PHONE]', text)
+
         # Email addresses
         text = re.sub(r'[\w.-]+@[\w.-]+\.\w+', '[EMAIL]', text)
-        # Names (common patterns like "My friend X", "X's startup")
-        text = re.sub(r'(?i)(?:my\s+(?:friend|contact|colleague)\s+)(\w+)', 'a contact', text)
-        # Specific identifiers
-        text = re.sub(r'(?i)(?:sarah|john|mike|alex|chris|jordan)[\'\']?s', 'a contact\'s', text)
+
+        # Social Security Numbers
+        text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN]', text)
+
+        # Credit card numbers (basic pattern)
+        text = re.sub(r'\b(?:\d{4}[-\s]?){3}\d{4}\b', '[CARD]', text)
+
+        # API keys and tokens (common patterns)
+        text = re.sub(r'\b(sk-|pk-|api[_-]?key[:\s]*)([\w-]{10,})\b', '[API_KEY]', text, flags=re.I)
+
         return text
 
     def store_research(self, agent: str, topic: str, findings: str,
@@ -456,36 +577,54 @@ class OperationalMemory:
                        sources=sources or [], depth=depth)
         return knowledge_id
 
+    def _generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding using sentence-transformers (all-MiniLM-L6-v2)."""
+        try:
+            from sentence_transformers import SentenceTransformer
+            if not hasattr(self, '_embedding_model'):
+                self._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            return self._embedding_model.encode(text).tolist()
+        except ImportError:
+            # Fallback: return empty list to trigger full-text search
+            return []
+
     def query_related(self, agent: str, topic: str,
                      min_confidence: float = 0.7) -> List[Dict[str, Any]]:
         """Query operational knowledge with vector fallback."""
         if self.fallback_mode:
             return self._local_store.get('research', [])
 
-        # Try vector search first (if available)
-        try:
-            query = """
-            CALL db.index.vector.queryNodes('concept_embedding', 5, $embedding)
-            YIELD node, score
-            WHERE score >= $min_score
-            RETURN node.name as concept, node.description as description, score
-            """
-            # Note: embedding generation would happen here
-            with self.driver.session() as session:
-                result = session.run(query, embedding=[], min_score=min_confidence)
-                return [dict(record) for record in result]
-        except Exception:
-            # Fallback to full-text search
-            query = """
-            CALL db.index.fulltext.queryNodes('knowledge_content', $topic)
-            YIELD node, score
-            WHERE score >= $min_score
-            RETURN node.topic as topic, node.findings as findings, score
-            LIMIT 10
-            """
-            with self.driver.session() as session:
-                result = session.run(query, topic=topic, min_score=min_confidence)
-                return [dict(record) for record in result]
+        # Generate embedding for the query topic
+        embedding = self._generate_embedding(topic)
+
+        # Try vector search first (if embedding generated and index exists)
+        if embedding:
+            try:
+                query = """
+                CALL db.index.vector.queryNodes('concept_embedding', 5, $embedding)
+                YIELD node, score
+                WHERE score >= $min_score
+                RETURN node.name as concept, node.description as description, score
+                """
+                with self.driver.session() as session:
+                    result = session.run(query, embedding=embedding, min_score=min_confidence)
+                    records = [dict(record) for record in result]
+                    if records:
+                        return records
+            except Exception:
+                pass  # Fall through to full-text search
+
+        # Fallback to full-text search
+        query = """
+        CALL db.index.fulltext.queryNodes('knowledge_content', $topic)
+        YIELD node, score
+        WHERE score >= $min_score
+        RETURN node.topic as topic, node.findings as findings, score
+        LIMIT 10
+        """
+        with self.driver.session() as session:
+            result = session.run(query, topic=topic, min_score=min_confidence)
+            return [dict(record) for record in result]
 
     def record_collaboration(self, from_agent: str, to_agent: str,
                            knowledge_id: UUID) -> bool:
@@ -558,8 +697,9 @@ class OperationalMemory:
             record = result.single()
             return dict(record) if record else None
 
-    def complete_task(self, task_id: UUID, results: Dict[str, Any]) -> bool:
-        """Mark task as completed with results."""
+    def complete_task(self, task_id: UUID, results: Dict[str, Any],
+                     notify_delegator: bool = True) -> bool:
+        """Mark task as completed with results. Optionally notify delegator."""
         if self.fallback_mode:
             for t in self._local_store.get('tasks', []):
                 if t['id'] == str(task_id):
@@ -570,28 +710,88 @@ class OperationalMemory:
 
         query = """
         MATCH (t:Task {id: $task_id})
+        MATCH (t)-[:ASSIGNED_TO]->(assignee:Agent)
+        MATCH (delegator:Agent)-[:CREATED]->(t)
         SET t.status = 'completed', t.completed_at = datetime(),
             t.results = $results, t.quality_score = $quality_score
+        RETURN delegator.id as delegator_id, assignee.id as assignee_id
         """
         with self.driver.session() as session:
-            session.run(query, task_id=str(task_id), results=str(results),
+            result = session.run(query, task_id=str(task_id), results=str(results),
                        quality_score=results.get('quality_score', 0.8))
+            record = result.single()
+
+            if record and notify_delegator:
+                # Create notification for delegator (Kublai)
+                self._notify_task_complete(
+                    delegator_id=record['delegator_id'],
+                    assignee_id=record['assignee_id'],
+                    task_id=task_id,
+                    results=results
+                )
         return True
+
+    def _notify_task_complete(self, delegator_id: str, assignee_id: str,
+                             task_id: UUID, results: Dict[str, Any]):
+        """Create notification for task completion.
+
+        In production, this would send agentToAgent message via OpenClaw.
+        For now, creates a Notification node that delegator can query.
+        """
+        query = """
+        MATCH (delegator:Agent {id: $delegator_id})
+        CREATE (n:Notification {
+            id: $notification_id,
+            type: 'task_complete',
+            task_id: $task_id,
+            from_agent: $assignee_id,
+            summary: $summary,
+            created_at: datetime(),
+            read: false
+        })
+        CREATE (delegator)-[:HAS_NOTIFICATION]->(n)
+        """
+        summary = results.get('summary', f"Task {task_id} completed by {assignee_id}")
+        with self.driver.session() as session:
+            session.run(query, delegator_id=delegator_id,
+                       notification_id=str(uuid4()), task_id=str(task_id),
+                       assignee_id=assignee_id, summary=summary)
+
+    def get_pending_notifications(self, agent_id: str) -> List[Dict[str, Any]]:
+        """Get unread notifications for an agent (call this when agent becomes active)."""
+        if self.fallback_mode:
+            return []
+
+        query = """
+        MATCH (a:Agent {id: $agent_id})-[:HAS_NOTIFICATION]->(n:Notification {read: false})
+        SET n.read = true
+        RETURN n.id as id, n.type as type, n.task_id as task_id,
+               n.from_agent as from_agent, n.summary as summary,
+               n.created_at as created_at
+        ORDER BY n.created_at DESC
+        """
+        with self.driver.session() as session:
+            result = session.run(query, agent_id=agent_id)
+            return [dict(record) for record in result]
 
     def save_session_context(self, sender_id: str, context: Dict[str, Any]) -> bool:
         """Save session context for persistence across resets."""
         if self.fallback_mode:
             return True
 
+        from datetime import date
+        today = date.today().isoformat()  # 'YYYY-MM-DD' string
+
         query = """
-        MERGE (s:SessionContext {sender_id: $sender_id, session_date: date()})
+        MERGE (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
         SET s.active_tasks = $active_tasks,
             s.pending_delegations = $pending_delegations,
             s.conversation_summary = $conversation_summary,
             s.updated_at = datetime()
+        ON CREATE SET s.created_at = datetime()
         """
         with self.driver.session() as session:
-            session.run(query, sender_id=sender_id,
+            session.run(query, sender_id=sender_id, session_date=today,
                        active_tasks=context.get('active_tasks', []),
                        pending_delegations=context.get('pending_delegations', []),
                        conversation_summary=context.get('conversation_summary', ''))
@@ -602,14 +802,17 @@ class OperationalMemory:
         if self.fallback_mode:
             return None
 
+        from datetime import date
+        today = date.today().isoformat()  # 'YYYY-MM-DD' string
+
         query = """
-        MATCH (s:SessionContext {sender_id: $sender_id, session_date: date()})
+        MATCH (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
         RETURN s.active_tasks as active_tasks,
                s.pending_delegations as pending_delegations,
                s.conversation_summary as conversation_summary
         """
         with self.driver.session() as session:
-            result = session.run(query, sender_id=sender_id)
+            result = session.run(query, sender_id=sender_id, session_date=today)
             record = result.single()
             return dict(record) if record else None
 
@@ -660,7 +863,7 @@ When receiving a request:
 
 1. **Query personal memory** - Load relevant user context
 2. **Query operational memory** - Check for related prior work
-3. **Strip personal identifiers** - "My friend Sarah" → "a contact"
+3. **Review for privacy** - Use LLM to identify private info, sanitize before sharing
 4. **Delegate via agentToAgent** based on task type:
    - Research → @researcher (Möngke)
    - Writing → @writer (Chagatai)
@@ -707,8 +910,14 @@ app.get('/health', async (req, res) => {
     health.status = 'degraded';
   }
 
-  // Check Signal
-  health.services.signal = signalClient?.isConnected() ? 'healthy' : 'disconnected';
+  // Check Signal (if signalClient is available in scope)
+  try {
+    health.services.signal = typeof signalClient !== 'undefined' && signalClient?.isConnected()
+      ? 'healthy'
+      : 'unknown';
+  } catch (e) {
+    health.services.signal = 'unavailable';
+  }
 
   res.status(health.status === 'ok' ? 200 : 503).json(health);
 });
