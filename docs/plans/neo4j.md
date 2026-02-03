@@ -44,6 +44,26 @@ Möngke Chagatai Temüjin Jochi Ögedei
 
 **Privacy Rule**: Kublai strips personal identifiers before delegating. "My friend Sarah's startup" → "a startup in X sector".
 
+### Task Queue Delegation Pattern
+
+To prevent Kublai from becoming a bottleneck, use Neo4j as the task queue instead of direct agentToAgent delegation:
+
+```
+User Request
+     ↓
+Kublai creates Task node in Neo4j
+     ↓
+Specialist agents poll for tasks
+     ↓
+Agent claims task (status: pending → in_progress)
+     ↓
+Agent completes work, stores results
+     ↓
+Kublai notified, synthesizes response
+```
+
+This decouples Kublai from waiting on specialist responses and enables async processing.
+
 ---
 
 ## Agent Configuration
@@ -133,7 +153,7 @@ Möngke Chagatai Temüjin Jochi Ögedei
   "channels": {
     "signal": {
       "enabled": true,
-      "account": "+15165643945",
+      "account": "${SIGNAL_ACCOUNT_NUMBER}",
       "autoStart": true,
       "dmPolicy": "pairing",
       "groupPolicy": "allowlist",
@@ -220,6 +240,15 @@ Möngke Chagatai Temüjin Jochi Ögedei
   delegated_by,
   quality_score
 })
+
+// Session context for persistence across daily resets
+(:SessionContext {
+  sender_id,
+  session_date,
+  active_tasks,
+  pending_delegations,
+  conversation_summary
+})
 ```
 
 ### Key Relationships
@@ -247,6 +276,9 @@ Möngke Chagatai Temüjin Jochi Ögedei
 
 // Approval workflow
 (WorkflowImprovement)-[:APPROVED_BY]->(Agent {id: "main"})
+
+// Knowledge provenance (CREATED relationship for all knowledge nodes)
+(Agent)-[:CREATED {timestamp}]->(Research|Content|Application|Analysis|Insight|SecurityAudit|CodeReview|ProcessUpdate|WorkflowImprovement|Synthesis|Concept|Task)
 ```
 
 ### Indexes
@@ -260,6 +292,8 @@ CREATE INDEX task_status FOR (t:Task) ON (t.assigned_to, t.status);
 CREATE FULLTEXT INDEX knowledge_content
   FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
 
+// Vector index for semantic search (Neo4j 5.11+)
+// Falls back to full-text search if unavailable
 CREATE VECTOR INDEX concept_embedding FOR (c:Concept)
   ON c.embedding OPTIONS {indexConfig: {
     `vector.dimensions`: 384,
@@ -275,16 +309,36 @@ CREATE VECTOR INDEX concept_embedding FOR (c:Concept)
 
 **Step 1.1**: Update `moltbot.json` with agents.list and agentToAgent
 
-**Step 1.2**: Create agent directories in wrapper startup
+**Step 1.2**: Create agent directories in Dockerfile (avoids race condition)
+
+```dockerfile
+# In Dockerfile, after STATE_DIR is set
+RUN mkdir -p /data/.clawdbot/agents/{main,researcher,writer,developer,analyst,ops} && \
+    mkdir -p /data/workspace/{souls,memory/kublai,tasks/{inbox,assigned,in-progress,review,done},deliverables}
+```
+
+**Alternative**: If using wrapper startup, add retry logic:
 
 ```javascript
 // In server.js, after STATE_DIR is defined
 const agentIds = ['main', 'researcher', 'writer', 'developer', 'analyst', 'ops'];
 const agentsDir = path.join(STATE_DIR, 'agents');
 
+function createAgentDirWithRetry(agentDir, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      fs.mkdirSync(agentDir, { recursive: true });
+      return;
+    } catch (err) {
+      if (i === maxRetries - 1) throw err;
+      setTimeout(() => {}, 100 * (i + 1));
+    }
+  }
+}
+
 for (const agentId of agentIds) {
   const agentDir = path.join(agentsDir, agentId);
-  fs.mkdirSync(agentDir, { recursive: true });
+  createAgentDirWithRetry(agentDir);
 }
 ```
 
@@ -319,6 +373,7 @@ services:
 NEO4J_URI=bolt://neo4j.railway.internal:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=<generate-secure-password>
+SIGNAL_ACCOUNT_NUMBER=+15165643945
 ```
 
 **Step 2.3**: Create schema and indexes
@@ -328,17 +383,254 @@ NEO4J_PASSWORD=<generate-secure-password>
 **Step 3.1**: Create `openclaw_memory.py` module
 
 ```python
+"""Neo4j-backed operational memory for cross-agent knowledge sharing."""
+import os
+import re
+from typing import Optional, List, Dict, Any
+from uuid import uuid4, UUID
+from datetime import datetime
+from neo4j import GraphDatabase, Driver
+from neo4j.exceptions import ServiceUnavailable, AuthError
+
 class OperationalMemory:
-    """Neo4j-backed operational memory for cross-agent knowledge."""
+    """Neo4j-backed operational memory with fallback mode."""
 
-    def store_research(self, agent: str, topic: str, findings: str, **kwargs) -> UUID:
-        """Store research findings to Neo4j."""
+    def __init__(self):
+        self.driver: Optional[Driver] = None
+        self.fallback_mode = False
+        self._connect()
 
-    def query_related(self, agent: str, topic: str, min_confidence: float = 0.7):
-        """Query operational knowledge relevant to current task."""
+    def _connect(self):
+        """Connect to Neo4j with fallback to memory-only mode."""
+        try:
+            uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+            user = os.getenv('NEO4J_USER', 'neo4j')
+            password = os.getenv('NEO4J_PASSWORD', '')
+            self.driver = GraphDatabase.driver(uri, auth=(user, password))
+            self.driver.verify_connectivity()
+            self.fallback_mode = False
+        except (ServiceUnavailable, AuthError) as e:
+            print(f"[WARN] Neo4j unavailable, running in fallback mode: {e}")
+            self.fallback_mode = True
+            self._local_store: Dict[str, List[Dict]] = {}
 
-    def record_collaboration(self, from_agent: str, to_agent: str, knowledge_id: UUID):
+    def _sanitize_for_sharing(self, text: str) -> str:
+        """Strip personal identifiers before storing to shared memory."""
+        # Phone numbers
+        text = re.sub(r'\+?1?\d{10,15}', '[PHONE]', text)
+        # Email addresses
+        text = re.sub(r'[\w.-]+@[\w.-]+\.\w+', '[EMAIL]', text)
+        # Names (common patterns like "My friend X", "X's startup")
+        text = re.sub(r'(?i)(?:my\s+(?:friend|contact|colleague)\s+)(\w+)', 'a contact', text)
+        # Specific identifiers
+        text = re.sub(r'(?i)(?:sarah|john|mike|alex|chris|jordan)[\'\']?s', 'a contact\'s', text)
+        return text
+
+    def store_research(self, agent: str, topic: str, findings: str,
+                      sources: List[str] = None, depth: str = "medium") -> Optional[UUID]:
+        """Store research findings to Neo4j with sanitization."""
+        knowledge_id = uuid4()
+        safe_findings = self._sanitize_for_sharing(findings)
+        safe_topic = self._sanitize_for_sharing(topic)
+
+        if self.fallback_mode:
+            self._local_store.setdefault('research', []).append({
+                'id': str(knowledge_id), 'agent': agent, 'topic': safe_topic,
+                'findings': safe_findings, 'created_at': datetime.now().isoformat()
+            })
+            return knowledge_id
+
+        query = """
+        MATCH (a:Agent {id: $agent})
+        CREATE (r:Research {
+            id: $id, topic: $topic, findings: $findings,
+            sources: $sources, depth: $depth,
+            created_at: datetime(), confidence: 0.9
+        })
+        CREATE (a)-[:CREATED {timestamp: datetime()}]->(r)
+        RETURN r.id as id
+        """
+        with self.driver.session() as session:
+            session.run(query, agent=agent, id=str(knowledge_id),
+                       topic=safe_topic, findings=safe_findings,
+                       sources=sources or [], depth=depth)
+        return knowledge_id
+
+    def query_related(self, agent: str, topic: str,
+                     min_confidence: float = 0.7) -> List[Dict[str, Any]]:
+        """Query operational knowledge with vector fallback."""
+        if self.fallback_mode:
+            return self._local_store.get('research', [])
+
+        # Try vector search first (if available)
+        try:
+            query = """
+            CALL db.index.vector.queryNodes('concept_embedding', 5, $embedding)
+            YIELD node, score
+            WHERE score >= $min_score
+            RETURN node.name as concept, node.description as description, score
+            """
+            # Note: embedding generation would happen here
+            with self.driver.session() as session:
+                result = session.run(query, embedding=[], min_score=min_confidence)
+                return [dict(record) for record in result]
+        except Exception:
+            # Fallback to full-text search
+            query = """
+            CALL db.index.fulltext.queryNodes('knowledge_content', $topic)
+            YIELD node, score
+            WHERE score >= $min_score
+            RETURN node.topic as topic, node.findings as findings, score
+            LIMIT 10
+            """
+            with self.driver.session() as session:
+                result = session.run(query, topic=topic, min_score=min_confidence)
+                return [dict(record) for record in result]
+
+    def record_collaboration(self, from_agent: str, to_agent: str,
+                           knowledge_id: UUID) -> bool:
         """Track that one agent learned from another's output."""
+        if self.fallback_mode:
+            return True
+
+        query = """
+        MATCH (from:Agent {id: $from_agent})
+        MATCH (to:Agent {id: $to_agent})
+        MATCH (k {id: $knowledge_id})
+        CREATE (from)-[:LEARNED {knowledge_id: $knowledge_id,
+                               timestamp: datetime()}]->(to)
+        CREATE (to)-[:BUILT_ON]->(k)
+        """
+        with self.driver.session() as session:
+            session.run(query, from_agent=from_agent, to_agent=to_agent,
+                       knowledge_id=str(knowledge_id))
+        return True
+
+    def create_task(self, task_type: str, description: str,
+                   delegated_by: str, assigned_to: str) -> Optional[UUID]:
+        """Create a task for specialist agents to pick up."""
+        task_id = uuid4()
+        safe_description = self._sanitize_for_sharing(description)
+
+        if self.fallback_mode:
+            self._local_store.setdefault('tasks', []).append({
+                'id': str(task_id), 'type': task_type, 'description': safe_description,
+                'status': 'pending', 'assigned_to': assigned_to,
+                'delegated_by': delegated_by
+            })
+            return task_id
+
+        query = """
+        MATCH (delegator:Agent {id: $delegated_by})
+        MATCH (assignee:Agent {id: $assigned_to})
+        CREATE (t:Task {
+            id: $id, type: $type, description: $description,
+            status: 'pending', created_at: datetime()
+        })
+        CREATE (delegator)-[:CREATED {timestamp: datetime()}]->(t)
+        CREATE (t)-[:ASSIGNED_TO]->(assignee)
+        RETURN t.id as id
+        """
+        with self.driver.session() as session:
+            session.run(query, id=str(task_id), type=task_type,
+                       description=safe_description,
+                       delegated_by=delegated_by, assigned_to=assigned_to)
+        return task_id
+
+    def claim_task(self, agent: str) -> Optional[Dict[str, Any]]:
+        """Claim next pending task for an agent."""
+        if self.fallback_mode:
+            tasks = self._local_store.get('tasks', [])
+            for t in tasks:
+                if t['assigned_to'] == agent and t['status'] == 'pending':
+                    t['status'] = 'in_progress'
+                    return t
+            return None
+
+        query = """
+        MATCH (t:Task {status: 'pending'})-[:ASSIGNED_TO]->(a:Agent {id: $agent})
+        SET t.status = 'in_progress', t.started_at = datetime()
+        RETURN t.id as id, t.type as type, t.description as description
+        LIMIT 1
+        """
+        with self.driver.session() as session:
+            result = session.run(query, agent=agent)
+            record = result.single()
+            return dict(record) if record else None
+
+    def complete_task(self, task_id: UUID, results: Dict[str, Any]) -> bool:
+        """Mark task as completed with results."""
+        if self.fallback_mode:
+            for t in self._local_store.get('tasks', []):
+                if t['id'] == str(task_id):
+                    t['status'] = 'completed'
+                    t['results'] = results
+                    return True
+            return False
+
+        query = """
+        MATCH (t:Task {id: $task_id})
+        SET t.status = 'completed', t.completed_at = datetime(),
+            t.results = $results, t.quality_score = $quality_score
+        """
+        with self.driver.session() as session:
+            session.run(query, task_id=str(task_id), results=str(results),
+                       quality_score=results.get('quality_score', 0.8))
+        return True
+
+    def save_session_context(self, sender_id: str, context: Dict[str, Any]) -> bool:
+        """Save session context for persistence across resets."""
+        if self.fallback_mode:
+            return True
+
+        query = """
+        MERGE (s:SessionContext {sender_id: $sender_id, session_date: date()})
+        SET s.active_tasks = $active_tasks,
+            s.pending_delegations = $pending_delegations,
+            s.conversation_summary = $conversation_summary,
+            s.updated_at = datetime()
+        """
+        with self.driver.session() as session:
+            session.run(query, sender_id=sender_id,
+                       active_tasks=context.get('active_tasks', []),
+                       pending_delegations=context.get('pending_delegations', []),
+                       conversation_summary=context.get('conversation_summary', ''))
+        return True
+
+    def get_session_context(self, sender_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve session context for a sender."""
+        if self.fallback_mode:
+            return None
+
+        query = """
+        MATCH (s:SessionContext {sender_id: $sender_id, session_date: date()})
+        RETURN s.active_tasks as active_tasks,
+               s.pending_delegations as pending_delegations,
+               s.conversation_summary as conversation_summary
+        """
+        with self.driver.session() as session:
+            result = session.run(query, sender_id=sender_id)
+            record = result.single()
+            return dict(record) if record else None
+
+    def health_check(self) -> Dict[str, Any]:
+        """Check Neo4j health status."""
+        if self.fallback_mode:
+            return {'status': 'fallback', 'connected': False}
+
+        try:
+            with self.driver.session() as session:
+                result = session.run("RETURN 1 as test")
+                record = result.single()
+                return {'status': 'healthy', 'connected': True,
+                       'test': record['test'] if record else None}
+        except Exception as e:
+            return {'status': 'unhealthy', 'connected': False, 'error': str(e)}
+
+    def close(self):
+        """Close Neo4j connection."""
+        if self.driver:
+            self.driver.close()
 ```
 
 **Step 3.2**: Add memory tools to agent capabilities
@@ -381,6 +673,53 @@ When receiving a request:
 
 ---
 
+## Monitoring & Health Checks
+
+Add a health check endpoint to the wrapper server:
+
+```javascript
+// In server.js - add health check endpoint
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {}
+  };
+
+  // Check OpenClaw gateway
+  try {
+    const gatewayRes = await fetch('http://localhost:8080/health');
+    health.services.openclaw = gatewayRes.ok ? 'healthy' : 'degraded';
+  } catch (e) {
+    health.services.openclaw = 'unavailable';
+    health.status = 'degraded';
+  }
+
+  // Check Neo4j
+  try {
+    const neo4jHealth = await memory.health_check();
+    health.services.neo4j = neo4jHealth.status;
+    if (neo4jHealth.status === 'unhealthy') {
+      health.status = 'degraded';
+    }
+  } catch (e) {
+    health.services.neo4j = 'unavailable';
+    health.status = 'degraded';
+  }
+
+  // Check Signal
+  health.services.signal = signalClient?.isConnected() ? 'healthy' : 'disconnected';
+
+  res.status(health.status === 'ok' ? 200 : 503).json(health);
+});
+```
+
+Health endpoint returns:
+- `200 OK` - All services healthy
+- `503 Service Unavailable` - One or more services degraded
+
+---
+
 ## Verification Checklist
 
 ### Multi-Agent Setup
@@ -400,10 +739,14 @@ When receiving a request:
 
 ### Integration
 - [ ] Agents can write to Neo4j
-- [ ] Agents can query Neo4j
-- [ ] Kublai delegates via agentToAgent
+- [ ] Agents can query Neo4j (with vector fallback)
+- [ ] Kublai delegates via Task queue pattern
 - [ ] Personal context stays in files
 - [ ] Operational knowledge goes to Neo4j
+- [ ] Privacy sanitization active (phone/email/names stripped)
+- [ ] Fallback mode works when Neo4j unavailable
+- [ ] Session context persists across daily resets
+- [ ] Health check endpoint returns 200 OK
 
 ---
 
@@ -420,8 +763,9 @@ When receiving a request:
 
 | File | Action |
 |------|--------|
-| `moltbot.json` | Add agents.list, agentToAgent config |
-| `server.js` | Add agent directory creation |
-| `openclaw_memory.py` | Create (new) |
+| `moltbot.json` | Add agents.list, agentToAgent config, Signal env var |
+| `Dockerfile` | Add agent directory creation (avoids race condition) |
+| `server.js` | Add health check endpoint |
+| `openclaw_memory.py` | Create with full implementation + fallback mode |
 | `/data/workspace/souls/*.md` | Create (6 files) |
-| Neo4j schema | Create via Cypher |
+| Neo4j schema | Create via Cypher (includes SessionContext, CREATED rel) |
