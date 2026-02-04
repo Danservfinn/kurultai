@@ -3521,6 +3521,416 @@ class OperationalMemory:
 
         return created
 
+    # =======================================================================
+    # Kurultai v0.1 Task Dependency Engine Methods
+    # =======================================================================
+
+    def create_task_with_embedding(
+        self,
+        task_type: str,
+        description: str,
+        delegated_by: str,
+        assigned_to: Optional[str],
+        priority: str,
+        sender_hash: str,
+        embedding: Optional[List[float]] = None,
+        deliverable_type: str = "analysis",
+        priority_weight: float = 0.5,
+        window_expires_at: Optional[datetime] = None,
+        **kwargs
+    ) -> str:
+        """
+        Create a task with Kurultai dependency fields.
+
+        Args:
+            task_type: Type of task
+            description: Task description
+            delegated_by: Agent who delegated the task
+            assigned_to: Agent assigned to the task
+            priority: Task priority (0-1)
+            sender_hash: HMAC-SHA256 of sender identifier
+            embedding: 384-dim vector for similarity (optional)
+            deliverable_type: Type of deliverable (research, code, etc.)
+            priority_weight: Weight for topological sort (0-1)
+            window_expires_at: When intent window expires
+
+        Returns:
+            Task ID
+        """
+        task_id = self._generate_id()
+        now = self._now()
+
+        # Normalize assigned_to - None or 'any' means unassigned
+        if assigned_to == 'any':
+            assigned_to_value = None
+        else:
+            assigned_to_value = assigned_to
+
+        cypher = """
+        CREATE (t:Task {
+            id: $task_id,
+            type: $task_type,
+            description: $description,
+            status: 'pending',
+            delegated_by: $delegated_by,
+            assigned_to: $assigned_to,
+            priority: $priority,
+            created_at: $created_at,
+            claimed_at: null,
+            completed_at: null,
+            claimed_by: null,
+            results: null,
+            error_message: null,
+            // Kurultai v0.1 fields
+            sender_hash: $sender_hash,
+            embedding: COALESCE($embedding, []),
+            deliverable_type: $deliverable_type,
+            priority_weight: $priority_weight,
+            user_priority_override: false,
+            window_expires_at: COALESCE($window_expires_at, $created_at),
+            merged_into: null,
+            merged_from: [],
+            notion_synced_at: null,
+            notion_page_id: null,
+            notion_url: null,
+            external_priority_source: null,
+            external_priority_weight: 0.0
+        })
+        RETURN t.id as id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Task creation simulated for {task_type}")
+                return task_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    task_id=task_id,
+                    task_type=task_type,
+                    description=description,
+                    delegated_by=delegated_by,
+                    assigned_to=assigned_to_value,
+                    priority=priority,
+                    created_at=now,
+                    sender_hash=sender_hash,
+                    embedding=embedding,
+                    deliverable_type=deliverable_type,
+                    priority_weight=priority_weight,
+                    window_expires_at=window_expires_at,
+                )
+                record = result.single()
+                if record:
+                    logger.info(
+                        f"Task created with embedding: {task_id} "
+                        f"(type: {task_type}, deliverable: {deliverable_type})"
+                    )
+                    return record["id"]
+                else:
+                    raise RuntimeError("Task creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create task with embedding: {e}")
+                raise
+
+    def add_dependency(
+        self,
+        task_id: str,
+        depends_on_id: str,
+        dep_type: str = "blocks"
+    ) -> bool:
+        """
+        Add a DEPENDS_ON relationship with ATOMIC cycle detection.
+
+        Args:
+            task_id: The task that depends on another (dependent)
+            depends_on_id: The task that must complete first (dependency)
+            dep_type: Type of dependency ("blocks" | "feeds_into" | "parallel_ok")
+
+        Returns:
+            True if dependency created successfully
+
+        Raises:
+            ValueError: If adding would create a cycle
+        """
+        atomic_query = """
+        // Verify both tasks exist
+        MATCH (task:Task {id: $task_id})
+        MATCH (dep:Task {id: $depends_on_id})
+
+        // Check for cycles - if a path exists from dep back to task, adding this edge creates a cycle
+        WHERE NOT EXISTS {
+            MATCH path = (dep)-[:DEPENDS_ON*]->(task)
+        }
+
+        // Create dependency atomically
+        CREATE (task)-[r:DEPENDS_ON {
+            type: $dep_type,
+            weight: 0.5,
+            detected_by: 'explicit',
+            confidence: 1.0,
+            created_at: datetime()
+        }]->(dep)
+
+        RETURN r as relationship
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning("Fallback mode: Dependency creation simulated")
+                return True
+
+            try:
+                result = session.run(
+                    atomic_query,
+                    task_id=task_id,
+                    depends_on_id=depends_on_id,
+                    dep_type=dep_type
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Dependency created: {task_id} depends on {depends_on_id} ({dep_type})")
+                    return True
+                else:
+                    # Cycle detected or tasks don't exist
+                    logger.warning(f"Could not create dependency (would create cycle or tasks not found)")
+                    return False
+            except Neo4jError as e:
+                logger.error(f"Failed to add dependency: {e}")
+                raise
+
+    def get_task_dependencies(
+        self,
+        task_id: str
+    ) -> List[Dict]:
+        """
+        Get all dependencies for a task.
+
+        Args:
+            task_id: Task ID
+
+        Returns:
+            List of dependency relationships
+        """
+        query = """
+        MATCH (t:Task {id: $task_id})-[d:DEPENDS_ON]->(dep:Task)
+        RETURN d.type as type, d.weight as weight, d.detected_by as detected_by,
+               d.confidence as confidence, dep.id as depends_on_id,
+               dep.description as depends_on_description
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning("Fallback mode: No dependencies returned")
+                return []
+
+            try:
+                result = session.run(query, task_id=task_id)
+                return [dict(record) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to get task dependencies: {e}")
+                raise
+
+    def get_ready_tasks(
+        self,
+        sender_hash: str,
+        limit: int = 50
+    ) -> List[Dict]:
+        """
+        Find tasks with no unmet BLOCKS dependencies.
+
+        Args:
+            sender_hash: User identifier
+            limit: Maximum tasks to return
+
+        Returns:
+            List of tasks ready for execution
+        """
+        query = """
+        MATCH (t:Task {sender_hash: $sender_hash, status: 'pending'})
+        WHERE NOT EXISTS {
+            // Check for uncompleted blocking dependencies
+            MATCH (t)-[:DEPENDS_ON {type: 'blocks'}]->(blocker:Task)
+            WHERE blocker.status != 'completed'
+        }
+        RETURN t
+        ORDER BY t.priority_weight DESC, t.created_at ASC
+        LIMIT $limit
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning("Fallback mode: No ready tasks returned")
+                return []
+
+            try:
+                result = session.run(query, sender_hash=sender_hash, limit=limit)
+                return [dict(record["t"]) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to get ready tasks: {e}")
+                raise
+
+    def complete_task_with_dependencies(
+        self,
+        task_id: str,
+        results: Dict,
+        notify_delegator: bool = True
+    ) -> bool:
+        """
+        Mark task as complete and check if dependent tasks are now ready.
+
+        Args:
+            task_id: Task ID to complete
+            results: Task results
+            notify_delegator: Whether to create notification
+
+        Returns:
+            True if successful
+        """
+        now = self._now()
+
+        complete_query = """
+        MATCH (t:Task {id: $task_id})
+        SET t.status = 'completed',
+            t.completed_at = $completed_at,
+            t.results = $results
+
+        // Find tasks that were blocked by this task
+        WITH t
+        MATCH (blocked:Task)-[:DEPENDS_ON {type: 'blocks'}]->(t)
+        WHERE blocked.status = 'pending'
+
+        // Check if blocked tasks are now ready (no other incomplete blockers)
+        WITH blocked
+        WHERE NOT EXISTS {
+            MATCH (blocked)-[:DEPENDS_ON {type: 'blocks'}]->(other:Task)
+            WHERE other.status != 'completed'
+        }
+
+        // Update now-ready tasks
+        SET blocked.status = 'ready',
+            blocked.unblocked_at = $completed_at
+
+        RETURN count(blocked) as newly_unblocked
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Task completion simulated for {task_id}")
+                return True
+
+            try:
+                result = session.run(
+                    complete_query,
+                    task_id=task_id,
+                    completed_at=now,
+                    results=str(results)
+                )
+                record = result.single()
+
+                newly_unblocked = record["newly_unblocked"] if record else 0
+                logger.info(
+                    f"Task completed: {task_id} (newly unblocked: {newly_unblocked})"
+                )
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to complete task with dependencies: {e}")
+                raise
+
+    def log_priority_change(
+        self,
+        sender_hash: str,
+        task_id: str,
+        old_priority: float,
+        new_priority: float,
+        reason: str
+    ) -> None:
+        """
+        Log priority change for audit trail.
+
+        Args:
+            sender_hash: User who made the change
+            task_id: Task whose priority changed
+            old_priority: Previous priority value
+            new_priority: New priority value
+            reason: Reason for the change
+        """
+        query = """
+        CREATE (a:PriorityAudit {
+            timestamp: datetime(),
+            sender_hash: $sender_hash,
+            task_id: $task_id,
+            old_priority: $old_priority,
+            new_priority: $new_priority,
+            reason: $reason
+        })
+        RETURN a
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning("Fallback mode: Priority audit not recorded")
+                return
+
+            try:
+                session.run(query, {
+                    "sender_hash": sender_hash,
+                    "task_id": task_id,
+                    "old_priority": old_priority,
+                    "new_priority": new_priority,
+                    "reason": reason
+                })
+                logger.info(f"Priority audit logged: {task_id} {old_priority} -> {new_priority}")
+            except Neo4jError as e:
+                logger.error(f"Failed to log priority change: {e}")
+
+    def get_tasks_by_sender(
+        self,
+        sender_hash: str,
+        status: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict]:
+        """
+        Get tasks for a specific sender.
+
+        Args:
+            sender_hash: User identifier
+            status: Optional status filter
+            limit: Maximum tasks to return
+
+        Returns:
+            List of tasks
+        """
+        if status:
+            query = """
+            MATCH (t:Task {sender_hash: $sender_hash, status: $status})
+            RETURN t
+            ORDER BY t.priority_weight DESC, t.created_at ASC
+            LIMIT $limit
+            """
+            params = {"sender_hash": sender_hash, "status": status, "limit": limit}
+        else:
+            query = """
+            MATCH (t:Task {sender_hash: $sender_hash})
+            RETURN t
+            ORDER BY t.priority_weight DESC, t.created_at ASC
+            LIMIT $limit
+            """
+            params = {"sender_hash": sender_hash, "limit": limit}
+
+        with self._session() as session:
+            if session is None:
+                logger.warning("Fallback mode: No tasks returned")
+                return []
+
+            try:
+                result = session.run(query, **params)
+                return [dict(record["t"]) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to get tasks by sender: {e}")
+                raise
+
     def close(self) -> None:
         """Close the Neo4j driver and release resources."""
         if self._driver:
