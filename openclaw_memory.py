@@ -2977,6 +2977,448 @@ class OperationalMemory:
                 raise
 
     # =======================================================================
+    # MetaRule Management (Self-Improvement Skills Integration)
+    # =======================================================================
+
+    def create_metarule(
+        self,
+        rule_content: str,
+        rule_type: str,
+        source_reflections: List[str]
+    ) -> str:
+        """
+        Create a new MetaRule node.
+
+        MetaRules are generated from consolidated reflections and represent
+        general principles that agents should follow.
+
+        Args:
+            rule_content: The rule text content
+            rule_type: Type of rule ('absolute', 'guideline', 'conditional')
+            source_reflections: List of reflection IDs that generated this rule
+
+        Returns:
+            MetaRule ID string
+
+        Raises:
+            ValueError: If rule_type is invalid
+        """
+        valid_types = ['absolute', 'guideline', 'conditional']
+        if rule_type not in valid_types:
+            raise ValueError(f"Invalid rule_type '{rule_type}'. Must be one of: {valid_types}")
+
+        rule_id = self._generate_id()
+        created_at = self._now()
+
+        cypher = """
+        CREATE (m:MetaRule {
+            id: $rule_id,
+            rule_content: $rule_content,
+            rule_type: $rule_type,
+            source_reflections: $source_reflections,
+            success_count: 0,
+            application_count: 0,
+            effectiveness_score: 0.0,
+            approved: false,
+            approved_by: null,
+            approved_at: null,
+            version: 1,
+            created_at: $created_at
+        })
+        RETURN m.id as rule_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: MetaRule creation simulated")
+                return rule_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    rule_id=rule_id,
+                    rule_content=rule_content,
+                    rule_type=rule_type,
+                    source_reflections=source_reflections,
+                    created_at=created_at
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"MetaRule created: {rule_id} (type: {rule_type})")
+                    return record["rule_id"]
+                else:
+                    raise RuntimeError("MetaRule creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create MetaRule: {e}")
+                raise
+
+    def get_metarule(self, rule_id: str) -> Optional[Dict]:
+        """
+        Get a MetaRule by ID.
+
+        Args:
+            rule_id: MetaRule ID to retrieve
+
+        Returns:
+            MetaRule dict if found, None otherwise
+        """
+        cypher = """
+        MATCH (m:MetaRule {id: $rule_id})
+        RETURN m
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, rule_id=rule_id)
+                record = result.single()
+                return dict(record["m"]) if record else None
+            except Neo4jError as e:
+                logger.error(f"Failed to get MetaRule: {e}")
+                return None
+
+    def list_metarules(
+        self,
+        approved: Optional[bool] = None,
+        rule_type: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict]:
+        """
+        List MetaRules with optional filters.
+
+        Args:
+            approved: Filter by approval status
+            rule_type: Filter by rule type
+            limit: Maximum number of rules to return
+
+        Returns:
+            List of MetaRule dicts
+        """
+        conditions = []
+        params = {"limit": limit}
+
+        if approved is not None:
+            conditions.append("m.approved = $approved")
+            params["approved"] = approved
+
+        if rule_type is not None:
+            conditions.append("m.rule_type = $rule_type")
+            params["rule_type"] = rule_type
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (m:MetaRule)
+        {where_clause}
+        RETURN m
+        ORDER BY m.effectiveness_score DESC, m.created_at DESC
+        LIMIT $limit
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                return [dict(record["m"]) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to list MetaRules: {e}")
+                return []
+
+    def approve_metarule(self, rule_id: str, approved_by: str) -> bool:
+        """
+        Approve a MetaRule (Kublai action).
+
+        Args:
+            rule_id: ID of the rule to approve
+            approved_by: Agent who approved the rule
+
+        Returns:
+            True if approval successful, False if rule not found
+        """
+        approved_at = self._now()
+
+        cypher = """
+        MATCH (m:MetaRule {id: $rule_id})
+        SET m.approved = true,
+            m.approved_by = $approved_by,
+            m.approved_at = $approved_at
+        RETURN m.id as rule_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: MetaRule approval simulated for {rule_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    rule_id=rule_id,
+                    approved_by=approved_by,
+                    approved_at=approved_at
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"MetaRule not found: {rule_id}")
+                    return False
+
+                logger.info(f"MetaRule approved: {rule_id} by {approved_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to approve MetaRule: {e}")
+                raise
+
+    def apply_metarule(self, rule_id: str, outcome_success: bool) -> bool:
+        """
+        Record a MetaRule application outcome.
+
+        Updates success_count and application_count, recalculates effectiveness_score.
+
+        Args:
+            rule_id: ID of the rule that was applied
+            outcome_success: Whether the application was successful
+
+        Returns:
+            True if update successful, False if rule not found
+        """
+        cypher = """
+        MATCH (m:MetaRule {id: $rule_id})
+        SET m.application_count = m.application_count + 1,
+            m.success_count = CASE WHEN $outcome_success
+                THEN m.success_count + 1
+                ELSE m.success_count
+            END,
+            m.effectiveness_score = CASE WHEN $outcome_success
+                THEN (m.success_count + 1.0) / (m.application_count + 1.0)
+                ELSE m.success_count / (m.application_count + 1.0)
+            END
+        RETURN m.id as rule_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: MetaRule application simulated for {rule_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    rule_id=rule_id,
+                    outcome_success=outcome_success
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"MetaRule not found: {rule_id}")
+                    return False
+
+                logger.debug(f"MetaRule application recorded: {rule_id}, success={outcome_success}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to record MetaRule application: {e}")
+                raise
+
+    def get_metarule_effectiveness(self, rule_id: str) -> Optional[Dict]:
+        """
+        Get effectiveness metrics for a MetaRule.
+
+        Args:
+            rule_id: ID of the rule
+
+        Returns:
+            Dict with effectiveness metrics, or None if rule not found
+        """
+        cypher = """
+        MATCH (m:MetaRule {id: $rule_id})
+        RETURN m.success_count as success_count,
+               m.application_count as application_count,
+               m.effectiveness_score as effectiveness_score
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, rule_id=rule_id)
+                record = result.single()
+
+                if record is None:
+                    return None
+
+                return {
+                    "rule_id": rule_id,
+                    "success_count": record["success_count"],
+                    "application_count": record["application_count"],
+                    "effectiveness_score": record["effectiveness_score"]
+                }
+
+            except Neo4jError as e:
+                logger.error(f"Failed to get MetaRule effectiveness: {e}")
+                return None
+
+    def version_metarule(
+        self,
+        old_rule_id: str,
+        new_rule_content: str,
+        reason: str
+    ) -> Optional[str]:
+        """
+        Create a new version of a MetaRule.
+
+        Creates a new rule node and adds REPLACED_BY relationship from old to new.
+
+        Args:
+            old_rule_id: ID of the rule being replaced
+            new_rule_content: Content for the new rule version
+            reason: Reason for the replacement
+
+        Returns:
+            New rule ID if successful, None if old rule not found
+        """
+        # Get old rule data
+        old_rule = self.get_metarule(old_rule_id)
+        if old_rule is None:
+            return None
+
+        # Create new rule with incremented version
+        new_rule_id = self._generate_id()
+        created_at = self._now()
+        new_version = old_rule.get("version", 1) + 1
+
+        cypher_create = """
+        CREATE (m:MetaRule {
+            id: $rule_id,
+            rule_content: $rule_content,
+            rule_type: $rule_type,
+            source_reflections: $source_reflections,
+            success_count: 0,
+            application_count: 0,
+            effectiveness_score: 0.0,
+            approved: false,
+            approved_by: null,
+            approved_at: null,
+            version: $version,
+            created_at: $created_at,
+            replaces_rule: $old_rule_id
+        })
+        RETURN m.id as rule_id
+        """
+
+        cypher_relate = """
+        MATCH (old:MetaRule {id: $old_rule_id})
+        MATCH (new:MetaRule {id: $new_rule_id})
+        CREATE (old)-[r:REPLACED_BY {
+            reason: $reason,
+            replaced_at: $replaced_at
+        }]->(new)
+        RETURN r
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: MetaRule versioning simulated")
+                return new_rule_id
+
+            try:
+                # Create new rule
+                result = session.run(
+                    cypher_create,
+                    rule_id=new_rule_id,
+                    rule_content=new_rule_content,
+                    rule_type=old_rule.get("rule_type", "guideline"),
+                    source_reflections=old_rule.get("source_reflections", []),
+                    version=new_version,
+                    created_at=created_at,
+                    old_rule_id=old_rule_id
+                )
+                record = result.single()
+                if not record:
+                    raise RuntimeError("New MetaRule creation failed")
+
+                # Create REPLACED_BY relationship
+                session.run(
+                    cypher_relate,
+                    old_rule_id=old_rule_id,
+                    new_rule_id=new_rule_id,
+                    reason=reason,
+                    replaced_at=created_at
+                )
+
+                logger.info(f"MetaRule versioned: {old_rule_id} -> {new_rule_id} (version {new_version})")
+                return new_rule_id
+
+            except Neo4jError as e:
+                logger.error(f"Failed to version MetaRule: {e}")
+                raise
+
+    def get_metarule_history(self, rule_id: str) -> List[Dict]:
+        """
+        Get version history for a MetaRule.
+
+        Follows REPLACED_BY relationships to build version chain.
+
+        Args:
+            rule_id: Current rule ID
+
+        Returns:
+            List of rule versions (oldest first)
+        """
+        # Check if this rule replaced another
+        cypher = """
+        MATCH (old:MetaRule)-[r:REPLACED_BY]->(new:MetaRule {id: $rule_id})
+        RETURN old, r
+        """
+
+        history = []
+
+        with self._session() as session:
+            if session is None:
+                return history
+
+            try:
+                # Walk backwards through the chain
+                current_id = rule_id
+                chain = []
+
+                while True:
+                    result = session.run(cypher, rule_id=current_id)
+                    record = result.single()
+
+                    if record is None:
+                        break
+
+                    old_rule = dict(record["old"])
+                    relationship = dict(record["r"])
+                    chain.append({
+                        "rule": old_rule,
+                        "replaced_by_reason": relationship.get("reason", ""),
+                        "replaced_at": relationship.get("replaced_at")
+                    })
+                    current_id = old_rule["id"]
+
+                # Reverse to get oldest first
+                chain.reverse()
+
+                # Add current rule
+                current_rule = self.get_metarule(rule_id)
+                if current_rule:
+                    chain.append({"rule": current_rule})
+
+                return chain
+
+            except Neo4jError as e:
+                logger.error(f"Failed to get MetaRule history: {e}")
+                return []
+
+    # =======================================================================
     # Schema Management
     # =======================================================================
 
@@ -3051,6 +3493,14 @@ class OperationalMemory:
             ("CREATE INDEX learning_agent_idx IF NOT EXISTS FOR (l:Learning) ON (l.agent)", "learning_agent_idx"),
             ("CREATE INDEX learning_topic_idx IF NOT EXISTS FOR (l:Learning) ON (l.topic)", "learning_topic_idx"),
             ("CREATE INDEX learning_created_at_idx IF NOT EXISTS FOR (l:Learning) ON (l.created_at)", "learning_created_at_idx"),
+
+            # MetaRule indexes (Self-Improvement Skills Integration)
+            ("CREATE INDEX metarule_id_idx IF NOT EXISTS FOR (m:MetaRule) ON (m.id)", "metarule_id_idx"),
+            ("CREATE INDEX metarule_approved_idx IF NOT EXISTS FOR (m:MetaRule) ON (m.approved)", "metarule_approved_idx"),
+            ("CREATE INDEX metarule_type_idx IF NOT EXISTS FOR (m:MetaRule) ON (m.rule_type)", "metarule_type_idx"),
+            ("CREATE INDEX metarule_version_idx IF NOT EXISTS FOR (m:MetaRule) ON (m.version)", "metarule_version_idx"),
+            ("CREATE INDEX metarule_created_at_idx IF NOT EXISTS FOR (m:MetaRule) ON (m.created_at)", "metarule_created_at_idx"),
+            ("CREATE INDEX metarule_effectiveness_idx IF NOT EXISTS FOR (m:MetaRule) ON (m.effectiveness_score)", "metarule_effectiveness_idx"),
         ]
 
         created = []
