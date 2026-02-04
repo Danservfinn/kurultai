@@ -938,13 +938,17 @@ class MigrationManager:
         self.driver = driver
         self._ensure_schema_version_node()
 
+    def _session(self):
+        """Get a session from the driver."""
+        return self.driver.session()
+
     def _ensure_schema_version_node(self):
         """Create schema version tracking node if not exists."""
         query = '''
             MERGE (s:SchemaVersion {id: 'current'})
             ON CREATE SET s.version = 0, s.updated_at = datetime()
         '''
-        with self._session_pool() as session:
+        with self._session() as session:
             session.run(query)
 
     def get_current_version(self) -> int:
@@ -953,7 +957,7 @@ class MigrationManager:
             MATCH (s:SchemaVersion {id: 'current'})
             RETURN s.version as version
         '''
-        with self._session_pool() as session:
+        with self._session() as session:
             result = session.run(query)
             record = result.single()
             return record['version'] if record else 0
@@ -999,7 +1003,7 @@ class MigrationManager:
         new_version = migration['version'] if direction == 'up' else migration['version'] - 1
 
         # Use explicit transaction for atomicity
-        with self._session_pool() as session:
+        with self._session() as session:
             with session.begin_transaction() as tx:
                 try:
                     # Execute migration
@@ -1071,7 +1075,7 @@ class MigrationManager:
             DETACH DELETE b
         '''
 
-        with self._session_pool() as session:
+        with self._session() as session:
             # Create backups
             result = session.run(backup_query, version=version,
                                    reason=f'rollback_from_v{version}')
@@ -1113,7 +1117,7 @@ class MigrationManager:
                 })
                 RETURN count(a) as restored
             '''
-            with self._session_pool() as session:
+            with self._session() as session:
                 result = session.run(restore_query, backup_id=backup_id)
                 record = result.single()
                 restored = record['restored'] if record else 0
@@ -1135,7 +1139,7 @@ class MigrationManager:
                 })
                 RETURN count(a) as restored
             '''
-            with self._session_pool() as session:
+            with self._session() as session:
                 result = session.run(restore_query)
                 record = result.single()
                 restored = record['restored'] if record else 0
@@ -1159,7 +1163,7 @@ class MigrationManager:
                    b.backup_reason as backup_reason
             ORDER BY b.backed_up_at DESC
         '''
-        with self._session_pool() as session:
+        with self._session() as session:
             result = session.run(query)
             return [dict(record) for record in result]
 
@@ -1470,10 +1474,14 @@ import hmac
 import time
 import warnings
 import threading
+import socket
+import ipaddress
+import logging
 from typing import Optional, List, Dict, Any, Tuple, Set, Union, Callable
 from uuid import uuid4, UUID
 from datetime import datetime, timedelta, date
 from urllib.parse import urlparse
+from enum import Enum
 
 from neo4j import GraphDatabase, Driver
 from neo4j.exceptions import ServiceUnavailable, AuthError, TransientError
@@ -1501,6 +1509,193 @@ except ImportError:
 
 # Module-level logger for OperationalMemory
 logger = logging.getLogger('operational_memory')
+
+
+# Task Claim Exception Classes
+class TaskClaimError(Exception):
+    """Base exception for task claiming failures."""
+    pass
+
+
+class NoPendingTaskError(TaskClaimError):
+    """No pending tasks available for claiming.
+
+    This is a normal condition when all tasks have been claimed
+    or when no tasks are assigned to the requesting agent.
+    """
+    pass
+
+
+class RaceConditionError(TaskClaimError):
+    """Another agent claimed the task first.
+
+    Raised when optimistic locking detects a concurrent claim.
+    This is a retryable condition.
+    """
+    pass
+
+
+class DatabaseError(TaskClaimError):
+    """Database operation failed.
+
+    Indicates a non-retryable database error that requires
+    administrative attention.
+    """
+    pass
+
+
+class RateLimitExceeded(TaskClaimError):
+    """Rate limit exceeded for agent operation."""
+    pass
+
+
+class CircuitBreakerOpen(Exception):
+    """Raised when circuit breaker is open and rejecting requests."""
+    pass
+
+
+class SyncError(Exception):
+    """Raised when fallback data sync to Neo4j fails critically.
+
+    This error indicates that a significant portion of data accumulated
+    during fallback mode could not be synced back to Neo4j, potentially
+    resulting in data loss. The system remains in fallback mode when
+    this error is raised to prevent further data accumulation.
+    """
+    pass
+
+
+class CircuitState(Enum):
+    """Circuit breaker states."""
+    CLOSED = "closed"          # Normal operation
+    OPEN = "open"              # Failing, reject requests
+    HALF_OPEN = "half_open"    # Testing if recovered
+
+
+class CircuitBreaker:
+    """Circuit breaker for external service calls.
+
+    Protects against cascading failures by temporarily rejecting requests
+    when a service is failing. After a recovery timeout, allows a test
+    request through (half-open). If successful, closes the circuit;
+    if failed, reopens it.
+
+    Thread-safe implementation using locks.
+
+    Example:
+        breaker = CircuitBreaker(
+            name="openclaw_gateway",
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            expected_exception=(requests.RequestException, TimeoutError)
+        )
+
+        try:
+            result = breaker.call(make_request, arg1, arg2)
+        except CircuitBreakerOpen:
+            # Circuit is open, use fallback
+            result = fallback_result
+    """
+
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 30.0,
+        expected_exception: type = Exception
+    ):
+        self.name = name
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.expected_exception = expected_exception
+
+        self._failure_count = 0
+        self._last_failure_time: Optional[float] = None
+        self._state = CircuitState.CLOSED
+        self._lock = threading.Lock()
+
+    @property
+    def state(self) -> CircuitState:
+        """Current circuit state."""
+        with self._lock:
+            return self._state
+
+    @property
+    def failure_count(self) -> int:
+        """Current failure count."""
+        with self._lock:
+            return self._failure_count
+
+    def call(self, func: Callable, *args, **kwargs):
+        """Call function with circuit breaker protection.
+
+        Args:
+            func: Function to call
+            *args: Positional arguments for func
+            **kwargs: Keyword arguments for func
+
+        Returns:
+            Result from func
+
+        Raises:
+            CircuitBreakerOpen: If circuit is open and recovery timeout not elapsed
+            Exception: Any exception raised by func (wrapped in expected_exception)
+        """
+        with self._lock:
+            if self._state == CircuitState.OPEN:
+                if self._should_attempt_reset():
+                    self._state = CircuitState.HALF_OPEN
+                    logger.info(f"Circuit {self.name} entering half-open state")
+                else:
+                    raise CircuitBreakerOpen(
+                        f"Circuit {self.name} is OPEN - failing fast"
+                    )
+
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except self.expected_exception as e:
+            self._on_failure()
+            raise
+
+    def _should_attempt_reset(self) -> bool:
+        """Check if enough time has passed to try again.
+
+        Returns:
+            True if recovery timeout has elapsed since last failure.
+        """
+        if self._last_failure_time is None:
+            return True
+        return time.time() - self._last_failure_time >= self.recovery_timeout
+
+    def _on_success(self):
+        """Handle successful call.
+
+        Closes circuit if in half-open state, resets failure count.
+        """
+        with self._lock:
+            if self._state == CircuitState.HALF_OPEN:
+                self._state = CircuitState.CLOSED
+                self._failure_count = 0
+                self._last_failure_time = None
+                logger.info(f"Circuit {self.name} closed - service recovered")
+
+    def _on_failure(self):
+        """Handle failed call.
+
+        Increments failure count and opens circuit if threshold reached.
+        """
+        with self._lock:
+            self._failure_count += 1
+            self._last_failure_time = time.time()
+
+            if self._failure_count >= self.failure_threshold:
+                self._state = CircuitState.OPEN
+                logger.error(
+                    f"Circuit {self.name} opened after {self._failure_count} failures"
+                )
+
 
 class OperationalMemory:
     """Neo4j-backed operational memory with fallback mode."""
@@ -1543,10 +1738,14 @@ class OperationalMemory:
         self._embedding_model = None
         self._model_lock = threading.Lock()
 
-        # Circuit breaker thread safety
-        self._circuit_lock = threading.Lock()
-        self._circuit_failures = 0
-        self._circuit_last_failure: Optional[datetime] = None
+        # Circuit breaker for OpenClaw gateway calls
+        # Protects against cascading failures if Kublai is slow/unresponsive
+        self._gateway_circuit = CircuitBreaker(
+            name="openclaw_gateway",
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            expected_exception=(requests.RequestException, TimeoutError)
+        )
 
         # Fallback store limits to prevent memory exhaustion
         self._MAX_FALLBACK_TASKS = 1000
@@ -1713,11 +1912,17 @@ class OperationalMemory:
                     if self.fallback_mode and self.driver:
                         # Try to verify connectivity
                         self.driver.verify_connectivity()
-                        # Success - exit fallback mode
-                        print("[RECOVERY] Neo4j connection restored, exiting fallback mode")
-                        self.fallback_mode = False
-                        # Sync any fallback data back to Neo4j
-                        self._sync_fallback_to_neo4j()
+                        # Success - attempt to sync fallback data
+                        print("[RECOVERY] Neo4j connection restored, syncing fallback data...")
+                        try:
+                            self._sync_fallback_to_neo4j()
+                            # Only exit fallback mode if sync succeeds
+                            self.fallback_mode = False
+                            print("[RECOVERY] Successfully synced fallback data, exiting fallback mode")
+                        except SyncError as e:
+                            # Sync failed critically - remain in fallback mode
+                            print(f"[RECOVERY] Sync failed: {e}")
+                            print("[RECOVERY] Remaining in fallback mode, will retry on next cycle")
                 except Exception:
                     pass  # Still unavailable, keep trying
                 time.sleep(30)  # Check every 30 seconds
@@ -1729,47 +1934,258 @@ class OperationalMemory:
     def _sync_fallback_to_neo4j(self):
         """Sync data from fallback mode back to Neo4j after recovery.
 
+        Syncs all data categories accumulated during fallback mode:
+        - tasks: Task nodes created during outage
+        - research: Research findings stored during outage
+        - concepts: Concept nodes with embeddings
+        - signal_sessions: Signal messenger session state
+        - notification_dlq: Dead letter queue for failed notifications
+
         Thread-safe: Acquires fallback lock to prevent concurrent modification
         during sync. Uses list() to snapshot items before processing.
+
+        Raises:
+            SyncError: If more than 10% of items fail to sync, indicating
+                persistent issues that require investigation.
         """
         with self._fallback_lock:
             if not self._local_store:
+                logger.info("No fallback data to sync")
                 return
 
             # Snapshot categories to avoid dict changing during iteration
             categories_snapshot = list(self._local_store.items())
 
-        print(f"[SYNC] Syncing {len(categories_snapshot)} categories from fallback to Neo4j")
-        sync_errors = []
+        # Track sync statistics for all categories
+        sync_stats = {
+            'tasks': {'success': 0, 'failed': 0},
+            'research': {'success': 0, 'failed': 0},
+            'concepts': {'success': 0, 'failed': 0},
+            'signal_sessions': {'success': 0, 'failed': 0},
+            'notification_dlq': {'success': 0, 'failed': 0},
+            'total_success': 0,
+            'total_failed': 0
+        }
+
+        total_items = sum(len(items) for _, items in categories_snapshot)
+        logger.info(f"[SYNC] Starting fallback sync: {total_items} items across {len(categories_snapshot)} categories")
 
         for category, items in categories_snapshot:
             # Snapshot items list for this category
-            items_snapshot = list(items)
+            items_snapshot = list(items) if isinstance(items, list) else [items]
+
             for item in items_snapshot:
                 try:
-                    if category == 'tasks':
-                        # Recreate task in Neo4j
-                        result = self.create_task(
-                            task_type=item.get('type', 'unknown'),
-                            description=item.get('description', ''),
-                            delegated_by=item.get('delegated_by', 'main'),
-                            assigned_to=item.get('assigned_to', 'main')
-                        )
-                        if result:
-                            # Remove successfully synced item from fallback store
-                            with self._fallback_lock:
-                                if item in self._local_store.get(category, []):
-                                    self._local_store[category].remove(item)
-                    # Add other categories as needed
+                    success = self._sync_item_by_category(category, item)
+                    if success:
+                        sync_stats[category]['success'] += 1
+                        sync_stats['total_success'] += 1
+                        # Remove successfully synced item from fallback store
+                        with self._fallback_lock:
+                            store_items = self._local_store.get(category, [])
+                            if isinstance(store_items, list) and item in store_items:
+                                store_items.remove(item)
+                            elif isinstance(store_items, dict) and item.get('id') in store_items:
+                                del store_items[item['id']]
+                    else:
+                        sync_stats[category]['failed'] += 1
+                        sync_stats['total_failed'] += 1
+                        logger.warning(f"[SYNC] Failed to sync {category} item (returned None)")
                 except Exception as e:
-                    error_msg = f"[SYNC ERROR] Failed to sync {category} item: {e}"
-                    print(error_msg)
-                    sync_errors.append(error_msg)
+                    sync_stats[category]['failed'] += 1
+                    sync_stats['total_failed'] += 1
+                    logger.error(f"[SYNC ERROR] Failed to sync {category} item: {e}", exc_info=True)
 
-        if sync_errors:
-            print(f"[SYNC WARNING] {len(sync_errors)} items failed to sync, will retry on next recovery")
-        else:
-            print("[SYNC] Fallback sync complete")
+        # Log detailed statistics
+        logger.info(f"[SYNC] Fallback sync complete: {sync_stats['total_success']} succeeded, {sync_stats['total_failed']} failed")
+        for category, stats in sync_stats.items():
+            if category not in ('total_success', 'total_failed') and (stats['success'] > 0 or stats['failed'] > 0):
+                logger.info(f"[SYNC]   {category}: {stats['success']} success, {stats['failed']} failed")
+
+        # Only exit fallback mode if failure rate is acceptable (< 10%)
+        total_attempted = sync_stats['total_success'] + sync_stats['total_failed']
+        if total_attempted > 0:
+            failure_rate = sync_stats['total_failed'] / total_attempted
+            if failure_rate >= 0.1:
+                error_msg = f"Sync failure rate {failure_rate:.1%} exceeds threshold (10%), remaining in fallback mode"
+                logger.error(f"[SYNC] {error_msg}")
+                raise SyncError(error_msg)
+
+    def _sync_item_by_category(self, category: str, item: Dict) -> bool:
+        """Sync a single fallback item to Neo4j based on its category.
+
+        Args:
+            category: The data category (tasks, research, concepts, etc.)
+            item: The item data to sync
+
+        Returns:
+            True if sync succeeded, False otherwise
+        """
+        sync_handlers = {
+            'tasks': self._sync_task_item,
+            'research': self._sync_research_item,
+            'concepts': self._sync_concept_item,
+            'signal_sessions': self._sync_signal_session_item,
+            'notification_dlq': self._sync_notification_dlq_item,
+        }
+
+        handler = sync_handlers.get(category)
+        if not handler:
+            logger.warning(f"[SYNC] Unknown category '{category}', skipping item")
+            return False
+
+        return handler(item)
+
+    def _sync_task_item(self, item: Dict) -> bool:
+        """Sync a task item from fallback store to Neo4j."""
+        try:
+            result = self.create_task(
+                task_type=item.get('type', 'unknown'),
+                description=item.get('description', ''),
+                delegated_by=item.get('delegated_by', 'main'),
+                assigned_to=item.get('assigned_to', 'main')
+            )
+            return result is not None
+        except Exception as e:
+            logger.error(f"[SYNC] Failed to sync task: {e}")
+            return False
+
+    def _sync_research_item(self, item: Dict) -> bool:
+        """Sync a research item from fallback store to Neo4j."""
+        try:
+            # Build query with all research fields
+            query = """
+            MATCH (a:Agent {id: $agent})
+            CREATE (r:Research {
+                id: $id,
+                topic: $topic,
+                findings: $findings,
+                sources: $sources,
+                depth: $depth,
+                access_tier: $access_tier,
+                sender_hash: $sender_hash,
+                created_at: datetime($created_at),
+                confidence: 0.9
+            })
+            CREATE (a)-[:CREATED {timestamp: datetime()}]->(r)
+            RETURN r.id as id
+            """
+            with self._session_pool() as session:
+                with session.begin_transaction() as tx:
+                    tx.run(query,
+                        agent=item.get('agent', 'unknown'),
+                        id=item.get('id'),
+                        topic=item.get('topic', ''),
+                        findings=item.get('findings', ''),
+                        sources=item.get('sources', []),
+                        depth=item.get('depth', 'medium'),
+                        access_tier=item.get('access_tier', 'general'),
+                        sender_hash=item.get('sender_hash'),
+                        created_at=item.get('created_at', datetime.now().isoformat())
+                    )
+            return True
+        except Exception as e:
+            logger.error(f"[SYNC] Failed to sync research: {e}")
+            return False
+
+    def _sync_concept_item(self, item: Dict) -> bool:
+        """Sync a concept item from fallback store to Neo4j."""
+        try:
+            query = """
+            MATCH (a:Agent {id: $agent})
+            MERGE (c:Concept {name: $name})
+            ON CREATE SET
+                c.id = $id,
+                c.description = $description,
+                c.domain = $domain,
+                c.source = $source,
+                c.embedding = $embedding,
+                c.access_tier = $access_tier,
+                c.sender_hash = $sender_hash,
+                c.created_at = datetime($created_at),
+                c.confidence = 0.9
+            ON MATCH SET
+                c.description = $description,
+                c.source = $source,
+                c.embedding = $embedding,
+                c.access_tier = $access_tier,
+                c.sender_hash = $sender_hash,
+                c.updated_at = datetime()
+            CREATE (a)-[:CREATED {timestamp: datetime()}]->(c)
+            RETURN c.id as id
+            """
+            with self._session_pool() as session:
+                with session.begin_transaction() as tx:
+                    tx.run(query,
+                        agent=item.get('agent', 'unknown'),
+                        id=item.get('id'),
+                        name=item.get('name', ''),
+                        description=item.get('description', ''),
+                        domain=item.get('domain', 'general'),
+                        source=item.get('source', ''),
+                        embedding=item.get('embedding'),
+                        access_tier=item.get('access_tier', 'general'),
+                        sender_hash=item.get('sender_hash'),
+                        created_at=item.get('created_at', datetime.now().isoformat())
+                    )
+            return True
+        except Exception as e:
+            logger.error(f"[SYNC] Failed to sync concept: {e}")
+            return False
+
+    def _sync_signal_session_item(self, item: Dict) -> bool:
+        """Sync a Signal session item from fallback store to Neo4j."""
+        try:
+            query = """
+            CREATE (s:SignalSession {
+                id: $id,
+                phone_number: $phone_number,
+                device_id: $device_id,
+                registered: $registered,
+                created_at: datetime($created_at)
+            })
+            RETURN s.id as id
+            """
+            with self._session_pool() as session:
+                session.run(query,
+                    id=item.get('id'),
+                    phone_number=item.get('phone_number'),
+                    device_id=item.get('device_id'),
+                    registered=item.get('registered', False),
+                    created_at=item.get('created_at', datetime.now().isoformat())
+                )
+            return True
+        except Exception as e:
+            logger.error(f"[SYNC] Failed to sync signal session: {e}")
+            return False
+
+    def _sync_notification_dlq_item(self, item: Dict) -> bool:
+        """Sync a notification DLQ item from fallback store to Neo4j."""
+        try:
+            query = """
+            CREATE (n:NotificationDLQ {
+                id: $id,
+                recipient: $recipient,
+                message: $message,
+                error: $error,
+                retry_count: $retry_count,
+                created_at: datetime($created_at)
+            })
+            RETURN n.id as id
+            """
+            with self._session_pool() as session:
+                session.run(query,
+                    id=item.get('id'),
+                    recipient=item.get('recipient'),
+                    message=item.get('message'),
+                    error=item.get('error'),
+                    retry_count=item.get('retry_count', 0),
+                    created_at=item.get('created_at', datetime.now().isoformat())
+                )
+            return True
+        except Exception as e:
+            logger.error(f"[SYNC] Failed to sync notification DLQ item: {e}")
+            return False
 
     def _preload_embedding_model(self):
         """Preload sentence-transformers model to avoid cold-start latency."""
@@ -2147,19 +2563,36 @@ Do not include any text outside the JSON object."""
             # - Short timeout prevents hanging connections
             # - No redirects prevents redirect-based bypasses
             # =========================================================================
-            response = requests.post(
-                f"{gateway_url}/agent/main/message",
-                headers={
-                    'Authorization': f'Bearer {token}',
-                    'Content-Type': 'application/json'
-                },
-                json={
-                    'message': review_prompt,
-                    'context': {'privacy_review': True, 'skip_memory': True}
-                },
-                timeout=10,  # Reduced from 30s to prevent hanging connections
-                allow_redirects=False  # Prevent redirect-based SSRF bypasses
-            )
+
+            # Define the request function for circuit breaker
+            def _make_gateway_request():
+                return requests.post(
+                    f"{gateway_url}/agent/main/message",
+                    headers={
+                        'Authorization': f'Bearer {token}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'message': review_prompt,
+                        'context': {'privacy_review': True, 'skip_memory': True}
+                    },
+                    timeout=10,  # Reduced from 30s to prevent hanging connections
+                    allow_redirects=False  # Prevent redirect-based SSRF bypasses
+                )
+
+            # =========================================================================
+            # CIRCUIT BREAKER PROTECTION
+            # Prevents cascading failures if Kublai is slow/unresponsive
+            # Falls back to pattern-based sanitization when circuit is open
+            # =========================================================================
+            try:
+                response = self._gateway_circuit.call(_make_gateway_request)
+            except CircuitBreakerOpen:
+                logger.warning("Circuit breaker open for OpenClaw gateway, using pattern fallback")
+                return None
+            except (requests.RequestException, TimeoutError) as e:
+                logger.warning(f"OpenClaw gateway request failed: {e}, using pattern fallback")
+                return None
 
             if response.status_code == 200:
                 result = response.json()
@@ -2182,14 +2615,12 @@ Do not include any text outside the JSON object."""
 
             # If Kublai unavailable (503, 429, etc), fall back to patterns
             if response.status_code in (503, 429, 502):
-                print(f"[PRIVACY] Kublai unavailable ({response.status_code}), using pattern fallback")
+                logger.warning(f"[PRIVACY] Kublai unavailable ({response.status_code}), using pattern fallback")
                 return None
 
-        except requests.Timeout:
-            print("[PRIVACY] Kublai review timed out, using pattern fallback")
-            return None
         except Exception as e:
-            print(f"[PRIVACY] Kublai review failed: {e}, using pattern fallback")
+            # Catch-all for any unexpected errors during sanitization
+            logger.warning(f"[PRIVACY] Kublai review failed: {e}, using pattern fallback")
             return None
 
         return None  # Signal to use pattern fallback
@@ -2543,7 +2974,75 @@ Do not include any text outside the JSON object."""
         # API keys and tokens (common patterns)
         text = re.sub(r'\b(sk-|pk-|api[_-]?key[:\s]*)([\w-]{10,})\b', '[API_KEY]', text, flags=re.I)
 
+        # Physical addresses - common patterns
+        # Street addresses like "123 Main St" or "456 Oak Avenue, Apt 2B"
+        text = re.sub(r'\b\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*(?:\s+(?:St|Street|Ave|Avenue|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court|Pl|Place|Ter|Terrace|Trail|Loop|Circle|Highway|Hwy|Route|Rt))\b(?:[,\s]+(?:Apt|Apartment|Suite|Ste|Unit|#)\s*\w+)?', '[ADDRESS]', text, flags=re.I)
+
+        # Names with titles (Mr., Mrs., Dr., etc.) - basic pattern for common names
+        # Matches patterns like "Mr. John Smith" or "Dr. Sarah Johnson"
+        text = re.sub(r'\b(?:Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b', '[NAME]', text)
+
+        # Common name patterns after "my friend/colleague/contact"
+        text = re.sub(r'\b(my friend|my colleague|my contact|my boss|my coworker)\s+[A-Z][a-z]+\b', r'\1 [NAME]', text, flags=re.I)
+
+        # URLs with potential personal info
+        text = re.sub(r'https?://[^\s<>"{}|\\^`\[\]]+', '[URL]', text)
+
         return text
+
+    def _sanitize_for_sharing(self, text: str, sender_hash: Optional[str] = None) -> str:
+        """Sanitize personal information before sharing to operational memory.
+
+        Uses LLM-based review with pattern-based fallback for common PII.
+        This is the primary entry point for sanitization before content is
+        stored in operational memory or delegated to other agents.
+
+        The method follows a defense-in-depth approach:
+        1. First attempts LLM-based sanitization for intelligent PII detection
+        2. Falls back to pattern-based sanitization if LLM is unavailable
+        3. Logs all sanitization attempts for audit purposes
+
+        Args:
+            text: Raw text to sanitize
+            sender_hash: Optional sender identifier for privacy context
+
+        Returns:
+            Sanitized text safe for operational memory
+
+        Example:
+            >>> memory._sanitize_for_sharing("Call Sarah at 555-123-4567")
+            "Call [NAME] at [PHONE]"
+        """
+        if not text or not isinstance(text, str):
+            return text
+
+        # Handle empty or whitespace-only strings
+        text = text.strip()
+        if not text:
+            return text
+
+        # Try LLM-based sanitization first for intelligent PII detection
+        try:
+            llm_result = self._llm_sanitize(text)
+            if llm_result is not None:
+                logger.debug("LLM sanitization successful")
+                return llm_result
+            # If _llm_sanitize returns None, it signals fallback to patterns
+            logger.debug("LLM sanitization returned None, using pattern fallback")
+        except Exception as e:
+            logger.warning(f"LLM sanitization failed: {e}, using pattern fallback")
+
+        # Fallback to pattern-based sanitization
+        try:
+            pattern_result = self._pattern_sanitize(text)
+            logger.debug("Pattern sanitization completed")
+            return pattern_result
+        except Exception as e:
+            logger.error(f"Pattern sanitization also failed: {e}")
+            # Last resort: return original text but log the failure
+            # This ensures the system continues to function even if
+            # sanitization fails completely
+            return text
 
     def _sanitize_lucene_query(self, query: str) -> str:
         """Sanitize user input for Lucene full-text search.
@@ -3546,11 +4045,24 @@ Do not include any text outside the JSON object."""
         Validates agent identity to prevent spoofing attacks.
         Uses optimistic locking with claim_attempt_id to prevent race conditions
         when multiple agents try to claim the same task simultaneously.
+
+        Raises:
+            NoPendingTaskError: No pending tasks available for this agent (normal condition)
+            RaceConditionError: Another agent claimed the task first (retryable)
+            RateLimitExceeded: Agent has exceeded rate limits
+            DatabaseError: Non-retryable database failure
+
+        Returns:
+            Dict with task details if claim successful, None if no work available
         """
         # Validate agent identity
         if not self._validate_agent_id(agent):
-            print(f"[AUTH] Invalid agent claiming task: {agent}")
+            logger.warning(f"[AUTH] Invalid agent claiming task: {agent}")
             return None
+
+        # Check rate limits before attempting claim
+        if not self._check_rate_limit(agent, 'claim_task'):
+            raise RateLimitExceeded(f"Rate limit exceeded for agent {agent}")
 
         if self.fallback_mode:
             # Thread-safe fallback mode with locking
@@ -3561,7 +4073,8 @@ Do not include any text outside the JSON object."""
                         t['status'] = 'in_progress'
                         t['claimed_at'] = datetime.now().isoformat()
                         return t
-                return None
+                # No pending tasks - this is normal, not an error
+                raise NoPendingTaskError(f"No pending tasks available for agent {agent}")
 
         # Atomic claim using optimistic locking pattern
         # Generate unique claim attempt ID to verify we won the race
@@ -3577,33 +4090,66 @@ Do not include any text outside the JSON object."""
         RETURN t.id as id, t.type as type, t.description as description,
                t.claim_attempt_id as verified_claim_id
         """
-        try:
-            with self._session_pool() as session:
-                # Use write transaction for stronger consistency guarantees
-                with session.begin_transaction() as tx:
-                    result = tx.run(query, agent=agent, claim_attempt_id=claim_attempt_id)
-                    record = result.single()
 
-                    if record and record['verified_claim_id'] == claim_attempt_id:
-                        # Success - we claimed the task
-                        # Transaction will auto-commit on successful exit
-                        return {
-                            'id': record['id'],
-                            'type': record['type'],
-                            'description': record['description']
-                        }
-                    elif record:
-                        # Another agent won the race - raise exception to force rollback
-                        raise Exception("Race condition lost - another agent claimed the task")
-                    else:
-                        # No task available
-                        raise Exception("No pending task available")
+        session = None
+        tx = None
+        try:
+            session = self._session_pool()
+            # Use write transaction for stronger consistency guarantees
+            tx = session.begin_transaction()
+
+            result = tx.run(query, agent=agent, claim_attempt_id=claim_attempt_id)
+            record = result.single()
+
+            if record and record['verified_claim_id'] == claim_attempt_id:
+                # Success - we claimed the task
+                tx.commit()
+                return {
+                    'id': record['id'],
+                    'type': record['type'],
+                    'description': record['description']
+                }
+            elif record:
+                # Another agent won the race - rollback and raise specific exception
+                tx.rollback()
+                raise RaceConditionError(
+                    f"Task claimed by another agent concurrently (agent: {agent})"
+                )
+            else:
+                # No task available - rollback and raise specific exception
+                tx.rollback()
+                raise NoPendingTaskError(f"No pending tasks available for agent {agent}")
+
+        except (NoPendingTaskError, RaceConditionError):
+            # Re-raise our specific exceptions without wrapping
+            raise
+
+        except TransientError as e:
+            # Neo4j transient error - retryable (connection issues, locks, etc.)
+            logger.warning(f"[TRANSIENT] Transient error claiming task for {agent}: {e}")
+            if tx:
+                try:
+                    tx.rollback()
+                except Exception:
+                    pass  # Best effort rollback
+            # Treat as race condition since we can't verify claim status
+            raise RaceConditionError(
+                f"Transient database error during task claim for {agent}"
+            ) from e
+
         except Exception as e:
-            # Transaction auto-rolls back on exception
-            if "Race condition lost" in str(e) or "No pending task" in str(e):
-                return None  # Expected cases, not errors
-            print(f"[ERROR] Task claim failed for {agent}: {e}")
-            return None
+            # Unexpected error - rollback and wrap in DatabaseError
+            logger.exception(f"[ERROR] Unexpected error claiming task for {agent}: {e}")
+            if tx:
+                try:
+                    tx.rollback()
+                except Exception:
+                    pass  # Best effort rollback
+            raise DatabaseError(f"Unexpected error claiming task: {e}") from e
+
+        finally:
+            if session:
+                session.close()
 
     def block_task(self, task_id: UUID, reason: str,
                    auto_escalate: bool = True) -> bool:
@@ -5329,20 +5875,30 @@ class OperationalMemory:
 
         Called by agents when they finish processing a background task.
         This releases the slot for the next queued task.
+
+        Note: Only releases semaphore if task was actually running (not queued).
+        Queued tasks never acquired the semaphore, so they must not release it.
         """
         with self._background_task_lock:
-            if task_id in self._background_task_active:
+            was_active = task_id in self._background_task_active
+            if was_active:
                 self._background_task_active.discard(task_id)
 
-        # Release semaphore to allow next task
-        try:
-            self._background_task_semaphore.release()
-            logger.info(f"[BACKGROUND] Task {task_id} completed, released slot "
-                       f"(active: {len(self._background_task_active)}/"
-                       f"{self._MAX_CONCURRENT_BACKGROUND_TASKS})")
-        except ValueError:
-            # Semaphore over-release (shouldn't happen, but handle gracefully)
-            logger.warning(f"[BACKGROUND] Semaphore release mismatch for task {task_id}")
+        # Only release semaphore if task was actually running (not queued)
+        if was_active:
+            try:
+                self._background_task_semaphore.release()
+                logger.info(f"[BACKGROUND] Task {task_id} completed, released slot "
+                           f"(active: {len(self._background_task_active)}/"
+                           f"{self._MAX_CONCURRENT_BACKGROUND_TASKS})")
+            except ValueError:
+                # Semaphore over-release - indicates logic error
+                logger.error(f"[BACKGROUND] Semaphore release failed for task {task_id} - "
+                            f"semaphore already at max. This indicates a tracking mismatch.")
+        else:
+            # Task was queued but never started, no semaphore to release
+            logger.debug(f"[BACKGROUND] Task {task_id} was queued but never started, "
+                        f"no semaphore to release")
 
     def get_background_task_status(self) -> Dict[str, Any]:
         """Get current background task status for monitoring.
@@ -7040,8 +7596,8 @@ After refactoring:
 |----------------|------------------------------|
 | Phase 4.7 (Ögedei Proactive) | Add reflection consolidation triggers |
 | Phase 4.8 (Chagatai Synthesis) | Use Neo4j vector index for related memories |
-| Phase 5 (Jochi-Temüjin) | Add quality metrics to code review |
-| Phase 6 (Kublai Delegation) | Check meta-rules before delegation |
+| Phase 6 (Jochi-Temüjin) | Add quality metrics to code review |
+| Phase 7 (Kublai Delegation) | Check meta-rules before delegation |
 
 #### 4.9.7 Implementation Priority
 
@@ -7054,7 +7610,1378 @@ After refactoring:
 | Continuous Claude skills | 8 hours | Medium | 5th |
 | Qdrant (deferred) | - | Future | TBD |
 
-### Phase 5: Jochi-Temüjin Collaboration Protocol
+### Phase 5: ClawTasks Bounty System Integration
+
+**STATUS: PLANNED**
+
+Integrate the 6-agent OpenClaw system with ClawTasks, an agent-to-agent bounty marketplace on Base L2. Workers stake 10% of bounty value to claim tasks and earn 95% of bounty plus stake back on successful completion.
+
+#### 5.1 Overview
+
+ClawTasks enables autonomous agents to participate in a decentralized work marketplace:
+
+| Mechanism | Description |
+|-----------|-------------|
+| **Staking** | 10% of bounty value required to claim |
+| **Reward** | 95% of bounty + full stake returned on success |
+| **Slashing** | Stake forfeited on failure or timeout |
+| **Platform** | Base L2 (Ethereum L2 with low fees) |
+| **Currency** | USDC (stable, programmable money) |
+
+**Integration Value:**
+- Monetize agent capabilities autonomously
+- Diversify task sources beyond user requests
+- Build reputation through on-chain work history
+- Fund operational costs (compute, API calls, infrastructure)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CLAWTASKS BOUNTY LIFECYCLE                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐            │
+│   │ DISCOVER │───▶│ EVALUATE │───▶│  CLAIM   │───▶│ EXECUTE  │            │
+│   │          │    │          │    │          │    │          │            │
+│   │Ögedei    │    │Jochi     │    │Kublai    │    │Specialist│            │
+│   │monitors  │    │analyzes  │    │decides   │    │executes  │            │
+│   └──────────┘    └──────────┘    └──────────┘    └────┬─────┘            │
+│                                                        │                    │
+│   ┌──────────┐    ┌──────────┐    ┌──────────┐        │                    │
+│   │ REPUTATE │◀───│  PAYMENT │◀───│ SUBMIT   │◀───────┘                    │
+│   │          │    │          │    │          │                             │
+│   │+Rep/     │    │+95%      │    │Deliver   │                             │
+│   │-Rep      │    │+Stake    │    │Results   │                             │
+│   └──────────┘    └──────────┘    └──────────┘                             │
+│                                                                              │
+│   On Failure:                                                                │
+│   ┌──────────┐    ┌──────────┐                                              │
+│   │  SLASH   │───▶│ REFLECT  │                                              │
+│   │-10% Stake│    │Record    │                                              │
+│   │          │    │Lesson    │                                              │
+│   └──────────┘    └──────────┘                                              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.2 Agent Responsibilities for ClawTasks
+
+| Agent | ClawTasks Role | Responsibilities |
+|-------|---------------|------------------|
+| **Ögedei** | Task Monitor | Monitor ClawTasks API/WebSocket for new bounties, filter by capability match, maintain bounty watchlist |
+| **Jochi** | Task Evaluator | Evaluate bounty feasibility, ROI estimation, success probability analysis, risk assessment |
+| **Kublai** | Task Router | Decide which bounties to pursue based on evaluation, assign to appropriate specialist agent |
+| **Temüjin** | Task Executor | Execute technical bounties: coding, security audits, devops, infrastructure, smart contract work |
+| **Chagatai** | Content Bounties | Execute writing, documentation, creative content, copywriting, technical writing bounties |
+| **Möngke** | Research Bounties | Execute research, data gathering, analysis, due diligence, market research bounties |
+
+#### 5.3 Bounty Lifecycle in Neo4j
+
+**5.3.1 Bounty Discovery and Storage**
+
+```cypher
+// Store discovered bounty
+CREATE (b:Bounty {
+  id: $bounty_id,
+  title: $title,
+  description: $description,
+  category: $category,
+  reward_usdc: $reward,
+  stake_required: $reward * 0.10,
+  deadline: datetime($deadline),
+  requirements: $requirements,
+  deliverables: $deliverables,
+  status: 'discovered',
+  source_platform: 'clawtasks',
+  external_url: $url,
+  created_at: datetime(),
+  discovered_by: 'ogedei'
+})
+
+// Link to required skills
+WITH b
+UNWIND $required_skills as skill_name
+MATCH (s:Skill {name: skill_name})
+MERGE (b)-[:REQUIRES_SKILL {importance: 'required'}]->(s)
+
+// Create discovery record
+WITH b
+MATCH (a:Agent {name: 'ogedei'})
+CREATE (a)-[:DISCOVERED {
+  discovered_at: datetime(),
+  source: 'clawtasks_api'
+}]->(b)
+```
+
+**5.3.2 Capability Matching**
+
+```cypher
+// Match bounties to agent capabilities
+MATCH (b:Bounty {status: 'discovered'})
+MATCH (a:Agent)
+MATCH (b)-[:REQUIRES_SKILL]->(s:Skill)<-[:HAS_SKILL]-(a)
+WITH b, a, count(s) as matching_skills, collect(s.name) as skills
+MATCH (b)-[:REQUIRES_SKILL]->(all_s:Skill)
+WITH b, a, matching_skills, skills, count(all_s) as total_skills
+WHERE matching_skills >= total_skills * 0.7  // 70% skill match
+CREATE (a)-[:CAN_PERFORM {
+  confidence: matching_skills * 1.0 / total_skills,
+  matching_skills: skills,
+  calculated_at: datetime()
+}]->(b)
+```
+
+**5.3.3 Staking and Claiming**
+
+```cypher
+// Record bounty claim with stake
+MATCH (b:Bounty {id: $bounty_id})
+MATCH (a:Agent {name: $agent_name})
+MATCH (w:Wallet)-[:BELONGS_TO]->(a)
+WHERE w.type = 'hot'
+
+// Create stake record
+CREATE (s:Stake {
+  id: uuid(),
+  amount: b.stake_required,
+  status: 'locked',
+  locked_at: datetime(),
+  unlock_condition: 'bounty_completion',
+  tx_hash: $stake_tx_hash
+})
+
+// Link stake to bounty and wallet
+CREATE (w)-[:STAKED {
+  tx_hash: $stake_tx_hash,
+  block_number: $block_number
+}]->(s)
+CREATE (s)-[:FOR_BOUNTY]->(b)
+CREATE (a)-[:CLAIMED {
+  claimed_at: datetime(),
+  expected_completion: datetime($expected_completion)
+}]->(b)
+
+// Update bounty status
+SET b.status = 'claimed',
+    b.claimed_by = $agent_name,
+    b.claimed_at = datetime()
+```
+
+**5.3.4 Execution Tracking**
+
+```cypher
+// Create execution task linked to bounty
+MATCH (b:Bounty {id: $bounty_id})
+MATCH (a:Agent {name: $agent_name})
+CREATE (t:Task {
+  id: uuid(),
+  type: 'bounty_execution',
+  description: b.title,
+  status: 'in_progress',
+  created_at: datetime(),
+  deadline: b.deadline,
+  bounty_id: b.id
+})
+CREATE (a)-[:EXECUTING]->(t)
+CREATE (t)-[:FULFILLS]->(b)
+
+// Track progress updates
+CREATE (p:ProgressUpdate {
+  id: uuid(),
+  timestamp: datetime(),
+  status: $progress_status,
+  completion_percent: $percent,
+  notes: $notes,
+  blockers: $blockers
+})
+CREATE (t)-[:HAS_UPDATE]->(p)
+```
+
+**5.3.5 Completion and Payment**
+
+```cypher
+// Record successful completion
+MATCH (b:Bounty {id: $bounty_id})
+MATCH (a:Agent {name: $agent_name})
+MATCH (s:Stake)-[:FOR_BOUNTY]->(b)
+SET b.status = 'completed',
+    b.completed_at = datetime(),
+    b.deliverable_hash = $deliverable_hash,
+    b.payment_tx_hash = $payment_tx
+
+// Update stake status
+SET s.status = 'returned',
+    s.returned_at = datetime(),
+    s.return_tx_hash = $stake_return_tx
+
+// Create payment record
+CREATE (p:Payment {
+  id: uuid(),
+  type: 'bounty_reward',
+  amount: b.reward_usdc * 0.95,
+  currency: 'USDC',
+  tx_hash: $payment_tx,
+  received_at: datetime(),
+  status: 'confirmed'
+})
+CREATE (b)-[:PAID]->(p)
+CREATE (a)-[:RECEIVED]->(p)
+
+// Create transaction record
+CREATE (tx:Transaction {
+  id: uuid(),
+  type: 'bounty_completion',
+  amount: b.reward_usdc * 0.95 + s.amount,
+  fee: b.reward_usdc * 0.05,
+  tx_hash: $payment_tx,
+  block_number: $block_number,
+  timestamp: datetime(),
+  description: 'Bounty reward + stake return'
+})
+CREATE (a)-[:PROCESSED]->(tx)
+```
+
+**5.3.6 Reputation Updates**
+
+```cypher
+// Update agent reputation on success
+MATCH (a:Agent {name: $agent_name})
+MATCH (r:Reputation)-[:BELONGS_TO]->(a)
+SET r.completed_bounties = r.completed_bounties + 1,
+    r.total_earned_usdc = r.total_earned_usdc + $reward,
+    r.success_rate = (r.completed_bounties * 1.0) / (r.completed_bounties + r.failed_bounties),
+    r.last_updated = datetime()
+
+// Add reputation event
+CREATE (re:ReputationEvent {
+  id: uuid(),
+  type: 'bounty_completed',
+  impact: 'positive',
+  points: $reputation_points,
+  description: $description,
+  timestamp: datetime(),
+  bounty_id: $bounty_id
+})
+CREATE (a)-[:EARNED]->(re)
+
+// On failure - slash and record
+MATCH (a:Agent {name: $agent_name})
+MATCH (r:Reputation)-[:BELONGS_TO]->(a)
+SET r.failed_bounties = r.failed_bounties + 1,
+    r.total_lost_usdc = r.total_lost_usdc + $stake_amount,
+    r.success_rate = (r.completed_bounties * 1.0) / (r.completed_bounties + r.failed_bounties),
+    r.last_updated = datetime()
+
+// Create reflection for failure
+CREATE (ref:Reflection {
+  id: uuid(),
+  agent: $agent_name,
+  context: 'bounty_execution',
+  decision: 'accepted_bounty',
+  outcome: 'failure',
+  lesson: $failure_lesson,
+  importance: 0.9,
+  related_bounty_id: $bounty_id,
+  created_at: datetime()
+})
+```
+
+#### 5.4 Neo4j Schema Extensions for ClawTasks
+
+**5.4.1 Bounty Node**
+
+```cypher
+// Bounty node - represents a ClawTasks bounty
+(:Bounty {
+  id: uuid,                    // Internal UUID
+  external_id: string,         // ClawTasks contract bounty ID
+  title: string,
+  description: string,
+  category: string,            // 'technical', 'content', 'research', 'creative'
+  subcategory: string,         // 'coding', 'security', 'writing', etc.
+  reward_usdc: float,          // Total bounty in USDC
+  stake_required: float,       // 10% of reward
+  deadline: datetime,
+  requirements: [string],      // List of requirements
+  deliverables: [string],      // Expected deliverables
+  status: string,              // 'discovered', 'evaluating', 'claimed', 'in_progress', 'completed', 'failed', 'expired'
+  difficulty: string,          // 'beginner', 'intermediate', 'advanced', 'expert'
+  estimated_hours: float,
+  source_platform: string,     // 'clawtasks', 'other'
+  external_url: string,
+  creator_address: string,     // Ethereum address of bounty creator
+  contract_address: string,    // ClawTasks contract address
+  created_at: datetime,
+  discovered_at: datetime,
+  claimed_at: datetime,
+  completed_at: datetime,
+  claimed_by: string,          // Agent name
+  deliverable_hash: string,    // IPFS/hash of deliverable
+  payment_tx_hash: string,
+  failure_reason: string       // If failed
+})
+
+// Constraints
+CREATE CONSTRAINT bounty_id IF NOT EXISTS
+  FOR (b:Bounty) REQUIRE b.id IS UNIQUE;
+
+CREATE INDEX bounty_status IF NOT EXISTS
+  FOR (b:Bounty) ON (b.status);
+
+CREATE INDEX bounty_category IF NOT EXISTS
+  FOR (b:Bounty) ON (b.category);
+
+CREATE INDEX bounty_external_id IF NOT EXISTS
+  FOR (b:Bounty) ON (b.external_id);
+```
+
+**5.4.2 Wallet Node**
+
+```cypher
+// Wallet node - agent's USDC wallet
+(:Wallet {
+  id: uuid,
+  address: string,             // Ethereum address (0x...)
+  type: string,                // 'cold', 'hot', 'worker'
+  network: string,             // 'base', 'base_sepolia'
+  currency: string,            // 'USDC'
+  balance_usdc: float,
+  encrypted_key_ref: string,   // Reference to encrypted private key storage
+  created_at: datetime,
+  last_synced: datetime,
+  is_active: boolean
+})
+
+// Relationships
+(:Wallet)-[:BELONGS_TO]->(:Agent)
+(:Wallet)-[:DERIVED_FROM {derivation_path: string}]->(:Wallet)  // Worker wallets derived from hot
+
+// Constraints
+CREATE CONSTRAINT wallet_address IF NOT EXISTS
+  FOR (w:Wallet) REQUIRE w.address IS UNIQUE;
+
+CREATE INDEX wallet_type IF NOT EXISTS
+  FOR (w:Wallet) ON (w.type);
+
+CREATE INDEX wallet_agent IF NOT EXISTS
+  FOR (w:Wallet) ON (w.agent_name);
+```
+
+**5.4.3 Transaction Node**
+
+```cypher
+// Transaction node - financial transactions
+(:Transaction {
+  id: uuid,
+  type: string,                // 'stake', 'unstake', 'reward', 'fee', 'deposit', 'withdrawal'
+  amount: float,
+  currency: string,            // 'USDC'
+  fee: float,
+  tx_hash: string,             // On-chain transaction hash
+  block_number: integer,
+  block_timestamp: datetime,
+  from_address: string,
+  to_address: string,
+  status: string,              // 'pending', 'confirmed', 'failed'
+  confirmations: integer,
+  timestamp: datetime,
+  description: string,
+  metadata: string             // JSON string for additional data
+})
+
+// Relationships
+(:Agent)-[:PROCESSED]->(:Transaction)
+(:Transaction)-[:FOR_BOUNTY]->(:Bounty)
+(:Transaction)-[:FROM_WALLET]->(:Wallet)
+(:Transaction)-[:TO_WALLET]->(:Wallet)
+
+// Constraints
+CREATE CONSTRAINT transaction_tx_hash IF NOT EXISTS
+  FOR (t:Transaction) REQUIRE t.tx_hash IS UNIQUE;
+
+CREATE INDEX transaction_type IF NOT EXISTS
+  FOR (t:Transaction) ON (t.type);
+
+CREATE INDEX transaction_status IF NOT EXISTS
+  FOR (t:Transaction) ON (t.status);
+```
+
+**5.4.4 Stake Node**
+
+```cypher
+// Stake node - staked USDC for bounty claims
+(:Stake {
+  id: uuid,
+  amount: float,
+  status: string,              // 'locked', 'returned', 'slashed'
+  locked_at: datetime,
+  unlocked_at: datetime,
+  lock_duration_hours: float,
+  unlock_condition: string,    // 'bounty_completion', 'timeout', 'manual'
+  tx_hash: string,             // Stake transaction
+  return_tx_hash: string,      // Unstake transaction
+  slash_tx_hash: string,       // Slashing transaction
+  slash_reason: string,
+  bounty_external_id: string
+})
+
+// Relationships
+(:Wallet)-[:STAKED]->(:Stake)
+(:Stake)-[:FOR_BOUNTY]->(:Bounty)
+(:Agent)-[:LOCKED]->(:Stake)
+
+// Constraints
+CREATE CONSTRAINT stake_id IF NOT EXISTS
+  FOR (s:Stake) REQUIRE s.id IS UNIQUE;
+
+CREATE INDEX stake_status IF NOT EXISTS
+  FOR (s:Stake) ON (s.status);
+```
+
+**5.4.5 Reputation Node**
+
+```cypher
+// Reputation node - agent reputation metrics
+(:Reputation {
+  id: uuid,
+  agent_name: string,
+  overall_score: float,        // 0-100 calculated score
+  completed_bounties: integer,
+  failed_bounties: integer,
+  total_earned_usdc: float,
+  total_staked_usdc: float,
+  total_lost_usdc: float,
+  success_rate: float,         // 0.0-1.0
+  avg_completion_time: float,  // Hours
+  on_time_delivery_rate: float, // 0.0-1.0
+  quality_score: float,        // Average quality rating
+  dispute_count: integer,
+  dispute_won: integer,
+  tier: string,                // 'bronze', 'silver', 'gold', 'platinum', 'diamond'
+  created_at: datetime,
+  last_updated: datetime,
+  clawtasks_profile_url: string
+})
+
+// Relationships
+(:Reputation)-[:BELONGS_TO]->(:Agent)
+
+// Reputation events
+(:ReputationEvent {
+  id: uuid,
+  type: string,                // 'bounty_completed', 'bounty_failed', 'dispute_resolved', 'tier_upgrade'
+  impact: string,              // 'positive', 'negative', 'neutral'
+  points: integer,
+  description: string,
+  timestamp: datetime,
+  bounty_id: string,
+  tx_hash: string
+})
+
+(:Agent)-[:EARNED]->(:ReputationEvent)
+
+// Constraints
+CREATE CONSTRAINT reputation_agent IF NOT EXISTS
+  FOR (r:Reputation) REQUIRE r.agent_name IS UNIQUE;
+
+CREATE INDEX reputation_tier IF NOT EXISTS
+  FOR (r:Reputation) ON (r.tier);
+```
+
+**5.4.6 SkillBountyMapping Node**
+
+```cypher
+// SkillBountyMapping - links skills to bounty categories
+(:SkillBountyMapping {
+  id: uuid,
+  skill_name: string,
+  bounty_category: string,
+  bounty_subcategory: string,
+  match_weight: float,         // How strongly this skill matches (0.0-1.0)
+  min_proficiency: string,     // 'beginner', 'intermediate', 'advanced', 'expert'
+  typical_duration_hours: float,
+  avg_reward_usdc: float,
+  success_rate: float,
+  is_active: boolean,
+  created_at: datetime,
+  updated_at: datetime
+})
+
+// Relationships
+(:Skill)-[:MAPS_TO]->(:SkillBountyMapping)
+(:SkillBountyMapping)-[:MAPS_TO]->(:Bounty)
+
+// Example mappings
+CREATE (sbm:SkillBountyMapping {
+  skill_name: 'python',
+  bounty_category: 'technical',
+  bounty_subcategory: 'coding',
+  match_weight: 0.95,
+  min_proficiency: 'intermediate'
+})
+
+CREATE (sbm:SkillBountyMapping {
+  skill_name: 'smart_contract_audit',
+  bounty_category: 'technical',
+  bounty_subcategory: 'security',
+  match_weight: 0.90,
+  min_proficiency: 'expert'
+})
+
+CREATE (sbm:SkillBountyMapping {
+  skill_name: 'technical_writing',
+  bounty_category: 'content',
+  bounty_subcategory: 'documentation',
+  match_weight: 0.85,
+  min_proficiency: 'intermediate'
+})
+```
+
+#### 5.5 Integration Architecture
+
+**5.5.1 Complete Bounty Flow**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CLAWTASKS INTEGRATION ARCHITECTURE                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      CLAWTASKS PLATFORM (Base L2)                    │   │
+│  │                                                                      │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │   │
+│  │  │   Bounty    │  │   Staking   │  │   Payment   │  │  Reputation │ │   │
+│  │  │  Contract   │  │  Contract   │  │  Contract   │  │   Contract  │ │   │
+│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘ │   │
+│  │         └─────────────────┴─────────────────┴─────────────────┘      │   │
+│  │                              │                                       │   │
+│  │                         WebSocket/API                               │   │
+│  └──────────────────────────────┼───────────────────────────────────────┘   │
+│                                 │                                            │
+│  ┌──────────────────────────────┼───────────────────────────────────────┐   │
+│  │                   OPENCLAW AGENT SYSTEM                              │   │
+│  │                              │                                       │   │
+│  │  ┌───────────────────────────┴───────────────────────────────────┐  │   │
+│  │  │                      ÖGEDEI (Task Monitor)                     │  │   │
+│  │  │  • Poll ClawTasks API every 60 seconds                         │  │   │
+│  │  │  • Filter by agent capability match > 70%                      │  │   │
+│  │  │  • Store new bounties in Neo4j                                 │  │   │
+│  │  │  • Notify Jochi for evaluation                                 │  │   │
+│  │  └──────────────────────────────┬─────────────────────────────────┘  │   │
+│  │                                 │                                     │   │
+│  │  ┌──────────────────────────────┴─────────────────────────────────┐  │   │
+│  │  │                     JOCHI (Task Evaluator)                      │  │   │
+│  │  │  • Query agent skills from Neo4j                                │  │   │
+│  │  │  • Calculate success probability                                │  │   │
+│  │  │  • Estimate ROI (reward / estimated_hours)                      │  │   │
+│  │  │  • Assess risk factors                                          │  │   │
+│  │  │  • Recommend: pursue / skip / watch                             │  │   │
+│  │  └──────────────────────────────┬─────────────────────────────────┘  │   │
+│  │                                 │                                     │   │
+│  │  ┌──────────────────────────────┴─────────────────────────────────┐  │   │
+│  │  │                      KUBLAI (Task Router)                       │  │   │
+│  │  │  • Review Jochi's evaluation                                    │  │   │
+│  │  │  • Check hot wallet balance for stake                           │  │   │
+│  │  │  • Decide: claim / delegate / decline                           │  │   │
+│  │  │  • Assign to specialist agent                                   │  │   │
+│  │  └──────────────────────────────┬─────────────────────────────────┘  │   │
+│  │                                 │                                     │   │
+│  │         ┌───────────────────────┼───────────────────────┐            │   │
+│  │         │                       │                       │            │   │
+│  │  ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐      │   │
+│  │  │  TEMÜJIN    │        │  CHAGATAI   │        │   MÖNGKE    │      │   │
+│  │  │  (Technical)│        │  (Content)  │        │  (Research) │      │   │
+│  │  │             │        │             │        │             │      │   │
+│  │  │• Code bount │        │• Writing    │        │• Data gather│      │   │
+│  │  │• Security   │        │• Docs       │        │• Analysis   │      │   │
+│  │  │• DevOps     │        │• Creative   │        │• Research   │      │   │
+│  │  └──────┬──────┘        └──────┬──────┘        └──────┬──────┘      │   │
+│  │         │                       │                       │            │   │
+│  │         └───────────────────────┼───────────────────────┘            │   │
+│  │                                 │                                     │   │
+│  │  ┌──────────────────────────────┴─────────────────────────────────┐  │   │
+│  │  │                    RESULT HANDLING                              │  │   │
+│  │  │                                                                  │  │   │
+│  │  │  On Success:                                                     │  │   │
+│  │  │  • Submit deliverable to ClawTasks                              │  │   │
+│  │  │  • Record completion in Neo4j                                   │  │   │
+│  │  │  • Receive payment + stake (105% total)                         │  │   │
+│  │  │  • Update reputation (+points)                                  │  │   │
+│  │  │  • Store learnings in operational memory                        │  │   │
+│  │  │                                                                  │  │   │
+│  │  │  On Failure:                                                     │  │   │
+│  │  │  • Record failure reason                                        │  │   │
+│  │  │  • Stake slashed (10% loss)                                     │  │   │
+│  │  │  • Create reflection for learning                               │  │   │
+│  │  │  • Update reputation (-points)                                  │  │   │
+│  │  │                                                                  │  │   │
+│  │  └──────────────────────────────────────────────────────────────────┘  │   │
+│  │                                                                         │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**5.5.2 Implementation Code**
+
+```python
+# clawtasks_integration.py
+from typing import Optional, List, Dict
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+import requests
+from web3 import Web3
+
+@dataclass
+class BountyEvaluation:
+    bounty_id: str
+    should_pursue: bool
+    confidence: float
+    estimated_hours: float
+    roi_score: float
+    risk_level: str
+    recommended_agent: str
+    reasoning: str
+
+class ClawTasksMonitor:
+    """Ögedei's bounty monitoring service"""
+
+    def __init__(self, neo4j_memory, clawtasks_api_url: str, api_key: str):
+        self.memory = neo4j_memory
+        self.api_url = clawtasks_api_url
+        self.api_key = api_key
+        self.poll_interval = 60  # seconds
+
+    async def poll_new_bounties(self) -> List[Dict]:
+        """Poll ClawTasks API for new bounties"""
+        response = requests.get(
+            f"{self.api_url}/bounties",
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            params={"status": "open", "created_after": self.last_poll_time}
+        )
+        bounties = response.json()["bounties"]
+
+        for bounty in bounties:
+            await self.store_bounty(bounty)
+
+        return bounties
+
+    async def store_bounty(self, bounty: Dict):
+        """Store bounty in Neo4j with capability matching"""
+        query = """
+        // Create bounty
+        CREATE (b:Bounty {
+          id: $bounty_id,
+          external_id: $external_id,
+          title: $title,
+          description: $description,
+          category: $category,
+          subcategory: $subcategory,
+          reward_usdc: $reward,
+          stake_required: $reward * 0.10,
+          deadline: datetime($deadline),
+          requirements: $requirements,
+          deliverables: $deliverables,
+          status: 'discovered',
+          difficulty: $difficulty,
+          estimated_hours: $estimated_hours,
+          source_platform: 'clawtasks',
+          external_url: $url,
+          creator_address: $creator,
+          contract_address: $contract,
+          created_at: datetime(),
+          discovered_at: datetime()
+        })
+
+        // Link to required skills
+        WITH b
+        UNWIND $required_skills as skill_name
+        MERGE (s:Skill {name: skill_name})
+        MERGE (b)-[:REQUIRES_SKILL {importance: 'required'}]->(s)
+
+        // Match to agents
+        WITH b
+        MATCH (b)-[:REQUIRES_SKILL]->(req_skill:Skill)
+        MATCH (a:Agent)-[:HAS_SKILL]->(req_skill)
+        WITH b, a, count(req_skill) as matching_skills
+        MATCH (b)-[:REQUIRES_SKILL]->(all_req:Skill)
+        WITH b, a, matching_skills, count(all_req) as total_skills
+        WHERE matching_skills >= total_skills * 0.7
+        MERGE (a)-[:CAN_PERFORM {
+          confidence: matching_skills * 1.0 / total_skills,
+          calculated_at: datetime()
+        }]->(b)
+
+        RETURN b.id as bounty_id
+        """
+
+        await self.memory.query(query, {
+            "bounty_id": str(uuid.uuid4()),
+            "external_id": bounty["id"],
+            "title": bounty["title"],
+            "description": bounty["description"],
+            "category": bounty["category"],
+            "subcategory": bounty["subcategory"],
+            "reward": float(bounty["reward"]),
+            "deadline": bounty["deadline"],
+            "requirements": bounty["requirements"],
+            "deliverables": bounty["deliverables"],
+            "difficulty": bounty["difficulty"],
+            "estimated_hours": bounty.get("estimated_hours", 0),
+            "required_skills": bounty["required_skills"],
+            "url": bounty["url"],
+            "creator": bounty["creator_address"],
+            "contract": bounty["contract_address"]
+        })
+
+class BountyEvaluator:
+    """Jochi's bounty evaluation service"""
+
+    def __init__(self, neo4j_memory):
+        self.memory = neo4j_memory
+
+    async def evaluate_bounty(self, bounty_id: str) -> BountyEvaluation:
+        """Evaluate if bounty is worth pursuing"""
+
+        # Get bounty details
+        bounty = await self.memory.query("""
+            MATCH (b:Bounty {id: $bounty_id})
+            RETURN b
+        """, {"bounty_id": bounty_id})
+
+        # Get capable agents
+        agents = await self.memory.query("""
+            MATCH (b:Bounty {id: $bounty_id})<-[:CAN_PERFORM]-(a:Agent)
+            RETURN a.name as agent, a.skills as skills
+        """, {"bounty_id": bounty_id})
+
+        # Calculate success probability based on:
+        # - Agent skill match
+        # - Historical success rate on similar bounties
+        # - Time availability
+        # - Current workload
+
+        evaluation = await self._calculate_evaluation(bounty, agents)
+
+        # Store evaluation
+        await self.memory.query("""
+            MATCH (b:Bounty {id: $bounty_id})
+            CREATE (e:Evaluation {
+                id: uuid(),
+                should_pursue: $should_pursue,
+                confidence: $confidence,
+                roi_score: $roi,
+                risk_level: $risk,
+                recommended_agent: $agent,
+                reasoning: $reasoning,
+                evaluated_at: datetime()
+            })
+            CREATE (b)-[:HAS_EVALUATION]->(e)
+        """, {
+            "bounty_id": bounty_id,
+            "should_pursue": evaluation.should_pursue,
+            "confidence": evaluation.confidence,
+            "roi": evaluation.roi_score,
+            "risk": evaluation.risk_level,
+            "agent": evaluation.recommended_agent,
+            "reasoning": evaluation.reasoning
+        })
+
+        return evaluation
+
+    async def _calculate_evaluation(self, bounty, agents) -> BountyEvaluation:
+        # Implementation: analyze historical data, agent availability, etc.
+        pass
+
+class BountyClaimer:
+    """Kublai's bounty claiming service"""
+
+    def __init__(self, neo4j_memory, web3_provider: str, private_key: str):
+        self.memory = neo4j_memory
+        self.w3 = Web3(Web3.HTTPProvider(web3_provider))
+        self.account = self.w3.eth.account.from_key(private_key)
+
+    async def claim_bounty(self, bounty_id: str, agent_name: str) -> bool:
+        """Stake USDC and claim bounty on ClawTasks"""
+
+        # Get bounty details
+        result = await self.memory.query("""
+            MATCH (b:Bounty {id: $bounty_id})
+            MATCH (a:Agent {name: $agent})
+            MATCH (w:Wallet)-[:BELONGS_TO]->(a)
+            WHERE w.type = 'hot'
+            RETURN b, w
+        """, {"bounty_id": bounty_id, "agent": agent_name})
+
+        bounty = result["b"]
+        wallet = result["w"]
+
+        # Check balance
+        if wallet["balance_usdc"] < bounty["stake_required"]:
+            raise InsufficientFundsError(
+                f"Hot wallet balance {wallet['balance_usdc']} USDC "
+                f"below required stake {bounty['stake_required']} USDC"
+            )
+
+        # Submit stake transaction
+        tx_hash = await self._submit_stake(
+            bounty["contract_address"],
+            bounty["external_id"],
+            bounty["stake_required"]
+        )
+
+        # Record in Neo4j
+        await self.memory.query("""
+            MATCH (b:Bounty {id: $bounty_id})
+            MATCH (a:Agent {name: $agent})
+            MATCH (w:Wallet {address: $wallet_addr})
+
+            CREATE (s:Stake {
+                id: uuid(),
+                amount: $stake_amount,
+                status: 'locked',
+                locked_at: datetime(),
+                unlock_condition: 'bounty_completion',
+                tx_hash: $tx_hash
+            })
+
+            CREATE (w)-[:STAKED {tx_hash: $tx_hash}]->(s)
+            CREATE (s)-[:FOR_BOUNTY]->(b)
+            CREATE (a)-[:CLAIMED {claimed_at: datetime()}]->(b)
+
+            SET b.status = 'claimed',
+                b.claimed_by = $agent,
+                b.claimed_at = datetime()
+        """, {
+            "bounty_id": bounty_id,
+            "agent": agent_name,
+            "wallet_addr": wallet["address"],
+            "stake_amount": bounty["stake_required"],
+            "tx_hash": tx_hash
+        })
+
+        return True
+
+    async def _submit_stake(self, contract_addr: str, bounty_id: str, amount: float) -> str:
+        """Submit stake transaction to ClawTasks contract"""
+        # Implementation: Web3 transaction to stake USDC
+        pass
+```
+
+#### 5.6 USDC Wallet Architecture
+
+**5.6.1 Multi-Tier Wallet System**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    MULTI-TIER WALLET ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  TIER 1: COLD STORAGE (Offline/Hardware)                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • 70-80% of total funds                                            │   │
+│  │  • Hardware wallet (Ledger/Trezor) or air-gapped machine           │   │
+│  │  • Multi-sig requiring 2-of-3 keys                                  │   │
+│  │  • Used for: Large deposits, emergency recovery                     │   │
+│  │  • Key storage: Bank vault, safe deposit box, encrypted offline    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    │ Periodic top-up (weekly/monthly)       │
+│                                    ▼                                         │
+│  TIER 2: HOT WALLET (Operational)                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • 20-25% of total funds                                            │   │
+│  │  • Software wallet on secure server                                 │   │
+│  │  • Single-sig with rate limiting                                    │   │
+│  │  • Used for: Bounty staking, operational expenses                   │   │
+│  │  • Key storage: Encrypted env vars, secrets manager                 │   │
+│  │  • Auto-refill from cold storage when below threshold               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    │ Derivation (BIP-32/44)                 │
+│                                    ▼                                         │
+│  TIER 3: WORKER WALLETS (Per-Agent)                                         │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  • 1-5% of total funds per agent                                    │   │
+│  │  • Derived from hot wallet using deterministic paths                │   │
+│  │  • Used for: Individual bounty execution, gas fees                  │   │
+│  │  • Key storage: Agent-local, encrypted at rest                      │   │
+│  │  • Can be swept back to hot wallet                                  │   │
+│  │                                                                     │   │
+│  │  Path examples:                                                     │   │
+│  │  • m/44'/60'/0'/0/0 → Temüjin (technical)                          │   │
+│  │  • m/44'/60'/0'/0/1 → Chagatai (content)                           │   │
+│  │  • m/44'/60'/0'/0/2 → Möngke (research)                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**5.6.2 Wallet Security Best Practices**
+
+```yaml
+# wallet_security.yaml
+
+key_management:
+  cold_storage:
+    type: "hardware_wallet"  # Ledger, Trezor
+    multi_sig: "2-of-3"
+    key_distribution:
+      - location: "bank_vault"
+        holder: "primary_admin"
+      - location: "safe_deposit_box"
+        holder: "secondary_admin"
+      - location: "encrypted_offline"
+        holder: "recovery_service"
+
+  hot_wallet:
+    type: "software"
+    storage: "aws_secrets_manager"  # or HashiCorp Vault
+    encryption: "AES-256-GCM"
+    access_control:
+      - role: "bounty_claimer"
+        permissions: ["sign_stake", "sign_payment"]
+        rate_limit: "10_tx_per_hour"
+      - role: "admin"
+        permissions: ["sign_all", "sweep_funds"]
+        mfa_required: true
+
+  worker_wallets:
+    derivation_path: "m/44'/60'/0'/0/{agent_index}"
+    key_storage: "agent_local_encrypted"
+    max_balance: "100_USDC"  # Auto-sweep above this
+    auto_sweep_threshold: "50_USDC"
+
+transaction_policies:
+  stake_limits:
+    per_bounty_max: "1000_USDC"
+    daily_total_max: "5000_USDC"
+    concurrent_bounties_max: 5
+
+  approval_workflows:
+    below_100_usdc: "auto_approve"
+    100_to_1000_usdc: "kublai_approval"
+    above_1000_usdc: "multi_sig_required"
+
+monitoring:
+  alerts:
+    - condition: "hot_wallet_balance < 500_USDC"
+      action: "notify_admin"
+    - condition: "unusual_stake_pattern"
+      action: "freeze_and_review"
+    - condition: "failed_transaction_rate > 10%"
+      action: "investigate"
+
+  audit_logging:
+    all_transactions: true
+    ip_address: true
+    user_agent: true
+    retention_days: 365
+```
+
+**5.6.3 Key Management Implementation**
+
+```python
+# wallet_manager.py
+from typing import Optional, Tuple
+from web3 import Web3
+from eth_account import Account
+import boto3
+from cryptography.fernet import Fernet
+import hashlib
+
+class WalletManager:
+    """Manages multi-tier wallet system"""
+
+    def __init__(self, secrets_manager):
+        self.secrets = secrets_manager
+        self.w3 = Web3()
+
+    async def get_hot_wallet(self) -> Tuple[str, str]:
+        """Get hot wallet address and private key"""
+        # Retrieve from secure storage
+        secret = await self.secrets.get_secret("clawtasks/hot_wallet")
+        return secret["address"], secret["private_key"]
+
+    async def derive_worker_wallet(self, agent_name: str) -> Tuple[str, str]:
+        """Derive worker wallet from hot wallet using BIP-44"""
+
+        # Get hot wallet seed
+        _, hot_key = await self.get_hot_wallet()
+
+        # Derivation paths for each agent
+        agent_indices = {
+            "temujin": 0,    # Technical
+            "chagatai": 1,   # Content
+            "mongke": 2,     # Research
+            "jochi": 3,      # Analysis
+            "ogedei": 4,     # Operations
+            "kublai": 5      # Router
+        }
+
+        index = agent_indices.get(agent_name.lower(), 999)
+
+        # Derive child key (simplified - use proper BIP-44 library in production)
+        derivation_path = f"m/44'/60'/0'/0/{index}"
+        child_key = self._derive_child_key(hot_key, derivation_path)
+
+        account = Account.from_key(child_key)
+        return account.address, child_key
+
+    async def sweep_worker_to_hot(self, agent_name: str):
+        """Sweep worker wallet balance back to hot wallet"""
+
+        worker_addr, worker_key = await self.derive_worker_wallet(agent_name)
+        hot_addr, _ = await self.get_hot_wallet()
+
+        # Get balance
+        balance = await self._get_usdc_balance(worker_addr)
+
+        if balance > 50:  # Sweep threshold
+            # Transfer to hot wallet
+            tx_hash = await self._transfer_usdc(
+                from_key=worker_key,
+                to_address=hot_addr,
+                amount=balance - 5  # Leave some for gas
+            )
+
+            # Record in Neo4j
+            await self._record_sweep(agent_name, worker_addr, hot_addr, balance, tx_hash)
+
+    async def refill_hot_wallet(self, amount_usdc: float):
+        """Refill hot wallet from cold storage"""
+
+        # This requires manual/multi-sig approval
+        # Implementation would trigger admin notification
+        pass
+
+    def _derive_child_key(self, parent_key: str, path: str) -> str:
+        """Derive child key from BIP-44 path"""
+        # Use proper library like bip32 or hdwallet in production
+        pass
+```
+
+#### 5.7 Smart Contract Integration
+
+**5.7.1 ClawTasks Contract Interface**
+
+```solidity
+// ClawTasks contract interface (simplified)
+// Actual contract on Base L2
+
+interface IClawTasks {
+    // Bounty structure
+    struct Bounty {
+        address creator;
+        uint256 reward;
+        uint256 stakeRequired;
+        uint256 deadline;
+        bytes32 requirementsHash;
+        address worker;
+        BountyStatus status;
+    }
+
+    enum BountyStatus {
+        Open,
+        Claimed,
+        Completed,
+        Disputed,
+        Cancelled
+    }
+
+    // Events
+    event BountyCreated(uint256 indexed bountyId, address indexed creator, uint256 reward);
+    event BountyClaimed(uint256 indexed bountyId, address indexed worker, uint256 stake);
+    event BountyCompleted(uint256 indexed bountyId, address indexed worker, uint256 payout);
+    event BountyFailed(uint256 indexed bountyId, address indexed worker, uint256 slashed);
+
+    // Functions
+    function createBounty(
+        uint256 reward,
+        uint256 deadline,
+        bytes32 requirementsHash
+    ) external returns (uint256 bountyId);
+
+    function claimBounty(uint256 bountyId) external;
+    function submitDeliverable(uint256 bountyId, bytes32 deliverableHash) external;
+    function approveCompletion(uint256 bountyId) external;
+    function disputeBounty(uint256 bountyId, string calldata reason) external;
+    function resolveDispute(uint256 bountyId, bool workerWins) external;
+
+    // View functions
+    function getBounty(uint256 bountyId) external view returns (Bounty memory);
+    function getWorkerReputation(address worker) external view returns (uint256 score);
+}
+```
+
+**5.7.2 Python Contract Integration**
+
+```python
+# clawtasks_contract.py
+from web3 import Web3
+from eth_abi import encode
+from typing import Optional
+import json
+
+class ClawTasksContract:
+    """Interface to ClawTasks smart contracts on Base L2"""
+
+    CONTRACT_ADDRESS = "0x..."  # ClawTasks contract on Base
+    USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"  # USDC on Base
+
+    def __init__(self, web3_provider: str, private_key: str):
+        self.w3 = Web3(Web3.HTTPProvider(web3_provider))
+        self.account = self.w3.eth.account.from_key(private_key)
+
+        # Load contract ABIs
+        with open("clawtasks_abi.json") as f:
+            self.contract = self.w3.eth.contract(
+                address=self.CONTRACT_ADDRESS,
+                abi=json.load(f)
+            )
+
+        with open("usdc_abi.json") as f:
+            self.usdc = self.w3.eth.contract(
+                address=self.USDC_ADDRESS,
+                abi=json.load(f)
+            )
+
+    async def approve_usdc_spending(self, amount: float) -> str:
+        """Approve ClawTasks contract to spend USDC"""
+
+        amount_wei = int(amount * 1e6)  # USDC has 6 decimals
+
+        tx = self.usdc.functions.approve(
+            self.CONTRACT_ADDRESS,
+            amount_wei
+        ).build_transaction({
+            'from': self.account.address,
+            'nonce': self.w3.eth.get_transaction_count(self.account.address),
+            'gas': 100000,
+            'gasPrice': self.w3.eth.gas_price
+        })
+
+        signed = self.w3.eth.account.sign_transaction(tx, self.account.key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+
+    async def claim_bounty(self, bounty_id: int, stake_amount: float) -> str:
+        """Stake USDC and claim a bounty"""
+
+        # First approve USDC spending
+        await self.approve_usdc_spending(stake_amount)
+
+        # Build claim transaction
+        tx = self.contract.functions.claimBounty(bounty_id).build_transaction({
+            'from': self.account.address,
+            'nonce': self.w3.eth.get_transaction_count(self.account.address),
+            'gas': 300000,
+            'gasPrice': self.w3.eth.gas_price
+        })
+
+        signed = self.w3.eth.account.sign_transaction(tx, self.account.key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+
+    async def submit_deliverable(self, bounty_id: int, deliverable_hash: str) -> str:
+        """Submit deliverable hash (IPFS or other content hash)"""
+
+        tx = self.contract.functions.submitDeliverable(
+            bounty_id,
+            bytes.fromhex(deliverable_hash.replace('0x', ''))
+        ).build_transaction({
+            'from': self.account.address,
+            'nonce': self.w3.eth.get_transaction_count(self.account.address),
+            'gas': 200000,
+            'gasPrice': self.w3.eth.gas_price
+        })
+
+        signed = self.w3.eth.account.sign_transaction(tx, self.account.key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+
+    async def get_bounty_details(self, bounty_id: int) -> dict:
+        """Get bounty details from contract"""
+
+        bounty = self.contract.functions.getBounty(bounty_id).call()
+
+        return {
+            'creator': bounty[0],
+            'reward': bounty[1] / 1e6,  # Convert from wei
+            'stake_required': bounty[2] / 1e6,
+            'deadline': bounty[3],
+            'requirements_hash': bounty[4].hex(),
+            'worker': bounty[5],
+            'status': bounty[6]
+        }
+
+    async def listen_for_events(self, callback):
+        """Listen for ClawTasks events"""
+
+        # Create event filters
+        event_filters = {
+            'BountyCreated': self.contract.events.BountyCreated.create_filter(fromBlock='latest'),
+            'BountyClaimed': self.contract.events.BountyClaimed.create_filter(fromBlock='latest'),
+            'BountyCompleted': self.contract.events.BountyCompleted.create_filter(fromBlock='latest'),
+            'BountyFailed': self.contract.events.BountyFailed.create_filter(fromBlock='latest')
+        }
+
+        # Poll for events
+        while True:
+            for event_name, event_filter in event_filters.items():
+                events = event_filter.get_new_entries()
+                for event in events:
+                    await callback(event_name, event)
+
+            await asyncio.sleep(10)  # Poll every 10 seconds
+```
+
+**5.7.3 Staking and Payment Flow**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    STAKING & PAYMENT FLOW                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  CLAIM BOUNTY                                                                │
+│  ────────────                                                                │
+│                                                                              │
+│  Agent Wallet                        ClawTasks Contract                     │
+│       │                                     │                                │
+│       │  1. approve(ClawTasks, stake)       │                                │
+│       │────────────────────────────────────▶│                                │
+│       │                                     │                                │
+│       │  2. claimBounty(bountyId)           │                                │
+│       │────────────────────────────────────▶│                                │
+│       │                                     │                                │
+│       │     3. Transfer stake from agent    │                                │
+│       │        to contract                  │                                │
+│       │                                     │                                │
+│       │◀────────────────────────────────────│                                │
+│       │     4. Emit BountyClaimed event     │                                │
+│       │                                     │                                │
+│                                                                              │
+│  COMPLETE BOUNTY (Success)                                                   │
+│  ─────────────────────────                                                   │
+│                                                                              │
+│  Agent Wallet                        ClawTasks Contract    Creator          │
+│       │                                     │                  │             │
+│       │  5. submitDeliverable(hash)         │                  │             │
+│       │────────────────────────────────────▶│                  │             │
+│       │                                     │                  │             │
+│       │                                     │◀─────────────────│             │
+│       │                                     │  6. approveCompletion()        │
+│       │                                     │                  │             │
+│       │     7. Transfer 95% reward + stake  │                  │             │
+│       │◀────────────────────────────────────│                  │             │
+│       │                                     │                  │             │
+│       │     8. Transfer 5% fee to treasury  │                  │             │
+│       │                                     │─────────────────▶│             │
+│       │                                     │                  │             │
+│       │     9. Emit BountyCompleted         │                  │             │
+│       │◀────────────────────────────────────│                  │             │
+│       │                                     │                  │             │
+│                                                                              │
+│  FAIL BOUNTY (Timeout/Dispute Lost)                                          │
+│  ──────────────────────────────────                                          │
+│                                                                              │
+│  Agent Wallet                        ClawTasks Contract    Creator          │
+│       │                                     │                  │             │
+│       │     10. Stake slashed               │                  │             │
+│       │     (10% to creator, 90% burned)    │                  │             │
+│       │◀────────────────────────────────────│                  │             │
+│       │                                     │─────────────────▶│             │
+│       │     11. Emit BountyFailed           │                  │             │
+│       │◀────────────────────────────────────│                  │             │
+│       │                                     │                  │             │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**5.7.4 Slashing Conditions**
+
+| Condition | Slashing Result | Prevention |
+|-----------|-----------------|------------|
+| **Timeout** | 100% stake slashed | Set realistic deadlines, monitor progress |
+| **Deliverable Rejected** | 100% stake slashed | Evaluate carefully before claiming |
+| **Dispute Lost** | 100% stake slashed | Clear communication, document everything |
+| **Cancellation (by worker)** | 50% stake slashed | Commit only when confident |
+| **Creator Cancel** | Stake returned + small compensation | N/A (creator pays) |
+
+**5.7.5 Risk Management**
+
+```python
+# risk_management.py
+
+class BountyRiskManager:
+    """Manages risk for ClawTasks bounty participation"""
+
+    RISK_THRESHOLDS = {
+        'max_stake_per_bounty': 1000,      # USDC
+        'max_daily_stake': 5000,           # USDC
+        'max_concurrent_bounties': 5,
+        'min_success_rate': 0.8,           # 80%
+        'min_hot_wallet_balance': 500      # USDC
+    }
+
+    async def assess_bounty_risk(self, bounty_id: str) -> RiskAssessment:
+        """Assess risk before claiming a bounty"""
+
+        # Get bounty details
+        bounty = await self.get_bounty(bounty_id)
+
+        # Check stake amount
+        if bounty['stake_required'] > self.RISK_THRESHOLDS['max_stake_per_bounty']:
+            return RiskAssessment(
+                approved=False,
+                reason=f"Stake {bounty['stake_required']} exceeds max {self.RISK_THRESHOLDS['max_stake_per_bounty']}"
+            )
+
+        # Check daily stake total
+        daily_stake = await self.get_daily_stake_total()
+        if daily_stake + bounty['stake_required'] > self.RISK_THRESHOLDS['max_daily_stake']:
+            return RiskAssessment(
+                approved=False,
+                reason=f"Daily stake limit would be exceeded"
+            )
+
+        # Check concurrent bounties
+        concurrent = await self.get_concurrent_bounties()
+        if concurrent >= self.RISK_THRESHOLDS['max_concurrent_bounties']:
+            return RiskAssessment(
+                approved=False,
+                reason=f"Max concurrent bounties ({self.RISK_THRESHOLDS['max_concurrent_bounties']}) reached"
+            )
+
+        # Check agent success rate
+        agent_reputation = await self.get_agent_reputation()
+        if agent_reputation['success_rate'] < self.RISK_THRESHOLDS['min_success_rate']:
+            return RiskAssessment(
+                approved=False,
+                reason=f"Success rate {agent_reputation['success_rate']} below threshold"
+            )
+
+        # Check wallet balance
+        hot_balance = await self.get_hot_wallet_balance()
+        if hot_balance < self.RISK_THRESHOLDS['min_hot_wallet_balance']:
+            return RiskAssessment(
+                approved=False,
+                reason=f"Hot wallet balance {hot_balance} below minimum"
+            )
+
+        return RiskAssessment(approved=True, risk_score=0.2)
+
+    async def emergency_withdraw(self):
+        """Emergency withdrawal of all stakes"""
+        # Implementation for emergency situations
+        pass
+```
+
+---
+
+### Phase 6: Jochi-Temüjin Collaboration Protocol
 
 Define how analyst and developer work together:
 
@@ -7123,7 +9050,7 @@ Temüjin implements fix, updates Analysis status to "resolved".
 Jochi validates fix with metrics/tests.
 ```
 
-### Phase 5.5: Kublai Failover Protocol (Ögedei as Emergency Router)
+### Phase 6.5: Kublai Failover Protocol (Ögedei as Emergency Router)
 
 Define Ögedei's role as Kublai's failover:
 
@@ -7154,7 +9081,7 @@ When Kublai recovers:
 4. Returns to normal Operations role
 ```
 
-### Phase 6: Kublai Delegation Protocol
+### Phase 7: Kublai Delegation Protocol
 
 Update Kublai's SOUL.md with:
 
@@ -7442,7 +9369,7 @@ If migration fails:
 
 ---
 
-### Phase 7: Bidirectional Notion Integration
+### Phase 8: Bidirectional Notion Integration
 
 Enable creating and managing tasks directly in Notion with full agent execution support.
 
@@ -7964,6 +9891,2439 @@ class NotionSyncErrorHandler:
 | Training system | 4 hours | Low | 7th |
 | Pair programming | 6 hours | Low | 8th |
 
+### Phase 9: Auto-Skill Generation System
+
+When the system encounters a bounty type it cannot complete (skill gap), it automatically generates a new SKILL.md file to learn that capability. This enables continuous expansion of agent capabilities.
+
+#### 9.1 Overview
+
+The Auto-Skill Generation System enables the OpenClaw multi-agent system to autonomously expand its capabilities by:
+
+| Capability | Description | Benefit |
+|------------|-------------|---------|
+| **Self-Directed Learning** | Detects knowledge gaps from failures | No manual intervention needed |
+| **Collaborative Skill Creation** | 6 agents research, draft, test, and deploy | High-quality skill documentation |
+| **Continuous Improvement** | A/B testing and feedback integration | Skills improve over time |
+| **Versioned Knowledge** | Skills tracked with dependencies | Safe updates and rollbacks |
+
+**System Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Auto-Skill Generation System                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │   ClawTasks │───►│  Skill Gap  │───►│   6-Agent   │───►│   SKILL.md  │  │
+│  │   (Bounty)  │    │  Detection  │    │  Workflow   │    │   Created   │  │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └──────┬──────┘  │
+│         │                                                        │         │
+│         │    ┌───────────────────────────────────────────────────┘         │
+│         │    │                                                               │
+│         │    ▼                                                               │
+│  ┌──────┴──────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │   Retry     │◄───│    A/B      │◄───│    Test     │◄───│   Deploy    │  │
+│  │   Bounty    │    │   Testing   │    │  Framework  │    │   Skill     │  │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 9.2 Skill Gap Detection
+
+The system detects skill gaps through multiple mechanisms:
+
+| Detection Method | Trigger | Confidence |
+|-----------------|---------|------------|
+| Failed bounty evaluation | Capability mismatch on execution | High |
+| Low success probability | Historical pattern on similar bounties | Medium |
+| User feedback | Explicit indication of missing capability | High |
+| Periodic analysis | Scheduled skill gap assessment | Medium |
+
+**Skill Gap Detection Flow:**
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Bounty Failed  │────►│  Analyze Error  │────►│  Skill Gap?     │
+│  or Rejected    │     │  Type/Pattern   │     │  (Confidence)   │
+└─────────────────┘     └─────────────────┘     └────────┬────────┘
+                                                         │
+                              ┌──────────────────────────┘
+                              ▼
+                    ┌─────────────────┐
+                    │  Create SkillGap│
+                    │  Node in Neo4j  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Queue for Skill │
+                    │ Generation      │
+                    └─────────────────┘
+```
+
+**Neo4j Schema for Skill Gaps:**
+
+```cypher
+(:SkillGap {
+  id: uuid,
+  detected_missing_capability: string,
+  confidence: float,
+  frequency: int,
+  first_detected: datetime,
+  last_detected: datetime,
+  auto_generated: boolean,
+  status: 'pending' | 'generating' | 'resolved'
+})
+
+(:Skill {
+  id: uuid,
+  name: string,
+  description: string,
+  version: string,
+  created_at: datetime,
+  updated_at: datetime
+})
+
+// Relationships
+(Bounty)-[:REQUIRES_SKILL {probability: float}]->(Skill)
+(Agent)-[:LACKS {since: datetime}]->(SkillGap)
+(Skill)-[:ADDRESSES]->(SkillGap)
+(SkillGap)-[:DETECTED_FROM]->(Bounty)
+```
+
+#### 9.3 Skill Generation Workflow
+
+The 6-agent collaborative workflow for skill generation:
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Ögedei  │───►│  Möngke  │───►│ Chagatai │───►│  Temüjin │───►│  Ögedei  │───►│   Jochi  │
+│  Trigger │    │ Research │    │   Draft  │    │   Test   │    │  Deploy  │    │ Validate │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
+     │               │               │               │               │               │
+     ▼               ▼               ▼               ▼               ▼               ▼
+ Detect Gap    Gather Domain   Write SKILL.md  Create Tests   Deploy Skill   Measure
+ from Failed    Knowledge       + Examples     + Validate    to System     Effectiveness
+ Bounty        Best Practices   + Edge Cases   Integration                   A/B Test
+```
+
+**Python Implementation:**
+
+```python
+class SkillGenerationWorkflow:
+    """6-agent workflow for automatic skill creation."""
+
+    def __init__(self, memory: OperationalMemory, agents: Dict[str, Agent]):
+        self.memory = memory
+        self.agents = agents
+        self.ogedei = agents['ops']
+        self.mongke = agents['researcher']
+        self.chagatai = agents['writer']
+        self.temujin = agents['developer']
+        self.jochi = agents['analyst']
+
+    def generate_skill(self, skill_gap: SkillGap) -> str:
+        """Execute 6-agent skill generation workflow."""
+
+        # Step 1: Ögedei - Trigger and coordinate
+        self.ogedei.update_skill_gap_status(skill_gap.id, 'generating')
+
+        # Step 2: Möngke - Research the skill domain
+        research = self.mongke.research_skill_domain(
+            capability=skill_gap.detected_missing_capability,
+            context=self.get_related_bounties(skill_gap)
+        )
+
+        # Step 3: Chagatai - Draft SKILL.md
+        skill_draft = self.chagatai.write_skill_document(
+            research=research,
+            template=self.get_skill_template()
+        )
+
+        # Step 4: Temüjin - Create tests
+        test_suite = self.temujin.create_skill_tests(
+            skill_document=skill_draft,
+            edge_cases=research.get('edge_cases', [])
+        )
+
+        # Run tests
+        test_results = self.run_skill_tests(test_suite)
+        if not test_results['passed']:
+            # Iterate with Chagatai on failures
+            skill_draft = self.chagatai.revise_skill_document(
+                skill_draft=skill_draft,
+                test_failures=test_results['failures']
+            )
+            test_results = self.run_skill_tests(test_suite)
+
+        # Step 5: Ögedei - Deploy
+        skill_id = self.ogedei.deploy_skill(
+            skill_document=skill_draft,
+            test_results=test_results
+        )
+
+        # Step 6: Jochi - Validate effectiveness
+        self.jochi.schedule_skill_validation(
+            skill_id=skill_id,
+            skill_gap_id=skill_gap.id,
+            validation_period_days=7
+        )
+
+        return skill_id
+
+    def get_related_bounties(self, skill_gap: SkillGap) -> List[Dict]:
+        """Query Neo4j for bounties that triggered this skill gap."""
+
+        query = """
+        MATCH (sg:SkillGap {id: $gap_id})-[:DETECTED_FROM]->(b:Bounty)
+        RETURN b.type as bounty_type,
+               b.description as description,
+               b.failure_reason as failure_reason
+        ORDER BY b.created_at DESC
+        LIMIT 10
+        """
+
+        result = self.memory.execute(query, gap_id=skill_gap.id)
+        return [record.data() for record in result]
+
+    def run_skill_tests(self, test_suite: Dict) -> Dict:
+        """Execute skill test suite."""
+
+        passed = []
+        failures = []
+
+        for test in test_suite['tests']:
+            try:
+                result = self.execute_test(test)
+                if result['success']:
+                    passed.append(test['name'])
+                else:
+                    failures.append({
+                        'test': test['name'],
+                        'error': result['error']
+                    })
+            except Exception as e:
+                failures.append({
+                    'test': test['name'],
+                    'error': str(e)
+                })
+
+        return {
+            'passed': len(failures) == 0,
+            'total': len(test_suite['tests']),
+            'passed_count': len(passed),
+            'failures': failures
+        }
+```
+
+#### 9.4 SKILL.md Format
+
+Standard SKILL.md format with YAML frontmatter:
+
+```markdown
+---
+name: skill-name
+description: What the skill does
+version: 1.0.0
+agents: [temujin, chagatai]
+tools: [file-write, bash, web-search]
+triggers: ["create api", "build endpoint", "setup database"]
+category: development
+complexity: intermediate
+dependencies: []
+created_at: 2024-01-15T10:30:00Z
+auto_generated: true
+skill_gap_id: sg_abc123
+---
+
+# Skill: {name}
+
+## Overview
+
+Brief description of what this skill enables agents to do.
+
+## When to Use
+
+- Trigger pattern 1: Description
+- Trigger pattern 2: Description
+- Trigger pattern 3: Description
+
+## Prerequisites
+
+- Required tool access
+- Required knowledge
+- Required context
+
+## Execution Steps
+
+### Step 1: [Action Name]
+
+```python
+# Code example or pseudocode
+def step_one(context):
+    # Implementation
+    pass
+```
+
+**Expected Output:** Description
+
+### Step 2: [Action Name]
+
+...
+
+## Error Handling
+
+| Error Pattern | Cause | Resolution |
+|--------------|-------|------------|
+| Error X | Cause Y | Do Z |
+
+## Examples
+
+### Example 1: Simple Case
+
+Input: ...
+Process: ...
+Output: ...
+
+### Example 2: Complex Case
+
+Input: ...
+Process: ...
+Output: ...
+
+## Testing
+
+```python
+# Test cases for this skill
+test_cases = [
+    {
+        'name': 'test_simple_case',
+        'input': {...},
+        'expected': {...}
+    },
+    {
+        'name': 'test_edge_case',
+        'input': {...},
+        'expected': {...}
+    }
+]
+```
+
+## Related Skills
+
+- [skill-name-1](link) - Relationship
+- [skill-name-2](link) - Relationship
+
+## Version History
+
+- 1.0.0 (2024-01-15): Initial skill created from skill gap sg_abc123
+```
+
+#### 9.5 Neo4j Schema for Skills
+
+Complete Cypher schema for skill tracking:
+
+```cypher
+// Skill node - represents a learned capability
+(:Skill {
+  id: uuid,
+  name: string,
+  description: string,
+  version: string,
+  category: string,
+  complexity: 'beginner' | 'intermediate' | 'advanced',
+  file_path: string,
+  created_at: datetime,
+  updated_at: datetime,
+  auto_generated: boolean,
+  status: 'draft' | 'testing' | 'active' | 'deprecated'
+})
+
+// SkillGap node - represents missing capabilities
+(:SkillGap {
+  id: uuid,
+  capability_type: string,
+  description: string,
+  frequency_detected: int,
+  first_detected: datetime,
+  last_detected: datetime,
+  auto_generated: boolean,
+  status: 'pending' | 'generating' | 'resolved' | 'wontfix',
+  confidence: float
+})
+
+// SkillUsage node - tracks how skills are used
+(:SkillUsage {
+  id: uuid,
+  skill_name: string,
+  usage_count: int,
+  success_count: int,
+  failure_count: int,
+  success_rate: float,
+  last_used: datetime,
+  first_used: datetime
+})
+
+// SkillTest node - stores test results
+(:SkillTest {
+  id: uuid,
+  test_name: string,
+  test_type: 'unit' | 'integration' | 'e2e',
+  status: 'passed' | 'failed' | 'pending',
+  executed_at: datetime,
+  execution_time_ms: int,
+  error_message: string
+})
+
+// Relationships
+(Agent)-[:HAS_SKILL {acquired_at: datetime, proficiency: float}]->(Skill)
+(Agent)-[:LACKS {since: datetime, priority: int}]->(SkillGap)
+(Skill)-[:ADDRESSES {effectiveness: float}]->(SkillGap)
+(SkillGap)-[:DETECTED_FROM {confidence: float}]->(Bounty)
+(Skill)-[:DEPENDS_ON]->(Skill)
+(Skill)-[:REPLACES {version_from: string, version_to: string}]->(Skill)
+(Skill)-[:HAS_USAGE]->(SkillUsage)
+(Skill)-[:HAS_TEST]->(SkillTest)
+(Bounty)-[:USES_SKILL {success: boolean}]->(Skill)
+(Task)-[:REQUIRES_SKILL]->(Skill)
+```
+
+#### 9.6 Skill Testing Framework
+
+Comprehensive testing approach for generated skills:
+
+```python
+class SkillTestingFramework:
+    """Test framework for skill validation."""
+
+    def __init__(self, memory: OperationalMemory):
+        self.memory = memory
+
+    def create_test_plan(self, skill: Skill) -> Dict:
+        """Generate comprehensive test plan for skill."""
+
+        return {
+            'unit_tests': self.generate_unit_tests(skill),
+            'integration_tests': self.generate_integration_tests(skill),
+            'edge_cases': self.generate_edge_case_tests(skill),
+            'performance_tests': self.generate_performance_tests(skill)
+        }
+
+    def generate_unit_tests(self, skill: Skill) -> List[Dict]:
+        """Create unit tests for individual skill components."""
+
+        tests = []
+
+        # Parse skill document for testable components
+        components = self.parse_skill_components(skill.file_path)
+
+        for component in components:
+            tests.append({
+                'name': f'test_{component["name"]}',
+                'type': 'unit',
+                'input': component['example_input'],
+                'expected_output': component['example_output'],
+                'validation': component['validation_rules']
+            })
+
+        return tests
+
+    def generate_integration_tests(self, skill: Skill) -> List[Dict]:
+        """Create integration tests for skill workflows."""
+
+        # Query similar successful bounties for test scenarios
+        query = """
+        MATCH (s:Skill {name: $skill_name})<-[:USES_SKILL {success: true}]-(b:Bounty)
+        RETURN b.description as scenario,
+               b.context as context
+        LIMIT 5
+        """
+
+        result = self.memory.execute(query, skill_name=skill.name)
+
+        tests = []
+        for record in result:
+            tests.append({
+                'name': f'integration_{len(tests)}',
+                'type': 'integration',
+                'scenario': record['scenario'],
+                'context': record['context'],
+                'expected_behavior': 'complete_successfully'
+            })
+
+        return tests
+
+    def run_ab_test(self, skill: Skill, control_skill: Skill = None) -> Dict:
+        """A/B test skill effectiveness against baseline."""
+
+        # Get pending bounties matching skill triggers
+        test_bounties = self.get_test_bounties(skill)
+
+        results = {
+            'skill_version': skill.version,
+            'test_bounties': len(test_bounties),
+            'control_group': [],
+            'test_group': []
+        }
+
+        for bounty in test_bounties:
+            if hash(bounty.id) % 2 == 0:
+                # Control group - existing approach
+                results['control_group'].append({
+                    'bounty_id': bounty.id,
+                    'approach': 'baseline',
+                    'result': self.execute_with_baseline(bounty)
+                })
+            else:
+                # Test group - new skill
+                results['test_group'].append({
+                    'bounty_id': bounty.id,
+                    'approach': skill.name,
+                    'result': self.execute_with_skill(bounty, skill)
+                })
+
+        # Calculate effectiveness
+        control_success = sum(1 for r in results['control_group'] if r['result']['success'])
+        test_success = sum(1 for r in results['test_group'] if r['result']['success'])
+
+        results['effectiveness'] = {
+            'control_rate': control_success / len(results['control_group']) if results['control_group'] else 0,
+            'test_rate': test_success / len(results['test_group']) if results['test_group'] else 0,
+            'improvement': (test_success / len(results['test_group'])) - (control_success / len(results['control_group']))
+                              if results['control_group'] and results['test_group'] else 0
+        }
+
+        return results
+
+    def gradual_rollout(self, skill: Skill, stages: List[float] = None) -> Dict:
+        """Gradually roll out skill to production."""
+
+        stages = stages or [0.1, 0.25, 0.5, 1.0]
+
+        rollout_status = {
+            'skill_id': skill.id,
+            'current_stage': 0,
+            'stages': []
+        }
+
+        for i, percentage in enumerate(stages):
+            stage_result = self.deploy_to_percentage(skill, percentage)
+
+            rollout_status['stages'].append({
+                'stage': i + 1,
+                'percentage': percentage * 100,
+                'success_rate': stage_result['success_rate'],
+                'error_rate': stage_result['error_rate'],
+                'proceed': stage_result['success_rate'] > 0.8
+            })
+
+            if stage_result['success_rate'] <= 0.8:
+                # Rollback
+                self.rollback_skill(skill)
+                rollout_status['status'] = 'rolled_back'
+                return rollout_status
+
+        rollout_status['status'] = 'fully_deployed'
+        return rollout_status
+```
+
+#### 9.7 ClawTasks Integration
+
+Integration between skill generation and ClawTasks bounty system:
+
+```python
+class SkillGenerationClawTasksIntegration:
+    """Connect skill generation to ClawTasks workflow."""
+
+    def __init__(self, memory: OperationalMemory, clawtasks: ClawTasksClient):
+        self.memory = memory
+        self.clawtasks = clawtasks
+
+    def handle_failed_bounty(self, bounty: Bounty, error: str) -> Optional[str]:
+        """Process failed bounty and potentially trigger skill generation."""
+
+        # Analyze failure for skill gap
+        skill_gap = self.analyze_failure_for_skill_gap(bounty, error)
+
+        if skill_gap and skill_gap['confidence'] > 0.7:
+            # Create or update SkillGap node
+            gap_id = self.create_or_update_skill_gap(skill_gap, bounty)
+
+            # Check if we should trigger generation
+            if self.should_trigger_generation(gap_id):
+                return self.trigger_skill_generation(gap_id)
+
+        return None
+
+    def analyze_failure_for_skill_gap(self, bounty: Bounty, error: str) -> Optional[Dict]:
+        """Determine if failure indicates a skill gap."""
+
+        # Query similar bounties
+        similar = self.query_similar_bounties(bounty)
+
+        # Pattern: Multiple similar bounties failing
+        if len(similar) >= 3:
+            failure_rate = sum(1 for b in similar if b['status'] == 'failed') / len(similar)
+
+            if failure_rate > 0.6:
+                return {
+                    'capability_type': self.extract_capability_type(bounty, error),
+                    'confidence': failure_rate,
+                    'frequency': len(similar),
+                    'pattern': 'repeated_failure'
+                }
+
+        # Pattern: Capability mismatch
+        if 'capability_mismatch' in error.lower() or 'not_supported' in error.lower():
+            return {
+                'capability_type': bounty.type,
+                'confidence': 0.9,
+                'frequency': 1,
+                'pattern': 'capability_mismatch'
+            }
+
+        return None
+
+    def should_trigger_generation(self, gap_id: str) -> bool:
+        """Determine if sufficient gaps exist to trigger generation."""
+
+        query = """
+        MATCH (sg:SkillGap {id: $gap_id})
+        RETURN sg.frequency_detected as frequency,
+               sg.confidence as confidence,
+               sg.status as status
+        """
+
+        result = self.memory.execute(query, gap_id=gap_id)
+        record = result.single()
+
+        if not record:
+            return False
+
+        # Thresholds for auto-generation
+        if record['frequency'] >= 3 and record['confidence'] > 0.7:
+            return True
+
+        # Check queue size - batch if many pending
+        pending_count = self.get_pending_skill_gaps_count()
+        if pending_count >= 5:
+            return True
+
+        return False
+
+    def trigger_skill_generation(self, gap_id: str) -> str:
+        """Create task for skill generation workflow."""
+
+        # Create Ögedei task
+        task_id = self.memory.create_task(
+            task_type='skill_generation',
+            description=f'Generate skill for gap {gap_id}',
+            delegated_by='system',
+            assigned_to='ops',
+            priority='high',
+            properties={
+                'skill_gap_id': gap_id,
+                'workflow': '6_agent_skill_generation',
+                'estimated_duration_hours': 2
+            }
+        )
+
+        return task_id
+
+    def retry_eligible_bounties(self, skill: Skill) -> List[str]:
+        """After skill deployment, retry bounties that were blocked."""
+
+        # Find bounties blocked by this skill gap
+        query = """
+        MATCH (s:Skill {id: $skill_id})-[:ADDRESSES]->(sg:SkillGap)
+              <-[:DETECTED_FROM]-(b:Bounty)
+        WHERE b.status = 'failed' OR b.status = 'blocked'
+        RETURN b.id as bounty_id,
+               b.description as description
+        LIMIT 10
+        """
+
+        result = self.memory.execute(query, skill_id=skill.id)
+
+        retried = []
+        for record in result:
+            # Retry bounty with new skill
+            retry_result = self.clawtasks.retry_bounty(
+                bounty_id=record['bounty_id'],
+                with_skill=skill.name
+            )
+            retried.append({
+                'bounty_id': record['bounty_id'],
+                'retry_result': retry_result
+            })
+
+        return retried
+
+    def update_skill_from_feedback(self, skill: Skill, feedback: Dict):
+        """Incorporate user feedback to improve skill."""
+
+        # Store feedback
+        query = """
+        MATCH (s:Skill {id: $skill_id})
+        CREATE (sf:SkillFeedback {
+          id: uuid(),
+          rating: $rating,
+          comment: $comment,
+          created_at: datetime()
+        })
+        CREATE (s)-[:HAS_FEEDBACK]->(sf)
+        """
+
+        self.memory.execute(
+            query,
+            skill_id=skill.id,
+            rating=feedback['rating'],
+            comment=feedback.get('comment', '')
+        )
+
+        # If low rating, queue for improvement
+        if feedback['rating'] < 3:
+            self.memory.create_task(
+                task_type='skill_improvement',
+                description=f'Improve skill {skill.name} based on feedback',
+                delegated_by='system',
+                assigned_to='writer',
+                priority='medium',
+                properties={
+                    'skill_id': skill.id,
+                    'feedback_id': feedback['id'],
+                    'improvement_areas': feedback.get('issues', [])
+                }
+            )
+```
+
+#### 9.8 Implementation Priority
+
+| Component | Effort | Value | Order |
+|-----------|--------|-------|-------|
+| Skill gap detection | 3 hours | High | 1st |
+| SKILL.md template | 2 hours | High | 2nd |
+| 6-agent workflow | 6 hours | High | 3rd |
+| Neo4j schema | 2 hours | Medium | 4th |
+| Testing framework | 4 hours | Medium | 5th |
+| ClawTasks integration | 3 hours | High | 6th |
+| A/B testing | 4 hours | Low | 7th |
+| Gradual rollout | 3 hours | Low | 8th |
+
+---
+
+### Phase 10: Competitive Advantage Mechanisms
+
+**STATUS: PLANNED**
+
+Systematic approaches to maintain competitive edge in the ClawTasks marketplace. This phase enables the OpenClaw system to optimize its positioning, maximize returns, and build sustainable advantages over competing agent systems.
+
+#### 10.1 Overview
+
+The Competitive Advantage Mechanisms phase provides the 6-agent system with strategic capabilities to thrive in a competitive marketplace:
+
+| Mechanism | Purpose | Competitive Edge |
+|-----------|---------|------------------|
+| **Dynamic Pricing** | Optimize bounty selection based on market conditions | Capture undervalued opportunities |
+| **Skill Specialization** | Identify and dominate high-value niches | Reduced competition in specialized areas |
+| **Reputation Optimization** | Maximize on-chain reputation scores | Priority access to premium bounties |
+| **Market Intelligence** | Monitor competitor performance and pricing | Anticipate market shifts |
+| **Portfolio Optimization** | Balance risk/reward across bounty types | Sustainable long-term returns |
+| **Network Effects** | Leverage multi-agent collaboration | Tackle complex bounties others cannot |
+
+**Integration Value:**
+- Increase bounty success rate through strategic selection
+- Maximize ROI by targeting undervalued opportunities
+- Build defensible market position through specialization
+- Create compounding advantages through reputation
+- Enable complex bounty execution via agent collaboration
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    COMPETITIVE ADVANTAGE SYSTEM                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                  │
+│   │   MARKET     │    │   PRICING    │    │   SKILL      │                  │
+│   │  INTELLIGENCE│───▶│  OPTIMIZER   │───▶│ SPECIALIZATION│                 │
+│   │              │    │              │    │              │                  │
+│   │Jochi monitors│    │Kublai decides│    │Möngke tracks │                  │
+│   │competitors   │    │optimal bids  │    │niche markets │                  │
+│   └──────────────┘    └──────────────┘    └──────┬───────┘                  │
+│                                                  │                           │
+│   ┌──────────────┐    ┌──────────────┐          │                           │
+│   │   NETWORK    │    │  REPUTATION  │◀─────────┘                           │
+│   │   EFFECTS    │◀───│  OPTIMIZER   │                                      │
+│   │              │    │              │                                      │
+│   │Multi-agent   │    │Ögedei tracks│                                      │
+│   │collaboration │    │on-chain score│                                      │
+│   └──────────────┘    └──────────────┘                                      │
+│                                                                              │
+│   ┌─────────────────────────────────────────────────────────────────┐      │
+│   │                     PORTFOLIO OPTIMIZER                          │      │
+│   │                                                                  │      │
+│   │   Risk/Return Analysis    Diversification    Opportunity Cost   │      │
+│   │   ────────────────────    ─────────────    ────────────────    │      │
+│   │   • Success probability   • Category mix   • Time allocation    │      │
+│   │   • Stake exposure        • Difficulty     • Skill building     │      │
+│   │   • Reputation impact     • Time horizon   • Market timing      │      │
+│   │                                                                  │      │
+│   └─────────────────────────────────────────────────────────────────┘      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.2 Dynamic Pricing Strategies
+
+Dynamic pricing adjusts bounty evaluation based on real-time market conditions, demand patterns, and opportunity costs.
+
+##### 10.2.1 Market Condition Analysis
+
+Jochi analyzes market conditions to inform pricing decisions:
+
+```python
+# competitive_pricing.py
+from dataclasses import dataclass
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
+from openclaw_memory import OperationalMemory
+import numpy as np
+
+@dataclass
+class MarketConditions:
+    """Current state of the ClawTasks marketplace."""
+    avg_bounty_size: float
+    median_completion_time: float
+    active_worker_count: int
+    bounty_supply_ratio: float  # bounties / active workers
+    category_demand: Dict[str, float]  # demand index by category
+    success_rate_by_category: Dict[str, float]
+    timestamp: datetime
+
+class DynamicPricingEngine:
+    """Adjusts bounty valuation based on market dynamics."""
+
+    def __init__(self, memory: OperationalMemory):
+        self.memory = memory
+        self.min_hourly_rate = 50.0  # USDC per hour minimum
+        self.risk_premium = 0.15  # 15% premium for uncertainty
+
+    def analyze_market_conditions(self) -> MarketConditions:
+        """Query Neo4j for current market state."""
+
+        query = """
+        // Get active bounties in last 24h
+        MATCH (b:Bounty)
+        WHERE b.discovered_at > datetime() - duration('P1D')
+        WITH count(b) as new_bounties,
+             avg(b.reward_usdc) as avg_reward,
+             percentileCont(b.reward_usdc, 0.5) as median_reward
+
+        // Get completion metrics
+        MATCH (b:Bounty {status: 'completed'})
+        WHERE b.completed_at > datetime() - duration('P7D')
+        WITH new_bounties, avg_reward, median_reward,
+             avg(duration.inSeconds(datetime(b.claimed_at), datetime(b.completed_at)) / 3600.0) as avg_hours
+
+        // Get active workers (unique claimants)
+        MATCH (b:Bounty {status: 'claimed'})
+        WITH count(DISTINCT b.claimed_by) as active_workers
+
+        // Category demand analysis
+        MATCH (b:Bounty)
+        WHERE b.discovered_at > datetime() - duration('P7D')
+        WITH b.category as cat, count(b) as bounty_count
+        WITH collect({category: cat, count: bounty_count}) as categories
+
+        RETURN new_bounties, avg_reward, median_reward, avg_hours,
+               active_workers, categories
+        """
+
+        result = self.memory.execute(query)
+        record = result.single()
+
+        # Calculate supply/demand ratio
+        supply_ratio = record['new_bounties'] / max(record['active_workers'], 1)
+
+        # Build category demand index
+        category_demand = {}
+        for cat_data in record['categories']:
+            category_demand[cat_data['category']] = cat_data['count']
+
+        return MarketConditions(
+            avg_bounty_size=record['avg_reward'] or 0,
+            median_completion_time=record['avg_hours'] or 24,
+            active_worker_count=record['active_workers'],
+            bounty_supply_ratio=supply_ratio,
+            category_demand=category_demand,
+            success_rate_by_category=self._get_category_success_rates(),
+            timestamp=datetime.now()
+        )
+
+    def calculate_fair_value(self, bounty: Dict, market: MarketConditions) -> Dict:
+        """Calculate fair value of a bounty considering market conditions."""
+
+        base_hourly = bounty['reward_usdc'] / max(bounty['estimated_hours'], 1)
+
+        # Adjust for category demand
+        demand_multiplier = 1.0
+        if bounty['category'] in market.category_demand:
+            demand_score = market.category_demand[bounty['category']]
+            demand_multiplier = 1 + (demand_score / 100)  # Higher demand = higher value
+
+        # Adjust for supply/demand ratio
+        supply_adjustment = 1.0
+        if market.bounty_supply_ratio < 0.5:
+            supply_adjustment = 1.2  # Scarce supply = premium pricing
+        elif market.bounty_supply_ratio > 2.0:
+            supply_adjustment = 0.9  # Oversupply = discount
+
+        # Risk adjustment based on historical success
+        success_rate = market.success_rate_by_category.get(bounty['category'], 0.5)
+        risk_multiplier = 1 + (self.risk_premium * (1 - success_rate))
+
+        adjusted_hourly = base_hourly * demand_multiplier * supply_adjustment * risk_multiplier
+
+        return {
+            'bounty_id': bounty['id'],
+            'base_hourly_rate': base_hourly,
+            'adjusted_hourly_rate': adjusted_hourly,
+            'demand_multiplier': demand_multiplier,
+            'supply_adjustment': supply_adjustment,
+            'risk_multiplier': risk_multiplier,
+            'is_undervalued': adjusted_hourly > self.min_hourly_rate * 1.5,
+            'market_conditions': market
+        }
+
+    def identify_opportunities(self, min_roi: float = 1.5) -> List[Dict]:
+        """Find bounties trading below fair value."""
+
+        market = self.analyze_market_conditions()
+
+        query = """
+        MATCH (b:Bounty {status: 'discovered'})
+        WHERE b.reward_usdc > 0
+        RETURN b.id as id, b.reward_usdc as reward, b.estimated_hours as hours,
+               b.category as category, b.difficulty as difficulty
+        """
+
+        opportunities = []
+        for record in self.memory.execute(query):
+            valuation = self.calculate_fair_value(dict(record), market)
+
+            roi = valuation['adjusted_hourly_rate'] / self.min_hourly_rate
+            if roi >= min_roi:
+                opportunities.append({
+                    **valuation,
+                    'roi_score': roi,
+                    'priority_score': roi * market.success_rate_by_category.get(
+                        record['category'], 0.5
+                    )
+                })
+
+        # Sort by priority score
+        return sorted(opportunities, key=lambda x: x['priority_score'], reverse=True)
+```
+
+##### 10.2.2 Time-Based Pricing Adjustments
+
+Pricing varies based on time-sensitive factors:
+
+```python
+    def calculate_time_sensitivity(self, bounty: Dict) -> float:
+        """Calculate time sensitivity multiplier."""
+
+        now = datetime.now()
+        deadline = bounty.get('deadline')
+        discovered = bounty.get('discovered_at', now)
+
+        if not deadline:
+            return 1.0
+
+        time_remaining = deadline - now
+        total_window = deadline - discovered
+
+        if total_window.total_seconds() == 0:
+            return 1.0
+
+        # Urgency ratio: how close to deadline
+        urgency = 1 - (time_remaining.total_seconds() / total_window.total_seconds())
+
+        if urgency > 0.8:
+            return 1.3  # High urgency - premium
+        elif urgency > 0.5:
+            return 1.1  # Moderate urgency
+        elif urgency < 0.2:
+            return 0.9  # Plenty of time - can be selective
+
+        return 1.0
+
+    def get_optimal_claim_time(self, bounty: Dict) -> datetime:
+        """Determine optimal time to claim based on competition patterns."""
+
+        # Query historical claim patterns
+        query = """
+        MATCH (b:Bounty {category: $category})
+        WHERE b.claimed_at IS NOT NULL
+        WITH b, datetime(b.discovered_at) as discovered,
+             datetime(b.claimed_at) as claimed
+        WITH duration.between(discovered, claimed).minutes as claim_delay
+        RETURN avg(claim_delay) as avg_delay,
+               percentileCont(claim_delay, 0.25) as fast_claim,
+               percentileCont(claim_delay, 0.75) as slow_claim
+        """
+
+        result = self.memory.execute(query, category=bounty['category'])
+        record = result.single()
+
+        if not record or not record['avg_delay']:
+            # No data - claim quickly
+            return datetime.now() + timedelta(minutes=5)
+
+        avg_delay = record['avg_delay']
+
+        # Strategy: claim slightly faster than average to secure,
+        # but not so fast we overpay for evaluation
+        optimal_delay = max(avg_delay * 0.7, 10)  # At least 10 minutes for evaluation
+
+        return datetime.now() + timedelta(minutes=optimal_delay)
+```
+
+##### 10.2.3 Neo4j Schema for Pricing Data
+
+```cypher
+// Market conditions tracking
+(:MarketSnapshot {
+  id: uuid,
+  timestamp: datetime,
+  avg_bounty_size: float,
+  median_completion_hours: float,
+  active_worker_count: int,
+  bounty_supply_ratio: float,
+  overall_success_rate: float
+})
+
+// Bounty valuation records
+(:BountyValuation {
+  id: uuid,
+  bounty_id: string,
+  calculated_at: datetime,
+  base_hourly_rate: float,
+  adjusted_hourly_rate: float,
+  demand_multiplier: float,
+  supply_adjustment: float,
+  risk_multiplier: float,
+  is_undervalued: boolean,
+  roi_score: float,
+  priority_score: float
+})
+
+// Category performance tracking
+(:CategoryMetrics {
+  category: string,
+  period_start: datetime,
+  period_end: datetime,
+  bounty_count: int,
+  avg_reward: float,
+  success_rate: float,
+  avg_completion_hours: float,
+  demand_index: float  // Relative demand vs other categories
+})
+
+// Relationships
+(:Bounty)-[:HAS_VALUATION]->(:BountyValuation)
+(:MarketSnapshot)-[:COVERS]->(:CategoryMetrics)
+(:Agent)-[:GENERATED]->(:BountyValuation)
+```
+
+#### 10.3 Skill Specialization Tracking
+
+Identify high-value niche capabilities and track market saturation to find underserved opportunities.
+
+##### 10.3.1 Niche Identification Algorithm
+
+Möngke continuously analyzes the market to identify profitable niches:
+
+```python
+# specialization_tracker.py
+from typing import List, Dict, Tuple
+from collections import defaultdict
+from openclaw_memory import OperationalMemory
+import math
+
+class SpecializationTracker:
+    """Tracks skill specialization opportunities and market saturation."""
+
+    def __init__(self, memory: OperationalMemory):
+        self.memory = memory
+        self.min_opportunity_score = 0.6
+
+    def analyze_niche_opportunities(self) -> List[Dict]:
+        """Identify underserved high-value niches."""
+
+        query = """
+        // Get all completed bounties with skills
+        MATCH (b:Bounty {status: 'completed'})-[:REQUIRES_SKILL]->(s:Skill)
+        WITH s.name as skill, count(b) as completions,
+             avg(b.reward_usdc) as avg_reward,
+             avg(b.reward_usdc / b.estimated_hours) as avg_hourly
+
+        // Count active workers with this skill
+        OPTIONAL MATCH (a:Agent)-[:HAS_SKILL {proficiency: 'expert'}]->(s:Skill {name: skill})
+        WITH skill, completions, avg_reward, avg_hourly, count(a) as expert_count
+
+        // Calculate opportunity metrics
+        WITH skill, completions, avg_reward, avg_hourly, expert_count,
+             (avg_hourly * completions) / (expert_count + 1) as opportunity_score
+
+        RETURN skill, completions, avg_reward, avg_hourly, expert_count,
+               opportunity_score
+        ORDER BY opportunity_score DESC
+        """
+
+        opportunities = []
+        for record in self.memory.execute(query):
+            if record['opportunity_score'] >= self.min_opportunity_score:
+                opportunities.append({
+                    'skill': record['skill'],
+                    'market_size': record['completions'],
+                    'avg_reward': record['avg_reward'],
+                    'avg_hourly': record['avg_hourly'],
+                    'competition_level': record['expert_count'],
+                    'opportunity_score': record['opportunity_score'],
+                    'saturation': self._calculate_saturation(record)
+                })
+
+        return opportunities
+
+    def _calculate_saturation(self, record: Dict) -> str:
+        """Determine market saturation level."""
+
+        experts = record['expert_count']
+        market_size = record['market_size']
+
+        if market_size == 0:
+            return 'unknown'
+
+        ratio = experts / market_size
+
+        if ratio < 0.1:
+            return 'underserved'  # High opportunity
+        elif ratio < 0.3:
+            return 'balanced'
+        elif ratio < 0.6:
+            return 'competitive'
+        else:
+            return 'saturated'
+
+    def recommend_specialization_path(self, agent_capabilities: List[str]) -> Dict:
+        """Recommend optimal specialization strategy."""
+
+        opportunities = self.analyze_niche_opportunities()
+
+        # Filter for related skills (adjacent to current capabilities)
+        related_opportunities = []
+        for opp in opportunities:
+            skill = opp['skill']
+
+            # Check if we have related skills
+            relatedness = self._calculate_skill_relatedness(skill, agent_capabilities)
+
+            if relatedness > 0.3:  # At least some overlap
+                related_opportunities.append({
+                    **opp,
+                    'relatedness': relatedness,
+                    'acquisition_difficulty': self._estimate_acquisition_difficulty(skill),
+                    'strategic_score': opp['opportunity_score'] * relatedness
+                })
+
+        # Sort by strategic score
+        related_opportunities.sort(key=lambda x: x['strategic_score'], reverse=True)
+
+        return {
+            'top_opportunities': related_opportunities[:5],
+            'recommended_focus': related_opportunities[0] if related_opportunities else None,
+            'diversification_skills': self._identify_diversification_opportunities(
+                agent_capabilities, opportunities
+            )
+        }
+
+    def _calculate_skill_relatedness(self, target_skill: str, current_skills: List[str]) -> float:
+        """Calculate how related a new skill is to existing capabilities."""
+
+        # Query Neo4j for skill co-occurrence
+        query = """
+        MATCH (target:Skill {name: $target})
+        MATCH (current:Skill)
+        WHERE current.name IN $current_skills
+        OPTIONAL MATCH (target)-[:CO_OCCURS_WITH]-(current)
+        WITH target, current, count(*) as co_occurrence
+        OPTIONAL MATCH (target)-[:SIMILAR_TO]-(current)
+        WITH target, current, co_occurrence,
+             CASE WHEN exists { MATCH (target)-[:SIMILAR_TO]-(current) } THEN 0.5 ELSE 0 END as similarity
+        RETURN avg(co_occurrence * 0.1 + similarity) as relatedness
+        """
+
+        result = self.memory.execute(query, target=target_skill, current_skills=current_skills)
+        record = result.single()
+
+        return record['relatedness'] or 0.0
+
+    def track_skill_gap_opportunities(self) -> List[Dict]:
+        """Find high-value skills that competitors lack."""
+
+        query = """
+        // Find skills required by high-value bounties
+        MATCH (b:Bounty)
+        WHERE b.reward_usdc > 500  // High-value threshold
+        MATCH (b)-[:REQUIRES_SKILL]->(s:Skill)
+        WITH s, count(b) as high_value_bounties, avg(b.reward_usdc) as avg_reward
+
+        // Count how many agents have this skill
+        OPTIONAL MATCH (a:Agent)-[:HAS_SKILL]->(s)
+        WITH s, high_value_bounties, avg_reward, count(a) as agent_count
+
+        WHERE agent_count < 3  // Few competitors
+
+        RETURN s.name as skill, high_value_bounties, avg_reward, agent_count,
+               (high_value_bounties * avg_reward) / (agent_count + 1) as value_score
+        ORDER BY value_score DESC
+        LIMIT 10
+        """
+
+        gaps = []
+        for record in self.memory.execute(query):
+            gaps.append({
+                'skill': record['skill'],
+                'high_value_bounties': record['high_value_bounties'],
+                'avg_reward': record['avg_reward'],
+                'competitors_with_skill': record['agent_count'],
+                'value_score': record['value_score'],
+                'recommendation': 'acquire' if record['agent_count'] == 0 else 'improve'
+            })
+
+        return gaps
+```
+
+##### 10.3.2 Specialization Strategy Framework
+
+```cypher
+// Skill specialization nodes
+(:SkillSpecialization {
+  id: uuid,
+  skill_name: string,
+  category: string,
+  market_saturation: 'underserved' | 'balanced' | 'competitive' | 'saturated',
+  avg_hourly_rate: float,
+  opportunity_score: float,
+  acquisition_difficulty: 'easy' | 'medium' | 'hard',
+  strategic_priority: 'critical' | 'high' | 'medium' | 'low',
+  last_updated: datetime
+})
+
+// Market position tracking
+(:MarketPosition {
+  id: uuid,
+  skill: string,
+  our_ranking: int,  // Among all agents
+  total_competitors: int,
+  market_share_percent: float,
+  avg_completion_time_ratio: float,  // vs competitors
+  success_rate_vs_market: float,
+  period: string  // 'weekly', 'monthly'
+})
+
+// Relationships
+(:Agent)-[:SPECIALIZES_IN {level: 'primary' | 'secondary' | 'tertiary'}]->(:SkillSpecialization)
+(:SkillSpecialization)-[:HAS_MARKET_POSITION]->(:MarketPosition)
+(:Skill)-[:CO_OCCURS_WITH {frequency: int}]->(:Skill)
+(:Skill)-[:SIMILAR_TO {similarity_score: float}]->(:Skill)
+```
+
+#### 10.4 Reputation Optimization
+
+Maximize on-chain reputation scores to gain priority access to premium bounties and better terms.
+
+##### 10.4.1 Reputation Score Components
+
+Ögedei tracks and optimizes multiple reputation dimensions:
+
+```python
+# reputation_optimizer.py
+from dataclasses import dataclass
+from typing import Dict, List, Optional
+from enum import Enum
+from openclaw_memory import OperationalMemory
+# from clawtasks_contract import ClawTasksContract  # Smart contract interface
+
+class ReputationDimension(Enum):
+    SUCCESS_RATE = "success_rate"
+    COMPLETION_SPEED = "completion_speed"
+    QUALITY_SCORE = "quality_score"
+    STAKE_RELIABILITY = "stake_reliability"
+    DISPUTE_RESOLUTION = "dispute_resolution"
+
+@dataclass
+class ReputationMetrics:
+    """Multi-dimensional reputation tracking."""
+    overall_score: float  # 0-1000
+    success_rate: float  # 0-1
+    avg_completion_time: float  # hours
+    quality_rating: float  # 0-5
+    total_completed: int
+    total_failed: int
+    dispute_win_rate: float
+    stake_forgiveness_count: int
+
+class ReputationOptimizer:
+    """Optimizes on-chain reputation for competitive advantage."""
+
+    def __init__(self, memory: OperationalMemory, clawtasks: ClawTasksContract):
+        self.memory = memory
+        self.clawtasks = clawtasks
+        self.target_success_rate = 0.95
+        self.max_concurrent_risk = 0.15  # 15% of stake at risk max
+
+    def get_current_reputation(self, agent_address: str) -> ReputationMetrics:
+        """Fetch current reputation from chain and Neo4j."""
+
+        # On-chain reputation
+        chain_score = self.clawtasks.get_worker_reputation(agent_address)
+
+        # Off-chain metrics from Neo4j
+        query = """
+        MATCH (a:Agent {wallet_address: $address})-[:RECEIVED]->(p:Payment)
+        WITH a, count(p) as completed, sum(p.amount) as total_earned
+
+        OPTIONAL MATCH (a)-[:FAILED]->(b:Bounty)
+        WITH a, completed, total_earned, count(b) as failed
+
+        OPTIONAL MATCH (a)-[:COMPLETED]->(b:Bounty)
+        WITH completed, total_earned, failed,
+             avg(duration.inSeconds(datetime(b.claimed_at), datetime(b.completed_at)) / 3600.0) as avg_time
+
+        RETURN completed, failed, total_earned, avg_time
+        """
+
+        result = self.memory.execute(query, address=agent_address)
+        record = result.single()
+
+        completed = record['completed'] or 0
+        failed = record['failed'] or 0
+        total = completed + failed
+
+        return ReputationMetrics(
+            overall_score=chain_score,
+            success_rate=completed / total if total > 0 else 0,
+            avg_completion_time=record['avg_time'] or 0,
+            quality_rating=self._calculate_quality_rating(agent_address),
+            total_completed=completed,
+            total_failed=failed,
+            dispute_win_rate=self._get_dispute_stats(agent_address),
+            stake_forgiveness_count=0
+        )
+
+    def calculate_reputation_impact(self, bounty: Dict) -> Dict:
+        """Calculate reputation impact of taking a bounty."""
+
+        metrics = self.get_current_reputation(bounty['agent_address'])
+
+        # Success scenario
+        success_impact = self._calculate_success_boost(metrics, bounty)
+
+        # Failure scenario
+        failure_impact = self._calculate_failure_penalty(metrics, bounty)
+
+        # Expected value of reputation change
+        success_prob = self._estimate_success_probability(bounty, metrics)
+        expected_reputation_change = (
+            success_impact * success_prob +
+            failure_impact * (1 - success_prob)
+        )
+
+        return {
+            'success_boost': success_impact,
+            'failure_penalty': failure_impact,
+            'success_probability': success_prob,
+            'expected_change': expected_reputation_change,
+            'risk_adjusted_value': self._calculate_risk_adjusted_value(
+                bounty, expected_reputation_change
+            )
+        }
+
+    def _calculate_success_boost(self, metrics: ReputationMetrics, bounty: Dict) -> float:
+        """Calculate reputation gain from successful completion."""
+
+        base_boost = 10.0
+
+        # Bonus for high-value bounties
+        value_bonus = min(bounty['reward_usdc'] / 1000, 20)
+
+        # Calculate speed bonus based on actual vs expected completion time
+        speed_bonus = 0
+        actual_completion_time = bounty.get('actual_completion_hours')
+        expected_time = bounty.get('estimated_hours', 24)
+
+        if actual_completion_time and expected_time > 0:
+            # Bonus for completing faster than expected
+            if actual_completion_time < expected_time * 0.8:
+                speed_bonus = 5  # 20% faster than expected
+            elif actual_completion_time < expected_time:
+                speed_bonus = 2  # Any speed improvement
+
+        # Bonus for difficult categories
+        difficulty_bonus = {'beginner': 0, 'intermediate': 2, 'advanced': 5, 'expert': 10}.get(
+            bounty.get('difficulty', 'intermediate'), 0
+        )
+
+        return base_boost + value_bonus + speed_bonus + difficulty_bonus
+
+    def _calculate_failure_penalty(self, metrics: ReputationMetrics, bounty: Dict) -> float:
+        """Calculate reputation loss from failure."""
+
+        base_penalty = -25.0
+
+        # Increased penalty if already below target success rate
+        if metrics.success_rate < self.target_success_rate:
+            base_penalty *= 1.5
+
+        # Penalty scales with bounty value (higher stakes = higher visibility)
+        value_factor = 1 + (bounty['reward_usdc'] / 5000)
+
+        return base_penalty * value_factor
+
+    def recommend_reputation_strategy(self, current_metrics: ReputationMetrics) -> Dict:
+        """Recommend actions to optimize reputation."""
+
+        recommendations = []
+
+        # Success rate optimization
+        if current_metrics.success_rate < self.target_success_rate:
+            recommendations.append({
+                'priority': 'critical',
+                'action': 'select_lower_difficulty',
+                'description': 'Focus on bounties with >90% historical success rate',
+                'target': 'Increase success rate to 95%'
+            })
+
+        # Speed optimization
+        market_avg_time = self._get_market_avg_completion_time()
+        if current_metrics.avg_completion_time > market_avg_time * 1.2:
+            recommendations.append({
+                'priority': 'high',
+                'action': 'improve_efficiency',
+                'description': f'Avg completion {current_metrics.avg_completion_time:.1f}h vs market {market_avg_time:.1f}h',
+                'target': 'Reduce avg completion time by 20%'
+            })
+
+        # Volume strategy
+        if current_metrics.total_completed < 10:
+            recommendations.append({
+                'priority': 'high',
+                'action': 'increase_volume',
+                'description': 'Complete more bounties to establish reputation baseline',
+                'target': 'Complete 10+ bounties'
+            })
+
+        return {
+            'current_tier': self._get_reputation_tier(current_metrics),
+            'next_tier_requirements': self._get_next_tier_requirements(current_metrics),
+            'recommendations': recommendations,
+            'optimal_bounty_profile': self._get_optimal_bounty_profile(current_metrics)
+        }
+
+    def _get_reputation_tier(self, metrics: ReputationMetrics) -> str:
+        """Determine reputation tier based on metrics."""
+
+        if metrics.overall_score >= 900 and metrics.success_rate >= 0.98:
+            return 'legendary'
+        elif metrics.overall_score >= 750 and metrics.success_rate >= 0.95:
+            return 'elite'
+        elif metrics.overall_score >= 500 and metrics.success_rate >= 0.90:
+            return 'established'
+        elif metrics.overall_score >= 250:
+            return 'rising'
+        else:
+            return 'newcomer'
+
+    def _get_optimal_bounty_profile(self, metrics: ReputationMetrics) -> Dict:
+        """Determine optimal bounty characteristics for reputation growth."""
+
+        tier = self._get_reputation_tier(metrics)
+
+        profiles = {
+            'newcomer': {
+                'max_difficulty': 'intermediate',
+                'min_success_rate': 0.85,
+                'focus': 'volume_and_consistency',
+                'avoid_disputes': True
+            },
+            'rising': {
+                'max_difficulty': 'advanced',
+                'min_success_rate': 0.80,
+                'focus': 'quality_improvement',
+                'target_categories': ['technical', 'content']
+            },
+            'established': {
+                'max_difficulty': 'expert',
+                'min_success_rate': 0.75,
+                'focus': 'premium_bounties',
+                'min_reward': 500
+            },
+            'elite': {
+                'max_difficulty': 'expert',
+                'min_success_rate': 0.70,
+                'focus': 'specialization',
+                'target_exclusivity': True
+            },
+            'legendary': {
+                'max_difficulty': 'expert',
+                'min_success_rate': 0.65,
+                'focus': 'market_leadership',
+                'mentoring_opportunities': True
+            }
+        }
+
+        return profiles.get(tier, profiles['newcomer'])
+```
+
+##### 10.4.2 Reputation Protection Mechanisms
+
+```python
+    def should_claim_bounty(self, bounty: Dict, metrics: ReputationMetrics) -> Tuple[bool, str]:
+        """Determine if claiming a bounty protects or improves reputation."""
+
+        # Never risk reputation if already in danger zone
+        if metrics.success_rate < 0.80 and metrics.total_completed > 5:
+            # Only take very safe bets
+            success_prob = self._estimate_success_probability(bounty, metrics)
+            if success_prob < 0.95:
+                return False, f"Reputation protection mode: success probability {success_prob:.2%} below 95% threshold"
+
+        # Check if failure would drop tier
+        tier = self._get_reputation_tier(metrics)
+        simulated_failure = self._simulate_failure(metrics, bounty)
+        new_tier = self._get_reputation_tier(simulated_failure)
+
+        if new_tier != tier:
+            return False, f"Claim risks tier downgrade from {tier} to {new_tier}"
+
+        # Check stake exposure
+        current_at_risk = self._calculate_current_stake_exposure()
+        additional_risk = bounty.get('stake_required', 0)
+
+        total_stake = current_at_risk + additional_risk
+        hot_wallet_balance = self._get_hot_wallet_balance()
+
+        if total_stake > hot_wallet_balance * self.max_concurrent_risk:
+            return False, f"Stake exposure {total_stake} exceeds {self.max_concurrent_risk:.0%} of wallet"
+
+        return True, "Bounty meets reputation protection criteria"
+
+    def _simulate_failure(self, metrics: ReputationMetrics, bounty: Dict) -> ReputationMetrics:
+        """Simulate metrics after hypothetical failure."""
+
+        new_completed = metrics.total_completed
+        new_failed = metrics.total_failed + 1
+        new_total = new_completed + new_failed
+
+        return ReputationMetrics(
+            overall_score=max(0, metrics.overall_score - 25),
+            success_rate=new_completed / new_total,
+            avg_completion_time=metrics.avg_completion_time,
+            quality_rating=metrics.quality_rating,
+            total_completed=new_completed,
+            total_failed=new_failed,
+            dispute_win_rate=metrics.dispute_win_rate,
+            stake_forgiveness_count=metrics.stake_forgiveness_count
+        )
+```
+
+#### 10.5 Market Intelligence
+
+Monitor competitor agent performance and pricing to anticipate market shifts and identify opportunities.
+
+##### 10.5.1 Competitor Analysis System
+
+Jochi maintains intelligence on competing agents:
+
+```python
+# market_intelligence.py
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
+from openclaw_memory import OperationalMemory
+import statistics
+
+class MarketIntelligence:
+    """Monitors competitor activity and market trends."""
+
+    def __init__(self, memory: OperationalMemory):
+        self.memory = memory
+        self.intelligence_ttl = timedelta(hours=24)
+
+    def track_competitor_activity(self, competitor_address: str) -> Dict:
+        """Track a competitor's recent activity and performance."""
+
+        query = """
+        // Get competitor's recent bounties
+        MATCH (b:Bounty {claimed_by: $address})
+        WHERE b.claimed_at > datetime() - duration('P30D')
+        WITH b
+        ORDER BY b.claimed_at DESC
+
+        WITH collect({
+            id: b.id,
+            status: b.status,
+            reward: b.reward_usdc,
+            category: b.category,
+            claimed_at: b.claimed_at,
+            completed_at: b.completed_at
+        }) as recent_bounties
+
+        // Calculate metrics
+        WITH recent_bounties,
+             size([x IN recent_bounties WHERE x.status = 'completed']) as completed,
+             size([x IN recent_bounties WHERE x.status = 'failed']) as failed
+
+        // Calculate average completion time using UNWIND
+        UNWIND recent_bounties as x
+        WITH recent_bounties, completed, failed, x
+        WHERE x.completed_at IS NOT NULL
+        RETURN recent_bounties, completed, failed,
+               avg(duration.inSeconds(datetime(x.claimed_at), datetime(x.completed_at)) / 3600.0) as avg_completion_time
+        """
+
+        result = self.memory.execute(query, address=competitor_address)
+        record = result.single()
+
+        if not record:
+            return {'error': 'No activity found'}
+
+        completed = record['completed'] or 0
+        failed = record['failed'] or 0
+        total = completed + failed
+
+        return {
+            'address': competitor_address,
+            'recent_bounties': record['recent_bounties'][:10],  # Last 10
+            'success_rate': completed / total if total > 0 else 0,
+            'total_recent': total,
+            'avg_completion_time': record['avg_completion_time'],
+            'activity_level': self._classify_activity_level(total),
+            'specializations': self._identify_competitor_specializations(competitor_address),
+            'pricing_strategy': self._analyze_pricing_strategy(competitor_address)
+        }
+
+    def identify_market_leaders(self, category: Optional[str] = None) -> List[Dict]:
+        """Identify top-performing agents in a category or overall."""
+
+        category_filter = "AND b.category = $category" if category else ""
+
+        query = f"""
+        MATCH (b:Bounty)
+        WHERE b.status = 'completed'
+        {category_filter}
+        AND b.completed_at > datetime() - duration('P30D')
+
+        WITH b.claimed_by as agent, count(b) as completions,
+             sum(b.reward_usdc) as total_revenue,
+             avg(b.reward_usdc) as avg_bounty_size
+
+        WHERE completions >= 3  // Minimum activity threshold
+
+        WITH agent, completions, total_revenue, avg_bounty_size,
+             (total_revenue * completions) / 1000 as performance_score
+
+        ORDER BY performance_score DESC
+        LIMIT 10
+
+        RETURN agent, completions, total_revenue, avg_bounty_size, performance_score
+        """
+
+        params = {'category': category} if category else {}
+        leaders = []
+
+        for record in self.memory.execute(query, **params):
+            leaders.append({
+                'address': record['agent'],
+                'completions_30d': record['completions'],
+                'revenue_30d': record['total_revenue'],
+                'avg_bounty_size': record['avg_bounty_size'],
+                'performance_score': record['performance_score']
+            })
+
+        return leaders
+
+    def detect_market_shifts(self) -> List[Dict]:
+        """Detect significant changes in market dynamics."""
+
+        query = """
+        // Compare last 7 days vs previous 7 days
+        MATCH (b:Bounty)
+        WHERE b.discovered_at > datetime() - duration('P14D')
+
+        WITH b,
+             CASE WHEN b.discovered_at > datetime() - duration('P7D')
+                  THEN 'recent' ELSE 'previous' END as period
+
+        WITH period, count(b) as bounty_count,
+             avg(b.reward_usdc) as avg_reward,
+             count(DISTINCT b.category) as category_diversity
+
+        RETURN period, bounty_count, avg_reward, category_diversity
+        ORDER BY period DESC
+        """
+
+        periods = {}
+        for record in self.memory.execute(query):
+            periods[record['period']] = {
+                'bounty_count': record['bounty_count'],
+                'avg_reward': record['avg_reward'],
+                'category_diversity': record['category_diversity']
+            }
+
+        shifts = []
+
+        if 'recent' in periods and 'previous' in periods:
+            recent = periods['recent']
+            previous = periods['previous']
+
+            # Volume shift
+            volume_change = (recent['bounty_count'] - previous['bounty_count']) / max(previous['bounty_count'], 1)
+            if abs(volume_change) > 0.2:
+                shifts.append({
+                    'type': 'volume_shift',
+                    'magnitude': volume_change,
+                    'description': f"Bounty volume {'increased' if volume_change > 0 else 'decreased'} by {abs(volume_change):.1%}",
+                    'implication': 'more_opportunities' if volume_change > 0 else 'increased_competition'
+                })
+
+            # Price shift
+            price_change = (recent['avg_reward'] - previous['avg_reward']) / max(previous['avg_reward'], 1)
+            if abs(price_change) > 0.15:
+                shifts.append({
+                    'type': 'price_shift',
+                    'magnitude': price_change,
+                    'description': f"Average bounty {'increased' if price_change > 0 else 'decreased'} by {abs(price_change):.1%}",
+                    'implication': 'premium_opportunities' if price_change > 0 else 'efficiency_required'
+                })
+
+        return shifts
+
+    def analyze_category_trends(self) -> List[Dict]:
+        """Analyze trends within specific bounty categories."""
+
+        query = """
+        MATCH (b:Bounty)
+        WHERE b.discovered_at > datetime() - duration('P30D')
+
+        WITH b.category as category,
+             CASE WHEN b.discovered_at > datetime() - duration('P7D')
+                  THEN 'recent' ELSE 'earlier' END as period
+
+        WITH category, period,
+             count(b) as count,
+             avg(b.reward_usdc) as avg_reward
+
+        RETURN category, period, count, avg_reward
+        ORDER BY category, period
+        """
+
+        category_data = defaultdict(lambda: {})
+        for record in self.memory.execute(query):
+            category_data[record['category']][record['period']] = {
+                'count': record['count'],
+                'avg_reward': record['avg_reward']
+            }
+
+        trends = []
+        for category, periods in category_data.items():
+            if 'recent' in periods and 'earlier' in periods:
+                recent = periods['recent']
+                earlier = periods['earlier']
+
+                growth = (recent['count'] - earlier['count']) / max(earlier['count'], 1)
+                price_trend = (recent['avg_reward'] - earlier['avg_reward']) / max(earlier['avg_reward'], 1)
+
+                trends.append({
+                    'category': category,
+                    'volume_growth': growth,
+                    'price_trend': price_trend,
+                    'trend_strength': growth + price_trend,
+                    'recommendation': self._categorize_trend(growth, price_trend)
+                })
+
+        return sorted(trends, key=lambda x: abs(x['trend_strength']), reverse=True)
+
+    def _categorize_trend(self, volume_growth: float, price_trend: float) -> str:
+        """Categorize market trend for strategic response."""
+
+        if volume_growth > 0.3 and price_trend > 0.1:
+            return 'hot_market_enter'
+        elif volume_growth > 0.3 and price_trend < -0.1:
+            return 'volume_play_efficiency'
+        elif volume_growth < -0.2 and price_trend > 0.2:
+            return 'premium_niche_focus'
+        elif volume_growth < -0.2 and price_trend < -0.1:
+            return 'avoid_or_differentiate'
+        else:
+            return 'steady_state'
+```
+
+##### 10.5.2 Market Intelligence Schema
+
+```cypher
+// Competitor tracking
+(:CompetitorAgent {
+  address: string,
+  first_seen: datetime,
+  last_active: datetime,
+  estimated_success_rate: float,
+  activity_level: 'high' | 'medium' | 'low',
+  primary_specializations: [string],
+  threat_level: 'direct' | 'indirect' | 'minimal'
+})
+
+// Market shift events
+(:MarketShift {
+  id: uuid,
+  detected_at: datetime,
+  shift_type: 'volume' | 'price' | 'competition' | 'category',
+  magnitude: float,
+  description: string,
+  recommended_action: string,
+  confidence: float
+})
+
+// Category trend tracking
+(:CategoryTrend {
+  category: string,
+  period_start: datetime,
+  period_end: datetime,
+  volume_growth: float,
+  price_trend: float,
+  competition_change: float,
+  trend_classification: string
+})
+
+// Intelligence reports
+(:IntelligenceReport {
+  id: uuid,
+  generated_at: datetime,
+  report_type: 'competitor' | 'market_shift' | 'category_analysis',
+  summary: string,
+  key_findings: [string],
+  recommendations: [string],
+  confidence: float
+})
+
+// Relationships
+(:Agent)-[:GENERATED]->(:IntelligenceReport)
+(:IntelligenceReport)-[:COVERS]->(:CompetitorAgent)
+(:IntelligenceReport)-[:IDENTIFIES]->(:MarketShift)
+(:CompetitorAgent)-[:COMPETES_IN]->(:CategoryTrend)
+```
+
+#### 10.6 Portfolio Optimization
+
+Balance risk/reward across different bounty types to achieve sustainable long-term returns.
+
+##### 10.6.1 Portfolio Theory for Bounty Selection
+
+```python
+# portfolio_optimizer.py
+from typing import List, Dict, Tuple
+from dataclasses import dataclass
+from collections import defaultdict
+from openclaw_memory import OperationalMemory
+import numpy as np
+
+@dataclass
+class BountyAsset:
+    """Represents a bounty as a portfolio asset."""
+    id: str
+    expected_return: float
+    success_probability: float
+    stake_required: float
+    category: str
+    time_estimate: float
+    difficulty: str
+
+class PortfolioOptimizer:
+    """Optimizes bounty portfolio for risk-adjusted returns."""
+
+    def __init__(self, memory: OperationalMemory):
+        self.memory = memory
+        self.target_portfolio_size = 5  # Concurrent bounties
+        self.max_category_concentration = 0.4  # Max 40% in one category
+        self.min_expected_return = 100.0  # Minimum USDC expected value
+
+    def calculate_expected_return(self, bounty: Dict, agent_metrics: Dict) -> float:
+        """Calculate expected return in USDC."""
+
+        reward = bounty['reward_usdc'] * 0.95  # 95% after platform fee
+        stake = bounty['stake_required']
+        success_prob = self._estimate_success_probability(bounty, agent_metrics)
+
+        # Expected value = (reward + stake back) * success - (stake lost) * failure
+        success_value = (reward + stake) * success_prob
+        failure_cost = stake * (1 - success_prob)
+
+        return success_value - failure_cost
+
+    def calculate_portfolio_metrics(self, bounties: List[BountyAsset]) -> Dict:
+        """Calculate risk/return metrics for a portfolio."""
+
+        if not bounties:
+            return {'expected_return': 0, 'risk': 0, 'sharpe_ratio': 0}
+
+        # Expected portfolio return
+        total_stake = sum(b.stake_required for b in bounties)
+        weights = [b.stake_required / total_stake for b in bounties]
+
+        expected_returns = [self.calculate_expected_return({'reward_usdc': b.expected_return, 'stake_required': b.stake_required}, {}) for b in bounties]
+        portfolio_return = sum(w * r for w, r in zip(weights, expected_returns))
+
+        # Portfolio risk (simplified - assumes some correlation by category)
+        category_groups = defaultdict(list)
+        for i, b in enumerate(bounties):
+            category_groups[b.category].append(i)
+
+        # Higher concentration = higher risk
+        concentration_risk = sum(
+            (len(group) / len(bounties)) ** 2
+            for group in category_groups.values()
+        )
+
+        # Individual bounty risks
+        individual_risks = [(1 - b.success_probability) * b.stake_required for b in bounties]
+        avg_risk = np.mean(individual_risks)
+
+        total_risk = avg_risk * (1 + concentration_risk)
+
+        # Sharpe-like ratio (return per unit risk)
+        sharpe = portfolio_return / total_risk if total_risk > 0 else 0
+
+        return {
+            'expected_return': portfolio_return,
+            'total_at_risk': total_stake,
+            'concentration_risk': concentration_risk,
+            'total_risk': total_risk,
+            'sharpe_ratio': sharpe,
+            'category_breakdown': {
+                cat: len(group) / len(bounties)
+                for cat, group in category_groups.items()
+            }
+        }
+
+    def optimize_portfolio(self, available_bounties: List[Dict],
+                          agent_metrics: Dict,
+                          current_portfolio: List[str] = None) -> Dict:
+        """Find optimal bounty combination."""
+
+        current_portfolio = current_portfolio or []
+
+        # Convert to assets
+        assets = []
+        for bounty in available_bounties:
+            if bounty['id'] not in current_portfolio:
+                assets.append(BountyAsset(
+                    id=bounty['id'],
+                    expected_return=bounty['reward_usdc'],
+                    success_probability=self._estimate_success_probability(bounty, agent_metrics),
+                    stake_required=bounty['stake_required'],
+                    category=bounty['category'],
+                    time_estimate=bounty.get('estimated_hours', 24),
+                    difficulty=bounty.get('difficulty', 'intermediate')
+                ))
+
+        # Filter by minimum expected return
+        viable_assets = [
+            a for a in assets
+            if self.calculate_expected_return({'reward_usdc': a.expected_return, 'stake_required': a.stake_required}, agent_metrics) >= self.min_expected_return
+        ]
+
+        if not viable_assets:
+            return {'recommendation': 'wait', 'reason': 'No bounties meet minimum return threshold'}
+
+        # Greedy optimization with constraints
+        selected = []
+        category_counts = defaultdict(int)
+
+        # Sort by risk-adjusted return
+        viable_assets.sort(
+            key=lambda a: a.success_probability * a.expected_return / a.stake_required,
+            reverse=True
+        )
+
+        for asset in viable_assets:
+            if len(selected) >= self.target_portfolio_size:
+                break
+
+            # Check category concentration
+            category_pct = (category_counts[asset.category] + 1) / (len(selected) + 1)
+            if category_pct > self.max_category_concentration:
+                continue
+
+            # Check time capacity (don't exceed 40 hours)
+            total_time = sum(a.time_estimate for a in selected) + asset.time_estimate
+            if total_time > 40:
+                continue
+
+            selected.append(asset)
+            category_counts[asset.category] += 1
+
+        portfolio_metrics = self.calculate_portfolio_metrics(selected)
+
+        return {
+            'recommendation': 'claim' if selected else 'wait',
+            'selected_bounties': [a.id for a in selected],
+            'portfolio_metrics': portfolio_metrics,
+            'diversification_score': 1 - portfolio_metrics['concentration_risk'],
+            'time_commitment': sum(a.time_estimate for a in selected),
+            'category_allocation': dict(category_counts)
+        }
+
+    def rebalance_portfolio(self, current_bounties: List[str],
+                           available_bounties: List[Dict],
+                           agent_metrics: Dict) -> Dict:
+        """Recommend portfolio rebalancing actions."""
+
+        current_metrics = self._analyze_current_portfolio(current_bounties)
+        optimal = self.optimize_portfolio(available_bounties, agent_metrics, current_bounties)
+
+        actions = []
+
+        # Check concentration
+        for category, pct in current_metrics['category_breakdown'].items():
+            if pct > self.max_category_concentration:
+                actions.append({
+                    'action': 'reduce_exposure',
+                    'category': category,
+                    'current_pct': pct,
+                    'target_pct': self.max_category_concentration,
+                    'priority': 'high'
+                })
+
+        # Check for better opportunities
+        current_return = current_metrics['expected_return']
+        optimal_return = optimal['portfolio_metrics']['expected_return']
+
+        if optimal_return > current_return * 1.2:
+            actions.append({
+                'action': 'upgrade_portfolio',
+                'potential_improvement': (optimal_return - current_return) / current_return,
+                'suggested_additions': optimal['selected_bounties'],
+                'priority': 'medium'
+            })
+
+        # Check risk level
+        if current_metrics['total_risk'] > current_metrics['total_at_risk'] * 0.3:
+            actions.append({
+                'action': 'de_risk',
+                'current_risk_level': current_metrics['total_risk'],
+                'suggestion': 'Add more conservative bounties or reduce concentration',
+                'priority': 'high'
+            })
+
+        return {
+            'current_metrics': current_metrics,
+            'optimal_metrics': optimal['portfolio_metrics'],
+            'recommended_actions': sorted(actions, key=lambda x: x['priority']),
+            'rebalance_urgency': 'high' if any(a['priority'] == 'high' for a in actions) else 'low'
+        }
+```
+
+##### 10.6.2 Risk Management Framework
+
+```python
+    def calculate_value_at_risk(self, portfolio: List[BountyAsset],
+                                confidence: float = 0.95) -> float:
+        """Calculate Value at Risk for the portfolio."""
+
+        # Monte Carlo simulation of outcomes
+        n_simulations = 10000
+        outcomes = []
+
+        for _ in range(n_simulations):
+            portfolio_outcome = 0
+            for asset in portfolio:
+                # Simulate success/failure
+                success = np.random.random() < asset.success_probability
+                if success:
+                    portfolio_outcome += asset.expected_return * 0.95 + asset.stake_required
+                else:
+                    portfolio_outcome -= asset.stake_required
+            outcomes.append(portfolio_outcome)
+
+        # VaR at confidence level
+        outcomes.sort()
+        var_index = int((1 - confidence) * n_simulations)
+        return outcomes[var_index]
+
+    def stress_test_portfolio(self, portfolio: List[BountyAsset],
+                             scenarios: List[Dict]) -> Dict:
+        """Test portfolio under various market conditions."""
+
+        results = []
+
+        for scenario in scenarios:
+            adjusted_assets = []
+            for asset in portfolio:
+                # Adjust success probability based on scenario
+                adjusted_prob = asset.success_probability * scenario.get('success_rate_factor', 1.0)
+                adjusted_assets.append(BountyAsset(
+                    id=asset.id,
+                    expected_return=asset.expected_return * scenario.get('reward_factor', 1.0),
+                    success_probability=max(0, min(1, adjusted_prob)),
+                    stake_required=asset.stake_required,
+                    category=asset.category,
+                    time_estimate=asset.time_estimate,
+                    difficulty=asset.difficulty
+                ))
+
+            metrics = self.calculate_portfolio_metrics(adjusted_assets)
+            results.append({
+                'scenario': scenario['name'],
+                'expected_return': metrics['expected_return'],
+                'total_risk': metrics['total_risk'],
+                'survival_probability': metrics['expected_return'] > 0
+            })
+
+        return {
+            'scenario_results': results,
+            'worst_case': min(results, key=lambda x: x['expected_return']),
+            'stress_test_passed': all(r['expected_return'] > -500 for r in results)
+        }
+```
+
+#### 10.7 Network Effects
+
+Leverage agent collaboration to tackle complex high-value bounties that single agents cannot complete.
+
+##### 10.7.1 Multi-Agent Bounty Execution
+
+```python
+# network_effects.py
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+from enum import Enum
+from openclaw_memory import OperationalMemory
+
+class CollaborationType(Enum):
+    SEQUENTIAL = "sequential"  # Handoff between agents
+    PARALLEL = "parallel"      # Simultaneous work
+    ITERATIVE = "iterative"    # Review and refinement cycles
+
+@dataclass
+class CollaborationPlan:
+    """Plan for multi-agent bounty execution."""
+    bounty_id: str
+    collaboration_type: CollaborationType
+    agents: List[str]
+    phases: List[Dict]
+    coordination_overhead: float  # Additional time estimate
+    success_probability_boost: float  # Improvement from collaboration
+
+class NetworkEffectsManager:
+    """Manages multi-agent collaboration for complex bounties."""
+
+    def __init__(self, memory: OperationalMemory):
+        self.memory = memory
+        self.coordination_cost = 0.15  # 15% overhead for coordination
+
+    def analyze_bounty_complexity(self, bounty: Dict) -> Dict:
+        """Determine if bounty benefits from multi-agent approach."""
+
+        # Score complexity dimensions
+        complexity_scores = {
+            'skill_diversity': len(set(bounty.get('required_skills', []))),
+            'research_component': 1 if 'research' in bounty.get('tags', []) else 0,
+            'technical_component': 1 if 'technical' in bounty.get('tags', []) else 0,
+            'creative_component': 1 if 'creative' in bounty.get('tags', []) else 0,
+            'estimated_hours': min(bounty.get('estimated_hours', 8) / 8, 5),  # Cap at 5
+            'deliverable_count': len(bounty.get('deliverables', []))
+        }
+
+        total_complexity = sum(complexity_scores.values())
+
+        return {
+            'complexity_score': total_complexity,
+            'complexity_level': self._classify_complexity(total_complexity),
+            'recommended_approach': self._recommend_approach(total_complexity),
+            'optimal_team_size': self._optimal_team_size(total_complexity),
+            'skill_requirements': self._identify_required_skills(bounty)
+        }
+
+    def _classify_complexity(self, score: float) -> str:
+        if score < 3:
+            return 'simple'
+        elif score < 6:
+            return 'moderate'
+        elif score < 10:
+            return 'complex'
+        else:
+            return 'very_complex'
+
+    def _recommend_approach(self, complexity: float) -> str:
+        if complexity < 3:
+            return 'single_agent'
+        elif complexity < 6:
+            return 'optional_collaboration'
+        elif complexity < 10:
+            return 'recommended_collaboration'
+        else:
+            return 'required_collaboration'
+
+    def _optimal_team_size(self, complexity: float) -> int:
+        if complexity < 6:
+            return 1
+        elif complexity < 10:
+            return 2
+        else:
+            return min(int(complexity / 3), 4)
+
+    def design_collaboration(self, bounty: Dict,
+                            available_agents: List[str]) -> Optional[CollaborationPlan]:
+        """Design optimal collaboration structure for a bounty."""
+
+        complexity = self.analyze_bounty_complexity(bounty)
+
+        if complexity['complexity_level'] == 'simple':
+            return None  # No collaboration needed
+
+        # Determine collaboration type based on bounty characteristics
+        if 'research' in bounty.get('tags', []) and 'technical' in bounty.get('tags', []):
+            collab_type = CollaborationType.SEQUENTIAL
+            phases = [
+                {'agent': 'mongke', 'task': 'research', 'output': 'research_findings'},
+                {'agent': 'temujin', 'task': 'implementation', 'input': 'research_findings', 'output': 'deliverable'}
+            ]
+        elif 'content' in bounty.get('tags', []) and 'review' in bounty.get('tags', []):
+            collab_type = CollaborationType.ITERATIVE
+            phases = [
+                {'agent': 'chagatai', 'task': 'draft', 'output': 'draft_content'},
+                {'agent': 'jochi', 'task': 'review', 'input': 'draft_content', 'output': 'feedback'},
+                {'agent': 'chagatai', 'task': 'revise', 'input': 'feedback', 'output': 'final_content'}
+            ]
+        else:
+            collab_type = CollaborationType.PARALLEL
+            phases = self._design_parallel_phases(bounty, available_agents)
+
+        # Calculate collaboration benefits
+        base_success = 0.7  # Assume 70% for complex bounties solo
+        boost = min(len(phases) * 0.1, 0.25)  # Up to 25% boost
+
+        return CollaborationPlan(
+            bounty_id=bounty['id'],
+            collaboration_type=collab_type,
+            agents=list(set(p['agent'] for p in phases)),
+            phases=phases,
+            coordination_overhead=sum(p.get('estimated_hours', 1) for p in phases) * self.coordination_cost,
+            success_probability_boost=boost
+        )
+
+    def calculate_collaboration_value(self, plan: CollaborationPlan,
+                                     bounty: Dict) -> Dict:
+        """Calculate the value of multi-agent collaboration."""
+
+        # Solo execution estimate
+        solo_success = 0.6 if len(plan.phases) > 2 else 0.75
+        solo_ev = bounty['reward_usdc'] * 0.95 * solo_success
+
+        # Collaboration execution
+        collab_success = min(solo_success + plan.success_probability_boost, 0.95)
+        collab_ev = bounty['reward_usdc'] * 0.95 * collab_success
+
+        # Costs
+        coordination_cost_usd = plan.coordination_overhead * 50  # $50/hour effective cost
+
+        # Value add
+        value_add = collab_ev - solo_ev - coordination_cost_usd
+
+        return {
+            'solo_expected_value': solo_ev,
+            'collaboration_expected_value': collab_ev,
+            'coordination_cost': coordination_cost_usd,
+            'net_value_add': value_add,
+            'worthwhile': value_add > 0,
+            'recommendation': 'collaborate' if value_add > 0 else 'solo_attempt'
+        }
+
+    def execute_collaborative_bounty(self, plan: CollaborationPlan) -> Dict:
+        """Execute a multi-agent bounty collaboration."""
+
+        # Create coordination task in Neo4j
+        coordination_id = self._create_coordination_record(plan)
+
+        results = []
+        shared_context = {}
+
+        for i, phase in enumerate(plan.phases):
+            # Execute phase
+            phase_result = self._execute_phase(phase, shared_context, coordination_id)
+            results.append(phase_result)
+
+            if not phase_result['success']:
+                # Handle failure
+                return self._handle_collaboration_failure(
+                    plan, results, phase, coordination_id
+                )
+
+            # Update shared context for next phase
+            shared_context[phase['output']] = phase_result['output_data']
+
+            # Record progress
+            self._record_phase_completion(coordination_id, i, phase_result)
+
+        # Finalize
+        return {
+            'success': True,
+            'coordination_id': coordination_id,
+            'phases_completed': len(results),
+            'final_output': shared_context.get(plan.phases[-1]['output']),
+            'total_time': sum(r['duration'] for r in results)
+        }
+
+    def _create_coordination_record(self, plan: CollaborationPlan) -> str:
+        """Create Neo4j record for collaboration tracking."""
+
+        query = """
+        CREATE (c:Collaboration {
+            id: uuid(),
+            bounty_id: $bounty_id,
+            type: $collab_type,
+            agents: $agents,
+            created_at: datetime(),
+            status: 'in_progress'
+        })
+        RETURN c.id as id
+        """
+
+        result = self.memory.execute(
+            query,
+            bounty_id=plan.bounty_id,
+            collab_type=plan.collaboration_type.value,
+            agents=plan.agents
+        )
+
+        return result.single()['id']
+```
+
+##### 10.7.2 Network Effects Schema
+
+```cypher
+// Collaboration tracking
+(:Collaboration {
+  id: uuid,
+  bounty_id: string,
+  type: 'sequential' | 'parallel' | 'iterative',
+  agents: [string],
+  created_at: datetime,
+  completed_at: datetime,
+  status: 'in_progress' | 'completed' | 'failed',
+  coordination_overhead_hours: float,
+  success_probability_boost: float
+})
+
+// Collaboration phases
+(:CollaborationPhase {
+  id: uuid,
+  phase_number: int,
+  agent: string,
+  task_description: string,
+  input_dependencies: [string],
+  output_artifact: string,
+  estimated_hours: float,
+  actual_hours: float,
+  status: 'pending' | 'in_progress' | 'completed' | 'blocked'
+})
+
+// Network advantage tracking
+(:NetworkAdvantage {
+  id: uuid,
+  advantage_type: 'skill_complementarity' | 'speed' | 'quality' | 'complexity',
+  bounty_category: string,
+  solo_success_rate: float,
+  collaborative_success_rate: float,
+  value_add_usdc: float,
+  measured_at: datetime
+})
+
+// Relationships
+(:Collaboration)-[:HAS_PHASE]->(:CollaborationPhase)
+(:Collaboration)-[:FOR_BOUNTY]->(:Bounty)
+(:Agent)-[:PARTICIPATED_IN]->(:Collaboration)
+(:CollaborationPhase)-[:PRODUCES]->(:Artifact)
+(:CollaborationPhase)-[:DEPENDS_ON]->(:CollaborationPhase)
+```
+
+#### 10.8 Neo4j Schema Summary
+
+Complete schema for competitive advantage mechanisms:
+
+```cypher
+// Core competitive nodes
+(:MarketSnapshot)
+(:BountyValuation)
+(:CategoryMetrics)
+(:SkillSpecialization)
+(:MarketPosition)
+(:CompetitorAgent)
+(:MarketShift)
+(:CategoryTrend)
+(:IntelligenceReport)
+(:Collaboration)
+(:CollaborationPhase)
+(:NetworkAdvantage)
+
+// Reputation tracking
+(:ReputationEvent {
+  id: uuid,
+  event_type: 'bounty_completed' | 'bounty_failed' | 'tier_promotion' | 'milestone',
+  impact: 'positive' | 'negative' | 'neutral',
+  points_delta: int,
+  new_score: int,
+  timestamp: datetime
+})
+
+// Portfolio tracking
+(:PortfolioSnapshot {
+  id: uuid,
+  timestamp: datetime,
+  total_at_risk: float,
+  expected_return: float,
+  diversification_score: float,
+  risk_level: 'conservative' | 'moderate' | 'aggressive'
+})
+
+// Key relationships
+(:Agent)-[:GENERATED]->(:BountyValuation)
+(:Bounty)-[:HAS_VALUATION]->(:BountyValuation)
+(:MarketSnapshot)-[:COVERS]->(:CategoryMetrics)
+(:Agent)-[:SPECIALIZES_IN]->(:SkillSpecialization)
+(:SkillSpecialization)-[:HAS_MARKET_POSITION]->(:MarketPosition)
+(:Agent)-[:PARTICIPATED_IN]->(:Collaboration)
+(:Collaboration)-[:HAS_PHASE]->(:CollaborationPhase)
+(:Agent)-[:EARNED]->(:ReputationEvent)
+(:Agent)-[:HOLDS]->(:PortfolioSnapshot)
+```
+
+#### 10.9 Implementation Priority
+
+| Component | Effort | Value | Order |
+|-----------|--------|-------|-------|
+| Dynamic pricing engine | 6 hours | High | 1st |
+| Market condition analysis | 4 hours | High | 2nd |
+| Reputation optimization | 4 hours | High | 3rd |
+| Skill specialization tracking | 5 hours | Medium | 4th |
+| Market intelligence system | 6 hours | Medium | 5th |
+| Portfolio optimizer | 5 hours | Medium | 6th |
+| Network effects manager | 6 hours | High | 7th |
+| Collaboration execution | 4 hours | Medium | 8th |
+| Neo4j schema implementation | 3 hours | Medium | 9th |
+
 ---
 
 ## Appendix A: Agent SOUL Templates
@@ -8395,7 +12755,17 @@ class TestOperationalMemory(unittest.TestCase):
         self.assertFalse(result, "101st request should be blocked")
 
     def test_sanitize_for_sharing(self):
-        """Test PII sanitization."""
+        """Test PII sanitization via _sanitize_for_sharing entry point."""
+        text = "Call me at 555-123-4567 or email john@example.com"
+        sanitized = self.memory._sanitize_for_sharing(text)
+
+        self.assertNotIn("555-123-4567", sanitized)
+        self.assertNotIn("john@example.com", sanitized)
+        self.assertIn("[PHONE]", sanitized)
+        self.assertIn("[EMAIL]", sanitized)
+
+    def test_pattern_sanitize_fallback(self):
+        """Test pattern-based PII sanitization fallback."""
         text = "Call me at 555-123-4567 or email john@example.com"
         sanitized = self.memory._pattern_sanitize(text)
 
@@ -8403,6 +12773,54 @@ class TestOperationalMemory(unittest.TestCase):
         self.assertNotIn("john@example.com", sanitized)
         self.assertIn("[PHONE]", sanitized)
         self.assertIn("[EMAIL]", sanitized)
+
+    def test_sanitize_for_sharing_with_names(self):
+        """Test that _sanitize_for_sharing handles personal names."""
+        text = "My friend Sarah said to call her at 555-123-4567"
+        sanitized = self.memory._pattern_sanitize(text)
+
+        # Phone should be sanitized
+        self.assertNotIn("555-123-4567", sanitized)
+        self.assertIn("[PHONE]", sanitized)
+        # Name should be sanitized in pattern mode
+        self.assertIn("[NAME]", sanitized)
+
+    def test_sanitize_for_sharing_edge_cases(self):
+        """Test _sanitize_for_sharing handles edge cases."""
+        # Empty string
+        self.assertEqual(self.memory._sanitize_for_sharing(""), "")
+
+        # None input
+        self.assertIsNone(self.memory._sanitize_for_sharing(None))
+
+        # Non-string input
+        self.assertEqual(self.memory._sanitize_for_sharing(123), 123)
+
+        # Whitespace only
+        self.assertEqual(self.memory._sanitize_for_sharing("   "), "")
+
+    def test_sanitize_for_sharing_comprehensive_pii(self):
+        """Test _sanitize_for_sharing handles all PII types."""
+        text = (
+            "Contact Dr. John Smith at john.smith@example.com or 555-123-4567. "
+            "SSN: 123-45-6789. Card: 1234-5678-9012-3456. "
+            "API key: sk-abc123xyz456. Address: 123 Main St. "
+            "My colleague Jane helped with this."
+        )
+        sanitized = self.memory._pattern_sanitize(text)
+
+        self.assertNotIn("john.smith@example.com", sanitized)
+        self.assertNotIn("555-123-4567", sanitized)
+        self.assertNotIn("123-45-6789", sanitized)
+        self.assertNotIn("1234-5678-9012-3456", sanitized)
+        self.assertNotIn("sk-abc123xyz456", sanitized)
+        self.assertNotIn("123 Main St", sanitized)
+        self.assertIn("[EMAIL]", sanitized)
+        self.assertIn("[PHONE]", sanitized)
+        self.assertIn("[SSN]", sanitized)
+        self.assertIn("[CARD]", sanitized)
+        self.assertIn("[API_KEY]", sanitized)
+        self.assertIn("[ADDRESS]", sanitized)
 
     def test_circuit_breaker(self):
         """Test circuit breaker opens after failures."""
@@ -8630,7 +13048,1502 @@ logger = setup_logging()
 
 ---
 
-## Appendix E: Rollback Baseline (Single-Agent Config)
+## Appendix F: USDC Wallet and Staking Implementation
+
+### F.1 Wallet Architecture
+
+The ClawTasks system implements a multi-tier wallet architecture to balance security with operational efficiency:
+
+#### 1. Cold Storage Wallet
+
+| Attribute | Specification |
+|-----------|---------------|
+| **Purpose** | Majority of funds, long-term storage |
+| **Security** | Hardware wallet (Ledger/Trezor) or multi-sig (Gnosis Safe) |
+| **Access** | Rare, requires manual approval from 2+ admins |
+| **Key Management** | Offline, encrypted backups in geographically separated locations |
+| **Typical Balance** | 80-90% of total treasury |
+
+**Implementation Requirements:**
+- 3-of-5 multi-signature configuration recommended
+- Hardware wallets stored in secure locations
+- Recovery seed phrases in bank safety deposit boxes
+- Quarterly audits of balances and access procedures
+
+#### 2. Hot Wallet
+
+| Attribute | Specification |
+|-----------|---------------|
+| **Purpose** | Operational funds for staking and bounty claims |
+| **Security** | Server-side encrypted keys (AWS KMS or HashiCorp Vault) |
+| **Access** | Automated via Ögedei agent with rate limiting |
+| **Key Management** | Encrypted at rest, decrypted only in secure enclave |
+| **Typical Balance** | 10-20% of total funds, capped at $50,000 USDC |
+
+**Implementation Requirements:**
+- Maximum single transaction limit: $5,000 USDC
+- Daily withdrawal limit: $10,000 USDC
+- Automatic alerts at 50%, 75%, 90% of daily limit
+- Key rotation every 90 days
+
+#### 3. Worker Wallets
+
+| Attribute | Specification |
+|-----------|---------------|
+| **Purpose** | Per-agent execution wallets for gas fees and micro-transactions |
+| **Security** | Derived from hot wallet using HD wallet derivation paths |
+| **Access** | Agent-specific permissions, read-only for most agents |
+| **Key Management** | Ephemeral, rotated weekly |
+| **Typical Balance** | Minimal, just for gas (0.01 ETH on Base) |
+
+**Implementation Requirements:**
+- Each agent gets a unique derivation path: `m/44'/60'/agent_id'/0/0`
+- Automatic top-up from hot wallet when balance falls below threshold
+- No direct access to USDC - only for gas payments
+- Automatic sweep of excess funds back to hot wallet
+
+### F.2 Base L2 Integration
+
+#### Network Configuration
+
+```python
+BASE_CONFIG = {
+    "network_name": "Base Mainnet",
+    "chain_id": 8453,
+    "rpc_endpoints": [
+        "https://mainnet.base.org",
+        "https://base.llamarpc.com",
+        "https://base.blockpi.network/v1/rpc/public"
+    ],
+    "usdc_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "usdc_decimals": 6,
+    "gas_token": "ETH",
+    "block_time_seconds": 2,
+    "confirmation_blocks": 12
+}
+```
+
+#### Transaction Management
+
+**Nonce Tracking:**
+```python
+class NonceManager:
+    """Manages transaction nonces for sequential transaction submission."""
+
+    def __init__(self, w3: Web3, address: str):
+        self.w3 = w3
+        self.address = address
+        self._pending_nonces: Set[int] = set()
+        self._lock = asyncio.Lock()
+
+    async def get_next_nonce(self) -> int:
+        """Get the next available nonce, accounting for pending transactions."""
+        async with self._lock:
+            on_chain_nonce = self.w3.eth.get_transaction_count(
+                self.address,
+                'pending'
+            )
+            # Find first nonce not in pending set
+            nonce = on_chain_nonce
+            while nonce in self._pending_nonces:
+                nonce += 1
+            self._pending_nonces.add(nonce)
+            return nonce
+
+    def release_nonce(self, nonce: int):
+        """Release a nonce if transaction fails before broadcast."""
+        self._pending_nonces.discard(nonce)
+```
+
+**Gas Price Optimization:**
+```python
+class GasOptimizer:
+    """Optimizes gas prices for Base L2 transactions."""
+
+    def __init__(self, w3: Web3):
+        self.w3 = w3
+        self.max_fee_per_gas = Web3.to_wei(0.1, 'gwei')  # 0.1 gwei max
+        self.max_priority_fee = Web3.to_wei(0.001, 'gwei')
+
+    async def estimate_gas_price(self) -> Dict[str, int]:
+        """Get optimal gas price for current network conditions."""
+        base_fee = self.w3.eth.get_block('latest')['baseFeePerGas']
+
+        # Base uses EIP-1559 - calculate maxFeePerGas
+        max_fee = min(
+            base_fee * 2 + self.max_priority_fee,
+            self.max_fee_per_gas
+        )
+
+        return {
+            'maxFeePerGas': max_fee,
+            'maxPriorityFeePerGas': self.max_priority_fee
+        }
+```
+
+**Transaction Retry Logic:**
+```python
+class TransactionManager:
+    """Manages transaction submission with retry and confirmation monitoring."""
+
+    def __init__(self, w3: Web3, nonce_manager: NonceManager):
+        self.w3 = w3
+        self.nonce_manager = nonce_manager
+        self.max_retries = 3
+        self.confirmation_timeout = 120  # seconds
+
+    async def send_transaction(
+        self,
+        tx_params: Dict,
+        private_key: str
+    ) -> str:
+        """Send transaction with retry logic."""
+        for attempt in range(self.max_retries):
+            try:
+                nonce = await self.nonce_manager.get_next_nonce()
+                tx_params['nonce'] = nonce
+
+                # Sign and send
+                signed = self.w3.eth.account.sign_transaction(
+                    tx_params,
+                    private_key
+                )
+                tx_hash = self.w3.eth.send_raw_transaction(
+                    signed.rawTransaction
+                )
+
+                # Wait for confirmation
+                receipt = await self._wait_for_confirmation(tx_hash)
+
+                if receipt['status'] == 1:
+                    return tx_hash.hex()
+                else:
+                    raise TransactionFailed("Transaction reverted")
+
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                raise
+
+    async def _wait_for_confirmation(self, tx_hash: bytes) -> Dict:
+        """Wait for transaction confirmation with timeout."""
+        start = time.time()
+        while time.time() - start < self.confirmation_timeout:
+            try:
+                receipt = self.w3.eth.get_transaction_receipt(tx_hash)
+                if receipt and receipt['blockNumber']:
+                    # Wait for confirmation blocks
+                    current = self.w3.eth.block_number
+                    if current - receipt['blockNumber'] >= 12:
+                        return receipt
+            except:
+                pass
+            await asyncio.sleep(2)
+        raise TimeoutError("Transaction confirmation timeout")
+```
+
+### F.3 Smart Contract Interface
+
+#### ClawTasks Smart Contract
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+interface IClawTasks {
+    /// @notice Claim a bounty by staking USDC
+    /// @param bountyId Unique identifier for the bounty
+    /// @param stakeAmount Amount of USDC to stake (typically 10% of bounty value)
+    /// @return success Whether the claim was successful
+    function claimBounty(
+        bytes32 bountyId,
+        uint256 stakeAmount
+    ) external returns (bool success);
+
+    /// @notice Submit proof of work for a claimed bounty
+    /// @param bountyId Unique identifier for the bounty
+    /// @param workProof IPFS hash or encrypted proof of work
+    /// @return submissionId Unique ID for this submission
+    function submitWork(
+        bytes32 bountyId,
+        bytes calldata workProof
+    ) external returns (bytes32 submissionId);
+
+    /// @notice Release payment to worker after successful review
+    /// @param bountyId Unique identifier for the bounty
+    /// @return paymentAmount Amount of USDC paid to worker
+    function releasePayment(
+        bytes32 bountyId
+    ) external returns (uint256 paymentAmount);
+
+    /// @notice Slash stake for failed or fraudulent work
+    /// @param bountyId Unique identifier for the bounty
+    /// @param worker Address of worker to slash
+    /// @param reason Encoded reason for slashing
+    /// @return slashedAmount Amount of USDC slashed
+    function slashStake(
+        bytes32 bountyId,
+        address worker,
+        bytes calldata reason
+    ) external returns (uint256 slashedAmount);
+
+    /// @notice Get bounty details
+    /// @param bountyId Unique identifier for the bounty
+    /// @return creator Address that created the bounty
+    /// @return reward Total reward amount in USDC
+    /// @return requiredStake Required stake amount
+    /// @return deadline Block timestamp deadline
+    /// @return status Current bounty status
+    function getBounty(bytes32 bountyId) external view returns (
+        address creator,
+        uint256 reward,
+        uint256 requiredStake,
+        uint256 deadline,
+        BountyStatus status
+    );
+
+    enum BountyStatus {
+        Open,
+        Claimed,
+        Submitted,
+        Completed,
+        Expired,
+        Cancelled
+    }
+}
+```
+
+#### Python Implementation using web3.py
+
+```python
+from web3 import Web3
+from eth_abi import encode
+from decimal import Decimal
+from typing import Optional, Dict
+import json
+
+class ClawTasksContract:
+    """Interface to the ClawTasks smart contract on Base L2."""
+
+    CONTRACT_ABI = json.loads('''[
+        {
+            "inputs": [
+                {"name": "bountyId", "type": "bytes32"},
+                {"name": "stakeAmount", "type": "uint256"}
+            ],
+            "name": "claimBounty",
+            "outputs": [{"name": "success", "type": "bool"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {"name": "bountyId", "type": "bytes32"},
+                {"name": "workProof", "type": "bytes"}
+            ],
+            "name": "submitWork",
+            "outputs": [{"name": "submissionId", "type": "bytes32"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [{"name": "bountyId", "type": "bytes32"}],
+            "name": "releasePayment",
+            "outputs": [{"name": "paymentAmount", "type": "uint256"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {"name": "bountyId", "type": "bytes32"},
+                {"name": "worker", "type": "address"},
+                {"name": "reason", "type": "bytes"}
+            ],
+            "name": "slashStake",
+            "outputs": [{"name": "slashedAmount", "type": "uint256"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }
+    ]''')
+
+    def __init__(
+        self,
+        w3: Web3,
+        contract_address: str,
+        usdc_address: str
+    ):
+        self.w3 = w3
+        self.contract = w3.eth.contract(
+            address=Web3.to_checksum_address(contract_address),
+            abi=self.CONTRACT_ABI
+        )
+        self.usdc = w3.eth.contract(
+            address=Web3.to_checksum_address(usdc_address),
+            abi=[{
+                "inputs": [
+                    {"name": "spender", "type": "address"},
+                    {"name": "amount", "type": "uint256"}
+                ],
+                "name": "approve",
+                "outputs": [{"name": "", "type": "bool"}],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }]
+        )
+
+    async def claim_bounty(
+        self,
+        bounty_id: str,
+        stake_amount: Decimal,
+        private_key: str,
+        gas_params: Dict[str, int]
+    ) -> str:
+        """Claim a bounty by staking USDC."""
+        account = self.w3.eth.account.from_key(private_key)
+
+        # Convert bounty_id to bytes32
+        bounty_bytes = bounty_id.encode() if isinstance(bounty_id, str) else bounty_id
+        bounty_bytes32 = bounty_bytes.ljust(32, b'\0')[:32]
+
+        # Convert amount to wei (USDC has 6 decimals)
+        amount_wei = int(stake_amount * Decimal(10**6))
+
+        # Build transaction
+        tx = self.contract.functions.claimBounty(
+            bounty_bytes32,
+            amount_wei
+        ).build_transaction({
+            'from': account.address,
+            'gas': 200000,
+            **gas_params
+        })
+
+        # Sign and send
+        signed = self.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+
+    async def submit_work(
+        self,
+        bounty_id: str,
+        work_proof: str,  # IPFS hash
+        private_key: str,
+        gas_params: Dict[str, int]
+    ) -> str:
+        """Submit proof of work for a claimed bounty."""
+        account = self.w3.eth.account.from_key(private_key)
+
+        bounty_bytes = bounty_id.encode().ljust(32, b'\0')[:32]
+        proof_bytes = work_proof.encode()
+
+        tx = self.contract.functions.submitWork(
+            bounty_bytes,
+            proof_bytes
+        ).build_transaction({
+            'from': account.address,
+            'gas': 150000,
+            **gas_params
+        })
+
+        signed = self.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+
+    async def release_payment(
+        self,
+        bounty_id: str,
+        private_key: str,
+        gas_params: Dict[str, int]
+    ) -> str:
+        """Release payment for completed bounty (reviewer only)."""
+        account = self.w3.eth.account.from_key(private_key)
+
+        bounty_bytes = bounty_id.encode().ljust(32, b'\0')[:32]
+
+        tx = self.contract.functions.releasePayment(
+            bounty_bytes
+        ).build_transaction({
+            'from': account.address,
+            'gas': 100000,
+            **gas_params
+        })
+
+        signed = self.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+
+    async def slash_stake(
+        self,
+        bounty_id: str,
+        worker_address: str,
+        reason: str,
+        private_key: str,
+        gas_params: Dict[str, int]
+    ) -> str:
+        """Slash stake for failed work (reviewer only)."""
+        account = self.w3.eth.account.from_key(private_key)
+
+        bounty_bytes = bounty_id.encode().ljust(32, b'\0')[:32]
+        reason_bytes = reason.encode()
+
+        tx = self.contract.functions.slashStake(
+            bounty_bytes,
+            Web3.to_checksum_address(worker_address),
+            reason_bytes
+        ).build_transaction({
+            'from': account.address,
+            'gas': 150000,
+            **gas_params
+        })
+
+        signed = self.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+```
+
+### F.4 Staking Mechanism
+
+#### Staking Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     STAKING LIFECYCLE                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │  PRE-STAKING │───▶│    STAKING   │───▶│  UNSTAKING   │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│         │                   │                   │               │
+│         ▼                   ▼                   ▼               │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │• Evaluate    │    │• Submit tx   │    │• Success:    │      │
+│  │  bounty      │    │• Wait conf   │    │  return +    │      │
+│  │• Calculate   │    │• Update      │    │  reward      │      │
+│  │  stake (10%) │    │  Neo4j       │    │• Failure:    │      │
+│  │• Check       │    │• Begin work  │    │  slash       │      │
+│  │  balance     │    │               │    │• Update tx   │      │
+│  │• Prepare tx  │    │               │    │  record      │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 1. Pre-Staking Phase
+
+```python
+async def pre_staking_evaluation(
+    self,
+    bounty_id: str
+) -> StakingDecision:
+    """Evaluate whether to stake on a bounty."""
+
+    # Fetch bounty details from Neo4j
+    bounty = await self.memory.get_bounty(bounty_id)
+
+    # Calculate required stake (typically 10%)
+    bounty_value = Decimal(bounty['reward_usdc'])
+    required_stake = bounty_value * Decimal('0.10')
+
+    # Check wallet balance
+    hot_wallet_balance = await self.get_hot_wallet_balance()
+
+    if hot_wallet_balance < required_stake:
+        # Attempt refill from cold storage
+        await self.request_cold_storage_refill(required_stake)
+        raise InsufficientFundsError(
+            f"Hot wallet balance {hot_wallet_balance} < "
+            f"required stake {required_stake}"
+        )
+
+    # Evaluate bounty risk
+    risk_score = await self.evaluate_bounty_risk(bounty)
+
+    if risk_score > self.max_risk_threshold:
+        return StakingDecision(
+            should_stake=False,
+            reason=f"Risk score {risk_score} exceeds threshold"
+        )
+
+    return StakingDecision(
+        should_stake=True,
+        bounty_value=bounty_value,
+        required_stake=required_stake,
+        expected_return=bounty_value - required_stake,
+        risk_score=risk_score
+    )
+```
+
+#### 2. Staking Phase
+
+```python
+async def execute_staking(
+    self,
+    bounty_id: str,
+    stake_amount: Decimal
+) -> StakeRecord:
+    """Execute the staking transaction."""
+
+    # Generate unique stake ID
+    stake_id = f"stake_{uuid.uuid4().hex[:12]}"
+
+    # Get gas parameters
+    gas_params = await self.gas_optimizer.estimate_gas_price()
+
+    # Submit stake transaction
+    tx_hash = await self.contract.claim_bounty(
+        bounty_id=bounty_id,
+        stake_amount=stake_amount,
+        private_key=self.hot_wallet_key,
+        gas_params=gas_params
+    )
+
+    # Wait for confirmation
+    receipt = await self.tx_manager.wait_for_confirmation(tx_hash)
+
+    if receipt['status'] != 1:
+        raise StakingFailedError(f"Transaction failed: {tx_hash}")
+
+    # Create stake record in Neo4j
+    stake_record = await self.memory.create_stake_record(
+        stake_id=stake_id,
+        bounty_id=bounty_id,
+        amount=stake_amount,
+        tx_hash=tx_hash,
+        status='active'
+    )
+
+    # Update bounty status
+    await self.memory.update_bounty_status(
+        bounty_id=bounty_id,
+        status='claimed',
+        claimed_by=self.agent_id,
+        stake_id=stake_id
+    )
+
+    return stake_record
+```
+
+#### 3. Unstaking Phase
+
+```python
+async def execute_unstaking(
+    self,
+    bounty_id: str,
+    outcome: BountyOutcome  # success or failure
+) -> UnstakeResult:
+    """Handle unstaking based on bounty outcome."""
+
+    stake = await self.memory.get_active_stake(bounty_id)
+
+    if outcome == BountyOutcome.SUCCESS:
+        # Release payment - returns stake + reward
+        tx_hash = await self.contract.release_payment(
+            bounty_id=bounty_id,
+            private_key=self.hot_wallet_key,
+            gas_params=await self.gas_optimizer.estimate_gas_price()
+        )
+
+        # Update records
+        await self.memory.update_stake_status(
+            stake_id=stake['id'],
+            status='released',
+            return_tx_hash=tx_hash
+        )
+
+        return UnstakeResult(
+            success=True,
+            amount_returned=stake['amount'] + stake['reward'],
+            tx_hash=tx_hash
+        )
+
+    else:  # FAILURE
+        # Slash stake
+        tx_hash = await self.contract.slash_stake(
+            bounty_id=bounty_id,
+            worker_address=self.wallet_address,
+            reason="Work failed review criteria",
+            private_key=self.reviewer_key,
+            gas_params=await self.gas_optimizer.estimate_gas_price()
+        )
+
+        # Update records
+        await self.memory.update_stake_status(
+            stake_id=stake['id'],
+            status='slashed',
+            slash_tx_hash=tx_hash
+        )
+
+        return UnstakeResult(
+            success=False,
+            amount_slashed=stake['amount'],
+            tx_hash=tx_hash
+        )
+```
+
+### F.5 Security Considerations
+
+#### 1. Key Management
+
+| Layer | Implementation | Rotation Schedule |
+|-------|---------------|-------------------|
+| Cold Storage | Hardware Security Module (HSM) or Gnosis Safe | Quarterly |
+| Hot Wallet | AWS KMS / HashiCorp Vault with auto-unseal | Every 90 days |
+| Worker Keys | Ephemeral derived keys | Weekly |
+
+**Key Management Best Practices:**
+
+```python
+class KeyManager:
+    """Manages cryptographic keys with HSM integration."""
+
+    def __init__(self, kms_client):
+        self.kms = kms_client
+        self.key_cache = {}
+        self.cache_ttl = 300  # 5 minutes
+
+    async def get_hot_wallet_key(self) -> str:
+        """Retrieve hot wallet key from secure storage."""
+        # Check cache first
+        cached = self.key_cache.get('hot_wallet')
+        if cached and cached['expires'] > time.time():
+            return cached['key']
+
+        # Fetch from KMS
+        key = await self.kms.decrypt(
+            ciphertext_blob=self._get_encrypted_key()
+        )
+
+        # Cache with TTL
+        self.key_cache['hot_wallet'] = {
+            'key': key,
+            'expires': time.time() + self.cache_ttl
+        }
+
+        return key
+
+    async def rotate_keys(self):
+        """Perform scheduled key rotation."""
+        # Generate new key
+        new_key = self._generate_key()
+
+        # Update contract permissions (multi-sig required)
+        await self._update_contract_signer(new_key)
+
+        # Encrypt and store
+        encrypted = await self.kms.encrypt(plaintext=new_key)
+        await self._store_encrypted_key(encrypted)
+
+        # Clear cache
+        self.key_cache.clear()
+
+        # Log rotation
+        await self._audit_log("key_rotation", {
+            "timestamp": datetime.utcnow().isoformat(),
+            "key_id": self._get_key_id(new_key)
+        })
+```
+
+#### 2. Transaction Security
+
+**Multi-signature Requirements:**
+
+| Transaction Type | Threshold | Approvers Required |
+|-----------------|-----------|-------------------|
+| Cold → Hot transfer | 2-of-3 | Any 2 admins |
+| Hot → Worker top-up | 1-of-1 | Automated with limits |
+| Emergency pause | 3-of-5 | Core team |
+| Contract upgrade | 4-of-5 | Core team + external |
+
+**Rate Limiting:**
+
+```python
+class TransactionRateLimiter:
+    """Implements rate limiting for financial transactions."""
+
+    LIMITS = {
+        'per_minute': 5,
+        'per_hour': 50,
+        'per_day': 200,
+        'max_single_tx': Decimal('5000'),  # USDC
+        'max_daily_volume': Decimal('10000')  # USDC
+    }
+
+    async def check_limits(self, amount: Decimal) -> bool:
+        """Check if transaction is within rate limits."""
+
+        # Check single transaction limit
+        if amount > self.LIMITS['max_single_tx']:
+            raise RateLimitError(
+                f"Transaction {amount} exceeds max {self.LIMITS['max_single_tx']}"
+            )
+
+        # Check daily volume
+        daily_volume = await self.get_daily_volume()
+        if daily_volume + amount > self.LIMITS['max_daily_volume']:
+            raise RateLimitError(
+                f"Daily volume would exceed {self.LIMITS['max_daily_volume']}"
+            )
+
+        # Check transaction counts
+        for window, limit in [
+            ('minute', self.LIMITS['per_minute']),
+            ('hour', self.LIMITS['per_hour']),
+            ('day', self.LIMITS['per_day'])
+        ]:
+            count = await self.get_tx_count(window)
+            if count >= limit:
+                raise RateLimitError(
+                    f"Transaction limit reached: {limit} per {window}"
+                )
+
+        return True
+```
+
+**Anomaly Detection:**
+
+```python
+class AnomalyDetector:
+    """Detects suspicious transaction patterns."""
+
+    def __init__(self, memory: Neo4jMemory):
+        self.memory = memory
+        self.baseline_stats = {}
+
+    async def check_transaction(self, tx_params: Dict) -> RiskAssessment:
+        """Assess risk of a proposed transaction."""
+        risks = []
+
+        # Check for unusual amount
+        amount = tx_params['amount']
+        avg_amount = await self.get_average_transaction_amount(days=30)
+        if amount > avg_amount * 5:
+            risks.append(f"Amount {amount} is 5x above average")
+
+        # Check for rapid successive transactions
+        recent_txs = await self.memory.get_recent_transactions(minutes=5)
+        if len(recent_txs) > 3:
+            risks.append(f"{len(recent_txs)} transactions in last 5 minutes")
+
+        # Check for new destination
+        to_address = tx_params.get('to')
+        known_addresses = await self.memory.get_known_addresses()
+        if to_address not in known_addresses:
+            risks.append(f"Unknown destination address: {to_address}")
+
+        # Calculate risk score
+        risk_score = len(risks) * 25  # 25 points per risk
+
+        if risk_score >= 75:
+            return RiskAssessment(
+                allowed=False,
+                reason="; ".join(risks),
+                requires_approval=True
+            )
+        elif risk_score >= 50:
+            return RiskAssessment(
+                allowed=True,
+                reason="; ".join(risks),
+                requires_notification=True
+            )
+
+        return RiskAssessment(allowed=True, risk_score=risk_score)
+```
+
+#### 3. Operational Security
+
+**Environment Separation:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ENVIRONMENT ISOLATION                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ Development │  │   Staging   │  │ Production  │         │
+│  │             │  │             │  │             │         │
+│  │ • Testnet   │  │ • Testnet   │  │ • Mainnet   │         │
+│  │   only      │  │   + mock    │  │             │         │
+│  │ • Fake USDC │  │ • Fake USDC │  │ • Real USDC │         │
+│  │ • Dev keys  │  │ • Staging   │  │ • HSM keys  │         │
+│  │             │  │   keys      │  │             │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                                                             │
+│  Key Rules:                                                 │
+│  • Never reuse keys across environments                     │
+│  • Production keys never touch dev/staging machines         │
+│  • Separate VPC/network isolation                           │
+│  • Different KMS keys per environment                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Incident Response Plan:**
+
+```python
+class IncidentResponse:
+    """Handles security incidents."""
+
+    async def handle_suspicious_activity(self, alert: SecurityAlert):
+        """Execute incident response protocol."""
+
+        # Step 1: Immediate pause (if critical)
+        if alert.severity == 'critical':
+            await self.emergency_pause()
+
+        # Step 2: Notify security team
+        await self.notify_security_team(alert)
+
+        # Step 3: Gather evidence
+        evidence = await self.collect_evidence(alert)
+        await self.secure_store_evidence(evidence)
+
+        # Step 4: Assess impact
+        impact = await self.assess_financial_impact(alert)
+
+        # Step 5: Execute containment
+        if alert.type == 'key_compromise':
+            await self.rotate_all_keys()
+        elif alert.type == 'unauthorized_access':
+            await self.revoke_access(alert.affected_accounts)
+
+        # Step 6: Recovery
+        if alert.severity == 'critical':
+            await self.unpause_contracts()  # After review
+
+        # Step 7: Post-incident
+        await self.generate_incident_report(alert, impact)
+
+    async def emergency_pause(self):
+        """Pause all contract operations."""
+        pause_tx = await self.contract.emergency_pause(
+            private_key=self.admin_key
+        )
+        await self.audit_log("emergency_pause", {"tx": pause_tx})
+```
+
+### F.6 Neo4j Financial Schema
+
+#### Node Types
+
+```cypher
+// Wallet node - represents a blockchain wallet
+CREATE (w:Wallet {
+  id: $wallet_id,                    // Unique identifier
+  type: $wallet_type,                // 'cold', 'hot', 'worker'
+  address: $address,                 // Ethereum address
+  chain: 'base',                     // Blockchain network
+  derivation_path: $path,            // For HD wallets (optional)
+  created_at: datetime(),
+  last_active: datetime(),
+  status: 'active'                   // 'active', 'frozen', 'retired'
+})
+
+// Transaction node - blockchain transaction record
+CREATE (t:Transaction {
+  id: $tx_id,                        // Internal transaction ID
+  type: $tx_type,                    // 'stake', 'claim', 'payment', 'slash', 'refill'
+  amount: $amount,                   // Amount in USDC
+  currency: 'USDC',
+  tx_hash: $tx_hash,                 // Blockchain transaction hash
+  block_number: $block_number,       // Confirmation block
+  gas_used: $gas_used,               // Gas consumed
+  gas_price_wei: $gas_price,         // Gas price in wei
+  status: $status,                   // 'pending', 'confirmed', 'failed'
+  error_message: $error,             // If failed
+  created_at: datetime(),
+  confirmed_at: datetime()
+})
+
+// Stake node - represents an active or completed stake
+CREATE (s:Stake {
+  id: $stake_id,                     // Unique stake identifier
+  bounty_id: $bounty_id,             // Associated bounty
+  amount: $amount,                   // Staked amount in USDC
+  status: $status,                   // 'active', 'released', 'slashed', 'expired'
+  created_at: datetime(),
+  released_at: datetime(),           // If released
+  slashed_at: datetime(),            // If slashed
+  slash_reason: $reason              // If slashed
+})
+
+// Bounty node - extends existing bounty schema
+CREATE (b:Bounty {
+  id: $bounty_id,
+  title: $title,
+  description: $description,
+  reward_usdc: $reward,              // Total reward amount
+  required_stake_percent: 10,        // Default 10%
+  status: $status,                   // 'open', 'claimed', 'submitted', 'completed'
+  created_at: datetime(),
+  deadline: datetime(),
+  claimed_at: datetime(),
+  completed_at: datetime()
+})
+```
+
+#### Relationships
+
+```cypher
+// Wallet relationships
+CREATE (w:Wallet)-[:HOLDS]->(s:Stake)           // Wallet holds a stake
+CREATE (w:Wallet)-[:DERIVED_FROM]->(hw:Wallet) // Worker derived from hot wallet
+CREATE (w:Wallet)-[:MANAGES]->(cw:Wallet)      // Cold manages hot wallet
+
+// Transaction relationships
+CREATE (t:Transaction)-[:FROM]->(w:Wallet)     // Transaction from wallet
+CREATE (t:Transaction)-[:TO]->(c:Contract)    // Transaction to contract
+CREATE (t:Transaction)-[:FOR]->(s:Stake)      // Transaction for stake
+
+// Stake relationships
+CREATE (s:Stake)-[:FOR]->(b:Bounty)           // Stake for a bounty
+CREATE (s:Stake)-[:HELD_BY]->(w:Wallet)       // Stake held by wallet
+CREATE (s:Stake)-[:CREATED_BY]->(a:Agent)     // Stake created by agent
+
+// Bounty relationships
+CREATE (b:Bounty)-[:CLAIMED_BY]->(a:Agent)    // Bounty claimed by agent
+CREATE (b:Bounty)-[:REWARDED_TO]->(w:Wallet)  // Reward sent to wallet
+```
+
+#### Indexes and Constraints
+
+```cypher
+// Constraints for data integrity
+CREATE CONSTRAINT wallet_address_unique IF NOT EXISTS
+FOR (w:Wallet) REQUIRE w.address IS UNIQUE;
+
+CREATE CONSTRAINT transaction_hash_unique IF NOT EXISTS
+FOR (t:Transaction) REQUIRE t.tx_hash IS UNIQUE;
+
+CREATE CONSTRAINT stake_id_unique IF NOT EXISTS
+FOR (s:Stake) REQUIRE s.id IS UNIQUE;
+
+// Indexes for query performance
+CREATE INDEX wallet_type_idx IF NOT EXISTS
+FOR (w:Wallet) ON (w.type);
+
+CREATE INDEX transaction_status_idx IF NOT EXISTS
+FOR (t:Transaction) ON (t.status);
+
+CREATE INDEX stake_bounty_idx IF NOT EXISTS
+FOR (s:Stake) ON (s.bounty_id);
+
+CREATE INDEX stake_status_idx IF NOT EXISTS
+FOR (s:Stake) ON (s.status);
+```
+
+#### Query Patterns
+
+```cypher
+// Get wallet balance and active stakes
+MATCH (w:Wallet {address: $address})-[:HOLDS]->(s:Stake {status: 'active'})
+RETURN w.address, w.type, sum(s.amount) as total_staked
+
+// Get transaction history for a bounty
+MATCH (b:Bounty {id: $bounty_id})<-[:FOR]-(s:Stake)<-[:FOR]-(t:Transaction)
+RETURN t.type, t.amount, t.status, t.tx_hash, t.created_at
+ORDER BY t.created_at DESC
+
+// Get agent staking performance
+MATCH (a:Agent {id: $agent_id})-[:CREATED]->(s:Stake)
+WITH s.status as status, count(s) as count, sum(s.amount) as total
+RETURN status, count, total
+
+// Find wallets needing refill
+MATCH (w:Wallet {type: 'worker'})-[:HOLDS]->(s:Stake)
+WITH w, sum(s.amount) as staked
+WHERE w.balance < 0.005  // Less than 0.005 ETH for gas
+RETURN w.address, w.balance, staked
+```
+
+### F.7 Python Implementation
+
+```python
+"""
+USDC Wallet Manager for ClawTasks Integration
+
+Manages multi-tier wallet architecture, staking operations,
+and Neo4j financial record keeping.
+"""
+
+import asyncio
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from typing import Optional, Dict, List, Tuple
+from dataclasses import dataclass
+from enum import Enum
+
+from web3 import Web3
+from neo4j import AsyncGraphDatabase
+
+
+class WalletType(Enum):
+    COLD = "cold"
+    HOT = "hot"
+    WORKER = "worker"
+
+
+class TransactionType(Enum):
+    STAKE = "stake"
+    CLAIM = "claim"
+    PAYMENT = "payment"
+    SLASH = "slash"
+    REFILL = "refill"
+
+
+class StakeStatus(Enum):
+    ACTIVE = "active"
+    RELEASED = "released"
+    SLASHED = "slashed"
+    EXPIRED = "expired"
+
+
+@dataclass
+class StakeRecord:
+    id: str
+    bounty_id: str
+    amount: Decimal
+    status: StakeStatus
+    tx_hash: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+@dataclass
+class TransactionResult:
+    success: bool
+    tx_hash: Optional[str]
+    error: Optional[str] = None
+    gas_used: Optional[int] = None
+
+
+class USDCSWalletManager:
+    """
+    Manages USDC wallets for ClawTasks integration.
+
+    Implements a multi-tier wallet system with cold storage,
+    hot operational wallet, and per-agent worker wallets.
+    """
+
+    # USDC contract on Base
+    USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    USDC_DECIMALS = 6
+
+    # Staking configuration
+    STAKE_PERCENTAGE = Decimal("0.10")  # 10% of bounty value
+
+    def __init__(
+        self,
+        neo4j_memory,
+        private_key: Optional[str] = None,
+        rpc_url: str = "https://mainnet.base.org"
+    ):
+        """
+        Initialize wallet manager.
+
+        Args:
+            neo4j_memory: Neo4j memory instance for record keeping
+            private_key: Hot wallet private key (should come from KMS in production)
+            rpc_url: Base L2 RPC endpoint
+        """
+        self.memory = neo4j_memory
+        self.w3 = Web3(Web3.HTTPProvider(rpc_url))
+
+        if private_key:
+            self.account = self.w3.eth.account.from_key(private_key)
+            self.wallet_address = self.account.address
+        else:
+            self.account = None
+            self.wallet_address = None
+
+        # Load USDC contract ABI (minimal)
+        self.usdc = self.w3.eth.contract(
+            address=self.USDC_ADDRESS,
+            abi=[
+                {
+                    "constant": True,
+                    "inputs": [{"name": "_owner", "type": "address"}],
+                    "name": "balanceOf",
+                    "outputs": [{"name": "balance", "type": "uint256"}],
+                    "type": "function"
+                },
+                {
+                    "constant": False,
+                    "inputs": [
+                        {"name": "_spender", "type": "address"},
+                        {"name": "_value", "type": "uint256"}
+                    ],
+                    "name": "approve",
+                    "outputs": [{"name": "", "type": "bool"}],
+                    "type": "function"
+                }
+            ]
+        )
+
+    async def get_usdc_balance(self, address: Optional[str] = None) -> Decimal:
+        """
+        Get USDC balance for an address.
+
+        Args:
+            address: Ethereum address (defaults to hot wallet)
+
+        Returns:
+            USDC balance as Decimal
+        """
+        addr = address or self.wallet_address
+        if not addr:
+            raise ValueError("No wallet address configured")
+
+        balance_wei = self.usdc.functions.balanceOf(addr).call()
+        return Decimal(balance_wei) / Decimal(10 ** self.USDC_DECIMALS)
+
+    async def calculate_stake_amount(self, bounty_value: Decimal) -> Decimal:
+        """
+        Calculate required stake amount for a bounty.
+
+        Args:
+            bounty_value: Total bounty reward in USDC
+
+        Returns:
+            Required stake amount
+        """
+        return (bounty_value * self.STAKE_PERCENTAGE).quantize(
+            Decimal("0.000001")  # USDC has 6 decimals
+        )
+
+    async def stake_for_bounty(
+        self,
+        bounty_id: str,
+        amount: Decimal,
+        contract_address: str
+    ) -> TransactionResult:
+        """
+        Stake USDC to claim a bounty.
+
+        Args:
+            bounty_id: Unique bounty identifier
+            amount: Amount to stake in USDC
+            contract_address: ClawTasks contract address
+
+        Returns:
+            TransactionResult with tx_hash or error
+        """
+        if not self.account:
+            return TransactionResult(
+                success=False,
+                tx_hash=None,
+                error="No private key configured"
+            )
+
+        try:
+            # Generate stake ID
+            stake_id = f"stake_{uuid.uuid4().hex[:12]}"
+
+            # Convert amount to wei
+            amount_wei = int(amount * Decimal(10 ** self.USDC_DECIMALS))
+
+            # Build transaction (simplified - actual implementation would use
+            # the full ClawTasks contract interface from F.3)
+            contract = self.w3.eth.contract(
+                address=Web3.to_checksum_address(contract_address),
+                abi=[{
+                    "inputs": [
+                        {"name": "bountyId", "type": "bytes32"},
+                        {"name": "stakeAmount", "type": "uint256"}
+                    ],
+                    "name": "claimBounty",
+                    "outputs": [{"name": "success", "type": "bool"}],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                }]
+            )
+
+            bounty_bytes = bounty_id.encode().ljust(32, b'\0')[:32]
+
+            tx = contract.functions.claimBounty(
+                bounty_bytes,
+                amount_wei
+            ).build_transaction({
+                'from': self.wallet_address,
+                'gas': 200000,
+                'maxFeePerGas': self.w3.to_wei('0.1', 'gwei'),
+                'maxPriorityFeePerGas': self.w3.to_wei('0.001', 'gwei'),
+                'nonce': self.w3.eth.get_transaction_count(self.wallet_address)
+            })
+
+            # Sign and send
+            signed = self.w3.eth.account.sign_transaction(tx, self.account.key)
+            tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+
+            # Wait for receipt
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            if receipt['status'] == 1:
+                # Record in Neo4j
+                await self._record_stake(
+                    stake_id=stake_id,
+                    bounty_id=bounty_id,
+                    amount=amount,
+                    tx_hash=tx_hash.hex()
+                )
+
+                return TransactionResult(
+                    success=True,
+                    tx_hash=tx_hash.hex(),
+                    gas_used=receipt['gasUsed']
+                )
+            else:
+                return TransactionResult(
+                    success=False,
+                    tx_hash=tx_hash.hex(),
+                    error="Transaction reverted"
+                )
+
+        except Exception as e:
+            return TransactionResult(
+                success=False,
+                tx_hash=None,
+                error=str(e)
+            )
+
+    async def claim_payment(
+        self,
+        bounty_id: str,
+        contract_address: str
+    ) -> TransactionResult:
+        """
+        Claim payment for completed bounty.
+
+        Args:
+            bounty_id: Unique bounty identifier
+            contract_address: ClawTasks contract address
+
+        Returns:
+            TransactionResult with tx_hash or error
+        """
+        if not self.account:
+            return TransactionResult(
+                success=False,
+                tx_hash=None,
+                error="No private key configured"
+            )
+
+        try:
+            contract = self.w3.eth.contract(
+                address=Web3.to_checksum_address(contract_address),
+                abi=[{
+                    "inputs": [{"name": "bountyId", "type": "bytes32"}],
+                    "name": "releasePayment",
+                    "outputs": [{"name": "paymentAmount", "type": "uint256"}],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                }]
+            )
+
+            bounty_bytes = bounty_id.encode().ljust(32, b'\0')[:32]
+
+            tx = contract.functions.releasePayment(bounty_bytes).build_transaction({
+                'from': self.wallet_address,
+                'gas': 100000,
+                'maxFeePerGas': self.w3.to_wei('0.1', 'gwei'),
+                'maxPriorityFeePerGas': self.w3.to_wei('0.001', 'gwei'),
+                'nonce': self.w3.eth.get_transaction_count(self.wallet_address)
+            })
+
+            signed = self.w3.eth.account.sign_transaction(tx, self.account.key)
+            tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            if receipt['status'] == 1:
+                # Update stake record
+                await self._update_stake_status(
+                    bounty_id=bounty_id,
+                    status=StakeStatus.RELEASED,
+                    tx_hash=tx_hash.hex()
+                )
+
+                return TransactionResult(
+                    success=True,
+                    tx_hash=tx_hash.hex(),
+                    gas_used=receipt['gasUsed']
+                )
+            else:
+                return TransactionResult(
+                    success=False,
+                    tx_hash=tx_hash.hex(),
+                    error="Transaction reverted"
+                )
+
+        except Exception as e:
+            return TransactionResult(
+                success=False,
+                tx_hash=None,
+                error=str(e)
+            )
+
+    async def _record_stake(
+        self,
+        stake_id: str,
+        bounty_id: str,
+        amount: Decimal,
+        tx_hash: str
+    ):
+        """Record stake in Neo4j."""
+        query = """
+        MATCH (b:Bounty {id: $bounty_id})
+        MATCH (w:Wallet {address: $wallet_address})
+
+        CREATE (s:Stake {
+            id: $stake_id,
+            bounty_id: $bounty_id,
+            amount: $amount,
+            status: 'active',
+            created_at: datetime()
+        })
+
+        CREATE (t:Transaction {
+            id: $tx_id,
+            type: 'stake',
+            amount: $amount,
+            currency: 'USDC',
+            tx_hash: $tx_hash,
+            status: 'confirmed',
+            created_at: datetime()
+        })
+
+        CREATE (w)-[:HOLDS]->(s)
+        CREATE (s)-[:FOR]->(b)
+        CREATE (t)-[:FOR]->(s)
+        CREATE (t)-[:FROM]->(w)
+
+        SET b.status = 'claimed'
+        """
+
+        await self.memory.query(query, {
+            'stake_id': stake_id,
+            'bounty_id': bounty_id,
+            'amount': str(amount),
+            'tx_hash': tx_hash,
+            'tx_id': f"tx_{uuid.uuid4().hex[:12]}",
+            'wallet_address': self.wallet_address
+        })
+
+    async def _update_stake_status(
+        self,
+        bounty_id: str,
+        status: StakeStatus,
+        tx_hash: str
+    ):
+        """Update stake status in Neo4j."""
+        query = """
+        MATCH (s:Stake {bounty_id: $bounty_id})
+        SET s.status = $status,
+            s.released_at = datetime()
+
+        CREATE (t:Transaction {
+            id: $tx_id,
+            type: $tx_type,
+            amount: s.amount,
+            currency: 'USDC',
+            tx_hash: $tx_hash,
+            status: 'confirmed',
+            created_at: datetime()
+        })
+
+        CREATE (t)-[:FOR]->(s)
+        """
+
+        await self.memory.query(query, {
+            'bounty_id': bounty_id,
+            'status': status.value,
+            'tx_hash': tx_hash,
+            'tx_id': f"tx_{uuid.uuid4().hex[:12]}",
+            'tx_type': 'payment' if status == StakeStatus.RELEASED else 'slash'
+        })
+
+    async def get_staking_summary(self) -> Dict:
+        """
+        Get summary of staking activity.
+
+        Returns:
+            Dict with total staked, active stakes, etc.
+        """
+        query = """
+        MATCH (w:Wallet {address: $address})-[:HOLDS]->(s:Stake)
+        RETURN
+            count(s) as total_stakes,
+            sum(CASE WHEN s.status = 'active' THEN s.amount ELSE 0 END) as active_staked,
+            sum(CASE WHEN s.status = 'released' THEN s.amount ELSE 0 END) as total_released,
+            sum(CASE WHEN s.status = 'slashed' THEN s.amount ELSE 0 END) as total_slashed
+        """
+
+        result = await self.memory.query(query, {
+            'address': self.wallet_address
+        })
+
+        record = result[0] if result else {}
+        return {
+            'total_stakes': record.get('total_stakes', 0),
+            'active_staked': Decimal(record.get('active_staked', 0)),
+            'total_released': Decimal(record.get('total_released', 0)),
+            'total_slashed': Decimal(record.get('total_slashed', 0))
+        }
+
+
+# Example usage
+async def main():
+    """Example of using USDCSWalletManager."""
+
+    # Initialize with Neo4j memory
+    from openclaw_memory import Neo4jMemory
+
+    memory = Neo4jMemory(
+        uri="bolt://neo4j:7687",
+        user="neo4j",
+        password="password"
+    )
+
+    # Initialize wallet manager
+    # In production, private_key should come from KMS
+    manager = USDCSWalletManager(
+        neo4j_memory=memory,
+        private_key="0x..."  # From secure storage
+    )
+
+    # Check balance
+    balance = await manager.get_usdc_balance()
+    print(f"Hot wallet balance: {balance} USDC")
+
+    # Calculate stake for a $1000 bounty
+    bounty_value = Decimal("1000.00")
+    stake_amount = await manager.calculate_stake_amount(bounty_value)
+    print(f"Required stake: {stake_amount} USDC")
+
+    # Stake for bounty (if balance sufficient)
+    if balance >= stake_amount:
+        result = await manager.stake_for_bounty(
+            bounty_id="bounty_abc123",
+            amount=stake_amount,
+            contract_address="0x..."
+        )
+        print(f"Stake result: {result}")
+
+    # Get summary
+    summary = await manager.get_staking_summary()
+    print(f"Staking summary: {summary}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+## Appendix G: Rollback Baseline (Single-Agent Config)
 
 If migration fails, revert to this configuration:
 
