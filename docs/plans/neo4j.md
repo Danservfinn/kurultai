@@ -466,6 +466,8 @@ def get_pending_notifications(agent_id: str) -> List[Dict]:
   description,
   status,  // "pending" | "in_progress" | "completed" | "blocked" | "escalated"
   assigned_to,
+  claimed_by,        // Agent ID that claimed the task (optimistic locking)
+  claim_attempt_id,  // UUID for atomic claim verification
   delegated_by,
   quality_score,
   blocked_reason,    // populated when status="blocked"
@@ -1127,6 +1129,9 @@ class OperationalMemory:
         self._fallback_lock = threading.Lock()  # Thread-safety for fallback mode
         self._rate_limit_lock = threading.Lock()
         self._rate_limit_counters: Dict[str, Dict[str, Any]] = {}
+
+        # APScheduler instance (initialized to None, set by start_cleanup_scheduler)
+        self._scheduler = None
 
         # Session pool limiting to prevent connection exhaustion
         self._session_semaphore = threading.Semaphore(max_concurrent_sessions)
@@ -2527,9 +2532,9 @@ Do not include any text outside the JSON object."""
         MATCH (from:Agent {id: $from_agent})
         MATCH (to:Agent {id: $to_agent})
         MATCH (k {id: $knowledge_id})
-        CREATE (from)-[:LEARNED {knowledge_id: $knowledge_id,
-                               timestamp: datetime(), depth: 1}]->(to)
-        CREATE (to)-[:BUILT_ON]->(k)
+        CREATE (to)-[:LEARNED {knowledge_id: $knowledge_id,
+                               timestamp: datetime(), depth: 1}]->(from)
+        CREATE (from)-[:BUILT_ON]->(k)
         """
         with self.driver.session() as session:
             session.run(query, from_agent=from_agent, to_agent=to_agent,
@@ -3151,17 +3156,6 @@ Do not include any text outside the JSON object."""
                         'burst_limit': self.RATE_LIMIT_BURST
                     }
 
-            # Check rate limit status
-            rate_limit_status = {}
-            with self._rate_limit_lock:
-                for key, counter in self._rate_limit_counters.items():
-                    rate_limit_status[key] = {
-                        'hourly_usage': counter['count'],
-                        'hourly_limit': self.RATE_LIMIT_HOURLY,
-                        'burst_usage': counter['burst_count'],
-                        'burst_limit': self.RATE_LIMIT_BURST
-                    }
-
             return {
                 'status': 'healthy' if read_ok else 'degraded',
                 'connected': True,
@@ -3242,13 +3236,20 @@ class SessionResetManager:
 
     def complete_reset(self, sender_id: str):
         """Mark reset as complete, exit drain mode."""
+        # Use the drain start date (when drain began) rather than today
+        # to handle the edge case where drain spans midnight
+        drain_start_date = None
+        if self._drain_start_time:
+            drain_start_date = self._drain_start_time.strftime('%Y-%m-%d')
+        else:
+            # Fallback to today if drain start time not set (shouldn't happen)
+            from datetime import date
+            drain_start_date = date.today().isoformat()
+
         self._drain_mode = False
         self._drain_start_time = None
 
-        # Clear session context for new day
-        from datetime import date
-        today = date.today().isoformat()
-
+        # Clear session context for the session being reset
         query = """
         MATCH (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
         SET s.drain_mode = false,
@@ -3257,7 +3258,7 @@ class SessionResetManager:
             s.pending_delegations = []
         """
         with self.memory.driver.session() as session:
-            session.run(query, sender_id=sender_id, session_date=today)
+            session.run(query, sender_id=sender_id, session_date=drain_start_date)
 
 
 class FailoverMonitor:
@@ -5047,10 +5048,6 @@ class AgentReflectionMemory:
                                    excess=excess)
                 record = result.single()
                 archived = record['archived'] if record else 0
-
-            print(f"[RETENTION] Archived {archived} old reflections for {self.agent_id}")
-                points_selector=ids_to_delete
-            )
 
             print(f"[RETENTION] Archived {archived} old reflections for {self.agent_id}")
 
