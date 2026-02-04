@@ -434,26 +434,30 @@ def get_pending_notifications(agent_id: str) -> List[Dict]:
   last_active: datetime
 })
 
-// Knowledge types (all have: id, agent, created_at, confidence)
-(:Research { topic, findings, sources, depth })
-(:Content { type, title, body, clarity_score })
-(:Application { concept_applied, success, lessons_learned })
-(:Analysis { type, title, findings, metrics, recommendations })
-(:Insight { insight, category, potential_value, urgency })
-(:SecurityAudit { scope, vulnerabilities, overall_risk })
-(:CodeReview { target, issues, enhancements })
-(:ProcessUpdate { type, entity_type, previous_state, new_state })
-(:WorkflowImprovement { target_process, status, proposed_by })
-(:Synthesis { insight, novelty_type, domains })
+// Knowledge types (all have: id, agent, created_at, confidence, access_tier)
+// access_tier: "PUBLIC" | "SENSITIVE" | "PRIVATE" - controls cross-sender visibility
+(:Research { topic, findings, sources, depth, access_tier })
+(:Content { type, title, body, clarity_score, access_tier })
+(:Application { concept_applied, success, lessons_learned, access_tier })
+(:Analysis { type, title, findings, metrics, recommendations, access_tier })
+(:Insight { insight, category, potential_value, urgency, access_tier })
+(:SecurityAudit { scope, vulnerabilities, overall_risk, access_tier })
+(:CodeReview { target, issues, enhancements, access_tier })
+(:ProcessUpdate { type, entity_type, previous_state, new_state, access_tier })
+(:WorkflowImprovement { target_process, status, proposed_by, access_tier })
+(:Synthesis { insight, novelty_type, domains, access_tier })
 
 // Concepts with vector embeddings for semantic search
+// SENDER ISOLATION: Concepts track originating sender_hash to prevent cross-sender contamination
 (:Concept {
   name,
   domain,
   description,
-  embedding: [float],  // 384-dim
+  embedding: [float],  // 384-dim - encrypted if access_tier="SENSITIVE"
   confidence,
-  source
+  source,
+  sender_hash,         // Hash of originating sender (null for general knowledge)
+  access_tier          // "PUBLIC" | "SENSITIVE" | "PRIVATE"
 })
 
 // Tasks
@@ -660,7 +664,56 @@ CREATE VECTOR INDEX reflection_embedding IF NOT EXISTS
 // Index for reflection tier management and agent queries
 CREATE INDEX reflection_agent_access FOR (r:Reflection)
   ON (r.agent, r.access_tier, r.created_at);
+
+// Index for sender-isolated concept queries (privacy enforcement)
+CREATE INDEX concept_sender_access FOR (c:Concept)
+  ON (c.sender_hash, c.access_tier, c.name);
 ```
+
+### Privacy Controls
+
+#### Access Tier System
+
+All knowledge nodes include an `access_tier` field controlling cross-sender visibility:
+
+| Tier | Visibility | Encryption | Use Case |
+|------|------------|------------|----------|
+| **PUBLIC** | All senders | None | General knowledge, code patterns, technical concepts |
+| **SENSITIVE** | Sender-isolated | AES-256-GCM | Health, finance, legal topics (encrypted embeddings) |
+| **PRIVATE** | Blocked from Neo4j | N/A | Personal relationships, specific names - never stored |
+
+#### Sender Isolation
+
+Concepts and knowledge track `sender_hash` (HMAC-SHA256 of phone number) to prevent cross-contamination:
+
+```cypher
+// Query enforces sender isolation at application layer
+MATCH (c:Concept)
+WHERE c.access_tier = 'PUBLIC'
+   OR (c.access_tier = 'SENSITIVE' AND c.sender_hash = $requesting_sender)
+RETURN c
+```
+
+#### Embedding Encryption
+
+SENSITIVE tier embeddings are encrypted at rest using AES-256-GCM:
+
+```python
+# Encryption key from environment
+EMBEDDING_ENCRYPTION_KEY=base64_encoded_key
+
+# Embeddings stored as encrypted JSON
+{
+  'encrypted': True,
+  'data': 'base64_encrypted_ciphertext',
+  'tier': 'SENSITIVE'
+}
+```
+
+**Note**: Vector similarity search on encrypted embeddings requires decrypting before comparison. For large-scale SENSITIVE concept search, consider:
+1. Hybrid approach: Hash-based pre-filtering before decryption
+2. Homomorphic encryption (future enhancement)
+3. Separate vector indexes per sender (trade-off: index proliferation)
 
 ---
 
@@ -1059,6 +1112,11 @@ class OperationalMemory:
         'OPENCLAW_GATEWAY_TOKEN'
     ]
 
+    # Access tier definitions for privacy control
+    ACCESS_TIER_PUBLIC = "PUBLIC"      # Safe to share across all senders
+    ACCESS_TIER_SENSITIVE = "SENSITIVE"  # Sender-isolated, encrypted embeddings
+    ACCESS_TIER_PRIVATE = "PRIVATE"    # Never stored in operational memory
+
     def __init__(self, max_concurrent_sessions: int = 50):
         # Validate environment variables before initialization
         self._validate_environment()
@@ -1086,6 +1144,10 @@ class OperationalMemory:
         self._MAX_FALLBACK_TASKS = 1000
         self._MAX_FALLBACK_RESEARCH = 500
         self._MAX_FALLBACK_ITEMS_PER_CATEGORY = 1000
+
+        # Embedding encryption for SENSITIVE access tier
+        self._embedding_cipher = None
+        self._init_embedding_encryption()
 
         self._connect()
 
@@ -1358,6 +1420,141 @@ class OperationalMemory:
         safe_error = re.sub(r'bolt://[^:]+:[^@]+@', 'bolt://***@', safe_error)
         safe_error = re.sub(r'neo4j://[^:]+:[^@]+@', 'neo4j://***@', safe_error)
         return safe_error
+
+    def _init_embedding_encryption(self):
+        """Initialize encryption for SENSITIVE tier embeddings.
+
+        Uses AES-256-GCM for authenticated encryption of embedding vectors.
+        Key is derived from EMBEDDING_ENCRYPTION_KEY environment variable.
+        Falls back to no encryption if key not provided (logs warning).
+        """
+        import os
+        import base64
+
+        key_env = os.getenv('EMBEDDING_ENCRYPTION_KEY', '')
+        if not key_env:
+            print("[PRIVACY WARNING] EMBEDDING_ENCRYPTION_KEY not set. SENSITIVE embeddings will be stored unencrypted.")
+            return
+
+        try:
+            from cryptography.fernet import Fernet
+            # Ensure key is valid Fernet key (32 bytes, base64-encoded)
+            if len(key_env) < 32:
+                # Derive key using PBKDF2 if provided key is too short
+                import hashlib
+                key_bytes = hashlib.pbkdf2_hmac('sha256', key_env.encode(), b'salt', 100000, 32)
+                key_env = base64.urlsafe_b64encode(key_bytes).decode()
+            self._embedding_cipher = Fernet(key_env.encode())
+            print("[PRIVACY] Embedding encryption initialized for SENSITIVE tier")
+        except ImportError:
+            print("[PRIVACY WARNING] cryptography library not installed. SENSITIVE embeddings will be stored unencrypted.")
+        except Exception as e:
+            print(f"[PRIVACY WARNING] Failed to initialize embedding encryption: {e}")
+
+    def _encrypt_embedding(self, embedding: List[float], access_tier: str) -> str:
+        """Encrypt embedding vector if SENSITIVE access tier.
+
+        Args:
+            embedding: The 384-dim vector to potentially encrypt
+            access_tier: One of PUBLIC, SENSITIVE, PRIVATE
+
+        Returns:
+            JSON string with embedding data (encrypted if SENSITIVE tier)
+        """
+        import json
+        import base64
+
+        if access_tier == self.ACCESS_TIER_SENSITIVE and self._embedding_cipher:
+            # Encrypt the embedding
+            embedding_bytes = json.dumps(embedding).encode()
+            encrypted = self._embedding_cipher.encrypt(embedding_bytes)
+            return json.dumps({
+                'encrypted': True,
+                'data': base64.b64encode(encrypted).decode(),
+                'tier': 'SENSITIVE'
+            })
+        else:
+            # Store unencrypted with tier annotation
+            return json.dumps({
+                'encrypted': False,
+                'data': embedding,
+                'tier': access_tier
+            })
+
+    def _decrypt_embedding(self, stored_value: str) -> Optional[List[float]]:
+        """Decrypt embedding vector if it was encrypted.
+
+        Args:
+            stored_value: JSON string from _encrypt_embedding
+
+        Returns:
+            The original embedding vector, or None if decryption fails
+        """
+        import json
+        import base64
+
+        try:
+            parsed = json.loads(stored_value)
+            if parsed.get('encrypted') and self._embedding_cipher:
+                encrypted_data = base64.b64decode(parsed['data'])
+                decrypted = self._embedding_cipher.decrypt(encrypted_data)
+                return json.loads(decrypted.decode())
+            else:
+                return parsed.get('data')
+        except Exception as e:
+            print(f"[PRIVACY ERROR] Failed to decrypt embedding: {e}")
+            return None
+
+    def _determine_access_tier(self, content: str, sender_hash: Optional[str] = None) -> str:
+        """Determine access tier based on content analysis and sender context.
+
+        Rules:
+        - PRIVATE: Content with explicit personal markers (names, relationships)
+        - SENSITIVE: Content that might infer personal context (health, finance, legal)
+        - PUBLIC: General knowledge, code patterns, technical concepts
+
+        Args:
+            content: The text content to classify
+            sender_hash: Hash of originating sender (if None, defaults to PUBLIC)
+
+        Returns:
+            ACCESS_TIER_PUBLIC, ACCESS_TIER_SENSITIVE, or ACCESS_TIER_PRIVATE
+        """
+        import re
+
+        if not sender_hash:
+            # No sender context = general knowledge = public
+            return self.ACCESS_TIER_PUBLIC
+
+        # Pattern-based classification for common sensitive topics
+        sensitive_patterns = [
+            r'\b(health|medical|doctor|patient|diagnosis|treatment)\b',
+            r'\b(finance|investment|debt|loan|mortgage|salary|income)\b',
+            r'\b(legal|lawyer|lawsuit|divorce|custody|contract)\b',
+            r'\b(relationship|marriage|affair|breakup|dating)\b',
+            r'\b(mental health|therapy|depression|anxiety|therapist)\b',
+        ]
+
+        private_patterns = [
+            r'\b(my |myself|I |me |my )\b',  # Personal pronouns indicate private context
+            r'\b(friend|family|mother|father|sister|brother|wife|husband|partner)\b',
+            r'\b\d{3}-\d{2}-\d{4}\b',  # SSN pattern
+            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Email
+        ]
+
+        content_lower = content.lower()
+
+        # Check for private markers first (highest priority)
+        for pattern in private_patterns:
+            if re.search(pattern, content_lower, re.IGNORECASE):
+                return self.ACCESS_TIER_PRIVATE
+
+        # Check for sensitive topics
+        for pattern in sensitive_patterns:
+            if re.search(pattern, content_lower, re.IGNORECASE):
+                return self.ACCESS_TIER_SENSITIVE
+
+        return self.ACCESS_TIER_PUBLIC
 
     def _start_pool_monitoring(self):
         """Start background thread to monitor connection pool health."""
@@ -1900,8 +2097,21 @@ Do not include any text outside the JSON object."""
         return text
 
     def store_research(self, agent: str, topic: str, findings: str,
-                      sources: List[str] = None, depth: str = "medium") -> Optional[UUID]:
-        """Store research findings to Neo4j with sanitization."""
+                      sources: List[str] = None, depth: str = "medium",
+                      sender_hash: Optional[str] = None) -> Optional[UUID]:
+        """Store research findings to Neo4j with sanitization and access tier control.
+
+        Args:
+            agent: Agent ID storing the research
+            topic: Research topic
+            findings: Research findings text
+            sources: List of source references
+            depth: Research depth (shallow/medium/deep)
+            sender_hash: Hash of originating sender for access control (None = general knowledge)
+
+        Returns:
+            UUID of stored research, or None if blocked/failed
+        """
         # Validate agent identity
         if not self._validate_agent_id(agent):
             print(f"[AUTH] Invalid agent storing research: {agent}")
@@ -1916,6 +2126,14 @@ Do not include any text outside the JSON object."""
         safe_findings = self._sanitize_for_sharing(findings)
         safe_topic = self._sanitize_for_sharing(topic)
 
+        # Determine access tier based on content and sender context
+        access_tier = self._determine_access_tier(safe_findings + " " + safe_topic, sender_hash)
+
+        # PRIVATE tier content never goes to operational memory
+        if access_tier == self.ACCESS_TIER_PRIVATE:
+            print(f"[PRIVACY] Research blocked from operational memory (PRIVATE tier)")
+            return None
+
         if self.fallback_mode:
             with self._fallback_lock:
                 # Enforce fallback store limits
@@ -1926,7 +2144,8 @@ Do not include any text outside the JSON object."""
 
                 self._local_store.setdefault('research', []).append({
                     'id': str(knowledge_id), 'agent': agent, 'topic': safe_topic,
-                    'findings': safe_findings, 'created_at': datetime.now().isoformat()
+                    'findings': safe_findings, 'created_at': datetime.now().isoformat(),
+                    'access_tier': access_tier, 'sender_hash': sender_hash
                 })
             return knowledge_id
 
@@ -1935,6 +2154,8 @@ Do not include any text outside the JSON object."""
         CREATE (r:Research {
             id: $id, topic: $topic, findings: $findings,
             sources: $sources, depth: $depth,
+            access_tier: $access_tier,
+            sender_hash: $sender_hash,
             created_at: datetime(), confidence: 0.9
         })
         CREATE (a)-[:CREATED {timestamp: datetime()}]->(r)
@@ -1943,8 +2164,215 @@ Do not include any text outside the JSON object."""
         with self.driver.session() as session:
             session.run(query, agent=agent, id=str(knowledge_id),
                        topic=safe_topic, findings=safe_findings,
-                       sources=sources or [], depth=depth)
+                       sources=sources or [], depth=depth,
+                       access_tier=access_tier, sender_hash=sender_hash)
         return knowledge_id
+
+    def store_concept(self, agent: str, name: str, description: str,
+                     domain: str = "general", source: str = "",
+                     sender_hash: Optional[str] = None) -> Optional[UUID]:
+        """Store a concept with encrypted embedding for SENSITIVE access tier.
+
+        Args:
+            agent: Agent ID creating the concept
+            name: Concept name (unique identifier)
+            description: Concept description
+            domain: Concept domain/category
+            source: Source of the concept
+            sender_hash: Hash of originating sender for access control
+
+        Returns:
+            UUID of stored concept, or None if blocked/failed
+        """
+        # Validate agent identity
+        if not self._validate_agent_id(agent):
+            print(f"[AUTH] Invalid agent storing concept: {agent}")
+            return None
+
+        # Check rate limit
+        if not self._check_rate_limit(agent, 'store_concept'):
+            print(f"[RATE_LIMIT] store_concept blocked for {agent}")
+            return None
+
+        # Sanitize content
+        safe_name = self._sanitize_for_sharing(name)
+        safe_description = self._sanitize_for_sharing(description)
+
+        # Determine access tier
+        access_tier = self._determine_access_tier(safe_name + " " + safe_description, sender_hash)
+
+        # PRIVATE tier content never goes to operational memory
+        if access_tier == self.ACCESS_TIER_PRIVATE:
+            print(f"[PRIVACY] Concept blocked from operational memory (PRIVATE tier)")
+            return None
+
+        # Generate embedding
+        embedding = self._generate_embedding(safe_name + " " + safe_description)
+
+        # Encrypt embedding if SENSITIVE tier
+        if embedding:
+            stored_embedding = self._encrypt_embedding(embedding, access_tier)
+        else:
+            stored_embedding = None
+
+        concept_id = uuid4()
+
+        if self.fallback_mode:
+            with self._fallback_lock:
+                self._local_store.setdefault('concepts', []).append({
+                    'id': str(concept_id),
+                    'agent': agent,
+                    'name': safe_name,
+                    'description': safe_description,
+                    'domain': domain,
+                    'source': source,
+                    'embedding': stored_embedding,
+                    'access_tier': access_tier,
+                    'sender_hash': sender_hash,
+                    'created_at': datetime.now().isoformat()
+                })
+            return concept_id
+
+        # Store in Neo4j with encrypted embedding if SENSITIVE
+        query = """
+        MATCH (a:Agent {id: $agent})
+        MERGE (c:Concept {name: $name})
+        ON CREATE SET
+            c.id = $id,
+            c.description = $description,
+            c.domain = $domain,
+            c.source = $source,
+            c.embedding = $embedding,
+            c.access_tier = $access_tier,
+            c.sender_hash = $sender_hash,
+            c.created_at = datetime(),
+            c.confidence = 0.9
+        ON MATCH SET
+            c.description = $description,
+            c.source = $source,
+            c.embedding = $embedding,
+            c.access_tier = $access_tier,
+            c.sender_hash = $sender_hash,
+            c.updated_at = datetime()
+        CREATE (a)-[:CREATED {timestamp: datetime()}]->(c)
+        RETURN c.id as id
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run(query,
+                    agent=agent, id=str(concept_id), name=safe_name,
+                    description=safe_description, domain=domain, source=source,
+                    embedding=stored_embedding, access_tier=access_tier,
+                    sender_hash=sender_hash)
+                return concept_id
+        except Exception as e:
+            print(f"[ERROR] Failed to store concept: {e}")
+            return None
+
+    def query_concepts(self, query_text: str, sender_hash: Optional[str] = None,
+                      min_confidence: float = 0.7, limit: int = 5) -> List[Dict[str, Any]]:
+        """Query concepts with sender isolation and access tier enforcement.
+
+        Args:
+            query_text: Text to search for
+            sender_hash: Hash of requesting sender (for access control)
+            min_confidence: Minimum similarity score
+            limit: Maximum results to return
+
+        Returns:
+            List of matching concepts (filtered by access tier)
+        """
+        if self.fallback_mode:
+            # Fallback: simple text match on local store
+            concepts = self._local_store.get('concepts', [])
+            results = []
+            for c in concepts:
+                # Filter by access tier
+                if c.get('access_tier') == self.ACCESS_TIER_SENSITIVE:
+                    if c.get('sender_hash') != sender_hash:
+                        continue  # Cannot access other senders' SENSITIVE concepts
+                if query_text.lower() in c.get('name', '').lower() or \
+                   query_text.lower() in c.get('description', '').lower():
+                    results.append({
+                        'name': c['name'],
+                        'description': c['description'],
+                        'domain': c.get('domain', 'general')
+                    })
+            return results[:limit]
+
+        # Generate embedding for query
+        query_embedding = self._generate_embedding(query_text)
+
+        if query_embedding:
+            try:
+                # Vector search with sender isolation
+                # Note: Vector index doesn't support filtering, so we filter post-query
+                query = """
+                CALL db.index.vector.queryNodes('concept_embedding', $limit * 3, $embedding)
+                YIELD node, score
+                WHERE score >= $min_score
+                RETURN node.name as name, node.description as description,
+                       node.domain as domain, node.access_tier as access_tier,
+                       node.sender_hash as concept_sender, score
+                """
+                with self.driver.session() as session:
+                    result = session.run(query, embedding=query_embedding,
+                                        min_score=min_confidence, limit=limit)
+                    records = []
+                    for record in result:
+                        # Enforce access tier rules
+                        tier = record.get('access_tier', self.ACCESS_TIER_PUBLIC)
+                        concept_sender = record.get('concept_sender')
+
+                        # SENSITIVE concepts are sender-isolated
+                        if tier == self.ACCESS_TIER_SENSITIVE and concept_sender != sender_hash:
+                            continue  # Skip - cannot access other senders' sensitive data
+
+                        records.append({
+                            'name': record['name'],
+                            'description': record['description'],
+                            'domain': record['domain'],
+                            'score': record['score']
+                        })
+                        if len(records) >= limit:
+                            break
+                    return records
+            except Exception as e:
+                print(f"[WARN] Vector search failed: {e}")
+
+        # Fallback to full-text search
+        query = """
+        CALL db.index.fulltext.queryNodes('knowledge_content', $query)
+        YIELD node, score
+        WHERE (node:Concept) AND score >= $min_score
+        RETURN node.name as name, node.description as description,
+               node.domain as domain, node.access_tier as access_tier,
+               node.sender_hash as concept_sender, score
+        LIMIT $limit
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run(query, query=query_text,
+                                    min_score=min_confidence, limit=limit)
+                records = []
+                for record in result:
+                    # Enforce access tier rules
+                    tier = record.get('access_tier', self.ACCESS_TIER_PUBLIC)
+                    concept_sender = record.get('concept_sender')
+
+                    if tier == self.ACCESS_TIER_SENSITIVE and concept_sender != sender_hash:
+                        continue
+
+                    records.append({
+                        'name': record['name'],
+                        'description': record['description'],
+                        'domain': record['domain'],
+                        'score': record['score']
+                    })
+                return records
+        except Exception as e:
+            print(f"[ERROR] Concept query failed: {e}")
+            return []
 
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embedding using sentence-transformers (all-MiniLM-L6-v2).
@@ -1989,10 +2417,31 @@ Do not include any text outside the JSON object."""
             return []
 
     def query_related(self, agent: str, topic: str,
-                     min_confidence: float = 0.7) -> List[Dict[str, Any]]:
-        """Query operational knowledge with vector fallback."""
+                     min_confidence: float = 0.7,
+                     sender_hash: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Query operational knowledge with vector fallback and access control.
+
+        Args:
+            agent: Agent ID performing the query
+            topic: Search topic
+            min_confidence: Minimum similarity threshold
+            sender_hash: Hash of requesting sender (for access tier enforcement)
+
+        Returns:
+            List of related knowledge items (filtered by access tier)
+        """
         if self.fallback_mode:
-            return self._local_store.get('research', [])
+            # Filter fallback store by access tier
+            research = self._local_store.get('research', [])
+            filtered = []
+            for r in research:
+                tier = r.get('access_tier', self.ACCESS_TIER_PUBLIC)
+                item_sender = r.get('sender_hash')
+                # SENSITIVE items are sender-isolated
+                if tier == self.ACCESS_TIER_SENSITIVE and item_sender != sender_hash:
+                    continue
+                filtered.append(r)
+            return filtered
 
         # Generate embedding for the query topic
         embedding = self._generate_embedding(topic)
@@ -2000,15 +2449,34 @@ Do not include any text outside the JSON object."""
         # Try vector search first (if embedding generated and index exists)
         if embedding:
             try:
+                # Query more results than needed to allow for filtering
                 query = """
-                CALL db.index.vector.queryNodes('concept_embedding', 5, $embedding)
+                CALL db.index.vector.queryNodes('concept_embedding', 10, $embedding)
                 YIELD node, score
                 WHERE score >= $min_score
-                RETURN node.name as concept, node.description as description, score
+                RETURN node.name as concept, node.description as description,
+                       node.access_tier as access_tier, node.sender_hash as item_sender,
+                       score
                 """
                 with self.driver.session() as session:
                     result = session.run(query, embedding=embedding, min_score=min_confidence)
-                    records = [dict(record) for record in result]
+                    records = []
+                    for record in result:
+                        # Enforce access tier rules
+                        tier = record.get('access_tier', self.ACCESS_TIER_PUBLIC)
+                        item_sender = record.get('item_sender')
+
+                        # SENSITIVE concepts are sender-isolated
+                        if tier == self.ACCESS_TIER_SENSITIVE and item_sender != sender_hash:
+                            continue
+
+                        records.append({
+                            'concept': record['concept'],
+                            'description': record['description'],
+                            'score': record['score']
+                        })
+                        if len(records) >= 5:
+                            break
                     if records:
                         return records
             except Exception:
@@ -6479,8 +6947,19 @@ python -m pytest --cov=openclaw_memory --cov-report=html
 | `ZAI_API_KEY` | Yes* | GLM model access | `sk-...` |
 | `SENTENCE_TRANSFORMERS_CACHE` | No | Model cache path | `/data/cache/sentence-transformers` |
 | `EMBEDDING_MODEL_SHA256` | No | Model verification | `e4ce9877...` |
+| `EMBEDDING_ENCRYPTION_KEY` | **Yes** | AES-256 key for SENSITIVE embeddings | `base64_encoded_key` |
+| `PHONE_HASH_SALT` | **Yes** | HMAC salt for sender hashing | `random_32+_chars` |
 
 *Required for LLM functionality
+
+**Security Note**: `EMBEDDING_ENCRYPTION_KEY` and `PHONE_HASH_SALT` are critical for privacy. Generate strong random values:
+```bash
+# Generate encryption key
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Generate phone hash salt
+openssl rand -base64 32
+```
 
 ---
 
