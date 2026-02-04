@@ -1081,6 +1081,720 @@ class OperationalMemory:
         return health["status"] == "healthy"
 
     # =======================================================================
+    # Analysis (Jochi Backend Issue Identification Protocol)
+    # =======================================================================
+
+    def create_analysis(
+        self,
+        agent: str,
+        analysis_type: str,
+        severity: str,
+        description: str,
+        target_agent: Optional[str] = None,
+        findings: Optional[Dict] = None,
+        recommendations: Optional[List[str]] = None,
+        assigned_to: Optional[str] = None
+    ) -> str:
+        """
+        Create a new Analysis node for backend issues.
+
+        Args:
+            agent: Agent who created the analysis (e.g., 'jochi')
+            analysis_type: Type of analysis ('performance', 'resource', 'error', 'security', 'other')
+            severity: Severity level ('low', 'medium', 'high', 'critical')
+            description: Human-readable description of the issue
+            target_agent: Agent the analysis is about (if applicable)
+            findings: Detailed findings as a dictionary
+            recommendations: List of suggested fixes
+            assigned_to: Agent assigned to fix (e.g., 'temujin' for backend issues)
+
+        Returns:
+            Analysis ID string
+
+        Raises:
+            ValueError: If analysis_type or severity is invalid
+        """
+        # Validate analysis_type
+        valid_types = ['performance', 'resource', 'error', 'security', 'other']
+        if analysis_type not in valid_types:
+            raise ValueError(f"Invalid analysis_type '{analysis_type}'. Must be one of: {valid_types}")
+
+        # Validate severity
+        valid_severities = ['low', 'medium', 'high', 'critical']
+        if severity not in valid_severities:
+            raise ValueError(f"Invalid severity '{severity}'. Must be one of: {valid_severities}")
+
+        analysis_id = self._generate_id()
+        created_at = self._now()
+
+        # Convert findings and recommendations to strings for Neo4j storage
+        findings_str = str(findings) if findings else None
+        recommendations_str = str(recommendations) if recommendations else None
+
+        cypher = """
+        CREATE (a:Analysis {
+            id: $analysis_id,
+            agent: $agent,
+            target_agent: $target_agent,
+            analysis_type: $analysis_type,
+            severity: $severity,
+            description: $description,
+            findings: $findings,
+            recommendations: $recommendations,
+            assigned_to: $assigned_to,
+            status: 'open',
+            created_at: $created_at,
+            updated_at: $created_at,
+            resolved_at: null
+        })
+        RETURN a.id as analysis_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Analysis creation simulated for {agent}")
+                return analysis_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    analysis_id=analysis_id,
+                    agent=agent,
+                    target_agent=target_agent,
+                    analysis_type=analysis_type,
+                    severity=severity,
+                    description=description,
+                    findings=findings_str,
+                    recommendations=recommendations_str,
+                    assigned_to=assigned_to,
+                    created_at=created_at
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Analysis created: {analysis_id} (type: {analysis_type}, severity: {severity})")
+                    return record["analysis_id"]
+                else:
+                    raise RuntimeError("Analysis creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create analysis: {e}")
+                raise
+
+    def list_analyses(
+        self,
+        agent: Optional[str] = None,
+        analysis_type: Optional[str] = None,
+        severity: Optional[str] = None,
+        status: Optional[str] = None,
+        assigned_to: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Query analyses with optional filters.
+
+        Args:
+            agent: Filter by agent who created the analysis
+            analysis_type: Filter by type ('performance', 'resource', 'error', 'security', 'other')
+            severity: Filter by severity ('low', 'medium', 'high', 'critical')
+            status: Filter by status ('open', 'in_progress', 'resolved', 'closed')
+            assigned_to: Filter by assigned agent
+
+        Returns:
+            List of analysis dicts, sorted by severity (critical first) then created_at
+        """
+        # Build dynamic query based on filters
+        conditions = []
+        params = {}
+
+        if agent is not None:
+            conditions.append("a.agent = $agent")
+            params["agent"] = agent
+
+        if analysis_type is not None:
+            conditions.append("a.analysis_type = $analysis_type")
+            params["analysis_type"] = analysis_type
+
+        if severity is not None:
+            conditions.append("a.severity = $severity")
+            params["severity"] = severity
+
+        if status is not None:
+            conditions.append("a.status = $status")
+            params["status"] = status
+
+        if assigned_to is not None:
+            conditions.append("a.assigned_to = $assigned_to")
+            params["assigned_to"] = assigned_to
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (a:Analysis)
+        {where_clause}
+        RETURN a
+        ORDER BY
+            CASE a.severity
+                WHEN 'critical' THEN 4
+                WHEN 'high' THEN 3
+                WHEN 'medium' THEN 2
+                WHEN 'low' THEN 1
+                ELSE 0
+            END DESC,
+            a.created_at DESC
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                analyses = []
+                for record in result:
+                    analysis_dict = dict(record["a"])
+                    # Parse findings and recommendations back from strings if possible
+                    if analysis_dict.get("findings"):
+                        try:
+                            import ast
+                            analysis_dict["findings"] = ast.literal_eval(analysis_dict["findings"])
+                        except (ValueError, SyntaxError):
+                            pass  # Keep as string if parsing fails
+                    if analysis_dict.get("recommendations"):
+                        try:
+                            import ast
+                            analysis_dict["recommendations"] = ast.literal_eval(analysis_dict["recommendations"])
+                        except (ValueError, SyntaxError):
+                            pass
+                    analyses.append(analysis_dict)
+                return analyses
+            except Neo4jError as e:
+                logger.error(f"Failed to list analyses: {e}")
+                raise
+
+    def update_analysis_status(self, analysis_id: str, status: str, updated_by: str) -> bool:
+        """
+        Update analysis status.
+
+        Args:
+            analysis_id: Analysis ID to update
+            status: New status ('open', 'in_progress', 'resolved', 'closed')
+            updated_by: Agent who is updating the status
+
+        Returns:
+            True if successful, False if analysis not found
+
+        Raises:
+            ValueError: If status is invalid
+        """
+        valid_statuses = ['open', 'in_progress', 'resolved', 'closed']
+        if status not in valid_statuses:
+            raise ValueError(f"Invalid status '{status}'. Must be one of: {valid_statuses}")
+
+        updated_at = self._now()
+
+        # Set resolved_at if status is resolved or closed
+        if status in ('resolved', 'closed'):
+            cypher = """
+            MATCH (a:Analysis {id: $analysis_id})
+            SET a.status = $status,
+                a.updated_at = $updated_at,
+                a.resolved_at = $updated_at
+            RETURN a.id as analysis_id
+            """
+        else:
+            cypher = """
+            MATCH (a:Analysis {id: $analysis_id})
+            SET a.status = $status,
+                a.updated_at = $updated_at
+            RETURN a.id as analysis_id
+            """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Analysis status update simulated for {analysis_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    analysis_id=analysis_id,
+                    status=status,
+                    updated_at=updated_at
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"Analysis not found: {analysis_id}")
+                    return False
+
+                logger.info(f"Analysis {status}: {analysis_id} by {updated_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to update analysis status: {e}")
+                raise
+
+    def assign_analysis(self, analysis_id: str, assigned_to: str, assigned_by: str) -> bool:
+        """
+        Assign analysis to an agent.
+
+        Args:
+            analysis_id: Analysis ID to assign
+            assigned_to: Agent to assign the analysis to (e.g., 'temujin')
+            assigned_by: Agent who is making the assignment
+
+        Returns:
+            True if successful, False if analysis not found
+        """
+        updated_at = self._now()
+
+        cypher = """
+        MATCH (a:Analysis {id: $analysis_id})
+        SET a.assigned_to = $assigned_to,
+            a.updated_at = $updated_at
+        RETURN a.id as analysis_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Analysis assignment simulated for {analysis_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    analysis_id=analysis_id,
+                    assigned_to=assigned_to,
+                    updated_at=updated_at
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"Analysis not found: {analysis_id}")
+                    return False
+
+                logger.info(f"Analysis assigned: {analysis_id} to {assigned_to} by {assigned_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to assign analysis: {e}")
+                raise
+
+    def get_analysis(self, analysis_id: str) -> Optional[Dict]:
+        """
+        Get a specific analysis by ID.
+
+        Args:
+            analysis_id: Analysis ID to retrieve
+
+        Returns:
+            Analysis dict if found, None otherwise
+        """
+        cypher = """
+        MATCH (a:Analysis {id: $analysis_id})
+        RETURN a
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, analysis_id=analysis_id)
+                record = result.single()
+                if record:
+                    analysis_dict = dict(record["a"])
+                    # Parse findings and recommendations back from strings if possible
+                    if analysis_dict.get("findings"):
+                        try:
+                            import ast
+                            analysis_dict["findings"] = ast.literal_eval(analysis_dict["findings"])
+                        except (ValueError, SyntaxError):
+                            pass
+                    if analysis_dict.get("recommendations"):
+                        try:
+                            import ast
+                            analysis_dict["recommendations"] = ast.literal_eval(analysis_dict["recommendations"])
+                        except (ValueError, SyntaxError):
+                            pass
+                    return analysis_dict
+                return None
+            except Neo4jError as e:
+                logger.error(f"Failed to get analysis: {e}")
+                raise
+
+    def get_analysis_summary(self, target_agent: Optional[str] = None) -> Dict:
+        """
+        Get summary counts of analyses by severity and status.
+
+        Args:
+            target_agent: Optional agent to filter by (the agent the analysis is about)
+
+        Returns:
+            Dict with counts by severity, status, and type
+        """
+        # Base query for counts by severity
+        if target_agent:
+            severity_cypher = """
+            MATCH (a:Analysis {target_agent: $target_agent})
+            RETURN a.severity as severity, a.status as status, a.analysis_type as analysis_type, count(a) as count
+            """
+            params = {"target_agent": target_agent}
+        else:
+            severity_cypher = """
+            MATCH (a:Analysis)
+            RETURN a.severity as severity, a.status as status, a.analysis_type as analysis_type, count(a) as count
+            """
+            params = {}
+
+        with self._session() as session:
+            if session is None:
+                return {
+                    "total": 0,
+                    "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+                    "by_status": {"open": 0, "in_progress": 0, "resolved": 0, "closed": 0},
+                    "by_type": {"performance": 0, "resource": 0, "error": 0, "security": 0, "other": 0},
+                    "open_by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+                }
+
+            try:
+                result = session.run(severity_cypher, **params)
+
+                # Initialize counters
+                by_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+                by_status = {"open": 0, "in_progress": 0, "resolved": 0, "closed": 0}
+                by_type = {"performance": 0, "resource": 0, "error": 0, "security": 0, "other": 0}
+                open_by_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+
+                total = 0
+                for record in result:
+                    severity = record["severity"]
+                    status = record["status"]
+                    analysis_type = record["analysis_type"]
+                    count = record["count"]
+
+                    total += count
+                    if severity in by_severity:
+                        by_severity[severity] += count
+                    if status in by_status:
+                        by_status[status] += count
+                    if analysis_type in by_type:
+                        by_type[analysis_type] += count
+                    if status == "open" and severity in open_by_severity:
+                        open_by_severity[severity] += count
+
+                return {
+                    "total": total,
+                    "by_severity": by_severity,
+                    "by_status": by_status,
+                    "by_type": by_type,
+                    "open_by_severity": open_by_severity
+                }
+
+            except Neo4jError as e:
+                logger.error(f"Failed to get analysis summary: {e}")
+                raise
+
+    def detect_performance_issues(self, metrics: Dict) -> List[Dict]:
+        """
+        Analyze metrics and return potential performance issues.
+
+        This method analyzes various performance metrics and returns a list
+        of detected issues with severity and recommendations.
+
+        Args:
+            metrics: Dictionary containing performance metrics such as:
+                - connection_pool_usage: Percentage of connections in use (0-100)
+                - query_time_ms: Average query execution time in milliseconds
+                - error_rate: Error rate as percentage (0-100)
+                - memory_usage_mb: Memory usage in MB
+                - cpu_usage_percent: CPU usage percentage (0-100)
+                - active_sessions: Number of active Neo4j sessions
+                - retry_count: Number of retries in time window
+                - circuit_breaker_trips: Number of circuit breaker trips
+
+        Returns:
+            List of detected issues, each containing:
+                - issue_type: Type of issue detected
+                - severity: 'low', 'medium', 'high', or 'critical'
+                - description: Human-readable description
+                - metric_value: The value that triggered the issue
+                - threshold: The threshold that was exceeded
+                - recommendations: List of suggested fixes
+        """
+        issues = []
+
+        # Connection pool exhaustion check
+        if "connection_pool_usage" in metrics:
+            usage = metrics["connection_pool_usage"]
+            if usage >= 95:
+                issues.append({
+                    "issue_type": "connection_pool_exhaustion",
+                    "severity": "critical",
+                    "description": f"Connection pool nearly exhausted ({usage:.1f}% used). System may become unresponsive.",
+                    "metric_value": usage,
+                    "threshold": 95,
+                    "recommendations": [
+                        "Increase max_connection_pool_size in OperationalMemory config",
+                        "Check for connection leaks - ensure all sessions are properly closed",
+                        "Implement connection timeout reduction",
+                        "Review and optimize query patterns to reduce connection hold time"
+                    ]
+                })
+            elif usage >= 80:
+                issues.append({
+                    "issue_type": "connection_pool_high_usage",
+                    "severity": "high",
+                    "description": f"Connection pool usage is high ({usage:.1f}% used).",
+                    "metric_value": usage,
+                    "threshold": 80,
+                    "recommendations": [
+                        "Monitor connection pool usage trends",
+                        "Review connection pool configuration",
+                        "Optimize queries to release connections faster"
+                    ]
+                })
+            elif usage >= 60:
+                issues.append({
+                    "issue_type": "connection_pool_elevated_usage",
+                    "severity": "medium",
+                    "description": f"Connection pool usage is elevated ({usage:.1f}% used).",
+                    "metric_value": usage,
+                    "threshold": 60,
+                    "recommendations": [
+                        "Monitor connection pool usage",
+                        "Review for potential connection leaks"
+                    ]
+                })
+
+        # Slow query detection
+        if "query_time_ms" in metrics:
+            query_time = metrics["query_time_ms"]
+            if query_time >= 5000:
+                issues.append({
+                    "issue_type": "slow_query_critical",
+                    "severity": "critical",
+                    "description": f"Critical: Average query time is {query_time:.0f}ms. Queries are severely impacting performance.",
+                    "metric_value": query_time,
+                    "threshold": 5000,
+                    "recommendations": [
+                        "Add missing indexes for frequently queried fields",
+                        "Optimize Cypher queries - avoid Cartesian products",
+                        "Consider query result pagination",
+                        "Review and optimize data model",
+                        "Enable query logging to identify slow queries"
+                    ]
+                })
+            elif query_time >= 1000:
+                issues.append({
+                    "issue_type": "slow_query_warning",
+                    "severity": "high",
+                    "description": f"Warning: Average query time is {query_time:.0f}ms. Queries may be impacting performance.",
+                    "metric_value": query_time,
+                    "threshold": 1000,
+                    "recommendations": [
+                        "Review slow query log",
+                        "Add indexes for frequently filtered properties",
+                        "Optimize complex queries"
+                    ]
+                })
+            elif query_time >= 500:
+                issues.append({
+                    "issue_type": "slow_query_notice",
+                    "severity": "medium",
+                    "description": f"Notice: Average query time is {query_time:.0f}ms.",
+                    "metric_value": query_time,
+                    "threshold": 500,
+                    "recommendations": [
+                        "Monitor query performance trends",
+                        "Review query patterns for optimization opportunities"
+                    ]
+                })
+
+        # Error rate detection
+        if "error_rate" in metrics:
+            error_rate = metrics["error_rate"]
+            if error_rate >= 10:
+                issues.append({
+                    "issue_type": "high_error_rate",
+                    "severity": "critical",
+                    "description": f"Critical error rate detected: {error_rate:.1f}% of operations are failing.",
+                    "metric_value": error_rate,
+                    "threshold": 10,
+                    "recommendations": [
+                        "Immediately review error logs",
+                        "Check Neo4j server health and connectivity",
+                        "Verify authentication credentials",
+                        "Check for network issues",
+                        "Review recent code changes"
+                    ]
+                })
+            elif error_rate >= 5:
+                issues.append({
+                    "issue_type": "elevated_error_rate",
+                    "severity": "high",
+                    "description": f"Elevated error rate detected: {error_rate:.1f}% of operations are failing.",
+                    "metric_value": error_rate,
+                    "threshold": 5,
+                    "recommendations": [
+                        "Review error logs for patterns",
+                        "Check Neo4j server status",
+                        "Monitor error rate trends"
+                    ]
+                })
+            elif error_rate >= 1:
+                issues.append({
+                    "issue_type": "increased_error_rate",
+                    "severity": "medium",
+                    "description": f"Increased error rate detected: {error_rate:.1f}% of operations are failing.",
+                    "metric_value": error_rate,
+                    "threshold": 1,
+                    "recommendations": [
+                        "Monitor error logs",
+                        "Review transient error handling"
+                    ]
+                })
+
+        # Memory usage detection
+        if "memory_usage_mb" in metrics:
+            memory_mb = metrics["memory_usage_mb"]
+            if memory_mb >= 2048:  # 2GB
+                issues.append({
+                    "issue_type": "high_memory_usage",
+                    "severity": "high",
+                    "description": f"High memory usage detected: {memory_mb:.0f}MB. Potential memory leak.",
+                    "metric_value": memory_mb,
+                    "threshold": 2048,
+                    "recommendations": [
+                        "Profile memory usage to identify leaks",
+                        "Check for large result sets being held in memory",
+                        "Review caching strategies",
+                        "Consider implementing result streaming"
+                    ]
+                })
+            elif memory_mb >= 1024:  # 1GB
+                issues.append({
+                    "issue_type": "elevated_memory_usage",
+                    "severity": "medium",
+                    "description": f"Elevated memory usage detected: {memory_mb:.0f}MB.",
+                    "metric_value": memory_mb,
+                    "threshold": 1024,
+                    "recommendations": [
+                        "Monitor memory usage trends",
+                        "Review memory-intensive operations"
+                    ]
+                })
+
+        # Circuit breaker detection
+        if "circuit_breaker_trips" in metrics:
+            trips = metrics["circuit_breaker_trips"]
+            if trips >= 5:
+                issues.append({
+                    "issue_type": "circuit_breaker_frequent_trips",
+                    "severity": "critical",
+                    "description": f"Circuit breaker has tripped {trips} times. System is in degraded state.",
+                    "metric_value": trips,
+                    "threshold": 5,
+                    "recommendations": [
+                        "Investigate root cause of failures",
+                        "Check Neo4j server availability",
+                        "Review timeout configurations",
+                        "Consider implementing fallback strategies"
+                    ]
+                })
+            elif trips >= 2:
+                issues.append({
+                    "issue_type": "circuit_breaker_trips",
+                    "severity": "high",
+                    "description": f"Circuit breaker has tripped {trips} times.",
+                    "metric_value": trips,
+                    "threshold": 2,
+                    "recommendations": [
+                        "Monitor circuit breaker status",
+                        "Review error patterns leading to trips"
+                    ]
+                })
+
+        # Retry storm detection
+        if "retry_count" in metrics:
+            retries = metrics["retry_count"]
+            if retries >= 50:
+                issues.append({
+                    "issue_type": "retry_storm",
+                    "severity": "high",
+                    "description": f"High retry count detected ({retries} retries). System may be unstable.",
+                    "metric_value": retries,
+                    "threshold": 50,
+                    "recommendations": [
+                        "Check Neo4j server stability",
+                        "Review retry logic and backoff strategies",
+                        "Investigate root cause of transient failures"
+                    ]
+                })
+
+        return issues
+
+    def create_analysis_from_issues(
+        self,
+        agent: str,
+        issues: List[Dict],
+        target_agent: Optional[str] = None,
+        assigned_to: Optional[str] = None
+    ) -> List[str]:
+        """
+        Create Analysis nodes from detected issues.
+
+        Convenience method to create analyses for all detected issues.
+
+        Args:
+            agent: Agent creating the analyses (e.g., 'jochi')
+            issues: List of issues from detect_performance_issues()
+            target_agent: Agent the analysis is about (if applicable)
+            assigned_to: Agent assigned to fix (default: 'temujin' for backend issues)
+
+        Returns:
+            List of created analysis IDs
+        """
+        if assigned_to is None:
+            assigned_to = "temujin"  # Default assignee for backend issues
+
+        analysis_ids = []
+        for issue in issues:
+            analysis_type = issue.get("issue_type", "other")
+            # Map issue types to analysis types
+            if "connection" in analysis_type or "pool" in analysis_type:
+                analysis_type = "resource"
+            elif "query" in analysis_type or "slow" in analysis_type:
+                analysis_type = "performance"
+            elif "error" in analysis_type:
+                analysis_type = "error"
+            elif "circuit" in analysis_type or "retry" in analysis_type:
+                analysis_type = "resource"
+            else:
+                analysis_type = "performance"
+
+            findings = {
+                "metric_value": issue.get("metric_value"),
+                "threshold": issue.get("threshold"),
+                "issue_type": issue.get("issue_type")
+            }
+
+            try:
+                analysis_id = self.create_analysis(
+                    agent=agent,
+                    analysis_type=analysis_type,
+                    severity=issue.get("severity", "medium"),
+                    description=issue.get("description", ""),
+                    target_agent=target_agent,
+                    findings=findings,
+                    recommendations=issue.get("recommendations", []),
+                    assigned_to=assigned_to
+                )
+                analysis_ids.append(analysis_id)
+            except Exception as e:
+                logger.error(f"Failed to create analysis for issue {issue.get('issue_type')}: {e}")
+
+        return analysis_ids
+
+    # =======================================================================
     # Security Audit (Temüjin Protocol)
     # =======================================================================
 
@@ -1504,6 +2218,18 @@ class OperationalMemory:
             ("CREATE INDEX securityaudit_created_at_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.created_at)", "securityaudit_created_at_idx"),
             ("CREATE INDEX securityaudit_agent_status_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.agent, s.status)", "securityaudit_agent_status_idx"),
             ("CREATE INDEX securityaudit_severity_status_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.severity, s.status)", "securityaudit_severity_status_idx"),
+
+            # Analysis indexes (Jochi Backend Issue Identification)
+            ("CREATE INDEX analysis_id_idx IF NOT EXISTS FOR (a:Analysis) ON (a.id)", "analysis_id_idx"),
+            ("CREATE INDEX analysis_agent_idx IF NOT EXISTS FOR (a:Analysis) ON (a.agent)", "analysis_agent_idx"),
+            ("CREATE INDEX analysis_target_agent_idx IF NOT EXISTS FOR (a:Analysis) ON (a.target_agent)", "analysis_target_agent_idx"),
+            ("CREATE INDEX analysis_type_idx IF NOT EXISTS FOR (a:Analysis) ON (a.analysis_type)", "analysis_type_idx"),
+            ("CREATE INDEX analysis_severity_idx IF NOT EXISTS FOR (a:Analysis) ON (a.severity)", "analysis_severity_idx"),
+            ("CREATE INDEX analysis_status_idx IF NOT EXISTS FOR (a:Analysis) ON (a.status)", "analysis_status_idx"),
+            ("CREATE INDEX analysis_assigned_to_idx IF NOT EXISTS FOR (a:Analysis) ON (a.assigned_to)", "analysis_assigned_to_idx"),
+            ("CREATE INDEX analysis_created_at_idx IF NOT EXISTS FOR (a:Analysis) ON (a.created_at)", "analysis_created_at_idx"),
+            ("CREATE INDEX analysis_severity_status_idx IF NOT EXISTS FOR (a:Analysis) ON (a.severity, a.status)", "analysis_severity_status_idx"),
+            ("CREATE INDEX analysis_type_status_idx IF NOT EXISTS FOR (a:Analysis) ON (a.analysis_type, a.status)", "analysis_type_status_idx"),
         ]
 
         created = []
