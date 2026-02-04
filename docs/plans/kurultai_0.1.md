@@ -216,7 +216,15 @@ The existing `:Task` node from [`neo4j.md`](./neo4j.md) provides the foundation:
 (:Task {
   // ... existing fields from neo4j.md ...
 
+  // ==== BASE FIELDS (from neo4j.md, explicitly listed for clarity) ====
+  id: uuid,                      // Primary key - MUST be defined
+  created_at: datetime,          // Creation timestamp - MUST be defined
+  updated_at: datetime,          // Last update timestamp (recommended)
+
   // ==== KURULTAI V0.1 ADDITIONS ====
+
+  // Sender tracking
+  sender_hash: string,           // HMAC-SHA256 of sender phone for task attribution
 
   // Intent window buffering
   window_expires_at: datetime,   // 30-60 sec from creation
@@ -242,46 +250,19 @@ The existing `:Task` node from [`neo4j.md`](./neo4j.md) provides the foundation:
 })
 ```
 
-### New Relationship: DEPENDS_ON
+**Status Value Mapping:**
 
-```cypher
-(:Task)-[:DEPENDS_ON {
-  // Identity
-  id: uuid,
-  sender_hash: string,           // HMAC-SHA256 of sender phone
+The following additional status values are used in this document and map to base schema values:
 
-  // Content
-  description: string,           // Original user message
-  embedding: [float],            // 384-dim vector for semantic comparison
-
-  // State machine
-  status: string,                // "pending" | "blocked" | "ready" |
-                                 // "in_progress" | "completed" | "aborted"
-
-  // Execution
-  priority_weight: float,        // 0.0-1.0 (default: 0.5)
-  estimated_duration: int,       // minutes (default: 15)
-  required_agents: [string],     // ["analyst", "researcher"]
-
-  // Classification
-  deliverable_type: string,      // "research" | "code" | "analysis" |
-                                 // "content" | "strategy" | "ops"
-
-  // Timing
-  created_at: datetime,
-  window_expires_at: datetime,   // 30-60 sec from creation
-  started_at: datetime,
-  completed_at: datetime,
-
-  // Results
-  result_summary: string,        // Truncated for quick reference
-  result_node_ids: [uuid],       // Linked Research/Analysis/etc nodes
-
-  // Merge tracking
-  merged_into: uuid,             // If deduplicated, points to canonical task
-  merged_from: [uuid]            // Tasks that were merged into this one
-})
+```python
+STATUS_MAPPING = {
+    "ready": "pending",           # Maps to base "pending" status
+    "paused": "blocked",          # Maps to base "blocked" with blocked_reason="paused"
+    "aborted": "blocked",         # Maps to base "blocked" with blocked_reason="aborted"
+}
 ```
+
+Base status values (from neo4j.md): `"pending"`, `"in_progress"`, `"completed"`, `"blocked"`, `"escalated"`
 
 #### Dependency (Relationship)
 
@@ -310,6 +291,7 @@ The existing `:Task` node from [`neo4j.md`](./neo4j.md) provides the foundation:
 // === KURULTAI V0.1 ADDITIONS ===
 
 // Semantic similarity search (uses existing vector index infrastructure)
+// NOTE: Requires Neo4j 5.11+ for vector index support
 CREATE INDEX task_embedding FOR (t:Task) ON (t.embedding)
   OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}};
 
@@ -319,7 +301,29 @@ CREATE INDEX task_window FOR (t:Task) ON (t.window_expires_at);
 // Sync audit trail lookups
 CREATE INDEX sync_event_sender FOR (s:SyncEvent) ON (s.sender_hash, s.triggered_at);
 CREATE INDEX sync_change_task FOR (c:SyncChange) ON (c.task_id);
+
+// Task sender status queries (for agent-specific task filtering)
+CREATE INDEX task_sender_status FOR (t:Task) ON (t.sender_hash, t.status);
+
+// Agent load queries (optimizes get_current_load)
+CREATE INDEX task_agent_status FOR (t:Task) ON (t.assigned_to, t.status);
+
+// Dependency type filtering (for DAG traversal optimization)
+CREATE INDEX depends_on_type FOR ()-[d:DEPENDS_ON]->() ON (d.type);
+
+// Priority queue queries (ordered by priority_weight then creation time)
+CREATE INDEX task_priority FOR (t:Task) ON (t.priority_weight DESC, t.created_at);
 ```
+
+### Neo4j Version Requirements
+
+| Component | Minimum Version | Notes |
+|-----------|----------------|-------|
+| Neo4j Database | 5.11+ | Vector index support requires 5.11+ |
+| Python Driver | 5.14+ | Async operations support |
+| NumPy | 1.24.0+ | Vector operations |
+
+**Vector Index Fallback:** On Neo4j versions < 5.11, the system falls back to full-text search for similarity matching.
 
 ---
 
@@ -330,32 +334,145 @@ CREATE INDEX sync_change_task FOR (c:SyncChange) ON (c.task_id);
 ### Step 1: Intent Window Buffering
 
 ```python
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
+# ============================================================================
+# TYPE DEFINITIONS
+# ============================================================================
+from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
+from enum import Enum
+from typing import DefaultDict, Dict, List, Optional, Any, Set, TypedDict
+from collections import defaultdict
+import os
+import re
+import hashlib
+import asyncio
+import numpy as np
+
+
+@dataclass
+class Message:
+    """Message in the intent window buffer."""
+    content: str
+    sender_hash: str
+    timestamp: datetime
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class TaskStatus(Enum):
+    """Task status enumeration (matches base neo4j.md schema)."""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    BLOCKED = "blocked"
+    ESCALATED = "escalated"
+
+
+class NotionChangeType(Enum):
+    """Types of changes detected from Notion."""
+    CREATED = "created"
+    UPDATED = "updated"
+    DELETED = "deleted"
+
+
+@dataclass
+class NotionTask:
+    """Task representation from Notion."""
+    notion_id: str
+    title: str
+    status: str
+    priority: float
+    sender_hash: str
+    last_edited_time: Optional[datetime] = None
+    notion_url: Optional[str] = None
+    notion_page_id: Optional[str] = None
+
+
+@dataclass
+class NotionChange:
+    """Change detected in Notion sync."""
+    change_type: NotionChangeType
+    task_id: str
+    detected_at: datetime
+    old_value: Optional[Any] = None
+    new_value: Optional[Any] = None
+
+
+class Task(TypedDict):
+    """Task structure matching Neo4j Task node."""
+    id: str
+    type: str
+    description: str
+    status: str
+    assigned_to: Optional[str]
+    claimed_by: Optional[str]
+    priority_weight: float
+    deliverable_type: Optional[str]
+    sender_hash: str
+    created_at: datetime
+    updated_at: Optional[datetime]
+    embedding: Optional[List[float]]
+    window_expires_at: Optional[datetime]
+
 
 class IntentWindowBuffer:
-    """Collects messages within time window before DAG building."""
+    """Collects messages within time window before DAG building.
+    Async-safe: uses asyncio.Lock instead of threading.Lock.
+    Enforces MAX_MESSAGES limit to prevent unbounded memory growth.
+    """
+
+    MAX_MESSAGES = 100  # Hard limit to prevent unbounded memory growth
 
     def __init__(self, window_seconds: int = 45):
         self.window = window_seconds
         self.pending: List[Message] = []
+        self._lock = asyncio.Lock()
 
-    def add(self, message: Message) -> Optional[List[Message]]:
+    async def add(self, message: Message) -> Optional[List[Message]]:
         """
         Add message to buffer. Returns full batch if window expired.
+        Async-safe: all operations on self.pending are protected by lock.
+        Enforces MAX_MESSAGES limit by dropping oldest messages when exceeded.
         """
-        self.pending.append(message)
+        async with self._lock:
+            self.pending.append(message)
 
-        if not self.pending:
-            return None
+            # Enforce MAX_MESSAGES limit - drop oldest if exceeded
+            if len(self.pending) > self.MAX_MESSAGES:
+                self.pending = self.pending[-self.MAX_MESSAGES:]
 
-        oldest = min(m.timestamp for m in self.pending)
-        if (now() - oldest).seconds >= self.window:
-            batch = self.pending.copy()
-            self.pending.clear()
-            return batch
+            if not self.pending:
+                return None
 
-        return None  # Still collecting
+            oldest = min(m.timestamp for m in self.pending)
+            if (now() - oldest).total_seconds() >= self.window:
+                batch = self.pending.copy()
+                self.pending.clear()
+                return batch
+
+            return None  # Still collecting
+```
+
+#### Custom Exception Classes
+
+```python
+class TaskDependencyError(Exception):
+    """Base exception for Task Dependency Engine."""
+    pass
+
+
+class CycleDetectedError(TaskDependencyError):
+    """Raised when a dependency cycle would be created."""
+    pass
+
+
+class DependencyNotFoundError(TaskDependencyError):
+    """Raised when a referenced dependency doesn't exist."""
+    pass
+
+
+class NotionSyncError(TaskDependencyError):
+    """Raised when Notion sync operations fail."""
+    pass
 ```
 
 ### Step 2: Semantic Similarity Analysis
@@ -424,40 +541,89 @@ class TopologicalExecutor:
     def __init__(self, neo4j_client):
         self.neo4j = neo4j_client
 
-    async def get_ready_tasks(self, sender_hash: str) -> List[Task]:
+    async def get_ready_tasks(self, sender_hash: str, limit: int = 50) -> List[Task]:
         """
         Find tasks with no unmet BLOCKS dependencies.
+
+        Args:
+            sender_hash: User identifier
+            limit: Maximum number of tasks to return (default: 50)
+
+        Returns:
+            List of tasks ready for execution
         """
         query = """
         MATCH (t:Task {sender_hash: $sender_hash, status: "pending"})
         WHERE NOT EXISTS {
             // Check for uncompleted blocking dependencies
-            MATCH (t)<-[:DEPENDS_ON {type: "blocks"}]-(blocker:Task)
+            MATCH (t)-[:DEPENDS_ON {type: "blocks"}]->(blocker:Task)
             WHERE blocker.status != "completed"
         }
         RETURN t
         ORDER BY t.priority_weight DESC, t.created_at ASC
+        LIMIT $limit
         """
-        return await self.neo4j.run(query, {"sender_hash": sender_hash})
+        return await self.neo4j.run(query, {"sender_hash": sender_hash, "limit": limit})
 
-    async def execute_ready_set(self, sender_hash: str):
+    async def execute_ready_set(self, sender_hash: str, max_execution_limit: int = 50) -> dict:
         """
         Dispatch all ready tasks to appropriate agents.
+
+        Args:
+            sender_hash: User identifier
+            max_execution_limit: Maximum number of tasks to execute (default: 50)
+
+        Returns:
+            Execution summary dict with:
+                - executed_count: Number of tasks executed
+                - error_count: Number of errors encountered
+                - executed: List of executed task IDs
+                - errors: List of {task_id, error} dicts
         """
-        ready = await self.get_ready_tasks(sender_hash)
+        ready = await self.get_ready_tasks(sender_hash, limit=max_execution_limit)
+
+        # Tracking for execution summary
+        executed_ids = []
+        errors = []
 
         # Group by required agent type
         by_agent = defaultdict(list)
-        for task in ready:
-            agent = select_best_agent(task)
+        for task in ready[:max_execution_limit]:
+            agent = self.select_best_agent(task)
             by_agent[agent].append(task)
 
         # Dispatch to agents (respecting 2-task limit)
         for agent_id, tasks in by_agent.items():
-            available_slots = 2 - await get_current_load(agent_id)
+            available_slots = 2 - await self.get_current_load(agent_id)
 
             for task in tasks[:available_slots]:
-                await self.dispatch_to_agent(task, agent_id)
+                try:
+                    await self.dispatch_to_agent(task, agent_id)
+                    executed_ids.append(task.id)
+                except Exception as e:
+                    errors.append({
+                        "task_id": task.id,
+                        "error": str(e)
+                    })
+
+        return {
+            "executed_count": len(executed_ids),
+            "error_count": len(errors),
+            "executed": executed_ids,
+            "errors": errors
+        }
+
+    async def get_current_load(self, agent_id: str) -> int:
+        """
+        Get current task load for an agent.
+        Returns the number of in-progress tasks assigned to the agent.
+        """
+        query = """
+        MATCH (t:Task {assigned_to: $agent_id, status: "in_progress"})
+        RETURN count(t) as load
+        """
+        result = await self.neo4j.run(query, {"agent_id": agent_id})
+        return result[0]["load"] if result else 0
 
     def select_best_agent(self, task: Task) -> str:
         """
@@ -472,6 +638,170 @@ class TopologicalExecutor:
             "strategy": "analyst"  # Jochi for strategic analysis
         }
         return routing.get(task.deliverable_type, "analyst")
+
+    async def dispatch_to_agent(
+        self,
+        task: Task,
+        agent_id: str
+    ) -> bool:
+        """Dispatch a task to a specific agent."""
+        dispatch_query = """
+        MATCH (t:Task {id: $task_id})
+        MATCH (a:Agent {id: $agent_id})
+
+        // Create dispatch record
+        CREATE (d:TaskDispatch {
+            id: randomUUID(),
+            task_id: $task_id,
+            agent_id: $agent_id,
+            dispatched_at: datetime(),
+            status: 'dispatched'
+        })
+
+        RETURN d.id as dispatch_id
+        """
+
+        result = await self.neo4j.run(dispatch_query, {
+            "task_id": task["id"],
+            "agent_id": agent_id
+        })
+
+        return len(result) > 0
+
+    async def add_dependency(
+        self,
+        task_id: str,
+        depends_on_id: str,
+        dep_type: str = "blocks"
+    ) -> bool:
+        """
+        Add a DEPENDS_ON relationship between tasks with ATOMIC cycle detection.
+
+        Uses a single Cypher query with WHERE NOT EXISTS to prevent TOCTOU
+        (time-of-check-to-time-of-use) vulnerabilities. The cycle check and
+        dependency creation happen atomically.
+
+        Args:
+            task_id: The task that depends on another task (dependent).
+            depends_on_id: The task that must complete first (dependency).
+            dep_type: Type of dependency ("blocks" | "feeds_into" | "parallel_ok").
+
+        Returns:
+            True if dependency was created successfully.
+
+        Raises:
+            CycleDetectedError: If adding this dependency would create a cycle.
+            DependencyNotFoundError: If either task doesn't exist.
+        """
+        # Single atomic query: check for cycle AND create dependency
+        atomic_query = """
+        // First, verify both tasks exist
+        MATCH (task:Task {id: $task_id})
+        MATCH (dep:Task {id: $depends_on_id})
+
+        // Check for existing path that would create a cycle
+        // Only proceed if NO such path exists
+        WHERE NOT EXISTS {
+            MATCH path = (dep)-[:DEPENDS_ON*]->(task)
+        }
+
+        // Create the DEPENDS_ON relationship atomically
+        CREATE (task)-[r:DEPENDS_ON {
+            type: $dep_type,
+            weight: 0.5,
+            detected_by: 'explicit',
+            confidence: 1.0,
+            created_at: datetime()
+        }]->(dep)
+
+        RETURN r as relationship
+        """
+
+        result = await self.neo4j.run(atomic_query, {
+            "task_id": task_id,
+            "depends_on_id": depends_on_id,
+            "dep_type": dep_type
+        })
+
+        if not result:
+            # Either tasks don't exist or cycle detected
+            # Check which case it is
+            check_exists = """
+            MATCH (t:Task {id: $task_id})
+            MATCH (d:Task {id: $depends_on_id})
+            RETURN count(t) + count(d) as count
+            """
+            exists_result = await self.neo4j.run(check_exists, {
+                "task_id": task_id,
+                "depends_on_id": depends_on_id
+            })
+
+            if not exists_result or exists_result[0]["count"] < 2:
+                raise DependencyNotFoundError(
+                    "Task dependency validation failed"
+                )
+            else:
+                raise CycleDetectedError(
+                    "Cannot create dependency: would create a circular dependency"
+                )
+
+        return True
+
+    async def add_dependency_with_transaction(
+        self,
+        task_id: str,
+        depends_on_id: str,
+        dep_type: str = "blocks"
+    ) -> bool:
+        """
+        Add a DEPENDS_ON relationship with explicit transaction boundaries.
+
+        This version uses explicit transactions for all-or-nothing semantics.
+        Use this when you need additional operations within the same transaction.
+
+        Args:
+            task_id: The task that depends on another task (dependent).
+            depends_on_id: The task that must complete first (dependency).
+            dep_type: Type of dependency ("blocks" | "feeds_into" | "parallel_ok").
+
+        Returns:
+            True if dependency was created successfully.
+
+        Raises:
+            CycleDetectedError: If adding this dependency would create a cycle.
+        """
+        async with self.neo4j.transaction() as tx:
+            # Check for cycle
+            cycle_check = await tx.run("""
+                MATCH path = shortestPath(
+                    (to:Task {id: $to_id})-[:DEPENDS_ON*]->(from:Task {id: $from_id})
+                )
+                RETURN path IS NOT NULL as has_cycle
+            """, {"from_id": task_id, "to_id": depends_on_id})
+
+            if cycle_check and cycle_check[0].get("has_cycle", False):
+                await tx.rollback()
+                raise CycleDetectedError(
+                    "Cannot create dependency: would create a circular dependency"
+                )
+
+            # Create dependency
+            await tx.run("""
+                MATCH (task:Task {id: $task_id})
+                MATCH (dep:Task {id: $depends_on_id})
+                CREATE (task)-[r:DEPENDS_ON {
+                    type: $dep_type,
+                    weight: 0.5,
+                    detected_by: 'explicit',
+                    confidence: 1.0,
+                    created_at: datetime()
+                }]->(dep)
+                RETURN r
+            """, {"task_id": task_id, "depends_on_id": depends_on_id, "dep_type": dep_type})
+
+            await tx.commit()
+
+        return True
 ```
 
 ---
@@ -497,6 +827,11 @@ Users can reprioritize at any time:
 ```python
 class PriorityCommandHandler:
     """Parses natural language priority commands."""
+
+    def __init__(self, neo4j_client, task_engine):
+        """Initialize with Neo4j client and task engine dependencies."""
+        self.neo4j = neo4j_client
+        self.task_engine = task_engine
 
     async def handle(self, message: str, sender_hash: str) -> str:
         """
@@ -544,6 +879,98 @@ New execution order:
 
 Estimated completion: {self.estimate_total_time(new_order)} minutes.
         """.strip()
+
+    async def find_task_by_description(
+        self,
+        description_pattern: str,
+        sender_hash: str
+    ) -> Optional[Task]:
+        """Find task by description pattern matching."""
+        query = """
+        MATCH (t:Task {sender_hash: $sender_hash})
+        WHERE t.description CONTAINS $pattern
+        RETURN t
+        ORDER BY t.created_at DESC
+        LIMIT 5
+        """
+        results = await self.neo4j.run(query, {
+            "pattern": description_pattern,
+            "sender_hash": sender_hash
+        })
+        return results[0] if results else None
+
+    async def create_explicit_dependency(
+        self,
+        task_id: str,
+        depends_on_id: str,
+        sender_hash: str
+    ) -> bool:
+        """Create an explicit dependency between tasks."""
+        return await self.task_engine.add_dependency(task_id, depends_on_id)
+
+    async def explain_dag(self, task_id: str, sender_hash: str) -> str:
+        """Generate human-readable explanation of task DAG."""
+        query = """
+        MATCH (t:Task {id: $task_id, sender_hash: $sender_hash})
+        OPTIONAL MATCH (t)-[d:DEPENDS_ON]->(dep:Task)
+        OPTIONAL MATCH (other)-[:DEPENDS_ON]->(t)
+        RETURN t, collect(DISTINCT dep) as dependencies, collect(DISTINCT other) as dependents
+        """
+
+        result = await self.neo4j.run(query, {"task_id": task_id, "sender_hash": sender_hash})
+        if not result:
+            return "Task not found"
+
+        row = result[0]
+        task = row["t"]
+        deps = row["dependencies"]
+        dependents = row["dependents"]
+
+        lines = [
+            f"Task: {task['description']}",
+            f"Status: {task['status']}",
+            f"Priority: {task.get('priority_weight', 0)}",
+            "",
+            f"Dependencies ({len(deps)}):"
+        ]
+        for dep in deps:
+            lines.append(f"  - {dep['description']} [{dep['status']}]")
+
+        lines.append("")
+        lines.append(f"Dependents ({len(dependents)}):")
+        for depent in dependents:
+            lines.append(f"  - {depent['description']} [{depent['status']}]")
+
+        return "\n".join(lines)
+
+    async def recalculate_order(self, sender_hash: str) -> List[Task]:
+        """Recalculate task execution order based on dependencies."""
+        query = """
+        MATCH (t:Task {sender_hash: $sender_hash})
+        WHERE t.status IN ['pending', 'ready']
+        RETURN t, count{(t)-[:DEPENDS_ON]->()} as dep_count
+        ORDER BY dep_count ASC, t.priority_weight DESC, t.created_at ASC
+        """
+        results = await self.neo4j.run(query, {"sender_hash": sender_hash})
+        return results
+
+    async def estimate_total_time(self, tasks: List[Task]) -> str:
+        """Estimate total completion time for ordered tasks."""
+        base_minutes = 30  # per task
+        total = len(tasks) * base_minutes
+        hours = total // 60
+        mins = total % 60
+
+        if hours > 0:
+            return f"~{hours}h {mins}m"
+        return f"~{mins}m"
+
+    def format_order(self, tasks: List[Task]) -> str:
+        """Format ordered task list for display."""
+        lines = ["Execution Order:"]
+        for i, task in enumerate(tasks, 1):
+            lines.append(f"{i}. {task['description']} [{task['status']}]")
+        return "\n".join(lines)
 ```
 
 ---
@@ -786,57 +1213,204 @@ These are NEW node types for Notion sync functionality:
   sync_preference: string                # "safe" | "aggressive"
 })
 ```
-  // ... existing fields ...
 
-  // Notion sync fields
-  notion_synced_at: datetime,       // Last successful sync
-  notion_page_id: string,           // Notion page URL ID
-  notion_url: string,               // Full URL for user reference
-  external_priority_source: string,  // "notion" | "user" | "auto"
-  external_priority_weight: float,   // Priority from external source
-})
-```
+### Security Classes
 
-#### Sync Audit Trail
+```python
+class RateLimiter:
+    """Per-sender rate limiting for task creation."""
 
-```cypher
-(:SyncEvent {
-  id: uuid,
-  sender_hash: string,
-  sync_type: string,                // "notion" | "manual"
-  triggered_at: datetime,
-  completed_at: datetime,
-  changes_applied: int,             // Count of successful changes
-  changes_skipped: int,             // Count of skipped changes
-  changes_failed: int,              // Count of failed changes
-  status: string                    // "success" | "partial" | "failed"
-})
+    def __init__(self, max_per_hour: int = 100, max_per_batch: int = 50):
+        self.max_per_hour = max_per_hour
+        self.max_per_batch = max_per_batch
+        self._requests: Dict[str, List[datetime]] = defaultdict(list)
 
-(:SyncChange {
-  id: uuid,
-  sync_event_id: uuid,              // -> (:SyncEvent)
-  task_id: uuid,                    // -> (:Task)
-  change_type: string,              // "create" | "priority" | "status" | "blocked"
-  old_value: string,
-  new_value: string,
-  applied: boolean,
-  reason: string                    // Why skipped/failed
-})
+    async def check_limit(self, sender_hash: str) -> bool:
+        """Check if sender has exceeded rate limit."""
+        now_dt = now()
+        hour_ago = now_dt - timedelta(hours=1)
 
-(:SyncEvent)-[:CONTAINS_CHANGE]->(:SyncChange)
-(:SyncChange)-[:AFFECTS]->(:Task)
+        # Clean old requests
+        self._requests[sender_hash] = [
+            ts for ts in self._requests[sender_hash] if ts > hour_ago
+        ]
+
+        return len(self._requests[sender_hash]) < self.max_per_hour
+
+    def record_request(self, sender_hash: str):
+        """Record a request for rate limiting."""
+        self._requests[sender_hash].append(now())
+
+
+class AuthManager:
+    """Authorization and authentication layer."""
+
+    async def validate_sender_hash(self, sender_hash: str, token: str) -> bool:
+        """Validate sender_hash against authenticated token.
+        Never trust sender_hash from user input directly.
+        """
+        # Extract sender_hash from validated JWT/session token
+        authenticated_hash = self._extract_from_token(token)
+        return sender_hash == authenticated_hash
+
+    def _extract_from_token(self, token: str) -> str:
+        """Extract sender_hash from validated JWT."""
+        # JWT validation logic
+        pass
+
+
+class AuditLogger:
+    """Audit logging for sensitive operations."""
+
+    async def log_priority_change(
+        self,
+        sender_hash: str,
+        task_id: str,
+        old_priority: float,
+        new_priority: float,
+        reason: str
+    ):
+        audit_query = """
+        CREATE (a:PriorityAudit {
+            timestamp: datetime(),
+            sender_hash: $sender_hash,
+            task_id: $task_id,
+            old_priority: $old_priority,
+            new_priority: $new_priority,
+            reason: $reason
+        })
+        RETURN a
+        """
+        await self.neo4j.run(audit_query, {
+            "sender_hash": sender_hash,
+            "task_id": task_id,
+            "old_priority": old_priority,
+            "new_priority": new_priority,
+            "reason": reason
+        })
+
+
+class TaskValidator:
+    """Input validation for task creation."""
+
+    VALID_DELIVERABLE_TYPES = {
+        "research", "code", "analysis", "content", "strategy", "ops", "testing"
+    }
+
+    @staticmethod
+    def validate_deliverable_type(value: str) -> str:
+        if value not in TaskValidator.VALID_DELIVERABLE_TYPES:
+            raise ValueError(
+                f"Invalid deliverable_type: {value}. "
+                f"Must be one of {TaskValidator.VALID_DELIVERABLE_TYPES}"
+            )
+        return value
+
+
+class PollingConfig:
+    """Configuration for Notion polling limits."""
+
+    MAX_TASKS_PER_SYNC = 1000
+    MAX_CONCURRENT_POLLS = 5
+    POLLING_TIMEOUT_SECONDS = 300
+    PER_USER_QUOTA_PER_HOUR = 10
+
+
+# Vector Index Fallback Helper
+
+async def find_similar_tasks_with_fallback(
+    neo4j_client,
+    embedding: np.ndarray,
+    sender_hash: str,
+    threshold: float = 0.75
+) -> List[Task]:
+    """Find similar tasks with fallback to full-text search."""
+
+    # Try vector index first
+    try:
+        vector_query = """
+        CALL db.index.vector.queryNodes('task_embeddings', 10, $embedding)
+        YIELD node, score
+        WHERE score >= $threshold
+        RETURN node as task, score
+        """
+        results = await neo4j_client.run(vector_query, {
+            "embedding": embedding.tolist(),
+            "threshold": threshold
+        })
+        if results:
+            return results
+    except Exception as e:
+        # Vector index unavailable - fall back to full-text search
+        import warnings
+        warnings.warn(f"Vector index unavailable: {e}. Using full-text fallback.")
+
+    # Fallback to full-text search
+    ft_query = """
+    CALL db.index.fulltext.queryNodes('task_fulltext', $query)
+    YIELD node, score
+    RETURN node as task, score
+    LIMIT 10
+    """
+    return await neo4j_client.run(ft_query, {"query": "search terms..."})
 ```
 
 ### Notion API Client
 
 ```python
+import aiohttp
+from aiohttp import ClientTimeout
+
+
 class NotionTaskClient:
-    """Client for reading tasks from Notion database."""
+    """Client for reading tasks from Notion database with retry logic."""
 
     def __init__(self, api_key: str, database_id: str):
         self.api_key = api_key
         self.database_id = database_id
         self.base_url = "https://api.notion.com/v1"
+        self.session = None
+        self.max_retries = 3
+        self.backoff_factor = 2
+
+    async def _post(self, endpoint: str, data: dict) -> dict:
+        """Make authenticated POST request to Notion API with retry logic."""
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+
+        url = f"{self.base_url}{endpoint}"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                async with self.session.post(
+                    url,
+                    json=data,
+                    headers=headers,
+                    timeout=ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 429:
+                        # Rate limited - back off
+                        wait_time = self.backoff_factor ** attempt
+                        await asyncio.sleep(wait_time)
+                        continue
+                    response.raise_for_status()
+                    return await response.json()
+            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+                if attempt == self.max_retries - 1:
+                    raise NotionSyncError(f"Request failed: {e}")
+                await asyncio.sleep(self.backoff_factor ** attempt)
+
+        raise NotionSyncError("Max retries exceeded")
+
+    async def close(self):
+        """Close the session."""
+        if self.session:
+            await self.session.close()
 
     async def fetch_tasks(self, sender_hash: str) -> List[NotionTask]:
         """
@@ -885,6 +1459,31 @@ class NotionTaskClient:
             "Backlog": 0.1
         }
         return mapping.get(notion_priority, 0.5)
+
+    async def estimate_completion(
+        self,
+        task_id: str,
+        sender_hash: str
+    ) -> Optional[datetime]:
+        """Estimate task completion time based on dependencies."""
+        query = """
+        MATCH (t:Task {id: $task_id, sender_hash: $sender_hash})
+        MATCH path = (t)-[:DEPENDS_ON*]->(dep:Task)
+        WHERE dep.status IN ['pending', 'in_progress', 'ready']
+        WITH count(DISTINCT dep) as pending_deps
+        RETURN t, pending_deps
+        """
+
+        result = await self.neo4j.run(query, {"task_id": task_id, "sender_hash": sender_hash})
+        if not result:
+            return None
+
+        row = result[0]
+        pending_deps = row["pending_deps"]
+
+        # Estimate: 30 min per pending dependency + 30 min for this task
+        minutes = (pending_deps + 1) * 30
+        return now() + timedelta(minutes=minutes)
 ```
 
 ### Sync Result Format
@@ -1118,6 +1717,169 @@ class NotionPollingEngine:
         # 6. Update tracking
         self.last_sync[sender_hash] = datetime.now(timezone.utc)
         self.seen_task_ids[sender_hash] = current_ids
+
+    async def _detect_all_changes(
+        self,
+        notion_tasks: List[NotionTask],
+        changed_tasks: List[NotionTask],
+        new_tasks: List[NotionTask],
+        deleted_ids: Set[str],
+        sender_hash: str
+    ) -> List[Change]:
+        """Detect all differences between Notion and Neo4j."""
+        changes = []
+
+        # Detect new tasks
+        for task in new_tasks:
+            changes.append(Change(
+                entity_type="task",
+                entity_id=task.notion_id,
+                change_type="created",
+                old_value=None,
+                new_value=task,
+                detected_at=now()
+            ))
+
+        # Detect changes in existing tasks
+        for task in changed_tasks:
+            if task not in new_tasks:  # Don't duplicate new task detection
+                changes.append(Change(
+                    entity_type="task",
+                    entity_id=task.notion_id,
+                    change_type="updated",
+                    old_value=None,
+                    new_value=task,
+                    detected_at=now()
+                ))
+
+        # Detect deletions
+        for deleted_id in deleted_ids:
+            changes.append(Change(
+                entity_type="task",
+                entity_id=deleted_id,
+                change_type="deleted",
+                old_value=deleted_id,
+                new_value=None,
+                detected_at=now()
+            ))
+
+        return changes
+
+    async def _apply_changes(self, changes: List[Change], sender_hash: str) -> dict:
+        """Apply detected changes to Neo4j."""
+        applied = 0
+        failed = 0
+        skipped = 0
+
+        for change in changes:
+            try:
+                if change.change_type == "created":
+                    await self._create_task_from_notion(change.new_value, sender_hash)
+                    applied += 1
+                elif change.change_type == "updated":
+                    await self._update_task_from_notion(change.new_value, sender_hash)
+                    applied += 1
+                elif change.change_type == "deleted":
+                    await self._soft_delete_task(change.entity_id, sender_hash)
+                    applied += 1
+            except Exception as e:
+                self.logger.error(f"Failed to apply change: {e}")
+                failed += 1
+
+        return {"applied": applied, "failed": failed, "skipped": skipped}
+
+    async def _notify_user(self, result: dict, sender_hash: str):
+        """Notify user of sync results."""
+        notification_query = """
+        CREATE (n:SyncNotification {
+            timestamp: datetime(),
+            sender_hash: $sender_hash,
+            applied: $applied,
+            failed: $failed,
+            skipped: $skipped
+        })
+        """
+        await self.neo4j.run(notification_query, {
+            "sender_hash": sender_hash,
+            "applied": result.get("applied", 0),
+            "failed": result.get("failed", 0),
+            "skipped": result.get("skipped", 0)
+        })
+
+    async def _create_task_from_notion(self, notion_task: NotionTask, sender_hash: str):
+        """Create a new task in Neo4j from Notion data."""
+        create_query = """
+        CREATE (t:Task {
+            id: randomUUID(),
+            description: $description,
+            status: $status,
+            priority_weight: $priority_weight,
+            sender_hash: $sender_hash,
+            created_at: datetime(),
+            updated_at: datetime(),
+            notion_page_id: $notion_page_id,
+            notion_url: $notion_url,
+            notion_synced_at: datetime()
+        })
+        RETURN t
+        """
+        await self.neo4j.run(create_query, {
+            "description": notion_task.title,
+            "status": notion_task.status,
+            "priority_weight": notion_task.priority,
+            "sender_hash": sender_hash,
+            "notion_page_id": notion_task.notion_page_id,
+            "notion_url": notion_task.notion_url
+        })
+
+    async def _update_task_from_notion(self, notion_task: NotionTask, sender_hash: str):
+        """Update an existing task from Notion data."""
+        update_query = """
+        MATCH (t:Task {notion_page_id: $notion_page_id, sender_hash: $sender_hash})
+        SET t.status = $status,
+            t.priority_weight = $priority_weight,
+            t.updated_at = datetime(),
+            t.notion_synced_at = datetime()
+        RETURN t
+        """
+        await self.neo4j.run(update_query, {
+            "notion_page_id": notion_task.notion_page_id,
+            "sender_hash": sender_hash,
+            "status": notion_task.status,
+            "priority_weight": notion_task.priority
+        })
+
+    async def _soft_delete_task(self, task_id: str, sender_hash: str):
+        """Soft delete a task by setting status to aborted."""
+        delete_query = """
+        MATCH (t:Task {id: $task_id, sender_hash: $sender_hash})
+        SET t.status = 'blocked',
+            t.blocked_reason = 'deleted_in_notion',
+            t.updated_at = datetime()
+        RETURN t
+        """
+        await self.neo4j.run(delete_query, {
+            "task_id": task_id,
+            "sender_hash": sender_hash
+        })
+
+
+# Neo4j client extension methods for Notion sync
+
+async def get_task_ids_for_sender(
+    self,
+    sender_hash: str,
+    limit: int = 1000
+) -> List[str]:
+    """Get all task IDs for a sender."""
+    query = """
+    MATCH (t:Task {sender_hash: $sender_hash})
+    RETURN t.id as task_id
+    ORDER BY t.created_at DESC
+    LIMIT $limit
+    """
+    result = await self.run(query, {"sender_hash": sender_hash, "limit": limit})
+    return [r["task_id"] for r in result]
 ```
 
 ### Change Detection
@@ -1361,7 +2123,7 @@ ORDER BY t.priority_weight DESC
 ```cypher
 MATCH (t:Task {sender_hash: $hash, status: "pending"})
 WHERE NOT EXISTS {
-    MATCH (t)<-[:DEPENDS_ON {type: "blocks"}]-(blocker)
+    MATCH (t)-[:DEPENDS_ON {type: "blocks"}]->(blocker)
     WHERE blocker.status <> "completed"
 }
 RETURN t
