@@ -6,6 +6,7 @@ This package provides tools for agent integration with the operational memory sy
 Modules:
     memory_tools: Tool functions that wrap OperationalMemory methods
     agent_integration: Helper class for agents to integrate with memory system
+    file_consistency: FileConsistencyChecker for monitoring and conflict detection
 
 Example Usage:
     # Using tools directly
@@ -25,15 +26,31 @@ Example Usage:
     if task:
         # Do work...
         memory.complete_and_notify(task['id'], {"approved": True})
+
+    # Using file consistency checker
+    from tools.file_consistency import FileConsistencyChecker
+    checker = FileConsistencyChecker(memory)
+    checker.record_version("/path/to/file.md", "developer")
+    conflicts = checker.detect_conflicts()
 """
 
 __version__ = "1.0.0"
 __all__ = [
     "memory_tools",
     "agent_integration",
+    "file_consistency",
 ]
 
 # Import main classes for convenience
 from . import memory_tools
 from . import agent_integration
+from . import file_consistency
 from .agent_integration import AgentMemoryIntegration
+from .file_consistency import (
+    FileConsistencyChecker,
+    FileConsistencyError,
+    ConflictNotFoundError,
+    create_file_consistency_checker,
+    record_file_version,
+    detect_and_escalate,
+)
