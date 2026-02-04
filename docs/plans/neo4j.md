@@ -639,6 +639,10 @@ CREATE INDEX task_claim_lock FOR (t:Task) ON (t.status, t.assigned_to, t.created
 CREATE INDEX notification_read FOR (n:Notification) ON (n.read, n.created_at);
 
 CREATE INDEX notification_created_at FOR (n:Notification) ON (n.created_at);
+// Index for efficient retention policy enforcement (oldest first query)
+// Supports: MATCH (r:Reflection) WHERE r.agent = $agent ORDER BY r.created_at ASC
+// Used by _enforce_retention_policy to find oldest reflections for archival
+CREATE INDEX reflection_created_at FOR (r:Reflection) ON (r.created_at);
 
 CREATE INDEX agent_last_active FOR (a:Agent) ON (a.last_active);
 
@@ -821,6 +825,7 @@ MIGRATIONS = [
             CREATE INDEX task_status FOR (t:Task) ON (t.assigned_to, t.status);
             CREATE INDEX notification_read FOR (n:Notification) ON (n.read, n.created_at);
             CREATE INDEX notification_created_at FOR (n:Notification) ON (n.created_at);
+            CREATE INDEX reflection_created_at FOR (r:Reflection) ON (r.created_at);
             CREATE INDEX session_context_lookup FOR (s:SessionContext) ON (s.sender_id, s.session_date);
             CREATE FULLTEXT INDEX knowledge_content
                 FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
@@ -831,6 +836,7 @@ MIGRATIONS = [
             DROP INDEX task_status IF EXISTS;
             DROP INDEX notification_read IF EXISTS;
             DROP INDEX notification_created_at IF EXISTS;
+            DROP INDEX reflection_created_at IF EXISTS;
             DROP INDEX session_context_lookup IF EXISTS;
             DROP INDEX knowledge_content IF EXISTS;
         '''
@@ -864,7 +870,7 @@ class MigrationManager:
             MERGE (s:SchemaVersion {id: 'current'})
             ON CREATE SET s.version = 0, s.updated_at = datetime()
         '''
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query)
 
     def get_current_version(self) -> int:
@@ -873,7 +879,7 @@ class MigrationManager:
             MATCH (s:SchemaVersion {id: 'current'})
             RETURN s.version as version
         '''
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query)
             record = result.single()
             return record['version'] if record else 0
@@ -919,7 +925,7 @@ class MigrationManager:
         new_version = migration['version'] if direction == 'up' else migration['version'] - 1
 
         # Use explicit transaction for atomicity
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             with session.begin_transaction() as tx:
                 try:
                     # Execute migration
@@ -1098,12 +1104,44 @@ RETURN a1.id, a2.id, a3.id, a4.id, a5.id, a6.id;
 """Neo4j-backed operational memory for cross-agent knowledge sharing."""
 import os
 import re
-from typing import Optional, List, Dict, Any
-from uuid import uuid4, UUID
-from datetime import datetime
-from neo4j import GraphDatabase, Driver
-from neo4j.exceptions import ServiceUnavailable, AuthError
+import json
+import base64
+import hashlib
+import hmac
+import time
+import warnings
 import threading
+from typing import Optional, List, Dict, Any, Tuple, Set, Union, Callable
+from uuid import uuid4, UUID
+from datetime import datetime, timedelta, date
+from urllib.parse import urlparse
+
+from neo4j import GraphDatabase, Driver
+from neo4j.exceptions import ServiceUnavailable, AuthError, TransientError
+
+# Optional dependencies - handle gracefully if not installed
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+except ImportError:
+    BackgroundScheduler = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+# Module-level logger for OperationalMemory
+logger = logging.getLogger('operational_memory')
 
 class OperationalMemory:
     """Neo4j-backed operational memory with fallback mode."""
@@ -1155,6 +1193,14 @@ class OperationalMemory:
         self._MAX_FALLBACK_RESEARCH = 500
         self._MAX_FALLBACK_ITEMS_PER_CATEGORY = 1000
 
+        # Background task concurrency limit to prevent connection pool exhaustion
+        # With 5 non-main agents, limit concurrent long-running tasks to 2
+        self._MAX_CONCURRENT_BACKGROUND_TASKS = 2
+        self._background_task_semaphore = threading.Semaphore(self._MAX_CONCURRENT_BACKGROUND_TASKS)
+        self._background_task_queue: List[Dict[str, Any]] = []  # Pending tasks
+        self._background_task_lock = threading.Lock()  # Thread-safe queue access
+        self._background_task_active: Set[str] = set()  # Track active task IDs
+
         # Embedding encryption for SENSITIVE access tier
         self._embedding_cipher = None
         self._init_embedding_encryption()
@@ -1171,13 +1217,15 @@ class OperationalMemory:
         # Preload embedding model to avoid cold-start
         self._preload_embedding_model()
 
+        # Cache valid agents from environment to avoid recomputation
+        self.VALID_AGENTS = self._compute_valid_agents()
+
     def _validate_environment(self):
         """Validate required environment variables are set.
 
         Raises:
             RuntimeError: If any required environment variable is missing.
         """
-        import os
         missing = []
         for var in self.REQUIRED_ENV_VARS:
             if not os.getenv(var):
@@ -1281,7 +1329,7 @@ class OperationalMemory:
             return
 
         try:
-            with self.driver.session() as session:
+            with self._session_pool() as session:
                 result = session.run("CALL dbms.components() YIELD name, versions")
                 record = result.single()
                 if record:
@@ -1292,6 +1340,8 @@ class OperationalMemory:
                         print("[WARN] Semantic search will use fallback to full-text search")
                     else:
                         print(f"[INFO] Neo4j {version} - compatible with all features")
+        except (ServiceUnavailable, AuthError) as e:
+            print(f"[WARN] Neo4j connection error during version check: {e}")
         except Exception as e:
             print(f"[WARN] Could not verify Neo4j version: {e}")
 
@@ -1381,9 +1431,6 @@ class OperationalMemory:
         Retries on transient errors (ServiceUnavailable, transient errors).
         Uses exponential backoff: 100ms, 200ms, 400ms.
         """
-        import time
-        from neo4j.exceptions import TransientError
-
         if not self._circuit_breaker_check():
             raise ServiceUnavailable("Circuit breaker open - Neo4j temporarily unavailable")
 
@@ -1411,6 +1458,7 @@ class OperationalMemory:
             except Exception as e:
                 # Other exceptions (e.g., Cypher syntax errors) should not affect circuit breaker
                 # Only transient connectivity issues should trigger circuit breaker
+                logger.exception(f"Unexpected error in query execution: {e}")
                 raise
 
         raise last_error or ServiceUnavailable("Max retries exceeded")
@@ -1426,7 +1474,6 @@ class OperationalMemory:
         if user:
             safe_error = safe_error.replace(user, '***')
         # Sanitize URI credentials (bolt://user:pass@host -> bolt://***@host)
-        import re
         safe_error = re.sub(r'bolt://[^:]+:[^@]+@', 'bolt://***@', safe_error)
         safe_error = re.sub(r'neo4j://[^:]+:[^@]+@', 'neo4j://***@', safe_error)
         return safe_error
@@ -1438,20 +1485,17 @@ class OperationalMemory:
         Key is derived from EMBEDDING_ENCRYPTION_KEY environment variable.
         Falls back to no encryption if key not provided (logs warning).
         """
-        import os
-        import base64
-
         key_env = os.getenv('EMBEDDING_ENCRYPTION_KEY', '')
         if not key_env:
             print("[PRIVACY WARNING] EMBEDDING_ENCRYPTION_KEY not set. SENSITIVE embeddings will be stored unencrypted.")
             return
 
         try:
-            from cryptography.fernet import Fernet
+            if Fernet is None:
+                raise ImportError("cryptography not installed")
             # Ensure key is valid Fernet key (32 bytes, base64-encoded)
             if len(key_env) < 32:
                 # Derive key using PBKDF2 if provided key is too short
-                import hashlib
                 key_bytes = hashlib.pbkdf2_hmac('sha256', key_env.encode(), b'salt', 100000, 32)
                 key_env = base64.urlsafe_b64encode(key_bytes).decode()
             self._embedding_cipher = Fernet(key_env.encode())
@@ -1471,9 +1515,6 @@ class OperationalMemory:
         Returns:
             JSON string with embedding data (encrypted if SENSITIVE tier)
         """
-        import json
-        import base64
-
         if access_tier == self.ACCESS_TIER_SENSITIVE and self._embedding_cipher:
             # Encrypt the embedding
             embedding_bytes = json.dumps(embedding).encode()
@@ -1500,9 +1541,6 @@ class OperationalMemory:
         Returns:
             The original embedding vector, or None if decryption fails
         """
-        import json
-        import base64
-
         try:
             parsed = json.loads(stored_value)
             if parsed.get('encrypted') and self._embedding_cipher:
@@ -1530,8 +1568,6 @@ class OperationalMemory:
         Returns:
             ACCESS_TIER_PUBLIC, ACCESS_TIER_SENSITIVE, or ACCESS_TIER_PRIVATE
         """
-        import re
-
         if not sender_hash:
             # No sender context = general knowledge = public
             return self.ACCESS_TIER_PUBLIC
@@ -1568,9 +1604,6 @@ class OperationalMemory:
 
     def _start_pool_monitoring(self):
         """Start background thread to monitor connection pool health."""
-        import threading
-        import time
-
         def monitor_pool():
             while True:
                 try:
@@ -1585,35 +1618,6 @@ class OperationalMemory:
                         # Alert if pool is near exhaustion
                         if active > max_size * 0.9:
                             print(f"[POOL WARNING] Connection pool near exhaustion: {active}/{max_size} in use")
-
-                        # Log metrics periodically (every 5 minutes)
-                        if int(time.time()) % 300 == 0:
-                            print(f"[POOL] Active: {active}, Idle: {idle}, Max: {max_size}")
-                except Exception as e:
-                    print(f"[POOL] Monitoring error: {e}")
-
-                time.sleep(30)  # Check every 30 seconds
-
-        monitor_thread = threading.Thread(target=monitor_pool, daemon=True)
-        monitor_thread.start()
-
-    def _sanitize_for_sharing(self, text: str, agent_context: Dict[str, Any] = None) -> str:
-        """Strip personal identifiers before storing to shared memory.
-
-        Uses LLM-based review for comprehensive PII detection.
-        Falls back to pattern matching if LLM unavailable.
-        """
-        # Try LLM-based sanitization first
-        try:
-            sanitized = self._llm_sanitize(text, agent_context)
-            if sanitized:
-                return sanitized
-        except Exception:
-            pass  # Fall through to pattern-based
-
-        # Fallback: pattern-based sanitization
-        return self._pattern_sanitize(text)
-
     def _llm_sanitize(self, text: str, agent_context: Dict[str, Any] = None) -> Optional[str]:
         """Use Kublai (via agentToAgent) to review and redact private information.
 
@@ -1623,13 +1627,16 @@ class OperationalMemory:
         SECURITY: Input is strictly validated and escaped before being sent to LLM
         to prevent prompt injection attacks.
 
+        SSRF PROTECTION: This method implements multiple layers of SSRF protection:
+        1. URL parsing and scheme validation
+        2. Hostname whitelist validation
+        3. DNS resolution with IP-based whitelist verification
+        4. Private IP range blocking (prevents access to internal services)
+        5. No redirects allowed (prevents redirect-based bypasses)
+        6. Request timeouts (prevents hanging connections)
+
         Returns sanitized text or None to trigger pattern fallback.
         """
-        import os
-        import json
-        import requests
-        import re
-
         # Input validation - reject suspicious inputs
         if not text or not isinstance(text, str):
             return text
@@ -1650,9 +1657,9 @@ class OperationalMemory:
             gateway_url = os.getenv('OPENCLAW_GATEWAY_URL', 'http://localhost:8080')
             token = os.getenv('OPENCLAW_GATEWAY_TOKEN', '')
 
-            # Validate gateway URL to prevent SSRF attacks
-            # Only allow specific known-safe hosts
-            from urllib.parse import urlparse
+            # =========================================================================
+            # SSRF PROTECTION - Layer 1: URL Parsing and Basic Validation
+            # =========================================================================
             allowed_hosts = {
                 'localhost', '127.0.0.1', '::1',
                 'kublai.kurult.ai',
@@ -1660,28 +1667,93 @@ class OperationalMemory:
                 'moltbot.railway.internal'
             }
 
+            # Allowed IP ranges (CIDR notation)
+            allowed_ip_ranges = {
+                '127.0.0.0/8',      # Loopback
+                '::1/128',          # IPv6 loopback
+                '10.0.0.0/8',       # Private network (if needed for internal services)
+                '172.16.0.0/12',    # Private network
+                '192.168.0.0/16',   # Private network
+            }
+
             try:
                 parsed = urlparse(gateway_url)
-                if parsed.hostname not in allowed_hosts:
-                    print(f"[PRIVACY] Invalid gateway URL host '{parsed.hostname}', using pattern fallback")
-                    return None
+
                 # Block non-HTTP schemes (file://, ftp://, etc.)
                 if parsed.scheme not in ('http', 'https'):
                     print(f"[PRIVACY] Invalid URL scheme '{parsed.scheme}', using pattern fallback")
                     return None
+
                 # Block URLs with authentication credentials (user:pass@host)
                 if parsed.username or parsed.password:
                     print("[PRIVACY] URL with embedded credentials rejected, using pattern fallback")
                     return None
-                # Block non-standard ports (only allow 80, 443, 8080-8089, 3000-3009 for dev)
+
+                # Block non-standard ports
                 if parsed.port and parsed.port not in (
                     80, 443, 8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089,
                     3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009
                 ):
                     print(f"[PRIVACY] Non-standard port {parsed.port} rejected, using pattern fallback")
                     return None
+
+                # Validate hostname is in whitelist
+                if not parsed.hostname:
+                    print("[PRIVACY] No hostname in URL, using pattern fallback")
+                    return None
+
+                if parsed.hostname not in allowed_hosts:
+                    print(f"[PRIVACY] Invalid gateway URL host '{parsed.hostname}', using pattern fallback")
+                    return None
+
             except ValueError as e:
                 print(f"[PRIVACY] URL parse error: {e}, using pattern fallback")
+                return None
+
+            # =========================================================================
+            # SSRF PROTECTION - Layer 2: DNS Resolution and IP Validation
+            # This prevents DNS rebinding attacks where an attacker controls DNS
+            # and returns different IPs between validation and request
+            # =========================================================================
+            try:
+                # Resolve hostname to IP addresses
+                resolved_ips = socket.getaddrinfo(parsed.hostname, None)
+                resolved_ip_set = {ip[4][0] for ip in resolved_ips}
+
+                # Check each resolved IP against private IP ranges
+                for ip_str in resolved_ip_set:
+                    try:
+                        ip_obj = ipaddress.ip_address(ip_str)
+
+                        # Block private IP ranges unless explicitly allowed
+                        # This prevents access to internal services via DNS rebinding
+                        if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+                            # Only allow if the hostname is explicitly whitelisted
+                            # AND the IP is in our allowed ranges
+                            in_allowed_range = any(
+                                ip_obj in ipaddress.ip_network(cidr)
+                                for cidr in allowed_ip_ranges
+                            )
+                            if not in_allowed_range:
+                                print(f"[PRIVACY] Blocked request to private IP {ip_str} "
+                                      f"(DNS rebinding protection), using pattern fallback")
+                                return None
+
+                        # Block multicast and reserved addresses
+                        if ip_obj.is_multicast or ip_obj.is_reserved:
+                            print(f"[PRIVACY] Blocked request to {ip_str} "
+                                  f"(multicast/reserved), using pattern fallback")
+                            return None
+
+                    except ValueError:
+                        # Invalid IP format, skip
+                        continue
+
+            except socket.gaierror as e:
+                print(f"[PRIVACY] DNS resolution failed for '{parsed.hostname}': {e}, using pattern fallback")
+                return None
+            except Exception as e:
+                print(f"[PRIVACY] IP validation error: {e}, using pattern fallback")
                 return None
 
             review_prompt = f"""Review the following text for private information that should NOT be stored in shared operational memory.
@@ -1710,6 +1782,11 @@ INSTRUCTIONS:
 
 Do not include any text outside the JSON object."""
 
+            # =========================================================================
+            # SSRF PROTECTION - Layer 3: Request Configuration
+            # - Short timeout prevents hanging connections
+            # - No redirects prevents redirect-based bypasses
+            # =========================================================================
             response = requests.post(
                 f"{gateway_url}/agent/main/message",
                 headers={
@@ -1720,7 +1797,8 @@ Do not include any text outside the JSON object."""
                     'message': review_prompt,
                     'context': {'privacy_review': True, 'skip_memory': True}
                 },
-                timeout=30
+                timeout=10,  # Reduced from 30s to prevent hanging connections
+                allow_redirects=False  # Prevent redirect-based SSRF bypasses
             )
 
             if response.status_code == 200:
@@ -1764,8 +1842,6 @@ Do not include any text outside the JSON object."""
 
         Returns True if operation allowed, False if rate limited.
         """
-        from datetime import datetime, timedelta
-
         # In fallback mode, use memory-based limiting (best effort)
         if self.fallback_mode:
             with self._rate_limit_lock:
@@ -1869,6 +1945,10 @@ Do not include any text outside the JSON object."""
                     print(f"[RATE_LIMIT] Agent {agent} limit exceeded for {operation}")
                     return False
 
+        except (ServiceUnavailable, TransientError) as e:
+            print(f"[RATE_LIMIT ERROR] Neo4j connectivity error during rate limit check: {e}, using fallback")
+            # Fall back to memory-based on error
+            return True  # Allow operation rather than block on error
         except Exception as e:
             print(f"[RATE_LIMIT ERROR] Neo4j rate limit check failed: {e}, using fallback")
             # Fall back to memory-based on error
@@ -1880,10 +1960,6 @@ Do not include any text outside the JSON object."""
         Uses PHONE_HASH_SALT environment variable. Same phone always produces
         same hash, but hash cannot be reversed without the salt.
         """
-        import hmac
-        import hashlib
-        import os
-
         salt = os.getenv('PHONE_HASH_SALT')
         if not salt:
             raise RuntimeError(
@@ -2086,8 +2162,6 @@ Do not include any text outside the JSON object."""
 
     def _pattern_sanitize(self, text: str) -> str:
         """Pattern-based PII sanitization (fallback method)."""
-        import re
-
         # Phone numbers (various formats including international)
         # US format: +1 (123) 456-7890, 123-456-7890, (123) 456-7890
         text = re.sub(r'\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', '[PHONE]', text)
@@ -2176,8 +2250,9 @@ Do not include any text outside the JSON object."""
         CREATE (a)-[:CREATED {timestamp: datetime()}]->(r)
         RETURN r.id as id
         """
-        with self.driver.session() as session:
-            session.run(query, agent=agent, id=str(knowledge_id),
+        with self._session_pool() as session:
+            with session.begin_transaction() as tx:
+                tx.run(query, agent=agent, id=str(knowledge_id),
                        topic=safe_topic, findings=safe_findings,
                        sources=sources or [], depth=depth,
                        access_tier=access_tier, sender_hash=sender_hash)
@@ -2273,12 +2348,13 @@ Do not include any text outside the JSON object."""
         RETURN c.id as id
         """
         try:
-            with self.driver.session() as session:
-                result = session.run(query,
-                    agent=agent, id=str(concept_id), name=safe_name,
-                    description=safe_description, domain=domain, source=source,
-                    embedding=stored_embedding, access_tier=access_tier,
-                    sender_hash=sender_hash)
+            with self._session_pool() as session:
+                with session.begin_transaction() as tx:
+                    tx.run(query,
+                        agent=agent, id=str(concept_id), name=safe_name,
+                        description=safe_description, domain=domain, source=source,
+                        embedding=stored_embedding, access_tier=access_tier,
+                        sender_hash=sender_hash)
                 return concept_id
         except Exception as e:
             print(f"[ERROR] Failed to store concept: {e}")
@@ -2321,18 +2397,22 @@ Do not include any text outside the JSON object."""
         if query_embedding:
             try:
                 # Vector search with sender isolation
-                # Note: Vector index doesn't support filtering, so we filter post-query
+                # Pagination strategy: Request 1.5x limit (min 10) to account for post-query
+                # access control filtering. This balances resource efficiency with ensuring
+                # we can return the requested limit after filtering out inaccessible SENSITIVE nodes.
+                # If insufficient results after filtering, client should request next page.
+                vector_limit = max(int(limit * 1.5), 10)
                 query = """
-                CALL db.index.vector.queryNodes('concept_embedding', $limit * 3, $embedding)
+                CALL db.index.vector.queryNodes('concept_embedding', $vector_limit, $embedding)
                 YIELD node, score
                 WHERE score >= $min_score
                 RETURN node.name as name, node.description as description,
                        node.domain as domain, node.access_tier as access_tier,
                        node.sender_hash as concept_sender, score
                 """
-                with self.driver.session() as session:
+                with self._session_pool() as session:
                     result = session.run(query, embedding=query_embedding,
-                                        min_score=min_confidence, limit=limit)
+                                        min_score=min_confidence, vector_limit=vector_limit)
                     records = []
                     for record in result:
                         # Enforce access tier rules
@@ -2352,6 +2432,8 @@ Do not include any text outside the JSON object."""
                         if len(records) >= limit:
                             break
                     return records
+            except (ServiceUnavailable, TransientError) as e:
+                print(f"[WARN] Vector search failed due to Neo4j connectivity: {e}")
             except Exception as e:
                 print(f"[WARN] Vector search failed: {e}")
 
@@ -2366,7 +2448,7 @@ Do not include any text outside the JSON object."""
         LIMIT $limit
         """
         try:
-            with self.driver.session() as session:
+            with self._session_pool() as session:
                 result = session.run(query, query=query_text,
                                     min_score=min_confidence, limit=limit)
                 records = []
@@ -2396,8 +2478,8 @@ Do not include any text outside the JSON object."""
         Preloads model in background to avoid cold-start latency on first query.
         """
         try:
-            from sentence_transformers import SentenceTransformer
-            import hashlib
+            if SentenceTransformer is None:
+                raise ImportError("sentence_transformers not installed")
 
             if not hasattr(self, '_embedding_model'):
                 cache_dir = os.getenv('SENTENCE_TRANSFORMERS_CACHE', '/data/cache/sentence-transformers')
@@ -2473,7 +2555,7 @@ Do not include any text outside the JSON object."""
                        node.access_tier as access_tier, node.sender_hash as item_sender,
                        score
                 """
-                with self.driver.session() as session:
+                with self._session_pool() as session:
                     result = session.run(query, embedding=embedding, min_score=min_confidence)
                     records = []
                     for record in result:
@@ -2494,7 +2576,10 @@ Do not include any text outside the JSON object."""
                             break
                     if records:
                         return records
-            except Exception:
+            except (ServiceUnavailable, TransientError):
+                pass  # Fall through to full-text search on connectivity issues
+            except Exception as e:
+                print(f"[WARN] Research vector search failed: {e}")
                 pass  # Fall through to full-text search
 
         # Fallback to full-text search
@@ -2505,7 +2590,7 @@ Do not include any text outside the JSON object."""
         RETURN node.topic as topic, node.findings as findings, score
         LIMIT 10
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, topic=topic, min_score=min_confidence)
             return [dict(record) for record in result]
 
@@ -2516,7 +2601,7 @@ Do not include any text outside the JSON object."""
         RETURN length(path) as cycle_length
         LIMIT 1
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, from_agent=from_agent, to_agent=to_agent)
             return result.single() is not None
 
@@ -2546,17 +2631,20 @@ Do not include any text outside the JSON object."""
                                timestamp: datetime(), depth: 1}]->(from)
         CREATE (from)-[:BUILT_ON]->(k)
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query, from_agent=from_agent, to_agent=to_agent,
                        knowledge_id=str(knowledge_id))
         return True
 
-    # Valid agent IDs for authentication
-    # Loaded from ALLOWED_AGENTS env var (comma-separated) or defaults to 6 standard agents
-    # Example: ALLOWED_AGENTS="kublai,mongke,chagatai,temujin,jochi,ogedei"
-    @property
-    def VALID_AGENTS(self) -> set:
-        import os
+    def _compute_valid_agents(self) -> set:
+        """Compute valid agent IDs from environment variable.
+
+        Loaded from ALLOWED_AGENTS env var (comma-separated) or defaults to 6 standard agents.
+        Example: ALLOWED_AGENTS="kublai,mongke,chagatai,temujin,jochi,ogedei"
+
+        Returns:
+            Set of valid agent ID strings.
+        """
         agents_env = os.getenv('ALLOWED_AGENTS', '')
         if agents_env:
             return set(a.strip() for a in agents_env.split(',') if a.strip())
@@ -2630,8 +2718,9 @@ Do not include any text outside the JSON object."""
         CREATE (t)-[:ASSIGNED_TO]->(assignee)
         RETURN t.id as id
         """
-        with self.driver.session() as session:
-            session.run(query, id=str(task_id), type=task_type,
+        with self._session_pool() as session:
+            with session.begin_transaction() as tx:
+                tx.run(query, id=str(task_id), type=task_type,
                        description=safe_description,
                        delegated_by=delegated_by, assigned_to=assigned_to)
         return task_id
@@ -2674,7 +2763,7 @@ Do not include any text outside the JSON object."""
                t.claim_attempt_id as verified_claim_id
         """
         try:
-            with self.driver.session() as session:
+            with self._session_pool() as session:
                 # Use write transaction for stronger consistency guarantees
                 with session.begin_transaction() as tx:
                     result = tx.run(query, agent=agent, claim_attempt_id=claim_attempt_id)
@@ -2720,7 +2809,7 @@ Do not include any text outside the JSON object."""
             t.blocked_at = datetime()
         RETURN t.delegated_by as delegator_id
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, task_id=str(task_id), reason=reason)
             record = result.single()
 
@@ -2840,7 +2929,7 @@ Do not include any text outside the JSON object."""
             t.reassigned_at = datetime()
         RETURN t.id as id
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, task_id=str(task_id), new_agent=new_agent)
             return result.single() is not None
 
@@ -2937,7 +3026,7 @@ Do not include any text outside the JSON object."""
         CREATE (delegator)-[:HAS_NOTIFICATION]->(n)
         """
         summary = results.get('summary', f"Task {task_id} completed by {assignee_id}")
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query, delegator_id=delegator_id,
                        notification_id=str(uuid4()), task_id=str(task_id),
                        assignee_id=assignee_id, summary=summary)
@@ -3031,7 +3120,7 @@ Do not include any text outside the JSON object."""
                n.created_at as created_at
         ORDER BY n.created_at DESC
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, agent_id=agent_id)
             return [dict(record) for record in result]
 
@@ -3040,7 +3129,6 @@ Do not include any text outside the JSON object."""
         if self.fallback_mode:
             return True
 
-        from datetime import date
         today = date.today().isoformat()  # 'YYYY-MM-DD' string
 
         query = """
@@ -3052,7 +3140,7 @@ Do not include any text outside the JSON object."""
             s.drain_mode = $drain_mode
         ON CREATE SET s.created_at = datetime()
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query, sender_id=sender_id, session_date=today,
                        active_tasks=context.get('active_tasks', []),
                        pending_delegations=context.get('pending_delegations', []),
@@ -3065,7 +3153,6 @@ Do not include any text outside the JSON object."""
 
         Returns status of pending tasks and whether reset should proceed.
         """
-        from datetime import date
         today = date.today().isoformat()
 
         query = """
@@ -3076,7 +3163,7 @@ Do not include any text outside the JSON object."""
                s.pending_delegations as pending_delegations,
                count(t) as pending_task_count
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, sender_id=sender_id, session_date=today)
             record = result.single()
             if not record:
@@ -3098,14 +3185,13 @@ Do not include any text outside the JSON object."""
 
     def enter_drain_mode(self, sender_id: str) -> bool:
         """Enter drain mode - stop accepting new work, complete existing."""
-        from datetime import date
         today = date.today().isoformat()
 
         query = """
         MATCH (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
         SET s.drain_mode = true, s.drain_started_at = datetime()
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query, sender_id=sender_id, session_date=today)
         return True
 
@@ -3114,7 +3200,6 @@ Do not include any text outside the JSON object."""
         if self.fallback_mode:
             return None
 
-        from datetime import date
         today = date.today().isoformat()  # 'YYYY-MM-DD' string
 
         query = """
@@ -3123,7 +3208,7 @@ Do not include any text outside the JSON object."""
                s.pending_delegations as pending_delegations,
                s.conversation_summary as conversation_summary
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             result = session.run(query, sender_id=sender_id, session_date=today)
             record = result.single()
             return dict(record) if record else None
@@ -3137,7 +3222,7 @@ Do not include any text outside the JSON object."""
         MATCH (a:Agent {id: $agent_id})
         SET a.last_active = datetime()
         """
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query, agent_id=agent_id)
         return True
 
@@ -3262,7 +3347,6 @@ class SessionResetManager:
             drain_start_date = self._drain_start_time.strftime('%Y-%m-%d')
         else:
             # Fallback to today if drain start time not set (shouldn't happen)
-            from datetime import date
             drain_start_date = date.today().isoformat()
 
         self._drain_mode = False
@@ -3276,7 +3360,7 @@ class SessionResetManager:
             s.active_tasks = [],
             s.pending_delegations = []
         """
-        with self.memory.driver.session() as session:
+        with self.memory._session_pool() as session:
             session.run(query, sender_id=sender_id, session_date=drain_start_date)
 
 
@@ -3337,7 +3421,7 @@ class FailoverMonitor:
             RETURN a.last_active as last_active,
                    datetime() - a.last_active as seconds_since_active
             """
-            with self.memory.driver.session() as session:
+            with self.memory._session_pool() as session:
                 result = session.run(query)
                 record = result.single()
 
@@ -3401,7 +3485,6 @@ class FailoverMonitor:
 
         # Create notification for admin using session pool
         try:
-            from uuid import uuid4
             notification_query = """
             MATCH (o:Agent {id: 'ops'})
             CREATE (n:Notification {
@@ -3646,7 +3729,6 @@ class FileConsistencyChecker:
         }
 
         # Extract timestamp if present
-        import re
         ts_match = re.search(r'timestamp:\s*(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})', content)
         if ts_match:
             facts['timestamp'] = ts_match.group(1)
@@ -3690,7 +3772,6 @@ class FileConsistencyChecker:
 
         if facts1.get('timestamp') and facts2.get('timestamp'):
             try:
-                from datetime import datetime
                 ts1 = datetime.fromisoformat(facts1['timestamp'].replace('Z', '+00:00'))
                 ts2 = datetime.fromisoformat(facts2['timestamp'].replace('Z', '+00:00'))
 
@@ -3770,8 +3851,7 @@ class FileConsistencyChecker:
         needs_attention = report['severity'] in ['high', 'critical']
 
         try:
-            from uuid import uuid4
-            with self.memory.driver.session() as session:
+            with self.memory._session_pool() as session:
                 session.run(query,
                     id=str(uuid4()),
                     timestamp=report['timestamp'],
@@ -3824,10 +3904,9 @@ class FileConsistencyChecker:
         """
 
         try:
-            from uuid import uuid4
             analysis_id = str(uuid4())
 
-            with self.memory.driver.session() as session:
+            with self.memory._session_pool() as session:
                 session.run(query,
                     id=analysis_id,
                     category=conflict.get('type', 'unknown'),
@@ -3861,8 +3940,6 @@ class NotionProjectManager:
 
     def _make_request(self, method: str, endpoint: str, data: Dict = None) -> Optional[Dict]:
         """Make HTTP request to Notion API."""
-        import requests
-
         if not self.token or not self.database_id:
             print("[NOTION] Not configured - missing token or database_id")
             return None
@@ -3950,7 +4027,6 @@ class NotionProjectManager:
         }
 
         if status == 'Done':
-            from datetime import date
             data['properties']['Completed'] = {
                 'date': {'start': date.today().isoformat()}
             }
@@ -3988,7 +4064,7 @@ class NotionProjectManager:
                t.assigned_to as assignee
         """
 
-        with memory.driver.session() as session:
+        with memory._session_pool() as session:
             result = session.run(query)
             pending_tasks = [dict(record) for record in result]
 
@@ -4137,7 +4213,7 @@ def record_workflow_improvement(self, proposed_by: str, target_process: str,
     """
 
     try:
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query,
                 id=str(improvement_id),
                 proposed_by=proposed_by,
@@ -4170,7 +4246,7 @@ def approve_workflow_improvement(self, improvement_id: UUID,
     """
 
     try:
-        with self.driver.session() as session:
+        with self._session_pool() as session:
             session.run(query,
                 improvement_id=str(improvement_id),
                 approved_by=approved_by,
@@ -4204,7 +4280,7 @@ def get_pending_improvements(self, agent_id: str = None) -> List[Dict[str, Any]]
         """
         params = {}
 
-    with self.driver.session() as session:
+    with self._session_pool() as session:
         result = session.run(query, **params)
         return [dict(record) for record in result]
 ```
@@ -4296,53 +4372,176 @@ class OperationalMemory:
 
         Called by Ögedei when agent has been idle for threshold period.
         Background tasks are preemptible - user tasks always take priority.
+
+        Global concurrency limit enforced to prevent connection pool exhaustion.
+        Tasks exceeding the limit are queued and processed FIFO.
         """
         if self.fallback_mode:
             return None
 
-        # Define synthesis types per agent
-        synthesis_types = {
-            "writer": "content_synthesis",
-            "researcher": "research_consolidation",
-            "developer": "pattern_extraction",
-            "analyst": "trend_synthesis",
-            "ops": "process_optimization"
-        }
+        # Check global concurrency limit using semaphore (non-blocking)
+        if not self._background_task_semaphore.acquire(blocking=False):
+            # Limit reached - queue the task request
+            with self._background_task_lock:
+                # Check if this agent already has a pending task
+                for pending in self._background_task_queue:
+                    if pending['agent_id'] == agent_id:
+                        logger.info(f"[BACKGROUND] Agent {agent_id} already has pending task, skipping")
+                        return None
 
-        task_type = synthesis_types.get(agent_id, "general_synthesis")
+                # Add to queue
+                task_id = uuid4()
+                self._background_task_queue.append({
+                    'task_id': task_id,
+                    'agent_id': agent_id,
+                    'queued_at': datetime.now()
+                })
+                logger.info(f"[BACKGROUND] Task limit reached, queued task {task_id} for {agent_id} "
+                           f"(queue depth: {len(self._background_task_queue)})")
+                return task_id
 
-        task_id = uuid4()
-
-        query = """
-        MATCH (agent:Agent {id: $agent_id})
-        CREATE (t:BackgroundTask {
-            id: $id,
-            agent: $agent_id,
-            type: $task_type,
-            status: 'pending',
-            priority: 'low',
-            preemptible: true,
-            created_at: datetime(),
-            started_at: null,
-            preempted_at: null,
-            completed_at: null
-        })
-        CREATE (agent)-[:ASSIGNED_BACKGROUND]->(t)
-        RETURN t.id as task_id
-        """
-
+        # Semaphore acquired - we can create the task
         try:
+            # Define synthesis types per agent
+            synthesis_types = {
+                "writer": "content_synthesis",
+                "researcher": "research_consolidation",
+                "developer": "pattern_extraction",
+                "analyst": "trend_synthesis",
+                "ops": "process_optimization"
+            }
+
+            task_type = synthesis_types.get(agent_id, "general_synthesis")
+
+            task_id = uuid4()
+
+            query = """
+            MATCH (agent:Agent {id: $agent_id})
+            CREATE (t:BackgroundTask {
+                id: $id,
+                agent: $agent_id,
+                type: $task_type,
+                status: 'pending',
+                priority: 'low',
+                preemptible: true,
+                created_at: datetime(),
+                started_at: null,
+                preempted_at: null,
+                completed_at: null
+            })
+            CREATE (agent)-[:ASSIGNED_BACKGROUND]->(t)
+            RETURN t.id as task_id
+            """
+
             with self._session_pool() as session:
                 session.run(query,
                     id=str(task_id),
                     agent_id=agent_id,
                     task_type=task_type
                 )
-            print(f"[BACKGROUND] Created {task_type} task for {agent_id}")
+
+            # Track active task
+            with self._background_task_lock:
+                self._background_task_active.add(str(task_id))
+
+            logger.info(f"[BACKGROUND] Created {task_type} task {task_id} for {agent_id} "
+                       f"(active: {len(self._background_task_active)}/"
+                       f"{self._MAX_CONCURRENT_BACKGROUND_TASKS})")
             return task_id
+
         except Exception as e:
-            print(f"[ERROR] Failed to create background task: {e}")
+            # Release semaphore on failure
+            self._background_task_semaphore.release()
+            logger.error(f"[ERROR] Failed to create background task: {e}")
             return None
+
+    def _create_queued_background_task(self, agent_id: str) -> Optional[UUID]:
+        """Create background task for queued request (semaphore already acquired).
+
+        Internal helper for processing queued tasks. Does not check semaphore
+        since it was already acquired by _process_background_task_queue.
+        """
+        if self.fallback_mode:
+            return None
+
+        try:
+            synthesis_types = {
+                "writer": "content_synthesis",
+                "researcher": "research_consolidation",
+                "developer": "pattern_extraction",
+                "analyst": "trend_synthesis",
+                "ops": "process_optimization"
+            }
+
+            task_type = synthesis_types.get(agent_id, "general_synthesis")
+            task_id = uuid4()
+
+            query = """
+            MATCH (agent:Agent {id: $agent_id})
+            CREATE (t:BackgroundTask {
+                id: $id,
+                agent: $agent_id,
+                type: $task_type,
+                status: 'pending',
+                priority: 'low',
+                preemptible: true,
+                created_at: datetime(),
+                started_at: null,
+                preempted_at: null,
+                completed_at: null
+            })
+            CREATE (agent)-[:ASSIGNED_BACKGROUND]->(t)
+            RETURN t.id as task_id
+            """
+
+            with self._session_pool() as session:
+                session.run(query,
+                    id=str(task_id),
+                    agent_id=agent_id,
+                    task_type=task_type
+                )
+
+            logger.info(f"[BACKGROUND] Created queued {task_type} task {task_id} for {agent_id}")
+            return task_id
+
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to create queued background task: {e}")
+            return None
+
+    def complete_background_task(self, task_id: str):
+        """Mark background task as completed and release semaphore.
+
+        Called by agents when they finish processing a background task.
+        This releases the slot for the next queued task.
+        """
+        with self._background_task_lock:
+            if task_id in self._background_task_active:
+                self._background_task_active.discard(task_id)
+
+        # Release semaphore to allow next task
+        try:
+            self._background_task_semaphore.release()
+            logger.info(f"[BACKGROUND] Task {task_id} completed, released slot "
+                       f"(active: {len(self._background_task_active)}/"
+                       f"{self._MAX_CONCURRENT_BACKGROUND_TASKS})")
+        except ValueError:
+            # Semaphore over-release (shouldn't happen, but handle gracefully)
+            logger.warning(f"[BACKGROUND] Semaphore release mismatch for task {task_id}")
+
+    def get_background_task_status(self) -> Dict[str, Any]:
+        """Get current background task status for monitoring.
+
+        Returns active count, queue depth, and limit info.
+        """
+        with self._background_task_lock:
+            return {
+                'active_tasks': len(self._background_task_active),
+                'active_task_ids': list(self._background_task_active),
+                'queued_tasks': len(self._background_task_queue),
+                'max_concurrent': self._MAX_CONCURRENT_BACKGROUND_TASKS,
+                'queue_depth': len(self._background_task_queue),
+                'available_slots': max(0, self._MAX_CONCURRENT_BACKGROUND_TASKS - len(self._background_task_active))
+            }
 
     def get_synthesis_candidates(self, agent_id: str, limit: int = 20) -> List[Dict]:
         """Get memories ready for synthesis (unsynthesized, recent)."""
@@ -4611,7 +4810,13 @@ Add to Ögedei's monitoring loop:
 IDLE_THRESHOLD_MINUTES = 5
 
 def monitor_agent_idle(self):
-    """Check all agents for idle status and assign background synthesis."""
+    """Check all agents for idle status and assign background synthesis.
+
+    Respects global background task limit to prevent connection pool exhaustion.
+    Processes queued tasks when slots become available.
+    """
+    # First, try to process any queued background tasks
+    self._process_background_task_queue()
 
     for agent_id in self.agent_ids:
         # Skip Kublai (main) - only handles user requests
@@ -4640,8 +4845,49 @@ def monitor_agent_idle(self):
             if preempted:
                 self.memory.resume_background_task(agent_id)
             else:
-                # Create new synthesis task
+                # Create new synthesis task (respects global limit)
                 self.memory.create_background_synthesis_task(agent_id)
+
+def _process_background_task_queue(self):
+    """Process queued background tasks when slots are available.
+
+    Called periodically by monitor_agent_idle to drain the queue.
+    """
+    with self.memory._background_task_lock:
+        if not self.memory._background_task_queue:
+            return
+
+        # Try to process queued tasks up to available slots
+        available_slots = self.memory._MAX_CONCURRENT_BACKGROUND_TASKS - len(self.memory._background_task_active)
+
+        for _ in range(available_slots):
+            if not self.memory._background_task_queue:
+                break
+
+            # Try to acquire semaphore (non-blocking)
+            if not self.memory._background_task_semaphore.acquire(blocking=False):
+                break
+
+            try:
+                # Get next queued task
+                queued = self.memory._background_task_queue.pop(0)
+
+                # Create the actual task
+                task_id = self.memory._create_queued_background_task(queued['agent_id'])
+
+                if task_id:
+                    self.memory._background_task_active.add(str(task_id))
+                    logger.info(f"[BACKGROUND] Processed queued task {task_id} for {queued['agent_id']}")
+                else:
+                    # Failed to create, release semaphore
+                    self.memory._background_task_semaphore.release()
+                    # Re-queue at front
+                    self.memory._background_task_queue.insert(0, queued)
+                    break
+            except Exception as e:
+                self.memory._background_task_semaphore.release()
+                logger.error(f"[BACKGROUND] Failed to process queued task: {e}")
+                break
 ```
 
 #### Chagatai's SOUL.md Addition
