@@ -1081,6 +1081,390 @@ class OperationalMemory:
         return health["status"] == "healthy"
 
     # =======================================================================
+    # Security Audit (Temüjin Protocol)
+    # =======================================================================
+
+    def create_security_audit(
+        self,
+        agent: str,
+        severity: str,
+        category: str,
+        description: str,
+        resource: str
+    ) -> str:
+        """
+        Create a new security audit entry.
+
+        Args:
+            agent: Agent being audited
+            severity: Severity level ('low', 'medium', 'high', 'critical')
+            category: Type of security issue ('auth', 'injection', 'secrets', 'config', 'crypto', 'other')
+            description: Human-readable description of the issue
+            resource: Affected resource (file path, endpoint, etc.)
+
+        Returns:
+            Audit ID string
+
+        Raises:
+            ValueError: If severity or category is invalid
+        """
+        # Validate severity
+        valid_severities = ['low', 'medium', 'high', 'critical']
+        if severity not in valid_severities:
+            raise ValueError(f"Invalid severity '{severity}'. Must be one of: {valid_severities}")
+
+        # Validate category
+        valid_categories = ['auth', 'injection', 'secrets', 'config', 'crypto', 'other']
+        if category not in valid_categories:
+            raise ValueError(f"Invalid category '{category}'. Must be one of: {valid_categories}")
+
+        audit_id = self._generate_id()
+        created_at = self._now()
+
+        cypher = """
+        CREATE (s:SecurityAudit {
+            id: $audit_id,
+            agent: $agent,
+            severity: $severity,
+            category: $category,
+            description: $description,
+            resource: $resource,
+            created_at: $created_at,
+            status: 'open',
+            resolved_by: null,
+            resolved_at: null
+        })
+        RETURN s.id as audit_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Security audit creation simulated for {agent}")
+                return audit_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    audit_id=audit_id,
+                    agent=agent,
+                    severity=severity,
+                    category=category,
+                    description=description,
+                    resource=resource,
+                    created_at=created_at
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Security audit created: {audit_id} (agent: {agent}, severity: {severity})")
+                    return record["audit_id"]
+                else:
+                    raise RuntimeError("Security audit creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create security audit: {e}")
+                raise
+
+    def list_security_audits(
+        self,
+        agent: Optional[str] = None,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+        category: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None
+    ) -> List[Dict]:
+        """
+        Query security audits with optional filters.
+
+        Args:
+            agent: Filter by agent being audited
+            status: Filter by status ('open', 'resolved', 'ignored')
+            severity: Filter by severity ('low', 'medium', 'high', 'critical')
+            category: Filter by category ('auth', 'injection', 'secrets', 'config', 'crypto', 'other')
+            date_from: Filter by created_at >= date_from
+            date_to: Filter by created_at <= date_to
+
+        Returns:
+            List of security audit dicts, sorted by severity (critical first) then created_at
+        """
+        # Build dynamic query based on filters
+        conditions = []
+        params = {}
+
+        if agent is not None:
+            conditions.append("s.agent = $agent")
+            params["agent"] = agent
+
+        if status is not None:
+            conditions.append("s.status = $status")
+            params["status"] = status
+
+        if severity is not None:
+            conditions.append("s.severity = $severity")
+            params["severity"] = severity
+
+        if category is not None:
+            conditions.append("s.category = $category")
+            params["category"] = category
+
+        if date_from is not None:
+            conditions.append("s.created_at >= $date_from")
+            params["date_from"] = date_from
+
+        if date_to is not None:
+            conditions.append("s.created_at <= $date_to")
+            params["date_to"] = date_to
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (s:SecurityAudit)
+        {where_clause}
+        RETURN s
+        ORDER BY
+            CASE s.severity
+                WHEN 'critical' THEN 4
+                WHEN 'high' THEN 3
+                WHEN 'medium' THEN 2
+                WHEN 'low' THEN 1
+                ELSE 0
+            END DESC,
+            s.created_at DESC
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                return [dict(record["s"]) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to list security audits: {e}")
+                raise
+
+    def resolve_security_audit(
+        self,
+        audit_id: str,
+        resolved_by: str,
+        status: str = "resolved"
+    ) -> bool:
+        """
+        Mark a security audit as resolved or ignored.
+
+        Args:
+            audit_id: Audit ID to resolve
+            resolved_by: Agent who is resolving the audit
+            status: New status ('resolved' or 'ignored')
+
+        Returns:
+            True if successful, False if audit not found
+
+        Raises:
+            ValueError: If status is not 'resolved' or 'ignored'
+        """
+        if status not in ('resolved', 'ignored'):
+            raise ValueError("Status must be 'resolved' or 'ignored'")
+
+        resolved_at = self._now()
+
+        cypher = """
+        MATCH (s:SecurityAudit {id: $audit_id})
+        WHERE s.status = 'open'
+        SET s.status = $status,
+            s.resolved_by = $resolved_by,
+            s.resolved_at = $resolved_at
+        RETURN s.id as audit_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Security audit resolution simulated for {audit_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    audit_id=audit_id,
+                    status=status,
+                    resolved_by=resolved_by,
+                    resolved_at=resolved_at
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"Security audit not found or not open: {audit_id}")
+                    return False
+
+                logger.info(f"Security audit {status}: {audit_id} by {resolved_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to resolve security audit: {e}")
+                raise
+
+    def get_security_audit(self, audit_id: str) -> Optional[Dict]:
+        """
+        Get a security audit by ID.
+
+        Args:
+            audit_id: Audit ID to retrieve
+
+        Returns:
+            Security audit dict if found, None otherwise
+        """
+        cypher = """
+        MATCH (s:SecurityAudit {id: $audit_id})
+        RETURN s
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, audit_id=audit_id)
+                record = result.single()
+                return dict(record["s"]) if record else None
+            except Neo4jError as e:
+                logger.error(f"Failed to get security audit: {e}")
+                raise
+
+    def get_security_summary(self, agent: Optional[str] = None) -> Dict:
+        """
+        Get summary counts of security audits by severity and status.
+
+        Args:
+            agent: Optional agent to filter by
+
+        Returns:
+            Dict with counts by severity and status
+        """
+        # Base query for counts by severity
+        if agent:
+            severity_cypher = """
+            MATCH (s:SecurityAudit {agent: $agent})
+            RETURN s.severity as severity, s.status as status, count(s) as count
+            """
+            params = {"agent": agent}
+        else:
+            severity_cypher = """
+            MATCH (s:SecurityAudit)
+            RETURN s.severity as severity, s.status as status, count(s) as count
+            """
+            params = {}
+
+        with self._session() as session:
+            if session is None:
+                return {
+                    "total": 0,
+                    "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+                    "by_status": {"open": 0, "resolved": 0, "ignored": 0},
+                    "open_by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0}
+                }
+
+            try:
+                result = session.run(severity_cypher, **params)
+
+                # Initialize counters
+                by_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+                by_status = {"open": 0, "resolved": 0, "ignored": 0}
+                open_by_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+
+                total = 0
+                for record in result:
+                    severity = record["severity"]
+                    status = record["status"]
+                    count = record["count"]
+
+                    total += count
+                    if severity in by_severity:
+                        by_severity[severity] += count
+                    if status in by_status:
+                        by_status[status] += count
+                    if status == "open" and severity in open_by_severity:
+                        open_by_severity[severity] += count
+
+                return {
+                    "total": total,
+                    "by_severity": by_severity,
+                    "by_status": by_status,
+                    "open_by_severity": open_by_severity
+                }
+
+            except Neo4jError as e:
+                logger.error(f"Failed to get security summary: {e}")
+                raise
+
+    def get_security_audit_trail(
+        self,
+        agent: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None
+    ) -> List[Dict]:
+        """
+        Get audit trail of security-related actions.
+
+        Returns both created and resolved audits within the date range.
+
+        Args:
+            agent: Filter by agent (optional)
+            date_from: Start date for audit trail
+            date_to: End date for audit trail
+
+        Returns:
+            List of audit trail entries with action type
+        """
+        # Build conditions
+        conditions = []
+        params = {}
+
+        if agent is not None:
+            conditions.append("s.agent = $agent")
+            params["agent"] = agent
+
+        if date_from is not None:
+            conditions.append("(s.created_at >= $date_from OR s.resolved_at >= $date_from)")
+            params["date_from"] = date_from
+
+        if date_to is not None:
+            conditions.append("(s.created_at <= $date_to OR s.resolved_at <= $date_to)")
+            params["date_to"] = date_to
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (s:SecurityAudit)
+        {where_clause}
+        RETURN s,
+            CASE
+                WHEN s.resolved_at IS NOT NULL THEN s.resolved_at
+                ELSE s.created_at
+            END as action_time,
+            CASE
+                WHEN s.resolved_at IS NOT NULL THEN 'resolved'
+                ELSE 'created'
+            END as action_type
+        ORDER BY action_time DESC
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                trail = []
+                for record in result:
+                    entry = dict(record["s"])
+                    entry["action_time"] = record["action_time"]
+                    entry["action_type"] = record["action_type"]
+                    trail.append(entry)
+                return trail
+            except Neo4jError as e:
+                logger.error(f"Failed to get security audit trail: {e}")
+                raise
+
+    # =======================================================================
     # Schema Management
     # =======================================================================
 
@@ -1110,6 +1494,16 @@ class OperationalMemory:
             # Agent indexes
             ("CREATE INDEX agent_name_idx IF NOT EXISTS FOR (a:Agent) ON (a.name)", "agent_name_idx"),
             ("CREATE INDEX agent_heartbeat_idx IF NOT EXISTS FOR (a:Agent) ON (a.last_heartbeat)", "agent_heartbeat_idx"),
+
+            # SecurityAudit indexes
+            ("CREATE INDEX securityaudit_id_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.id)", "securityaudit_id_idx"),
+            ("CREATE INDEX securityaudit_agent_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.agent)", "securityaudit_agent_idx"),
+            ("CREATE INDEX securityaudit_status_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.status)", "securityaudit_status_idx"),
+            ("CREATE INDEX securityaudit_severity_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.severity)", "securityaudit_severity_idx"),
+            ("CREATE INDEX securityaudit_category_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.category)", "securityaudit_category_idx"),
+            ("CREATE INDEX securityaudit_created_at_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.created_at)", "securityaudit_created_at_idx"),
+            ("CREATE INDEX securityaudit_agent_status_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.agent, s.status)", "securityaudit_agent_status_idx"),
+            ("CREATE INDEX securityaudit_severity_status_idx IF NOT EXISTS FOR (s:SecurityAudit) ON (s.severity, s.status)", "securityaudit_severity_status_idx"),
         ]
 
         created = []
