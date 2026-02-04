@@ -1,0 +1,52 @@
+# Prometheus configuration for OpenClaw multi-agent system monitoring.
+#
+# This configuration sets up Prometheus to scrape metrics from the
+# OpenClaw monitoring endpoint and includes alerting rules.
+#
+# Usage:
+#   prometheus --config.file=monitoring/prometheus.yml
+#
+# The metrics endpoint is exposed at http://localhost:9090/metrics
+
+global:
+  # How frequently to scrape targets
+  scrape_interval: 15s
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+  # The timeout for scraping
+  scrape_timeout: 10s
+  # External labels
+  external_labels:
+    cluster: 'openclaw'
+    environment: 'production'
+
+# Rule files for alerting
+rule_files:
+  - 'monitoring/alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # OpenClaw metrics endpoint
+  - job_name: 'openclaw'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+        labels:
+          service: 'openclaw'
+          component: 'multi-agent-system'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+
+# Alerting configuration (for AlertManager)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            # - 'localhost:9093'  # Uncomment if using AlertManager

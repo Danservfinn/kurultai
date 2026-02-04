@@ -1,0 +1,221 @@
+# Prometheus alerting rules for OpenClaw multi-agent system.
+#
+# These rules define when alerts should be fired based on metrics.
+# Alerts are evaluated at the interval specified in each group.
+#
+# Severity levels:
+#   - critical: Immediate action required, service may be down
+#   - warning: Action required soon, service degraded
+#   - info: Informational, no immediate action required
+
+groups:
+  # ========================================================================
+  # Neo4j Alerts
+  # ========================================================================
+  - name: neo4j_alerts
+    interval: 30s
+    rules:
+      - alert: Neo4jDown
+        expr: openclaw_neo4j_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Neo4j is unavailable"
+          description: "Neo4j connection has been down for more than 1 minute. The system is operating in fallback mode."
+          runbook_url: "https://wiki.internal/runbooks/neo4j-down"
+
+      - alert: Neo4jSlowQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(openclaw_neo4j_query_duration_seconds_bucket[5m])) by (le, query_type)
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          team: performance
+        annotations:
+          summary: "Slow Neo4j queries detected"
+          description: "95th percentile query time for {{ $labels.query_type }} is {{ $value }}s"
+
+  # ========================================================================
+  # Agent Health Alerts
+  # ========================================================================
+  - name: agent_alerts
+    interval: 30s
+    rules:
+      - alert: AgentDown
+        expr: |
+          (time() - openclaw_agent_heartbeat_timestamp) > 300
+        for: 2m
+        labels:
+          severity: critical
+          team: agents
+        annotations:
+          summary: "Agent {{ $labels.agent }} is down"
+          description: "Agent {{ $labels.agent }} has not sent a heartbeat in over 5 minutes"
+
+      - alert: AgentHighErrorRate
+        expr: |
+          openclaw_agent_error_rate > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "High error rate for agent {{ $labels.agent }}"
+          description: "Agent {{ $labels.agent }} error rate is {{ $value | humanizePercentage }}, above 10% threshold"
+
+      - alert: AgentLowSuccessRate
+        expr: |
+          openclaw_agent_success_rate < 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "Low success rate for agent {{ $labels.agent }}"
+          description: "Agent {{ $labels.agent }} success rate is {{ $value | humanizePercentage }}, below 85% threshold"
+
+  # ========================================================================
+  # Task Performance Alerts
+  # ========================================================================
+  - name: task_alerts
+    interval: 30s
+    rules:
+      - alert: HighTaskFailureRate
+        expr: |
+          (
+            sum(rate(openclaw_task_failed_total[5m])) by (agent, task_type)
+            /
+            (
+              sum(rate(openclaw_task_completed_total[5m])) by (agent, task_type)
+              +
+              sum(rate(openclaw_task_failed_total[5m])) by (agent, task_type)
+            )
+          ) > 0.15
+        for: 5m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "High task failure rate for {{ $labels.agent }}"
+          description: "{{ $labels.agent }} {{ $labels.task_type }} task failure rate is {{ $value | humanizePercentage }}, above 15% threshold"
+
+      - alert: AgentQueueBacklog
+        expr: |
+          openclaw_queue_depth > 50
+        for: 5m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "Task backlog detected for {{ $labels.agent }}"
+          description: "Agent {{ $labels.agent }} has {{ $value }} pending tasks, above 50 threshold"
+
+      - alert: AgentQueueCritical
+        expr: |
+          openclaw_queue_depth > 100
+        for: 2m
+        labels:
+          severity: critical
+          team: agents
+        annotations:
+          summary: "Critical task backlog for {{ $labels.agent }}"
+          description: "Agent {{ $labels.agent }} has {{ $value }} pending tasks, above 100 critical threshold"
+
+  # ========================================================================
+  # Failover Alerts
+  # ========================================================================
+  - name: failover_alerts
+    interval: 30s
+    rules:
+      - alert: FailoverActivated
+        expr: |
+          openclaw_failover_active == 1
+        for: 0s
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Failover mode is active"
+          description: "The system is operating in failover mode. Kublai may be unavailable."
+
+      - alert: FailoverExtended
+        expr: |
+          openclaw_failover_active == 1 and openclaw_failover_duration_seconds > 3600
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Extended failover duration"
+          description: "Failover has been active for {{ $value | humanizeDuration }}"
+
+      - alert: ExcessiveFailovers
+        expr: |
+          sum(rate(openclaw_failover_activated_total[1h])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Excessive failover activations"
+          description: "More than 3 failovers per hour detected"
+
+  # ========================================================================
+  # System Health Alerts
+  # ========================================================================
+  - name: system_alerts
+    interval: 30s
+    rules:
+      - alert: GatewayDown
+        expr: |
+          openclaw_gateway_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Gateway {{ $labels.gateway_id }} is unavailable"
+          description: "Gateway {{ $labels.gateway_id }} has been down for over 1 minute"
+
+      - alert: SignalDisconnected
+        expr: |
+          openclaw_signal_status == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Signal connectivity lost"
+          description: "Signal service has been disconnected for over 2 minutes"
+
+  # ========================================================================
+  # Memory Growth Alerts
+  # ========================================================================
+  - name: memory_alerts
+    interval: 60s
+    rules:
+      - alert: HighNodeCount
+        expr: |
+          openclaw_memory_nodes_total{node_type="Task"} > 10000
+        for: 10m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High number of Task nodes"
+          description: "{{ $value }} Task nodes in memory, consider archival"
+
+      - alert: HighRelationshipCount
+        expr: |
+          openclaw_memory_relationships_total > 50000
+        for: 10m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High number of relationships"
+          description: "{{ $value }} relationships in memory, consider cleanup"

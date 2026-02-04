@@ -10,6 +10,10 @@ Modules:
     background_synthesis: BackgroundTaskManager for idle-time synthesis tasks
     reflection_memory: AgentReflectionMemory for recording agent mistakes
     meta_learning: MetaLearningEngine for generating MetaRules from reflections
+    backend_collaboration: BackendCodeReviewer for Jochi-Temüjin collaboration protocol
+    failover_monitor: FailoverMonitor for Kublai failover to Ögedei
+    notion_integration: NotionIntegration for bidirectional Notion sync
+    monitoring: PrometheusMetrics and AlertManager for system monitoring
 
 Example Usage:
     # Using tools directly
@@ -64,6 +68,31 @@ Example Usage:
         source_reflections=[reflection_id]
     )
     meta_engine.approve_metarule(rule_id, approved_by="main")
+
+    # Using backend collaboration (Jochi-Temüjin protocol)
+    from tools.backend_collaboration import BackendCodeReviewer
+    reviewer = BackendCodeReviewer(memory)
+    analysis_id = reviewer.create_backend_analysis(
+        category="connection_pool",
+        findings="Database connections not pooled",
+        location="db.py:25",
+        severity="critical",
+        recommended_fix="Implement connection pooling"
+    )
+
+    # Using Notion integration
+    from tools.notion_integration import NotionIntegration
+    integration = NotionIntegration(memory)
+    integration.start_polling()
+
+    # Using monitoring
+    from tools.monitoring import PrometheusMetrics, AlertManager, start_monitoring
+    metrics, alert_manager = start_monitoring(port=9090)
+    metrics.inc_task_created("main", "research")
+    metrics.inc_task_completed("main", "research", duration=45.2)
+    alerts = alert_manager.check_all(metrics)
+    for alert in alerts:
+        alert_manager.send_alert(alert)
 """
 
 __version__ = "1.0.0"
@@ -74,6 +103,10 @@ __all__ = [
     "background_synthesis",
     "reflection_memory",
     "meta_learning",
+    "backend_collaboration",
+    "failover_monitor",
+    "notion_integration",
+    "monitoring",
 ]
 
 # Import main classes for convenience
@@ -83,6 +116,10 @@ from . import file_consistency
 from . import background_synthesis
 from . import reflection_memory
 from . import meta_learning
+from . import backend_collaboration
+from . import failover_monitor
+from . import notion_integration
+from . import monitoring
 from .agent_integration import AgentMemoryIntegration
 from .file_consistency import (
     FileConsistencyChecker,
@@ -112,4 +149,28 @@ from .meta_learning import (
     MetaRuleError,
     create_meta_learning_engine,
     generate_and_create_metarule,
+)
+from .backend_collaboration import (
+    BackendCodeReviewer,
+)
+from .failover_monitor import (
+    FailoverMonitor,
+    FailoverError,
+    create_failover_monitor,
+)
+from .notion_integration import (
+    NotionIntegration,
+    NotionClient,
+    NotionTask,
+    Checkpoint,
+    create_notion_integration,
+)
+from .monitoring import (
+    PrometheusMetrics,
+    AlertManager,
+    Alert,
+    MetricsRegistry,
+    get_registry,
+    create_monitoring,
+    start_monitoring,
 )
