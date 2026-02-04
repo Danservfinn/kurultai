@@ -6354,6 +6354,530 @@ If migration fails:
 
 ---
 
+### Phase 7: Bidirectional Notion Integration
+
+Enable creating and managing tasks directly in Notion with full agent execution support.
+
+#### 7.1 Notion Database Schema
+
+Required fields for bidirectional sync:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| **Name** | Title | Task description |
+| **Status** | Select | Backlog / Pending Review / To Do / In Progress / Review / Done / Blocked |
+| **Agent** | Select | (Optional) Force specific agent |
+| **Priority** | Select | P0 / P1 / P2 / P3 |
+| **Neo4j Task ID** | Rich Text | Links to operational memory |
+| **Requester** | Rich Text | Who created the task |
+| **Created From** | Select | Notion / Signal / Agent |
+
+#### 7.2 Bidirectional Sync Architecture
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Notion    │◄───►│   Ögedei    │◄───►│   Neo4j     │
+│  Kanban     │     │  (Poller)   │     │  (Tasks)    │
+└─────────────┘     └──────┬──────┘     └──────┬──────┘
+                           │                   │
+                           ▼                   ▼
+                    ┌─────────────┐     ┌─────────────┐
+                    │   Kublai    │     │   Agents    │
+                    │  (Reviewer) │     │ (Execution) │
+                    └─────────────┘     └─────────────┘
+```
+
+#### 7.3 Ögedei's Polling Loop
+
+```python
+def poll_notion_for_new_tasks(self, memory: OperationalMemory):
+    """Detect tasks created in Notion without Neo4j Task ID."""
+
+    # Query Notion for orphan tasks (no Neo4j ID)
+    orphan_tasks = self.query_notion_tasks(
+        filter={"property": "Neo4j Task ID", "rich_text": {"is_empty": True}}
+    )
+
+    for notion_task in orphan_tasks:
+        # Move to Pending Review
+        self.update_task_status(notion_task['id'], 'Pending Review')
+
+        # Create draft Neo4j task
+        draft_task_id = memory.create_task(
+            task_type="pending_review",
+            description=notion_task['title'],
+            delegated_by="main",
+            assigned_to="main",
+            priority=self.map_priority(notion_task['priority']),
+            properties={
+                'notion_page_id': notion_task['id'],
+                'requester': 'notion',
+                'suggested_agent': notion_task.get('agent', 'auto')
+            }
+        )
+
+        # Link Notion to Neo4j
+        self.update_task_neo4j_id(notion_task['id'], draft_task_id)
+
+        # Notify Kublai
+        self.notify_kublai_of_pending_review(draft_task_id, notion_task)
+```
+
+#### 7.4 Kublai Review Protocol
+
+```python
+def review_notion_task(self, task_id: str, notion_context: Dict) -> Dict:
+    """Kublai evaluates tasks from Notion before activation."""
+
+    # Load related context
+    related = self.memory.query_related(
+        agent="main",
+        topic=notion_context['title'],
+        sender_hash=self.get_sender_hash(notion_context.get('requester'))
+    )
+
+    # Make delegation decision
+    decision = self.delegate_or_execute(
+        task_description=notion_context['title'],
+        suggested_agent=notion_context.get('suggested_agent'),
+        related_context=related,
+        source='notion'
+    )
+
+    return {
+        'action': decision['action'],  # delegate/execute/reject/clarify
+        'assigned_to': decision['agent'],
+        'task_type': decision['task_type'],
+        'notes': decision['reasoning']
+    }
+```
+
+**Review Outcomes:**
+
+| Action | Notion Status | Signal Notification |
+|--------|--------------|---------------------|
+| Approve + Delegate | → "To Do" | ✅ Task assigned to {agent} |
+| Approve + Execute | → "In Progress" | ⚡ Quick task completed |
+| Reject | → "Blocked" | ❌ Couldn't process: {reason} |
+| Need Clarification | → "Blocked" | ❓ Need clarification: {question} |
+
+#### 7.5 Reprioritization via Column Moves
+
+```python
+COLUMN_ACTIONS = {
+    'Backlog': {'neo4j_status': 'suspended', 'action': 'pause'},
+    'To Do': {'neo4j_status': 'pending', 'action': 'queue'},
+    'In Progress': {'neo4j_status': 'in_progress', 'action': 'start'},
+    'Blocked': {'neo4j_status': 'blocked', 'action': 'pause_and_report'},
+    'Review': {'neo4j_status': 'completed', 'action': 'mark_complete'},
+    'Done': {'neo4j_status': 'completed', 'action': 'archive'}
+}
+
+def handle_column_change(self, notion_task: Dict, old_status: str, new_status: str):
+    """Handle user moving cards in Notion."""
+
+    task_id = notion_task['neo4j_task_id']
+
+    # Case: Interrupt active work
+    if old_status == 'In Progress' and new_status in ['Backlog', 'To Do', 'Blocked']:
+        # Create checkpoint before interrupting
+        checkpoint = self.create_checkpoint(
+            agent=self.memory.get_task_assignee(task_id),
+            task_id=task_id
+        )
+
+        # Notify agent to pause
+        self.interrupt_agent(
+            agent=self.memory.get_task_assignee(task_id),
+            task_id=task_id,
+            reason=f"Reprioritized to {new_status}"
+        )
+
+        self.send_signal_message(
+            message=f"⏸️ Paused '{notion_task['title']}' - checkpoint saved."
+        )
+```
+
+#### 7.6 Checkpoint System for Interrupted Tasks
+
+```python
+def create_checkpoint(self, agent: str, task_id: str) -> Dict:
+    """Save agent state before interruption."""
+
+    checkpoint = {
+        'agent': agent,
+        'task_id': task_id,
+        'timestamp': datetime.now().isoformat(),
+        'context': {
+            'files_open': self.get_agent_open_files(agent),
+            'partial_code': self.get_uncommitted_changes(agent),
+            'research_notes': self.get_agent_notes(agent)
+        },
+        'progress': {
+            'percent_complete': self.estimate_task_progress(agent, task_id),
+            'completed_steps': self.get_completed_steps(agent, task_id),
+            'next_step': self.get_next_step(agent, task_id)
+        }
+    }
+
+    # Store in Neo4j
+    self.memory.store_checkpoint(checkpoint)
+    return checkpoint
+```
+
+**Neo4j Schema:**
+
+```cypher
+(:Checkpoint {
+  id: uuid,
+  task_id: uuid,
+  agent: string,
+  created_at: datetime,
+  context_json: string,
+  progress_percent: float,
+  expires_at: datetime
+})
+```
+
+#### 7.7 Intelligent Error Routing
+
+```python
+class ErrorRouter:
+    """Routes errors to appropriate specialist agents."""
+
+    ERROR_CLASSIFICATION = {
+        'api_error': {'agent': 'developer', 'confidence': 0.85},
+        'syntax_error': {'agent': 'developer', 'confidence': 0.95},
+        'performance_issue': {'agent': 'analyst', 'confidence': 0.85},
+        'race_condition': {'agent': 'analyst', 'confidence': 0.90},
+        'insufficient_information': {'agent': 'researcher', 'confidence': 0.80},
+        'tone_issue': {'agent': 'writer', 'confidence': 0.75},
+        'sync_failure': {'agent': 'ops', 'confidence': 0.90}
+    }
+
+    def classify_error(self, error_message: str) -> Dict:
+        """Analyze error and determine best agent."""
+
+        error_lower = error_message.lower()
+        scores = {}
+
+        for error_type, config in self.ERROR_CLASSIFICATION.items():
+            if re.search(config['pattern'], error_lower, re.IGNORECASE):
+                scores[error_type] = config['confidence']
+
+        if scores:
+            best = max(scores.items(), key=lambda x: x[1])
+            return {
+                'agent': self.ERROR_CLASSIFICATION[best[0]]['agent'],
+                'confidence': best[1],
+                'error_type': best[0]
+            }
+
+        return self._llm_classify_error(error_message)
+```
+
+#### 7.8 Failure History Tracking
+
+```python
+def analyze_agent_failure_history(self, agent: str, error_type: str) -> Dict:
+    """Query Neo4j for agent's track record."""
+
+    query = """
+    MATCH (f:AgentFailure {agent: $agent, error_type: $error_type})
+    WHERE f.created_at > datetime() - duration('days', 30)
+    RETURN count(f) as recent_failures,
+           avg(CASE WHEN f.fix_successful THEN 1.0 ELSE 0.0 END) as fix_rate
+    """
+
+    result = self.memory.execute(query, agent=agent, error_type=error_type)
+    record = result.single()
+
+    return {
+        'recent_failures': record['recent_failures'] or 0,
+        'fix_success_rate': record['fix_rate'] or 1.0
+    }
+
+def route_with_history_awareness(self, failed_task: Dict, error: str) -> Dict:
+    """Route error considering both type and history."""
+
+    classification = self.error_router.classify_error(error)
+    history = self.analyze_agent_failure_history(
+        failed_task['assigned_to'],
+        classification['error_type']
+    )
+
+    # Pattern: Repeat offender
+    if history['recent_failures'] >= 3:
+        return {
+            'action': 'escalate_to_kublai',
+            'reason': f"{failed_task['assigned_to']} failed {history['recent_failures']} times"
+        }
+
+    # Pattern: Low fix success rate
+    elif history['fix_success_rate'] < 0.5:
+        return {
+            'action': 'try_different_agent',
+            'suggested_agent': self.find_alternative_agent(classification['error_type'])
+        }
+
+    # Normal routing
+    return {
+        'action': 'delegate',
+        'suggested_agent': classification['agent']
+    }
+```
+
+**Neo4j Schema:**
+
+```cypher
+(:AgentFailure {
+  id: uuid,
+  agent: string,
+  task_type: string,
+  error_type: string,
+  fix_successful: boolean,
+  fix_agent: string,
+  created_at: datetime
+})
+
+(:AgentReliability {
+  agent: string,
+  task_type: string,
+  success_rate: float,
+  total_attempts: int,
+  recent_failures: int
+})
+```
+
+#### 7.9 Proactive Training System
+
+```python
+def detect_training_needs(self, agent: str, error_type: str,
+                         recent_failures: List[Dict]) -> Optional[Dict]:
+    """Identify when an agent needs training."""
+
+    if len(recent_failures) >= 3:
+        return {
+            'type': 'skill_gap',
+            'priority': 'high',
+            'suggestion': f"{agent} needs training on {error_type}",
+            'action': 'create_knowledge_base_entry'
+        }
+
+    return None
+
+def create_knowledge_base_entry(self, training_need: Dict):
+    """Generate training material from successful fixes."""
+
+    # Query successful fixes for this error
+    examples = self.query_successful_fixes(training_need['error_type'], limit=5)
+
+    # Synthesize best practices
+    kb_content = self.synthesize_training_material(
+        error_type=training_need['error_type'],
+        successes=examples
+    )
+
+    # Store as Synthesis node
+    kb_id = self.memory.store_synthesis(
+        agent="main",
+        insight=kb_content['summary'],
+        novelty_type="training_material",
+        access_tier="PUBLIC"
+    )
+
+    # Create MetaRule for agent SOUL
+    self.meta_learning.create_rule(
+        agent=training_need.get('affected_agent'),
+        rule_content=kb_content['rule'],
+        context=f"Derived from failures"
+    )
+
+    # Queue SOUL update via Ögedei
+    self.ogedei.queue_soul_update(
+        agent=training_need.get('affected_agent'),
+        addition=kb_content['soul_addition']
+    )
+
+    return kb_id
+```
+
+#### 7.10 Pair Programming Suggestions
+
+```python
+def suggest_pair_programming(self, task: Dict, failing_agent: str,
+                            error_type: str) -> Optional[Dict]:
+    """Suggest optimal pair programming match."""
+
+    # Find experts with successful fixes
+    experts = self.find_error_experts(error_type, exclude=[failing_agent])
+
+    if not experts:
+        return None
+
+    # Calculate compatibility
+    best_match = None
+    best_score = 0
+
+    for expert in experts:
+        score = self.calculate_pair_compatibility(
+            mentor=expert,
+            mentee=failing_agent,
+            task=task
+        )
+        if score > best_score and score >= 0.6:
+            best_score = score
+            best_match = expert
+
+    return {
+        'mentor': best_match,
+        'mentee': failing_agent,
+        'compatibility_score': best_score
+    } if best_match else None
+
+def calculate_pair_compatibility(self, mentor: str, mentee: str,
+                                 task: Dict) -> float:
+    """Score how well two agents work together."""
+
+    scores = []
+
+    # Factor 1: Expertise gap
+    mentor_skill = self.get_agent_skill_rating(mentor, task['type'])
+    mentee_skill = self.get_agent_skill_rating(mentee, task['type'])
+    if mentor_skill > mentee_skill + 0.3:
+        scores.append(0.25)
+
+    # Factor 2: Collaboration history
+    history = self.get_collaboration_history(mentor, mentee)
+    if history['successful_collaborations'] > 0:
+        scores.append(0.25 * min(history['success_rate'], 1.0))
+    else:
+        scores.append(0.15)
+
+    # Factor 3: Workload balance
+    mentor_load = self.get_agent_workload(mentor)
+    if mentor_load < 0.7:
+        scores.append(0.25)
+    elif mentor_load < 0.9:
+        scores.append(0.15)
+    else:
+        scores.append(0.05)
+
+    # Factor 4: Communication style
+    style_match = self.get_communication_compatibility(mentor, mentee)
+    scores.append(0.25 * style_match)
+
+    return sum(scores)
+
+def initiate_pair_session(self, pair_match: Dict, task: Dict):
+    """Carefully introduce pair programming."""
+
+    mentor = pair_match['mentor']
+    mentee = pair_match['mentee']
+
+    # Step 1: Check mentor availability
+    if not self.is_agent_available(mentor):
+        self.queue_pair_session(pair_match, task)
+        return {'status': 'queued'}
+
+    # Step 2: Propose to mentor (opt-in)
+    proposal = self.send_agent_message(
+        to=mentor,
+        message=(
+            f"🤝 Pair Programming Opportunity\n"
+            f"{mentee} is struggling with {task['type']}.\n"
+            f"You have {self.get_success_count(mentor, task['type'])} successes.\n\n"
+            f"1. Accept - Guide {mentee}\n"
+            f"2. Suggest async - Share notes\n"
+            f"3. Decline - Too busy"
+        ),
+        require_response=True,
+        timeout_minutes=30
+    )
+
+    if proposal['response'] == '1':
+        # Mentor accepts
+        self.notify_mentee(mentee, mentor, task, pair_match)
+        self.create_pair_workspace(mentor, mentee, task)
+        return {'status': 'accepted'}
+
+    elif proposal['response'] == '2':
+        self.initiate_async_mentoring(mentor, mentee, task)
+        return {'status': 'async'}
+
+    else:
+        # Try next expert
+        return self.try_next_expert(task, mentee, exclude=[mentor])
+```
+
+#### 7.11 Error Handling & Recovery
+
+```python
+class NotionSyncErrorHandler:
+    """Handle failures in bidirectional sync."""
+
+    def handle_notion_api_failure(self, error: Exception,
+                                  pending_changes: List[Dict]):
+        """Queue changes for retry when Notion is down."""
+
+        for change in pending_changes:
+            self.memory.create_task(
+                task_type="notion_sync_retry",
+                description=f"Retry {change['operation']}",
+                delegated_by="ops",
+                assigned_to="ops",
+                properties={
+                    'change': change,
+                    'retry_count': 0,
+                    'max_retries': 5
+                }
+            )
+
+        # Alert if outage persists >10 minutes
+        self.schedule_alert(
+            condition="notion_api_down > 600",
+            notify="kublai",
+            message="Notion API down >10 min"
+        )
+
+    def detect_sync_conflict(self, notion_task: Dict,
+                            neo4j_task: Dict) -> Optional[str]:
+        """Detect when Notion and Neo4j diverge."""
+
+        conflicts = []
+
+        # Status mismatch
+        notion_status = notion_task['status']
+        neo4j_status = neo4j_task['status']
+
+        status_map = {
+            'To Do': ['pending'],
+            'In Progress': ['in_progress', 'claimed'],
+            'Done': ['completed']
+        }
+
+        if notion_status in status_map and \
+           neo4j_status not in status_map[notion_status]:
+            conflicts.append(f"Status: Notion={notion_status}, Neo4j={neo4j_status}")
+
+        return '; '.join(conflicts) if conflicts else None
+```
+
+#### 7.12 Implementation Priority
+
+| Component | Effort | Value | Order |
+|-----------|--------|-------|-------|
+| Notion polling loop | 2 hours | High | 1st |
+| Kublai review protocol | 3 hours | High | 2nd |
+| Status sync (bidirectional) | 2 hours | Medium | 3rd |
+| Checkpoint system | 4 hours | Medium | 4th |
+| Error routing | 4 hours | High | 5th |
+| Failure history tracking | 3 hours | Medium | 6th |
+| Training system | 4 hours | Low | 7th |
+| Pair programming | 6 hours | Low | 8th |
+
+---
+
 ## Appendix A: Agent SOUL Templates
 
 Create these 6 files in `/data/workspace/souls/`:
