@@ -644,6 +644,9 @@ CREATE INDEX agent_last_active FOR (a:Agent) ON (a.last_active);
 
 CREATE INDEX rate_limit_lookup FOR (r:RateLimit) ON (r.agent, r.operation, r.date, r.hour);
 
+// Composite index for SessionContext lookups (enter_drain_mode, complete_reset, get_session_context)
+CREATE INDEX session_context_lookup FOR (s:SessionContext) ON (s.sender_id, s.session_date);
+
 CREATE FULLTEXT INDEX knowledge_content
   FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
 
@@ -818,6 +821,7 @@ MIGRATIONS = [
             CREATE INDEX task_status FOR (t:Task) ON (t.assigned_to, t.status);
             CREATE INDEX notification_read FOR (n:Notification) ON (n.read, n.created_at);
             CREATE INDEX notification_created_at FOR (n:Notification) ON (n.created_at);
+            CREATE INDEX session_context_lookup FOR (s:SessionContext) ON (s.sender_id, s.session_date);
             CREATE FULLTEXT INDEX knowledge_content
                 FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
         ''',
@@ -827,6 +831,7 @@ MIGRATIONS = [
             DROP INDEX task_status IF EXISTS;
             DROP INDEX notification_read IF EXISTS;
             DROP INDEX notification_created_at IF EXISTS;
+            DROP INDEX session_context_lookup IF EXISTS;
             DROP INDEX knowledge_content IF EXISTS;
         '''
     },
@@ -2083,12 +2088,17 @@ Do not include any text outside the JSON object."""
         """Pattern-based PII sanitization (fallback method)."""
         import re
 
-        # Phone numbers (various formats)
+        # Phone numbers (various formats including international)
+        # US format: +1 (123) 456-7890, 123-456-7890, (123) 456-7890
         text = re.sub(r'\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', '[PHONE]', text)
-        text = re.sub(r'\+?\d{10,15}', '[PHONE]', text)
+        # International format: +44 20 7946 0958, +91-98765-43210, +33 1 23 45 67 89
+        text = re.sub(r'\+\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}', '[PHONE]', text)
+        # Generic 10-15 digit numbers that look like phone numbers
+        text = re.sub(r'\b\d{10,15}\b', '[PHONE]', text)
 
-        # Email addresses
-        text = re.sub(r'[\w.-]+@[\w.-]+\.\w+', '[EMAIL]', text)
+        # Email addresses (comprehensive RFC 5322 subset)
+        # Handles: user@example.com, user.name+tag@example.co.uk, user_name@subdomain.example.com
+        text = re.sub(r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*", '[EMAIL]', text)
 
         # Social Security Numbers
         text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN]', text)
@@ -2542,7 +2552,16 @@ Do not include any text outside the JSON object."""
         return True
 
     # Valid agent IDs for authentication
-    VALID_AGENTS = {'main', 'researcher', 'writer', 'developer', 'analyst', 'ops'}
+    # Loaded from ALLOWED_AGENTS env var (comma-separated) or defaults to 6 standard agents
+    # Example: ALLOWED_AGENTS="kublai,mongke,chagatai,temujin,jochi,ogedei"
+    @property
+    def VALID_AGENTS(self) -> set:
+        import os
+        agents_env = os.getenv('ALLOWED_AGENTS', '')
+        if agents_env:
+            return set(a.strip() for a in agents_env.split(',') if a.strip())
+        # Default 6-agent set
+        return {'main', 'researcher', 'writer', 'developer', 'analyst', 'ops'}
 
     def _validate_agent_id(self, agent_id: str) -> bool:
         """Validate that agent_id is a known agent.
@@ -4335,7 +4354,7 @@ class OperationalMemory:
         WHERE n.agent = $agent_id
           AND (n:Research OR n:Content OR n:Application OR n:Analysis)
           AND NOT (n)<-[:BASED_ON]-(:Synthesis)
-          AND n.created_at > datetime() - duration('P7D')
+          AND n.created_at > datetime() - duration({days: 7})
         RETURN n.id as id,
                n.type as type,
                labels(n) as labels,
@@ -4509,7 +4528,7 @@ class OperationalMemory:
         MATCH (c:Concept)
         WHERE NOT (c)<-[:SUPPORTS]-(:Insight {
             agent: $agent_id,
-            created_at: datetime() - duration('P30D')
+            created_at: datetime() - duration({days: 30})
         })
         WITH c.domain as domain, count(c) as concept_count
         WHERE concept_count >= $min_concepts
