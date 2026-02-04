@@ -2179,6 +2179,804 @@ class OperationalMemory:
                 raise
 
     # =======================================================================
+    # Proactive Improvement (Ögedei Protocol)
+    # =======================================================================
+
+    def create_improvement(
+        self,
+        submitted_by: str,
+        title: str,
+        description: str,
+        category: str,
+        expected_benefit: str,
+        effort_hours: float,
+        improvement_value: float
+    ) -> str:
+        """
+        Create a new improvement proposal.
+
+        Ögedei uses this to record workflow improvements that require
+        Kublai approval before implementation.
+
+        Args:
+            submitted_by: Agent who submitted the improvement (usually 'ogedei')
+            title: Short title of the improvement
+            description: Detailed description of the improvement
+            category: Category ('workflow', 'performance', 'security', 'documentation', 'other')
+            expected_benefit: Description of expected benefit
+            effort_hours: Estimated effort to implement
+            improvement_value: Estimated value of the improvement
+
+        Returns:
+            Improvement ID string
+
+        Raises:
+            ValueError: If category is invalid or effort_hours is not positive
+        """
+        # Validate category
+        valid_categories = ['workflow', 'performance', 'security', 'documentation', 'other']
+        if category not in valid_categories:
+            raise ValueError(f"Invalid category '{category}'. Must be one of: {valid_categories}")
+
+        # Validate effort_hours
+        if effort_hours <= 0:
+            raise ValueError("effort_hours must be greater than 0")
+
+        # Calculate value_score (ROI)
+        value_score = improvement_value / effort_hours if effort_hours > 0 else 0
+
+        improvement_id = self._generate_id()
+        created_at = self._now()
+
+        cypher = """
+        CREATE (i:Improvement {
+            id: $improvement_id,
+            submitted_by: $submitted_by,
+            title: $title,
+            description: $description,
+            category: $category,
+            expected_benefit: $expected_benefit,
+            effort_hours: $effort_hours,
+            improvement_value: $improvement_value,
+            value_score: $value_score,
+            status: 'proposed',
+            approved_by: null,
+            approved_at: null,
+            implemented_at: null,
+            rejection_reason: null,
+            created_at: $created_at
+        })
+        RETURN i.id as improvement_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Improvement creation simulated for {submitted_by}")
+                return improvement_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    improvement_id=improvement_id,
+                    submitted_by=submitted_by,
+                    title=title,
+                    description=description,
+                    category=category,
+                    expected_benefit=expected_benefit,
+                    effort_hours=effort_hours,
+                    improvement_value=improvement_value,
+                    value_score=value_score,
+                    created_at=created_at
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Improvement created: {improvement_id} (category: {category}, value_score: {value_score:.2f})")
+
+                    # Notify Kublai of pending approval
+                    self.create_notification(
+                        agent="kublai",
+                        type="improvement_pending_approval",
+                        summary=f"Improvement '{title}' ({category}) pending approval - Value Score: {value_score:.2f}",
+                        task_id=improvement_id
+                    )
+
+                    return record["improvement_id"]
+                else:
+                    raise RuntimeError("Improvement creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create improvement: {e}")
+                raise
+
+    def list_improvements(
+        self,
+        status: Optional[str] = None,
+        category: Optional[str] = None,
+        submitted_by: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Query improvements with optional filters.
+
+        Args:
+            status: Filter by status ('proposed', 'approved', 'rejected', 'implemented')
+            category: Filter by category ('workflow', 'performance', 'security', 'documentation', 'other')
+            submitted_by: Filter by submitting agent
+
+        Returns:
+            List of improvement dicts, sorted by value_score (highest first) then created_at
+        """
+        # Validate status if provided
+        if status is not None:
+            valid_statuses = ['proposed', 'approved', 'rejected', 'implemented']
+            if status not in valid_statuses:
+                raise ValueError(f"Invalid status '{status}'. Must be one of: {valid_statuses}")
+
+        # Validate category if provided
+        if category is not None:
+            valid_categories = ['workflow', 'performance', 'security', 'documentation', 'other']
+            if category not in valid_categories:
+                raise ValueError(f"Invalid category '{category}'. Must be one of: {valid_categories}")
+
+        # Build dynamic query based on filters
+        conditions = []
+        params = {}
+
+        if status is not None:
+            conditions.append("i.status = $status")
+            params["status"] = status
+
+        if category is not None:
+            conditions.append("i.category = $category")
+            params["category"] = category
+
+        if submitted_by is not None:
+            conditions.append("i.submitted_by = $submitted_by")
+            params["submitted_by"] = submitted_by
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (i:Improvement)
+        {where_clause}
+        RETURN i
+        ORDER BY i.value_score DESC, i.created_at DESC
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                return [dict(record["i"]) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to list improvements: {e}")
+                raise
+
+    def approve_improvement(self, improvement_id: str, approved_by: str) -> bool:
+        """
+        Approve an improvement (Kublai action).
+
+        Args:
+            improvement_id: Improvement ID to approve
+            approved_by: Agent who is approving (usually 'kublai')
+
+        Returns:
+            True if successful, False if improvement not found or not in proposed status
+        """
+        approved_at = self._now()
+
+        cypher = """
+        MATCH (i:Improvement {id: $improvement_id})
+        WHERE i.status = 'proposed'
+        SET i.status = 'approved',
+            i.approved_by = $approved_by,
+            i.approved_at = $approved_at
+        RETURN i.submitted_by as submitted_by, i.title as title
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Improvement approval simulated for {improvement_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    improvement_id=improvement_id,
+                    approved_by=approved_by,
+                    approved_at=approved_at
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"Improvement not found or not in proposed status: {improvement_id}")
+                    return False
+
+                # Notify submitter of approval
+                self.create_notification(
+                    agent=record["submitted_by"],
+                    type="improvement_approved",
+                    summary=f"Improvement '{record['title']}' approved by {approved_by}",
+                    task_id=improvement_id
+                )
+
+                logger.info(f"Improvement approved: {improvement_id} by {approved_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to approve improvement: {e}")
+                raise
+
+    def reject_improvement(self, improvement_id: str, rejected_by: str, reason: str) -> bool:
+        """
+        Reject an improvement.
+
+        Args:
+            improvement_id: Improvement ID to reject
+            rejected_by: Agent who is rejecting (usually 'kublai')
+            reason: Reason for rejection
+
+        Returns:
+            True if successful, False if improvement not found or not in proposed status
+        """
+        rejected_at = self._now()
+
+        cypher = """
+        MATCH (i:Improvement {id: $improvement_id})
+        WHERE i.status = 'proposed'
+        SET i.status = 'rejected',
+            i.approved_by = $rejected_by,
+            i.approved_at = $rejected_at,
+            i.rejection_reason = $reason
+        RETURN i.submitted_by as submitted_by, i.title as title
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Improvement rejection simulated for {improvement_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    improvement_id=improvement_id,
+                    rejected_by=rejected_by,
+                    rejected_at=rejected_at,
+                    reason=reason
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"Improvement not found or not in proposed status: {improvement_id}")
+                    return False
+
+                # Notify submitter of rejection
+                self.create_notification(
+                    agent=record["submitted_by"],
+                    type="improvement_rejected",
+                    summary=f"Improvement '{record['title']}' rejected by {rejected_by}: {reason[:100]}",
+                    task_id=improvement_id
+                )
+
+                logger.info(f"Improvement rejected: {improvement_id} by {rejected_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to reject improvement: {e}")
+                raise
+
+    def implement_improvement(self, improvement_id: str, implemented_by: str) -> bool:
+        """
+        Mark an improvement as implemented.
+
+        Args:
+            improvement_id: Improvement ID to mark as implemented
+            implemented_by: Agent who implemented the improvement
+
+        Returns:
+            True if successful, False if improvement not found or not in approved status
+        """
+        implemented_at = self._now()
+
+        cypher = """
+        MATCH (i:Improvement {id: $improvement_id})
+        WHERE i.status = 'approved'
+        SET i.status = 'implemented',
+            i.implemented_at = $implemented_at
+        RETURN i.submitted_by as submitted_by, i.title as title, i.approved_by as approved_by
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Improvement implementation simulated for {improvement_id}")
+                return True
+
+            try:
+                result = session.run(
+                    cypher,
+                    improvement_id=improvement_id,
+                    implemented_at=implemented_at
+                )
+                record = result.single()
+
+                if record is None:
+                    logger.warning(f"Improvement not found or not in approved status: {improvement_id}")
+                    return False
+
+                # Notify submitter and approver of implementation
+                self.create_notification(
+                    agent=record["submitted_by"],
+                    type="improvement_implemented",
+                    summary=f"Improvement '{record['title']}' implemented by {implemented_by}",
+                    task_id=improvement_id
+                )
+
+                if record["approved_by"] and record["approved_by"] != record["submitted_by"]:
+                    self.create_notification(
+                        agent=record["approved_by"],
+                        type="improvement_implemented",
+                        summary=f"Improvement '{record['title']}' implemented by {implemented_by}",
+                        task_id=improvement_id
+                    )
+
+                logger.info(f"Improvement implemented: {improvement_id} by {implemented_by}")
+                return True
+
+            except Neo4jError as e:
+                logger.error(f"Failed to implement improvement: {e}")
+                raise
+
+    def get_improvement(self, improvement_id: str) -> Optional[Dict]:
+        """
+        Get a specific improvement by ID.
+
+        Args:
+            improvement_id: Improvement ID to retrieve
+
+        Returns:
+            Improvement dict if found, None otherwise
+        """
+        cypher = """
+        MATCH (i:Improvement {id: $improvement_id})
+        RETURN i
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, improvement_id=improvement_id)
+                record = result.single()
+                return dict(record["i"]) if record else None
+            except Neo4jError as e:
+                logger.error(f"Failed to get improvement: {e}")
+                raise
+
+    def get_improvement_summary(self) -> Dict:
+        """
+        Get summary counts of improvements by status and category.
+
+        Returns:
+            Dict with counts by status and category, plus high-value improvements
+        """
+        cypher = """
+        MATCH (i:Improvement)
+        RETURN i.status as status, i.category as category, count(i) as count
+        """
+
+        with self._session() as session:
+            if session is None:
+                return {
+                    "total": 0,
+                    "by_status": {"proposed": 0, "approved": 0, "rejected": 0, "implemented": 0},
+                    "by_category": {"workflow": 0, "performance": 0, "security": 0, "documentation": 0, "other": 0},
+                    "high_value_pending": [],
+                    "avg_value_score": 0.0
+                }
+
+            try:
+                result = session.run(cypher)
+
+                # Initialize counters
+                by_status = {"proposed": 0, "approved": 0, "rejected": 0, "implemented": 0}
+                by_category = {"workflow": 0, "performance": 0, "security": 0, "documentation": 0, "other": 0}
+
+                total = 0
+                total_value_score = 0.0
+                count_with_score = 0
+
+                for record in result:
+                    status = record["status"]
+                    category = record["category"]
+                    count = record["count"]
+
+                    total += count
+                    if status in by_status:
+                        by_status[status] += count
+                    if category in by_category:
+                        by_category[category] += count
+
+                # Get high-value pending improvements (top 5 proposed with value_score > 1.0)
+                high_value_cypher = """
+                MATCH (i:Improvement {status: 'proposed'})
+                WHERE i.value_score > 1.0
+                RETURN i.id as id, i.title as title, i.value_score as value_score, i.category as category
+                ORDER BY i.value_score DESC
+                LIMIT 5
+                """
+
+                high_value_result = session.run(high_value_cypher)
+                high_value_pending = [
+                    {
+                        "id": record["id"],
+                        "title": record["title"],
+                        "value_score": record["value_score"],
+                        "category": record["category"]
+                    }
+                    for record in high_value_result
+                ]
+
+                # Calculate average value score for implemented improvements
+                avg_cypher = """
+                MATCH (i:Improvement)
+                WHERE i.value_score IS NOT NULL
+                RETURN avg(i.value_score) as avg_value_score, count(i) as count
+                """
+
+                avg_result = session.run(avg_cypher).single()
+                avg_value_score = avg_result["avg_value_score"] if avg_result and avg_result["avg_value_score"] else 0.0
+
+                return {
+                    "total": total,
+                    "by_status": by_status,
+                    "by_category": by_category,
+                    "high_value_pending": high_value_pending,
+                    "avg_value_score": round(avg_value_score, 2) if avg_value_score else 0.0
+                }
+
+            except Neo4jError as e:
+                logger.error(f"Failed to get improvement summary: {e}")
+                raise
+
+    # =======================================================================
+    # Background Synthesis (Chagatai Protocol)
+    # =======================================================================
+
+    def create_reflection(
+        self,
+        agent: str,
+        content: str,
+        topic: str = "general",
+        task_id: Optional[str] = None
+    ) -> str:
+        """
+        Create a new reflection node.
+
+        Chagatai uses this to record agent reflections for later consolidation.
+
+        Args:
+            agent: Agent who created the reflection
+            content: Reflection content
+            topic: Topic/category of the reflection
+            task_id: Associated task ID (optional)
+
+        Returns:
+            Reflection ID string
+        """
+        reflection_id = self._generate_id()
+        created_at = self._now()
+
+        cypher = """
+        CREATE (r:Reflection {
+            id: $reflection_id,
+            agent: $agent,
+            content: $content,
+            topic: $topic,
+            task_id: $task_id,
+            consolidated: false,
+            consolidated_at: null,
+            created_at: $created_at
+        })
+        RETURN r.id as reflection_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Reflection creation simulated for {agent}")
+                return reflection_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    reflection_id=reflection_id,
+                    agent=agent,
+                    content=content,
+                    topic=topic,
+                    task_id=task_id,
+                    created_at=created_at
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Reflection created: {reflection_id} (agent: {agent}, topic: {topic})")
+                    return record["reflection_id"]
+                else:
+                    raise RuntimeError("Reflection creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create reflection: {e}")
+                raise
+
+    def get_reflection(self, reflection_id: str) -> Optional[Dict]:
+        """
+        Get a reflection by ID.
+
+        Args:
+            reflection_id: Reflection ID to retrieve
+
+        Returns:
+            Reflection dict if found, None otherwise
+        """
+        cypher = """
+        MATCH (r:Reflection {id: $reflection_id})
+        RETURN r
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, reflection_id=reflection_id)
+                record = result.single()
+                return dict(record["r"]) if record else None
+            except Neo4jError as e:
+                logger.error(f"Failed to get reflection: {e}")
+                raise
+
+    def list_reflections(
+        self,
+        agent: Optional[str] = None,
+        topic: Optional[str] = None,
+        consolidated: Optional[bool] = None,
+        limit: int = 100
+    ) -> List[Dict]:
+        """
+        Query reflections with optional filters.
+
+        Args:
+            agent: Filter by agent
+            topic: Filter by topic
+            consolidated: Filter by consolidation status
+            limit: Maximum number of reflections to return
+
+        Returns:
+            List of reflection dicts
+        """
+        conditions = []
+        params = {"limit": limit}
+
+        if agent is not None:
+            conditions.append("r.agent = $agent")
+            params["agent"] = agent
+
+        if topic is not None:
+            conditions.append("r.topic = $topic")
+            params["topic"] = topic
+
+        if consolidated is not None:
+            conditions.append("r.consolidated = $consolidated")
+            params["consolidated"] = consolidated
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (r:Reflection)
+        {where_clause}
+        RETURN r
+        ORDER BY r.created_at DESC
+        LIMIT $limit
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                return [dict(record["r"]) for record in result]
+            except Neo4jError as e:
+                logger.error(f"Failed to list reflections: {e}")
+                raise
+
+    def count_unconsolidated_reflections(self) -> int:
+        """
+        Count unconsolidated reflections.
+
+        Returns:
+            Number of unconsolidated reflections
+        """
+        cypher = """
+        MATCH (r:Reflection {consolidated: false})
+        RETURN count(r) as count
+        """
+
+        with self._session() as session:
+            if session is None:
+                return 0
+
+            try:
+                result = session.run(cypher)
+                record = result.single()
+                return record["count"] if record else 0
+            except Neo4jError as e:
+                logger.error(f"Failed to count unconsolidated reflections: {e}")
+                return 0
+
+    def create_learning(
+        self,
+        agent: str,
+        topic: str,
+        content: str,
+        themes: Optional[List[str]] = None,
+        reflection_ids: Optional[List[str]] = None
+    ) -> str:
+        """
+        Create a consolidated learning node.
+
+        Args:
+            agent: Agent the learning belongs to
+            topic: Topic of the learning
+            content: Learning content/summary
+            themes: List of theme keywords
+            reflection_ids: IDs of source reflections
+
+        Returns:
+            Learning ID string
+        """
+        learning_id = self._generate_id()
+        created_at = self._now()
+
+        cypher = """
+        CREATE (l:Learning {
+            id: $learning_id,
+            agent: $agent,
+            topic: $topic,
+            content: $content,
+            themes: $themes,
+            reflection_count: $reflection_count,
+            source_reflections: $reflection_ids,
+            created_at: $created_at
+        })
+        RETURN l.id as learning_id
+        """
+
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Learning creation simulated for {agent}")
+                return learning_id
+
+            try:
+                result = session.run(
+                    cypher,
+                    learning_id=learning_id,
+                    agent=agent,
+                    topic=topic,
+                    content=content,
+                    themes=str(themes) if themes else None,
+                    reflection_count=len(reflection_ids) if reflection_ids else 0,
+                    reflection_ids=str(reflection_ids) if reflection_ids else None,
+                    created_at=created_at
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Learning created: {learning_id} (agent: {agent}, topic: {topic})")
+                    return record["learning_id"]
+                else:
+                    raise RuntimeError("Learning creation failed: no record returned")
+            except Neo4jError as e:
+                logger.error(f"Failed to create learning: {e}")
+                raise
+
+    def get_learning(self, learning_id: str) -> Optional[Dict]:
+        """
+        Get a learning by ID.
+
+        Args:
+            learning_id: Learning ID to retrieve
+
+        Returns:
+            Learning dict if found, None otherwise
+        """
+        cypher = """
+        MATCH (l:Learning {id: $learning_id})
+        RETURN l
+        """
+
+        with self._session() as session:
+            if session is None:
+                return None
+
+            try:
+                result = session.run(cypher, learning_id=learning_id)
+                record = result.single()
+                if record:
+                    learning_dict = dict(record["l"])
+                    # Parse themes and source_reflections back from strings if possible
+                    for key in ["themes", "source_reflections"]:
+                        if learning_dict.get(key):
+                            try:
+                                import ast
+                                learning_dict[key] = ast.literal_eval(learning_dict[key])
+                            except (ValueError, SyntaxError):
+                                pass
+                    return learning_dict
+                return None
+            except Neo4jError as e:
+                logger.error(f"Failed to get learning: {e}")
+                raise
+
+    def list_learnings(
+        self,
+        agent: Optional[str] = None,
+        topic: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict]:
+        """
+        Query learnings with optional filters.
+
+        Args:
+            agent: Filter by agent
+            topic: Filter by topic
+            limit: Maximum number of learnings to return
+
+        Returns:
+            List of learning dicts
+        """
+        conditions = []
+        params = {"limit": limit}
+
+        if agent is not None:
+            conditions.append("l.agent = $agent")
+            params["agent"] = agent
+
+        if topic is not None:
+            conditions.append("l.topic = $topic")
+            params["topic"] = topic
+
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        cypher = f"""
+        MATCH (l:Learning)
+        {where_clause}
+        RETURN l
+        ORDER BY l.created_at DESC
+        LIMIT $limit
+        """
+
+        with self._session() as session:
+            if session is None:
+                return []
+
+            try:
+                result = session.run(cypher, **params)
+                learnings = []
+                for record in result:
+                    learning_dict = dict(record["l"])
+                    # Parse themes and source_reflections back from strings if possible
+                    for key in ["themes", "source_reflections"]:
+                        if learning_dict.get(key):
+                            try:
+                                import ast
+                                learning_dict[key] = ast.literal_eval(learning_dict[key])
+                            except (ValueError, SyntaxError):
+                                pass
+                    learnings.append(learning_dict)
+                return learnings
+            except Neo4jError as e:
+                logger.error(f"Failed to list learnings: {e}")
+                raise
+
+    # =======================================================================
     # Schema Management
     # =======================================================================
 
@@ -2230,6 +3028,29 @@ class OperationalMemory:
             ("CREATE INDEX analysis_created_at_idx IF NOT EXISTS FOR (a:Analysis) ON (a.created_at)", "analysis_created_at_idx"),
             ("CREATE INDEX analysis_severity_status_idx IF NOT EXISTS FOR (a:Analysis) ON (a.severity, a.status)", "analysis_severity_status_idx"),
             ("CREATE INDEX analysis_type_status_idx IF NOT EXISTS FOR (a:Analysis) ON (a.analysis_type, a.status)", "analysis_type_status_idx"),
+
+            # Improvement indexes (Ogedei Proactive Improvement Protocol)
+            ("CREATE INDEX improvement_id_idx IF NOT EXISTS FOR (i:Improvement) ON (i.id)", "improvement_id_idx"),
+            ("CREATE INDEX improvement_submitted_by_idx IF NOT EXISTS FOR (i:Improvement) ON (i.submitted_by)", "improvement_submitted_by_idx"),
+            ("CREATE INDEX improvement_status_idx IF NOT EXISTS FOR (i:Improvement) ON (i.status)", "improvement_status_idx"),
+            ("CREATE INDEX improvement_category_idx IF NOT EXISTS FOR (i:Improvement) ON (i.category)", "improvement_category_idx"),
+            ("CREATE INDEX improvement_value_score_idx IF NOT EXISTS FOR (i:Improvement) ON (i.value_score)", "improvement_value_score_idx"),
+            ("CREATE INDEX improvement_created_at_idx IF NOT EXISTS FOR (i:Improvement) ON (i.created_at)", "improvement_created_at_idx"),
+            ("CREATE INDEX improvement_status_category_idx IF NOT EXISTS FOR (i:Improvement) ON (i.status, i.category)", "improvement_status_category_idx"),
+            ("CREATE INDEX improvement_status_value_score_idx IF NOT EXISTS FOR (i:Improvement) ON (i.status, i.value_score)", "improvement_status_value_score_idx"),
+
+            # Reflection indexes (Chagatai Background Synthesis)
+            ("CREATE INDEX reflection_id_idx IF NOT EXISTS FOR (r:Reflection) ON (r.id)", "reflection_id_idx"),
+            ("CREATE INDEX reflection_agent_idx IF NOT EXISTS FOR (r:Reflection) ON (r.agent)", "reflection_agent_idx"),
+            ("CREATE INDEX reflection_topic_idx IF NOT EXISTS FOR (r:Reflection) ON (r.topic)", "reflection_topic_idx"),
+            ("CREATE INDEX reflection_consolidated_idx IF NOT EXISTS FOR (r:Reflection) ON (r.consolidated)", "reflection_consolidated_idx"),
+            ("CREATE INDEX reflection_created_at_idx IF NOT EXISTS FOR (r:Reflection) ON (r.created_at)", "reflection_created_at_idx"),
+
+            # Learning indexes (Chagatai Background Synthesis)
+            ("CREATE INDEX learning_id_idx IF NOT EXISTS FOR (l:Learning) ON (l.id)", "learning_id_idx"),
+            ("CREATE INDEX learning_agent_idx IF NOT EXISTS FOR (l:Learning) ON (l.agent)", "learning_agent_idx"),
+            ("CREATE INDEX learning_topic_idx IF NOT EXISTS FOR (l:Learning) ON (l.topic)", "learning_topic_idx"),
+            ("CREATE INDEX learning_created_at_idx IF NOT EXISTS FOR (l:Learning) ON (l.created_at)", "learning_created_at_idx"),
         ]
 
         created = []
