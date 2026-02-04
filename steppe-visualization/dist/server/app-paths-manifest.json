@@ -1,0 +1,15 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/agents/route": "app/api/agents/route.js",
+  "/api/collaborations/route": "app/api/collaborations/route.js",
+  "/api/deliverables/route": "app/api/deliverables/route.js",
+  "/api/memory-stats/route": "app/api/memory-stats/route.js",
+  "/api/notifications/route": "app/api/notifications/route.js",
+  "/api/tasks/route": "app/api/tasks/route.js",
+  "/api/webhook/route": "app/api/webhook/route.js",
+  "/control-panel/page": "app/control-panel/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/mission-control/page": "app/mission-control/page.js",
+  "/page": "app/page.js"
+}

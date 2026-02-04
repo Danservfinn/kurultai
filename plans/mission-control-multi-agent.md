@@ -57,10 +57,12 @@ Build a coordinated team of 6 specialized AI agents working together, with Kubla
 |----|------|------|-------------|-----------|
 | main | Kublai | Squad Lead / Coordinator | `agent:main:main` | :00 |
 | researcher | Möngke | Deep Researcher | `agent:researcher:main` | :03 |
-| writer | Ögedei | Content Writer | `agent:writer:main` | :06 |
+| writer | Chagatai | Content Writer | `agent:writer:main` | :06 |
 | developer | Temüjin | Developer / Code | `agent:developer:main` | :09 |
 | analyst | Jochi | Analyst / Strategy | `agent:analyst:main` | :12 |
-| ops | Chagatai | Operations / Admin | `agent:ops:main` | :15 |
+| ops | Ögedei | Operations / Admin | `agent:ops:main` | :15 |
+
+**CRITICAL**: Chagatai is WRITER, Ögedei is OPERATIONS (commonly confused)
 
 ### Agent Personalities (SOUL.md summaries)
 
@@ -78,7 +80,7 @@ Build a coordinated team of 6 specialized AI agents working together, with Kubla
 - Skeptical, thorough, evidence-based
 - Patient scholar who leaves no stone unturned
 
-**Ögedei (Writer)** — *The eloquent Khan who built the Mongol bureaucracy*
+**Chagatai (Writer)** — *The eloquent wordsmith of the empire*
 - Wordsmith with strong opinions
 - Pro-Oxford comma, anti-passive voice
 - Every sentence earns its place
@@ -99,7 +101,7 @@ Build a coordinated team of 6 specialized AI agents working together, with Kubla
 - Long-term thinking
 - Independent thinker, sees what others miss
 
-**Chagatai (Operations)** — *The lawgiver who maintained order in the empire*
+**Ögedei (Operations)** — *The Khan who built the Mongol bureaucracy*
 - Keeps the machine running
 - Email sequences, scheduling, admin tasks
 - Documentation and process improvement

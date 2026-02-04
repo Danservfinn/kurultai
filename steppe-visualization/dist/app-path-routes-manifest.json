@@ -1,0 +1,15 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/agents/route": "/api/agents",
+  "/api/collaborations/route": "/api/collaborations",
+  "/api/deliverables/route": "/api/deliverables",
+  "/api/memory-stats/route": "/api/memory-stats",
+  "/api/notifications/route": "/api/notifications",
+  "/api/tasks/route": "/api/tasks",
+  "/api/webhook/route": "/api/webhook",
+  "/control-panel/page": "/control-panel",
+  "/favicon.ico/route": "/favicon.ico",
+  "/mission-control/page": "/mission-control",
+  "/page": "/"
+}

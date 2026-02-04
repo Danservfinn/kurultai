@@ -1,5 +1,6 @@
 {
-  "/api/deliverables/route": "app/api/deliverables/route.js",
+  "/api/agents/route": "app/api/agents/route.js",
+  "/api/tasks/route": "app/api/tasks/route.js",
   "/mission-control/page": "app/mission-control/page.js",
   "/page": "app/page.js"
 }

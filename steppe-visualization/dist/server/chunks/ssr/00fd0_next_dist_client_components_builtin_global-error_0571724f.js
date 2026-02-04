@@ -1,0 +1,3 @@
+module.exports=[68172,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(27721);a.n(d("[project]/molt/steppe-visualization/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},98194,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(27721);a.n(d("[project]/molt/steppe-visualization/node_modules/next/dist/client/components/builtin/global-error.js"))},12880,a=>{"use strict";a.i(68172);var b=a.i(98194);a.n(b)}];
+
+//# sourceMappingURL=00fd0_next_dist_client_components_builtin_global-error_0571724f.js.map

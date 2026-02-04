@@ -1,0 +1,3 @@
+{
+  "/api/memory-stats/route": "app/api/memory-stats/route.js"
+}

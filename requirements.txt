@@ -1,0 +1,36 @@
+# OpenClaw Multi-Agent System Dependencies
+# Python 3.11+ compatible
+
+# Database
+neo4j>=5.15.0
+
+# Data Validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# HTTP Client
+httpx>=0.25.0
+
+# Environment Configuration
+python-dotenv>=1.0.0
+
+# Structured Logging
+structlog>=23.2.0
+
+# Retry Logic
+tenacity>=8.2.0
+
+# YAML Parsing
+pyyaml>=6.0.1
+
+# Async Support
+anyio>=4.0.0
+
+# Date/Time Handling
+python-dateutil>=2.8.2
+
+# JSON Processing
+orjson>=3.9.0
+
+# Cryptography (for secure token handling)
+cryptography>=41.0.0

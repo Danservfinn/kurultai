@@ -1,0 +1,59 @@
+# Authentik Forward Auth Proxy for OpenClaw/Moltbot
+# This Caddy instance sits in front of the moltbot service and requires
+# authentication via Authentik before allowing access.
+
+{
+    # Global options
+    admin off
+    auto_https off
+    log {
+        level DEBUG
+    }
+}
+
+# Listen on the Railway-assigned port
+:{$PORT} {
+    log {
+        output stdout
+        level DEBUG
+    }
+
+    # Bypass auth for Signal SSE endpoint - EventSource can't follow redirects
+    # The page itself is protected, so this is reasonably secure
+    handle /setup/api/signal-link {
+        reverse_proxy moltbot-railway-template.railway.internal:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            # Enable SSE streaming
+            header_down -Content-Length
+        }
+    }
+
+    # Forward authentication to Authentik's embedded outpost
+    forward_auth authentik-server.railway.internal:9000 {
+        uri /outpost.goauthentik.io/auth/caddy
+
+        # Headers that Authentik needs to identify the request
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Uri {uri}
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Method {method}
+
+        # Copy authentication headers from Authentik response to upstream
+        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-*
+
+        # Trust Railway's internal network
+        trusted_proxies private_ranges
+    }
+
+    # Reverse proxy to the moltbot service
+    reverse_proxy moltbot-railway-template.railway.internal:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
+
+    # Handle errors
+    handle_errors {
+        respond "{err.status_code} {err.status_text}"
+    }
+}

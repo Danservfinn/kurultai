@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export',
+  // Removed 'export' to allow dynamic API routes
+  // Use standalone deployment instead
   distDir: 'dist',
   images: {
     unoptimized: true,

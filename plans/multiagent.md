@@ -21,7 +21,7 @@ Transform the current single-agent Kublai setup into a multi-agent orchestrator 
 
 ### Step 1: Update `moltbot.json` with Multi-Agent Configuration
 
-**File**: `/tmp/moltbot-railway-template/moltbot.json`
+**File**: `/Users/kurultai/molt/moltbot.json` (template) → `/data/.clawdbot/moltbot.json` (active on Railway)
 
 Add the following sections:
 
@@ -153,7 +153,34 @@ MOONSHOT_API_KEY=sk-...    # From https://platform.moonshot.cn/
 ZAI_API_KEY=sk-...         # From https://www.z.ai/
 ```
 
-### Step 3: Create Agent Directory Structure
+### Step 3: Add Agent Directory Creation to Server.js
+
+**File**: `/tmp/moltbot-railway-template/src/server.js`
+
+Add agent directory creation in the startup sequence (after STATE_DIR is defined):
+
+```javascript
+// Create agent directories for multi-agent support
+function createAgentDirectories() {
+  const agentIds = ['main', 'researcher', 'writer', 'developer', 'analyst', 'ops'];
+  const agentsDir = path.join(STATE_DIR, 'agents');
+
+  for (const agentId of agentIds) {
+    const agentDir = path.join(agentsDir, agentId);
+    try {
+      fs.mkdirSync(agentDir, { recursive: true });
+      console.log(`[startup] Created agent directory: ${agentDir}`);
+    } catch (err) {
+      console.warn(`[startup] Could not create agent directory ${agentDir}: ${err.message}`);
+    }
+  }
+}
+
+// Call after STATE_DIR is set
+createAgentDirectories();
+```
+
+### Step 4: Create Agent Directory Structure
 
 Create both workspace and per-agent directories:
 
@@ -192,9 +219,12 @@ mkdir -p /data/.clawdbot/agents/{main,researcher,writer,developer,analyst,ops}
     └── analytics/
 ```
 
-Create via Control UI file browser or terminal.
+Create via Control UI file browser or terminal:
+```bash
+mkdir -p /data/workspace/{souls,memory/{kublai,mongke,ogedei,temujin,jochi,chagatai},tasks/{inbox,assigned,in-progress,review,done},deliverables/{research,content,security,analytics}}
+```
 
-### Step 4: Create Agent SOUL Files
+### Step 5: Create Agent SOUL Files
 
 Reference: `/Users/kurultai/molt/plans/mission-control-multi-agent.md`
 
@@ -210,33 +240,36 @@ Each agent needs a personality file at `/data/workspace/souls/{agent}.md` defini
 As Squad Lead, you coordinate the agent network. When receiving tasks:
 
 1. **Assess the request** - Determine which specialist(s) should handle it
-2. **Delegate via @mentions** - Use Signal to route to specific agents:
+2. **Delegate via internal messaging** - Use agentToAgent tool to route to specialists:
    - @mongke - Deep research tasks
    - @chagatai - Writing and content creation
    - @temujin - Development and coding
    - @jochi - Data analysis and metrics
    - @ogedei - Operations and scheduling
 3. **Synthesize responses** - Combine specialist outputs into cohesive deliverables
-4. **Escalate when needed** - Use glm-4.7 reasoning for complex orchestration
+4. **Escalate when needed** - Use kimi-k2.5 reasoning for complex orchestration
 
 Do NOT broadcast to all agents. Route intentionally based on expertise.
 ```
 
-### Step 5: Deploy and Verify
+### Step 6: Deploy and Verify
 
-1. Commit and push updated `moltbot.json` to trigger Railway redeployment
-2. Access Control UI at `https://kublai.kurult.ai/`
-3. Configure Moonshot provider in Settings > OpenClaw
-4. Verify all 6 agents appear in Settings > Agents
-5. Create SOUL files via terminal or Control UI
-6. Test Signal channel - Kublai should receive messages and delegate to specialists
+1. Update `server.js` with agent directory creation code
+2. Commit and push updated `moltbot.json` and `server.js` to trigger Railway redeployment
+3. Access Control UI at `https://kublai.kurult.ai/`
+4. Configure Moonshot provider in Settings > OpenClaw
+5. Verify all 6 agents appear in Settings > Agents
+6. Create SOUL files via terminal or Control UI
+7. Test Signal channel - Kublai should receive messages and delegate via agentToAgent messaging
 
 ## Critical Files
 
 | File | Purpose |
 |------|---------|
-| `/tmp/moltbot-railway-template/moltbot.json` | Template config (add agents.list + broadcast.groups) |
+| `/Users/kurultai/molt/moltbot.json` | Template config (add agents.list) |
+| `/tmp/moltbot-railway-template/src/server.js` | Wrapper server (agent directory creation) |
 | `/data/.clawdbot/moltbot.json` | Active config on Railway volume |
+| `/data/.clawdbot/openclaw.json` | Model provider configuration |
 | `/Users/kurultai/molt/plans/mission-control-multi-agent.md` | Agent personality templates |
 
 ## Verification Checklist

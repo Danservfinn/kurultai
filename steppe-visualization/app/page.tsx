@@ -76,6 +76,17 @@ export default function Home() {
           <p className="py-0.5">📜 Scroll / Pinch to zoom</p>
           <p className="py-0.5">⌨️ WASD / Arrow keys to pan</p>
           <p className="py-0.5">👆 2-finger drag to pan map</p>
+          <div className="mt-3 pt-3 border-t border-white/20">
+            <a
+              href="/control-panel"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-sm rounded transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Mission Control
+            </a>
+          </div>
         </div>
       </div>
     </main>

@@ -1,16 +1,23 @@
-[00:00:00.701] Server  LOG     ✓ Ready in 520ms
-[00:00:04.837] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:49.698] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:52.398] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:02:52.699] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
-[00:03:02.119] Browser LOG     THREE.WebGLRenderer: Context Lost.
+[00:00:00.587] Server  LOG     ✓ Ready in 449ms
+[00:00:02.086] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:02.158] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:20:51.176] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:20:51.490] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[01:20:51.490] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[01:20:51.490] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[01:20:51.491] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[01:20:51.491] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[01:20:51.491] Browser WARN    THREE.Color: Alpha component of rgba(0,0,0,0.7) will be ignored.
+[01:20:54.602] Browser LOG     THREE.WebGLRenderer: Context Lost.
+[01:22:08.352] Server  LOG       Reload env: .env.local
+[01:24:42.371] Server  LOG     ✓ Compiled in 972ms
+[01:25:06.294] Server  LOG       Reload env: .env.local
+[01:38:12.719] Server  LOG     ✓ Compiled in 695ms
+[01:45:51.211] Server  LOG     ✓ Compiled in 831ms
+[01:46:50.828] Server  LOG     ✓ Compiled in 373ms
+[03:11:04.138] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[06:57:30.799] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[15:55:03.451] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[19:32:16.729] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[23:15:21.957] Server  LOG     ✓ Finished filesystem cache database compaction in 12.8s
+[24:21:45.844] Server  LOG     ✓ Finished filesystem cache database compaction in 16.0s

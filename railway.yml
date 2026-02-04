@@ -1,0 +1,218 @@
+# Railway Deployment Configuration for OpenClaw Multi-Agent System
+# This file configures the moltbot gateway service and Neo4j database
+# Reference: moltbot.json shows gateway runs on port 18789
+
+# =============================================================================
+# SERVICES CONFIGURATION
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # MOLTBOT SERVICE - Main OpenClaw Gateway
+  # ===========================================================================
+  moltbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Port configuration (gateway runs on 18789 per moltbot.json)
+    ports:
+      - port: 18789
+        targetPort: 18789
+        protocol: TCP
+      - port: 8080
+        targetPort: 8080
+        protocol: TCP
+
+    # Health check endpoint
+    healthcheck:
+      path: /health
+      port: 18789
+      interval: 30s
+      timeout: 10s
+      startPeriod: 5s
+      retries: 3
+
+    # Environment variables from .env file
+    envFile: .env
+
+    # Additional environment variables
+    environment:
+      # OpenClaw Gateway Configuration
+      - name: OPENCLAW_GATEWAY_PORT
+        value: "18789"
+      - name: OPENCLAW_CONTROL_UI_ENABLED
+        value: "true"
+
+      # Neo4j Connection
+      - name: NEO4J_URI
+        value: "bolt://neo4j:7687"
+      - name: NEO4J_USER
+        value: "neo4j"
+      # NEO4J_PASSWORD should be set via Railway dashboard or .env
+
+      # Data directories
+      - name: CLAWDBOT_STATE_DIR
+        value: "/data/.clawdbot"
+      - name: CLAWDBOT_WORKSPACE_DIR
+        value: "/data/workspace"
+
+      # Python configuration
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: PYTHONDONTWRITEBYTECODE
+        value: "1"
+
+    # Resource allocation (adjust based on needs)
+    resources:
+      cpu: 1
+      memory: 2Gi
+
+    # Volume mounts for persistent data
+    volumes:
+      - name: clawdbot-data
+        mountPath: /data
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Dependencies - ensure Neo4j starts first
+    dependsOn:
+      - neo4j
+
+  # ===========================================================================
+  # NEO4J SERVICE - Graph Database
+  # ===========================================================================
+  neo4j:
+    image: neo4j:5-community
+
+    # Port configuration
+    ports:
+      - port: 7474
+        targetPort: 7474
+        protocol: TCP
+        description: "Neo4j HTTP Browser"
+      - port: 7687
+        targetPort: 7687
+        protocol: TCP
+        description: "Neo4j Bolt Protocol"
+
+    # Health check using Neo4j's built-in health endpoint
+    healthcheck:
+      path: /db/manage/server/jmx/domain/org.neo4j/instance%3Dkernel%230%2Cname%3DDiagnostics
+      port: 7474
+      interval: 30s
+      timeout: 10s
+      startPeriod: 60s
+      retries: 5
+
+    # Environment variables for Neo4j configuration
+    environment:
+      # Authentication (format: neo4j/password)
+      # IMPORTANT: Set NEO4J_USER and NEO4J_PASSWORD via Railway dashboard
+      - name: NEO4J_AUTH
+        value: ${NEO4J_USER}/${NEO4J_PASSWORD}
+
+      # Plugins (APOC and GDS - Graph Data Science)
+      - name: NEO4J_PLUGINS
+        value: '["apoc", "gds"]'
+
+      # Memory settings (adjust based on Railway plan)
+      - name: NEO4J_dbms_memory_heap_initial__size
+        value: "512m"
+      - name: NEO4J_dbms_memory_heap_max__size
+        value: "1G"
+      - name: NEO4J_dbms_memory_pagecache_size
+        value: "512m"
+
+      # Accept license for enterprise features (if using enterprise edition)
+      # - name: NEO4J_ACCEPT_LICENSE_AGREEMENT
+      #   value: "yes"
+
+      # Enable remote connections
+      - name: NEO4J_dbms_default__listen__address
+        value: "0.0.0.0"
+
+      # Logging configuration
+      - name: NEO4J_dbms_logs_debug_level
+        value: "INFO"
+
+    # Resource allocation
+    resources:
+      cpu: 1
+      memory: 2Gi
+
+    # Volume mounts for data persistence
+    volumes:
+      - name: neo4j-data
+        mountPath: /data
+      - name: neo4j-logs
+        mountPath: /logs
+
+    # Restart policy
+    restart: unless-stopped
+
+# =============================================================================
+# VOLUME CONFIGURATION
+# =============================================================================
+
+volumes:
+  # Persistent storage for moltbot data
+  clawdbot-data:
+    size: 10Gi
+    description: "OpenClaw agent state, workspaces, and session data"
+
+  # Persistent storage for Neo4j data
+  neo4j-data:
+    size: 20Gi
+    description: "Neo4j graph database storage"
+
+  # Persistent storage for Neo4j logs
+  neo4j-logs:
+    size: 5Gi
+    description: "Neo4j log files"
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+deploy:
+  # Number of replicas for moltbot service
+  replicas:
+    moltbot: 1
+    neo4j: 1
+
+  # Deployment strategy
+  strategy: rolling
+
+  # Health check grace period
+  healthcheckGracePeriod: 120s
+
+# =============================================================================
+# NOTES FOR RAILWAY DEPLOYMENT
+# =============================================================================
+#
+# 1. Environment Variables to Set in Railway Dashboard:
+#    - OPENCLAW_GATEWAY_TOKEN: Secure token for gateway authentication
+#    - NEO4J_PASSWORD: Strong password for Neo4j (overrides the default)
+#
+# 2. Neo4j Browser Access:
+#    - After deployment, access Neo4j Browser at: http://<railway-domain>:7474
+#    - Login with: neo4j / <NEO4J_PASSWORD>
+#
+# 3. Health Check Endpoints:
+#    - moltbot: http://<service>:18789/health
+#    - neo4j: http://<service>:7474/db/manage/server/jmx/...
+#
+# 4. Volume Persistence:
+#    - Data persists across deployments
+#    - Back up important data regularly
+#
+# 5. Scaling Considerations:
+#    - Neo4j should typically run as single instance
+#    - moltbot can be scaled horizontally if stateless
+#
+# 6. Security:
+#    - Change default passwords before production use
+#    - Consider enabling SSL/TLS for Neo4j connections
+#    - Use Railway's private networking for service-to-service communication

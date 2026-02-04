@@ -16,8 +16,49 @@
       "workspace": "/data/workspace",
       "sandbox": {
         "mode": "off"
+      },
+      "model": {
+        "primary": "zai/glm-4.5"
       }
-    }
+    },
+    "list": [
+      {
+        "id": "main",
+        "name": "Kublai",
+        "default": true,
+        "agentDir": "/data/.clawdbot/agents/main",
+        "model": "moonshot/kimi-k2.5"
+      },
+      {
+        "id": "researcher",
+        "name": "Mongke",
+        "agentDir": "/data/.clawdbot/agents/researcher"
+      },
+      {
+        "id": "writer",
+        "name": "Chagatai",
+        "agentDir": "/data/.clawdbot/agents/writer",
+        "model": "moonshot/kimi-k2.5"
+      },
+      {
+        "id": "developer",
+        "name": "Temujin",
+        "agentDir": "/data/.clawdbot/agents/developer",
+        "model": "zai/glm-4.7"
+      },
+      {
+        "id": "analyst",
+        "name": "Jochi",
+        "agentDir": "/data/.clawdbot/agents/analyst"
+      },
+      {
+        "id": "ops",
+        "name": "Ogedei",
+        "agentDir": "/data/.clawdbot/agents/ops",
+        "failoverFor": ["main"],
+        "failoverTriggers": ["kublai_unavailable", "kublai_rate_limited"]
+      }
+    ]
   },
   "channels": {
     "signal": {
@@ -36,8 +77,20 @@
   },
   "session": {
     "scope": "per-sender",
+    "signalRouting": {
+      "enabled": true,
+      "defaultAgent": "main",
+      "sessionIsolation": true,
+      "responseRouting": {
+        "mode": "sender-matched",
+        "description": "Agent responses are routed back to the original Signal sender session"
+      }
+    },
     "reset": {
-      "mode": "daily"
+      "mode": "daily",
+      "graceful": true,
+      "drainTimeoutSeconds": 300,
+      "maxPendingTasksBeforeForceReset": 10
     }
   },
   "logging": {
