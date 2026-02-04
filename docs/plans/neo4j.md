@@ -481,7 +481,7 @@ def get_pending_notifications(agent_id: str) -> List[Dict]:
 // Session context for persistence across daily resets
 (:SessionContext {
   sender_id,
-  session_date,  // Store as string 'YYYY-MM-DD' to survive midnight
+  session_date,  // Neo4j date() type - enables proper date arithmetic and range queries
   active_tasks,
   pending_delegations,
   conversation_summary,
@@ -679,6 +679,52 @@ CREATE INDEX concept_sender_access FOR (c:Concept)
   ON (c.sender_hash, c.access_tier, c.name);
 ```
 
+### Data Type Migrations
+
+#### SessionContext session_date Migration (v2.0)
+
+**Change**: `session_date` field changed from string ('YYYY-MM-DD') to Neo4j `date()` type.
+
+**Benefits**:
+- Enables proper date arithmetic using Neo4j temporal functions
+- Supports range queries with `duration.between()`
+- Allows efficient filtering with comparison operators
+- Enables date truncation and extraction functions
+
+**Migration Cypher**:
+```cypher
+// Migrate existing string dates to date() type
+MATCH (s:SessionContext)
+WHERE s.session_date IS STRING
+WITH s, s.session_date as old_date
+SET s.session_date = date(s.session_date)
+RETURN count(s) as migrated_count
+```
+
+**Query Updates**:
+```cypher
+// Before (string comparison - unreliable)
+MATCH (s:SessionContext)
+WHERE s.session_date >= '2024-01-15'  // String comparison
+
+// After (date arithmetic - reliable)
+MATCH (s:SessionContext)
+WHERE s.session_date >= date('2024-01-15')
+
+// Range queries now possible
+MATCH (s:SessionContext)
+WHERE s.session_date >= date() - duration({days: 7})
+RETURN s
+
+// Date difference calculations
+MATCH (s:SessionContext)
+RETURN duration.between(s.session_date, date()).days as days_old
+```
+
+**Python Driver Compatibility**:
+- Python `datetime.date` objects are automatically converted to Neo4j `date()`
+- No code changes required - pass `date.today()` instead of `date.today().isoformat()`
+
 ### Privacy Controls
 
 #### Access Tier System
@@ -827,10 +873,37 @@ MIGRATIONS = [
             CREATE INDEX notification_created_at FOR (n:Notification) ON (n.created_at);
             CREATE INDEX reflection_created_at FOR (r:Reflection) ON (r.created_at);
             CREATE INDEX session_context_lookup FOR (s:SessionContext) ON (s.sender_id, s.session_date);
+            CREATE INDEX agent_backup_lookup FOR (b:AgentBackup) ON (b.created_at);
             CREATE FULLTEXT INDEX knowledge_content
                 FOR (n:Research|Content|Concept) ON EACH [n.findings, n.body, n.description];
         ''',
         'down': '''
+            // Backup all Agent nodes before deletion (auto-cleanup: keeps last 10)
+            CALL {
+                MATCH (a:Agent)
+                CREATE (b:AgentBackup {
+                    agent_id: a.id,
+                    name: a.name,
+                    role: a.role,
+                    primary_capabilities: a.primary_capabilities,
+                    personality: a.personality,
+                    last_active: a.last_active,
+                    backed_up_at: datetime(),
+                    migration_version: 0,
+                    backup_reason: 'rollback_from_v1'
+                })
+                RETURN count(b) as backed_up
+            }
+            // Clean up old backups (keep only most recent 10)
+            WITH backed_up
+            CALL {
+                MATCH (b:AgentBackup)
+                WITH b ORDER BY b.created_at DESC
+                SKIP 10
+                DETACH DELETE b
+            }
+            // Now delete the agents
+            WITH backed_up
             MATCH (a:Agent) DETACH DELETE a;
             DROP INDEX agent_knowledge IF EXISTS;
             DROP INDEX task_status IF EXISTS;
@@ -838,6 +911,7 @@ MIGRATIONS = [
             DROP INDEX notification_created_at IF EXISTS;
             DROP INDEX reflection_created_at IF EXISTS;
             DROP INDEX session_context_lookup IF EXISTS;
+            DROP INDEX agent_backup_lookup IF EXISTS;
             DROP INDEX knowledge_content IF EXISTS;
         '''
     },
@@ -961,7 +1035,292 @@ class MigrationManager:
                 for m in MIGRATIONS
             ]
         }
+
+    def _backup_agents_before_rollback(self, version: int) -> int:
+        """Create backup of all Agent nodes before destructive rollback.
+
+        Creates :AgentBackup nodes with all Agent properties, timestamp,
+        and migration version. Automatically limits to most recent 10 backups.
+
+        Args:
+            version: The migration version being rolled back from
+
+        Returns:
+            Number of agents backed up
+        """
+        backup_query = '''
+            MATCH (a:Agent)
+            CREATE (b:AgentBackup {
+                agent_id: a.id,
+                name: a.name,
+                role: a.role,
+                primary_capabilities: a.primary_capabilities,
+                personality: a.personality,
+                last_active: a.last_active,
+                backed_up_at: datetime(),
+                migration_version: $version,
+                backup_reason: $reason
+            })
+            RETURN count(b) as backed_up
+        '''
+
+        cleanup_query = '''
+            MATCH (b:AgentBackup)
+            WITH b ORDER BY b.backed_up_at DESC
+            SKIP 10
+            DETACH DELETE b
+        '''
+
+        with self._session_pool() as session:
+            # Create backups
+            result = session.run(backup_query, version=version,
+                                   reason=f'rollback_from_v{version}')
+            record = result.single()
+            backed_up = record['backed_up'] if record else 0
+
+            # Clean up old backups (keep last 10)
+            session.run(cleanup_query)
+
+            print(f"[BACKUP] Created {backed_up} AgentBackup nodes "
+                  f"(migration v{version})")
+            return backed_up
+
+    def _restore_agents_from_backup(self, backup_id: str = None) -> int:
+        """Restore Agent nodes from backup.
+
+        Emergency recovery method to restore agents from AgentBackup nodes.
+        If backup_id is specified, restores from that specific backup.
+        Otherwise, restores from the most recent backup.
+
+        Args:
+            backup_id: Optional specific agent_id to restore from backup
+
+        Returns:
+            Number of agents restored
+        """
+        if backup_id:
+            # Restore specific agent from backup
+            restore_query = '''
+                MATCH (b:AgentBackup {agent_id: $backup_id})
+                WITH b ORDER BY b.backed_up_at DESC LIMIT 1
+                CREATE (a:Agent {
+                    id: b.agent_id,
+                    name: b.name,
+                    role: b.role,
+                    primary_capabilities: b.primary_capabilities,
+                    personality: b.personality,
+                    last_active: datetime()
+                })
+                RETURN count(a) as restored
+            '''
+            with self._session_pool() as session:
+                result = session.run(restore_query, backup_id=backup_id)
+                record = result.single()
+                restored = record['restored'] if record else 0
+                print(f"[RESTORE] Restored agent '{backup_id}' from backup")
+                return restored
+        else:
+            # Restore all agents from most recent backup
+            restore_query = '''
+                MATCH (b:AgentBackup)
+                WITH b.agent_id as agent_id, max(b.backed_up_at) as latest
+                MATCH (b:AgentBackup {agent_id: agent_id, backed_up_at: latest})
+                CREATE (a:Agent {
+                    id: b.agent_id,
+                    name: b.name,
+                    role: b.role,
+                    primary_capabilities: b.primary_capabilities,
+                    personality: b.personality,
+                    last_active: datetime()
+                })
+                RETURN count(a) as restored
+            '''
+            with self._session_pool() as session:
+                result = session.run(restore_query)
+                record = result.single()
+                restored = record['restored'] if record else 0
+                print(f"[RESTORE] Restored {restored} agents from latest backups")
+                return restored
+
+    def list_agent_backups(self) -> List[Dict[str, Any]]:
+        """List all available Agent backups.
+
+        Returns:
+            List of backup records with agent_id, name, backed_up_at,
+            migration_version, and backup_reason
+        """
+        query = '''
+            MATCH (b:AgentBackup)
+            RETURN b.agent_id as agent_id,
+                   b.name as name,
+                   b.role as role,
+                   b.backed_up_at as backed_up_at,
+                   b.migration_version as migration_version,
+                   b.backup_reason as backup_reason
+            ORDER BY b.backed_up_at DESC
+        '''
+        with self._session_pool() as session:
+            result = session.run(query)
+            return [dict(record) for record in result]
+
+    def migrate_with_backup(self, target_version: int = None) -> List[Dict[str, Any]]:
+        """Run migrations with automatic backup before destructive rollbacks.
+
+        This is the RECOMMENDED way to run migrations. It automatically creates
+        backups before any 'down' migration that would delete Agent nodes.
+
+        Args:
+            target_version: Version to migrate to (None = latest)
+
+        Returns:
+            List of applied migrations with backup info
+        """
+        current = self.get_current_version()
+        target = target_version or max(m['version'] for m in MIGRATIONS)
+        applied = []
+
+        if current < target:
+            # Migrate up - no backup needed
+            for migration in MIGRATIONS:
+                if current < migration['version'] <= target:
+                    self._apply_migration(migration, 'up')
+                    applied.append({
+                        'version': migration['version'],
+                        'direction': 'up',
+                        'backup_created': False
+                    })
+        elif current > target:
+            # Migrate down - backup before destructive operations
+            for migration in reversed(MIGRATIONS):
+                if target < migration['version'] <= current:
+                    # Check if this is v1 (has Agent deletion)
+                    if migration['version'] == 1:
+                        # Create backup before rollback
+                        backed_up = self._backup_agents_before_rollback(
+                            migration['version']
+                        )
+                        applied.append({
+                            'version': migration['version'],
+                            'direction': 'down',
+                            'backup_created': True,
+                            'agents_backed_up': backed_up
+                        })
+                    else:
+                        applied.append({
+                            'version': migration['version'],
+                            'direction': 'down',
+                            'backup_created': False
+                        })
+
+                    self._apply_migration(migration, 'down')
+
+        return applied
 ```
+
+**Data Safety: Backup and Restore Procedures**
+
+The MigrationManager includes automatic backup capabilities to prevent data loss during rollbacks. When rolling back migration v1 (which deletes all Agent nodes), the system automatically creates backups before deletion.
+
+**Automatic Backup During Rollback:**
+
+The migration v1 'down' operation now includes embedded backup logic:
+
+```cypher
+// Backup all Agent nodes before deletion (auto-cleanup: keeps last 10)
+CALL {
+    MATCH (a:Agent)
+    CREATE (b:AgentBackup {
+        agent_id: a.id,
+        name: a.name,
+        role: a.role,
+        primary_capabilities: a.primary_capabilities,
+        personality: a.personality,
+        last_active: a.last_active,
+        backed_up_at: datetime(),
+        migration_version: 0,
+        backup_reason: 'rollback_from_v1'
+    })
+    RETURN count(b) as backed_up
+}
+// Clean up old backups (keep only most recent 10)
+WITH backed_up
+CALL {
+    MATCH (b:AgentBackup)
+    WITH b ORDER BY b.created_at DESC
+    SKIP 10
+    DETACH DELETE b
+}
+// Now delete the agents
+WITH backed_up
+MATCH (a:Agent) DETACH DELETE a;
+```
+
+**Using migrate_with_backup() (Recommended):**
+
+```python
+manager = MigrationManager(driver)
+
+# This automatically backs up before destructive rollbacks
+result = manager.migrate_with_backup(target_version=0)
+# Output: [{'version': 1, 'direction': 'down', 'backup_created': True, 'agents_backed_up': 6}]
+```
+
+**Manual Backup and Restore:**
+
+```python
+# Create manual backup before rollback
+manager._backup_agents_before_rollback(version=1)
+
+# List available backups
+backups = manager.list_agent_backups()
+for backup in backups:
+    print(f"{backup['agent_id']}: {backup['name']} backed up at {backup['backed_up_at']}")
+
+# Restore all agents from latest backups
+restored_count = manager._restore_agents_from_backup()
+print(f"Restored {restored_count} agents")
+
+# Restore specific agent
+manager._restore_agents_from_backup(backup_id='analyst')
+```
+
+**Emergency Recovery Procedure:**
+
+If agents are accidentally deleted during a rollback:
+
+1. **Check available backups:**
+   ```python
+   backups = manager.list_agent_backups()
+   ```
+
+2. **Restore from backup:**
+   ```python
+   # Restore all agents
+   manager._restore_agents_from_backup()
+
+   # Or restore specific agent
+   manager._restore_agents_from_backup(backup_id='developer')
+   ```
+
+3. **Verify restoration:**
+   ```cypher
+   MATCH (a:Agent) RETURN count(a) as agent_count
+   ```
+
+**Backup Retention Policy:**
+
+- Maximum 10 backups retained per agent (configurable)
+- Oldest backups are automatically purged
+- Each backup includes: agent_id, name, role, capabilities, personality, timestamp, migration version
+- Backups are stored as `:AgentBackup` nodes in Neo4j
+
+**Index for Backup Performance:**
+
+```cypher
+CREATE INDEX agent_backup_lookup FOR (b:AgentBackup) ON (b.created_at);
+```
+
+This index ensures fast backup queries and efficient cleanup of old backups.
 
 **Step 2.1**: Add Neo4j service to Railway
 
@@ -1154,7 +1513,8 @@ class OperationalMemory:
     REQUIRED_ENV_VARS = [
         'NEO4J_URI',
         'NEO4J_PASSWORD',
-        'OPENCLAW_GATEWAY_TOKEN'
+        'OPENCLAW_GATEWAY_TOKEN',
+        'AGENT_AUTH_SECRET'
     ]
 
     # Access tier definitions for privacy control
@@ -2651,12 +3011,143 @@ Do not include any text outside the JSON object."""
         # Default 6-agent set
         return {'main', 'researcher', 'writer', 'developer', 'analyst', 'ops'}
 
-    def _validate_agent_id(self, agent_id: str) -> bool:
-        """Validate that agent_id is a known agent.
+    def _validate_agent_id(self, agent_id: str, auth_token: Optional[str] = None) -> bool:
+        """Validate that agent_id is a known agent with optional HMAC authentication.
 
         Prevents spoofing by ensuring only valid agents can create/claim tasks.
+        When auth_token is provided, performs HMAC-SHA256 authentication to verify
+        the agent's identity cryptographically. Without auth_token, falls back to
+        simple set membership check (less secure, for backward compatibility only).
+
+        Args:
+            agent_id: The agent identifier to validate.
+            auth_token: Optional HMAC authentication token in format
+                       'agent_id:timestamp:signature'. If provided, the token
+                       is verified using AGENT_AUTH_SECRET.
+
+        Returns:
+            True if agent is valid (and token is valid if provided), False otherwise.
+
+        Security:
+            - Always provide auth_token in production environments
+            - Tokens expire after 5 minutes to prevent replay attacks
+            - HMAC-SHA256 prevents signature forgery without the secret
+            - Simple set membership (no token) is vulnerable if env is compromised
         """
-        return agent_id in self.VALID_AGENTS
+        if agent_id not in self.VALID_AGENTS:
+            return False
+
+        if auth_token is not None:
+            return self._authenticate_agent(agent_id, auth_token)
+
+        return True
+
+    def _authenticate_agent(self, agent_id: str, auth_token: str) -> bool:
+        """Authenticate agent using HMAC-SHA256 token validation.
+
+        Token format: 'agent_id:timestamp:signature'
+        Signature: HMAC-SHA256('${agent_id}:${timestamp}', AGENT_AUTH_SECRET)
+
+        Args:
+            agent_id: The agent identifier to authenticate.
+            auth_token: HMAC token in format 'agent_id:timestamp:signature'.
+
+        Returns:
+            True if token is valid and not expired, False otherwise.
+
+        Security:
+            - Tokens expire after 5 minutes to prevent replay attacks
+            - HMAC-SHA256 signature ensures authenticity without exposing secret
+            - Constant-time comparison prevents timing attacks
+            - Agent ID in token must match claimed agent_id
+        """
+        if not auth_token or ':' not in auth_token:
+            return False
+
+        try:
+            parts = auth_token.split(':')
+            if len(parts) != 3:
+                return False
+
+            token_agent, timestamp_str, signature = parts
+
+            # Verify agent matches the token
+            if token_agent != agent_id:
+                return False
+
+            # Parse and validate timestamp
+            try:
+                timestamp = int(timestamp_str)
+            except ValueError:
+                return False
+
+            # Check for replay attacks (5 minute window)
+            current_time = int(time.time())
+            time_diff = abs(current_time - timestamp)
+            if time_diff > 300:  # 5 minutes in seconds
+                return False
+
+            # Verify HMAC signature
+            auth_secret = os.getenv('AGENT_AUTH_SECRET', '')
+            if not auth_secret:
+                return False
+
+            expected_message = f"{agent_id}:{timestamp_str}"
+            expected_signature = hmac.new(
+                auth_secret.encode('utf-8'),
+                expected_message.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+
+            # Constant-time comparison to prevent timing attacks
+            if not hmac.compare_digest(signature, expected_signature):
+                return False
+
+            return True
+
+        except (ValueError, TypeError):
+            return False
+
+    def _generate_agent_token(self, agent_id: str) -> str:
+        """Generate HMAC authentication token for an agent.
+
+        Token format: 'agent_id:timestamp:signature'
+        Signature: HMAC-SHA256('${agent_id}:${timestamp}', AGENT_AUTH_SECRET)
+
+        Args:
+            agent_id: The agent identifier to generate token for.
+
+        Returns:
+            HMAC authentication token string.
+
+        Raises:
+            RuntimeError: If AGENT_AUTH_SECRET is not configured.
+            ValueError: If agent_id is not a valid agent.
+
+        Security:
+            - Tokens expire after 5 minutes; generate fresh tokens for each request
+            - Keep AGENT_AUTH_SECRET secure; it is the root of trust
+            - Do not log tokens; they contain sensitive signature data
+        """
+        if agent_id not in self.VALID_AGENTS:
+            raise ValueError(f"Invalid agent_id: {agent_id}")
+
+        auth_secret = os.getenv('AGENT_AUTH_SECRET')
+        if not auth_secret:
+            raise RuntimeError(
+                "AGENT_AUTH_SECRET environment variable not set. "
+                "Cannot generate authentication tokens."
+            )
+
+        timestamp = int(time.time())
+        message = f"{agent_id}:{timestamp}"
+        signature = hmac.new(
+            auth_secret.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+
+        return f"{agent_id}:{timestamp}:{signature}"
 
     def create_task(self, task_type: str, description: str,
                    delegated_by: str, assigned_to: str) -> Optional[UUID]:
@@ -3129,7 +3620,7 @@ Do not include any text outside the JSON object."""
         if self.fallback_mode:
             return True
 
-        today = date.today().isoformat()  # 'YYYY-MM-DD' string
+        today = date.today()  # Python date object - Neo4j converts to date()
 
         query = """
         MERGE (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
@@ -3153,7 +3644,7 @@ Do not include any text outside the JSON object."""
 
         Returns status of pending tasks and whether reset should proceed.
         """
-        today = date.today().isoformat()
+        today = date.today()  # Python date object - Neo4j converts to date()
 
         query = """
         MATCH (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
@@ -3185,7 +3676,7 @@ Do not include any text outside the JSON object."""
 
     def enter_drain_mode(self, sender_id: str) -> bool:
         """Enter drain mode - stop accepting new work, complete existing."""
-        today = date.today().isoformat()
+        today = date.today()  # Python date object - Neo4j converts to date()
 
         query = """
         MATCH (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
@@ -3200,7 +3691,7 @@ Do not include any text outside the JSON object."""
         if self.fallback_mode:
             return None
 
-        today = date.today().isoformat()  # 'YYYY-MM-DD' string
+        today = date.today()  # Python date object - Neo4j converts to date()
 
         query = """
         MATCH (s:SessionContext {sender_id: $sender_id, session_date: $session_date})
@@ -3344,10 +3835,11 @@ class SessionResetManager:
         # to handle the edge case where drain spans midnight
         drain_start_date = None
         if self._drain_start_time:
-            drain_start_date = self._drain_start_time.strftime('%Y-%m-%d')
+            # Convert datetime to Python date object for Neo4j date() type
+            drain_start_date = self._drain_start_time.date()
         else:
             # Fallback to today if drain start time not set (shouldn't happen)
-            drain_start_date = date.today().isoformat()
+            drain_start_date = date.today()  # Python date object
 
         self._drain_mode = False
         self._drain_start_time = None
