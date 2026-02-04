@@ -134,8 +134,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # =============================================================================
 # SECTION 12: Entry Point
 # =============================================================================
-# Default command to start the OpenClaw gateway
+# This container provides the agent configuration and protocols for OpenClaw.
+# The actual OpenClaw gateway runs as a separate service.
+# This container keeps running to provide file system access for agents.
 
 EXPOSE 8080 18789
 
-CMD ["python", "-m", "openclaw.gateway"]
+# Simple health check server to keep container running
+CMD ["python", "/app/health_server.py"]

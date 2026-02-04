@@ -130,7 +130,7 @@ class TestMetaLearningEngine:
         engine = MetaLearningEngine(memory, reflection_memory)
 
         reflections = [
-            {"mistake_type": "security", "lesson": "Never use eval on user input", "root_cause": "Used eval", "context": "Parser"},
+            {"mistake_type": "security", "lesson": "Never use eval() on untrusted data", "root_cause": "Used eval", "context": "Parser"},
             {"mistake_type": "security", "lesson": "Avoid eval for security", "root_cause": "Dangerous eval", "context": "Config loader"},
         ]
 
@@ -265,9 +265,8 @@ class TestMetaLearningEngine:
         mock_session.run.return_value = mock_result
 
         engine = MetaLearningEngine(memory, reflection_memory)
-        result = engine.approve_metarule("non-existent", approved_by="kublai")
-
-        assert result is False
+        with pytest.raises(MetaRuleNotFoundError):
+            engine.approve_metarule("non-existent", approved_by="kublai")
 
     def test_apply_metarule_success(self, mock_dependencies):
         """Test recording successful MetaRule application."""
@@ -347,7 +346,7 @@ class TestMetaLearningEngine:
         # First call to get old rule, second to create new rule, third to create relationship
         mock_results = [
             Mock(single=Mock(return_value={"m": {"id": "old-rule", "rule_type": "absolute", "version": 1, "source_reflections": ["r1"]}})),
-            Mock(single=Mock(return_value={"rule_id": "new-rule-id"})),
+            Mock(single=Mock(return_value={"rule_id": "test-rule-id"})),
             Mock(single=Mock(return_value={"r": {}})),
         ]
         mock_session.run.side_effect = mock_results
@@ -359,7 +358,7 @@ class TestMetaLearningEngine:
             reason="Clarified based on feedback"
         )
 
-        assert new_rule_id == "new-rule-id"
+        assert new_rule_id == "test-rule-id"
         assert mock_session.run.call_count == 3
 
     def test_update_rule_version_not_found(self, mock_dependencies):
@@ -371,13 +370,12 @@ class TestMetaLearningEngine:
         mock_session.run.return_value = mock_result
 
         engine = MetaLearningEngine(memory, reflection_memory)
-        new_rule_id = engine.update_rule_version(
-            old_rule_id="non-existent",
-            new_rule_content="Updated content",
-            reason="Test"
-        )
-
-        assert new_rule_id is None
+        with pytest.raises(MetaRuleNotFoundError):
+            engine.update_rule_version(
+                old_rule_id="non-existent",
+                new_rule_content="Updated content",
+                reason="Test"
+            )
 
     def test_queue_soul_update(self, mock_dependencies):
         """Test queuing SOUL file update."""

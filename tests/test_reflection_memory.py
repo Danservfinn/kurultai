@@ -61,11 +61,13 @@ class TestAgentReflectionMemory:
         """Test initialization when sentence-transformers is available."""
         memory, _ = mock_memory
 
-        with patch('tools.reflection_memory.SentenceTransformer') as mock_st:
-            mock_model = Mock()
-            mock_model.encode.return_value = [0.1] * 384
-            mock_st.return_value = mock_model
+        # Create a mock module with SentenceTransformer
+        mock_st_module = Mock()
+        mock_model = Mock()
+        mock_model.encode.return_value = [0.1] * 384
+        mock_st_module.SentenceTransformer.return_value = mock_model
 
+        with patch.dict('sys.modules', {'sentence_transformers': mock_st_module}):
             rm = AgentReflectionMemory(memory)
             assert rm._embedding_model is not None
 
@@ -73,11 +75,16 @@ class TestAgentReflectionMemory:
         """Test embedding generation with sentence-transformers."""
         memory, _ = mock_memory
 
-        with patch('tools.reflection_memory.SentenceTransformer') as mock_st:
-            mock_model = Mock()
-            mock_model.encode.return_value = [0.1] * 384
-            mock_st.return_value = mock_model
+        # Create a mock module with SentenceTransformer
+        mock_st_module = Mock()
+        mock_model = Mock()
+        # encode() returns a numpy-like array with tolist() method
+        mock_array = Mock()
+        mock_array.tolist.return_value = [0.1] * 384
+        mock_model.encode.return_value = mock_array
+        mock_st_module.SentenceTransformer.return_value = mock_model
 
+        with patch.dict('sys.modules', {'sentence_transformers': mock_st_module}):
             rm = AgentReflectionMemory(memory)
             embedding = rm._generate_embedding("test text")
 
@@ -193,16 +200,11 @@ class TestAgentReflectionMemory:
         """Test getting a reflection by ID."""
         memory, mock_session = mock_memory
 
-        mock_record = Mock()
-        mock_record.__getitem__ = Mock(return_value={
-            "id": "reflection-1",
-            "agent": "developer",
-            "mistake_type": "security",
-            "lesson": "Test lesson"
-        })
+        # Create a mock that behaves like a dict when passed to dict()
+        mock_node = {"id": "reflection-1", "agent": "developer", "mistake_type": "security", "lesson": "Test lesson"}
 
         mock_result = Mock()
-        mock_result.single.return_value = {"r": mock_record}
+        mock_result.single.return_value = {"r": mock_node}
         mock_session.run.return_value = mock_result
 
         rm = AgentReflectionMemory(memory)
@@ -315,10 +317,11 @@ class TestAgentReflectionMemory:
         """Test consolidating specific reflection IDs."""
         memory, mock_session = mock_memory
 
-        # First call for get_reflection, second for list
+        # First two calls for get_reflection (r1, r2), third for _mark_reflections_consolidated
         mock_results = [
             Mock(single=Mock(return_value={"r": {"id": "r1", "agent": "dev1", "mistake_type": "security", "consolidated": False}})),
             Mock(single=Mock(return_value={"r": {"id": "r2", "agent": "dev1", "mistake_type": "security", "consolidated": False}})),
+            Mock(),  # For _mark_reflections_consolidated which doesn't check return value
         ]
         mock_session.run.side_effect = mock_results
 
