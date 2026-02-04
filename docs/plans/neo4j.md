@@ -2545,6 +2545,34 @@ Do not include any text outside the JSON object."""
 
         return text
 
+    def _sanitize_lucene_query(self, query: str) -> str:
+        """Sanitize user input for Lucene full-text search.
+
+        Escapes Lucene special characters that could cause syntax errors
+        or unexpected behavior in full-text queries. While Neo4j parameterization
+        prevents Cypher injection, Lucene query syntax has its own special
+        characters that need escaping.
+
+        Args:
+            query: Raw user query string
+
+        Returns:
+            Sanitized query safe for Lucene full-text search
+
+        Example:
+            >>> _sanitize_lucene_query("C++ programming")
+            'C\\+\\+ programming'
+            >>> _sanitize_lucene_query("(foo OR bar)")
+            '\\(foo OR bar\\)'
+        """
+        if not query or not isinstance(query, str):
+            return query
+
+        # Escape Lucene special characters
+        # Characters: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+        special_chars = r'[\+\-\!\(\)\{\}\[\]\^"\~\*\?\:\\\\/]'
+        return re.sub(special_chars, r'\\\g<0>', query)
+
     def store_research(self, agent: str, topic: str, findings: str,
                       sources: List[str] = None, depth: str = "medium",
                       sender_hash: Optional[str] = None) -> Optional[UUID]:
@@ -2720,8 +2748,294 @@ Do not include any text outside the JSON object."""
             print(f"[ERROR] Failed to store concept: {e}")
             return None
 
+
+    def store_concepts_batch(self, agent: str, concepts: List[Dict[str, Any]]) -> List[str]:
+        """Store multiple concepts in a single transaction.
+
+        Reduces transaction overhead for bulk operations by using UNWIND
+        to process all concepts in one Cypher query.
+
+        Args:
+            agent: Agent ID creating the concepts
+            concepts: List of concept dicts with keys:
+                - name: Concept name (required)
+                - description: Concept description (required)
+                - domain: Concept domain/category (default: "general")
+                - source: Source of the concept (default: "")
+                - sender_hash: Hash for access control (default: None)
+
+        Returns:
+            List of concept IDs that were successfully stored
+
+        Example:
+            concepts = [
+                {
+                    "name": "Machine Learning",
+                    "description": "AI subset using statistical methods",
+                    "domain": "AI",
+                    "source": "research_paper_1"
+                },
+                {
+                    "name": "Neural Networks",
+                    "description": "Computing systems inspired by biological neurons",
+                    "domain": "AI",
+                    "source": "research_paper_1"
+                }
+            ]
+            ids = memory.store_concepts_batch("agent_1", concepts)
+        """
+        if not concepts:
+            return []
+
+        # Validate agent identity once for the batch
+        if not self._validate_agent_id(agent):
+            print(f"[AUTH] Invalid agent storing concepts batch: {agent}")
+            return []
+
+        # Check rate limit once for the batch (count as single operation)
+        if not self._check_rate_limit(agent, 'store_concept'):
+            print(f"[RATE_LIMIT] store_concepts_batch blocked for {agent}")
+            return []
+
+        # Prepare concept data with IDs and sanitization
+        concept_data = []
+        for concept in concepts:
+            name = concept.get('name', '')
+            description = concept.get('description', '')
+
+            # Skip invalid concepts
+            if not name or not description:
+                print(f"[WARN] Skipping concept with missing name/description")
+                continue
+
+            # Sanitize content
+            safe_name = self._sanitize_for_sharing(name)
+            safe_description = self._sanitize_for_sharing(description)
+
+            # Determine access tier
+            access_tier = self._determine_access_tier(
+                safe_name + " " + safe_description,
+                concept.get('sender_hash')
+            )
+
+            # Skip PRIVATE tier concepts
+            if access_tier == self.ACCESS_TIER_PRIVATE:
+                print(f"[PRIVACY] Concept '{safe_name}' blocked (PRIVATE tier)")
+                continue
+
+            # Generate and encrypt embedding
+            embedding = self._generate_embedding(safe_name + " " + safe_description)
+            stored_embedding = self._encrypt_embedding(embedding, access_tier) if embedding else None
+
+            concept_data.append({
+                'id': str(uuid4()),
+                'name': safe_name,
+                'description': safe_description,
+                'domain': concept.get('domain', 'general'),
+                'source': concept.get('source', ''),
+                'embedding': stored_embedding,
+                'access_tier': access_tier,
+                'sender_hash': concept.get('sender_hash'),
+                'confidence': 0.9
+            })
+
+        if not concept_data:
+            return []
+
+        # Fallback mode: store in local memory
+        if self.fallback_mode:
+            with self._fallback_lock:
+                stored_ids = []
+                for data in concept_data:
+                    self._local_store.setdefault('concepts', []).append({
+                        'id': data['id'],
+                        'agent': agent,
+                        'name': data['name'],
+                        'description': data['description'],
+                        'domain': data['domain'],
+                        'source': data['source'],
+                        'embedding': data['embedding'],
+                        'access_tier': data['access_tier'],
+                        'sender_hash': data['sender_hash'],
+                        'created_at': datetime.now().isoformat()
+                    })
+                    stored_ids.append(data['id'])
+            return stored_ids
+
+        # Neo4j batch insert using UNWIND
+        query = """
+        MATCH (a:Agent {id: $agent})
+        UNWIND $concepts AS concept
+        MERGE (c:Concept {name: concept.name})
+        ON CREATE SET
+            c.id = concept.id,
+            c.description = concept.description,
+            c.domain = concept.domain,
+            c.source = concept.source,
+            c.embedding = concept.embedding,
+            c.access_tier = concept.access_tier,
+            c.sender_hash = concept.sender_hash,
+            c.created_at = datetime(),
+            c.confidence = concept.confidence
+        ON MATCH SET
+            c.description = concept.description,
+            c.source = concept.source,
+            c.embedding = concept.embedding,
+            c.access_tier = concept.access_tier,
+            c.sender_hash = concept.sender_hash,
+            c.updated_at = datetime()
+        CREATE (a)-[:CREATED {timestamp: datetime()}]->(c)
+        RETURN c.id as id
+        """
+
+        try:
+            with self._session_pool() as session:
+                result = session.run(query, agent=agent, concepts=concept_data)
+                return [record['id'] for record in result]
+        except Exception as e:
+            print(f"[ERROR] Failed to store concepts batch: {e}")
+            return []
+
+    def store_research_batch(self, agent: str, research_items: List[Dict[str, Any]]) -> List[str]:
+        """Store multiple research findings in a single transaction.
+
+        Reduces transaction overhead for bulk operations by using UNWIND
+        to process all research items in one Cypher query.
+
+        Args:
+            agent: Agent ID storing the research
+            research_items: List of research dicts with keys:
+                - topic: Research topic (required)
+                - findings: Research findings text (required)
+                - sources: List of source references (default: [])
+                - depth: Research depth (default: "medium")
+                - sender_hash: Hash for access control (default: None)
+
+        Returns:
+            List of research IDs that were successfully stored
+
+        Example:
+            research_items = [
+                {
+                    "topic": "Quantum Computing",
+                    "findings": "Qubits enable exponential speedup for certain problems",
+                    "sources": ["Nature 2024", "IBM Research"],
+                    "depth": "deep"
+                },
+                {
+                    "topic": "Error Correction",
+                    "findings": "Surface codes provide fault-tolerant quantum computation",
+                    "sources": ["Google Quantum AI"],
+                    "depth": "medium"
+                }
+            ]
+            ids = memory.store_research_batch("agent_1", research_items)
+        """
+        if not research_items:
+            return []
+
+        # Validate agent identity once for the batch
+        if not self._validate_agent_id(agent):
+            print(f"[AUTH] Invalid agent storing research batch: {agent}")
+            return []
+
+        # Check rate limit once for the batch
+        if not self._check_rate_limit(agent, 'store_research'):
+            print(f"[RATE_LIMIT] store_research_batch blocked for {agent}")
+            return []
+
+        # Prepare research data with IDs and sanitization
+        research_data = []
+        for item in research_items:
+            topic = item.get('topic', '')
+            findings = item.get('findings', '')
+
+            # Skip invalid items
+            if not topic or not findings:
+                print(f"[WARN] Skipping research with missing topic/findings")
+                continue
+
+            # Sanitize content
+            safe_topic = self._sanitize_for_sharing(topic)
+            safe_findings = self._sanitize_for_sharing(findings)
+
+            # Determine access tier
+            access_tier = self._determine_access_tier(
+                safe_topic + " " + safe_findings,
+                item.get('sender_hash')
+            )
+
+            # Skip PRIVATE tier research
+            if access_tier == self.ACCESS_TIER_PRIVATE:
+                print(f"[PRIVACY] Research on '{safe_topic}' blocked (PRIVATE tier)")
+                continue
+
+            research_data.append({
+                'id': str(uuid4()),
+                'topic': safe_topic,
+                'findings': safe_findings,
+                'sources': item.get('sources', []),
+                'depth': item.get('depth', 'medium'),
+                'access_tier': access_tier,
+                'sender_hash': item.get('sender_hash'),
+                'confidence': 0.9
+            })
+
+        if not research_data:
+            return []
+
+        # Fallback mode: store in local memory
+        if self.fallback_mode:
+            with self._fallback_lock:
+                stored_ids = []
+                for data in research_data:
+                    # Enforce fallback store limits
+                    current_research = self._local_store.get('research', [])
+                    if len(current_research) >= self._MAX_FALLBACK_RESEARCH:
+                        current_research.pop(0)  # Remove oldest
+
+                    self._local_store.setdefault('research', []).append({
+                        'id': data['id'],
+                        'agent': agent,
+                        'topic': data['topic'],
+                        'findings': data['findings'],
+                        'created_at': datetime.now().isoformat(),
+                        'access_tier': data['access_tier'],
+                        'sender_hash': data['sender_hash']
+                    })
+                    stored_ids.append(data['id'])
+            return stored_ids
+
+        # Neo4j batch insert using UNWIND
+        query = """
+        MATCH (a:Agent {id: $agent})
+        UNWIND $research_items AS item
+        CREATE (r:Research {
+            id: item.id,
+            topic: item.topic,
+            findings: item.findings,
+            sources: item.sources,
+            depth: item.depth,
+            access_tier: item.access_tier,
+            sender_hash: item.sender_hash,
+            created_at: datetime(),
+            confidence: item.confidence
+        })
+        CREATE (a)-[:CREATED {timestamp: datetime()}]->(r)
+        RETURN r.id as id
+        """
+
+        try:
+            with self._session_pool() as session:
+                result = session.run(query, agent=agent, research_items=research_data)
+                return [record['id'] for record in result]
+        except Exception as e:
+            print(f"[ERROR] Failed to store research batch: {e}")
+            return []
+
     def query_concepts(self, query_text: str, sender_hash: Optional[str] = None,
-                      min_confidence: float = 0.7, limit: int = 5) -> List[Dict[str, Any]]:
+                      min_confidence: float = 0.7, limit: int = 5,
+                      offset: int = 0) -> List[Dict[str, Any]]:
         """Query concepts with sender isolation and access tier enforcement.
 
         Args:
@@ -2729,6 +3043,7 @@ Do not include any text outside the JSON object."""
             sender_hash: Hash of requesting sender (for access control)
             min_confidence: Minimum similarity score
             limit: Maximum results to return
+            offset: Number of results to skip (for pagination)
 
         Returns:
             List of matching concepts (filtered by access tier)
@@ -2749,7 +3064,7 @@ Do not include any text outside the JSON object."""
                         'description': c['description'],
                         'domain': c.get('domain', 'general')
                     })
-            return results[:limit]
+            return results[offset:offset + limit]
 
         # Generate embedding for query
         query_embedding = self._generate_embedding(query_text)
@@ -2761,7 +3076,7 @@ Do not include any text outside the JSON object."""
                 # access control filtering. This balances resource efficiency with ensuring
                 # we can return the requested limit after filtering out inaccessible SENSITIVE nodes.
                 # If insufficient results after filtering, client should request next page.
-                vector_limit = max(int(limit * 1.5), 10)
+                vector_limit = max(int((offset + limit) * 1.5), 10)
                 query = """
                 CALL db.index.vector.queryNodes('concept_embedding', $vector_limit, $embedding)
                 YIELD node, score
@@ -2789,15 +3104,16 @@ Do not include any text outside the JSON object."""
                             'domain': record['domain'],
                             'score': record['score']
                         })
-                        if len(records) >= limit:
-                            break
-                    return records
+                    # Apply offset and limit after access control filtering
+                    return records[offset:offset + limit]
             except (ServiceUnavailable, TransientError) as e:
                 print(f"[WARN] Vector search failed due to Neo4j connectivity: {e}")
             except Exception as e:
                 print(f"[WARN] Vector search failed: {e}")
 
-        # Fallback to full-text search
+        # Fallback to full-text search with pagination
+        # Sanitize query_text to prevent Lucene injection attacks
+        safe_query_text = self._sanitize_lucene_query(query_text)
         query = """
         CALL db.index.fulltext.queryNodes('knowledge_content', $query)
         YIELD node, score
@@ -2805,12 +3121,13 @@ Do not include any text outside the JSON object."""
         RETURN node.name as name, node.description as description,
                node.domain as domain, node.access_tier as access_tier,
                node.sender_hash as concept_sender, score
-        LIMIT $limit
+        ORDER BY score DESC
+        SKIP $offset LIMIT $limit
         """
         try:
             with self._session_pool() as session:
-                result = session.run(query, query=query_text,
-                                    min_score=min_confidence, limit=limit)
+                result = session.run(query, query=safe_query_text,
+                                    min_score=min_confidence, offset=offset, limit=limit)
                 records = []
                 for record in result:
                     # Enforce access tier rules
@@ -2875,7 +3192,8 @@ Do not include any text outside the JSON object."""
 
     def query_related(self, agent: str, topic: str,
                      min_confidence: float = 0.7,
-                     sender_hash: Optional[str] = None) -> List[Dict[str, Any]]:
+                     sender_hash: Optional[str] = None,
+                     limit: int = 5, offset: int = 0) -> List[Dict[str, Any]]:
         """Query operational knowledge with vector fallback and access control.
 
         Args:
@@ -2883,12 +3201,14 @@ Do not include any text outside the JSON object."""
             topic: Search topic
             min_confidence: Minimum similarity threshold
             sender_hash: Hash of requesting sender (for access tier enforcement)
+            limit: Maximum results to return
+            offset: Number of results to skip (for pagination)
 
         Returns:
             List of related knowledge items (filtered by access tier)
         """
         if self.fallback_mode:
-            # Filter fallback store by access tier
+            # Filter fallback store by access tier with pagination
             research = self._local_store.get('research', [])
             filtered = []
             for r in research:
@@ -2898,7 +3218,7 @@ Do not include any text outside the JSON object."""
                 if tier == self.ACCESS_TIER_SENSITIVE and item_sender != sender_hash:
                     continue
                 filtered.append(r)
-            return filtered
+            return filtered[offset:offset + limit]
 
         # Generate embedding for the query topic
         embedding = self._generate_embedding(topic)
@@ -2906,9 +3226,10 @@ Do not include any text outside the JSON object."""
         # Try vector search first (if embedding generated and index exists)
         if embedding:
             try:
-                # Query more results than needed to allow for filtering
+                # Query more results than needed to allow for filtering and pagination
+                vector_limit = max(int((offset + limit) * 1.5), 10)
                 query = """
-                CALL db.index.vector.queryNodes('concept_embedding', 10, $embedding)
+                CALL db.index.vector.queryNodes('concept_embedding', $vector_limit, $embedding)
                 YIELD node, score
                 WHERE score >= $min_score
                 RETURN node.name as concept, node.description as description,
@@ -2916,7 +3237,8 @@ Do not include any text outside the JSON object."""
                        score
                 """
                 with self._session_pool() as session:
-                    result = session.run(query, embedding=embedding, min_score=min_confidence)
+                    result = session.run(query, embedding=embedding, min_score=min_confidence,
+                                        vector_limit=vector_limit)
                     records = []
                     for record in result:
                         # Enforce access tier rules
@@ -2932,26 +3254,28 @@ Do not include any text outside the JSON object."""
                             'description': record['description'],
                             'score': record['score']
                         })
-                        if len(records) >= 5:
-                            break
-                    if records:
-                        return records
+                    # Apply offset and limit after access control filtering
+                    return records[offset:offset + limit]
             except (ServiceUnavailable, TransientError):
                 pass  # Fall through to full-text search on connectivity issues
             except Exception as e:
                 print(f"[WARN] Research vector search failed: {e}")
                 pass  # Fall through to full-text search
 
-        # Fallback to full-text search
+        # Fallback to full-text search with pagination
+        # Sanitize topic to prevent Lucene injection attacks
+        safe_topic = self._sanitize_lucene_query(topic)
         query = """
         CALL db.index.fulltext.queryNodes('knowledge_content', $topic)
         YIELD node, score
         WHERE score >= $min_score
         RETURN node.topic as topic, node.findings as findings, score
-        LIMIT 10
+        ORDER BY score DESC
+        SKIP $offset LIMIT $limit
         """
         with self._session_pool() as session:
-            result = session.run(query, topic=topic, min_score=min_confidence)
+            result = session.run(query, topic=safe_topic, min_score=min_confidence,
+                                offset=offset, limit=limit)
             return [dict(record) for record in result]
 
     def _detect_cycle(self, from_agent: str, to_agent: str) -> bool:
@@ -5035,8 +5359,18 @@ class OperationalMemory:
                 'available_slots': max(0, self._MAX_CONCURRENT_BACKGROUND_TASKS - len(self._background_task_active))
             }
 
-    def get_synthesis_candidates(self, agent_id: str, limit: int = 20) -> List[Dict]:
-        """Get memories ready for synthesis (unsynthesized, recent)."""
+    def get_synthesis_candidates(self, agent_id: str, limit: int = 20,
+                                  offset: int = 0) -> List[Dict]:
+        """Get memories ready for synthesis (unsynthesized, recent).
+
+        Args:
+            agent_id: ID of the agent to get candidates for
+            limit: Maximum number of candidates to return
+            offset: Number of candidates to skip (for pagination)
+
+        Returns:
+            List of memory candidates for synthesis
+        """
         if self.fallback_mode:
             return []
 
@@ -5054,12 +5388,12 @@ class OperationalMemory:
                n.body as body,
                n.description as description
         ORDER BY n.created_at DESC
-        LIMIT $limit
+        SKIP $offset LIMIT $limit
         """
 
         try:
             with self._session_pool() as session:
-                result = session.run(query, agent_id=agent_id, limit=limit)
+                result = session.run(query, agent_id=agent_id, limit=limit, offset=offset)
                 return [dict(record) for record in result]
         except Exception as e:
             print(f"[ERROR] Failed to get synthesis candidates: {e}")
