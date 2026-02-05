@@ -797,6 +797,29 @@ class OperationalMemory:
                 logger.error(f"Failed to get notifications: {e}")
                 raise
 
+    def get_pending_notifications(
+        self,
+        agent: str,
+        mark_read: bool = True
+    ) -> List[Dict]:
+        """
+        Get pending (unread) notifications for an agent.
+
+        Args:
+            agent: Agent to get notifications for
+            mark_read: If True, mark notifications as read when retrieved
+
+        Returns:
+            List of notification dicts
+        """
+        notifications = self.get_notifications(agent, unread_only=True)
+
+        if mark_read and notifications:
+            for notification in notifications:
+                self.mark_notification_read(notification["id"])
+
+        return notifications
+
     def mark_notification_read(self, notification_id: str) -> bool:
         """
         Mark notification as read.
@@ -1130,6 +1153,86 @@ class OperationalMemory:
         """
         status = "busy" if busy else "active"
         return self.update_agent_heartbeat(agent, status)
+
+    def update_heartbeat(self, agent_id: str, status: str = "active") -> bool:
+        """
+        Update agent heartbeat timestamp (alias for update_agent_heartbeat).
+
+        Args:
+            agent_id: Agent name/identifier
+            status: Agent status ('active', 'busy', 'idle', 'offline')
+
+        Returns:
+            True if successful
+        """
+        return self.update_agent_heartbeat(agent_id, status)
+
+    def is_agent_available(self, agent_id: str, max_age_seconds: int = 300) -> bool:
+        """
+        Check if an agent is available based on recent heartbeat.
+
+        Args:
+            agent_id: Agent name/identifier
+            max_age_seconds: Maximum age of heartbeat to consider agent available
+
+        Returns:
+            True if agent has recent heartbeat, False otherwise
+        """
+        agent_status = self.get_agent_status(agent_id)
+        if agent_status is None:
+            return False
+
+        last_heartbeat = agent_status.get("last_heartbeat")
+        if last_heartbeat is None:
+            return False
+
+        # Handle different datetime formats
+        if isinstance(last_heartbeat, str):
+            try:
+                # Try ISO format
+                last_heartbeat = datetime.fromisoformat(last_heartbeat.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                return False
+
+        now = self._now()
+        age = (now - last_heartbeat).total_seconds()
+        return age <= max_age_seconds
+
+    def cleanup_old_heartbeats(self, max_age_seconds: int = 86400) -> int:
+        """
+        Remove old heartbeat entries for agents that haven't reported recently.
+
+        Args:
+            max_age_seconds: Maximum age of heartbeat to keep (default: 24 hours)
+
+        Returns:
+            Number of agent records removed
+        """
+        now = self._now()
+        cutoff_time = now - timedelta(seconds=max_age_seconds)
+
+        cypher = """
+        MATCH (a:Agent)
+        WHERE a.last_heartbeat < $cutoff_time
+        WITH a LIMIT 1000
+        DELETE a
+        RETURN count(a) as removed_count
+        """
+
+        with self._session() as session:
+            if session is None:
+                return 0
+
+            try:
+                result = session.run(cypher, cutoff_time=cutoff_time)
+                record = result.single()
+                removed_count = record["removed_count"] if record else 0
+                if removed_count > 0:
+                    logger.info(f"Cleaned up {removed_count} old agent heartbeat records")
+                return removed_count
+            except _get_neo4j_error() as e:
+                logger.error(f"Failed to cleanup old heartbeats: {e}")
+                raise
 
     # =======================================================================
     # Health Checks
