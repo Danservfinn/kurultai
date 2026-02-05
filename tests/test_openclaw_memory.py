@@ -501,6 +501,10 @@ class TestRateLimiting:
 # TestAgentHeartbeat
 # =============================================================================
 
+# =============================================================================
+# TestAgentHeartbeat
+# =============================================================================
+
 class TestAgentHeartbeat:
     """Tests for agent heartbeat functionality."""
 
@@ -515,37 +519,44 @@ class TestAgentHeartbeat:
         mem, mock_session = memory
 
         result = MagicMock()
-        result.single.return_value = {"name": "jochi"}
+        result.single.return_value = {"name": "kublai"}
         mock_session.run.return_value = result
 
-        mem.update_agent_heartbeat("jochi")
+        success = mem.update_heartbeat("kublai", status="active")
 
+        assert success is True
         mock_session.run.assert_called_once()
         call_args = mock_session.run.call_args
-        assert call_args[1]["agent"] == "jochi"
+        assert call_args[1]["agent"] == "kublai"
+        assert call_args[1]["status"] == "active"
 
     def test_update_heartbeat_all_agents(self, memory):
-        """Test updating heartbeat for multiple agents."""
+        """Test updating heartbeat for all 6 agents."""
         mem, mock_session = memory
 
         result = MagicMock()
         result.single.return_value = {"name": "test"}
         mock_session.run.return_value = result
 
-        agents = ["kublai", "jochi", "temüjin", "ögedei", "chagatai", "tolui"]
+        # The 6 agents: Kublai, Ögedei, Tolui, Hulagu, Möngke, Ariq Böke
+        agents = ["kublai", "ögedei", "tolui", "hulagu", "möngke", "ariq böke"]
         for agent in agents:
-            mem.update_agent_heartbeat(agent)
+            mem.update_heartbeat(agent, status="active")
 
         assert mock_session.run.call_count == len(agents)
 
-    def test_get_agent_status_recent(self, memory):
-        """Test agent status check with recent heartbeat."""
+        # Verify each agent was called
+        called_agents = [call[1]["agent"] for call in mock_session.run.call_args_list]
+        assert sorted(called_agents) == sorted(agents)
+
+    def test_is_agent_available_recent(self, memory):
+        """Test is_agent_available returns True for recent heartbeat."""
         mem, mock_session = memory
 
         # Mock recent heartbeat (within threshold)
         recent_time = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         agent_node = {
-            "name": "jochi",
+            "name": "kublai",
             "last_heartbeat": recent_time,
             "status": "active"
         }
@@ -554,19 +565,21 @@ class TestAgentHeartbeat:
         result.single.return_value = {"a": agent_node}
         mock_session.run.return_value = result
 
-        status = mem.get_agent_status("jochi")
+        # Mock _now to return a time just 60 seconds after the heartbeat
+        mem._now = Mock(return_value=datetime(2025, 1, 1, 12, 1, 0, tzinfo=timezone.utc))
 
-        assert status is not None
-        assert status["name"] == "jochi"
+        is_available = mem.is_agent_available("kublai", max_age_seconds=300)
 
-    def test_get_agent_status_stale(self, memory):
-        """Test agent status check with stale heartbeat."""
+        assert is_available is True
+
+    def test_is_agent_available_stale(self, memory):
+        """Test is_agent_available returns False for stale heartbeat."""
         mem, mock_session = memory
 
         # Mock stale heartbeat (beyond threshold)
         stale_time = datetime(2025, 1, 1, 11, 0, 0, tzinfo=timezone.utc)
         agent_node = {
-            "name": "jochi",
+            "name": "kublai",
             "last_heartbeat": stale_time,
             "status": "active"
         }
@@ -575,43 +588,40 @@ class TestAgentHeartbeat:
         result.single.return_value = {"a": agent_node}
         mock_session.run.return_value = result
 
-        status = mem.get_agent_status("jochi")
+        # Mock _now to return a time 10 minutes after the heartbeat
+        mem._now = Mock(return_value=datetime(2025, 1, 1, 12, 10, 0, tzinfo=timezone.utc))
 
-        assert status is not None
-        assert status["name"] == "jochi"
+        is_available = mem.is_agent_available("kublai", max_age_seconds=300)
 
-    def test_get_agent_status_no_record(self, memory):
-        """Test agent status when no heartbeat record exists."""
+        assert is_available is False
+
+    def test_is_agent_available_no_heartbeat(self, memory):
+        """Test is_agent_available returns False when no heartbeat record exists."""
         mem, mock_session = memory
 
         result = MagicMock()
         result.single.return_value = None
         mock_session.run.return_value = result
 
-        status = mem.get_agent_status("jochi")
+        is_available = mem.is_agent_available("nonexistent_agent")
 
-        assert status is None
+        assert is_available is False
 
-    def test_list_active_agents(self, memory):
-        """Test listing active agents."""
+    def test_heartbeat_cleanup_old_entries(self, memory):
+        """Test cleanup_old_heartbeats removes old entries."""
         mem, mock_session = memory
 
         result = MagicMock()
-        result.__iter__ = Mock(return_value=iter([
-            {"a": {"name": "jochi", "status": "active"}, "is_active": True},
-            {"a": {"name": "kublai", "status": "active"}, "is_active": True}
-        ]))
+        result.single.return_value = {"removed_count": 3}
         mock_session.run.return_value = result
 
-        agents = mem.list_active_agents(inactive_threshold_seconds=300)
+        removed = mem.cleanup_old_heartbeats(max_age_seconds=86400)
 
+        assert removed == 3
         mock_session.run.assert_called_once()
-        assert len(agents) == 2
+        call_args = mock_session.run.call_args
+        assert "cutoff_time" in call_args[1]
 
-
-# =============================================================================
-# TestNotifications
-# =============================================================================
 
 class TestNotifications:
     """Tests for notification functionality."""
