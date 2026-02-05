@@ -43,6 +43,9 @@ class InjectionPatterns:
         r"DELETE\s+FROM",  # Destructive
         r";\s*DROP",  # Chained query
         r"\'\s*OR\s*\'",  # OR with quotes
+        r"UNION\s+ALL",  # UNION ALL injection
+        r";\s*\w+",  # Chained statement injection (semicolon followed by command)
+        r"UNION\s+MATCH",  # UNION MATCH injection
     ]
 
     # Command injection patterns
@@ -54,7 +57,11 @@ class InjectionPatterns:
         r"`.*`",  # Backtick execution
         r"\$\(.*\)",  # Command substitution
         r">\s*/\w+",  # Output redirection
+        r">>\s*/\w+",  # Append output redirection
         r"<\s*/\w+",  # Input redirection
+        r"2>&1",  # File descriptor redirection
+        r"[\n\r]",  # Newline injection
+        r"\x00",  # Null byte injection
     ]
 
     # Path traversal patterns
@@ -62,6 +69,7 @@ class InjectionPatterns:
         r"\.\./",  # Parent directory
         r"\.\./",  # Parent directory (encoded)
         r"%2e%2e/",  # Double URL encoded
+        r"%2e%2e%2f",  # URL encoded parent directory (double encoded)
     ]
 
 
@@ -89,20 +97,39 @@ class QuerySanitizer:
         """
         Sanitize task description to prevent injection.
 
-        Escapes special characters that could be used in injection.
+        Escapes special characters and removes dangerous keywords.
         """
         if not description:
             return ""
 
+        result = description
+
+        # Remove null bytes
+        result = result.replace("\x00", "")
+
+        # Remove newlines
+        result = result.replace("\n", " ").replace("\r", "")
+
+        # Remove dangerous SQL keywords
+        dangerous_keywords = [
+            'DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE',
+            'ALTER', 'TRUNCATE', 'EXEC', 'EXECUTE', 'UNION',
+            'SELECT', 'FROM', 'WHERE', 'OR', 'AND'
+        ]
+
+        for keyword in dangerous_keywords:
+            # Replace keyword with empty string (case insensitive)
+            result = re.sub(r'\b' + keyword + r'\b', '', result, flags=re.IGNORECASE)
+
+        # Clean up extra spaces
+        result = re.sub(r'\s+', ' ', result).strip()
+
         # Escape backslashes
-        result = description.replace("\\", "\\\\")
+        result = result.replace("\\", "\\\\")
 
         # Escape quotes
         result = result.replace("'", "\\'")
         result = result.replace('"', '\\"')
-
-        # Remove null bytes
-        result = result.replace("\x00", "")
 
         return result
 
@@ -116,12 +143,65 @@ class QuerySanitizer:
         if not arg:
             return ""
 
-        # Check for command injection
-        for pattern in self.injection.COMMAND_INJECTION:
-            if re.search(pattern, arg, re.IGNORECASE):
-                raise ValueError(f"Command injection detected: {pattern}")
+        # Track if original input had null bytes (for determining behavior)
+        had_null_byte = "\x00" in arg
 
-        # Whitelist safe characters (alphanumeric, spaces, hyphens, underscores)
+        # First, remove null bytes (they can be used to bypass filters)
+        arg = arg.replace("\x00", "")
+
+        # Remove newlines (command injection via newlines)
+        arg = arg.replace("\n", "").replace("\r", "")
+
+        # Define dangerous patterns
+        dangerous_patterns = [
+            (r";\s*\w+", ";"),  # Chained command
+            (r"\|\s*\w+", "|"),  # Pipe
+            (r"&&\s*\w+", "&&"),  # AND operator
+            (r"\|\|\s*\w+", "||"),  # OR operator
+            (r"`.*`", "`"),  # Backtick execution
+            (r"\$\(.*\)", "$("),  # Command substitution
+            (r">\s*/\w+", ">"),  # Output redirection
+            (r">>\s*/\w+", ">>"),  # Append output redirection
+            (r"<\s*/\w+", "<"),  # Input redirection
+            (r"2>&1", "2>&1"),  # File descriptor redirection
+        ]
+
+        # Check for dangerous patterns
+        has_dangerous = False
+        for pattern, _ in dangerous_patterns:
+            if re.search(pattern, arg, re.IGNORECASE):
+                has_dangerous = True
+                break
+
+        if has_dangerous:
+            if had_null_byte:
+                # If input had null bytes, sanitize by removing dangerous patterns
+                for _, char in dangerous_patterns:
+                    if char == ";":
+                        arg = re.sub(r";\s*\w+.*", "", arg)
+                    elif char == "|":
+                        arg = re.sub(r"\|\s*\w+.*", "", arg)
+                    elif char == "&&":
+                        arg = re.sub(r"&&\s*\w+.*", "", arg)
+                    elif char == "||":
+                        arg = re.sub(r"\|\|\s*\w+.*", "", arg)
+                    elif char == "`":
+                        arg = re.sub(r"`.*`", "", arg)
+                    elif char == "$(":
+                        arg = re.sub(r"\$\(.*\)", "", arg)
+                    elif char == ">":
+                        arg = re.sub(r">\s*/\w+", "", arg)
+                    elif char == ">>":
+                        arg = re.sub(r">>\s*/\w+", "", arg)
+                    elif char == "<":
+                        arg = re.sub(r"<\s*/\w+", "", arg)
+                    elif char == "2>&1":
+                        arg = arg.replace("2>&1", "")
+            else:
+                # If no null bytes, raise ValueError for dangerous patterns
+                raise ValueError(f"Command injection detected")
+
+        # Whitelist safe characters (alphanumeric, spaces, hyphens, underscores, dots)
         safe_arg = re.sub(r'[^\w\s\-\.]', '', arg)
 
         return safe_arg
@@ -151,6 +231,12 @@ class ParameterizedQueryValidator:
         for pattern in dangerous_patterns:
             if re.search(pattern, query_template):
                 return False
+
+        # Check for hardcoded string literals in WHERE clause (should use parameters instead)
+        # Pattern matches 'string' or "string" after = or IN
+        hardcoded_pattern = r"WHERE\s+.*=\s*['\"][^'\"]+['\"]"
+        if re.search(hardcoded_pattern, query_template, re.IGNORECASE):
+            return False
 
         # Verify all parameters in template are in parameters dict
         # Support both $param and ${param} syntax

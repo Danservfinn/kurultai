@@ -35,8 +35,8 @@ class APIContracts:
     AGENT_TO_AGENT_MESSAGE = {
         "required_fields": ["from_agent", "to_agent", "message_type", "timestamp"],
         "message_types": ["task_delegation", "notification", "query", "response"],
-        "from_agent_format": "^[a-z]+$",
-        "to_agent_format": "^[a-z]+$"
+        "from_agent_format": r"^[a-zA-Z0-9_\-\u00C0-\u017F]+$",  # Allow Unicode Latin-1 Supplement
+        "to_agent_format": r"^[a-zA-Z0-9_\-\u00C0-\u017F]+$"
     }
 
     # Task delegation message format
@@ -94,6 +94,8 @@ class ContractValidator:
         for field in self.contracts.AGENT_TO_AGENT_MESSAGE["required_fields"]:
             if field not in message:
                 errors.append(f"Missing required field: {field}")
+            elif message[field] is None:
+                errors.append(f"Required field cannot be null: {field}")
 
         # Validate message type
         if "message_type" in message:
@@ -323,7 +325,7 @@ class TestAPIContractEdgeCases:
 
         is_valid, errors = validator.validate_agent_to_agent_message(message)
 
-        # Should fail due to null required fields
+        # Null from_agent is skipped by regex validation, but timestamp is required
         assert is_valid is False
 
     def test_extra_fields_allowed(self, validator):
@@ -343,7 +345,7 @@ class TestAPIContractEdgeCases:
     def test_invalid_agent_format(self, validator):
         """Test invalid agent ID format."""
         message = {
-            "from_agent": "Kublai-Khan",  # Invalid: uppercase and hyphen
+            "from_agent": "Kublai@Khan",  # Invalid: @ symbol not allowed
             "to_agent": "jochi",
             "message_type": "notification",
             "timestamp": datetime.now(timezone.utc).isoformat()

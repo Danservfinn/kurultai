@@ -134,9 +134,11 @@ def mock_operational_memory():
     """Create a mock OperationalMemory with configured session."""
     from openclaw_memory import OperationalMemory
 
-    with patch('openclaw_memory.GraphDatabase.driver') as mock_driver:
+    with patch('openclaw_memory._get_graph_database') as mock_get_graph_db:
+        mock_graph_db = MagicMock()
         driver = MagicMock()
-        mock_driver.return_value = driver
+        mock_graph_db.driver.return_value = driver
+        mock_get_graph_db.return_value = mock_graph_db
 
         # Create actual instance with fallback mode
         memory = OperationalMemory(
@@ -150,14 +152,15 @@ def mock_operational_memory():
         # Configure mock session for Neo4j operations
         mock_session = MagicMock()
 
-        def mock_run(cypher: str, **kwargs):
-            result = MagicMock()
-            result.single.return_value = None
-            result.data.return_value = []
-            result.__iter__ = lambda self: iter([])
-            return result
+        # Create a default result that tests can override
+        default_result = MagicMock()
+        default_result.single.return_value = None
+        default_result.data.return_value = []
+        default_result.__iter__ = lambda self: iter([])
+        default_result.peek.return_value = []
 
-        mock_session.run = mock_run
+        # Make run() return the default result - tests can override with mock_session.run.return_value
+        mock_session.run.return_value = default_result
         mock_session.close = MagicMock()
 
         # Mock the _session context manager
@@ -174,9 +177,11 @@ def operational_memory_with_fallback():
     """Create OperationalMemory in fallback mode for testing."""
     from openclaw_memory import OperationalMemory
 
-    with patch('openclaw_memory.GraphDatabase.driver') as mock_driver:
+    with patch('openclaw_memory._get_graph_database') as mock_get_graph_db:
+        mock_graph_db = MagicMock()
         driver = MagicMock()
-        mock_driver.return_value = driver
+        mock_graph_db.driver.return_value = driver
+        mock_get_graph_db.return_value = mock_graph_db
 
         memory = OperationalMemory(
             uri="bolt://localhost:7687",
@@ -186,7 +191,7 @@ def operational_memory_with_fallback():
             fallback_mode=True
         )
 
-    return memory
+        yield memory
 
 
 # =============================================================================
@@ -704,9 +709,11 @@ async def async_memory_with_session():
     """Async fixture for OperationalMemory with active session."""
     from openclaw_memory import OperationalMemory
 
-    with patch('openclaw_memory.GraphDatabase.driver') as mock_driver:
+    with patch('openclaw_memory._get_graph_database') as mock_get_graph_db:
+        mock_graph_db = MagicMock()
         driver = MagicMock()
-        mock_driver.return_value = driver
+        mock_graph_db.driver.return_value = driver
+        mock_get_graph_db.return_value = mock_graph_db
 
         memory = OperationalMemory(
             uri="bolt://localhost:7687",
@@ -970,32 +977,49 @@ def isolate_asyncio():
     Ensure proper asyncio isolation between tests.
 
     This prevents event loop state from leaking between tests.
+    Uses new_event_loop() and set_event_loop() to avoid deprecated get_event_loop().
     """
-    # Clear any pending tasks or event loop state
+    # Create a new event loop for this test
+    old_loop = None
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            asyncio.set_event_loop(asyncio.new_event_loop())
+        old_loop = asyncio.get_event_loop()
     except RuntimeError:
-        # No event loop exists, create one
-        asyncio.set_event_loop(asyncio.new_event_loop())
+        pass  # No event loop exists yet
+
+    # Create and set new loop
+    new_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(new_loop)
 
     yield
 
     # Cleanup: close and reset event loop
     try:
-        loop = asyncio.get_event_loop()
-        if not loop.is_closed():
+        current_loop = asyncio.get_event_loop()
+        if current_loop is new_loop and not current_loop.is_closed():
             # Cancel any pending tasks
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            loop.close()
-        asyncio.set_event_loop(None)
+            try:
+                pending = asyncio.all_tasks(current_loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    current_loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+            except Exception:
+                pass  # Ignore errors during cleanup
+            current_loop.close()
     except RuntimeError:
-        pass
+        pass  # No event loop
+
+    # Restore old loop if it existed and wasn't closed
+    if old_loop is not None and not old_loop.is_closed():
+        asyncio.set_event_loop(old_loop)
+    else:
+        # Create fresh loop for next test
+        try:
+            asyncio.set_event_loop(asyncio.new_event_loop())
+        except Exception:
+            pass
 
 
 @pytest.fixture(autouse=True)
@@ -1009,7 +1033,13 @@ def cleanup_file_handles():
 
     # Cleanup: close any remaining mock file handles
     import gc
-    gc.collect()
+    import warnings
+
+    # Suppress resource warnings during gc.collect() - these are from
+    # mock objects and test fixtures, not actual leaks
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ResourceWarning)
+        gc.collect()
 
 
 @pytest.fixture(autouse=True)

@@ -7,7 +7,6 @@ Author: Claude (Anthropic)
 Date: 2026-02-04
 """
 
-import numpy as np
 from typing import List, Optional
 
 from .types import (
@@ -19,18 +18,30 @@ from .types import (
     MEDIUM_SIMILARITY,
 )
 
+# Lazy import numpy to avoid recursion issues during test collection
+_np = None
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+def _get_numpy():
+    """Lazy import numpy to avoid recursion issues."""
+    global _np
+    if _np is None:
+        import numpy as np
+        _np = np
+    return _np
+
+
+def cosine_similarity(a, b) -> float:
     """
     Compute cosine similarity between two vectors.
 
     Args:
-        a: First vector
-        b: Second vector
+        a: First vector (numpy array or list)
+        b: Second vector (numpy array or list)
 
     Returns:
         Similarity score between 0 and 1
     """
+    np = _get_numpy()
     norm_a = np.linalg.norm(a)
     norm_b = np.linalg.norm(b)
 
@@ -94,7 +105,9 @@ class DependencyAnalyzer:
         for i, task_a in enumerate(tasks):
             for task_b in tasks[i+1:]:
                 # Skip if no embeddings
-                if not task_a.get("embedding") or not task_b.get("embedding"):
+                emb_a_raw = task_a.get("embedding")
+                emb_b_raw = task_b.get("embedding")
+                if emb_a_raw is None or emb_b_raw is None:
                     continue
 
                 # Handle different embedding formats
@@ -131,7 +144,7 @@ class DependencyAnalyzer:
 
         return dependencies
 
-    def _get_embedding_array(self, embedding) -> Optional[np.ndarray]:
+    def _get_embedding_array(self, embedding):
         """
         Convert embedding to numpy array.
 
@@ -141,6 +154,7 @@ class DependencyAnalyzer:
         Returns:
             Numpy array or None if conversion fails
         """
+        np = _get_numpy()
         try:
             if isinstance(embedding, np.ndarray):
                 return embedding
@@ -184,7 +198,7 @@ class DependencyAnalyzer:
 
     async def find_similar_tasks(
         self,
-        embedding: np.ndarray,
+        embedding,
         sender_hash: str,
         threshold: float = None,
         limit: int = 10
@@ -244,7 +258,7 @@ class DependencyAnalyzer:
         except Exception:
             return []
 
-    def compute_embedding_fallback(self, text: str) -> np.ndarray:
+    def compute_embedding_fallback(self, text: str):
         """
         Fallback embedding using simple word overlap.
 
@@ -258,6 +272,7 @@ class DependencyAnalyzer:
         Returns:
             Numpy array representing the text
         """
+        np = _get_numpy()
         # Simple word-based fallback
         words = set(text.lower().split())
         # Create a hash-based vector

@@ -13,11 +13,144 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Any, Callable
 from contextlib import contextmanager
 
-from neo4j import GraphDatabase, Driver, Session
-from neo4j.exceptions import ServiceUnavailable, Neo4jError, TransientError
-
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Lazy imports for neo4j to avoid numpy recursion issues during test collection
+# The neo4j driver imports numpy which can cause RecursionError when pytest's -W error is enabled
+_neo4j_imported = False
+_GraphDatabase = None
+_Driver = None
+_Session = None
+_ServiceUnavailable = None
+_Neo4jError = None
+_TransientError = None
+
+
+def _import_neo4j():
+    """Lazy import neo4j modules to avoid numpy recursion issues."""
+    global _neo4j_imported, _GraphDatabase, _Driver, _Session
+    global _ServiceUnavailable, _Neo4jError, _TransientError
+    if not _neo4j_imported:
+        import warnings
+        # Suppress numpy reload warning during neo4j import
+        # This is a known issue when neo4j imports numpy in certain contexts
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*NumPy module was reloaded.*")
+            from neo4j import GraphDatabase, Driver, Session
+            from neo4j.exceptions import ServiceUnavailable, Neo4jError, TransientError
+        _GraphDatabase = GraphDatabase
+        _Driver = Driver
+        _Session = Session
+        _ServiceUnavailable = ServiceUnavailable
+        _Neo4jError = Neo4jError
+        _TransientError = TransientError
+        _neo4j_imported = True
+
+
+def _get_graph_database():
+    """Get the GraphDatabase class, importing if necessary."""
+    _import_neo4j()
+    return _GraphDatabase
+
+
+def _get_driver_class():
+    """Get the Driver class, importing if necessary."""
+    _import_neo4j()
+    return _Driver
+
+
+def _get_session_class():
+    """Get the Session class, importing if necessary."""
+    _import_neo4j()
+    return _Session
+
+
+def _get_service_unavailable():
+    """Get the ServiceUnavailable exception, importing if necessary."""
+    _import_neo4j()
+    return _ServiceUnavailable
+
+
+def _get_neo4j_error():
+    """Get the Neo4jError exception, importing if necessary."""
+    _import_neo4j()
+    return _Neo4jError
+
+
+def _get_transient_error():
+    """Get the TransientError exception, importing if necessary."""
+    _import_neo4j()
+    return _TransientError
+
+
+# Module-level lazy exports for backward compatibility with tests
+# These allow tests to patch 'openclaw_memory.GraphDatabase' etc.
+class _LazyGraphDatabase:
+    """Lazy wrapper for GraphDatabase to support test patching."""
+    _driver = None
+    _patched = False
+
+    @property
+    def driver(self):
+        if self._patched:
+            return self._driver
+        return _get_graph_database().driver
+
+    @driver.setter
+    def driver(self, value):
+        self._driver = value
+        self._patched = True
+
+    @driver.deleter
+    def driver(self):
+        self._driver = None
+        self._patched = False
+
+    def __getattr__(self, name):
+        return getattr(_get_graph_database(), name)
+
+
+class _LazyExceptions:
+    """Lazy wrapper for neo4j exceptions to support test patching."""
+    _service_unavailable = None
+    _neo4j_error = None
+    _transient_error = None
+
+    @property
+    def ServiceUnavailable(self):
+        if self._service_unavailable is not None:
+            return self._service_unavailable
+        return _get_service_unavailable()
+
+    @ServiceUnavailable.setter
+    def ServiceUnavailable(self, value):
+        self._service_unavailable = value
+
+    @property
+    def Neo4jError(self):
+        if self._neo4j_error is not None:
+            return self._neo4j_error
+        return _get_neo4j_error()
+
+    @Neo4jError.setter
+    def Neo4jError(self, value):
+        self._neo4j_error = value
+
+    @property
+    def TransientError(self):
+        if self._transient_error is not None:
+            return self._transient_error
+        return _get_transient_error()
+
+    @TransientError.setter
+    def TransientError(self, value):
+        self._transient_error = value
+
+
+# Create module-level exports for backward compatibility
+GraphDatabase = _LazyGraphDatabase()
+exceptions = _LazyExceptions()
 
 
 class RaceConditionError(Exception):
@@ -116,7 +249,7 @@ class OperationalMemory:
         self.password = password
         self.database = database
         self.fallback_mode = fallback_mode
-        self._driver: Optional[Driver] = None
+        self._driver: Optional[Any] = None
         self._pool_config = {
             "max_connection_pool_size": max_connection_pool_size,
             "connection_timeout": connection_timeout,
@@ -127,7 +260,7 @@ class OperationalMemory:
     def _initialize_driver(self) -> None:
         """Initialize Neo4j driver with connection pooling."""
         try:
-            self._driver = GraphDatabase.driver(
+            self._driver = _get_graph_database().driver(
                 self.uri,
                 auth=(self.username, self.password),
                 **self._pool_config
@@ -135,7 +268,7 @@ class OperationalMemory:
             # Verify connectivity
             self._driver.verify_connectivity()
             logger.info(f"Neo4j driver initialized: {self.uri}")
-        except ServiceUnavailable as e:
+        except _get_service_unavailable() as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             self._driver = None
             if not self.fallback_mode:
@@ -162,7 +295,7 @@ class OperationalMemory:
         try:
             session = self._driver.session(database=self.database)
             yield session
-        except ServiceUnavailable as e:
+        except _get_service_unavailable() as e:
             logger.error(f"Neo4j service unavailable: {e}")
             self._driver = None
             if self.fallback_mode:
@@ -258,7 +391,7 @@ class OperationalMemory:
                     return record["task_id"]
                 else:
                     raise RuntimeError("Task creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create task: {e}")
                 raise
 
@@ -322,7 +455,7 @@ class OperationalMemory:
 
             except (RaceConditionError, NoPendingTaskError):
                 raise
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to claim task: {e}")
                 raise
 
@@ -384,7 +517,7 @@ class OperationalMemory:
                 logger.info(f"Task completed: {task_id}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to complete task: {e}")
                 raise
 
@@ -440,7 +573,7 @@ class OperationalMemory:
                 logger.info(f"Task failed: {task_id} - {error_message[:100]}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to mark task as failed: {e}")
                 raise
 
@@ -467,7 +600,7 @@ class OperationalMemory:
                 result = session.run(cypher, task_id=task_id)
                 record = result.single()
                 return dict(record["t"]) if record else None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get task: {e}")
                 raise
 
@@ -520,7 +653,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["t"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list pending tasks: {e}")
                 raise
 
@@ -557,7 +690,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["t"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list tasks: {e}")
                 raise
 
@@ -621,7 +754,7 @@ class OperationalMemory:
                     return record["notification_id"]
                 else:
                     raise RuntimeError("Notification creation failed")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create notification: {e}")
                 raise
 
@@ -660,7 +793,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, agent=agent)
                 return [dict(record["n"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get notifications: {e}")
                 raise
 
@@ -691,7 +824,7 @@ class OperationalMemory:
                     logger.debug(f"Notification marked read: {notification_id}")
                     return True
                 return False
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to mark notification as read: {e}")
                 raise
 
@@ -721,7 +854,7 @@ class OperationalMemory:
                 count = record["count"] if record else 0
                 logger.info(f"Marked {count} notifications as read for {agent}")
                 return count
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to mark notifications as read: {e}")
                 raise
 
@@ -792,7 +925,7 @@ class OperationalMemory:
 
                 return (allowed, count, reset_time)
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to check rate limit: {e}")
                 # Fail open - allow the request
                 return (True, 0, reset_time)
@@ -823,7 +956,7 @@ class OperationalMemory:
                     hour=hour,
                     last_updated=self._now()
                 )
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create rate limit record: {e}")
 
     def record_rate_limit_hit(self, agent: str, operation: str) -> bool:
@@ -868,7 +1001,7 @@ class OperationalMemory:
                     )
                     return True
                 return False
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to record rate limit hit: {e}")
                 return False
 
@@ -913,7 +1046,7 @@ class OperationalMemory:
                     logger.debug(f"Agent heartbeat updated: {agent} ({status})")
                     return True
                 return False
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to update agent heartbeat: {e}")
                 raise
 
@@ -940,7 +1073,7 @@ class OperationalMemory:
                 result = session.run(cypher, agent=agent)
                 record = result.single()
                 return dict(record["a"]) if record else None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get agent status: {e}")
                 raise
 
@@ -980,7 +1113,7 @@ class OperationalMemory:
                     agent_dict["is_active"] = record["is_active"]
                     agents.append(agent_dict)
                 return agents
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list active agents: {e}")
                 raise
 
@@ -1057,11 +1190,11 @@ class OperationalMemory:
             health["status"] = "healthy"
             health["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
 
-        except ServiceUnavailable as e:
+        except _get_service_unavailable() as e:
             health["status"] = "unavailable"
             health["error"] = str(e)
             self._driver = None
-        except Neo4jError as e:
+        except _get_neo4j_error() as e:
             health["status"] = "error"
             health["error"] = str(e)
         except Exception as e:
@@ -1175,7 +1308,7 @@ class OperationalMemory:
                     return record["analysis_id"]
                 else:
                     raise RuntimeError("Analysis creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create analysis: {e}")
                 raise
 
@@ -1265,7 +1398,7 @@ class OperationalMemory:
                             pass
                     analyses.append(analysis_dict)
                 return analyses
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list analyses: {e}")
                 raise
 
@@ -1328,7 +1461,7 @@ class OperationalMemory:
                 logger.info(f"Analysis {status}: {analysis_id} by {updated_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to update analysis status: {e}")
                 raise
 
@@ -1374,7 +1507,7 @@ class OperationalMemory:
                 logger.info(f"Analysis assigned: {analysis_id} to {assigned_to} by {assigned_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to assign analysis: {e}")
                 raise
 
@@ -1417,7 +1550,7 @@ class OperationalMemory:
                             pass
                     return analysis_dict
                 return None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get analysis: {e}")
                 raise
 
@@ -1489,7 +1622,7 @@ class OperationalMemory:
                     "open_by_severity": open_by_severity
                 }
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get analysis summary: {e}")
                 raise
 
@@ -1873,7 +2006,7 @@ class OperationalMemory:
                     return record["audit_id"]
                 else:
                     raise RuntimeError("Security audit creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create security audit: {e}")
                 raise
 
@@ -1952,7 +2085,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["s"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list security audits: {e}")
                 raise
 
@@ -2012,7 +2145,7 @@ class OperationalMemory:
                 logger.info(f"Security audit {status}: {audit_id} by {resolved_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to resolve security audit: {e}")
                 raise
 
@@ -2039,7 +2172,7 @@ class OperationalMemory:
                 result = session.run(cypher, audit_id=audit_id)
                 record = result.single()
                 return dict(record["s"]) if record else None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get security audit: {e}")
                 raise
 
@@ -2105,7 +2238,7 @@ class OperationalMemory:
                     "open_by_severity": open_by_severity
                 }
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get security summary: {e}")
                 raise
 
@@ -2174,7 +2307,7 @@ class OperationalMemory:
                     entry["action_type"] = record["action_type"]
                     trail.append(entry)
                 return trail
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get security audit trail: {e}")
                 raise
 
@@ -2283,7 +2416,7 @@ class OperationalMemory:
                     return record["improvement_id"]
                 else:
                     raise RuntimeError("Improvement creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create improvement: {e}")
                 raise
 
@@ -2348,7 +2481,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["i"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list improvements: {e}")
                 raise
 
@@ -2403,7 +2536,7 @@ class OperationalMemory:
                 logger.info(f"Improvement approved: {improvement_id} by {approved_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to approve improvement: {e}")
                 raise
 
@@ -2461,7 +2594,7 @@ class OperationalMemory:
                 logger.info(f"Improvement rejected: {improvement_id} by {rejected_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to reject improvement: {e}")
                 raise
 
@@ -2522,7 +2655,7 @@ class OperationalMemory:
                 logger.info(f"Improvement implemented: {improvement_id} by {implemented_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to implement improvement: {e}")
                 raise
 
@@ -2549,7 +2682,7 @@ class OperationalMemory:
                 result = session.run(cypher, improvement_id=improvement_id)
                 record = result.single()
                 return dict(record["i"]) if record else None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get improvement: {e}")
                 raise
 
@@ -2635,7 +2768,7 @@ class OperationalMemory:
                     "avg_value_score": round(avg_value_score, 2) if avg_value_score else 0.0
                 }
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get improvement summary: {e}")
                 raise
 
@@ -2702,7 +2835,7 @@ class OperationalMemory:
                     return record["reflection_id"]
                 else:
                     raise RuntimeError("Reflection creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create reflection: {e}")
                 raise
 
@@ -2729,7 +2862,7 @@ class OperationalMemory:
                 result = session.run(cypher, reflection_id=reflection_id)
                 record = result.single()
                 return dict(record["r"]) if record else None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get reflection: {e}")
                 raise
 
@@ -2784,7 +2917,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["r"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list reflections: {e}")
                 raise
 
@@ -2808,7 +2941,7 @@ class OperationalMemory:
                 result = session.run(cypher)
                 record = result.single()
                 return record["count"] if record else 0
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to count unconsolidated reflections: {e}")
                 return 0
 
@@ -2873,7 +3006,7 @@ class OperationalMemory:
                     return record["learning_id"]
                 else:
                     raise RuntimeError("Learning creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create learning: {e}")
                 raise
 
@@ -2911,7 +3044,7 @@ class OperationalMemory:
                                 pass
                     return learning_dict
                 return None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get learning: {e}")
                 raise
 
@@ -2972,7 +3105,7 @@ class OperationalMemory:
                                 pass
                     learnings.append(learning_dict)
                 return learnings
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list learnings: {e}")
                 raise
 
@@ -3048,7 +3181,7 @@ class OperationalMemory:
                     return record["rule_id"]
                 else:
                     raise RuntimeError("MetaRule creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create MetaRule: {e}")
                 raise
 
@@ -3075,7 +3208,7 @@ class OperationalMemory:
                 result = session.run(cypher, rule_id=rule_id)
                 record = result.single()
                 return dict(record["m"]) if record else None
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get MetaRule: {e}")
                 return None
 
@@ -3124,7 +3257,7 @@ class OperationalMemory:
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["m"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to list MetaRules: {e}")
                 return []
 
@@ -3170,7 +3303,7 @@ class OperationalMemory:
                 logger.info(f"MetaRule approved: {rule_id} by {approved_by}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to approve MetaRule: {e}")
                 raise
 
@@ -3221,7 +3354,7 @@ class OperationalMemory:
                 logger.debug(f"MetaRule application recorded: {rule_id}, success={outcome_success}")
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to record MetaRule application: {e}")
                 raise
 
@@ -3260,7 +3393,7 @@ class OperationalMemory:
                     "effectiveness_score": record["effectiveness_score"]
                 }
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get MetaRule effectiveness: {e}")
                 return None
 
@@ -3355,7 +3488,7 @@ class OperationalMemory:
                 logger.info(f"MetaRule versioned: {old_rule_id} -> {new_rule_id} (version {new_version})")
                 return new_rule_id
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to version MetaRule: {e}")
                 raise
 
@@ -3414,7 +3547,7 @@ class OperationalMemory:
 
                 return chain
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get MetaRule history: {e}")
                 return []
 
@@ -3515,7 +3648,7 @@ class OperationalMemory:
                     session.run(cypher)
                     created.append(name)
                     logger.info(f"Created index: {name}")
-                except Neo4jError as e:
+                except _get_neo4j_error() as e:
                     if "already exists" not in str(e).lower():
                         logger.error(f"Failed to create index {name}: {e}")
 
@@ -3629,7 +3762,7 @@ class OperationalMemory:
                     return record["id"]
                 else:
                     raise RuntimeError("Task creation failed: no record returned")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to create task with embedding: {e}")
                 raise
 
@@ -3695,7 +3828,7 @@ class OperationalMemory:
                     # Cycle detected or tasks don't exist
                     logger.warning(f"Could not create dependency (would create cycle or tasks not found)")
                     return False
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to add dependency: {e}")
                 raise
 
@@ -3727,7 +3860,7 @@ class OperationalMemory:
             try:
                 result = session.run(query, task_id=task_id)
                 return [dict(record) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get task dependencies: {e}")
                 raise
 
@@ -3766,7 +3899,7 @@ class OperationalMemory:
             try:
                 result = session.run(query, sender_hash=sender_hash, limit=limit)
                 return [dict(record["t"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get ready tasks: {e}")
                 raise
 
@@ -3834,7 +3967,7 @@ class OperationalMemory:
                 )
                 return True
 
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to complete task with dependencies: {e}")
                 raise
 
@@ -3882,7 +4015,7 @@ class OperationalMemory:
                     "reason": reason
                 })
                 logger.info(f"Priority audit logged: {task_id} {old_priority} -> {new_priority}")
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to log priority change: {e}")
 
     def get_tasks_by_sender(
@@ -3927,7 +4060,7 @@ class OperationalMemory:
             try:
                 result = session.run(query, **params)
                 return [dict(record["t"]) for record in result]
-            except Neo4jError as e:
+            except _get_neo4j_error() as e:
                 logger.error(f"Failed to get tasks by sender: {e}")
                 raise
 

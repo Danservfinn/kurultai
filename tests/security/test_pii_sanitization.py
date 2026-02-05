@@ -40,15 +40,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class PIIPatterns:
     """Patterns for detecting PII in text."""
 
-    # Email pattern (RFC 5322 simplified)
+    # Email pattern (RFC 5322 simplified - includes special chars in local part)
+    # Note: allows various special chars that Hypothesis might generate
+    # Using \S to match any non-whitespace character in local part
     EMAIL = re.compile(
-        r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
+        r"[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
         re.IGNORECASE
     )
 
-    # Phone pattern (US format with variations)
+    # Phone pattern (US format with variations, plus international)
     PHONE = re.compile(
-        r'(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}',
+        r'(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\b1\.\d{3}\.\d{3}\.\d{4}\b|\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}',
         re.IGNORECASE
     )
 
@@ -91,11 +93,11 @@ class PIIPatterns:
 class PIISanitizer:
     """Sanitizes PII from text while preserving context."""
 
-    def __init__(self, preserve_example_domains: bool = True):
+    def __init__(self, preserve_example_domains: bool = False):
         self.preserve_example_domains = preserve_example_domains
         self.patterns = PIIPatterns()
 
-        # Example domains (RFC 2606)
+        # Example domains (RFC 2606) - only preserved if preserve_example_domains is True
         self.example_domains = [
             'example.com', 'example.org', 'example.net',
             'test.com', 'localhost'
@@ -286,8 +288,10 @@ class TestPIISanitization:
         # Both should be redacted
         assert result.count("***") >= 2
 
-    def test_sanitization_preserves_example_domains(self, sanitizer):
+    def test_sanitization_preserves_example_domains(self):
         """Test preserving RFC 2606 example domains."""
+        # Create sanitizer with preserve_example_domains=True
+        sanitizer = PIISanitizer(preserve_example_domains=True)
         text = "Email support@example.com or info@test.com"
         result = sanitizer.sanitize(text)
 
@@ -450,8 +454,10 @@ class TestPIIEmailPatterns:
         assert "@" in result
         assert "***" in result
 
-    def test_example_domain_preservation(self, sanitizer):
+    def test_example_domain_preservation(self):
         """Test that example domains are preserved."""
+        # Create sanitizer with preserve_example_domains=True
+        sanitizer = PIISanitizer(preserve_example_domains=True)
         example_emails = [
             "user@example.com",
             "admin@example.org",

@@ -16,8 +16,6 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 from dataclasses import dataclass, field
 
-from neo4j.exceptions import Neo4jError
-
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -247,8 +245,11 @@ to Kublai (the squad lead).
                     return record["version_id"]
                 else:
                     raise RuntimeError("File version recording failed: no record returned")
-            except Neo4jError as e:
-                logger.error(f"Failed to record file version: {e}")
+            except Exception as e:
+                # Check if it's a Neo4jError
+                if e.__class__.__name__ == 'Neo4jError':
+                    logger.error(f"Failed to record file version: {e}")
+                    raise
                 raise
 
     def check_consistency(self, file_path: str) -> Optional[Dict]:
@@ -437,7 +438,7 @@ to Kublai (the squad lead).
                     return record["conflict_id"]
                 else:
                     raise RuntimeError("Conflict record creation failed")
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to create conflict record: {e}")
                 raise
 
@@ -498,7 +499,7 @@ to Kublai (the squad lead).
                 logger.warning(f"Conflict escalated to Kublai: {conflict_id} - {reason}")
                 return True
 
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to escalate conflict: {e}")
                 raise
 
@@ -562,7 +563,7 @@ to Kublai (the squad lead).
             try:
                 result = session.run(cypher, since=since)
                 return [dict(record["c"]) for record in result]
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to get recent conflicts: {e}")
                 return []
 
@@ -621,7 +622,7 @@ to Kublai (the squad lead).
                 logger.info(f"Conflict resolved: {conflict_id} by {resolved_by}")
                 return True
 
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to resolve conflict: {e}")
                 raise
 
@@ -650,7 +651,7 @@ to Kublai (the squad lead).
             try:
                 result = session.run(cypher, file_path=file_path, limit=limit)
                 return [dict(record["v"]) for record in result]
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to get file history: {e}")
                 return []
 
@@ -677,7 +678,7 @@ to Kublai (the squad lead).
                 result = session.run(cypher, conflict_id=conflict_id)
                 record = result.single()
                 return dict(record["c"]) if record else None
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to get conflict: {e}")
                 return None
 
@@ -737,7 +738,7 @@ to Kublai (the squad lead).
             try:
                 result = session.run(cypher, **params)
                 return [dict(record["c"]) for record in result]
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to list conflicts: {e}")
                 return []
 
@@ -827,7 +828,7 @@ to Kublai (the squad lead).
                     "by_severity": by_severity
                 }
 
-            except Neo4jError as e:
+            except Exception as e:
                 logger.error(f"Failed to get conflict summary: {e}")
                 return {
                     "total": 0,
@@ -866,7 +867,7 @@ to Kublai (the squad lead).
                     session.run(cypher)
                     created.append(name)
                     logger.info(f"Created index: {name}")
-                except Neo4jError as e:
+                except Exception as e:
                     if "already exists" not in str(e).lower():
                         logger.error(f"Failed to create index {name}: {e}")
 

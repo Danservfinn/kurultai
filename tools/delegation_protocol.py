@@ -63,6 +63,7 @@ class PersonalContext:
     recent_history: List[str] = field(default_factory=list)
     friend_names: List[str] = field(default_factory=list)
     relevant_notes: List[str] = field(default_factory=list)
+    user_message: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -70,7 +71,8 @@ class PersonalContext:
             "user_preferences": self.user_preferences,
             "recent_history": self.recent_history,
             "friend_names": self.friend_names,
-            "relevant_notes": self.relevant_notes
+            "relevant_notes": self.relevant_notes,
+            "user_message": self.user_message
         }
 
 
@@ -486,6 +488,20 @@ class DelegationProtocol:
             logger.info(f"Sanitized {sum(counts.values())} items from content: {counts}")
 
         return sanitized, counts
+
+    def sanitize_pii(self, text: str, options: Dict[str, Any] = None) -> Tuple[str, Dict[str, int]]:
+        """
+        Sanitize PII from text - alias for sanitize_for_delegation.
+
+        Args:
+            text: Text to sanitize
+            options: Sanitization options (optional)
+
+        Returns:
+            Tuple of (sanitized_text, sanitization_counts)
+        """
+        # Use existing sanitize_for_delegation implementation
+        return self.sanitize_for_delegation(text)
 
     def determine_target_agent(
         self,

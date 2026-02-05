@@ -1230,7 +1230,11 @@ class TopologicalExecutor:
 
             node_id, value = result
             if value is not None:
-                results[node_id] = value
+                # Check if this is an error result
+                if isinstance(value, dict) and "error" in value:
+                    errors[node_id] = value
+                else:
+                    results[node_id] = value
 
         # Check for blocking failures
         should_abort = any(
