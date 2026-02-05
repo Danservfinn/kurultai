@@ -101,6 +101,22 @@ RUN mkdir -p /data/.clawdbot/sessions \
     && mkdir -p /data/.signal
 
 # =============================================================================
+# SECTION 6b: Import Signal Data (if available)
+# =============================================================================
+# Copy pre-linked Signal device data into container
+
+COPY .signal-data/signal-data.tar.gz /tmp/signal-data.tar.gz
+RUN if [ -f /tmp/signal-data.tar.gz ]; then \
+    tar -xzf /tmp/signal-data.tar.gz -C /data/.signal \
+    && chown -R 1000:1000 /data/.signal \
+    && chmod -R 755 /data/.signal \
+    && rm /tmp/signal-data.tar.gz \
+    && echo "Signal data imported successfully"; \
+    else \
+    echo "No Signal data to import"; \
+    fi
+
+# =============================================================================
 # SECTION 7: Permissions
 # =============================================================================
 # Set proper ownership and permissions for all data directories
