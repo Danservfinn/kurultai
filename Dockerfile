@@ -127,7 +127,7 @@ RUN groupadd -r clawdbot -g 1000 \
     && chown -R 1000:1000 /data \
     && chmod -R 755 /data/.clawdbot \
     && chmod -R 755 /data/workspace \
-    && chmod -R 755 /data/.signal \
+    && chmod -R 700 /data/.signal \
     && chmod 777 /data/workspace/temp \
     && chmod 777 /data/workspace/logs
 
@@ -156,7 +156,9 @@ ENV CLAWDBOT_STATE_DIR=/data/.clawdbot
 ENV CLAWDBOT_WORKSPACE_DIR=/data/workspace
 ENV CLAWDBOT_LOG_LEVEL=info
 ENV SIGNAL_DATA_DIR=/data/.signal
-ENV SIGNAL_ACCOUNT=+15165643945
+# SIGNAL_ACCOUNT is set at runtime via Railway environment variables
+# Do not hardcode sensitive values in the image
+ENV SIGNAL_ACCOUNT=${SIGNAL_ACCOUNT}
 
 # =============================================================================
 # SECTION 11: Health Check

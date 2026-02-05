@@ -2,6 +2,23 @@
 # Translates Moltbot's expected API format to signal-cli-rest-api format
 
 :8080 {
+    # API Key Authentication
+    # Require X-API-Key header matching the configured key
+    @unauthorized {
+        not header X-API-Key {$SIGNAL_API_KEY}
+    }
+
+    handle @unauthorized {
+        header Content-Type application/json
+        respond `{"error":"Unauthorized","message":"Valid X-API-Key header required"}` 401
+    }
+
+    # Health check endpoint (public, no auth required)
+    handle /health {
+        header Content-Type application/json
+        respond `{"status":"healthy","service":"signal-api-proxy"}` 200
+    }
+
     # Health check endpoint
     # Moltbot calls: /api/v1/check
     # signal-cli-rest-api provides: /v1/about (not /v1/health which doesn't exist)
@@ -16,9 +33,8 @@
     # Events/receive endpoint (supports SSE streaming)
     # Moltbot calls: /api/v1/events?account=+15165643945
     # signal-cli-rest-api provides: /v1/receive/+15165643945
-    # Note: Using direct path rewrite since there's only one account
     handle /api/v1/events {
-        rewrite * /v1/receive/%2B15165643945
+        rewrite * /v1/receive/{$SIGNAL_ACCOUNT_NUMBER}
         reverse_proxy https://signal-cli-rest-api-production-010a.up.railway.app {
             header_up Host {upstream_hostport}
             header_up X-Forwarded-Host {host}
