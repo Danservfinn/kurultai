@@ -6,7 +6,7 @@ FROM python:3.12-slim
 # =============================================================================
 # SECTION 1: System Dependencies
 # =============================================================================
-# Install required system packages for Python packages and Neo4j driver
+# Install required system packages for Python packages, Neo4j driver, and Signal
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -15,7 +15,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libssl-dev \
     pkg-config \
+    openjdk-17-jre-headless \
+    libfuse2 \
     && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# SECTION 1a: Install signal-cli
+# =============================================================================
+# Download and install signal-cli for Signal messaging integration
+
+ARG SIGNAL_CLI_VERSION=0.13.12
+RUN curl -L -o /tmp/signal-cli.tar.gz \
+    "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux.tar.gz" \
+    && tar -xzf /tmp/signal-cli.tar.gz -C /opt \
+    && ln -s "/opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli" /usr/local/bin/signal-cli \
+    && rm /tmp/signal-cli.tar.gz \
+    && signal-cli --version
 
 # =============================================================================
 # SECTION 2: Working Directory
@@ -82,7 +97,8 @@ RUN mkdir -p /data/workspace/souls/main \
 RUN mkdir -p /data/.clawdbot/sessions \
     && mkdir -p /data/.clawdbot/credentials/signal \
     && mkdir -p /data/.clawdbot/skills \
-    && mkdir -p /data/.clawdbot/migrations
+    && mkdir -p /data/.clawdbot/migrations \
+    && mkdir -p /data/.signal
 
 # =============================================================================
 # SECTION 7: Permissions
@@ -95,6 +111,7 @@ RUN groupadd -r clawdbot -g 1000 \
     && chown -R 1000:1000 /data \
     && chmod -R 755 /data/.clawdbot \
     && chmod -R 755 /data/workspace \
+    && chmod -R 755 /data/.signal \
     && chmod 777 /data/workspace/temp \
     && chmod 777 /data/workspace/logs
 
@@ -122,6 +139,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV CLAWDBOT_STATE_DIR=/data/.clawdbot
 ENV CLAWDBOT_WORKSPACE_DIR=/data/workspace
 ENV CLAWDBOT_LOG_LEVEL=info
+ENV SIGNAL_DATA_DIR=/data/.signal
+ENV SIGNAL_ACCOUNT=+15165643945
 
 # =============================================================================
 # SECTION 11: Health Check

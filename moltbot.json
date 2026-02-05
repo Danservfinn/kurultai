@@ -64,7 +64,9 @@
     "signal": {
       "enabled": true,
       "account": "+15165643945",
+      "cliPath": "/usr/local/bin/signal-cli",
       "autoStart": true,
+      "startupTimeoutMs": 120000,
       "dmPolicy": "pairing",
       "groupPolicy": "allowlist",
       "configWrites": false,
