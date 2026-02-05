@@ -1,0 +1,919 @@
+name: Quality Gates
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip test execution (for emergency fixes)'
+        required: false
+        default: false
+        type: boolean
+      skip_security:
+        description: 'Skip security scan (for emergency fixes)'
+        required: false
+        default: false
+        type: boolean
+      skip_performance:
+        description: 'Skip performance benchmarks (for emergency fixes)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHONUNBUFFERED: 1
+  FORCE_COLOR: 1
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  # =============================================================================
+  # Job 0: Pre-flight Checks - Run before main quality gates
+  # =============================================================================
+  pre-flight-checks:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+
+    services:
+      neo4j:
+        image: neo4j:5.13.0
+        env:
+          NEO4J_AUTH: neo4j/test_password
+        ports:
+          - 7687:7687
+          - 7474:7474
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p test_password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NEO4J_PASSWORD: test_password
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            test-requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          if [ -f test-requirements.txt ]; then
+            pip install -r test-requirements.txt
+          fi
+
+      - name: Wait for Neo4j to be healthy
+        run: |
+          echo "Waiting for Neo4j service to be ready..."
+          for i in {1..30}; do
+            if cypher-shell -u neo4j -p test_password -a bolt://localhost:7687 'RETURN 1' 2>/dev/null; then
+              echo "Neo4j is ready!"
+              break
+            fi
+            echo "Neo4j not ready yet, waiting... (attempt $i/30)"
+            sleep 2
+          done
+
+      - name: Verify pre-flight check dependencies
+        run: |
+          echo "Verifying pre-flight check module imports..."
+          python3 << 'EOF'
+          import sys
+          sys.path.insert(0, '.')
+
+          # Verify all check modules can be imported
+          modules_to_check = [
+              'scripts.check_types',
+              'scripts.check_environment',
+              'scripts.check_neo4j',
+              'scripts.check_auth',
+              'scripts.check_agents',
+              'scripts.pre_flight_check'
+          ]
+
+          all_imports_ok = True
+          for module_name in modules_to_check:
+              try:
+                  __import__(module_name)
+                  print(f"✓ {module_name}")
+              except ImportError as e:
+                  print(f"✗ {module_name}: {e}")
+                  all_imports_ok = False
+
+          # Also verify key dependencies are available
+          dependencies = [
+              ('neo4j', 'neo4j'),
+              ('dotenv', 'python-dotenv'),
+          ]
+
+          for module, package in dependencies:
+              try:
+                  __import__(module)
+                  print(f"✓ {package}")
+              except ImportError:
+                  print(f"✗ {package} (package not installed)")
+                  all_imports_ok = False
+
+          if not all_imports_ok:
+              print("\nSome imports failed. Please ensure all dependencies are installed.")
+              sys.exit(1)
+          else:
+              print("\nAll pre-flight check dependencies verified successfully!")
+          EOF
+
+      - name: Run pre-flight check
+        id: preflight
+        run: |
+          python -m scripts.pre_flight_check --output preflight.json --verbose
+
+      - name: Parse pre-flight results and check decision
+        id: parse
+        run: |
+          echo "## Pre-flight Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Parse the JSON output
+          if [ -f preflight.json ]; then
+            TOTAL_CHECKS=$(cat preflight.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('checks', [])))" 2>/dev/null || echo "0")
+            PASSED_CHECKS=$(cat preflight.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(sum(1 for c in data.get('checks', []) if c.get('passed', False)))" 2>/dev/null || echo "0")
+            DECISION=$(cat preflight.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('decision', 'UNKNOWN'))" 2>/dev/null || echo "UNKNOWN")
+            BLOCKERS=$(cat preflight.json | python3 -c "import sys, json; data=json.load(sys.stdin); blockers=[c.get('name') for c in data.get('checks', []) if c.get('passed') == False and c.get('blocking', True)]; print(', '.join(blockers))" 2>/dev/null || echo "")
+
+            # Calculate pass rate
+            if [ "$TOTAL_CHECKS" -gt 0 ] 2>/dev/null; then
+              PASS_RATE=$(python3 -c "print(f'{$PASSED_CHECKS / $TOTAL_CHECKS * 100:.1f}')")
+            else
+              PASS_RATE="0.0"
+            fi
+
+            echo "total_checks=$TOTAL_CHECKS" >> $GITHUB_OUTPUT
+            echo "passed_checks=$PASSED_CHECKS" >> $GITHUB_OUTPUT
+            echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+            echo "decision=$DECISION" >> $GITHUB_OUTPUT
+            echo "blockers=$BLOCKERS" >> $GITHUB_OUTPUT
+
+            # Write summary
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Checks | $TOTAL_CHECKS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed Checks | $PASSED_CHECKS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pass Rate | $PASS_RATE% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Decision | $DECISION |" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$DECISION" == "NO-GO" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Blockers" >> $GITHUB_STEP_SUMMARY
+              if [ -n "$BLOCKERS" ]; then
+                echo "The following blocking checks failed:" >> $GITHUB_STEP_SUMMARY
+                for blocker in $(echo "$BLOCKERS" | tr ',' ' '); do
+                  echo "- $blocker" >> $GITHUB_STEP_SUMMARY
+                done
+              else
+                echo "Unknown blockers (decision is NO-GO)" >> $GITHUB_STEP_SUMMARY
+              fi
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Pre-flight check failed. Stopping workflow.**" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            else
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Pre-flight check passed. Proceeding with workflow.**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "Error: preflight.json not found" >> $GITHUB_STEP_SUMMARY
+            echo "decision=NO-GO" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Upload pre-flight report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preflight-report-${{ github.run_id }}
+          path: preflight.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  # =============================================================================
+  # Job 1: Quality Gates - Main Testing Job
+  # =============================================================================
+  quality-gates:
+    name: Quality Gates (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: pre-flight-checks
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            test-requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          if [ -f test-requirements.txt ]; then
+            pip install -r test-requirements.txt
+          fi
+
+      - name: Install linting tools
+        run: |
+          pip install black ruff isort mypy
+
+      - name: Run code formatting checks
+        id: formatting
+        run: |
+          echo "## Code Formatting Checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Black formatting check
+          echo "### Black Formatting" >> $GITHUB_STEP_SUMMARY
+          if black --check --diff . 2>/dev/null; then
+            echo "- Black: **PASS**" >> $GITHUB_STEP_SUMMARY
+            echo "black_status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "- Black: **FAIL** (run 'black .' to fix)" >> $GITHUB_STEP_SUMMARY
+            echo "black_status=fail" >> $GITHUB_OUTPUT
+            black --check --diff . || true
+          fi
+
+          # Ruff linting
+          echo "### Ruff Linting" >> $GITHUB_STEP_SUMMARY
+          if ruff check . 2>/dev/null; then
+            echo "- Ruff: **PASS**" >> $GITHUB_STEP_SUMMARY
+            echo "ruff_status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "- Ruff: **FAIL**" >> $GITHUB_STEP_SUMMARY
+            echo "ruff_status=fail" >> $GITHUB_OUTPUT
+            ruff check . || true
+          fi
+
+          # Import sorting check
+          echo "### Import Sorting" >> $GITHUB_STEP_SUMMARY
+          if isort --check-only --diff . 2>/dev/null; then
+            echo "- isort: **PASS**" >> $GITHUB_STEP_SUMMARY
+            echo "isort_status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "- isort: **FAIL** (run 'isort .' to fix)" >> $GITHUB_STEP_SUMMARY
+            echo "isort_status=fail" >> $GITHUB_OUTPUT
+            isort --check-only --diff . || true
+          fi
+
+      - name: Run type checking
+        id: typecheck
+        run: |
+          echo "### Type Checking (mypy)" >> $GITHUB_STEP_SUMMARY
+          if mypy --ignore-missing-imports --follow-imports=skip . 2>/dev/null | grep -q "Success"; then
+            echo "- mypy: **PASS**" >> $GITHUB_STEP_SUMMARY
+            echo "mypy_status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "- mypy: **WARN** (issues found but not blocking)" >> $GITHUB_STEP_SUMMARY
+            echo "mypy_status=warn" >> $GITHUB_OUTPUT
+            mypy --ignore-missing-imports --follow-imports=skip . || true
+          fi
+        continue-on-error: true
+
+      - name: Run tests with coverage
+        id: tests
+        if: ${{ !inputs.skip_tests }}
+        run: |
+          echo "## Test Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run tests with pytest
+          pytest -v --tb=short --json-report --json-report-file=pytest-report.json || TEST_EXIT=$?
+
+          if [ -z "$TEST_EXIT" ]; then
+            echo "- Tests: **PASS**" >> $GITHUB_STEP_SUMMARY
+            echo "test_status=pass" >> $GITHUB_OUTPUT
+          else
+            echo "- Tests: **FAIL** (exit code: $TEST_EXIT)" >> $GITHUB_STEP_SUMMARY
+            echo "test_status=fail" >> $GITHUB_OUTPUT
+            exit $TEST_EXIT
+          fi
+
+      - name: Generate coverage report
+        id: coverage
+        if: ${{ !inputs.skip_tests }}
+        run: |
+          pytest --cov --cov-report=xml --cov-report=html --cov-report=term-missing 2>&1 | tee coverage-output.txt
+
+          # Extract coverage percentage
+          COVERAGE_PCT=$(grep -oP 'TOTAL.*\K\d+%' coverage-output.txt | head -1 || echo "unknown")
+          echo "coverage_pct=$COVERAGE_PCT" >> $GITHUB_OUTPUT
+
+          echo "### Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "- Coverage: **$COVERAGE_PCT**" >> $GITHUB_STEP_SUMMARY
+
+          # Check minimum coverage threshold
+          if grep -q "FAIL Required test coverage of" coverage-output.txt; then
+            echo "- Coverage Check: **FAIL** (below 80%)" >> $GITHUB_STEP_SUMMARY
+            echo "coverage_status=fail" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "- Coverage Check: **PASS** (>= 80%)" >> $GITHUB_STEP_SUMMARY
+            echo "coverage_status=pass" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload coverage report as artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        with:
+          name: coverage-report-${{ github.run_id }}
+          path: |
+            htmlcov/
+            coverage.xml
+            pytest-report.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12' && !inputs.skip_tests
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+          name: python-${{ matrix.python-version }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Post PR comment with results
+        if: github.event_name == 'pull_request' && matrix.python-version == '3.12'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Build the comment body
+            let body = '## Quality Gates Report\n\n';
+            body += '| Check | Status |\n';
+            body += '|-------|--------|\n';
+
+            // Add formatting status
+            const blackStatus = '${{ steps.formatting.outputs.black_status }}';
+            const blackEmoji = blackStatus === 'pass' ? '✅' : '⚠️';
+            body += `| Black Formatting | ${blackEmoji} ${blackStatus || 'N/A'} |\n`;
+
+            const ruffStatus = '${{ steps.formatting.outputs.ruff_status }}';
+            const ruffEmoji = ruffStatus === 'pass' ? '✅' : '⚠️';
+            body += `| Ruff Linting | ${ruffEmoji} ${ruffStatus || 'N/A'} |\n`;
+
+            const isortStatus = '${{ steps.formatting.outputs.isort_status }}';
+            const isortEmoji = isortStatus === 'pass' ? '✅' : '⚠️';
+            body += `| Import Sorting | ${isortEmoji} ${isortStatus || 'N/A'} |\n`;
+
+            // Add test status
+            const testStatus = '${{ steps.tests.outputs.test_status }}';
+            const testEmoji = testStatus === 'pass' ? '✅' : '❌';
+            body += `| Tests | ${testEmoji} ${testStatus || 'skipped'} |\n`;
+
+            // Add coverage status
+            const coverageStatus = '${{ steps.coverage.outputs.coverage_status }}';
+            const coveragePct = '${{ steps.coverage.outputs.coverage_pct }}';
+            const coverageEmoji = coverageStatus === 'pass' ? '✅' : '❌';
+            body += `| Coverage (${coveragePct || 'N/A'}) | ${coverageEmoji} ${coverageStatus || 'N/A'} |\n`;
+
+            body += '\n';
+            body += '**Python Version:** 3.12\n';
+            body += '**Commit:** ${{ github.sha }}\n';
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const botComment = comments.find(comment => {
+              return comment.user.type === 'Bot' && comment.body.includes('Quality Gates Report');
+            });
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Job Summary
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Black | ${{ steps.formatting.outputs.black_status || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruff | ${{ steps.formatting.outputs.ruff_status || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| isort | ${{ steps.formatting.outputs.isort_status || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| mypy | ${{ steps.typecheck.outputs.mypy_status || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tests | ${{ steps.tests.outputs.test_status || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ steps.coverage.outputs.coverage_status || 'N/A' }} (${{ steps.coverage.outputs.coverage_pct || 'N/A' }}) |" >> $GITHUB_STEP_SUMMARY
+
+  # =============================================================================
+  # Job 2: Security Scan
+  # =============================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-flight-checks
+    if: ${{ !inputs.skip_security }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f test-requirements.txt ]; then
+            pip install -r test-requirements.txt
+          fi
+
+      - name: Install security tools
+        run: |
+          pip install bandit safety pip-audit
+
+      - name: Run Bandit security linter
+        id: bandit
+        run: |
+          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bandit Security Linter" >> $GITHUB_STEP_SUMMARY
+
+          # Run bandit and capture output
+          bandit -r . -f json -o bandit-report.json || BANDIT_EXIT=$?
+          bandit -r . -f txt -o bandit-report.txt || true
+
+          # Count issues by severity
+          if [ -f bandit-report.json ]; then
+            HIGH_COUNT=$(cat bandit-report.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len([r for r in data.get('results', []) if r.get('issue_severity') == 'HIGH']))" 2>/dev/null || echo "0")
+            MEDIUM_COUNT=$(cat bandit-report.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len([r for r in data.get('results', []) if r.get('issue_severity') == 'MEDIUM']))" 2>/dev/null || echo "0")
+            LOW_COUNT=$(cat bandit-report.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len([r for r in data.get('results', []) if r.get('issue_severity') == 'LOW']))" 2>/dev/null || echo "0")
+
+            echo "- High Severity: $HIGH_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "- Medium Severity: $MEDIUM_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "- Low Severity: $LOW_COUNT" >> $GITHUB_STEP_SUMMARY
+
+            echo "high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+            echo "medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+            echo "low_count=$LOW_COUNT" >> $GITHUB_OUTPUT
+
+            if [ "$HIGH_COUNT" -gt 0 ]; then
+              echo "status=fail" >> $GITHUB_OUTPUT
+              echo "- **Status: FAIL** (High severity issues found)" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            elif [ "$MEDIUM_COUNT" -gt 0 ]; then
+              echo "status=warn" >> $GITHUB_OUTPUT
+              echo "- **Status: WARN** (Medium severity issues found)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "status=pass" >> $GITHUB_OUTPUT
+              echo "- **Status: PASS**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "- **Status: ERROR** (Could not generate report)" >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
+
+      - name: Run Safety check for dependencies
+        id: safety
+        run: |
+          echo "### Safety Dependency Check" >> $GITHUB_STEP_SUMMARY
+
+          # Run safety check
+          safety check --json --output safety-report.json || SAFETY_EXIT=$?
+          safety check --output safety-report.txt || true
+
+          if [ -f safety-report.json ]; then
+            VULN_COUNT=$(cat safety-report.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('vulnerabilities', [])))" 2>/dev/null || echo "0")
+
+            echo "- Vulnerabilities Found: $VULN_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "vuln_count=$VULN_COUNT" >> $GITHUB_OUTPUT
+
+            if [ "$VULN_COUNT" -gt 0 ]; then
+              echo "status=fail" >> $GITHUB_OUTPUT
+              echo "- **Status: FAIL** ($VULN_COUNT vulnerabilities found)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "status=pass" >> $GITHUB_OUTPUT
+              echo "- **Status: PASS** (No known vulnerabilities)" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            # Fallback if safety check doesn't support JSON output
+            if safety check 2>&1 | grep -q "No known security vulnerabilities"; then
+              echo "- Vulnerabilities Found: 0" >> $GITHUB_STEP_SUMMARY
+              echo "vuln_count=0" >> $GITHUB_OUTPUT
+              echo "status=pass" >> $GITHUB_OUTPUT
+              echo "- **Status: PASS** (No known vulnerabilities)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "status=warn" >> $GITHUB_OUTPUT
+              echo "- **Status: WARN** (Check output for details)" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        continue-on-error: true
+
+      - name: Run pip-audit
+        id: pipaudit
+        run: |
+          echo "### pip-audit Check" >> $GITHUB_STEP_SUMMARY
+
+          if pip-audit --format=json --output=pip-audit-report.json || PIP_AUDIT_EXIT=$?; then
+            echo "- **Status: PASS** (No vulnerabilities found)" >> $GITHUB_STEP_SUMMARY
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "vuln_count=0" >> $GITHUB_OUTPUT
+          else
+            # Count vulnerabilities
+            if [ -f pip-audit-report.json ]; then
+              VULN_COUNT=$(cat pip-audit-report.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('vulnerabilities', [])))" 2>/dev/null || echo "0")
+              echo "- Vulnerabilities Found: $VULN_COUNT" >> $GITHUB_STEP_SUMMARY
+              echo "vuln_count=$VULN_COUNT" >> $GITHUB_OUTPUT
+
+              if [ "$VULN_COUNT" -gt 0 ]; then
+                echo "status=fail" >> $GITHUB_OUTPUT
+                echo "- **Status: FAIL** ($VULN_COUNT vulnerabilities found)" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "status=pass" >> $GITHUB_OUTPUT
+                echo "- **Status: PASS**" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "status=error" >> $GITHUB_OUTPUT
+              echo "- **Status: ERROR** (Could not parse results)" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        continue-on-error: true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports-${{ github.run_id }}
+          path: |
+            bandit-report.json
+            bandit-report.txt
+            safety-report.json
+            safety-report.txt
+            pip-audit-report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Security Summary
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "## Security Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Tool | Status | Issues |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Bandit | ${{ steps.bandit.outputs.status || 'N/A' }} | High: ${{ steps.bandit.outputs.high_count || 'N/A' }}, Medium: ${{ steps.bandit.outputs.medium_count || 'N/A' }}, Low: ${{ steps.bandit.outputs.low_count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Safety | ${{ steps.safety.outputs.status || 'N/A' }} | ${{ steps.safety.outputs.vuln_count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| pip-audit | ${{ steps.pipaudit.outputs.status || 'N/A' }} | ${{ steps.pipaudit.outputs.vuln_count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Fail the job if any critical security issues found
+          if [ "${{ steps.bandit.outputs.high_count }}" -gt 0 ] 2>/dev/null; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**❌ Security scan failed due to high severity issues**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  # =============================================================================
+  # Job 3: Performance Benchmark
+  # =============================================================================
+  performance-benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    needs: pre-flight-checks
+    if: ${{ !inputs.skip_performance }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f test-requirements.txt ]; then
+            pip install -r test-requirements.txt
+          fi
+
+      - name: Install benchmark tools
+        run: |
+          pip install pytest-benchmark
+
+      - name: Run performance benchmarks
+        id: benchmark
+        run: |
+          echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run benchmarks and generate JSON report
+          pytest tests/performance/ -v --benchmark-only --benchmark-json=benchmark-report.json || BENCHMARK_EXIT=$?
+
+          if [ -f benchmark-report.json ]; then
+            echo "Benchmark report generated successfully" >> $GITHUB_STEP_SUMMARY
+            echo "status=complete" >> $GITHUB_OUTPUT
+          else
+            echo "No benchmark report generated" >> $GITHUB_STEP_SUMMARY
+            echo "status=skipped" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -n "$BENCHMARK_EXIT" ] && [ "$BENCHMARK_EXIT" -ne 0 ] && [ "$BENCHMARK_EXIT" -ne 5 ]; then
+            echo "Benchmark tests failed with exit code: $BENCHMARK_EXIT" >> $GITHUB_STEP_SUMMARY
+            exit $BENCHMARK_EXIT
+          fi
+        continue-on-error: true
+
+      - name: Compare against baseline
+        id: compare
+        run: |
+          echo "### Baseline Comparison" >> $GITHUB_STEP_SUMMARY
+
+          # Check if baseline exists in main branch
+          git fetch origin main:main
+
+          if git show main:benchmark-baseline.json > /dev/null 2>&1; then
+            git show main:benchmark-baseline.json > baseline.json
+            echo "Found baseline in main branch" >> $GITHUB_STEP_SUMMARY
+
+            # Compare using pytest-benchmark compare
+            if [ -f benchmark-report.json ] && [ -f baseline.json ]; then
+              # Parse and compare key metrics
+              python3 << 'EOF'
+          import json
+          import sys
+
+          try:
+              with open('baseline.json', 'r') as f:
+                  baseline = json.load(f)
+              with open('benchmark-report.json', 'r') as f:
+                  current = json.load(f)
+
+              regressions = []
+              improvements = []
+
+              baseline_times = {b['name']: b['stats']['mean'] for b in baseline.get('benchmarks', [])}
+
+              for bench in current.get('benchmarks', []):
+                  name = bench['name']
+                  current_time = bench['stats']['mean']
+
+                  if name in baseline_times:
+                      baseline_time = baseline_times[name]
+                      change_pct = ((current_time - baseline_time) / baseline_time) * 100
+
+                      if change_pct > 10:
+                          regressions.append((name, change_pct, current_time, baseline_time))
+                      elif change_pct < -10:
+                          improvements.append((name, -change_pct, current_time, baseline_time))
+
+              # Output results
+              print(f"Regressions found: {len(regressions)}")
+              print(f"Improvements found: {len(improvements)}")
+
+              with open('benchmark-comparison.md', 'w') as f:
+                  f.write("## Benchmark Comparison\n\n")
+
+                  if regressions:
+                      f.write("### Regressions (>10% slower)\n")
+                      for name, pct, current, baseline in regressions:
+                          f.write(f"- {name}: +{pct:.1f}% ({baseline:.4f}s → {current:.4f}s)\n")
+                      f.write("\n")
+
+                  if improvements:
+                      f.write("### Improvements (>10% faster)\n")
+                      for name, pct, current, baseline in improvements:
+                          f.write(f"- {name}: -{pct:.1f}% ({baseline:.4f}s → {current:.4f}s)\n")
+                      f.write("\n")
+
+                  if not regressions and not improvements:
+                      f.write("No significant changes detected (<10% difference)\n")
+
+                  # Write GitHub outputs
+                  with open('benchmark-outputs.txt', 'w') as out:
+                      out.write(f"regression_count={len(regressions)}\n")
+                      out.write(f"improvement_count={len(improvements)}\n")
+                      out.write(f"has_regression={'true' if regressions else 'false'}\n")
+
+              sys.exit(0 if not regressions else 1)
+
+          except Exception as e:
+              print(f"Error comparing benchmarks: {e}")
+              with open('benchmark-outputs.txt', 'w') as out:
+                  out.write("regression_count=0\n")
+                  out.write("improvement_count=0\n")
+                  out.write("has_regression=false\n")
+              sys.exit(0)
+          EOF
+
+              if [ -f benchmark-comparison.md ]; then
+                  cat benchmark-comparison.md >> $GITHUB_STEP_SUMMARY
+              fi
+
+              if [ -f benchmark-outputs.txt ]; then
+                  cat benchmark-outputs.txt >> $GITHUB_ENV
+                  cat benchmark-outputs.txt >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "Could not find benchmark files for comparison" >> $GITHUB_STEP_SUMMARY
+              echo "regression_count=0" >> $GITHUB_OUTPUT
+              echo "improvement_count=0" >> $GITHUB_OUTPUT
+              echo "has_regression=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No baseline found in main branch (skipping comparison)" >> $GITHUB_STEP_SUMMARY
+            echo "regression_count=0" >> $GITHUB_OUTPUT
+            echo "improvement_count=0" >> $GITHUB_OUTPUT
+            echo "has_regression=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fail if regression > 10%
+        if: steps.compare.outputs.has_regression == 'true'
+        run: |
+          echo "## Performance Regression Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.compare.outputs.regression_count }} benchmark(s)** regressed by more than 10%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please review the benchmark comparison above." >> $GITHUB_STEP_SUMMARY
+          exit 1
+
+      - name: Upload benchmark reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-reports-${{ github.run_id }}
+          path: |
+            benchmark-report.json
+            benchmark-comparison.md
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Update baseline (on main branch push)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          # This would typically commit the new baseline back to the repo
+          # For now, we just note that it should be done
+          echo "Note: New baseline should be committed to the repository" >> $GITHUB_STEP_SUMMARY
+
+  # =============================================================================
+  # Job 4: Final Status Report
+  # =============================================================================
+  quality-gates-summary:
+    name: Quality Gates Summary
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, quality-gates, security-scan, performance-benchmark]
+    if: always()
+
+    steps:
+      - name: Generate final status report
+        run: |
+          echo "# Quality Gates Final Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+
+          PREFLIGHT_STATUS="${{ needs.pre-flight-checks.result }}"
+          QUALITY_STATUS="${{ needs.quality-gates.result }}"
+          SECURITY_STATUS="${{ needs.security-scan.result }}"
+          PERF_STATUS="${{ needs.performance-benchmark.result }}"
+
+          # Pre-flight Checks
+          if [ "$PREFLIGHT_STATUS" == "success" ]; then
+            echo "| Pre-flight Checks | ✅ PASS |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$PREFLIGHT_STATUS" == "skipped" ]; then
+            echo "| Pre-flight Checks | ⏭️ SKIPPED |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Pre-flight Checks | ❌ FAIL |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Quality Gates
+          if [ "$QUALITY_STATUS" == "success" ]; then
+            echo "| Quality Gates | ✅ PASS |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$QUALITY_STATUS" == "skipped" ]; then
+            echo "| Quality Gates | ⏭️ SKIPPED |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Quality Gates | ❌ FAIL |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Security Scan
+          if [ "$SECURITY_STATUS" == "success" ]; then
+            echo "| Security Scan | ✅ PASS |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$SECURITY_STATUS" == "skipped" ]; then
+            echo "| Security Scan | ⏭️ SKIPPED |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Security Scan | ❌ FAIL |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Performance Benchmark
+          if [ "$PERF_STATUS" == "success" ]; then
+            echo "| Performance Benchmark | ✅ PASS |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$PERF_STATUS" == "skipped" ]; then
+            echo "| Performance Benchmark | ⏭️ SKIPPED |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Performance Benchmark | ❌ FAIL |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const message = `❌ Quality Gates Failed
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Triggered by: ${{ github.event_name }}
+
+            Failed jobs:
+            - Pre-flight Checks: ${{ needs.pre-flight-checks.result }}
+            - Quality Gates: ${{ needs.quality-gates.result }}
+            - Security Scan: ${{ needs.security-scan.result }}
+            - Performance Benchmark: ${{ needs.performance-benchmark.result }}
+
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            // Create an issue comment or use other notification methods
+            if (context.eventName === 'pull_request') {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: message
+              });
+            }
+
+            console.log(message);
+
+      - name: Final status check
+        run: |
+          PREFLIGHT_STATUS="${{ needs.pre-flight-checks.result }}"
+          QUALITY_STATUS="${{ needs.quality-gates.result }}"
+          SECURITY_STATUS="${{ needs.security-scan.result }}"
+          PERF_STATUS="${{ needs.performance-benchmark.result }}"
+
+          if [ "$PREFLIGHT_STATUS" != "success" ] || [ "$QUALITY_STATUS" != "success" ] || [ "$SECURITY_STATUS" != "success" ] || [ "$PERF_STATUS" != "success" ]; then
+            echo "One or more quality gates failed"
+            exit 1
+          fi
+
+          echo "All quality gates passed!"

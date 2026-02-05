@@ -1,0 +1,107 @@
+{
+  "emails": [
+    "user@example.com",
+    "john.doe@company.co.uk",
+    "test+tag@gmail.com",
+    "admin@test-domain.org",
+    "first.last@sub.domain.example.com",
+    "user123@localhost",
+    "contact@company-name.io",
+    "name@123domain.com"
+  ],
+  "phone_numbers": [
+    "+1 (555) 123-4567",
+    "555-123-4567",
+    "1.555.123.4567",
+    "+44 20 7123 4567",
+    "020 7123 4567",
+    "+91 98765 43210",
+    "+86 138 1234 5678",
+    "(555) 123-4567 ext. 123"
+  ],
+  "ssns": [
+    "123-45-6789",
+    "987-65-4321",
+    "123 45 6789",
+    "123456789"
+  ],
+  "api_keys": [
+    "sk_live_51HvXjbK2NXdJv5QRYG3xYjL3mQZLNpHkL3kJT3G",
+    "AKIAIOSFODNN7EXAMPLE",
+    "sa_9876543210abcdefghijklmnopqrstuvwxyz",
+    "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJ",
+    "xoxb-1234567890123-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx",
+    "AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe"
+  ],
+  "names": [
+    "John Doe",
+    "Jane A. Smith",
+    "Dr. Robert Johnson Jr.",
+    "Maria Garcia Lopez",
+    "Jean-Claude Van Damme"
+  ],
+  "addresses": [
+    "123 Main St, Springfield, IL 62701",
+    "456 Oak Avenue, Apt 7B, New York, NY 10001",
+    "789 Pine Road, Suite 200, Los Angeles, CA 90001",
+    "321 Elm Street, London, SW1A 1AA, UK"
+  ],
+  "credit_cards": [
+    "4111-1111-1111-1111",
+    "5500 0000 0000 0004",
+    "378282246310005",
+    "6011-1111-1111-1117",
+    "3530-1113-3330-0000"
+  ],
+  "ip_addresses": [
+    "192.168.1.1",
+    "10.0.0.1",
+    "203.0.113.42",
+    "198.51.100.23",
+    "172.16.254.1",
+    "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+  ],
+  "preservation_contexts": {
+    "allowed_emails": [
+      "support@company.com",
+      "noreply@service.com",
+      "info@example.org",
+      "admin@localhost"
+    ],
+    "example_domains": [
+      "user@example.com",
+      "test@test.com",
+      "admin@example.org"
+    ],
+    "false_positives": [
+      "Send to john.doe@",
+      "Call 555-",
+      "Key: ABC123",
+      "Not an SSN: 12-34"
+    ],
+    "log_contexts": [
+      "Email field: user@example.com",
+      "Phone: +1 (555) 123-4567",
+      "SSN provided",
+      "API key: sk_live_***"
+    ]
+  },
+  "detection_patterns": {
+    "email_regex": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+    "phone_regex": "(?:\\+?1[-.\\s]?)?\\(?[0-9]{3}\\)?[-.\\s]?[0-9]{3}[-.\\s]?[0-9]{4}",
+    "ssn_regex": "\\d{3}[-\\s]?\\d{2}[-\\s]?\\d{4}",
+    "api_key_prefixes": [
+      "sk_live_",
+      "sk_test_",
+      "AKIA",
+      "sa_",
+      "ghp_",
+      "gho_",
+      "ghu_",
+      "ghs_",
+      "ghr_",
+      "xoxb-",
+      "AIzaSy"
+    ]
+  }
+}

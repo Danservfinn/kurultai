@@ -1,0 +1,280 @@
+{
+  "linear_dag": {
+    "description": "Simple linear chain of tasks",
+    "nodes": [
+      {
+        "id": "research-auth",
+        "title": "Research authentication options",
+        "status": "pending",
+        "priority": "high",
+        "blocks": ["implement-jwt"]
+      },
+      {
+        "id": "implement-jwt",
+        "title": "Implement JWT middleware",
+        "status": "pending",
+        "priority": "high",
+        "blocked_by": ["research-auth"],
+        "blocks": ["add-tests"]
+      },
+      {
+        "id": "add-tests",
+        "title": "Add authentication tests",
+        "status": "pending",
+        "priority": "normal",
+        "blocked_by": ["implement-jwt"],
+        "blocks": ["deploy"]
+      },
+      {
+        "id": "deploy",
+        "title": "Deploy to staging",
+        "status": "pending",
+        "priority": "normal",
+        "blocked_by": ["add-tests"]
+      }
+    ],
+    "execution_order": ["research-auth", "implement-jwt", "add-tests", "deploy"]
+  },
+  "parallel_dag": {
+    "description": "Multiple independent tasks that can run in parallel",
+    "nodes": [
+      {
+        "id": "setup-project",
+        "title": "Set up project structure",
+        "status": "pending",
+        "priority": "critical",
+        "blocks": ["frontend", "backend", "docs"]
+      },
+      {
+        "id": "frontend",
+        "title": "Implement frontend components",
+        "status": "pending",
+        "priority": "high",
+        "blocked_by": ["setup-project"],
+        "blocks": ["integration"]
+      },
+      {
+        "id": "backend",
+        "title": "Implement backend API",
+        "status": "pending",
+        "priority": "high",
+        "blocked_by": ["setup-project"],
+        "blocks": ["integration"]
+      },
+      {
+        "id": "docs",
+        "title": "Write API documentation",
+        "status": "pending",
+        "priority": "low",
+        "blocked_by": ["setup-project"],
+        "blocks": ["integration"]
+      },
+      {
+        "id": "integration",
+        "title": "Integration testing",
+        "status": "pending",
+        "priority": "high",
+        "blocked_by": ["frontend", "backend", "docs"]
+      }
+    ],
+    "parallel_sets": [
+      ["frontend", "backend", "docs"]
+    ]
+  },
+  "complex_dag": {
+    "description": "Complex multi-goal orchestration with multiple levels",
+    "nodes": [
+      {
+        "id": "goal-auth",
+        "title": "Authentication Goal",
+        "type": "goal",
+        "status": "pending",
+        "priority": "critical",
+        "blocks": ["auth-research", "auth-security"]
+      },
+      {
+        "id": "goal-ui",
+        "title": "UI Enhancement Goal",
+        "type": "goal",
+        "status": "pending",
+        "priority": "high",
+        "blocks": ["ui-design", "ui-accessibility"]
+      },
+      {
+        "id": "auth-research",
+        "title": "Research auth approaches",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["goal-auth"],
+        "blocks": ["auth-backend"]
+      },
+      {
+        "id": "auth-security",
+        "title": "Security audit auth design",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["goal-auth"],
+        "blocks": ["auth-backend"]
+      },
+      {
+        "id": "auth-backend",
+        "title": "Implement auth backend",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["auth-research", "auth-security"],
+        "blocks": ["auth-integration"]
+      },
+      {
+        "id": "auth-integration",
+        "title": "Integrate auth with UI",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["auth-backend", "ui-components"],
+        "blocks": ["final-testing"]
+      },
+      {
+        "id": "ui-design",
+        "title": "Design UI components",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["goal-ui"],
+        "blocks": ["ui-components"]
+      },
+      {
+        "id": "ui-accessibility",
+        "title": "Accessibility audit",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["goal-ui"],
+        "blocks": ["ui-components"]
+      },
+      {
+        "id": "ui-components",
+        "title": "Build UI components",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["ui-design", "ui-accessibility"],
+        "blocks": ["auth-integration"]
+      },
+      {
+        "id": "final-testing",
+        "title": "Final integration testing",
+        "type": "task",
+        "status": "pending",
+        "blocked_by": ["auth-integration"]
+      }
+    ],
+    "goals": ["goal-auth", "goal-ui"],
+    "critical_path": [
+      "goal-auth",
+      "auth-research",
+      "auth-backend",
+      "auth-integration",
+      "final-testing"
+    ]
+  },
+  "cyclic_dag": {
+    "description": "Invalid DAG containing a cycle (should fail)",
+    "nodes": [
+      {
+        "id": "task-a",
+        "title": "Task A",
+        "status": "pending",
+        "blocked_by": ["task-c"],
+        "blocks": ["task-b"]
+      },
+      {
+        "id": "task-b",
+        "title": "Task B",
+        "status": "pending",
+        "blocked_by": ["task-a"],
+        "blocks": ["task-c"]
+      },
+      {
+        "id": "task-c",
+        "title": "Task C",
+        "status": "pending",
+        "blocked_by": ["task-b"],
+        "blocks": ["task-a"]
+      }
+    ],
+    "cycle": ["task-a", "task-b", "task-c", "task-a"]
+  },
+  "multi_goal_dag": {
+    "description": "Multiple independent goals with synergistic relationships",
+    "goals": [
+      {
+        "id": "goal-performance",
+        "title": "Performance Optimization Goal",
+        "priority": "high",
+        "relationship_to": "goal-security",
+        "relationship_type": "synergistic"
+      },
+      {
+        "id": "goal-security",
+        "title": "Security Hardening Goal",
+        "priority": "critical",
+        "relationship_to": "goal-performance",
+        "relationship_type": "synergistic"
+      },
+      {
+        "id": "goal-monitoring",
+        "title": "Monitoring Setup Goal",
+        "priority": "normal",
+        "relationship_to": "goal-performance",
+        "relationship_type": "reinforces"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "profiling",
+        "goal_id": "goal-performance",
+        "title": "Profile application bottlenecks",
+        "blocked_by": []
+      },
+      {
+        "id": "caching",
+        "goal_id": "goal-performance",
+        "title": "Implement caching layer",
+        "blocked_by": ["profiling"]
+      },
+      {
+        "id": "security-audit",
+        "goal_id": "goal-security",
+        "title": "Conduct security audit",
+        "blocked_by": []
+      },
+      {
+        "id": "rate-limiting",
+        "goal_id": "goal-security",
+        "title": "Add rate limiting",
+        "blocked_by": ["security-audit"]
+      },
+      {
+        "id": "metrics",
+        "goal_id": "goal-monitoring",
+        "title": "Add metrics collection",
+        "blocked_by": []
+      },
+      {
+        "id": "alerts",
+        "goal_id": "goal-monitoring",
+        "title": "Configure alerting",
+        "blocked_by": ["metrics"]
+      }
+    ]
+  },
+  "priority_override_dag": {
+    "description": "DAG with priority override commands",
+    "initial_order": [
+      {"id": "task-a", "priority": "normal"},
+      {"id": "task-b", "priority": "normal"},
+      {"id": "task-c", "priority": "normal"}
+    ],
+    "override_commands": [
+      "do task-a before task-b",
+      "make task-c critical priority"
+    ],
+    "final_order": ["task-c", "task-a", "task-b"]
+  }
+}

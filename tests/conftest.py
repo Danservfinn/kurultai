@@ -907,20 +907,30 @@ def reset_global_state():
     global state that could cause test ordering dependencies.
     """
     # Clear MemoryManagerFactory singleton instances
-    try:
-        from memory_manager import MemoryManagerFactory
-        MemoryManagerFactory._instances.clear()
-    except (ImportError, AttributeError):
-        pass
+    # Use sys.modules to check if already imported to avoid triggering imports
+    # which can cause issues with C-extension modules like numpy
+    if 'memory_manager' in sys.modules:
+        try:
+            memory_module = sys.modules['memory_manager']
+            if hasattr(memory_module, 'MemoryManagerFactory'):
+                factory = memory_module.MemoryManagerFactory
+                if hasattr(factory, '_instances'):
+                    factory._instances.clear()
+        except (ImportError, AttributeError, Exception):
+            pass
 
     yield
 
     # Cleanup after test
-    try:
-        from memory_manager import MemoryManagerFactory
-        MemoryManagerFactory._instances.clear()
-    except (ImportError, AttributeError):
-        pass
+    if 'memory_manager' in sys.modules:
+        try:
+            memory_module = sys.modules['memory_manager']
+            if hasattr(memory_module, 'MemoryManagerFactory'):
+                factory = memory_module.MemoryManagerFactory
+                if hasattr(factory, '_instances'):
+                    factory._instances.clear()
+        except (ImportError, AttributeError, Exception):
+            pass
 
 
 @pytest.fixture(autouse=True)
@@ -986,3 +996,33 @@ def isolate_asyncio():
         asyncio.set_event_loop(None)
     except RuntimeError:
         pass
+
+
+@pytest.fixture(autouse=True)
+def cleanup_file_handles():
+    """
+    Cleanup any open file handles after each test.
+
+    This prevents file descriptor leaks between tests.
+    """
+    yield
+
+    # Cleanup: close any remaining mock file handles
+    import gc
+    gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def reset_import_cache():
+    """
+    Reset module-level caches that might persist between tests.
+
+    This ensures that module-level state doesn't leak between tests.
+    Note: This fixture is currently a no-op to avoid issues with numpy
+    and other C-extension modules being reloaded. Individual tests
+    should clean up their own module-level state.
+    """
+    yield
+    # Note: We intentionally do NOT remove modules from sys.modules here
+    # as reloading C-extension modules like numpy can cause issues.
+    # Instead, tests should use proper mocking and cleanup.

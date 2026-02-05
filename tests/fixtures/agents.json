@@ -1,0 +1,157 @@
+{
+  "agents": [
+    {
+      "id": "kublai",
+      "name": "Kublai Khan",
+      "role": "orchestrator",
+      "description": "Multi-agent orchestrator and delegation coordinator",
+      "capabilities": [
+        "delegation",
+        "coordination",
+        "synthesis",
+        "monitoring"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:00.000Z",
+      "tasks_completed": 156,
+      "tasks_failed": 3,
+      "average_response_time_ms": 250,
+      "max_concurrent_tasks": 10
+    },
+    {
+      "id": "jochi",
+      "name": "Jochi",
+      "role": "backend_analyst",
+      "description": "Backend code analysis and issue identification specialist",
+      "capabilities": [
+        "code_analysis",
+        "backend_review",
+        "api_analysis",
+        "database_review"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:30.000Z",
+      "tasks_completed": 89,
+      "tasks_failed": 5,
+      "average_response_time_ms": 1800,
+      "max_concurrent_tasks": 5
+    },
+    {
+      "id": "temüjin",
+      "name": "Temüjin",
+      "role": "security_auditor",
+      "description": "Security audit and vulnerability assessment specialist",
+      "capabilities": [
+        "security_audit",
+        "vulnerability_scan",
+        "owasp_analysis",
+        "penetration_testing"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T11:58:00.000Z",
+      "tasks_completed": 67,
+      "tasks_failed": 1,
+      "average_response_time_ms": 2200,
+      "max_concurrent_tasks": 3
+    },
+    {
+      "id": "ögedei",
+      "name": "Ögedei",
+      "role": "file_consistency_manager",
+      "description": "File consistency and emergency routing specialist",
+      "capabilities": [
+        "file_consistency",
+        "emergency_routing",
+        "improvement_detection",
+        "refactoring"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:15.000Z",
+      "tasks_completed": 45,
+      "tasks_failed": 2,
+      "average_response_time_ms": 1200,
+      "max_concurrent_tasks": 4
+    },
+    {
+      "id": "chagatai",
+      "name": "Chagatai",
+      "role": "background_synthesizer",
+      "description": "Background synthesis and continuous improvement specialist",
+      "capabilities": [
+        "background_synthesis",
+        "meta_learning",
+        "pattern_recognition",
+        "knowledge_extraction"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T11:59:45.000Z",
+      "tasks_completed": 234,
+      "tasks_failed": 8,
+      "average_response_time_ms": 3500,
+      "max_concurrent_tasks": 8
+    },
+    {
+      "id": "tolui",
+      "name": "Tolui",
+      "role": "frontend_specialist",
+      "description": "Frontend code and UI/UX review specialist",
+      "capabilities": [
+        "frontend_review",
+        "accessibility_audit",
+        "ux_analysis",
+        "component_review"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:00.000Z",
+      "tasks_completed": 78,
+      "tasks_failed": 4,
+      "average_response_time_ms": 1500,
+      "max_concurrent_tasks": 5
+    }
+  ],
+  "agent_states": {
+    "all_active": {
+      "kublai": "active",
+      "jochi": "active",
+      "temüjin": "active",
+      "ögedei": "active",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "one_stale": {
+      "kublai": "active",
+      "jochi": "active",
+      "temüjin": "stale",
+      "ögedei": "active",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "one_unavailable": {
+      "kublai": "active",
+      "jochi": "active",
+      "temüjin": "unavailable",
+      "ögedei": "active",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "failover_active": {
+      "kublai": "unavailable",
+      "jochi": "active",
+      "temüjin": "active",
+      "ögedei": "emergency_router",
+      "chagatai": "active",
+      "tolui": "active"
+    }
+  },
+  "agent_routing": {
+    "code": ["jochi", "tolui"],
+    "security": ["temüjin"],
+    "backend": ["jochi"],
+    "frontend": ["tolui"],
+    "analysis": ["jochi", "temüjin"],
+    "synthesis": ["chagatai"],
+    "improvement": ["ögedei", "chagatai"],
+    "file_consistency": ["ögedei"],
+    "delegation": ["kublai"]
+  }
+}

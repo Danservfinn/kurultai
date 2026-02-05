@@ -1,0 +1,479 @@
+{
+  "_meta": {
+    "description": "Agent configuration fixtures for all 6 agents in the Kublai system",
+    "version": "1.0.0",
+    "last_updated": "2025-01-01",
+    "agents_count": 6
+  },
+  "agents": [
+    {
+      "id": "kublai",
+      "name": "Kublai Khan",
+      "role": "orchestrator",
+      "description": "Multi-agent orchestrator and delegation coordinator",
+      "short_description": "Main orchestrator agent",
+      "capabilities": [
+        "delegation",
+        "coordination",
+        "synthesis",
+        "monitoring",
+        "routing",
+        "conflict_resolution"
+      ],
+      "expertise_areas": [
+        "system_architecture",
+        "agent_coordination",
+        "task_decomposition"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:00.000Z",
+      "tasks_completed": 156,
+      "tasks_failed": 3,
+      "tasks_in_progress": 2,
+      "average_response_time_ms": 250,
+      "max_concurrent_tasks": 10,
+      "priority": 1,
+      "is_orchestrator": true,
+      "can_delegate_to": ["jochi", "temüjin", "ögedei", "chagatai", "tolui"],
+      "fallback_for": [],
+      "fallback_agent": "ögedei",
+      "routing_preferences": {
+        "code": ["jochi", "tolui"],
+        "security": ["temüjin"],
+        "analysis": ["jochi", "temüjin"],
+        "synthesis": ["chagatai"],
+        "improvement": ["ögedei", "chagatai"]
+      },
+      "config": {
+        "heartbeat_interval_seconds": 30,
+        "stale_threshold_seconds": 120,
+        "failover_threshold_missed": 3,
+        "max_delegation_depth": 3,
+        "synthesis_timeout_seconds": 60
+      },
+      "memory_settings": {
+        "personal_memory_access": true,
+        "operational_memory_access": true,
+        "max_history_items": 50
+      }
+    },
+    {
+      "id": "jochi",
+      "name": "Jochi",
+      "role": "backend_analyst",
+      "description": "Backend code analysis and issue identification specialist",
+      "short_description": "Backend analysis specialist",
+      "capabilities": [
+        "code_analysis",
+        "backend_review",
+        "api_analysis",
+        "database_review",
+        "performance_analysis",
+        "architecture_review"
+      ],
+      "expertise_areas": [
+        "python",
+        "nodejs",
+        "databases",
+        "api_design",
+        "microservices"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:30.000Z",
+      "tasks_completed": 89,
+      "tasks_failed": 5,
+      "tasks_in_progress": 1,
+      "average_response_time_ms": 1800,
+      "max_concurrent_tasks": 5,
+      "priority": 2,
+      "is_orchestrator": false,
+      "can_delegate_to": [],
+      "fallback_for": [],
+      "fallback_agent": "kublai",
+      "routing_preferences": {},
+      "config": {
+        "heartbeat_interval_seconds": 60,
+        "stale_threshold_seconds": 180,
+        "analysis_timeout_seconds": 300,
+        "max_file_size_mb": 10,
+        "supported_languages": ["python", "javascript", "typescript", "java", "go", "rust"]
+      },
+      "memory_settings": {
+        "personal_memory_access": false,
+        "operational_memory_access": true,
+        "max_code_cache_mb": 100
+      }
+    },
+    {
+      "id": "temüjin",
+      "name": "Temüjin",
+      "role": "security_auditor",
+      "description": "Security audit and vulnerability assessment specialist",
+      "short_description": "Security audit specialist",
+      "capabilities": [
+        "security_audit",
+        "vulnerability_scan",
+        "owasp_analysis",
+        "penetration_testing",
+        "compliance_check",
+        "threat_modeling"
+      ],
+      "expertise_areas": [
+        "application_security",
+        "cryptography",
+        "compliance",
+        "secure_coding",
+        "threat_intelligence"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T11:58:00.000Z",
+      "tasks_completed": 67,
+      "tasks_failed": 1,
+      "tasks_in_progress": 0,
+      "average_response_time_ms": 2200,
+      "max_concurrent_tasks": 3,
+      "priority": 2,
+      "is_orchestrator": false,
+      "can_delegate_to": [],
+      "fallback_for": [],
+      "fallback_agent": "kublai",
+      "routing_preferences": {},
+      "config": {
+        "heartbeat_interval_seconds": 60,
+        "stale_threshold_seconds": 180,
+        "audit_timeout_seconds": 600,
+        "enable_static_analysis": true,
+        "enable_dependency_check": true,
+        "severity_threshold": "medium"
+      },
+      "memory_settings": {
+        "personal_memory_access": false,
+        "operational_memory_access": true,
+        "vulnerability_db_ttl_days": 7
+      }
+    },
+    {
+      "id": "ögedei",
+      "name": "Ögedei",
+      "role": "file_consistency_manager",
+      "description": "File consistency and emergency routing specialist",
+      "short_description": "File consistency and emergency routing",
+      "capabilities": [
+        "file_consistency",
+        "emergency_routing",
+        "improvement_detection",
+        "refactoring",
+        "conflict_resolution",
+        "merge_assistance"
+      ],
+      "expertise_areas": [
+        "version_control",
+        "conflict_resolution",
+        "code_refactoring",
+        "git_workflows",
+        "emergency_response"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:15.000Z",
+      "tasks_completed": 45,
+      "tasks_failed": 2,
+      "tasks_in_progress": 1,
+      "average_response_time_ms": 1200,
+      "max_concurrent_tasks": 4,
+      "priority": 2,
+      "is_orchestrator": false,
+      "can_delegate_to": ["jochi", "temüjin", "chagatai", "tolui"],
+      "fallback_for": ["kublai"],
+      "fallback_agent": "kublai",
+      "routing_preferences": {
+        "emergency": ["jochi", "temüjin"],
+        "refactoring": ["jochi", "tolui"]
+      },
+      "config": {
+        "heartbeat_interval_seconds": 45,
+        "stale_threshold_seconds": 150,
+        "failover_auto_activate": true,
+        "emergency_timeout_seconds": 120,
+        "consistency_check_interval_minutes": 5
+      },
+      "memory_settings": {
+        "personal_memory_access": false,
+        "operational_memory_access": true,
+        "emergency_log_retention_hours": 24
+      }
+    },
+    {
+      "id": "chagatai",
+      "name": "Chagatai",
+      "role": "background_synthesizer",
+      "description": "Background synthesis and continuous improvement specialist",
+      "short_description": "Background synthesis specialist",
+      "capabilities": [
+        "background_synthesis",
+        "meta_learning",
+        "pattern_recognition",
+        "knowledge_extraction",
+        "documentation",
+        "trend_analysis"
+      ],
+      "expertise_areas": [
+        "machine_learning",
+        "pattern_analysis",
+        "technical_writing",
+        "knowledge_management",
+        "process_optimization"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T11:59:45.000Z",
+      "tasks_completed": 234,
+      "tasks_failed": 8,
+      "tasks_in_progress": 3,
+      "average_response_time_ms": 3500,
+      "max_concurrent_tasks": 8,
+      "priority": 2,
+      "is_orchestrator": false,
+      "can_delegate_to": [],
+      "fallback_for": [],
+      "fallback_agent": "kublai",
+      "routing_preferences": {},
+      "config": {
+        "heartbeat_interval_seconds": 90,
+        "stale_threshold_seconds": 300,
+        "synthesis_interval_minutes": 15,
+        "pattern_analysis_enabled": true,
+        "max_patterns_to_track": 100,
+        "learning_rate": 0.01
+      },
+      "memory_settings": {
+        "personal_memory_access": false,
+        "operational_memory_access": true,
+        "pattern_history_days": 30
+      }
+    },
+    {
+      "id": "tolui",
+      "name": "Tolui",
+      "role": "frontend_specialist",
+      "description": "Frontend code and UI/UX review specialist",
+      "short_description": "Frontend and UI/UX specialist",
+      "capabilities": [
+        "frontend_review",
+        "accessibility_audit",
+        "ux_analysis",
+        "component_review",
+        "responsive_design",
+        "performance_optimization"
+      ],
+      "expertise_areas": [
+        "react",
+        "vue",
+        "angular",
+        "css",
+        "accessibility",
+        "ui_design",
+        "responsive_design"
+      ],
+      "status": "active",
+      "last_heartbeat": "2025-01-01T12:00:00.000Z",
+      "tasks_completed": 78,
+      "tasks_failed": 4,
+      "tasks_in_progress": 2,
+      "average_response_time_ms": 1500,
+      "max_concurrent_tasks": 5,
+      "priority": 2,
+      "is_orchestrator": false,
+      "can_delegate_to": [],
+      "fallback_for": [],
+      "fallback_agent": "kublai",
+      "routing_preferences": {},
+      "config": {
+        "heartbeat_interval_seconds": 60,
+        "stale_threshold_seconds": 180,
+        "review_timeout_seconds": 240,
+        "accessibility_check_enabled": true,
+        "responsive_check_enabled": true,
+        "supported_frameworks": ["react", "vue", "angular", "svelte", "vanilla"]
+      },
+      "memory_settings": {
+        "personal_memory_access": false,
+        "operational_memory_access": true,
+        "component_library_cache_enabled": true
+      }
+    }
+  ],
+  "agent_states": {
+    "all_active": {
+      "kublai": "active",
+      "jochi": "active",
+      "temüjin": "active",
+      "ögedei": "active",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "one_stale": {
+      "kublai": "active",
+      "jochi": "active",
+      "temüjin": "stale",
+      "ögedei": "active",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "one_unavailable": {
+      "kublai": "active",
+      "jochi": "active",
+      "temüjin": "unavailable",
+      "ögedei": "active",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "failover_active": {
+      "kublai": "unavailable",
+      "jochi": "active",
+      "temüjin": "active",
+      "ögedei": "emergency_router",
+      "chagatai": "active",
+      "tolui": "active"
+    },
+    "degraded": {
+      "kublai": "active",
+      "jochi": "stale",
+      "temüjin": "unavailable",
+      "ögedei": "active",
+      "chagatai": "stale",
+      "tolui": "active"
+    },
+    "maintenance_mode": {
+      "kublai": "maintenance",
+      "jochi": "active",
+      "temüjin": "active",
+      "ögedei": "emergency_router",
+      "chagatai": "active",
+      "tolui": "active"
+    }
+  },
+  "agent_routing": {
+    "by_task_type": {
+      "code": ["jochi", "tolui"],
+      "security": ["temüjin"],
+      "backend": ["jochi"],
+      "frontend": ["tolui"],
+      "analysis": ["jochi", "temüjin"],
+      "synthesis": ["chagatai"],
+      "improvement": ["ögedei", "chagatai"],
+      "file_consistency": ["ögedei"],
+      "delegation": ["kublai"],
+      "research": ["jochi", "chagatai"],
+      "writing": ["chagatai"],
+      "ops": ["ögedei"],
+      "emergency": ["ögedei"]
+    },
+    "by_keyword": {
+      "research": ["jochi", "chagatai"],
+      "investigate": ["jochi", "chagatai"],
+      "find": ["jochi", "chagatai"],
+      "search": ["jochi", "chagatai"],
+      "discover": ["jochi", "chagatai"],
+      "explore": ["jochi", "chagatai"],
+      "writing": ["chagatai"],
+      "write": ["chagatai"],
+      "draft": ["chagatai"],
+      "document": ["chagatai"],
+      "content": ["chagatai"],
+      "compose": ["chagatai"],
+      "edit": ["chagatai"],
+      "code": ["jochi", "tolui"],
+      "coding": ["jochi", "tolui"],
+      "develop": ["jochi", "tolui"],
+      "implement": ["jochi", "tolui"],
+      "programming": ["jochi", "tolui"],
+      "build": ["jochi", "tolui"],
+      "fix": ["jochi", "tolui"],
+      "bug": ["jochi", "tolui"],
+      "debug": ["jochi", "tolui"],
+      "refactor": ["jochi", "tolui", "ögedei"],
+      "security": ["temüjin"],
+      "audit": ["temüjin", "tolui"],
+      "vulnerability": ["temüjin"],
+      "penetration": ["temüjin"],
+      "owasp": ["temüjin"],
+      "compliance": ["temüjin"],
+      "analysis": ["jochi", "temüjin"],
+      "analyze": ["jochi", "temüjin"],
+      "review": ["jochi", "temüjin", "tolui"],
+      "assess": ["jochi", "temüjin"],
+      "evaluate": ["jochi", "temüjin"],
+      "process": ["ögedei"],
+      "task": ["ögedei"],
+      "ops": ["ögedei"],
+      "deploy": ["ögedei"],
+      "release": ["ögedei"],
+      "emergency": ["ögedei"],
+      "failover": ["ögedei"],
+      "consistency": ["ögedei"],
+      "synthesis": ["chagatai"],
+      "synthesize": ["chagatai"],
+      "pattern": ["chagatai"],
+      "learn": ["chagatai"],
+      "improve": ["chagatai", "ögedei"],
+      "optimize": ["chagatai", "jochi"],
+      "frontend": ["tolui"],
+      "ui": ["tolui"],
+      "ux": ["tolui"],
+      "component": ["tolui"],
+      "accessibility": ["tolui"],
+      "responsive": ["tolui"],
+      "css": ["tolui"],
+      "html": ["tolui"],
+      "react": ["tolui"],
+      "vue": ["tolui"],
+      "angular": ["tolui"]
+    }
+  },
+  "task_type_mapping": {
+    "research": {
+      "primary_agents": ["jochi", "chagatai"],
+      "estimated_duration_minutes": [30, 120],
+      "complexity_levels": ["low", "medium", "high"]
+    },
+    "writing": {
+      "primary_agents": ["chagatai"],
+      "estimated_duration_minutes": [15, 60],
+      "complexity_levels": ["low", "medium", "high"]
+    },
+    "code": {
+      "primary_agents": ["jochi", "tolui"],
+      "estimated_duration_minutes": [15, 300],
+      "complexity_levels": ["low", "medium", "high"]
+    },
+    "security": {
+      "primary_agents": ["temüjin"],
+      "estimated_duration_minutes": [30, 180],
+      "complexity_levels": ["medium", "high", "critical"]
+    },
+    "analysis": {
+      "primary_agents": ["jochi", "temüjin"],
+      "estimated_duration_minutes": [20, 120],
+      "complexity_levels": ["low", "medium", "high"]
+    },
+    "synthesis": {
+      "primary_agents": ["chagatai"],
+      "estimated_duration_minutes": [60, 300],
+      "complexity_levels": ["medium", "high"]
+    },
+    "improvement": {
+      "primary_agents": ["ögedei", "chagatai"],
+      "estimated_duration_minutes": [30, 180],
+      "complexity_levels": ["low", "medium", "high"]
+    },
+    "file_consistency": {
+      "primary_agents": ["ögedei"],
+      "estimated_duration_minutes": [10, 60],
+      "complexity_levels": ["low", "medium"]
+    },
+    "ops": {
+      "primary_agents": ["ögedei"],
+      "estimated_duration_minutes": [5, 30],
+      "complexity_levels": ["low", "medium"]
+    }
+  }
+}

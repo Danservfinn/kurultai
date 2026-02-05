@@ -1,0 +1,623 @@
+{
+  "_meta": {
+    "description": "Neo4j test data fixtures for Kublai Testing Suite",
+    "version": "1.0.0",
+    "last_updated": "2025-01-01"
+  },
+  "nodes": {
+    "task_pending": {
+      "id": "node-task-pending-001",
+      "labels": ["Task", "Pending"],
+      "properties": {
+        "task_id": "550e8400-e29b-41d4-a716-446655440001",
+        "task_type": "research",
+        "description": "Investigate OAuth 2.0 implementation options",
+        "status": "pending",
+        "priority": "normal",
+        "assigned_to": "jochi",
+        "delegated_by": "kublai",
+        "created_at": "2025-01-01T12:00:00.000Z",
+        "updated_at": "2025-01-01T12:00:00.000Z",
+        "metadata": {
+          "complexity": "medium",
+          "estimated_hours": 4,
+          "tags": ["auth", "oauth", "research"]
+        }
+      }
+    },
+    "task_in_progress": {
+      "id": "node-task-inprogress-001",
+      "labels": ["Task", "InProgress"],
+      "properties": {
+        "task_id": "550e8400-e29b-41d4-a716-446655440002",
+        "task_type": "code",
+        "description": "Implement JWT token validation middleware",
+        "status": "in_progress",
+        "priority": "high",
+        "assigned_to": "jochi",
+        "delegated_by": "kublai",
+        "claimed_at": "2025-01-01T12:15:00.000Z",
+        "created_at": "2025-01-01T12:05:00.000Z",
+        "updated_at": "2025-01-01T12:15:00.000Z",
+        "metadata": {
+          "complexity": "high",
+          "estimated_hours": 6,
+          "tags": ["auth", "jwt", "middleware"]
+        }
+      }
+    },
+    "task_completed": {
+      "id": "node-task-completed-001",
+      "labels": ["Task", "Completed"],
+      "properties": {
+        "task_id": "550e8400-e29b-41d4-a716-446655440003",
+        "task_type": "code",
+        "description": "Set up project structure for auth module",
+        "status": "completed",
+        "priority": "high",
+        "assigned_to": "jochi",
+        "delegated_by": "kublai",
+        "result": "Created auth module with __init__.py, models.py, and handlers.py",
+        "completed_at": "2025-01-01T13:00:00.000Z",
+        "created_at": "2025-01-01T11:00:00.000Z",
+        "updated_at": "2025-01-01T13:00:00.000Z",
+        "metadata": {
+          "complexity": "low",
+          "estimated_hours": 1,
+          "actual_hours": 0.5,
+          "tags": ["auth", "setup"]
+        }
+      }
+    },
+    "task_failed": {
+      "id": "node-task-failed-001",
+      "labels": ["Task", "Failed"],
+      "properties": {
+        "task_id": "550e8400-e29b-41d4-a716-446655440004",
+        "task_type": "code",
+        "description": "Integrate with external OAuth provider",
+        "status": "failed",
+        "priority": "normal",
+        "assigned_to": "jochi",
+        "delegated_by": "kublai",
+        "error_message": "API rate limit exceeded after 100 requests",
+        "failed_at": "2025-01-01T14:00:00.000Z",
+        "retry_count": 2,
+        "created_at": "2025-01-01T12:30:00.000Z",
+        "updated_at": "2025-01-01T14:00:00.000Z",
+        "metadata": {
+          "complexity": "high",
+          "estimated_hours": 4,
+          "tags": ["auth", "oauth", "integration"]
+        }
+      }
+    },
+    "task_blocked": {
+      "id": "node-task-blocked-001",
+      "labels": ["Task", "Blocked"],
+      "properties": {
+        "task_id": "550e8400-e29b-41d4-a716-446655440005",
+        "task_type": "code",
+        "description": "Implement refresh token rotation",
+        "status": "blocked",
+        "priority": "high",
+        "assigned_to": "jochi",
+        "delegated_by": "kublai",
+        "blocked_by": ["550e8400-e29b-41d4-a716-446655440002"],
+        "created_at": "2025-01-01T12:20:00.000Z",
+        "updated_at": "2025-01-01T12:20:00.000Z",
+        "metadata": {
+          "complexity": "medium",
+          "estimated_hours": 3,
+          "tags": ["auth", "refresh-token"]
+        }
+      }
+    },
+    "agent_kublai": {
+      "id": "node-agent-kublai",
+      "labels": ["Agent", "Orchestrator"],
+      "properties": {
+        "id": "kublai",
+        "name": "Kublai Khan",
+        "role": "orchestrator",
+        "status": "active",
+        "last_heartbeat": "2025-01-01T12:00:00.000Z",
+        "capabilities": ["delegation", "coordination", "synthesis", "monitoring"],
+        "tasks_completed": 156,
+        "tasks_failed": 3,
+        "average_response_time_ms": 250,
+        "max_concurrent_tasks": 10,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "agent_jochi": {
+      "id": "node-agent-jochi",
+      "labels": ["Agent", "BackendAnalyst"],
+      "properties": {
+        "id": "jochi",
+        "name": "Jochi",
+        "role": "backend_analyst",
+        "status": "active",
+        "last_heartbeat": "2025-01-01T12:00:30.000Z",
+        "capabilities": ["code_analysis", "backend_review", "api_analysis", "database_review"],
+        "tasks_completed": 89,
+        "tasks_failed": 5,
+        "average_response_time_ms": 1800,
+        "max_concurrent_tasks": 5,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "agent_temujin": {
+      "id": "node-agent-temujin",
+      "labels": ["Agent", "SecurityAuditor"],
+      "properties": {
+        "id": "temüjin",
+        "name": "Temüjin",
+        "role": "security_auditor",
+        "status": "active",
+        "last_heartbeat": "2025-01-01T11:58:00.000Z",
+        "capabilities": ["security_audit", "vulnerability_scan", "owasp_analysis", "penetration_testing"],
+        "tasks_completed": 67,
+        "tasks_failed": 1,
+        "average_response_time_ms": 2200,
+        "max_concurrent_tasks": 3,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "agent_ogedei": {
+      "id": "node-agent-ogedei",
+      "labels": ["Agent", "FileConsistencyManager"],
+      "properties": {
+        "id": "ögedei",
+        "name": "Ögedei",
+        "role": "file_consistency_manager",
+        "status": "active",
+        "last_heartbeat": "2025-01-01T12:00:15.000Z",
+        "capabilities": ["file_consistency", "emergency_routing", "improvement_detection", "refactoring"],
+        "tasks_completed": 45,
+        "tasks_failed": 2,
+        "average_response_time_ms": 1200,
+        "max_concurrent_tasks": 4,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "agent_chagatai": {
+      "id": "node-agent-chagatai",
+      "labels": ["Agent", "BackgroundSynthesizer"],
+      "properties": {
+        "id": "chagatai",
+        "name": "Chagatai",
+        "role": "background_synthesizer",
+        "status": "active",
+        "last_heartbeat": "2025-01-01T11:59:45.000Z",
+        "capabilities": ["background_synthesis", "meta_learning", "pattern_recognition", "knowledge_extraction"],
+        "tasks_completed": 234,
+        "tasks_failed": 8,
+        "average_response_time_ms": 3500,
+        "max_concurrent_tasks": 8,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "agent_tolui": {
+      "id": "node-agent-tolui",
+      "labels": ["Agent", "FrontendSpecialist"],
+      "properties": {
+        "id": "tolui",
+        "name": "Tolui",
+        "role": "frontend_specialist",
+        "status": "active",
+        "last_heartbeat": "2025-01-01T12:00:00.000Z",
+        "capabilities": ["frontend_review", "accessibility_audit", "ux_analysis", "component_review"],
+        "tasks_completed": 78,
+        "tasks_failed": 4,
+        "average_response_time_ms": 1500,
+        "max_concurrent_tasks": 5,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "goal_auth": {
+      "id": "node-goal-auth",
+      "labels": ["Goal", "Active"],
+      "properties": {
+        "goal_id": "goal-auth-001",
+        "title": "Authentication Goal",
+        "description": "Implement secure authentication system",
+        "status": "active",
+        "priority": "critical",
+        "progress": 0.35,
+        "created_at": "2025-01-01T12:00:00.000Z",
+        "updated_at": "2025-01-01T12:00:00.000Z",
+        "metadata": {
+          "tags": ["auth", "security"],
+          "estimated_completion": "2025-01-15T00:00:00.000Z"
+        }
+      }
+    },
+    "goal_ui": {
+      "id": "node-goal-ui",
+      "labels": ["Goal", "Active"],
+      "properties": {
+        "goal_id": "goal-ui-001",
+        "title": "UI Enhancement Goal",
+        "description": "Improve user interface and experience",
+        "status": "active",
+        "priority": "high",
+        "progress": 0.20,
+        "created_at": "2025-01-01T12:00:00.000Z",
+        "updated_at": "2025-01-01T12:00:00.000Z",
+        "metadata": {
+          "tags": ["ui", "ux"],
+          "estimated_completion": "2025-01-20T00:00:00.000Z"
+        }
+      }
+    },
+    "notification_unread": {
+      "id": "node-notification-001",
+      "labels": ["Notification", "Unread"],
+      "properties": {
+        "notification_id": "550e8400-e29b-41d4-a716-446655440008",
+        "target_agent": "jochi",
+        "source_agent": "kublai",
+        "type": "task_delegated",
+        "message": "New task assigned: Implement OAuth flow",
+        "task_id": "550e8400-e29b-41d4-a716-446655440001",
+        "read": false,
+        "created_at": "2025-01-01T12:00:00.000Z"
+      }
+    },
+    "notification_read": {
+      "id": "node-notification-002",
+      "labels": ["Notification", "Read"],
+      "properties": {
+        "notification_id": "550e8400-e29b-41d4-a716-446655440009",
+        "target_agent": "kublai",
+        "source_agent": "jochi",
+        "type": "task_completed",
+        "message": "Task completed: JWT middleware implementation",
+        "task_id": "550e8400-e29b-41d4-a716-446655440002",
+        "read": true,
+        "read_at": "2025-01-01T13:05:00.000Z",
+        "created_at": "2025-01-01T13:00:00.000Z"
+      }
+    },
+    "rate_limit": {
+      "id": "node-ratelimit-001",
+      "labels": ["RateLimit"],
+      "properties": {
+        "agent": "jochi",
+        "operation": "claim_task",
+        "count": 10,
+        "hour": 12,
+        "date": "2025-01-01",
+        "max_limit": 100,
+        "window_start": "2025-01-01T12:00:00.000Z",
+        "window_end": "2025-01-01T13:00:00.000Z"
+      }
+    }
+  },
+  "relationships": {
+    "task_a_blocks_b": {
+      "id": "rel-001",
+      "type": "BLOCKS",
+      "start_node": "node-task-pending-001",
+      "end_node": "node-task-blocked-001",
+      "properties": {
+        "created_at": "2025-01-01T12:00:00.000Z",
+        "reason": "Task dependency"
+      }
+    },
+    "task_b_depends_on_a": {
+      "id": "rel-002",
+      "type": "DEPENDS_ON",
+      "start_node": "node-task-blocked-001",
+      "end_node": "node-task-pending-001",
+      "properties": {
+        "created_at": "2025-01-01T12:00:00.000Z"
+      }
+    },
+    "task_assigned_to_jochi": {
+      "id": "rel-003",
+      "type": "ASSIGNED_TO",
+      "start_node": "node-task-pending-001",
+      "end_node": "node-agent-jochi",
+      "properties": {
+        "assigned_at": "2025-01-01T12:00:00.000Z",
+        "delegated_by": "kublai"
+      }
+    },
+    "task_delegated_by_kublai": {
+      "id": "rel-004",
+      "type": "DELEGATED_BY",
+      "start_node": "node-task-pending-001",
+      "end_node": "node-agent-kublai",
+      "properties": {
+        "delegated_at": "2025-01-01T12:00:00.000Z"
+      }
+    },
+    "task_part_of_goal": {
+      "id": "rel-005",
+      "type": "PART_OF",
+      "start_node": "node-task-pending-001",
+      "end_node": "node-goal-auth",
+      "properties": {
+        "added_at": "2025-01-01T12:00:00.000Z"
+      }
+    },
+    "notification_notifies_jochi": {
+      "id": "rel-006",
+      "type": "NOTIFIES",
+      "start_node": "node-notification-001",
+      "end_node": "node-agent-jochi",
+      "properties": {
+        "created_at": "2025-01-01T12:00:00.000Z"
+      }
+    },
+    "notification_sent_by_kublai": {
+      "id": "rel-007",
+      "type": "SENT_BY",
+      "start_node": "node-notification-001",
+      "end_node": "node-agent-kublai",
+      "properties": {
+        "created_at": "2025-01-01T12:00:00.000Z"
+      }
+    },
+    "agent_can_fallback_to": {
+      "id": "rel-008",
+      "type": "CAN_FALLBACK_TO",
+      "start_node": "node-agent-kublai",
+      "end_node": "node-agent-ogedei",
+      "properties": {
+        "priority": 1,
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    },
+    "agent_reports_to": {
+      "id": "rel-009",
+      "type": "REPORTS_TO",
+      "start_node": "node-agent-jochi",
+      "end_node": "node-agent-kublai",
+      "properties": {
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    }
+  },
+  "query_results": {
+    "empty": {
+      "data": [],
+      "single": null,
+      "values": []
+    },
+    "single_task": {
+      "data": [
+        {
+          "t": {
+            "task_id": "550e8400-e29b-41d4-a716-446655440001",
+            "status": "pending",
+            "priority": "normal",
+            "created_at": "2025-01-01T12:00:00.000Z"
+          }
+        }
+      ],
+      "single": {
+        "t": {
+          "task_id": "550e8400-e29b-41d4-a716-446655440001",
+          "status": "pending",
+          "priority": "normal",
+          "created_at": "2025-01-01T12:00:00.000Z"
+        }
+      },
+      "values": [
+        [
+          {
+            "task_id": "550e8400-e29b-41d4-a716-446655440001",
+            "status": "pending",
+            "priority": "normal",
+            "created_at": "2025-01-01T12:00:00.000Z"
+          }
+        ]
+      ]
+    },
+    "multiple_tasks": {
+      "data": [
+        {
+          "t": {
+            "task_id": "550e8400-e29b-41d4-a716-446655440001",
+            "status": "pending"
+          }
+        },
+        {
+          "t": {
+            "task_id": "550e8400-e29b-41d4-a716-446655440002",
+            "status": "in_progress"
+          }
+        },
+        {
+          "t": {
+            "task_id": "550e8400-e29b-41d4-a716-446655440003",
+            "status": "completed"
+          }
+        }
+      ],
+      "single": {
+        "t": {
+          "task_id": "550e8400-e29b-41d4-a716-446655440001",
+          "status": "pending"
+        }
+      },
+      "values": [
+        [{"task_id": "550e8400-e29b-41d4-a716-446655440001", "status": "pending"}],
+        [{"task_id": "550e8400-e29b-41d4-a716-446655440002", "status": "in_progress"}],
+        [{"task_id": "550e8400-e29b-41d4-a716-446655440003", "status": "completed"}]
+      ]
+    },
+    "task_with_dependencies": {
+      "data": [
+        {
+          "t": {
+            "task_id": "550e8400-e29b-41d4-a716-446655440002",
+            "status": "in_progress"
+          },
+          "dependencies": [
+            {"task_id": "550e8400-e29b-41d4-a716-446655440001", "status": "completed"}
+          ],
+          "dependents": [
+            {"task_id": "550e8400-e29b-41d4-a716-446655440003", "status": "pending"}
+          ]
+        }
+      ],
+      "single": {
+        "t": {
+          "task_id": "550e8400-e29b-41d4-a716-446655440002",
+          "status": "in_progress"
+        },
+        "dependencies": [
+          {"task_id": "550e8400-e29b-41d4-a716-446655440001", "status": "completed"}
+        ],
+        "dependents": [
+          {"task_id": "550e8400-e29b-41d4-a716-446655440003", "status": "pending"}
+        ]
+      },
+      "values": [
+        [
+          {
+            "task_id": "550e8400-e29b-41d4-a716-446655440002",
+            "status": "in_progress"
+          }
+        ]
+      ]
+    },
+    "agent_heartbeat": {
+      "data": [
+        {
+          "a": {
+            "id": "kublai",
+            "status": "active",
+            "last_heartbeat": "2025-01-01T12:00:00.000Z"
+          },
+          "last_seen": "2025-01-01T12:00:00.000Z"
+        }
+      ],
+      "single": {
+        "a": {
+          "id": "kublai",
+          "status": "active",
+          "last_heartbeat": "2025-01-01T12:00:00.000Z"
+        },
+        "last_seen": "2025-01-01T12:00:00.000Z"
+      },
+      "values": [
+        [
+          {
+            "id": "kublai",
+            "status": "active",
+            "last_heartbeat": "2025-01-01T12:00:00.000Z"
+          },
+          "2025-01-01T12:00:00.000Z"
+        ]
+      ]
+    },
+    "all_agents_status": {
+      "data": [
+        {"a": {"id": "kublai", "status": "active", "last_heartbeat": "2025-01-01T12:00:00.000Z"}},
+        {"a": {"id": "jochi", "status": "active", "last_heartbeat": "2025-01-01T12:00:30.000Z"}},
+        {"a": {"id": "temüjin", "status": "stale", "last_heartbeat": "2025-01-01T11:58:00.000Z"}},
+        {"a": {"id": "ögedei", "status": "active", "last_heartbeat": "2025-01-01T12:00:15.000Z"}},
+        {"a": {"id": "chagatai", "status": "active", "last_heartbeat": "2025-01-01T11:59:45.000Z"}},
+        {"a": {"id": "tolui", "status": "active", "last_heartbeat": "2025-01-01T12:00:00.000Z"}}
+      ],
+      "single": {"a": {"id": "kublai", "status": "active", "last_heartbeat": "2025-01-01T12:00:00.000Z"}},
+      "values": [
+        [{"id": "kublai", "status": "active", "last_heartbeat": "2025-01-01T12:00:00.000Z"}],
+        [{"id": "jochi", "status": "active", "last_heartbeat": "2025-01-01T12:00:30.000Z"}],
+        [{"id": "temüjin", "status": "stale", "last_heartbeat": "2025-01-01T11:58:00.000Z"}],
+        [{"id": "ögedei", "status": "active", "last_heartbeat": "2025-01-01T12:00:15.000Z"}],
+        [{"id": "chagatai", "status": "active", "last_heartbeat": "2025-01-01T11:59:45.000Z"}],
+        [{"id": "tolui", "status": "active", "last_heartbeat": "2025-01-01T12:00:00.000Z"}]
+      ]
+    },
+    "count": {
+      "data": [{"count": 42}],
+      "single": {"count": 42},
+      "values": [[42]]
+    },
+    "notification": {
+      "data": [
+        {
+          "n": {
+            "notification_id": "550e8400-e29b-41d4-a716-446655440008",
+            "target_agent": "jochi",
+            "type": "task_delegated",
+            "read": false
+          }
+        }
+      ],
+      "single": {
+        "n": {
+          "notification_id": "550e8400-e29b-41d4-a716-446655440008",
+          "target_agent": "jochi",
+          "type": "task_delegated",
+          "read": false
+        }
+      },
+      "values": [
+        [
+          {
+            "notification_id": "550e8400-e29b-41d4-a716-446655440008",
+            "target_agent": "jochi",
+            "type": "task_delegated",
+            "read": false
+          }
+        ]
+      ]
+    },
+    "tasks_by_agent": {
+      "data": [
+        {
+          "t": {
+            "task_id": "550e8400-e29b-41d4-a716-446655440001",
+            "status": "pending"
+          },
+          "a": {
+            "id": "jochi",
+            "role": "backend_analyst"
+          }
+        }
+      ],
+      "single": {
+        "t": {
+          "task_id": "550e8400-e29b-41d4-a716-446655440001",
+          "status": "pending"
+        },
+        "a": {
+          "id": "jochi",
+          "role": "backend_analyst"
+        }
+      },
+      "values": [
+        [
+          {"task_id": "550e8400-e29b-41d4-a716-446655440001", "status": "pending"},
+          {"id": "jochi", "role": "backend_analyst"}
+        ]
+      ]
+    }
+  },
+  "cypher_queries": {
+    "create_task": "CREATE (t:Task {task_id: $task_id, task_type: $task_type, description: $description, status: $status, priority: $priority, assigned_to: $assigned_to, delegated_by: $delegated_by, created_at: $created_at}) RETURN t",
+    "get_task_by_id": "MATCH (t:Task {task_id: $task_id}) RETURN t",
+    "get_tasks_by_status": "MATCH (t:Task {status: $status}) RETURN t ORDER BY t.created_at DESC",
+    "get_tasks_by_agent": "MATCH (t:Task {assigned_to: $agent_id}) RETURN t ORDER BY t.created_at DESC",
+    "update_task_status": "MATCH (t:Task {task_id: $task_id}) SET t.status = $status, t.updated_at = $updated_at RETURN t",
+    "create_dependency": "MATCH (t1:Task {task_id: $task_id_1}), (t2:Task {task_id: $task_id_2}) CREATE (t1)-[:BLOCKS]->(t2), (t2)-[:DEPENDS_ON]->(t1)",
+    "get_dependencies": "MATCH (t:Task {task_id: $task_id})-[:DEPENDS_ON]->(dep:Task) RETURN dep",
+    "get_dependents": "MATCH (t:Task {task_id: $task_id})<-[:DEPENDS_ON]-(dep:Task) RETURN dep",
+    "create_agent": "CREATE (a:Agent {id: $id, role: $role, status: $status, last_heartbeat: $last_heartbeat, capabilities: $capabilities}) RETURN a",
+    "get_agent_by_id": "MATCH (a:Agent {id: $agent_id}) RETURN a",
+    "update_agent_heartbeat": "MATCH (a:Agent {id: $agent_id}) SET a.last_heartbeat = $timestamp, a.status = $status RETURN a",
+    "get_all_agents": "MATCH (a:Agent) RETURN a ORDER BY a.id",
+    "create_notification": "CREATE (n:Notification {notification_id: $notification_id, target_agent: $target_agent, source_agent: $source_agent, type: $type, message: $message, task_id: $task_id, read: $read, created_at: $created_at}) RETURN n",
+    "get_notifications_for_agent": "MATCH (n:Notification {target_agent: $agent_id}) RETURN n ORDER BY n.created_at DESC",
+    "mark_notification_read": "MATCH (n:Notification {notification_id: $notification_id}) SET n.read = true, n.read_at = $read_at RETURN n",
+    "create_goal": "CREATE (g:Goal {goal_id: $goal_id, title: $title, description: $description, status: $status, priority: $priority, created_at: $created_at}) RETURN g",
+    "link_task_to_goal": "MATCH (t:Task {task_id: $task_id}), (g:Goal {goal_id: $goal_id}) CREATE (t)-[:PART_OF]->(g)"
+  }
+}
