@@ -114,19 +114,22 @@ class DelegationProtocol:
         "main": "Kublai",
     }
 
-    def __init__(self, memory: OperationalMemory, gateway_url: str, gateway_token: str):
+    def __init__(self, memory: OperationalMemory, gateway_url: str, gateway_token: str,
+                 classifier=None):
         """Initialize with operational memory and gateway config.
 
         Args:
             memory: OperationalMemory instance for Neo4j operations
             gateway_url: OpenClaw gateway URL (must start with http:// or https://)
             gateway_token: Bearer token for gateway authentication
+            classifier: Optional TeamSizeClassifier for complexity scoring
 
         Raises:
             ValueError: If gateway_url is invalid
         """
         self.memory = memory
         self.gateway_token = gateway_token
+        self.classifier = classifier
 
         # Validate and store gateway URL
         if not gateway_url.startswith(('http://', 'https://')):
@@ -134,6 +137,26 @@ class DelegationProtocol:
         self.gateway_url = gateway_url.rstrip('/')
 
         logger.info(f"DelegationProtocol initialized with gateway: {self.gateway_url}")
+
+    def classify_task_complexity(self, description: str):
+        """Classify task complexity using the configured classifier.
+
+        Args:
+            description: Task description (should be sanitized first)
+
+        Returns:
+            Dict with complexity_score and team_size, or None if no classifier
+        """
+        if self.classifier is None:
+            return None
+        try:
+            result = self.classifier.classify(description)
+            score = result.get("complexity", 0.0) if isinstance(result, dict) else 0.0
+            team_size = result.get("team_size", "individual") if isinstance(result, dict) else "individual"
+            return {"complexity_score": score, "team_size": team_size}
+        except Exception as e:
+            logger.warning(f"Classifier failed: {e}")
+            return None
 
     def sanitize_for_privacy(self, content: str) -> str:
         """Sanitize content to remove PII before delegation.
@@ -282,10 +305,15 @@ class DelegationProtocol:
         # Step 1: Sanitize for privacy
         sanitized_description = self.sanitize_for_privacy(description)
 
-        # Step 2: Determine target agent
+        # Step 2: Classify complexity (uses sanitized description)
+        complexity_result = self.classify_task_complexity(sanitized_description)
+        complexity_score = complexity_result["complexity_score"] if complexity_result else None
+        team_size = complexity_result["team_size"] if complexity_result else None
+
+        # Step 3: Determine target agent
         target_agent = self.determine_agent(description, task_type)
 
-        # Step 3: Create Task node in Neo4j
+        # Step 4: Create Task node in Neo4j
         task_id = str(uuid.uuid4())
         timestamp = datetime.utcnow().isoformat() + "Z"
 
@@ -299,6 +327,8 @@ class DelegationProtocol:
             task_type: $task_type,
             target_agent: $target_agent,
             priority: $priority,
+            complexity_score: $complexity_score,
+            team_size: $team_size,
             created_at: datetime($timestamp),
             updated_at: datetime($timestamp),
             delegated_by: 'main'
@@ -314,6 +344,8 @@ class DelegationProtocol:
             "task_type": task_type or "unknown",
             "target_agent": target_agent,
             "priority": priority,
+            "complexity_score": complexity_score,
+            "team_size": team_size,
             "timestamp": timestamp,
         }
 

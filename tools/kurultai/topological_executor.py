@@ -8,10 +8,14 @@ Date: 2026-02-04
 """
 
 import asyncio
+import logging
 from collections import defaultdict
 from typing import Dict, List, Optional
 
+from .complexity_config import ComplexityConfig, DEFAULT_CONFIG, complexity_to_team_size
 from .types import Task, ExecutionSummary, MAX_TASKS_PER_AGENT, DeliverableType
+
+logger = logging.getLogger(__name__)
 
 
 class TopologicalExecutor:
@@ -40,8 +44,10 @@ class TopologicalExecutor:
         DeliverableType.DOCS: ("writer", "Chagatai"),
     }
 
-    def __init__(self, neo4j_client=None):
+    def __init__(self, neo4j_client=None, classifier=None, config=None):
         self.neo4j = neo4j_client
+        self.classifier = classifier
+        self.config = config or DEFAULT_CONFIG
 
     async def get_ready_tasks(
         self,
@@ -63,6 +69,37 @@ class TopologicalExecutor:
 
         # Fallback: return empty list
         return []
+
+    def _determine_team_configuration(self, task: Task) -> Dict:
+        """Determine team configuration based on complexity classification.
+
+        Args:
+            task: Task to classify
+
+        Returns:
+            Dict with 'mode' and 'agents' keys
+        """
+        if self.classifier is None:
+            return {"mode": "individual", "agents": self.config.individual_agents}
+
+        try:
+            result = self.classifier.classify(task.get("description", ""))
+            score = result.get("complexity", 0.0) if isinstance(result, dict) else 0.0
+            team_size = complexity_to_team_size(score, self.config)
+
+            agent_counts = {
+                "individual": self.config.individual_agents,
+                "small_team": self.config.small_team_agents,
+                "full_team": self.config.full_team_agents,
+            }
+
+            return {
+                "mode": team_size,
+                "agents": agent_counts.get(team_size, self.config.individual_agents),
+            }
+        except Exception as e:
+            logger.warning(f"Classifier failed for task {task.get('id', '?')}: {e}")
+            return {"mode": "individual", "agents": self.config.individual_agents}
 
     async def execute_ready_set(
         self,
@@ -87,6 +124,8 @@ class TopologicalExecutor:
         # Group by required agent type
         by_agent = defaultdict(list)
         for task in ready[:max_execution_limit]:
+            # Store team configuration in task metadata
+            task["_team_config"] = self._determine_team_configuration(task)
             agent = self._select_best_agent(task)
             by_agent[agent].append(task)
 

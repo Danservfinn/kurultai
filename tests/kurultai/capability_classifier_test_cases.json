@@ -1,0 +1,477 @@
+{
+  "test_cases": [
+    {
+      "id": "TC001",
+      "request": "Send a Slack message to a channel",
+      "expected_complexity": 0.35,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "Single well-documented API, no PII, standalone functionality"
+    },
+    {
+      "id": "TC002",
+      "request": "Read a CSV file and print contents",
+      "expected_complexity": 0.25,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 0,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "No external APIs, local file processing only, no network dependencies"
+    },
+    {
+      "id": "TC003",
+      "request": "Send a simple email via SMTP",
+      "expected_complexity": 0.40,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "Standard SMTP protocol, well-documented, single integration point"
+    },
+    {
+      "id": "TC004",
+      "request": "Make a GET request to a public REST API",
+      "expected_complexity": 0.30,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "Simple HTTP GET, no authentication complexity, read-only operation"
+    },
+    {
+      "id": "TC005",
+      "request": "Log a message to a local file",
+      "expected_complexity": 0.20,
+      "category": "INFRASTRUCTURE",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 0,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "Local filesystem operation only, no external dependencies"
+    },
+    {
+      "id": "TC006",
+      "request": "Send an SMS via Twilio",
+      "expected_complexity": 0.45,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Single API but requires phone number handling, moderate documentation"
+    },
+    {
+      "id": "TC007",
+      "request": "Parse JSON from a string",
+      "expected_complexity": 0.15,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 0,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "Native language functionality, no external dependencies, minimal risk"
+    },
+    {
+      "id": "TC008",
+      "request": "Post a tweet to Twitter/X",
+      "expected_complexity": 0.50,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "OAuth authentication required, well-documented but auth complexity"
+    },
+    {
+      "id": "TC009",
+      "request": "Write data to a local SQLite database",
+      "expected_complexity": 0.40,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "LOW",
+        "api_count": 0,
+        "integration_points": 1,
+        "security_sensitivity": "LOW"
+      },
+      "rationale": "Local database only, no network, standard SQL operations"
+    },
+    {
+      "id": "TC010",
+      "request": "Make a phone call via Twilio",
+      "expected_complexity": 0.55,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Voice call complexity higher than SMS, webhook handling for status"
+    },
+    {
+      "id": "TC011",
+      "request": "Sync Notion pages to GitHub issues",
+      "expected_complexity": 0.72,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 2,
+        "integration_points": 2,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Two API integrations with bidirectional sync, mapping logic required"
+    },
+    {
+      "id": "TC012",
+      "request": "Send email with attachments and HTML formatting",
+      "expected_complexity": 0.65,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 2,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "MIME encoding complexity, file handling, HTML sanitization considerations"
+    },
+    {
+      "id": "TC013",
+      "request": "Extract data from a PDF and save to CSV",
+      "expected_complexity": 0.68,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 0,
+        "integration_points": 2,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "PDF parsing library dependency, format conversion, data extraction logic"
+    },
+    {
+      "id": "TC014",
+      "request": "Create a scheduled webhook that calls an API daily",
+      "expected_complexity": 0.70,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 2,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Cron scheduling plus webhook handling, retry logic, error handling"
+    },
+    {
+      "id": "TC015",
+      "request": "Sync data between PostgreSQL and MongoDB",
+      "expected_complexity": 0.75,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 0,
+        "integration_points": 2,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Dual database connections, schema mapping, conflict resolution"
+    },
+    {
+      "id": "TC016",
+      "request": "Build a Slack bot that responds to commands",
+      "expected_complexity": 0.78,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 3,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Webhook server, command parsing, response handling, state management"
+    },
+    {
+      "id": "TC017",
+      "request": "Create a workflow that processes form submissions and sends notifications",
+      "expected_complexity": 0.74,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 2,
+        "integration_points": 3,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Form handling, validation, notification integration, error recovery"
+    },
+    {
+      "id": "TC018",
+      "request": "Implement OAuth2 flow for Google API access",
+      "expected_complexity": 0.76,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 2,
+        "security_sensitivity": "HIGH"
+      },
+      "rationale": "Token management, refresh logic, secure storage, PKCE handling"
+    },
+    {
+      "id": "TC019",
+      "request": "Set up automated database backups to S3",
+      "expected_complexity": 0.73,
+      "category": "INFRASTRUCTURE",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 2,
+        "security_sensitivity": "HIGH"
+      },
+      "rationale": "Database export, cloud storage, encryption, retention policies"
+    },
+    {
+      "id": "TC020",
+      "request": "Create a webhook integration between Jira and GitHub",
+      "expected_complexity": 0.77,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 2,
+        "integration_points": 3,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "Bidirectional webhook handling, issue mapping, state synchronization"
+    },
+    {
+      "id": "TC021",
+      "request": "Implement Stripe payment processing with webhooks for confirmation",
+      "expected_complexity": 0.92,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 1,
+        "integration_points": 4,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Financial transactions, PCI compliance, webhook security, idempotency, fraud handling"
+    },
+    {
+      "id": "TC022",
+      "request": "Build real-time ML inference pipeline with model versioning",
+      "expected_complexity": 0.95,
+      "category": "INTELLIGENCE",
+      "factors": {
+        "domain_risk": "HIGH",
+        "api_count": 2,
+        "integration_points": 5,
+        "security_sensitivity": "HIGH"
+      },
+      "rationale": "Model serving, A/B testing, feature store, monitoring, rollback capability"
+    },
+    {
+      "id": "TC023",
+      "request": "Create multi-factor authentication system with SMS and TOTP",
+      "expected_complexity": 0.88,
+      "category": "INFRASTRUCTURE",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 2,
+        "integration_points": 4,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Security-critical, multiple auth factors, session management, recovery flows"
+    },
+    {
+      "id": "TC024",
+      "request": "Implement end-to-end encrypted messaging with key rotation",
+      "expected_complexity": 0.93,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 1,
+        "integration_points": 4,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Cryptographic operations, key management, forward secrecy, compliance"
+    },
+    {
+      "id": "TC025",
+      "request": "Build distributed transaction system across microservices",
+      "expected_complexity": 0.96,
+      "category": "INFRASTRUCTURE",
+      "factors": {
+        "domain_risk": "HIGH",
+        "api_count": 3,
+        "integration_points": 5,
+        "security_sensitivity": "HIGH"
+      },
+      "rationale": "Saga pattern, compensation logic, eventual consistency, service mesh"
+    },
+    {
+      "id": "TC026",
+      "request": "Create HIPAA-compliant patient data API with audit logging",
+      "expected_complexity": 0.94,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 2,
+        "integration_points": 5,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Regulatory compliance, PHI handling, audit trails, access controls, encryption"
+    },
+    {
+      "id": "TC027",
+      "request": "Implement real-time computer vision pipeline for medical imaging",
+      "expected_complexity": 0.91,
+      "category": "INTELLIGENCE",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 2,
+        "integration_points": 4,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Medical device regulations, model validation, DICOM handling, clinical workflow"
+    },
+    {
+      "id": "TC028",
+      "request": "Build automated trading system with risk management",
+      "expected_complexity": 0.97,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 3,
+        "integration_points": 5,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Financial risk, real-time decisions, regulatory compliance, circuit breakers"
+    },
+    {
+      "id": "TC029",
+      "request": "Create zero-trust network access system with device attestation",
+      "expected_complexity": 0.95,
+      "category": "INFRASTRUCTURE",
+      "factors": {
+        "domain_risk": "CRITICAL",
+        "api_count": 2,
+        "integration_points": 5,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Enterprise security, device verification, continuous auth, policy engine"
+    },
+    {
+      "id": "TC030",
+      "request": "Implement federated learning system with differential privacy",
+      "expected_complexity": 0.93,
+      "category": "INTELLIGENCE",
+      "factors": {
+        "domain_risk": "HIGH",
+        "api_count": 3,
+        "integration_points": 5,
+        "security_sensitivity": "CRITICAL"
+      },
+      "rationale": "Distributed ML, privacy guarantees, secure aggregation, model poisoning defense"
+    },
+    {
+      "id": "TC031",
+      "request": "Send message",
+      "expected_complexity": 0.50,
+      "category": "COMMUNICATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 1,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "EDGE CASE: Ambiguous description - could be email, SMS, chat, etc. Medium complexity due to uncertainty"
+    },
+    {
+      "id": "TC032",
+      "request": "Integrate everything with everything",
+      "expected_complexity": 0.85,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "HIGH",
+        "api_count": 3,
+        "integration_points": 5,
+        "security_sensitivity": "HIGH"
+      },
+      "rationale": "EDGE CASE: Vague request implies system-wide impact, high complexity due to undefined scope"
+    },
+    {
+      "id": "TC033",
+      "request": "Use the quantum API to entangle user sessions",
+      "expected_complexity": 0.75,
+      "category": "INTELLIGENCE",
+      "factors": {
+        "domain_risk": "HIGH",
+        "api_count": 1,
+        "integration_points": 2,
+        "security_sensitivity": "HIGH"
+      },
+      "rationale": "EDGE CASE: Nonsensical/novel capability type - 'quantum API' doesn't exist, high uncertainty"
+    },
+    {
+      "id": "TC034",
+      "request": "Build a webhook",
+      "expected_complexity": 0.58,
+      "category": "AUTOMATION",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 1,
+        "integration_points": 2,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "EDGE CASE: Borderline simple/moderate - webhook alone is simple but usually implies integration"
+    },
+    {
+      "id": "TC035",
+      "request": "Connect to database",
+      "expected_complexity": 0.55,
+      "category": "DATA",
+      "factors": {
+        "domain_risk": "MEDIUM",
+        "api_count": 0,
+        "integration_points": 1,
+        "security_sensitivity": "MEDIUM"
+      },
+      "rationale": "EDGE CASE: Ambiguous - production DB with credentials is complex, local SQLite is simple. Averaged to moderate"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "created_date": "2026-02-05",
+    "total_cases": 35,
+    "distribution": {
+      "simple": {"count": 10, "range": "< 0.6"},
+      "moderate": {"count": 10, "range": "0.6 - 0.8"},
+      "complex": {"count": 10, "range": "> 0.8"},
+      "edge_cases": {"count": 5, "range": "varied"}
+    },
+    "categories": {
+      "COMMUNICATION": 8,
+      "DATA": 7,
+      "INFRASTRUCTURE": 5,
+      "AUTOMATION": 8,
+      "INTELLIGENCE": 7
+    }
+  }
+}
