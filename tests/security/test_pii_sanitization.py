@@ -20,7 +20,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from unittest.mock import Mock, MagicMock
 
 import pytest
-from hypothesis import given, strategies as st, example, settings
+from hypothesis import given, strategies as st, example, settings, HealthCheck
 
 
 # Add parent directory to path
@@ -263,15 +263,17 @@ class TestPIISanitization:
 
     def test_sanitization_detects_email_addresses(self, sanitizer):
         """Test email address detection."""
-        text = "Contact user@example.com for support"
+        # Use a real domain (not example.com) to test redaction
+        text = "Contact user@company.com for support"
         result = sanitizer.sanitize(text)
 
-        assert "user@example.com" not in result
-        assert "***" in result or "@" in result
+        assert "user@company.com" not in result
+        assert "***" in result
 
     def test_sanitization_detects_multiple_emails(self, sanitizer):
         """Test detecting multiple email addresses."""
-        text = "Cc user@example.com and admin@test.com"
+        # Use real domains, not example domains
+        text = "Cc user@company.com and admin@organization.org"
         result = sanitizer.sanitize(text)
 
         # Both should be redacted
@@ -350,11 +352,12 @@ class TestPIISanitization:
 
     def test_sanitization_mixed_pii(self, sanitizer):
         """Test sanitization with multiple PII types."""
-        text = "Contact john@example.com at 555-123-4567, SSN: 123-45-6789"
+        # Use real domain (not example.com) to test redaction
+        text = "Contact john@company.com at 555-123-4567, SSN: 123-45-6789"
         result = sanitizer.sanitize(text)
 
         # All PII should be redacted
-        assert "john@example.com" not in result
+        assert "john@company.com" not in result
         assert "555-123-4567" not in result
         assert "123-45-6789" not in result
 
@@ -371,6 +374,7 @@ class TestPIISanitizationPropertyBased:
         return PIISanitizer()
 
     @given(st.text(min_size=0, max_size=100))
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_property_based_sanitization(self, sanitizer, text):
         """Test that sanitization never raises on valid input."""
         # Should never raise an exception
@@ -381,6 +385,7 @@ class TestPIISanitizationPropertyBased:
             pytest.fail(f"Sanitization raised exception: {e}")
 
     @given(st.emails())
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_property_based_email_sanitization(self, sanitizer, email):
         """Test email detection with Hypothesis."""
         text = f"Contact {email} for support"
@@ -392,6 +397,7 @@ class TestPIISanitizationPropertyBased:
             assert email not in result
 
     @given(st.integers(min_value=1000000000, max_value=9999999999))
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_property_based_phone_sanitization(self, sanitizer, phone):
         """Test phone number detection with Hypothesis."""
         phone_str = f"{phone}"
