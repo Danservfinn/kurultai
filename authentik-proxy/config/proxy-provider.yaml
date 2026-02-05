@@ -1,0 +1,56 @@
+# Authentik Blueprint: Proxy Provider Configuration
+# Version: 2025.10
+# Description: Proxy provider for Kublai web interface protection
+
+version: 1
+metadata:
+  name: Kublai Proxy Provider
+  labels:
+    blueprints.goauthentik.io/description: "Proxy provider for Kublai Control UI"
+    blueprints.goauthentik.io/version: "1"
+    blueprints.goauthentik.io/name: "Kublai Proxy Provider"
+
+entries:
+  # Proxy Provider
+  - model: authentik_providers_proxy.proxyprovider
+    id: kublai-proxy-provider
+    identifiers:
+      name: "Kublai Proxy Provider"
+    attrs:
+      external_host: "https://kublai.kurult.ai"
+      internal_host: "http://moltbot:8080"
+      mode: forward_domain
+      access_token_validity: hours=24
+      refresh_token_validity: days=30
+      authorization_flow: !Find [authentik_flows.flow, [slug, kublai-webauthn-auth]]
+      skip_path_regex: "^/setup/api/signal-link$"
+      basic_auth_enabled: false
+      basic_auth_username_attribute: ""
+      basic_auth_password_attribute: ""
+
+  # Property Mapping for X-Authentik-Username header
+  - model: authentik_providers_proxy.proxymapping
+    id: username-mapping
+    identifiers:
+      name: "X-Authentik-Username Mapping"
+    attrs:
+      expression: |
+        return request.user.username
+
+  # Property Mapping for X-Authentik-Email header
+  - model: authentik_providers_proxy.proxymapping
+    id: email-mapping
+    identifiers:
+      name: "X-Authentik-Email Mapping"
+    attrs:
+      expression: |
+        return request.user.email
+
+  # Property Mapping for X-Authentik-Name header
+  - model: authentik_providers_proxy.proxymapping
+    id: name-mapping
+    identifiers:
+      name: "X-Authentik-Name Mapping"
+    attrs:
+      expression: |
+        return request.user.name

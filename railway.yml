@@ -1,5 +1,5 @@
 # Railway Deployment Configuration for OpenClaw Multi-Agent System
-# This file configures the moltbot gateway service and Neo4j database
+# This file configures the moltbot gateway service, Neo4j database, and Authentik
 # Reference: moltbot.json shows gateway runs on port 18789
 
 # =============================================================================
@@ -152,6 +152,197 @@ services:
     # Restart policy
     restart: unless-stopped
 
+  # ===========================================================================
+  # AUTHENTIK DATABASE - PostgreSQL for Authentik
+  # ===========================================================================
+  authentik-db:
+    image: postgres:15-alpine
+
+    # Health check for PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTHENTIK_POSTGRESQL__USER} -d ${AUTHENTIK_POSTGRESQL__NAME}"]
+      interval: 10s
+      timeout: 5s
+      startPeriod: 30s
+      retries: 5
+
+    # Environment variables
+    environment:
+      - name: POSTGRES_USER
+        value: ${AUTHENTIK_POSTGRESQL__USER}
+      - name: POSTGRES_PASSWORD
+        value: ${AUTHENTIK_POSTGRESQL__PASSWORD}
+      - name: POSTGRES_DB
+        value: ${AUTHENTIK_POSTGRESQL__NAME}
+
+    # Resource allocation
+    resources:
+      cpu: 0.5
+      memory: 512Mi
+
+    # Volume mounts for data persistence
+    volumes:
+      - name: authentik-db-data
+        mountPath: /var/lib/postgresql/data
+
+    # Restart policy
+    restart: unless-stopped
+
+  # ===========================================================================
+  # AUTHENTIK SERVER - Identity Provider
+  # ===========================================================================
+  authentik-server:
+    build:
+      context: ./authentik-server
+      dockerfile: Dockerfile
+
+    # Port configuration
+    ports:
+      - port: 9000
+        targetPort: 9000
+        protocol: TCP
+        description: "Authentik HTTP API"
+      - port: 9443
+        targetPort: 9443
+        protocol: TCP
+        description: "Authentik HTTPS API"
+
+    # Health check
+    healthcheck:
+      path: /-/health/ready/
+      port: 9000
+      interval: 30s
+      timeout: 10s
+      startPeriod: 120s
+      retries: 5
+
+    # Environment variables
+    environment:
+      # Database connection
+      - name: AUTHENTIK_POSTGRESQL__HOST
+        value: authentik-db.railway.internal
+      - name: AUTHENTIK_POSTGRESQL__NAME
+        value: ${AUTHENTIK_POSTGRESQL__NAME}
+      - name: AUTHENTIK_POSTGRESQL__USER
+        value: ${AUTHENTIK_POSTGRESQL__USER}
+      - name: AUTHENTIK_POSTGRESQL__PASSWORD
+        value: ${AUTHENTIK_POSTGRESQL__PASSWORD}
+
+      # Security
+      - name: AUTHENTIK_SECRET_KEY
+        value: ${AUTHENTIK_SECRET_KEY}
+      - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+        value: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+
+      # URLs
+      - name: AUTHENTIK_EXTERNAL_HOST
+        value: ${AUTHENTIK_EXTERNAL_HOST}
+
+      # Disable Redis (Authentik 2025.10+)
+      - name: AUTHENTIK_REDIS__HOST
+        value: ""
+
+      # Logging
+      - name: AUTHENTIK_LOG_LEVEL
+        value: info
+
+    # Resource allocation
+    resources:
+      cpu: 0.5
+      memory: 1Gi
+
+    # Dependencies
+    dependsOn:
+      - authentik-db
+
+    # Restart policy
+    restart: unless-stopped
+
+  # ===========================================================================
+  # AUTHENTIK WORKER - Background Tasks
+  # ===========================================================================
+  authentik-worker:
+    build:
+      context: ./authentik-worker
+      dockerfile: Dockerfile
+
+    # Environment variables (same as server)
+    environment:
+      - name: AUTHENTIK_POSTGRESQL__HOST
+        value: authentik-db.railway.internal
+      - name: AUTHENTIK_POSTGRESQL__NAME
+        value: ${AUTHENTIK_POSTGRESQL__NAME}
+      - name: AUTHENTIK_POSTGRESQL__USER
+        value: ${AUTHENTIK_POSTGRESQL__USER}
+      - name: AUTHENTIK_POSTGRESQL__PASSWORD
+        value: ${AUTHENTIK_POSTGRESQL__PASSWORD}
+      - name: AUTHENTIK_SECRET_KEY
+        value: ${AUTHENTIK_SECRET_KEY}
+      - name: AUTHENTIK_EXTERNAL_HOST
+        value: ${AUTHENTIK_EXTERNAL_HOST}
+      - name: AUTHENTIK_REDIS__HOST
+        value: ""
+      - name: AUTHENTIK_LOG_LEVEL
+        value: info
+
+    # Resource allocation (lighter than server)
+    resources:
+      cpu: 0.25
+      memory: 512Mi
+
+    # Dependencies
+    dependsOn:
+      - authentik-server
+
+    # Restart policy
+    restart: unless-stopped
+
+  # ===========================================================================
+  # AUTHENTIK PROXY - Caddy Reverse Proxy with Forward Auth
+  # ===========================================================================
+  authentik-proxy:
+    build:
+      context: ./authentik-proxy
+      dockerfile: Dockerfile
+
+    # Port configuration (public-facing)
+    ports:
+      - port: 80
+        targetPort: 8080
+        protocol: TCP
+        description: "HTTP Proxy Port"
+
+    # Health check
+    healthcheck:
+      path: /health
+      port: 8080
+      interval: 30s
+      timeout: 5s
+      startPeriod: 30s
+      retries: 3
+
+    # Environment variables
+    environment:
+      - name: PORT
+        value: "8080"
+      - name: SIGNAL_LINK_TOKEN
+        value: ${SIGNAL_LINK_TOKEN}
+      - name: AUTHENTIK_URL
+        value: http://authentik-server:9000
+
+    # Resource allocation (lightweight)
+    resources:
+      cpu: 0.25
+      memory: 256Mi
+
+    # Dependencies
+    dependsOn:
+      - authentik-server
+      - moltbot
+
+    # Restart policy
+    restart: unless-stopped
+
 # =============================================================================
 # VOLUME CONFIGURATION
 # =============================================================================
@@ -172,21 +363,30 @@ volumes:
     size: 5Gi
     description: "Neo4j log files"
 
+  # Persistent storage for Authentik PostgreSQL
+  authentik-db-data:
+    size: 10Gi
+    description: "Authentik PostgreSQL database storage"
+
 # =============================================================================
 # DEPLOYMENT CONFIGURATION
 # =============================================================================
 
 deploy:
-  # Number of replicas for moltbot service
+  # Number of replicas for each service
   replicas:
     moltbot: 1
     neo4j: 1
+    authentik-db: 1
+    authentik-server: 1
+    authentik-worker: 1
+    authentik-proxy: 1
 
   # Deployment strategy
   strategy: rolling
 
   # Health check grace period
-  healthcheckGracePeriod: 120s
+  healthcheckGracePeriod: 180s
 
 # =============================================================================
 # NOTES FOR RAILWAY DEPLOYMENT
@@ -196,23 +396,37 @@ deploy:
 #    - OPENCLAW_GATEWAY_TOKEN: Secure token for gateway authentication
 #    - NEO4J_PASSWORD: Strong password for Neo4j (overrides the default)
 #
-# 2. Neo4j Browser Access:
-#    - After deployment, access Neo4j Browser at: http://<railway-domain>:7474
-#    - Login with: neo4j / <NEO4J_PASSWORD>
+# 2. Authentik Environment Variables (REQUIRED):
+#    - AUTHENTIK_SECRET_KEY: 50+ character random string (generate with: openssl rand -hex 32)
+#    - AUTHENTIK_BOOTSTRAP_PASSWORD: Initial admin password (change after first login)
+#    - AUTHENTIK_EXTERNAL_HOST: https://kublai.kurult.ai
+#    - AUTHENTIK_POSTGRESQL__USER: postgres (or custom username)
+#    - AUTHENTIK_POSTGRESQL__PASSWORD: Strong database password
+#    - AUTHENTIK_POSTGRESQL__NAME: authentik
+#    - SIGNAL_LINK_TOKEN: Random token for SSE endpoint (generate with: openssl rand -hex 32)
 #
 # 3. Health Check Endpoints:
 #    - moltbot: http://<service>:18789/health
 #    - neo4j: http://<service>:7474/db/manage/server/jmx/...
+#    - authentik-server: http://<service>:9000/-/health/ready/
 #
-# 4. Volume Persistence:
+# 4. Authentik Admin Access:
+#    - After deployment, access Authentik at: https://kublai.kurult.ai/if/admin/
+#    - Login with: akadmin / AUTHENTIK_BOOTSTRAP_PASSWORD
+#    - Run bootstrap script: python authentik-proxy/bootstrap_authentik.py
+#
+# 5. Volume Persistence:
 #    - Data persists across deployments
-#    - Back up important data regularly
+#    - Back up important data regularly (see scripts/backup-authentik-db.sh)
 #
-# 5. Scaling Considerations:
-#    - Neo4j should typically run as single instance
-#    - moltbot can be scaled horizontally if stateless
+# 6. Service Dependencies:
+#    - authentik-db starts first
+#    - authentik-server waits for authentik-db
+#    - authentik-worker waits for authentik-server
+#    - authentik-proxy waits for authentik-server and moltbot
 #
-# 6. Security:
+# 7. Security:
 #    - Change default passwords before production use
 #    - Consider enabling SSL/TLS for Neo4j connections
 #    - Use Railway's private networking for service-to-service communication
+#    - Keep AUTHENTIK_SECRET_KEY secure - it encrypts sensitive data

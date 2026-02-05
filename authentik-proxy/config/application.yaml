@@ -1,0 +1,60 @@
+# Authentik Blueprint: Application and Outpost Configuration
+# Version: 2025.10
+# Description: Application definition and embedded outpost linking
+
+version: 1
+metadata:
+  name: Kublai Control UI Application
+  labels:
+    blueprints.goauthentik.io/description: "Application configuration for Kublai Control UI"
+    blueprints.goauthentik.io/version: "1"
+    blueprints.goauthentik.io/name: "Kublai Application"
+
+entries:
+  # Application
+  - model: authentik_core.application
+    id: kublai-control-ui
+    identifiers:
+      slug: kublai-control-ui
+    attrs:
+      name: "Kublai Control UI"
+      provider: !Find [authentik_providers_proxy.proxyprovider, [name, "Kublai Proxy Provider"]]
+      meta_launch_url: "https://kublai.kurult.ai"
+      meta_description: "Multi-agent system control panel and monitoring interface"
+      meta_publisher: "Kublai"
+      policy_engine_mode: any
+
+  # Group for Kublai Administrators
+  - model: authentik_core.group
+    id: kublai-admins
+    identifiers:
+      name: "Kublai Administrators"
+    attrs:
+      is_superuser: false
+      attributes:
+        description: "Administrators with full access to Kublai Control UI"
+
+  # Policy: Allow only Kublai Administrators
+  - model: authentik_policies_expression.expressionpolicy
+    id: kublai-admin-policy
+    identifiers:
+      name: "Kublai Administrator Policy"
+    attrs:
+      expression: |
+        # Check if user is in the Kublai Administrators group
+        from authentik.core.models import Group
+        admin_group = Group.objects.filter(name="Kublai Administrators").first()
+        if admin_group:
+            return ak_group_contains(admin_group)
+        # If group doesn't exist, allow any authenticated user (fallback)
+        return True
+
+  # Link policy to application
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf kublai-control-ui
+      policy: !KeyOf kublai-admin-policy
+      order: 10
+    attrs:
+      enabled: true
+      timeout: 30

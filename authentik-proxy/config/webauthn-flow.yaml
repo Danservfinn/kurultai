@@ -1,0 +1,61 @@
+# Authentik Blueprint: WebAuthn Authentication Flow
+# Version: 2025.10
+# Description: Authentication flow with WebAuthn/FIDO2 biometric support
+
+version: 1
+metadata:
+  name: Kublai WebAuthn Authentication
+  labels:
+    blueprints.goauthentik.io/description: "WebAuthn biometric authentication flow for Kublai"
+    blueprints.goauthentik.io/version: "1"
+    blueprints.goauthentik.io/name: "Kublai WebAuthn Auth"
+
+entries:
+  # Password Stage (fallback)
+  - model: authentik_stages_password.passwordstage
+    id: kublai-password-stage
+    identifiers:
+      name: "Kublai Password"
+    attrs:
+      backends:
+        - authentik.core.auth.InbuiltBackend
+      failed_attempts_before_captcha: 3
+      failed_attempts_before_timeout: 5
+      timeout_minutes: 5
+
+  # WebAuthn Authenticator Stage (biometric)
+  - model: authentik_stages_authenticator_webauthn.authenticatorwebauthnstage
+    id: kublai-webauthn-stage
+    identifiers:
+      name: "Kublai WebAuthn"
+    attrs:
+      friendly_name: "Kublai Control Panel"
+      resident_key_requirement: preferred
+      user_verification: preferred
+      authenticator_attachment: platform
+
+  # Authentication Flow
+  - model: authentik_flows.flow
+    id: kublai-authentication-flow
+    identifiers:
+      slug: kublai-webauthn-auth
+    attrs:
+      name: "Kublai WebAuthn Authentication"
+      designation: authentication
+      title: "Sign in to Kublai"
+      layout: stacked
+      denied_action: message_continue
+      authentication: none
+
+  # Flow Stage Bindings
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf kublai-authentication-flow
+      stage: !KeyOf kublai-password-stage
+      order: 10
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf kublai-authentication-flow
+      stage: !KeyOf kublai-webauthn-stage
+      order: 20

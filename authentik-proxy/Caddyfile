@@ -7,8 +7,11 @@
     admin off
     auto_https off
     log {
+        output stdout
         level DEBUG
     }
+    # Rate limiting for auth endpoints (using Caddy's http.ratelimit module if available)
+    # Fallback: Authentik has built-in rate limiting configured via API
 }
 
 # Listen on the Railway-assigned port
@@ -18,14 +21,27 @@
         level DEBUG
     }
 
-    # Bypass auth for Signal SSE endpoint - EventSource can't follow redirects
-    # The page itself is protected, so this is reasonably secure
+    # Rate limit all requests (generous limit for normal use)
+    # Note: Requires github.com/RussellLuo/caddy-ext/ratelimit or similar
+    # For now, we rely on Authentik's built-in rate limiting
+
+    # Signal SSE endpoint with token-based authentication
+    # The page itself is protected, but we add a secret token check for API access
     handle /setup/api/signal-link {
-        reverse_proxy moltbot-railway-template.railway.internal:8080 {
+        # Check for valid secret token in header (set by the protected page)
+        @noToken {
+            header !X-Signal-Token {$SIGNAL_LINK_TOKEN}
+        }
+        respond @noToken "Unauthorized" 401
+
+        reverse_proxy moltbot.railway.internal:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
+            header_up X-Signal-Token {http.request.header.X-Signal-Token}
             # Enable SSE streaming
             header_down -Content-Length
+            # Keep connection alive for SSE
+            flush_interval -1
         }
     }
 
@@ -47,9 +63,11 @@
     }
 
     # Reverse proxy to the moltbot service
-    reverse_proxy moltbot-railway-template.railway.internal:8080 {
+    reverse_proxy moltbot.railway.internal:8080 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto https
     }
 
     # Handle errors
