@@ -19,15 +19,15 @@
       "max_concurrent_tasks": 10
     },
     {
-      "id": "jochi",
-      "name": "Jochi",
-      "role": "backend_analyst",
-      "description": "Backend code analysis and issue identification specialist",
+      "id": "ogedei",
+      "name": "Ögedei",
+      "role": "failover",
+      "description": "Failover and emergency routing specialist",
       "capabilities": [
-        "code_analysis",
-        "backend_review",
-        "api_analysis",
-        "database_review"
+        "failover",
+        "emergency_routing",
+        "health_monitoring",
+        "circuit_breaker"
       ],
       "status": "active",
       "last_heartbeat": "2025-01-01T12:00:30.000Z",
@@ -37,15 +37,15 @@
       "max_concurrent_tasks": 5
     },
     {
-      "id": "temüjin",
-      "name": "Temüjin",
-      "role": "security_auditor",
-      "description": "Security audit and vulnerability assessment specialist",
+      "id": "tolui",
+      "name": "Tolui",
+      "role": "research",
+      "description": "Research and information gathering specialist",
       "capabilities": [
-        "security_audit",
-        "vulnerability_scan",
-        "owasp_analysis",
-        "penetration_testing"
+        "research",
+        "information_gathering",
+        "data_analysis",
+        "knowledge_synthesis"
       ],
       "status": "active",
       "last_heartbeat": "2025-01-01T11:58:00.000Z",
@@ -55,15 +55,15 @@
       "max_concurrent_tasks": 3
     },
     {
-      "id": "ögedei",
-      "name": "Ögedei",
-      "role": "file_consistency_manager",
-      "description": "File consistency and emergency routing specialist",
+      "id": "hulagu",
+      "name": "Hulagu",
+      "role": "strategy",
+      "description": "Strategy and planning specialist",
       "capabilities": [
-        "file_consistency",
-        "emergency_routing",
-        "improvement_detection",
-        "refactoring"
+        "strategy",
+        "planning",
+        "architecture_design",
+        "risk_assessment"
       ],
       "status": "active",
       "last_heartbeat": "2025-01-01T12:00:15.000Z",
@@ -73,15 +73,15 @@
       "max_concurrent_tasks": 4
     },
     {
-      "id": "chagatai",
-      "name": "Chagatai",
-      "role": "background_synthesizer",
-      "description": "Background synthesis and continuous improvement specialist",
+      "id": "mongke",
+      "name": "Möngke",
+      "role": "execution",
+      "description": "Execution and implementation specialist",
       "capabilities": [
-        "background_synthesis",
-        "meta_learning",
-        "pattern_recognition",
-        "knowledge_extraction"
+        "execution",
+        "implementation",
+        "code_generation",
+        "deployment"
       ],
       "status": "active",
       "last_heartbeat": "2025-01-01T11:59:45.000Z",
@@ -91,15 +91,15 @@
       "max_concurrent_tasks": 8
     },
     {
-      "id": "tolui",
-      "name": "Tolui",
-      "role": "frontend_specialist",
-      "description": "Frontend code and UI/UX review specialist",
+      "id": "ariq_boke",
+      "name": "Ariq Böke",
+      "role": "qa",
+      "description": "Quality assurance and testing specialist",
       "capabilities": [
-        "frontend_review",
-        "accessibility_audit",
-        "ux_analysis",
-        "component_review"
+        "qa",
+        "testing",
+        "validation",
+        "quality_control"
       ],
       "status": "active",
       "last_heartbeat": "2025-01-01T12:00:00.000Z",
@@ -112,46 +112,55 @@
   "agent_states": {
     "all_active": {
       "kublai": "active",
-      "jochi": "active",
-      "temüjin": "active",
-      "ögedei": "active",
-      "chagatai": "active",
-      "tolui": "active"
+      "ogedei": "active",
+      "tolui": "active",
+      "hulagu": "active",
+      "mongke": "active",
+      "ariq_boke": "active"
     },
     "one_stale": {
       "kublai": "active",
-      "jochi": "active",
-      "temüjin": "stale",
-      "ögedei": "active",
-      "chagatai": "active",
-      "tolui": "active"
+      "ogedei": "active",
+      "tolui": "stale",
+      "hulagu": "active",
+      "mongke": "active",
+      "ariq_boke": "active"
     },
     "one_unavailable": {
       "kublai": "active",
-      "jochi": "active",
-      "temüjin": "unavailable",
-      "ögedei": "active",
-      "chagatai": "active",
-      "tolui": "active"
+      "ogedei": "active",
+      "tolui": "unavailable",
+      "hulagu": "active",
+      "mongke": "active",
+      "ariq_boke": "active"
     },
     "failover_active": {
       "kublai": "unavailable",
-      "jochi": "active",
-      "temüjin": "active",
-      "ögedei": "emergency_router",
-      "chagatai": "active",
-      "tolui": "active"
+      "ogedei": "emergency_router",
+      "tolui": "active",
+      "hulagu": "active",
+      "mongke": "active",
+      "ariq_boke": "active"
+    },
+    "orchestrator_down": {
+      "kublai": "unavailable",
+      "ogedei": "failover_orchestrator",
+      "tolui": "active",
+      "hulagu": "active",
+      "mongke": "active",
+      "ariq_boke": "active"
     }
   },
   "agent_routing": {
-    "code": ["jochi", "tolui"],
-    "security": ["temüjin"],
-    "backend": ["jochi"],
-    "frontend": ["tolui"],
-    "analysis": ["jochi", "temüjin"],
-    "synthesis": ["chagatai"],
-    "improvement": ["ögedei", "chagatai"],
-    "file_consistency": ["ögedei"],
-    "delegation": ["kublai"]
+    "delegation": ["kublai"],
+    "failover": ["ogedei"],
+    "research": ["tolui"],
+    "strategy": ["hulagu"],
+    "execution": ["mongke"],
+    "qa": ["ariq_boke"],
+    "code": ["mongke", "hulagu"],
+    "analysis": ["tolui", "ariq_boke"],
+    "planning": ["hulagu", "kublai"],
+    "testing": ["ariq_boke"]
   }
 }
