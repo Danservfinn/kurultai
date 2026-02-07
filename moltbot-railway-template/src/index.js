@@ -313,6 +313,59 @@ app.get('/signal/status', async (req, res) => {
 });
 
 // =============================================================================
+// Proposal System Migration Endpoint
+// =============================================================================
+
+app.post('/api/migrate-proposals', async (req, res) => {
+  const neo4j = require('neo4j-driver');
+  const NEO4J_URI = process.env.NEO4J_URI || 'bolt://neo4j.railway.internal:7687';
+  const NEO4J_USER = process.env.NEO4J_USER || 'neo4j';
+  const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || '';
+
+  const driver = neo4j.driver(
+    NEO4J_URI,
+    neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD)
+  );
+
+  const statements = [
+    "CREATE CONSTRAINT proposal_id IF NOT EXISTS FOR (p:ArchitectureProposal) REQUIRE p.id IS UNIQUE",
+    "CREATE CONSTRAINT opportunity_id IF NOT EXISTS FOR (o:ImprovementOpportunity) REQUIRE o.id IS UNIQUE",
+    "CREATE CONSTRAINT vetting_id IF NOT EXISTS FOR (v:Vetting) REQUIRE v.id IS UNIQUE",
+    "CREATE CONSTRAINT implementation_id IF NOT EXISTS FOR (i:Implementation) REQUIRE i.id IS UNIQUE",
+    "CREATE CONSTRAINT validation_id IF NOT EXISTS FOR (v:Validation) REQUIRE v.id IS UNIQUE",
+    "CREATE INDEX proposal_status IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.status)",
+    "CREATE INDEX opportunity_status IF NOT EXISTS FOR (o:ImprovementOpportunity) ON (o.status)",
+    "CREATE INDEX proposal_priority IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.priority)"
+  ];
+
+  const results = [];
+
+  for (const statement of statements) {
+    const session = driver.session();
+    try {
+      await session.run(statement);
+      results.push({ statement: statement.substring(0, 50) + '...', status: 'success' });
+    } catch (error) {
+      if (error.message.includes('AlreadyExists') || error.message.includes('equivalent')) {
+        results.push({ statement: statement.substring(0, 50) + '...', status: 'skipped (exists)' });
+      } else {
+        results.push({ statement: statement.substring(0, 50) + '...', status: 'failed', error: error.message });
+      }
+    } finally {
+      await session.close();
+    }
+  }
+
+  await driver.close();
+
+  res.json({
+    migration: '003_proposals',
+    results,
+    status: 'complete'
+  });
+});
+
+// =============================================================================
 // Gateway Root Endpoint
 // =============================================================================
 
