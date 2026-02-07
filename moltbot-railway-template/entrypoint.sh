@@ -9,6 +9,25 @@ mkdir -p "$OPENCLAW_STATE_DIR" 2>/dev/null || true
 mkdir -p /data/logs 2>/dev/null || true
 mkdir -p /data/workspace 2>/dev/null || true
 
+# =============================================================================
+# DEPLOY AGENT SOUL FILES
+# =============================================================================
+# Copy SOUL.md + CLAUDE.md for each agent to their workspace on the volume.
+# OpenClaw loads these at session start from each agent's workspace path.
+# Always overwrite to pick up changes from new deploys.
+if [ -d /app/souls ]; then
+    echo "=== Deploying Agent Soul Files ==="
+    for agent_dir in /app/souls/*/; do
+        agent_id=$(basename "$agent_dir")
+        target="/data/workspace/souls/$agent_id"
+        mkdir -p "$target"
+        cp -f "$agent_dir"*.md "$target/" 2>/dev/null || true
+        echo "  $agent_id: $(ls "$target"/*.md 2>/dev/null | wc -l | tr -d ' ') files deployed"
+    done
+    chown -R 1001:1001 /data/workspace/souls 2>/dev/null || true
+    echo "=== Soul Files Deployed ==="
+fi
+
 # Skills directory for hot-reload (shared with skill-sync-service)
 SKILLS_DIR="${SKILLS_DIR:-/data/skills}"
 mkdir -p "$SKILLS_DIR" 2>/dev/null || true
