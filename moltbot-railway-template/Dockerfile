@@ -1,6 +1,6 @@
 # Moltbot Railway Template - OpenClaw Gateway with embedded Signal
 # Replaces Express gateway with full OpenClaw gateway including built-in webchat UI
-# CACHE_BUST: 2026-02-07-v6 - Force rebuild with entrypoint version marker
+# CACHE_BUST: 2026-02-07-v7 - Fix config directory path
 
 FROM node:22-bookworm-slim
 
@@ -84,7 +84,7 @@ RUN npm install --production
 COPY --chown=1000:1000 src /app/src
 COPY --chown=1000:1000 routes /app/routes
 COPY --chown=1000:1000 middleware /app/middleware
-COPY --chown=1000:1000 config /app/config
+# Note: config is inside src/, not at root level
 
 COPY --chown=1000:1000 migrations /app/migrations
 COPY --chown=1000:1000 openclaw_memory.py /app/
