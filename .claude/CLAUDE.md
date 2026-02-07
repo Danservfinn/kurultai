@@ -22,8 +22,6 @@
 | #32797 | 6:22 PM | ✅ | Knowledge Base Manifest Updated with OSA AI Detection Patterns | ~380 |
 | #32796 | " | ✅ | Knowledge Base Manifest Updated with OSA Pattern Documents | ~444 |
 | #32351 | 3:23 PM | 🔵 | OpenClaw Architecture and Documentation Landscape - Comprehensive System Integration | ~565 |
-| #32128 | 2:37 PM | ✅ | Project Instructions (CLAUDE.md) Updated with Neo4j Architecture and Agent System | ~527 |
-| #32127 | " | ✅ | Project Instructions Updated with Neo4j-First Memory Principles and Memory Tiering Strategy | ~631 |
 </claude-mem-context>
 
 # Kurultai Project Instructions

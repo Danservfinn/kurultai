@@ -14,8 +14,7 @@
 | #32652 | 4:34 PM | 🔵 | Found increased bootstrapMaxChars limit and skipBootstrap flag in openclaw.json | ~298 |
 | #32648 | 4:33 PM | 🔵 | Containerized Agent Runtime with Heartbeat Sidecar and OpenClaw Gateway | ~434 |
 | #32647 | " | 🔵 | Docker Image Includes Soul Files Directory | ~297 |
-| #32640 | 4:31 PM | 🔵 | V4 Proposals Migration File Confirmed in Repository | ~315 |
-| #32638 | " | 🔵 | OpenClaw Gateway API and Session State Query Options Analyzed | ~748 |
+| #32638 | 4:31 PM | 🔵 | OpenClaw Gateway API and Session State Query Options Analyzed | ~748 |
 | #32633 | 4:29 PM | 🔵 | Moltbot Entrypoint Script: Agent Deployment and Signal Configuration | ~505 |
 | #32595 | 4:18 PM | 🔵 | OpenClaw Session Lifecycle Management Analysis Completed | ~602 |
 | #32593 | " | 🔵 | OpenClaw Gateway Configuration Defines Six-Agent Golden Horde Network | ~472 |
@@ -23,4 +22,8 @@
 | #32586 | " | 🔵 | Soul File Deployment Architecture in Entrypoint | ~391 |
 | #32583 | " | 🔵 | OpenClaw Configuration with 6-Agent Soul-Based Architecture | ~338 |
 | #32559 | 4:11 PM | 🔵 | OpenClaw Gateway Configuration for Kurultai Multi-Agent System | ~672 |
+| #32552 | " | 🔵 | Neo4j Integration Across Molt Agent System | ~373 |
+| #32544 | 4:07 PM | 🔵 | Complete entrypoint.sh - Comprehensive Moltbot Startup Orchestration | ~683 |
+| #32499 | 3:41 PM | 🔵 | Complete SOUL.md and IDENTITY.md Deployment Lifecycle Analysis | ~627 |
+| #32498 | " | 🔵 | OpenClaw Agent Soul/Identity File Loading Mechanism Documented | ~675 |
 </claude-mem-context>

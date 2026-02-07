@@ -13,5 +13,4 @@
 | #32755 | 6:01 PM | 🔵 | Reviewed existing guardrail-enforcer tests as reference pattern for proposal-states tests | ~706 |
 | #32753 | 6:00 PM | 🟣 | Validation Handler test suite created with comprehensive check scenarios | ~348 |
 | #32752 | " | 🟣 | Comprehensive test suite generated for Kublai self-awareness modules | ~839 |
-| #32666 | 4:40 PM | 🟣 | Implemented Application-Layer Guardrail Enforcement for Proposal System | ~482 |
 </claude-mem-context>
