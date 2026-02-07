@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Neo4j migration runner for Kurultai v0.2.
 
-Registers all migrations (v1, v2, v3) and runs to the specified target version.
+Registers all migrations (v1, v2, v3, v4) and runs to the specified target version.
 Supports dry-run mode for validation before applying changes.
 
 Usage:
-    python3 scripts/run_migrations.py --target-version 3
-    python3 scripts/run_migrations.py --target-version 3 --dry-run
+    python3 scripts/run_migrations.py --target-version 4
+    python3 scripts/run_migrations.py --target-version 4 --dry-run
     python3 scripts/run_migrations.py --status
 """
 
@@ -22,6 +22,7 @@ from migrations.migration_manager import MigrationManager
 from migrations.v1_initial_schema import V1InitialSchema
 from migrations.v2_kurultai_dependencies import V2KurultaiDependencies
 from migrations.v3_capability_acquisition import V3CapabilityAcquisition
+from migrations.v4_proposals import V4Proposals
 
 
 def main():
@@ -57,7 +58,8 @@ def main():
         V1InitialSchema.register(manager)
         V2KurultaiDependencies.register(manager)
         V3CapabilityAcquisition.register(manager)
-        print("Registered migrations: v1, v2, v3")
+        V4Proposals.register(manager)
+        print("Registered migrations: v1, v2, v3, v4")
 
         current = manager.get_current_version()
         print(f"Current schema version: {current}")
@@ -85,7 +87,7 @@ def main():
 
         target = args.target_version
         if target is None:
-            target = 3  # Latest
+            target = 4  # Latest
 
         if args.dry_run:
             print(f"\n[DRY RUN] Would migrate from v{current} to v{target}")

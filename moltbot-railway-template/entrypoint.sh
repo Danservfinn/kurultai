@@ -85,7 +85,7 @@ print('OK')
     # Run migrations
     if [ -f /app/scripts/run_migrations.py ]; then
         echo "Running migration script..."
-        python /app/scripts/run_migrations.py --target-version 3 || echo "Migration completed with status: $?"
+        python /app/scripts/run_migrations.py --target-version 4 || echo "Migration completed with status: $?"
     else
         echo "Migration script not found, skipping..."
     fi
@@ -155,25 +155,14 @@ if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ] && [ -n "$SIGNAL_ACCOUNT" ];
     su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT trust --trust-all-known-keys $SIGNAL_ACCOUNT" 2>&1 || echo "  trust command returned: $?"
     echo "=== Identity Keys Trusted ==="
 
-    # Request session sync from primary device.
-    echo "=== Requesting Session Sync from Primary Device ==="
-    su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT sendSyncRequest" 2>&1 || echo "  sendSyncRequest returned: $?"
-    echo "=== Sync Request Sent ==="
-
-    # Reset encryption sessions with allowed contacts.
-    # Linked devices get stale ratchet state when offline — the sender encrypts
-    # with a session the linked device can't decrypt ("decryption failed").
-    # sendEndSessionMessage forces both sides to re-establish from scratch.
-    echo "=== Resetting Signal Sessions ==="
-    if [ -n "$SIGNAL_ALLOW_FROM" ]; then
-        echo "$SIGNAL_ALLOW_FROM" | tr ',' '\n' | while read -r NUM; do
-            NUM=$(echo "$NUM" | tr -d ' ')
-            [ -z "$NUM" ] && continue
-            echo "  Resetting session with $NUM..."
-            su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT send --end-session $NUM" 2>&1 || echo "  send --end-session $NUM returned: $?"
-        done
-    fi
-    echo "=== Sessions Reset ==="
+    # Note: sendSyncRequest and send --end-session were run on 2026-02-07 to fix
+    # stale session ratchets after the linked device was offline. Sessions are now
+    # fresh. These commands are commented out to avoid rate limiting on redeploy.
+    # Uncomment if decryption errors return after extended offline periods.
+    # echo "=== Requesting Session Sync from Primary Device ==="
+    # su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT sendSyncRequest" 2>&1
+    # echo "=== Resetting Signal Sessions ==="
+    # su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT send --end-session <NUMBER>" 2>&1
 fi
 
 # =============================================================================
