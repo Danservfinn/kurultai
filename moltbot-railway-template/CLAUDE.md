@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31956 | 2:07 PM | ✅ | entrypoint.sh Signal Status Logging Simplified | ~402 |
 | #31819 | 1:41 PM | 🔵 | Primary Session Re-Reading OpenClaw Configuration - Signal httpUrl Configuration Verified | ~545 |
 | #31795 | 1:33 PM | ✅ | Deployed Moltbot to Railway Infrastructure | ~268 |
 | #31788 | 1:30 PM | 🔵 | Primary Session Reading Signal Daemon Startup Code to Identify Connection Issue | ~432 |
@@ -26,5 +27,4 @@
 | #31660 | 1:02 PM | 🔵 | Entrypoint Script Reviewed: Multi-Phase Startup with Neo4j Migrations, Signal Data, and OpenClaw | ~921 |
 | #31659 | " | 🔵 | Primary Session Reading OpenClaw Gateway Configuration for Kurultai System | ~830 |
 | #31658 | " | 🔵 | OpenClaw Gateway Configuration Examined: Signal Provider Already Defined but Requires Environment Variables | ~664 |
-| #31657 | " | 🔵 | Dockerfile Configuration Reviewed: OpenClaw Gateway with Signal and Neo4j Support | ~695 |
 </claude-mem-context>
