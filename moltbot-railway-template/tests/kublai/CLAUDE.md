@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32790 | 6:21 PM | ✅ | Confirmed all test files include jest in @jest/globals imports | ~167 |
 | #32761 | 6:04 PM | ✅ | All test files passed syntax validation successfully | ~243 |
 | #32760 | " | ✅ | Fixed scheduled-reflection test file to explicitly import jest from @jest/globals | ~184 |
 | #32758 | 6:03 PM | 🔵 | Confirmed architecture-introspection test file structure and setup patterns | ~191 |

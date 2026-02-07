@@ -28,6 +28,8 @@ The Kurultai knowledge base is organized by entry type and uses YAML front matte
 | Title | Link | Tags | Updated |
 |-------|------|------|---------|
 | Delegation Protocol Pattern | delegation-protocol | patterns,delegation,routing,complexity-scoring | 2026-02-07 |
+| OSA Behavioral Verification - AI vs Human Distinction | osa-ai-human-behavioral-verification | osa,security,verification,ai-detection,behavioral-analysis | 2026-02-07 |
+| OSA ML/Statistical Detection - AI vs Human Content Classification | osa-ai-human-ml-statistical-detection | osa,security,verification,ai-detection,ml,statistical-analysis,nlp | 2026-02-07 |
 
 ### qa
 *Questions, answers, and troubleshooting guides*
@@ -67,19 +69,20 @@ The Kurultai knowledge base is organized by entry type and uses YAML front matte
 
 ## Statistics
 
-- **Total Entries**: 5
+- **Total Entries**: 7
 - **Entry Types Populated**: 4/8 (qa, code_index, debug_history empty)
-- **Last Updated**: 2026-02-07 17:00 UTC
+- **Last Updated**: 2026-02-07 18:30 UTC
 
 ## Tag Cloud
 
 ```
-architecture                 health-check            monitoring
-cheatsheets                 heartbeat               multi-agent
-cli                        openclaw                orchestration
-commands                   patterns                reference
-complexity-scoring         delegation              routing
-failover                   metrics                 testing
+ai-detection               architecture            behavioral-analysis
+cli                        commands                complexity-scoring
+delegation                 failover                health-check
+ml                         monitoring              nlp
+openclaw                   orchestration           patterns
+reference                  routing                 security
+statistical-analysis       testing                 verification
 ```
 
 ## Ontological Relations
@@ -88,10 +91,17 @@ All relations now point to existing entries:
 - `kurultai-project-overview` → `openclaw-gateway-architecture` ✓
 - `kurultai-project-overview` → `two-tier-heartbeat-system` ✓
 - `kurultai-project-overview` → `delegation-protocol` ✓
-- `openclaw-gateway-architecture` → `two-tier-heartbeat-system` ✓
+- `openclai-gateway-architecture` → `two-tier-heartbeat-system` ✓
 - `delegation-protocol` → `two-tier-heartbeat-system` ✓
+- `osa-ai-human-behavioral-verification` → `osa-ai-human-ml-statistical-detection` ✓
+- `osa-ai-human-ml-statistical-detection` → `osa-ai-human-behavioral-verification` ✓
 
 ## Recent Updates
+
+### 2026-02-07 18:30 UTC - OSA AI Detection Documentation Added
+- **Added**: OSA Behavioral Verification pattern (osa-ai-human-behavioral-verification)
+- **Added**: OSA ML/Statistical Detection pattern (osa-ai-human-ml-statistical-detection)
+- **Coverage**: Comprehensive AI vs Human detection using behavioral and content-based methods
 
 ### 2026-02-07 17:00 UTC - Knowledge Base Audit & Fixes
 - **Fixed**: Removed broken ontological_relations (6 broken links removed)

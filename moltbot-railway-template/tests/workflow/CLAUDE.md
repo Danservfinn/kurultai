@@ -7,9 +7,11 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32790 | 6:21 PM | ✅ | Confirmed all test files include jest in @jest/globals imports | ~167 |
 | #32761 | 6:04 PM | ✅ | All test files passed syntax validation successfully | ~243 |
 | #32759 | 6:03 PM | 🔵 | Confirmed proposal-mapper test file structure and initialization patterns | ~169 |
 | #32755 | 6:01 PM | 🔵 | Reviewed existing guardrail-enforcer tests as reference pattern for proposal-states tests | ~706 |
 | #32753 | 6:00 PM | 🟣 | Validation Handler test suite created with comprehensive check scenarios | ~348 |
 | #32752 | " | 🟣 | Comprehensive test suite generated for Kublai self-awareness modules | ~839 |
+| #32666 | 4:40 PM | 🟣 | Implemented Application-Layer Guardrail Enforcement for Proposal System | ~482 |
 </claude-mem-context>
