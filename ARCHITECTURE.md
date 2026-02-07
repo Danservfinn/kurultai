@@ -288,6 +288,303 @@ Each agent has a signing key stored in Neo4j as an `AgentKey` node. Messages bet
 
 **Privacy Rule**: Kublai sanitizes PII via `PIISanitizer` before delegating to other agents.
 
+### Neo4j Memory System Overview
+
+**Implementation**: `/Users/kurultai/molt/memory_manager.py` (class `MemoryManager`)
+
+The Neo4j-first memory architecture provides a bounded, tiered memory system with fixed initialization cost regardless of conversation length. All agents use `MemoryManager` for accessing Neo4j with graceful fallback when unavailable.
+
+#### Tiered Memory Architecture
+
+Memory is organized into 4 tiers with different access patterns and token budgets:
+
+| Tier | Token Budget | Access Pattern | Loading Strategy | Contents |
+|------|-------------|----------------|------------------|----------|
+| **Hot** | ~1,600 tokens | Always in memory | Eager load on init | Current session context, active tasks, critical notifications, high-confidence beliefs |
+| **Warm** | ~400 tokens | On-demand | Lazy load (2s timeout) | Recent completed tasks (24h), recent notifications, medium-confidence beliefs |
+| **Cold** | ~200 tokens | On-demand with timeout | Lazy load (5s timeout) | Older completed tasks (7-30 days), archived beliefs, historical context |
+| **Archive** | Unbounded | Query only | Never loaded | Full history retained in Neo4j, accessed via targeted queries |
+
+**Total In-Memory Limit**: 2,000 tokens (Hot + Warm + Cold) per agent conversation
+
+#### MemoryManager Class
+
+**Location**: `/Users/kurultai/molt/memory_manager.py`
+
+**Key Features**:
+- Async-safe implementation with tier-specific locks
+- Bounded `MEMORY.md` size (2,000 tokens max) regardless of conversation length
+- Fixed initialization cost (hot tier loads once at startup)
+- Graceful degradation to fallback mode when Neo4j unavailable
+- Connection pooling with `max_connection_pool_size=10`
+- Automatic retry with exponential backoff for transient errors
+
+**Configuration**:
+
+```python
+# Token limits per tier
+HOT_TOKEN_LIMIT = 1600
+WARM_TOKEN_LIMIT = 400
+COLD_TOKEN_LIMIT = 200
+TOTAL_MEMORY_LIMIT = 2000
+
+# Timeout configurations
+WARM_LOAD_TIMEOUT = 2.0  # seconds
+COLD_LOAD_TIMEOUT = 5.0  # seconds
+```
+
+**Usage Example**:
+
+```python
+# Create memory manager for an agent
+async with MemoryManager(
+    agent_name="kublai",
+    neo4j_uri="bolt://localhost:7687",
+    neo4j_username="neo4j",
+    neo4j_password=os.environ.get("NEO4J_PASSWORD"),
+    fallback_mode=True
+) as memory:
+    # Get hot tier context (always available)
+    context = await memory.get_memory_context()
+
+    # Get full context with warm/cold tiers
+    full_context = await memory.get_memory_context(
+        include_warm=True,
+        include_cold=True
+    )
+
+    # Query archive for specific information
+    results = await memory.query_archive(
+        query_text="async patterns",
+        days=7,
+        limit=5
+    )
+
+    # Add new memory entry
+    entry_id = await memory.add_entry(
+        content="User requested analysis of async patterns",
+        entry_type="task_request",
+        tier=MemoryTier.HOT,
+        confidence=1.0
+    )
+```
+
+#### Memory Protocols
+
+**Write Protocol** (Neo4j-first):
+
+| Content Type | Storage | Rationale |
+|-------------|---------|-----------|
+| Human PII (names, emails, phone numbers) | File only (personal tier) | Privacy protection, not shared across agents |
+| Operational findings, research, code patterns | Neo4j (operational tier) | Shared memory accessible to all agents |
+| Agent state, tasks, notifications | Neo4j (operational tier) | Cross-agent coordination and failover |
+
+**PII Detection**: Kublai uses `PIISanitizer` to detect and sanitize PII before delegating to other agents. Detected PII is only written to local files (`/data/workspace/souls/main/MEMORY.md`) and never propagated to Neo4j.
+
+**Read Protocol** (tiered fallback):
+
+1. **Hot Tier**: Always loaded, immediate access (~1,600 tokens)
+2. **Warm Tier**: Lazy load on first access (2s timeout, ~400 tokens)
+3. **Cold Tier**: Lazy load if warm miss (5s timeout, ~200 tokens)
+4. **Archive Tier**: Query-only, never loaded into memory
+5. **File Fallback**: Local `MEMORY.md` files when Neo4j unavailable
+
+#### Graceful Degradation
+
+When Neo4j is unavailable, `MemoryManager` operates in **fallback mode**:
+
+- Hot tier cache remains empty
+- All read operations return empty results
+- Write operations are queued (not persisted)
+- Automatic reconnection attempts on next operation
+- No errors raised to caller (silent degradation)
+
+**Circuit Breaker**: After 3 consecutive connection failures, `MemoryManager` marks Neo4j unavailable and skips connection attempts for 60 seconds.
+
+#### Factory Pattern
+
+Use `MemoryManagerFactory` for shared connections across agents:
+
+```python
+# Get or create manager with shared OperationalMemory connection
+manager = await MemoryManagerFactory.get_manager(
+    agent_name="mongke",
+    operational_memory=shared_op_memory  # Optional shared connection
+)
+```
+
+### Agent-Specific Node Types
+
+Each agent uses specialized Neo4j node types for their operational memory:
+
+#### Kublai (main) - Orchestration
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:OperationalMemory` | Shared operational state | `id`, `agent`, `state`, `last_updated` |
+| `:Task` | Task Dependency Engine tasks | `id`, `description`, `status`, `priority_weight`, `assigned_to`, `sender_hash`, `embedding`, `window_expires_at` |
+| `:Agent` | Agent identity and heartbeat tracking | `id`, `name`, `infra_heartbeat`, `last_heartbeat`, `status` |
+| `:SessionContext` | Session context tracking | `id`, `agent`, `active`, `content`, `created_at` |
+| `:Notification` | Notification management | `id`, `agent`, `type`, `summary`, `read`, `created_at` |
+| `:Reflection` | Agent reflection entries | `id`, `agent`, `content`, `created_at` |
+
+**Example Cypher** (Kublai queries active tasks):
+
+```cypher
+// Get all active tasks for Kublai
+MATCH (t:Task)
+WHERE (t.assigned_to = 'main' OR t.delegated_by = 'main')
+  AND t.status IN ['pending', 'in_progress']
+RETURN t.id, t.description, t.status, t.priority_weight
+ORDER BY t.priority_weight DESC, t.created_at ASC
+LIMIT 50
+```
+
+#### Möngke (researcher) - Research
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:Research` | Research findings | `id`, `content`, `source`, `timestamp`, `agent`, `research_type`, `capability_name`, `embedding` |
+| `:Concept` | Concept definitions | `id`, `name`, `definition`, `related_concepts` |
+| `:Insight` | Insight records | `id`, `content`, `confidence`, `created_at` |
+
+**Example Cypher** (Möngke stores research findings):
+
+```cypher
+// Create a new research finding with vector embedding
+CREATE (r:Research {
+  id: 'research_' + toString(timestamp()),
+  content: $content,
+  source: $source,
+  timestamp: datetime(),
+  agent: 'researcher',
+  research_type: $research_type,
+  capability_name: $capability_name,
+  embedding: $embedding  // 384-dim vector for semantic search
+})
+RETURN r.id
+```
+
+**Example Cypher** (Möngke semantic search):
+
+```cypher
+// Semantic search for related research using vector similarity
+CALL db.index.vector.queryNodes('capability_research_embedding', 10, $query_embedding)
+YIELD node, score
+WHERE node.agent = 'researcher' OR node.agent = 'shared'
+RETURN node.id, node.content, node.source, score
+ORDER BY score DESC
+```
+
+#### Chagatai (writer) - Content
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:Content` | Content items | `id`, `type`, `title`, `body`, `author`, `created_at` |
+| `:StyleGuide` | Style guidelines | `id`, `agent`, `guidelines`, `version` |
+| `:Synthesis` | Synthesis outputs | `id`, `content`, `sources`, `created_at` |
+| `:Application` | Application entries | `id`, `content`, `created_at` |
+
+**Example Cypher** (Chagatai creates content):
+
+```cypher
+// Create new content with style attribution
+CREATE (c:Content {
+  id: 'content_' + toString(timestamp()),
+  type: $type,
+  title: $title,
+  body: $body,
+  author: 'writer',
+  created_at: datetime()
+})
+RETURN c.id
+```
+
+#### Temüjin (developer) - Implementation
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:CodePattern` | Reusable code patterns | `id`, `pattern`, `language`, `use_case`, `confidence` |
+| `:CodeReview` | Code review records | `id`, `file_path`, `findings`, `status`, `reviewer` |
+| `:SecurityAudit` | Security audit records | `id`, `file_path`, `vulnerabilities`, `severity`, `status` |
+| `:ProcessUpdate` | Process update records | `id`, `agent`, `update_type`, `content` |
+
+**Example Cypher** (Temüjin stores code patterns):
+
+```cypher
+// Store a reusable code pattern
+CREATE (cp:CodePattern {
+  id: 'pattern_' + toString(timestamp()),
+  pattern: $pattern_code,
+  language: $language,
+  use_case: $use_case_description,
+  confidence: 0.95,
+  created_at: datetime()
+})
+RETURN cp.id
+```
+
+#### Jochi (analyst) - Analysis
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:Analysis` | Backend analysis results | `id`, `file_path`, `agent`, `status`, `severity`, `assigned_to`, `findings` |
+| `:SecurityAudit` | Security audit records | `id`, `file_path`, `vulnerabilities`, `severity`, `status` |
+| `:CodeReview` | Code review records | `id`, `file_path`, `findings`, `status`, `reviewer` |
+
+**Example Cypher** (Jochi queries pending analyses):
+
+```cypher
+// Get high-severity pending analyses
+MATCH (a:Analysis)
+WHERE a.status = 'pending'
+  AND a.severity IN ['high', 'critical']
+RETURN a.id, a.file_path, a.severity, a.findings
+ORDER BY a.severity DESC, a.created_at ASC
+LIMIT 20
+```
+
+#### Ögedei (ops) - Operations
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:Agent` | Agent identity and heartbeat tracking | `id`, `name`, `infra_heartbeat`, `last_heartbeat`, `status` |
+| `:SystemHealth` | System health records | `id`, `service`, `status`, `checked_at`, `details` |
+| `:FileConsistencyReport` | File consistency scan results | `id`, `severity`, `status`, `scan_timestamp`, `files_checked` |
+| `:FileConflict` | Detected file conflicts | `id`, `file_path`, `conflicting_agents`, `status`, `severity` |
+| `:FailoverEvent` | Failover event records | `id`, `from_agent`, `to_agent`, `reason`, `timestamp` |
+| `:BackgroundTask` | Background task tracking | `id`, `task_type`, `status`, `started_at`, `completed_at` |
+
+**Example Cypher** (Ögedei checks heartbeat for failover):
+
+```cypher
+// Check for agents with stale heartbeat (failover condition)
+MATCH (a:Agent)
+WHERE a.id <> 'ops'
+  AND (
+    // Infra heartbeat stale (>90 seconds)
+    a.infra_heartbeat < datetime() - duration('PT90S')
+    OR
+    // Functional heartbeat stale (>5 minutes)
+    a.last_heartbeat < datetime() - duration('PT5M')
+  )
+RETURN a.id, a.name, a.infra_heartbeat, a.last_heartbeat
+```
+
+**Example Cypher** (Ögedei creates failover event):
+
+```cypher
+// Record failover event
+CREATE (fe:FailoverEvent {
+  id: 'failover_' + toString(timestamp()),
+  from_agent: $from_agent,
+  to_agent: 'ops',
+  reason: $reason,
+  timestamp: datetime()
+})
+RETURN fe.id
+```
+
 ### Operational Tier (Neo4j)
 
 **Storage**: Neo4j AuraDB (graph database)

@@ -14,9 +14,20 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #29735 | 1:33 PM | 🔵 | .claude/CLAUDE.md file exists but is empty or near-empty | ~198 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #32128 | 2:37 PM | ✅ | Project Instructions (CLAUDE.md) Updated with Neo4j Architecture and Agent System | ~527 |
+| #32127 | " | ✅ | Project Instructions Updated with Neo4j-First Memory Principles and Memory Tiering Strategy | ~631 |
 </claude-mem-context>
 
 # Kurultai Project Instructions
+
+## Project Overview
+
+Kurultai is a **6-agent multi-agent orchestration platform** built on OpenClaw gateway messaging and Neo4j-backed operational memory. Named after the Kurultai (the council of Mongol/Turkic tribal leaders), the system enables collaborative AI agent workflows with task delegation, capability-based routing, and failure recovery.
 
 ## Knowledge Base
 
@@ -50,6 +61,104 @@ updated_at: YYYY-MM-DD
 ---
 ```
 
+## Neo4j-First Memory Architecture
+
+### Core Principle
+
+> **Neo4j is the default for ALL operational data EXCEPT human private information.**
+
+### Memory Access Priority
+
+All agents use a tiered memory access pattern:
+
+1. **Neo4j Hot Tier** (in-memory) - Immediate access, no query needed
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+4. **Neo4j Archive** (query only) - Full-text search, 5s timeout
+5. **File Cache** (fallback) - Only when Neo4j unavailable
+
+### What Goes to Neo4j
+
+- Tasks, findings, metrics, agent status, routing decisions
+- Agent beliefs and philosophy (shareable across agents)
+- System coordination data
+- Performance and health data
+- Operational context and task state
+
+### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/<agent>/MEMORY.md`
+
+### Write Decision Flow
+
+```
+Creating memory entry
+    ↓
+Does it contain human PII or sensitive personal data?
+    ↓ YES → File ONLY (never Neo4j)
+    ↓ NO → Neo4j FIRST (then file cache backup)
+```
+
+### Example Cypher Queries
+
+```cypher
+// Get current operational state
+MATCH (o:OperationalMemory {agent: 'kublai'})
+RETURN o.context, o.last_updated
+
+// Get pending tasks for routing
+MATCH (t:Task {status: 'pending'})
+RETURN t.id, t.type, t.priority, t.payload
+ORDER BY t.priority DESC, t.created_at ASC
+
+// Get agent availability status
+MATCH (a:Agent)
+RETURN a.name, a.status, a.current_task, a.last_heartbeat
+
+// Cross-agent context sharing
+MATCH (o:OperationalMemory)
+WHERE o.agent IN ['möngke', 'chagatai', 'temüjin', 'jochi', 'ögedei']
+AND o.last_updated > datetime() - duration('P1D')
+RETURN o.agent, o.context
+ORDER BY o.last_updated DESC
+```
+
+## 6-Agent System
+
+| Agent | Role | Capabilities |
+|-------|------|--------------|
+| **Kublai** | Orchestrator / Squad Lead | Delegation protocol, task classification, synthesis, receives all inbound messages |
+| **Möngke** | Researcher | Information search, summarization, extraction, critical analysis |
+| **Chagatai** | Writer | Content creation, documentation, prose, storytelling |
+| **Temüjin** | Developer | Code implementation, technical architecture, system design |
+| **Jochi** | Analyst | Security review, code analysis, metrics, performance evaluation |
+| **Ögedei** | Operations | Failover, monitoring, recovery orchestration, emergency routing |
+
+### Delegation Matrix
+
+| Message Type | Delegate To |
+|--------------|-------------|
+| Research questions | möngke |
+| Content creation | chagatai |
+| Code/development | temüjin |
+| Analysis/performance | jochi |
+| Operations/emergency | ögedei |
+
+### Emergency Failover
+
+If Kublai is unavailable:
+1. Ögedei monitors via heartbeat
+2. After 3 missed heartbeats (90 seconds), Ögedei assumes routing role
+3. Ögedei updates Agent status: `MATCH (a:Agent {name: 'kublai'}) SET a.status = 'unavailable'`
+4. Ögedei begins routing incoming messages
+5. On recovery, Kublai resumes routing, Ögedei returns to monitoring
+
 ## Project Naming
 
 - **Project**: Kurultai (the multi-agent orchestration platform)
@@ -58,3 +167,41 @@ updated_at: YYYY-MM-DD
 - **Agent Names**: Kublai (orchestrator), Möngke, Chagatai, Temüjin, Jochi, Ögedei
 
 **Note**: "Kublai" is the name of the orchestrator agent (named after Kublai Khan). "Kurultai" is the project/platform name.
+
+## Architecture Components
+
+### OpenClaw Gateway (Port 18789)
+- WebSocket-based agent-to-agent messaging
+- Operator role authentication with token-based auth
+- Bidirectional streaming for agent responses
+- Built-in webchat control UI at `:18789/`
+
+See `.claude/memory_anchors/openclaw-gateway-architecture.md` for detailed protocol documentation.
+
+### Neo4j Operational Memory
+- Task tracking with DAG-based dependencies
+- Agent heartbeat monitoring (infra + functional tiers)
+- Capability nodes for dynamic routing
+- Vector embeddings for semantic search
+
+### Delegation Protocol
+- Complexity scoring system (0.0-1.0)
+- Team size classification (1-8 agents)
+- Capability-based agent selection
+- Automatic task reassignment on failure
+
+See `.claude/patterns/delegation-protocol.md` for detailed workflow and routing logic.
+
+### Two-Tier Heartbeat System
+- Infrastructure heartbeat (30s write interval, 120s threshold)
+- Functional heartbeat (event-driven on task operations, 90s threshold)
+
+See `.claude/metadata/two-tier-heartbeat-system.md` for complete specification.
+
+## External Integrations
+
+- **Signal Messaging**: Via signal-cli-daemon
+- **Authentik SSO**: Authentication and authorization
+- **Railway Deployment**: Containerized service deployment
+- **Caddy Reverse Proxy**: SSL termination and routing (external :9000 → internal :18789)
+- **Neo4j**: Graph database for operational memory
