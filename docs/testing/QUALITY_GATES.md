@@ -1,6 +1,6 @@
 # Quality Gate Verification System
 
-Comprehensive documentation for the Kublai Testing Suite quality gate verification system.
+Comprehensive documentation for the Kurultai Testing Suite quality gate verification system.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Comprehensive documentation for the Kublai Testing Suite quality gate verificati
 
 ### What Are Quality Gates
 
-Quality gates are automated checkpoints that validate code quality, test coverage, and system readiness before deployment. The Kublai Testing Suite implements a comprehensive **37-gate** verification system that ensures production readiness.
+Quality gates are automated checkpoints that validate code quality, test coverage, and system readiness before deployment. The Kurultai Testing Suite implements a comprehensive **37-gate** verification system that ensures production readiness.
 
 Each gate validates a specific aspect of the system:
 

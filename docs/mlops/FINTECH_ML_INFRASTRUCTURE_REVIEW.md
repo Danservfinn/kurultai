@@ -389,7 +389,7 @@ class CircuitBreakerOpen(Exception):
 
 ### 2.1 Current State Analysis
 
-Based on the Kublai system's Neo4j-based memory management, a fintech feature store would face these challenges:
+Based on the Kurultai system's Neo4j-based memory management, a fintech feature store would face these challenges:
 
 | Challenge | Impact | Priority |
 |-----------|--------|----------|

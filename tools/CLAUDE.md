@@ -14,13 +14,14 @@
 | #29737 | 1:33 PM | 🔵 | tools/__init__.py exports 10 modules with lazy import pattern to avoid numpy recursion | ~434 |
 | #29730 | 1:32 PM | 🔵 | memory_tools.py defines wrapper functions for OperationalMemory access | ~342 |
 | #29700 | 1:20 PM | 🔵 | Notion Sync Module Uses AsyncGraphDatabase Creating Architectural Inconsistency | ~432 |
-| #29691 | 1:18 PM | 🔵 | Notion Sync Module Uses AsyncGraphDatabase While OperationalMemory Uses Synchronous Driver | ~411 |
-| #29685 | 1:17 PM | 🔵 | Memory Tools Initialize OperationalMemory Singleton with Environment-Based Configuration | ~390 |
 
 ### Feb 7, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31436 | 12:06 PM | 🔵 | OpenClaw Configuration Architecture - Complete Agent System Definition | ~581 |
+| #31433 | 12:05 PM | 🔵 | Delegation Protocol Implementation - Kublai Multi-Memory Routing System | ~358 |
+| #31431 | " | 🔵 | Failover Monitor Implementation - Kublai Health Monitoring and Ögedei Failover Activation | ~402 |
 | #31137 | 10:33 AM | 🔵 | Heartbeat System Implementation in Kurultai Codebase | ~1130 |
 | #31025 | 1:37 AM | 🔵 | Notion Sync Node Types and Relationship Labels | ~310 |
 | #31008 | " | 🔵 | Notion Sync Neo4j Query Patterns: TaskNode-Centric Operations | ~440 |

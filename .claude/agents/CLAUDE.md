@@ -1,3 +1,80 @@
+# kb-claude Agent Instructions
+
+This knowledge base is managed by the kb-claude system. Entries are organized by type and use YAML front matter for metadata.
+
+## Entry Types
+
+- `debug_history`: Records of debugging sessions and problem resolution
+- `patterns`: Design patterns, architectural patterns, code patterns
+- `qa`: Questions and answers, troubleshooting guides
+- `code_index`: Indexes of code locations, API references, function catalogs
+- `metadata`: Project metadata, configuration documentation
+- `plans`: Implementation plans, project roadmaps
+- `cheatsheets`: Quick reference guides, command summaries
+- `memory_anchors`: Key concepts, important decisions, project knowledge anchors
+
+## YAML Front Matter Template
+
+```yaml
+---
+title: Clear descriptive title
+link: kebab-case-link-slug
+type: entry_type
+tags: [relevant, tags]
+ontological_relations:
+  - relates_to: [[related-entry-link]]
+  - builds_on: [[foundation-entry-link]]
+  - contradicts: [[alternative-entry-link]]
+uuid: AUTO_GENERATED
+created_at: AUTO_GENERATED
+updated_at: YYYY-MM-DD
+---
+```
+
+## Required Fields
+
+- `title`: Human-readable title
+- `link`: Kebab-case slug for linking
+- `type`: One of the entry types listed above
+- `uuid`: Auto-generated UUID v4
+- `created_at`: Auto-generated ISO 8601 timestamp
+
+## Optional Fields
+
+- `tags`: Array of topic tags
+- `ontological_relations`: Cross-references to other entries
+  - `relates_to`: General related entries
+  - `builds_on`: Foundation/prerequisite entries
+  - `contradicts`: Contradictory or alternative approaches
+- `updated_at`: Last modification timestamp
+
+## Wiki Linking
+
+Use `[[link-slug]]` syntax to reference other entries within the knowledge base. These create bidirectional links.
+
+## CLI Commands
+
+The kb-claude CLI provides these commands:
+
+- `kb new`: Create a new knowledge base entry
+- `kb search <query>`: Search entries by title, content, or tags
+- `kb validate`: Check all entries for valid YAML and references
+- `kb manifest`: Generate/update the manifest.md summary
+- `kb link <from> <to>`: Create bidirectional links between entries
+
+## Best Practices
+
+1. **Use specific types**: Choose the most appropriate type for your content
+2. **Tag generously**: Tags help with discoverability
+3. **Link related entries**: Use ontological_relations to build knowledge graphs
+4. **Write clear titles**: Titles should be self-descriptive
+5. **Update timestamps**: Modify `updated_at` when editing entries
+
+## Manifest
+
+The `manifest.md` file is auto-generated and provides a searchable index of all knowledge base entries.
+
+
 <claude-mem-context>
 # Recent Activity
 

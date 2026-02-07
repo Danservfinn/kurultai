@@ -1,4 +1,4 @@
-# Kublai Multi-Agent System - Deployment Readiness Report
+# Kurultai Multi-Agent System - Deployment Readiness Report
 
 > **Generated**: 2026-02-04
 > **System**: OpenClaw 6-Agent Orchestrator with Neo4j Operational Memory
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The Kublai multi-agent orchestrator system has made significant progress with comprehensive testing infrastructure, security protocols, and deployment documentation in place. However, **critical blockers remain** that must be resolved before production deployment.
+The Kurultai multi-agent orchestrator platform has made significant progress with comprehensive testing infrastructure, security protocols, and deployment documentation in place. However, **critical blockers remain** that must be resolved before production deployment.
 
 ### Current Status: 89.4% Test Pass Rate, 49.9% Coverage
 

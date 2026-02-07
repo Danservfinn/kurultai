@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |
 | #31386 | 12:01 PM | 🔵 | Writer Agent (Chagatai) Soul Configuration and Content Creation Framework | ~519 |
 | #31382 | " | 🔵 | Horde Agent Soul Files Structure Identified | ~201 |
 </claude-mem-context>

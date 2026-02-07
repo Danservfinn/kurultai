@@ -14,6 +14,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |
 | #31387 | 12:02 PM | 🔵 | Main Agent (Kublai) Soul Configuration and Message Routing Architecture | ~572 |
 | #31382 | 12:01 PM | 🔵 | Horde Agent Soul Files Structure Identified | ~201 |
 </claude-mem-context>

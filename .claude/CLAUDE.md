@@ -13,5 +13,55 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #29735 | 1:33 PM | 🔵 | .claude/CLAUDE.md file exists but is empty or near-empty | ~198 |
+| #29735 | 1:33 PM | 🔵 | .claude/CLAUDE.md file exists but is near-empty | ~198 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #31500 | 12:15 PM | ✅ | kb-claude Knowledge Base Implemented | ~450 |
+| #31501 | " | ✅ | Project Naming Standardized (Kublai → Kurultai) | ~350 |
 </claude-mem-context>
+
+# Kurultai Project Instructions
+
+## Knowledge Base
+
+This project uses the **kb-claude** knowledge base system in `.claude/` with typed entries and YAML front matter.
+
+### Entry Types
+- `metadata/`: Project specifications, configuration docs
+- `patterns/`: Design/architecture patterns
+- `memory_anchors/`: Key concepts and decisions
+- `cheatsheets/`: Command reference guides
+- `qa/`: Troubleshooting guides
+- `code_index/`: API references
+- `debug_history/`: Debugging session records
+- `plans/`: Implementation plans
+
+### Creating New Entries
+
+Use the YAML front matter template:
+
+```yaml
+---
+title: Clear title
+link: kebab-case-slug
+type: entry_type
+tags: [relevant, tags]
+ontological_relations:
+  - relates_to: [[other-entry]]
+uuid: AUTO_GENERATED
+created_at: AUTO_GENERATED
+updated_at: YYYY-MM-DD
+---
+```
+
+## Project Naming
+
+- **Project**: Kurultai (the multi-agent orchestration platform)
+- **GitHub**: https://github.com/Danservfinn/Kurultai
+- **Domain**: kublai.kurult.ai
+- **Agent Names**: Kublai (orchestrator), Möngke, Chagatai, Temüjin, Jochi, Ögedei
+
+**Note**: "Kublai" is the name of the orchestrator agent (named after Kublai Khan). "Kurultai" is the project/platform name.

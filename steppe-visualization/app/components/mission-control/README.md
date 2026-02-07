@@ -336,9 +336,9 @@ import { example1_BasicParsing } from './lib/GoalOrchestrator.example';
 example1_BasicParsing();
 ```
 
-## Integration with Kublai
+## Integration with Kurultai
 
-To integrate with the existing Kublai system:
+To integrate with the existing Kurultai system:
 
 1. **Connect to Signal Channel**: Use the existing Signal integration to send/receive messages
 2. **Parse User Messages**: Route user messages through GoalOrchestrator

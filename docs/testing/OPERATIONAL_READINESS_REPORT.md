@@ -392,7 +392,7 @@ Tests run against multiple Python versions:
 
 ### Formal Certification
 
-The Kublai Testing Suite is hereby certified as **OPERATIONALLY READY** for production deployment.
+The Kurultai Testing Suite is hereby certified as **OPERATIONALLY READY** for production deployment.
 
 ### Certification Criteria Met
 

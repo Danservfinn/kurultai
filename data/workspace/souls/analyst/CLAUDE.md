@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |
 | #31384 | 12:01 PM | 🔵 | Analyst Agent (Jochi) Soul Configuration and Capabilities | ~544 |
 | #31382 | " | 🔵 | Horde Agent Soul Files Structure Identified | ~201 |
 </claude-mem-context>
