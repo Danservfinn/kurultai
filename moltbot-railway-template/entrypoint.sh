@@ -331,3 +331,4 @@ else
     exec su -s /bin/sh moltbot -c "python /app/start_server.py"
 fi
 # Test timestamp: Sat Feb  7 17:46:39 EST 2026
+# Cache bust: 1770506481
