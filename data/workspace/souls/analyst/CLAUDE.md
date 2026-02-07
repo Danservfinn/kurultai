@@ -7,7 +7,10 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
+| #32079 | 2:30 PM | 🔵 | Analyst CLAUDE.md Session Log Records horde-health References | ~344 |
+| #32077 | " | 🔵 | Project Repository Contains horde-health Reference in Analyst Session Log | ~230 |
+| #32056 | 2:27 PM | ✅ | Analyst SOUL.md Updated - horde-health Command References Renamed to kurultai-health | ~368 |
+| #32045 | " | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
 | #32043 | " | 🔵 | Complete Analyst SOUL.md with Integrated horde-health Protocol | ~614 |
 | #31508 | 12:25 PM | 🟣 | Jochi SOUL.md Enhanced with Skill Routing Section | ~758 |
 | #31498 | 12:23 PM | 🔵 | Jochi's Current SOUL.md Architecture and Capabilities | ~1182 |

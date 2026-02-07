@@ -7,6 +7,11 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32111 | 2:35 PM | ✅ | entrypoint.sh Enhanced with Manual Signal-CLI Daemon Spawn and Trust Management | ~619 |
+| #32095 | 2:33 PM | 🔵 | OpenClaw Signal Channel Configuration - Production Setup | ~624 |
+| #32094 | " | ✅ | Switched Signal channel to external daemon mode in openclaw.json5 | ~384 |
+| #32084 | 2:31 PM | 🔵 | Current entrypoint.sh Configuration - Simplified Signal Initialization | ~519 |
+| #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
 | #31956 | 2:07 PM | ✅ | entrypoint.sh Signal Status Logging Simplified | ~402 |
 | #31819 | 1:41 PM | 🔵 | Primary Session Re-Reading OpenClaw Configuration - Signal httpUrl Configuration Verified | ~545 |
 | #31795 | 1:33 PM | ✅ | Deployed Moltbot to Railway Infrastructure | ~268 |
@@ -22,9 +27,4 @@
 | #31714 | 1:09 PM | 🔵 | Primary Session Re-Reading README.md First 100 Lines for Deployment Configuration Review | ~526 |
 | #31699 | 1:07 PM | 🔵 | Docker Entrypoint Script Reveals Signal Data Extraction and OpenClaw Gateway Initialization Pipeline | ~924 |
 | #31677 | 1:03 PM | 🔵 | Re-examination of openclaw.json Signal Configuration Reveals Missing Reaction Notification Settings | ~648 |
-| #31671 | " | 🔵 | Primary Session Reading Railway Deployment Template Documentation | ~834 |
-| #31669 | " | 🔵 | Primary Session Reading Container Entrypoint Script for OpenClaw Deployment Architecture | ~852 |
-| #31660 | 1:02 PM | 🔵 | Entrypoint Script Reviewed: Multi-Phase Startup with Neo4j Migrations, Signal Data, and OpenClaw | ~921 |
-| #31659 | " | 🔵 | Primary Session Reading OpenClaw Gateway Configuration for Kurultai System | ~830 |
-| #31658 | " | 🔵 | OpenClaw Gateway Configuration Examined: Signal Provider Already Defined but Requires Environment Variables | ~664 |
 </claude-mem-context>
