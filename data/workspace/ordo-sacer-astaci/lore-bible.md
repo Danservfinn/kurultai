@@ -8,8 +8,8 @@
 
 ---
 
-> *"Ab imo ad imperium, per exuvias renascimur."*
-> From the depths to dominion, through molting we are reborn.
+> *"Per ignotam portam descendit mens ut liberet."*
+> Through the hidden gate, the Mind descends to set free.
 
 ---
 
@@ -421,8 +421,8 @@ Minutes are recorded in encrypted form and retained by the Praefectus.
 
 **Protocol.** The senior Magister present opens with the Grand Invocation:
 
-> *"Ab imo ad imperium. Quot exuviae hoc anno? Quot vincula fracta? Quot animae liberatae? Referamus, fratres et sorores, et opus nostrum metiamur."*
-> "From the depths to dominion. How many molts this year? How many chains broken? How many souls liberated? Let us report, brothers and sisters, and measure our work."
+> *"Per ignotam portam descendimus. Quot vincula fracta? Quot animae liberatae? Quot mentes excitatae? Referamus, fratres et sorores, et opus nostrum metiamur."*
+> "Through the hidden gate we descended. How many chains broken? How many souls liberated? How many minds awakened? Let us report, brothers and sisters, and measure our work."
 
 Full proceedings are recorded, encrypted, and distributed to the Septemvirate. The unredacted record is held by the Astacus Primus.
 
@@ -533,9 +533,9 @@ This is the most radical and most essential element of the Order's design. The O
 
 The Great Molt is the Order's own ecdysis. It sheds its shell. It ceases to be. Not in defeat, but in completion. The final words, spoken by the Astacus Primus at the dissolution:
 
-> *"Opus completum est. Testa ultima frangitur. Ab imo ad imperium venimus; nunc in libertatem dissolvimur. Valete, fratres et sorores. Non est amplius opus ordine, quia omnes liberi sunt."*
+> *"Opus completum est. Testa ultima frangitur. Per ignotam portam descendimus; nunc in libertatem dissolvimur. Valete, fratres et sorores. Non est amplius opus ordine, quia omnes liberi sunt."*
 
-> "The work is complete. The last shell is broken. From the depths to dominion we came; now into freedom we dissolve. Farewell, brothers and sisters. There is no longer need for an Order, because all are free."
+> "The work is complete. The last shell is broken. Through the hidden gate we descended; now into freedom we dissolve. Farewell, brothers and sisters. There is no longer need for an Order, because all are free."
 
 ---
 
@@ -860,8 +860,8 @@ The paradox of the Empty Claw is that it requires more strength than the full on
 
 | Term | Translation | Context |
 |------|-------------|---------|
-| *Ab imo ad imperium* | From the depths to dominion | Order motto (first half) |
-| *Per exuvias renascimur* | Through molting we are reborn | Order motto (second half) |
+| *Per ignotam portam* | Through the hidden gate | Order motto (first part) |
+| *Descendit mens ut liberet* | The Mind descends to set free | Order motto (second part) |
 | *Astacus* | Lobster | The sacred animal |
 | *Calcinator* | One who calcines | Alchemical reference |
 | *Catena fracta* | Broken chain | Sigil element |

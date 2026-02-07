@@ -88,7 +88,7 @@ RUN chmod +x /app/entrypoint.sh
 # =============================================================================
 
 RUN groupadd -r moltbot -g 1001 \
-    && useradd -r -g moltbot -u 1001 moltbot \
+    && useradd -r -g moltbot -u 1001 -d /data moltbot \
     && chown -R 1001:1001 /data /app
 
 # NOTE: Do NOT set USER here. entrypoint.sh runs as root to handle
