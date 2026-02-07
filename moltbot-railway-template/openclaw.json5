@@ -54,7 +54,7 @@
       httpHost: "127.0.0.1",
       httpPort: 8080,
       startupTimeoutMs: 120000,
-      receiveMode: "manual",
+      receiveMode: "on-start",
       dmPolicy: "pairing",
       groupPolicy: "allowlist",
       configWrites: false,

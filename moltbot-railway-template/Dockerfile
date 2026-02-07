@@ -103,10 +103,9 @@ ENV OPENCLAW_STATE_DIR=/data/.openclaw
 ENV OPENCLAW_GATEWAY_PORT=18789
 
 # Signal Configuration
+# signal-cli uses default XDG path: $HOME/.local/share/signal-cli/ (HOME=/data at runtime)
 ENV SIGNAL_ENABLED=true
 ENV SIGNAL_ACCOUNT=${SIGNAL_ACCOUNT}
-ENV SIGNAL_DATA_DIR=/data/.signal
-ENV SIGNAL_CLI_PATH=/usr/local/bin/signal-cli
 
 # =============================================================================
 # SECTION 9: Health Check

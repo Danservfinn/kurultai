@@ -90,16 +90,8 @@ chmod 755 /data/.local /data/.local/share 2>/dev/null || true
 
 echo "Signal data status:"
 if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ]; then
-    echo "  accounts.json found at $SIGNAL_CLI_DATA_DIR/data/accounts.json"
-    echo "  accounts.json content: $(cat "$SIGNAL_CLI_DATA_DIR/data/accounts.json")"
-    echo "  signal-cli version: $(/usr/local/bin/signal-cli --version 2>&1 || echo unknown)"
-    echo "  Directory tree:"
-    find "$SIGNAL_CLI_DATA_DIR" -type f 2>/dev/null | while read -r f; do
-        echo "    $f ($(stat -c '%U:%G %a' "$f" 2>/dev/null || stat -f '%Su:%Sg %Lp' "$f" 2>/dev/null))"
-    done
-    # Quick smoke test: list accounts as moltbot user
-    echo "  Testing signal-cli env and listAccounts as moltbot..."
-    su -s /bin/sh moltbot -c "HOME=/data; export HOME; echo HOME=\$HOME; echo XDG_DATA_HOME=\${XDG_DATA_HOME:-unset}; echo 'Expected data dir: /data/.local/share/signal-cli'; ls -la /data/.local/share/signal-cli/data/ 2>&1; echo '--- verbose listAccounts ---'; /usr/local/bin/signal-cli -v listAccounts 2>&1" || true
+    echo "  accounts.json: OK ($(wc -c < "$SIGNAL_CLI_DATA_DIR/data/accounts.json") bytes)"
+    echo "  signal-cli: $(/usr/local/bin/signal-cli --version 2>&1 || echo unknown)"
 else
     echo "  WARNING: accounts.json missing — Signal will not work"
 fi
@@ -113,17 +105,7 @@ echo "Installing OpenClaw configuration..."
 cp /app/openclaw.json "$OPENCLAW_STATE_DIR/openclaw.json"
 cp /app/openclaw.json5 "$OPENCLAW_STATE_DIR/openclaw.json5"
 chown 1001:1001 "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/openclaw.json5"
-echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json"
-echo "Config contents (agents section):"
-python3 -c "import json; c=json.load(open('$OPENCLAW_STATE_DIR/openclaw.json')); print(json.dumps(c.get('agents',{}).get('defaults',{}), indent=2))" 2>&1 || echo "  (could not parse config)"
-echo "Config file size: $(wc -c < $OPENCLAW_STATE_DIR/openclaw.json) bytes"
-
-# Run OpenClaw doctor to check config validity
-echo "Running OpenClaw config validation..."
-OPENCLAW_BIN_CHECK=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
-if [ -x "$OPENCLAW_BIN_CHECK" ]; then
-    HOME=/data su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR $OPENCLAW_BIN_CHECK doctor" 2>&1 || echo "  (doctor exited with code $?)"
-fi
+echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < $OPENCLAW_STATE_DIR/openclaw.json) bytes)"
 
 # =============================================================================
 # START HEARTBEAT SIDECAR
