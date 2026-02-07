@@ -13,14 +13,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #29735 | 1:33 PM | 🔵 | .claude/CLAUDE.md file exists but is near-empty | ~198 |
-
-### Feb 7, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #31500 | 12:15 PM | ✅ | kb-claude Knowledge Base Implemented | ~450 |
-| #31501 | " | ✅ | Project Naming Standardized (Kublai → Kurultai) | ~350 |
+| #29735 | 1:33 PM | 🔵 | .claude/CLAUDE.md file exists but is empty or near-empty | ~198 |
 </claude-mem-context>
 
 # Kurultai Project Instructions

@@ -5,10 +5,10 @@ type: metadata
 tags: [heartbeat, monitoring, failover, health-check]
 ontological_relations:
   - relates_to: [[kurultai-project-overview]]
-  - relates_to: [[ogedei-failover-activation]]
+  - relates_to: [[delegation-protocol]]
 uuid: 550e8400-e29b-41d4-a716-446655440005
-created_at: 2026-02-07T12:00:00Z
-updated_at: 2026-02-07T12:00:00Z
+created_at: 2026-02-07T17:00:00Z
+updated_at: 2026-02-07T17:00:00Z
 ---
 
 # Two-Tier Heartbeat System Specification
@@ -50,11 +50,13 @@ CREATE (a:Agent {
 
 All components use consistent thresholds:
 
-| Component | Infra Threshold | Functional Threshold |
-|-----------|-----------------|---------------------|
-| Failover Protocol | 120s | 90s |
-| Delegation Routing | 120s | - |
-| Failover Monitor | - | 90s |
+| Component | Infra Threshold | Functional Threshold | Notes |
+|-----------|-----------------|---------------------|-------|
+| Failover Protocol | 120s | 90s | Both tiers checked |
+| Delegation Routing | 120s | - | Infra only for availability |
+| Failover Monitor | - | 90s | Functional only (stuck/zombie detection) |
+
+**Note**: `failover_monitor.py` uses `FAILOVER_THRESHOLD_SECONDS = 90` for detecting stuck/zombie agents (functional heartbeat). The 120s infra threshold is used by `delegation.py` to check if an agent is available before delegating.
 
 ## Failover Decision Matrix
 
@@ -79,8 +81,8 @@ async def write_infra_heartbeat():
     while True:
         timestamp = datetime.utcnow().isoformat()
         await memory.update_agent_property(
-            "main", 
-            "infra_heartbeat", 
+            "main",
+            "infra_heartbeat",
             timestamp
         )
         await asyncio.sleep(WRITE_INTERVAL)
@@ -91,7 +93,7 @@ async def write_infra_heartbeat():
 # OperationalMemory.claim_task()
 async def claim_task(task_id, agent_id):
     # ... claim logic ...
-    
+
     # Update functional heartbeat
     await self.update_agent_property(
         agent_id,

@@ -5,10 +5,10 @@ type: memory_anchors
 tags: [openclaw, gateway, websocket, messaging, architecture]
 ontological_relations:
   - relates_to: [[kurultai-project-overview]]
-  - relates_to: [[openclaw-websocket-protocol]]
+  - relates_to: [[two-tier-heartbeat-system]]
 uuid: 550e8400-e29b-41d4-a716-446655440002
-created_at: 2026-02-07T12:00:00Z
-updated_at: 2026-02-07T12:00:00Z
+created_at: 2026-02-07T17:00:00Z
+updated_at: 2026-02-07T17:00:00Z
 ---
 
 # OpenClaw Gateway Architecture
@@ -34,6 +34,7 @@ CMD ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789", "--
 ## Port Binding
 
 - **Internal Port**: 18789 (binds to `lan` for internal Docker network access)
+- **External Port** (via Caddy): 9000 (external access, SSL termination)
 - **Health Check**: `curl -f http://localhost:18789/health`
 - **WebChat UI**: Available at `http://localhost:18789/`
 
@@ -86,7 +87,7 @@ Events with `event: "agent"` contain streaming chunks:
 
 ## Integration Points
 
-- **Caddyfile**: Reverse proxy routes from `:9000` → `:18789`
+- **Caddyfile**: Reverse proxy routes from external `:9000` → internal `:18789`
 - **Agent Connectors**: Python async clients for each agent
 - **Kublai**: Primary orchestrator connects as operator
 

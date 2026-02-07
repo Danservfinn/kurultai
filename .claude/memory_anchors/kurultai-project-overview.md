@@ -5,11 +5,11 @@ type: memory_anchors
 tags: [architecture, multi-agent, orchestration, kublai, openclaw]
 ontological_relations:
   - relates_to: [[openclaw-gateway-architecture]]
-  - relates_to: [[neo4j-operational-memory]]
-  - builds_on: [[golden-horde-skill-system]]
+  - relates_to: [[two-tier-heartbeat-system]]
+  - relates_to: [[delegation-protocol]]
 uuid: 550e8400-e29b-41d4-a716-446655440001
-created_at: 2026-02-07T12:00:00Z
-updated_at: 2026-02-07T12:00:00Z
+created_at: 2026-02-07T17:00:00Z
+updated_at: 2026-02-07T17:00:00Z
 ---
 
 # Kurultai Multi-Agent Orchestration Platform
@@ -37,6 +37,8 @@ Kurultai is a 6-agent multi-agent orchestration platform built on OpenClaw gatew
 - Bidirectional streaming for agent responses
 - Built-in webchat control UI at `:18789/`
 
+See [[openclaw-gateway-architecture]] for detailed protocol documentation.
+
 ### Neo4j Operational Memory
 - Task tracking with DAG-based dependencies
 - Agent heartbeat monitoring (infra + functional tiers)
@@ -49,12 +51,20 @@ Kurultai is a 6-agent multi-agent orchestration platform built on OpenClaw gatew
 - Capability-based agent selection
 - Automatic task reassignment on failure
 
+See [[delegation-protocol]] for detailed workflow and routing logic.
+
+### Two-Tier Heartbeat System
+- Infrastructure heartbeat (30s write interval, 120s threshold)
+- Functional heartbeat (event-driven on task operations, 90s threshold)
+
+See [[two-tier-heartbeat-system]] for complete specification.
+
 ## Key Features
 
 1. **Dynamic Team Composition**: Automatically scales team size based on task complexity
 2. **Capability Acquisition**: `/learn` command for runtime skill acquisition
-3. **Two-Tier Heartbeat**: Infrastructure (30s) + functional (90s) health monitoring
-4. **Graceful Failover**: Ögedei activates when Kublai becomes unavailable
+3. **Two-Tier Heartbeat**: Infrastructure (30s interval, 120s threshold) + functional (90s threshold) health monitoring
+4. **Graceful Failover**: Ögedei activates when Kublai becomes unavailable (3 consecutive failures)
 5. **Fallback Mode**: In-memory operations when Neo4j is unavailable
 
 ## External Integrations
@@ -62,10 +72,10 @@ Kurultai is a 6-agent multi-agent orchestration platform built on OpenClaw gatew
 - **Signal Messaging**: Via signal-cli-daemon
 - **Authentik SSO**: Authentication and authorization
 - **Railway Deployment**: Containerized service deployment
-- **Caddy Reverse Proxy**: SSL termination and routing
+- **Caddy Reverse Proxy**: SSL termination and routing (external :9000 → internal :18789)
 
 ## Project Status
 
-Current development phase: v0.2 (82% complete)
+Current development phase: v0.2 (testing infrastructure implemented)
 
-See [[kurultai-testing-metrics-framework]] for testing infrastructure.
+Testing infrastructure is documented in `.claude/plans/staged-mapping-lovelace.md` (Kurultai Testing & Metrics Framework).

@@ -5,10 +5,10 @@ type: patterns
 tags: [patterns, delegation, routing, complexity-scoring]
 ontological_relations:
   - relates_to: [[kurultai-project-overview]]
-  - builds_on: [[team-size-classification]]
+  - relates_to: [[two-tier-heartbeat-system]]
 uuid: 550e8400-e29b-41d4-a716-446655440004
-created_at: 2026-02-07T12:00:00Z
-updated_at: 2026-02-07T12:00:00Z
+created_at: 2026-02-07T17:00:00Z
+updated_at: 2026-02-07T17:00:00Z
 ---
 
 # Delegation Protocol Pattern
@@ -65,7 +65,7 @@ Specialist Agent    Multi-Agent Workflow
 1. **Below threshold**: Direct route to best-fit specialist
 2. **Above threshold**: Form team with complementary capabilities
 3. **Capability check**: Verify agent has required capabilities
-4. **Availability check**: Confirm agent heartbeat is current
+4. **Availability check**: Confirm agent heartbeat is current (120s infra, 90s functional)
 
 ## Task Lifecycle
 
@@ -98,7 +98,7 @@ PENDING → CLAIMED → IN_PROGRESS → COMPLETED
 async def handle_failure(task_id, agent_id, error):
     # Mark task as failed
     await memory.update_task_status(task_id, "failed", error=str(error))
-    
+
     # Claim count check
     claims = await memory.get_claim_count(task_id)
     if claims >= 3:
@@ -112,6 +112,6 @@ async def handle_failure(task_id, agent_id, error):
 ## Implementation Notes
 
 - **Atomic Claims**: Neo4j Cypher ensures exactly one agent can claim
-- **Heartbeat Check**: 120s threshold for agent availability
+- **Heartbeat Check**: 120s threshold for infra heartbeat availability (see [[two-tier-heartbeat-system]])
 - **Capability CBAC**: Capability-Based Access Control for skill routing
 - **DAG Support**: Tasks can have dependencies for complex workflows
