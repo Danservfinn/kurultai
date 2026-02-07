@@ -66,22 +66,17 @@ fi
 # We use /data/.signal as the config dir, with data/ subdirectory inside.
 # Archive structure: data/accounts.json, data/182126, data/182126.d/
 
-# Ensure correct directory structure
-if [ ! -f "$SIGNAL_DATA_DIR/data/accounts.json" ]; then
-    # Migrate old layout (--strip-components=1 put files at root without data/ prefix)
-    if [ -f "$SIGNAL_DATA_DIR/accounts.json" ]; then
-        echo "Migrating Signal data to correct directory structure..."
-        mkdir -p "$SIGNAL_DATA_DIR/data"
-        mv "$SIGNAL_DATA_DIR/accounts.json" "$SIGNAL_DATA_DIR/data/"
-        for f in "$SIGNAL_DATA_DIR"/[0-9]*; do
-            [ -e "$f" ] && mv "$f" "$SIGNAL_DATA_DIR/data/"
-        done
-    # Fresh extraction from archive
-    elif [ -f /opt/signal-data.tar.gz ]; then
-        echo "Extracting Signal data to $SIGNAL_DATA_DIR..."
-        tar -xzf /opt/signal-data.tar.gz -C "$SIGNAL_DATA_DIR"
-    fi
+# Always force-extract from archive to ensure clean state
+# Previous migrations may have created truncated or corrupted files
+if [ -f /opt/signal-data.tar.gz ]; then
+    echo "Extracting Signal data from archive to $SIGNAL_DATA_DIR..."
+    # Remove old data/ subdir to ensure clean extraction
+    rm -rf "$SIGNAL_DATA_DIR/data" 2>/dev/null || true
+    tar -xzf /opt/signal-data.tar.gz -C "$SIGNAL_DATA_DIR"
     find "$SIGNAL_DATA_DIR" -name '._*' -delete 2>/dev/null
+    echo "  Extracted contents:"
+    ls -la "$SIGNAL_DATA_DIR/data/"
+    echo "  accounts.json size: $(wc -c < "$SIGNAL_DATA_DIR/data/accounts.json") bytes"
 fi
 
 chown -R 1001:1001 "$SIGNAL_DATA_DIR" 2>/dev/null || true
@@ -108,7 +103,7 @@ if [ -f "$SIGNAL_DATA_DIR/data/accounts.json" ] && [ -x /usr/local/bin/signal-cl
     SIGNAL_READY=false
     for i in $(seq 1 30); do
         sleep 2
-        if curl -sf http://127.0.0.1:$SIGNAL_CLI_PORT/v1/about > /dev/null 2>&1; then
+        if curl -sf http://127.0.0.1:$SIGNAL_CLI_PORT/api/v1/check > /dev/null 2>&1; then
             SIGNAL_READY=true
             echo "  signal-cli daemon ready after $((i*2))s"
             break

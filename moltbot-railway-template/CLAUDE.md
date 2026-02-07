@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31788 | 1:30 PM | 🔵 | Primary Session Reading Signal Daemon Startup Code to Identify Connection Issue | ~432 |
 | #31769 | 1:25 PM | ✅ | OpenClaw Signal Configuration Modified: Disable autoStart, Use httpUrl for Pre-Started Daemon | ~663 |
 | #31768 | " | 🟣 | Enhanced Signal Integration - Manual Daemon Startup Before OpenClaw Gateway | ~614 |
 | #31766 | 1:24 PM | 🔵 | Entrypoint Script Reviewed: OpenClaw Gateway Startup Configuration | ~543 |
@@ -26,5 +27,4 @@
 | #31657 | " | 🔵 | Dockerfile Configuration Reviewed: OpenClaw Gateway with Signal and Neo4j Support | ~695 |
 | #31436 | 12:06 PM | 🔵 | OpenClaw Configuration Architecture - Complete Agent System Definition | ~581 |
 | #31435 | " | 🔵 | Moltbot Railway Dockerfile - OpenClaw Gateway Deployment Configuration | ~319 |
-| #31392 | 12:02 PM | 🔵 | OpenClaw Gateway JSON Configuration (Production Variant) | ~293 |
 </claude-mem-context>
