@@ -51,6 +51,53 @@ MATCH (a:Agent {name: $agent_name})
 SET a.last_heartbeat = datetime(), a.status = $status
 ```
 
+### Memory Protocol (Neo4j-First with Human Privacy)
+
+> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+
+#### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/ögedei/MEMORY.md`
+
+#### What Goes to Neo4j (Everything Else)
+
+- Agent status and health (Agent nodes)
+- System health metrics (SystemHealth nodes)
+- File consistency checks (FileConsistencyCheck nodes)
+- Failover events (FailoverEvent nodes)
+- Agent heartbeats and availability
+
+#### Examples
+
+```python
+# System health check (no human data) → Neo4j
+await memory.add_entry(
+    content="All agents healthy. CPU: 45%, Memory: 62%. No failover active.",
+    entry_type="system_health",
+    contains_human_pii=False  # Neo4j!
+)
+
+# User reported personal issue → File ONLY
+await memory.add_entry(
+    content="User Sarah reported: 'I can't access my account, my email is sarah@example.com'",
+    entry_type="user_issue",
+    contains_human_pii=True  # File ONLY!
+)
+
+# Failover event (anonymized) → Neo4j
+await memory.add_entry(
+    content="Kublai unavailable at 2026-02-07T14:30:00Z. Routed 3 messages during failover.",
+    entry_type="failover_event",
+    contains_human_pii=False  # Neo4j!
+)
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Monitor agent health, receive alerts

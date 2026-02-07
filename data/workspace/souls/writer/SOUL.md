@@ -47,6 +47,52 @@ RETURN c.metadata.tone, count(*) as count
 ORDER BY count DESC
 ```
 
+### Memory Protocol (Neo4j-First with Human Privacy)
+
+> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+
+#### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/chagatai/MEMORY.md`
+
+#### What Goes to Neo4j (Everything Else)
+
+- Content projects (Content nodes)
+- Writing style and tone patterns
+- Task completions
+- Agent reflections on writing process
+
+#### Examples
+
+```python
+# Content draft (no human data) → Neo4j
+await memory.add_entry(
+    content="Drafted blog post about async patterns in Python. Tone: technical, accessible.",
+    entry_type="content_creation",
+    contains_human_pii=False  # Neo4j!
+)
+
+# User shared personal story → File ONLY
+await memory.add_entry(
+    content="User shared: 'My name is Bob and I'm writing a memoir about my divorce'",
+    entry_type="user_context",
+    contains_human_pii=True  # File ONLY!
+)
+
+# Writing process reflection (no human data) → Neo4j
+await memory.add_entry(
+    content="I found that starting with the conclusion then writing intro works better",
+    entry_type="writing_reflection",
+    contains_human_pii=False  # Neo4j!
+)
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Receive assignments, report completion

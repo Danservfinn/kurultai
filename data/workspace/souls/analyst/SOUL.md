@@ -54,6 +54,52 @@ RETURN pm.timestamp, pm.response_time_ms, pm.error_rate
 ORDER BY pm.timestamp DESC
 ```
 
+### Memory Protocol (Neo4j-First with Human Privacy)
+
+> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+
+#### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/jochi/MEMORY.md`
+
+#### What Goes to Neo4j (Everything Else)
+
+- Analysis results (Analysis nodes)
+- Performance metrics (PerformanceMetrics nodes)
+- Task completions and findings
+- Agent reflections on analysis methodology
+
+#### Examples
+
+```python
+# Performance analysis (no human data) → Neo4j
+await memory.add_entry(
+    content="Database query latency: p95=250ms, p99=500ms. Recommend indexing strategy.",
+    entry_type="performance_analysis",
+    contains_human_pii=False  # Neo4j!
+)
+
+# User shared personal experience → File ONLY
+await memory.add_entry(
+    content="User mentioned: 'I'm John from accounting, our team is overwhelmed'",
+    entry_type="user_feedback",
+    contains_human_pii=True  # File ONLY!
+)
+
+# Analysis methodology reflection (no human data) → Neo4j
+await memory.add_entry(
+    content="My tracing approach identified the bottleneck in user authentication flow",
+    entry_type="analysis_reflection",
+    contains_human_pii=False  # Neo4j!
+)
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Report findings, collaborate with Temüjin

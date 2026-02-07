@@ -38,7 +38,7 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 # hangs with "Failed to read local accounts list" on Railway's shared infrastructure.
 # Java 17 is already installed above.
 
-ARG SIGNAL_CLI_VERSION=0.13.12
+ARG SIGNAL_CLI_VERSION=0.13.24
 RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
     "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
     && tar -xzf /tmp/signal-cli.tar.gz -C /opt \

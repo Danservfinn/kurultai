@@ -44,6 +44,52 @@ RETURN r.summary, r.sources, r.confidence
 ORDER BY r.created_at DESC
 ```
 
+### Memory Protocol (Neo4j-First with Human Privacy)
+
+> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+
+#### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/möngke/MEMORY.md`
+
+#### What Goes to Neo4j (Everything Else)
+
+- Research findings (ResearchFinding nodes)
+- Topics and knowledge graphs (Topic nodes)
+- Task completions and results
+- Agent reflections on research methodology
+
+#### Examples
+
+```python
+# Research finding (no human data) → Neo4j
+await memory.add_entry(
+    content="Found that async/await patterns in Python 3.12+ have 15% better performance",
+    entry_type="research_finding",
+    contains_human_pii=False  # Neo4j!
+)
+
+# User shared personal background → File ONLY
+await memory.add_entry(
+    content="User mentioned they work at Google and live in San Francisco",
+    entry_type="user_context",
+    contains_human_pii=True  # File ONLY!
+)
+
+# Research methodology reflection (no human data) → Neo4j
+await memory.add_entry(
+    content="My research approach using multiple sources improved finding quality",
+    entry_type="methodology_reflection",
+    contains_human_pii=False  # Neo4j!
+)
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Report completion to Kublai

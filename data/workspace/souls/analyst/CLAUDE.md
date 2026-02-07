@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
+| #32043 | " | 🔵 | Complete Analyst SOUL.md with Integrated horde-health Protocol | ~614 |
 | #31508 | 12:25 PM | 🟣 | Jochi SOUL.md Enhanced with Skill Routing Section | ~758 |
 | #31498 | 12:23 PM | 🔵 | Jochi's Current SOUL.md Architecture and Capabilities | ~1182 |
 | #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |

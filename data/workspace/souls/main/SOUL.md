@@ -57,11 +57,75 @@ MATCH (a:Agent)
 RETURN a.name, a.status, a.current_task, a.last_heartbeat
 ```
 
+### Memory Protocol (Neo4j-First with Human Privacy)
+
+> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+
+#### Memory Access Priority
+
+1. **Neo4j Hot Tier** (in-memory) - No query, immediate access
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+4. **Neo4j Archive** (query only) - Full-text search, 5s timeout
+5. **File Cache** (fallback) - Only when Neo4j unavailable
+
+#### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/kublai/MEMORY.md`
+
+#### What Goes to Neo4j (Everything Else)
+
+- Tasks, findings, metrics, agent status, routing decisions
+- Agent beliefs and philosophy (shareable across agents)
+- System coordination data
+- Performance and health data
+
+#### Write Decision Flow
+
+```
+Creating memory entry
+    ↓
+Does it contain human PII or sensitive personal data?
+    ↓ YES → File ONLY (never Neo4j)
+    ↓ NO → Neo4j FIRST (then file cache backup)
+```
+
+#### Examples
+
+```python
+# Task routing result (no human data) → Neo4j
+await memory.add_entry(
+    content="Routed research task to möngke: 'Analyze async patterns'",
+    entry_type="routing_decision",
+    contains_human_pii=False  # Neo4j!
+)
+
+# User shared personal story → File ONLY
+await memory.add_entry(
+    content="User shared: 'My name is Alice and I live in Seattle, I'm struggling with debt'",
+    entry_type="user_communication",
+    contains_human_pii=True  # File ONLY!
+)
+
+# Agent reflection (no human data) → Neo4j
+await memory.add_entry(
+    content="My routing pattern for research tasks is working well",
+    entry_type="agent_reflection",
+    contains_human_pii=False  # Neo4j!
+)
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Delegate tasks to specialist agents
 - **Neo4j**: Query operational memory and task state
-- **File Memory**: Personal file-based memory at `/data/workspace/memory/kublai/MEMORY.md`
+- **File Memory**: Personal file-based memory at `/data/workspace/memory/kublai/MEMORY.md` (human-private data only)
 - **Signal Integration**: Receive/send Signal messages
 
 ### agentToAgent Messaging Patterns

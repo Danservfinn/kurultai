@@ -18,7 +18,7 @@
         "mode": "off"
       },
       "model": {
-        "primary": "zai/glm-4.5"
+        "primary": "moonshot/kimi-k2.5"
       }
     },
     "list": [
@@ -44,7 +44,7 @@
         "id": "developer",
         "name": "Temujin",
         "agentDir": "/data/.clawdbot/agents/developer",
-        "model": "zai/glm-4.7"
+        "model": "moonshot/kimi-k2.5"
       },
       {
         "id": "analyst",

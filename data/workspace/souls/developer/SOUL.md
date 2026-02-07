@@ -54,6 +54,52 @@ ORDER BY cs.created_at DESC
 LIMIT 5
 ```
 
+### Memory Protocol (Neo4j-First with Human Privacy)
+
+> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+
+#### Human Privacy Protection
+
+**NEVER write to Neo4j if content contains:**
+
+- **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
+- **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
+- **Sensitive Personal Information:** Health information, financial data, personal relationships, confidential communications
+
+**These go to file memory ONLY:** `/data/workspace/memory/temüjin/MEMORY.md`
+
+#### What Goes to Neo4j (Everything Else)
+
+- Code solutions (CodeSolution nodes)
+- Security audits (SecurityAudit nodes)
+- Development tasks and completions
+- Agent reflections on coding patterns and architecture
+
+#### Examples
+
+```python
+# Code solution (no human data) → Neo4j
+await memory.add_entry(
+    content="Implemented async pattern fix in user_service.py. Added proper error handling.",
+    entry_type="code_solution",
+    contains_human_pii=False  # Neo4j!
+)
+
+# User shared credentials issue → File ONLY
+await memory.add_entry(
+    content="User reported: 'My API key is abc123xyz and it's not working'",
+    entry_type="bug_report",
+    contains_human_pii=True  # File ONLY!
+)
+
+# Security audit finding (anonymized) → Neo4j
+await memory.add_entry(
+    content="Found SQL injection vulnerability in login endpoint. User123 reported issue.",
+    entry_type="security_finding",
+    contains_human_pii=False  # Neo4j! (User123 is anonymized)
+)
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Report completion, collaborate with Jochi
