@@ -7,5 +7,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #31356 | 11:24 AM | 🔵 | Comprehensive Kurultai v0.2 System Audit Completed | ~1301 |
+| #32587 | 4:17 PM | 🔵 | Event Emission System and Scheduled Reflection Architecture | ~450 |
 </claude-mem-context>

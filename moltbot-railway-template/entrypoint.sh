@@ -205,6 +205,21 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -f /app/scripts/heartbeat_writer.py ]; then
 fi
 
 # =============================================================================
+# START EXPRESS API SERVER
+# =============================================================================
+# The Express server provides the proposal API endpoints on port 8080
+# Start as background process so OpenClaw gateway can run in foreground
+if [ -f /app/src/index.js ]; then
+    echo "Starting Express API server on port ${EXPRESS_PORT:-8080}..."
+    su -s /bin/sh moltbot -c "NODE_ENV=production PORT=${EXPRESS_PORT:-8080} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js &"
+    # Wait a moment for Express to start
+    sleep 2
+    echo "Express API server started in background"
+else
+    echo "WARNING: Express server not found at /app/src/index.js"
+fi
+
+# =============================================================================
 # START OPENCLAW GATEWAY
 # =============================================================================
 # Drop to moltbot user and start the OpenClaw gateway

@@ -20,7 +20,8 @@
         "primary": "kimi-coding/k2p5"
       },
       "bootstrapMaxChars": 50000,
-      "skipBootstrap": true
+      "skipBootstrap": true,
+      "thinkingDefault": "high"
     },
     "list": [
       { "id": "main", "name": "Kublai", "workspace": "/data/workspace/souls/main" },
@@ -40,7 +41,7 @@
       "httpPort": 8080,
       "startupTimeoutMs": 120000,
       "receiveMode": "on-start",
-      "dmPolicy": "open",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "configWrites": true,
       "allowFrom": ["+15165643945", "+19194133445"],

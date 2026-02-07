@@ -11,21 +11,25 @@
 | #30626 | 10:04 PM | 🔵 | Signal Embedded Child Process Implementation Verified | ~538 |
 | #30540 | 6:52 PM | 🔵 | Moltbot Gateway Implementation with Embedded Signal-CLI Process Management | ~623 |
 | #30371 | 6:25 PM | 🔵 | Kurultai Molt Repository Inventory and Gap Analysis | ~882 |
-| #30240 | 5:28 PM | 🔵 | moltbot src/index.js: Full Implementation of Embedded signal-cli Child Process Management | ~1128 |
-| #30213 | 5:21 PM | ✅ | ARCHITECTURE.md Updated: Signal Integration Moved from Separate Services to Embedded Process | ~616 |
-| #30128 | 5:05 PM | 🔵 | Moltbot Railway Template Entry Point Implementation | ~647 |
-| #29696 | 1:19 PM | 🔵 | Index.js Complete Review Confirms All Critical Issues and No Proxy Implementation | ~659 |
-| #29673 | 1:15 PM | ✅ | Golden-Horde Plan Update Complete: Comprehensive Review and Codebase Validation | ~696 |
-| #29661 | 1:14 PM | 🔵 | Express Gateway Currently Runs Signal-CLI Management, Not OpenClaw Integration | ~655 |
-| #29637 | 12:54 PM | 🔵 | src/index.js Final Verification - Entry Point Ready for http-proxy-middleware Integration | ~778 |
-| #29584 | 12:48 PM | 🔵 | Express Gateway Server Missing WebSocket Proxy to OpenClaw | ~688 |
-| #29332 | 12:49 AM | 🔵 | Moltbot Railway Template Gateway Entry Point Reviewed | ~381 |
 
 ### Feb 7, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #31350 | 11:23 AM | 🔵 | Moltbot Gateway Entry Point - Signal CLI Integration Architecture | ~906 |
-| #31308 | 11:07 AM | ✅ | Skill Sync Architecture Analysis Document Created | ~877 |
+| #32707 | 4:53 PM | 🔴 | Added Error Handling to Proposal Endpoints | ~287 |
+| #32684 | 4:51 PM | 🔵 | Completed Moltbot Gateway Implementation with Kublai Integration | ~622 |
+| #32683 | 4:50 PM | 🟣 | Proposals API Endpoints and Root Endpoint Enhancements | ~419 |
+| #32682 | " | ✅ | Module Exports Updated with Kublai Functions | ~190 |
+| #32681 | " | 🟣 | Kublai Module Graceful Shutdown Integrated | ~223 |
+| #32680 | " | 🟣 | Kublai Module Initialization Integrated into Server Startup | ~292 |
+| #32679 | " | 🟣 | Neo4j v4 Migration Endpoint Expanded to Full Schema | ~514 |
+| #32678 | 4:49 PM | 🟣 | Health Endpoint Extended with Kublai Status | ~372 |
+| #32677 | " | 🟣 | Kublai Module Initialization and Lifecycle Management | ~504 |
+| #32676 | " | ✅ | Kublai and Workflow Module Imports Added to Gateway | ~294 |
+| #32671 | " | 🔵 | Moltbot Railway Template Gateway Architecture | ~492 |
+| #32638 | 4:31 PM | 🔵 | OpenClaw Gateway API and Session State Query Options Analyzed | ~748 |
+| #32634 | 4:30 PM | 🔵 | Express-Based Gateway Server Manages Signal Protocol and Neo4j Integration | ~309 |
+| #32595 | 4:18 PM | 🔵 | OpenClaw Session Lifecycle Management Analysis Completed | ~602 |
+| #32552 | 4:11 PM | 🔵 | Neo4j Integration Across Molt Agent System | ~373 |
 | #31012 | 1:37 AM | 🔵 | Signal CLI Daemon Integration in Express Gateway | ~379 |
 </claude-mem-context>

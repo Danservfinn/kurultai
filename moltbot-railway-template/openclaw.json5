@@ -33,6 +33,8 @@
       bootstrapMaxChars: 50000,
       // We manage workspace files ourselves — don't let OpenClaw overwrite with templates
       skipBootstrap: true,
+      // Extended thinking: low|high|off — "high" maximizes reasoning depth
+      thinkingDefault: "high",
     },
     // Kurultai's 6 agents — each with its own workspace containing SOUL.md + CLAUDE.md
     // OpenClaw loads SOUL.md, CLAUDE.md, IDENTITY.md etc. from workspace root at session start
@@ -47,19 +49,17 @@
   },
 
   // Signal channel configuration
-  // OpenClaw autoStarts signal-cli daemon — data must be at $HOME/.local/share/signal-cli/
-  // With HOME=/data, that means /data/.local/share/signal-cli/data/accounts.json
+  // Express server manages signal-cli daemon on port 8081
+  // OpenClaw connects to externally-managed daemon via httpUrl
   channels: {
     signal: {
       enabled: true,
       account: "${SIGNAL_ACCOUNT}",
-      // Wrapper adds --trust-new-identities always to handle identity key changes
-      cliPath: "/app/signal-cli-wrapper.sh",
-      httpHost: "127.0.0.1",
-      httpPort: 8080,
-      startupTimeoutMs: 120000,
+      // Connect to Express-managed signal-cli daemon (external mode)
+      httpUrl: "http://127.0.0.1:8081",
+      autoStart: false,
       receiveMode: "on-start",
-      dmPolicy: "open",
+      dmPolicy: "allowlist",
       groupPolicy: "allowlist",
       configWrites: true,
       allowFrom: ["+15165643945", "+19194133445"],

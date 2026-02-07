@@ -23,6 +23,7 @@ from migrations.v1_initial_schema import V1InitialSchema
 from migrations.v2_kurultai_dependencies import V2KurultaiDependencies
 from migrations.v3_capability_acquisition import V3CapabilityAcquisition
 from migrations.v4_proposals import V4Proposals
+from migrations.v5_chat_summaries import V5ChatSummaries
 
 
 def main():
@@ -59,7 +60,8 @@ def main():
         V2KurultaiDependencies.register(manager)
         V3CapabilityAcquisition.register(manager)
         V4Proposals.register(manager)
-        print("Registered migrations: v1, v2, v3, v4")
+        V5ChatSummaries.register(manager)
+        print("Registered migrations: v1, v2, v3, v4, v5")
 
         current = manager.get_current_version()
         print(f"Current schema version: {current}")
@@ -87,7 +89,7 @@ def main():
 
         target = args.target_version
         if target is None:
-            target = 4  # Latest
+            target = 5  # Latest
 
         if args.dry_run:
             print(f"\n[DRY RUN] Would migrate from v{current} to v{target}")

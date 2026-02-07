@@ -7,24 +7,24 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32710 | 4:54 PM | 🔵 | OpenClaw entrypoint script configures device identity and WebSocket authentication | ~487 |
+| #32708 | 4:53 PM | 🔵 | OpenClaw multi-agent configuration reviewed | ~370 |
+| #32672 | 4:49 PM | 🔵 | Moltbot Railway Template Package Configuration | ~324 |
+| #32665 | 4:40 PM | ✅ | Agent Extended Thinking Configuration Added | ~297 |
+| #32652 | 4:34 PM | 🔵 | Found increased bootstrapMaxChars limit and skipBootstrap flag in openclaw.json | ~298 |
+| #32648 | 4:33 PM | 🔵 | Containerized Agent Runtime with Heartbeat Sidecar and OpenClaw Gateway | ~434 |
+| #32647 | " | 🔵 | Docker Image Includes Soul Files Directory | ~297 |
+| #32638 | 4:31 PM | 🔵 | OpenClaw Gateway API and Session State Query Options Analyzed | ~748 |
+| #32633 | 4:29 PM | 🔵 | Moltbot Entrypoint Script: Agent Deployment and Signal Configuration | ~505 |
+| #32595 | 4:18 PM | 🔵 | OpenClaw Session Lifecycle Management Analysis Completed | ~602 |
+| #32593 | " | 🔵 | OpenClaw Gateway Configuration Defines Six-Agent Golden Horde Network | ~472 |
+| #32587 | 4:17 PM | 🔵 | Event Emission System and Scheduled Reflection Architecture | ~450 |
+| #32586 | " | 🔵 | Soul File Deployment Architecture in Entrypoint | ~391 |
+| #32583 | " | 🔵 | OpenClaw Configuration with 6-Agent Soul-Based Architecture | ~338 |
+| #32559 | 4:11 PM | 🔵 | OpenClaw Gateway Configuration for Kurultai Multi-Agent System | ~672 |
+| #32552 | " | 🔵 | Neo4j Integration Across Molt Agent System | ~373 |
+| #32544 | 4:07 PM | 🔵 | Complete entrypoint.sh - Comprehensive Moltbot Startup Orchestration | ~683 |
 | #32499 | 3:41 PM | 🔵 | Complete SOUL.md and IDENTITY.md Deployment Lifecycle Analysis | ~627 |
 | #32498 | " | 🔵 | OpenClaw Agent Soul/Identity File Loading Mechanism Documented | ~675 |
 | #32484 | 3:39 PM | 🔵 | OpenClaw Bootstrap Configuration for Soul Files Documented | ~399 |
-| #32483 | " | 🔵 | OpenClaw Agent Configuration: Model and Workspace Setup | ~339 |
-| #32478 | " | 🔵 | Examined OpenClaw gateway configuration defining 6-agent orchestration architecture | ~417 |
-| #32476 | " | 🔵 | Agent Soul File Loading Mechanism Identified in OpenClaw Configuration | ~447 |
-| #32470 | " | 🔵 | OpenClaw Agent Workspace Configuration for Soul File Loading | ~368 |
-| #32461 | 3:38 PM | ✅ | Entrypoint Script Updated with Agent Soul File Deployment | ~579 |
-| #32460 | " | 🔵 | OpenClaw Gateway with Embedded Signal and Webchat Architecture | ~461 |
-| #32458 | " | 🔵 | Examined OpenClaw gateway configuration for Kurultai multi-agent system | ~371 |
-| #32457 | " | 🔵 | OpenClaw Configuration Updated - Agent Workspace Paths Now Configured for Soul File Loading | ~513 |
-| #32403 | 3:31 PM | ✅ | OpenClaw Console Logging Level Changed to Debug | ~247 |
-| #32400 | 3:30 PM | ✅ | Enabled debug logging in OpenClaw gateway configuration | ~257 |
-| #32373 | 3:25 PM | 🟣 | Entrypoint Script Enhanced - Agent Soul Files Deployment Added to Startup Sequence | ~524 |
-| #32355 | 3:23 PM | 🔵 | Session Startup Workspace Loading Pattern Found - SOUL.md and CLAUDE.md Loaded at Agent Session Start | ~403 |
-| #32345 | 3:22 PM | 🔴 | Signal Session Reset Added to Startup Pipeline | ~481 |
-| #32340 | 3:21 PM | 🔵 | Updated OpenClaw JSON5 Config - Agent-Specific Workspaces and Signal Wrapper Integration | ~544 |
-| #32337 | " | 🔵 | OpenClaw Gateway Configuration Complete - Kurultai v0.2 Railway Deployment Settings | ~550 |
-| #32336 | " | 🔵 | OpenClaw JSON Configuration Complete Review - All Settings Documented | ~442 |
-| #32314 | 3:14 PM | 🔵 | Moltbot Entrypoint Startup Sequence - Comprehensive Multi-Phase Initialization | ~557 |
 </claude-mem-context>

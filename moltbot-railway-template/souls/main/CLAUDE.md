@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32649 | 4:33 PM | 🔵 | Kublai Build Context Soul Files Present and Recently Updated - IDENTITY.md Added | ~336 |
+| #32565 | 4:13 PM | 🔵 | Kublai Main Agent SOUL.md - Comprehensive Squad Lead Identity with Neo4j-First Memory Architecture | ~736 |
 | #32499 | 3:41 PM | 🔵 | Complete SOUL.md and IDENTITY.md Deployment Lifecycle Analysis | ~627 |
 | #32492 | 3:40 PM | 🔵 | Agent Soul File Storage in Moltbot Railway Template | ~354 |
 | #32473 | 3:39 PM | 🔵 | Session Log Divergence Between Deployment Environments | ~489 |

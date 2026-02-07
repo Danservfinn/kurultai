@@ -75,6 +75,16 @@ COPY .signal-data/signal-data.tar.gz /opt/signal-data.tar.gz
 # =============================================================================
 # Copy migration scripts, config, and operational files
 
+# Install Express server dependencies first (for layer caching)
+COPY --chown=1000:1000 package*.json /app/
+RUN npm install --production
+
+# Copy Express server source files
+COPY --chown=1000:1000 src /app/src
+COPY --chown=1000:1000 routes /app/routes
+COPY --chown=1000:1000 middleware /app/middleware
+COPY --chown=1000:1000 config /app/config
+
 COPY --chown=1000:1000 migrations /app/migrations
 COPY --chown=1000:1000 openclaw_memory.py /app/
 COPY --chown=1000:1000 scripts /app/scripts
