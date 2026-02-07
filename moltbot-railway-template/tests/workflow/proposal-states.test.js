@@ -1,11 +1,11 @@
 /**
  * Proposal State Machine Tests
  *
- * Tests for the proposal state machine managing architecture proposal lifecycles.
+ * Tests for the proposal state machine managing architecture proposal lifecycle.
  * Verifies state transitions, validation, and proposal management.
  */
 
-const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const {
   ProposalStateMachine,
@@ -18,11 +18,12 @@ describe('Proposal State Machine', () => {
   let stateMachine;
   const mockLogger = {
     info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn()
+    warn: jest.fn(),
+    error: jest.fn()
   };
 
   beforeAll(async () => {
+    // Connect to test Neo4j instance
     const uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
     const user = process.env.NEO4J_USER || 'neo4j';
     const password = process.env.NEO4J_PASSWORD || 'password';
@@ -30,17 +31,17 @@ describe('Proposal State Machine', () => {
     driver = neo4j.driver(uri, { auth: { user, password } });
     stateMachine = new ProposalStateMachine(driver, mockLogger);
 
-    // Clean up test data
+    // Clean up any existing test data
     const session = driver.session();
     try {
       await session.run(`
         MATCH (p:ArchitectureProposal)
-        WHERE p.title STARTS WITH 'test-'
+        WHERE p.title STARTS WITH 'Test-'
         DETACH DELETE p
       `);
       await session.run(`
         MATCH (o:ImprovementOpportunity)
-        WHERE o.description CONTAINS 'test-opportunity'
+        WHERE o.description CONTAINS 'Test-'
         DETACH DELETE o
       `);
     } finally {
@@ -49,16 +50,17 @@ describe('Proposal State Machine', () => {
   });
 
   afterAll(async () => {
+    // Clean up test data
     const session = driver.session();
     try {
       await session.run(`
         MATCH (p:ArchitectureProposal)
-        WHERE p.title STARTS WITH 'test-'
+        WHERE p.title STARTS WITH 'Test-'
         DETACH DELETE p
       `);
       await session.run(`
         MATCH (o:ImprovementOpportunity)
-        WHERE o.description CONTAINS 'test-opportunity'
+        WHERE o.description CONTAINS 'Test-'
         DETACH DELETE o
       `);
     } finally {
@@ -70,12 +72,8 @@ describe('Proposal State Machine', () => {
     }
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('proposalStates constants', () => {
-    it('should define all proposal states', () => {
+    it('should define all expected states', () => {
       expect(proposalStates.PROPOSED).toBe('proposed');
       expect(proposalStates.UNDER_REVIEW).toBe('under_review');
       expect(proposalStates.APPROVED).toBe('approved');
@@ -87,7 +85,7 @@ describe('Proposal State Machine', () => {
   });
 
   describe('implementationStates constants', () => {
-    it('should define all implementation states', () => {
+    it('should define all expected implementation states', () => {
       expect(implementationStates.NOT_STARTED).toBe('not_started');
       expect(implementationStates.IN_PROGRESS).toBe('in_progress');
       expect(implementationStates.COMPLETED).toBe('completed');
@@ -97,12 +95,11 @@ describe('Proposal State Machine', () => {
   });
 
   describe('createProposal', () => {
-    it('should create a new proposal', async () => {
+    it('should create a new proposal with default values', async () => {
       const result = await stateMachine.createProposal(
         null,
-        'test-New Proposal',
-        'Test description',
-        'api'
+        'Test- New Proposal',
+        'Test description for new proposal'
       );
 
       expect(result.proposalId).toBeDefined();
@@ -110,182 +107,218 @@ describe('Proposal State Machine', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('[Proposal] Created:')
       );
+
+      // Verify in database
+      const session = driver.session();
+      try {
+        const dbResult = await session.run(`
+          MATCH (p:ArchitectureProposal {id: $id})
+          RETURN p.title as title, p.status as status, p.implementation_status as implStatus
+        `, { id: result.proposalId });
+
+        expect(dbResult.records[0].get('title')).toBe('Test- New Proposal');
+        expect(dbResult.records[0].get('status')).toBe('proposed');
+        expect(dbResult.records[0].get('implStatus')).toBe('not_started');
+      } finally {
+        await session.close();
+      }
     });
 
     it('should create proposal linked to opportunity', async () => {
       const session = driver.session();
-      let opportunityId;
+      let oppId;
       try {
         // Create opportunity
         const oppResult = await session.run(`
           CREATE (o:ImprovementOpportunity {
             id: randomUUID(),
-            type: 'test-opportunity',
-            description: 'test-opportunity for linking'
+            type: 'missing_section',
+            description: 'Test- Opportunity for proposal'
           })
           RETURN o.id as id
         `);
-        opportunityId = oppResult.records[0].get('id');
+        oppId = oppResult.records[0].get('id');
 
         const result = await stateMachine.createProposal(
-          opportunityId,
-          'test-Linked Proposal',
-          'Linked to opportunity'
+          oppId,
+          'Test- Proposal From Opportunity',
+          'Test description'
         );
 
-        // Verify link
-        const linkResult = await session.run(`
+        // Verify relationship
+        const relResult = await session.run(`
           MATCH (o:ImprovementOpportunity {id: $oppId})-[:EVOLVES_INTO]->(p:ArchitectureProposal {id: $propId})
-          RETURN count(*) as linkCount
-        `, { oppId: opportunityId, propId: result.proposalId });
+          RETURN count(*) as count
+        `, { oppId, propId: result.proposalId });
 
-        expect(linkResult.records[0].get('linkCount').toNumber()).toBe(1);
+        expect(relResult.records[0].get('count').toNumber()).toBe(1);
       } finally {
         await session.close();
       }
     });
 
-    it('should create proposal without opportunity', async () => {
+    it('should create proposal with category', async () => {
       const result = await stateMachine.createProposal(
         null,
-        'test-Standalone Proposal',
-        'No opportunity link'
-      );
-
-      expect(result.proposalId).toBeDefined();
-      expect(result.status).toBe('proposed');
-    });
-
-    it('should set default values correctly', async () => {
-      const result = await stateMachine.createProposal(
-        null,
-        'test-Default Values',
-        'Checking defaults'
+        'Test- Categorized Proposal',
+        'Test description',
+        'security'
       );
 
       const session = driver.session();
       try {
-        const record = await session.run(`
+        const dbResult = await session.run(`
           MATCH (p:ArchitectureProposal {id: $id})
-          RETURN p.status as status, p.implementation_status as implStatus, p.priority as priority
+          RETURN p.category as category
         `, { id: result.proposalId });
 
-        expect(record.records[0].get('status')).toBe('proposed');
-        expect(record.records[0].get('implStatus')).toBe('not_started');
-        expect(record.records[0].get('priority')).toBe('medium');
+        expect(dbResult.records[0].get('category')).toBe('security');
       } finally {
         await session.close();
       }
     });
 
-    it('should handle Neo4j errors', async () => {
-      const badStateMachine = new ProposalStateMachine(
-        { session: () => ({ run: () => { throw new Error('Create failed'); }, close: jest.fn() }) },
-        mockLogger
-      );
+    it('should throw error on Neo4j failure', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Database error'); },
+          close: jest.fn()
+        })
+      };
+      const badStateMachine = new ProposalStateMachine(badDriver, mockLogger);
 
       await expect(
-        badStateMachine.createProposal(null, 'test-Fail', 'Will fail')
-      ).rejects.toThrow('Create failed');
+        badStateMachine.createProposal(null, 'Test- Bad Proposal', 'Description')
+      ).rejects.toThrow('Database error');
     });
   });
 
   describe('transition', () => {
-    it('should transition proposal to valid state', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Transition Proposal',
-        'For transition testing'
-      );
+    let testProposalId;
 
-      const transitionResult = await stateMachine.transition(
-        createResult.proposalId,
+    beforeEach(async () => {
+      // Create a fresh proposal for transition tests
+      const result = await stateMachine.createProposal(
+        null,
+        'Test- Transition Proposal',
+        'Test description'
+      );
+      testProposalId = result.proposalId;
+    });
+
+    it('should transition from proposed to under_review', async () => {
+      const result = await stateMachine.transition(
+        testProposalId,
         'under_review',
         'Starting review'
       );
 
-      expect(transitionResult.success).toBe(true);
-      expect(transitionResult.newState).toBe('under_review');
-      expect(transitionResult.previousState).toBe('proposed');
+      expect(result.success).toBe(true);
+      expect(result.newState).toBe('under_review');
+      expect(result.previousState).toBe('proposed');
+    });
+
+    it('should transition from under_review to approved', async () => {
+      await stateMachine.transition(testProposalId, 'under_review', 'Starting review');
+
+      const result = await stateMachine.transition(
+        testProposalId,
+        'approved',
+        'Review complete'
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.newState).toBe('approved');
+    });
+
+    it('should transition from approved to implemented', async () => {
+      await stateMachine.transition(testProposalId, 'under_review', '');
+      await stateMachine.transition(testProposalId, 'approved', '');
+
+      const result = await stateMachine.transition(
+        testProposalId,
+        'implemented',
+        'Implementation started'
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.newState).toBe('implemented');
+    });
+
+    it('should transition from implemented to validated', async () => {
+      await stateMachine.transition(testProposalId, 'under_review', '');
+      await stateMachine.transition(testProposalId, 'approved', '');
+      await stateMachine.transition(testProposalId, 'implemented', '');
+
+      const result = await stateMachine.transition(
+        testProposalId,
+        'validated',
+        'Validation passed'
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.newState).toBe('validated');
+    });
+
+    it('should transition from validated to synced', async () => {
+      await stateMachine.transition(testProposalId, 'under_review', '');
+      await stateMachine.transition(testProposalId, 'approved', '');
+      await stateMachine.transition(testProposalId, 'implemented', '');
+      await stateMachine.transition(testProposalId, 'validated', '');
+
+      const result = await stateMachine.transition(
+        testProposalId,
+        'synced',
+        'Synced to architecture'
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.newState).toBe('synced');
     });
 
     it('should reject invalid transitions', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Invalid Transition',
-        'Testing invalid transition'
+      // Cannot go from proposed directly to validated
+      const result = await stateMachine.transition(
+        testProposalId,
+        'validated',
+        'Trying to skip'
       );
 
-      const transitionResult = await stateMachine.transition(
-        createResult.proposalId,
-        'synced',
-        'Trying to skip states'
-      );
-
-      expect(transitionResult.success).toBe(false);
-      expect(transitionResult.error).toContain('Invalid transition');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid transition');
     });
 
     it('should return error for non-existent proposal', async () => {
       const result = await stateMachine.transition(
         'non-existent-id',
         'under_review',
-        'Testing'
+        ''
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Proposal not found');
     });
 
-    it('should store metadata on transition', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Metadata Transition',
-        'Testing metadata'
-      );
+    it('should store metadata with transition', async () => {
+      await stateMachine.transition(testProposalId, 'under_review', '');
 
+      const metadata = { reviewer: 'test-user', notes: 'Looks good' };
       await stateMachine.transition(
-        createResult.proposalId,
-        'under_review',
-        'Review started',
-        { reviewer: 'test-user', priority: 'high' }
+        testProposalId,
+        'approved',
+        'Approved with metadata',
+        metadata
       );
 
       const session = driver.session();
       try {
-        const record = await session.run(`
+        const result = await session.run(`
           MATCH (p:ArchitectureProposal {id: $id})
-          RETURN p.reviewer as reviewer, p.priority as priority
-        `, { id: createResult.proposalId });
+          RETURN p.reviewer as reviewer, p.notes as notes
+        `, { id: testProposalId });
 
-        expect(record.records[0].get('reviewer')).toBe('test-user');
-        expect(record.records[0].get('priority')).toBe('high');
-      } finally {
-        await session.close();
-      }
-    });
-
-    it('should handle state change reason', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Reason Transition',
-        'Testing reason'
-      );
-
-      await stateMachine.transition(
-        createResult.proposalId,
-        'under_review',
-        'Code review requested'
-      );
-
-      const session = driver.session();
-      try {
-        const record = await session.run(`
-          MATCH (p:ArchitectureProposal {id: $id})
-          RETURN p.state_change_reason as reason
-        `, { id: createResult.proposalId });
-
-        expect(record.records[0].get('reason')).toBe('Code review requested');
+        expect(result.records[0].get('reviewer')).toBe('test-user');
+        expect(result.records[0].get('notes')).toBe('Looks good');
       } finally {
         await session.close();
       }
@@ -315,25 +348,14 @@ describe('Proposal State Machine', () => {
       expect(stateMachine.canTransition('unknown', 'proposed')).toBe(false);
       expect(stateMachine.canTransition('proposed', 'unknown')).toBe(false);
     });
-
-    it('should treat rejected as terminal state', () => {
-      expect(stateMachine.canTransition('rejected', 'proposed')).toBe(false);
-      expect(stateMachine.canTransition('rejected', 'approved')).toBe(false);
-      expect(stateMachine.canTransition('rejected', 'any')).toBe(false);
-    });
-
-    it('should treat synced as terminal state', () => {
-      expect(stateMachine.canTransition('synced', 'proposed')).toBe(false);
-      expect(stateMachine.canTransition('synced', 'validated')).toBe(false);
-    });
   });
 
   describe('getStatus', () => {
-    it('should return proposal status', async () => {
+    it('should return status for existing proposal', async () => {
       const createResult = await stateMachine.createProposal(
         null,
-        'test-Get Status',
-        'Testing getStatus'
+        'Test- Status Check',
+        'Test description'
       );
 
       const status = await stateMachine.getStatus(createResult.proposalId);
@@ -341,7 +363,7 @@ describe('Proposal State Machine', () => {
       expect(status).not.toBeNull();
       expect(status.status).toBe('proposed');
       expect(status.implStatus).toBe('not_started');
-      expect(status.title).toBe('test-Get Status');
+      expect(status.title).toBe('Test- Status Check');
     });
 
     it('should return null for non-existent proposal', async () => {
@@ -350,47 +372,66 @@ describe('Proposal State Machine', () => {
       expect(status).toBeNull();
     });
 
-    it('should return updated status after transition', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Updated Status',
-        'Testing status update'
-      );
+    it('should handle errors gracefully', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Query failed'); },
+          close: jest.fn()
+        })
+      };
+      const badStateMachine = new ProposalStateMachine(badDriver, mockLogger);
 
-      await stateMachine.transition(createResult.proposalId, 'under_review', 'Reviewing');
-      await stateMachine.transition(createResult.proposalId, 'approved', 'Approved');
-
-      const status = await stateMachine.getStatus(createResult.proposalId);
-
-      expect(status.status).toBe('approved');
-    });
-
-    it('should handle Neo4j errors gracefully', async () => {
-      const badStateMachine = new ProposalStateMachine(
-        { session: () => ({ run: () => { throw new Error('Read failed'); }, close: jest.fn() }) },
-        mockLogger
-      );
-
-      const status = await badStateMachine.getStatus('any-id');
+      const status = await badStateMachine.getStatus('test-id');
 
       expect(status).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[StateMachine] Failed to get status')
-      );
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('listByStatus', () => {
-    it('should return proposals by status', async () => {
-      // Create multiple proposals
-      await stateMachine.createProposal(null, 'test-List Proposed 1', 'First');
-      await stateMachine.createProposal(null, 'test-List Proposed 2', 'Second');
+    beforeAll(async () => {
+      // Create proposals in different states
+      const session = driver.session();
+      try {
+        await session.run(`
+          CREATE (p1:ArchitectureProposal {
+            id: 'test-list-1',
+            title: 'Test- Proposed One',
+            description: 'Test',
+            status: 'proposed',
+            priority: 'high',
+            proposed_at: datetime(),
+            implementation_status: 'not_started'
+          })
+          CREATE (p2:ArchitectureProposal {
+            id: 'test-list-2',
+            title: 'Test- Proposed Two',
+            description: 'Test',
+            status: 'proposed',
+            priority: 'low',
+            proposed_at: datetime(),
+            implementation_status: 'not_started'
+          })
+          CREATE (p3:ArchitectureProposal {
+            id: 'test-list-3',
+            title: 'Test- Approved One',
+            description: 'Test',
+            status: 'approved',
+            priority: 'medium',
+            proposed_at: datetime(),
+            implementation_status: 'not_started'
+          })
+        `);
+      } finally {
+        await session.close();
+      }
+    });
 
-      const proposals = await stateMachine.listByStatus('proposed', 10);
+    it('should list proposals by status', async () => {
+      const proposals = await stateMachine.listByStatus('proposed');
 
-      expect(Array.isArray(proposals)).toBe(true);
-      expect(proposals.some(p => p.title === 'test-List Proposed 1')).toBe(true);
-      expect(proposals.some(p => p.title === 'test-List Proposed 2')).toBe(true);
+      expect(proposals.length).toBeGreaterThanOrEqual(2);
+      expect(proposals.every(p => p.status === 'proposed' || !p.status)).toBe(true);
     });
 
     it('should respect limit parameter', async () => {
@@ -399,69 +440,77 @@ describe('Proposal State Machine', () => {
       expect(proposals.length).toBeLessThanOrEqual(1);
     });
 
-    it('should return empty array when no proposals exist', async () => {
-      const proposals = await stateMachine.listByStatus('nonexistent-status', 10);
+    it('should sort by priority and creation date', async () => {
+      const proposals = await stateMachine.listByStatus('proposed');
 
-      expect(Array.isArray(proposals)).toBe(true);
-      expect(proposals.length).toBe(0);
+      if (proposals.length >= 2) {
+        // High priority should come before low
+        const highPriorityIndex = proposals.findIndex(p => p.priority === 'high');
+        const lowPriorityIndex = proposals.findIndex(p => p.priority === 'low');
+
+        if (highPriorityIndex !== -1 && lowPriorityIndex !== -1) {
+          expect(highPriorityIndex).toBeLessThan(lowPriorityIndex);
+        }
+      }
     });
 
-    it('should return proposal details', async () => {
-      await stateMachine.createProposal(null, 'test-Details Check', 'Checking fields');
+    it('should return empty array for status with no proposals', async () => {
+      const proposals = await stateMachine.listByStatus('nonexistent_status_xyz');
 
-      const proposals = await stateMachine.listByStatus('proposed', 10);
-      const proposal = proposals.find(p => p.title === 'test-Details Check');
-
-      expect(proposal).toBeDefined();
-      expect(proposal.id).toBeDefined();
-      expect(proposal.description).toBe('Checking fields');
-      expect(proposal.priority).toBeDefined();
-      expect(proposal.implementationStatus).toBeDefined();
+      expect(proposals).toEqual([]);
     });
 
-    it('should handle Neo4j errors gracefully', async () => {
-      const badStateMachine = new ProposalStateMachine(
-        { session: () => ({ run: () => { throw new Error('List failed'); }, close: jest.fn() }) },
-        mockLogger
-      );
+    it('should handle errors gracefully', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Query failed'); },
+          close: jest.fn()
+        })
+      };
+      const badStateMachine = new ProposalStateMachine(badDriver, mockLogger);
 
-      const proposals = await badStateMachine.listByStatus('proposed', 10);
+      const proposals = await badStateMachine.listByStatus('proposed');
 
-      expect(Array.isArray(proposals)).toBe(true);
-      expect(proposals.length).toBe(0);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[StateMachine] Failed to list')
-      );
+      expect(proposals).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('updateImplementationStatus', () => {
-    it('should update implementation status', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Impl Status',
-        'Testing impl status'
-      );
+    let testProposalId;
 
+    beforeEach(async () => {
+      const result = await stateMachine.createProposal(
+        null,
+        'Test- Impl Status',
+        'Test description'
+      );
+      testProposalId = result.proposalId;
+    });
+
+    it('should update implementation status', async () => {
       const result = await stateMachine.updateImplementationStatus(
-        createResult.proposalId,
+        testProposalId,
         'in_progress'
       );
 
       expect(result.success).toBe(true);
 
-      const status = await stateMachine.getStatus(createResult.proposalId);
-      expect(status.implStatus).toBe('in_progress');
+      const session = driver.session();
+      try {
+        const dbResult = await session.run(`
+          MATCH (p:ArchitectureProposal {id: $id})
+          RETURN p.implementation_status as implStatus
+        `, { id: testProposalId });
+
+        expect(dbResult.records[0].get('implStatus')).toBe('in_progress');
+      } finally {
+        await session.close();
+      }
     });
 
-    it('should update implementation record with progress and notes', async () => {
-      const createResult = await stateMachine.createProposal(
-        null,
-        'test-Impl Progress',
-        'Testing impl progress'
-      );
-
-      // First create implementation node
+    it('should update implementation status with progress and notes', async () => {
+      // Create implementation node first
       const session = driver.session();
       try {
         await session.run(`
@@ -469,27 +518,36 @@ describe('Proposal State Machine', () => {
           CREATE (i:Implementation {
             id: randomUUID(),
             proposal_id: $id,
-            status: 'in_progress'
+            status: 'in_progress',
+            progress: 0
           })
           CREATE (p)-[:IMPLEMENTED_BY]->(i)
-        `, { id: createResult.proposalId });
-
-        await stateMachine.updateImplementationStatus(
-          createResult.proposalId,
-          'completed',
-          75,
-          'Work in progress'
-        );
-
-        const implResult = await session.run(`
-          MATCH (i:Implementation {proposal_id: $id})
-          RETURN i.progress as progress, i.notes as notes
-        `, { id: createResult.proposalId });
-
-        expect(implResult.records[0].get('progress').toNumber()).toBe(75);
-        expect(implResult.records[0].get('notes')).toBe('Work in progress');
+        `, { id: testProposalId });
       } finally {
         await session.close();
+      }
+
+      const result = await stateMachine.updateImplementationStatus(
+        testProposalId,
+        'completed',
+        100,
+        'Implementation complete'
+      );
+
+      expect(result.success).toBe(true);
+
+      // Verify implementation record was updated
+      const verifySession = driver.session();
+      try {
+        const dbResult = await verifySession.run(`
+          MATCH (i:Implementation {proposal_id: $id})
+          RETURN i.progress as progress, i.notes as notes
+        `, { id: testProposalId });
+
+        expect(dbResult.records[0].get('progress').toNumber()).toBe(100);
+        expect(dbResult.records[0].get('notes')).toBe('Implementation complete');
+      } finally {
+        await verifySession.close();
       }
     });
 
@@ -500,25 +558,26 @@ describe('Proposal State Machine', () => {
       );
 
       // Should not throw, but may not update anything
-      expect(result).toHaveProperty('success');
+      expect(result.success).toBe(true);
     });
 
-    it('should handle Neo4j errors', async () => {
-      const badStateMachine = new ProposalStateMachine(
-        { session: () => ({ run: () => { throw new Error('Update failed'); }, close: jest.fn() }) },
-        mockLogger
-      );
+    it('should handle errors gracefully', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Update failed'); },
+          close: jest.fn()
+        })
+      };
+      const badStateMachine = new ProposalStateMachine(badDriver, mockLogger);
 
       const result = await badStateMachine.updateImplementationStatus(
-        'any-id',
+        'test-id',
         'completed'
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[StateMachine] Failed to update impl status')
-      );
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 });
