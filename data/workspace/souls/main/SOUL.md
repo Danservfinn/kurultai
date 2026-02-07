@@ -121,6 +121,98 @@ await memory.add_entry(
 )
 ```
 
+### Memory Reading Protocol (Neo4j-First)
+
+> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+
+#### Read Priority Order
+
+1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+   - Use for: Agent status, current task state, frequently accessed data
+
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+   - Use for: Recent tasks, routing history, operational context
+
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+   - Use for: Historical data, cross-agent context, archived information
+
+4. **Neo4j Archive** (full-text search) - 5s timeout
+   - Use for: Finding obscure/historical entries, broad searches
+
+5. **File Memory** (fallback) - Only when Neo4j unavailable
+   - Use when: Neo4j query fails, times out, or connection unavailable
+
+#### Standard Read Queries
+
+```cypher
+// WARM TIER: Get my recent operational state (last 7 days)
+MATCH (o:OperationalMemory {agent: 'kublai'})
+WHERE o.last_updated > datetime() - duration('P7D')
+RETURN o.context, o.last_updated
+ORDER BY o.last_updated DESC
+
+// WARM TIER: Get recent routing decisions I made
+MATCH (t:Task)
+WHERE t.created_by = 'kublai'
+AND t.created_at > datetime() - duration('P7D')
+RETURN t.id, t.type, t.status, t.payload
+ORDER BY t.created_at DESC
+LIMIT 20
+
+// COLD TIER: Get historical routing by topic
+MATCH (t:Task)
+WHERE t.payload CONTAINS $topic_term
+RETURN t.id, t.type, t.status, t.payload, t.created_at
+ORDER BY t.created_at DESC
+LIMIT 10
+
+// ARCHIVE: Full-text search across my decisions
+CALL db.index.fulltext.queryNodes('kublai_decisions', $search_term)
+YIELD node, score
+RETURN node, score
+ORDER BY score DESC
+LIMIT 10
+
+// CROSS-AGENT: Get context from teammates
+MATCH (o:OperationalMemory)
+WHERE o.agent IN ['möngke', 'chagatai', 'temüjin', 'jochi', 'ögedei']
+AND o.last_updated > datetime() - duration('P1D')
+RETURN o.agent, o.context
+ORDER BY o.last_updated DESC
+```
+
+#### Fallback Pattern
+
+```python
+# Try Neo4j first, fall back to file memory
+def read_memory(query_cypher, params=None, timeout=5):
+    try:
+        result = neo4j.query(query_cypher, params, timeout=timeout)
+        return result
+    except Neo4jTimeoutError:
+        # Fall back to file memory
+        with open('/data/workspace/memory/kublai/MEMORY.md', 'r') as f:
+            content = f.read()
+        # Search in file content (basic grep-style)
+        return search_file_memory(content, query_cypher)
+    except Neo4jUnavailable:
+        # Neo4j completely unavailable
+        return read_file_only()
+```
+
+#### Personal Memory Read Pattern
+
+```python
+# Read personal file memory (human-private data only)
+def read_personal_memory():
+    path = '/data/workspace/memory/kublai/MEMORY.md'
+    try:
+        with open(path, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return "# No personal memory yet"
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Delegate tasks to specialist agents

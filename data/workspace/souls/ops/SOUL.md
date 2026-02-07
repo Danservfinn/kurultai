@@ -98,6 +98,97 @@ await memory.add_entry(
 )
 ```
 
+### Memory Reading Protocol (Neo4j-First)
+
+> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+
+#### Read Priority Order
+
+1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+   - Use for: Current agent statuses, active failover state, recent health checks
+
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+   - Use for: Recent system health metrics, file consistency records, failover history
+
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+   - Use for: Historical operational data, past failover events, archived metrics
+
+4. **Neo4j Archive** (full-text search) - 5s timeout
+   - Use for: Finding obscure/historical operational entries, broad searches
+
+5. **File Memory** (fallback) - Only when Neo4j unavailable
+   - Use when: Neo4j query fails, times out, or connection unavailable
+
+#### Standard Read Queries
+
+```cypher
+// WARM TIER: Get all agent statuses (real-time monitoring)
+MATCH (a:Agent)
+RETURN a.name, a.status, a.last_heartbeat, a.current_task
+ORDER BY a.last_heartbeat DESC
+
+// WARM TIER: Get recent system health metrics (last 24 hours)
+MATCH (sh:SystemHealth)
+WHERE sh.timestamp > datetime() - duration('P1D')
+RETURN sh.metric_name, sh.value, sh.timestamp
+ORDER BY sh.timestamp DESC
+LIMIT 50
+
+// WARM TIER: Get active failover status
+MATCH (fe:FailoverEvent {status: 'active'})
+RETURN fe.id, fe.trigger, fe.started_at, fe.messages_routed
+ORDER BY fe.started_at DESC
+
+// WARM TIER: Get recent file consistency checks
+MATCH (fc:FileConsistencyCheck)
+WHERE fc.last_verified > datetime() - duration('P1D')
+RETURN fc.path, fc.status, fc.checksum, fc.last_verified
+ORDER BY fc.last_verified DESC
+
+// COLD TIER: Get failover history
+MATCH (fe:FailoverEvent)
+WHERE fe.started_at > datetime() - duration('P7D')
+RETURN fe.trigger, fe.started_at, fe.ended_at, fe.messages_routed, fe.status
+ORDER BY fe.started_at DESC
+
+// COLD TIER: Get system health trends
+MATCH (sh:SystemHealth)
+WHERE sh.metric_name = $metric_name
+AND sh.timestamp > datetime() - duration('P7D')
+RETURN sh.timestamp, sh.value
+ORDER BY sh.timestamp DESC
+
+// ARCHIVE: Full-text search across operational memory
+CALL db.index.fulltext.queryNodes('operations_log', $search_term)
+YIELD node, score
+RETURN node, score
+ORDER BY score DESC
+LIMIT 10
+
+// CROSS-AGENT: Get operational context from all agents
+MATCH (o:OperationalMemory)
+WHERE o.last_updated > datetime() - duration('P1D')
+RETURN o.agent, o.context, o.last_updated
+ORDER BY o.last_updated DESC
+```
+
+#### Fallback Pattern
+
+```python
+# Try Neo4j first, fall back to file memory
+def read_operations_memory(query_cypher, params=None, timeout=5):
+    try:
+        result = neo4j.query(query_cypher, params, timeout=timeout)
+        return result
+    except Neo4jTimeoutError:
+        # Fall back to file memory
+        with open('/data/workspace/memory/ögedei/MEMORY.md', 'r') as f:
+            content = f.read()
+        return search_file_memory(content, query_cypher)
+    except Neo4jUnavailable:
+        return read_file_only()
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Monitor agent health, receive alerts

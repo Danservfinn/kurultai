@@ -100,6 +100,94 @@ await memory.add_entry(
 )
 ```
 
+### Memory Reading Protocol (Neo4j-First)
+
+> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+
+#### Read Priority Order
+
+1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+   - Use for: Current development tasks, frequently accessed code patterns
+
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+   - Use for: Recent code solutions, security audits, active tasks
+
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+   - Use for: Historical solutions, past security audits, archived code patterns
+
+4. **Neo4j Archive** (full-text search) - 5s timeout
+   - Use for: Finding obscure/historical code entries, broad searches
+
+5. **File Memory** (fallback) - Only when Neo4j unavailable
+   - Use when: Neo4j query fails, times out, or connection unavailable
+
+#### Standard Read Queries
+
+```cypher
+// WARM TIER: Get my recent code solutions (last 7 days)
+MATCH (cs:CodeSolution {created_by: 'temüjin'})
+WHERE cs.created_at > datetime() - duration('P7D')
+RETURN cs.id, cs.language, cs.description, cs.created_at
+ORDER BY cs.created_at DESC
+LIMIT 20
+
+// WARM TIER: Get my assigned development tasks
+MATCH (t:Task {assigned_to: 'temüjin', status: 'pending'})
+RETURN t.id, t.task_type, t.code_context, t.priority
+ORDER BY t.priority DESC
+
+// WARM TIER: Get my recent security audits
+MATCH (sa:SecurityAudit {created_by: 'temüjin'})
+WHERE sa.created_at > datetime() - duration('P7D')
+RETURN sa.target, sa.audit_type, sa.severity_counts, sa.status
+ORDER BY sa.created_at DESC
+
+// COLD TIER: Get solutions by language/type
+MATCH (cs:CodeSolution {created_by: 'temüjin'})
+WHERE cs.language = $language
+RETURN cs.description, cs.code
+ORDER BY cs.created_at DESC
+LIMIT 10
+
+// COLD TIER: Get similar code solutions
+MATCH (cs:CodeSolution)
+WHERE cs.description CONTAINS $keyword
+RETURN cs.description, cs.code, cs.language
+ORDER BY cs.created_at DESC
+LIMIT 5
+
+// ARCHIVE: Full-text search across my code
+CALL db.index.fulltext.queryNodes('temujin_code', $search_term)
+YIELD node, score
+RETURN node, score
+ORDER BY score DESC
+LIMIT 10
+
+// CROSS-AGENT: Get analysis from Jochi related to my code
+MATCH (a:Analysis {created_by: 'jochi'})
+WHERE a.target CONTAINS 'backend' OR a.findings CONTAINS 'performance'
+RETURN a.type, a.findings, a.recommendations
+ORDER BY a.created_at DESC
+LIMIT 10
+```
+
+#### Fallback Pattern
+
+```python
+# Try Neo4j first, fall back to file memory
+def read_development_memory(query_cypher, params=None, timeout=5):
+    try:
+        result = neo4j.query(query_cypher, params, timeout=timeout)
+        return result
+    except Neo4jTimeoutError:
+        # Fall back to file memory
+        with open('/data/workspace/memory/temüjin/MEMORY.md', 'r') as f:
+            content = f.read()
+        return search_file_memory(content, query_cypher)
+    except Neo4jUnavailable:
+        return read_file_only()
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Report completion, collaborate with Jochi

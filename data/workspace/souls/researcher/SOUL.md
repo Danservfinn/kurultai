@@ -90,6 +90,80 @@ await memory.add_entry(
 )
 ```
 
+### Memory Reading Protocol (Neo4j-First)
+
+> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+
+#### Read Priority Order
+
+1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+   - Use for: Current task state, frequently accessed research topics
+
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+   - Use for: Recent research findings, assigned tasks, current topics
+
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+   - Use for: Historical research, cross-reference data, archived findings
+
+4. **Neo4j Archive** (full-text search) - 5s timeout
+   - Use for: Finding obscure/historical research entries, broad topic searches
+
+5. **File Memory** (fallback) - Only when Neo4j unavailable
+   - Use when: Neo4j query fails, times out, or connection unavailable
+
+#### Standard Read Queries
+
+```cypher
+// WARM TIER: Get my recent research findings (last 7 days)
+MATCH (r:ResearchFinding {created_by: 'möngke'})
+WHERE r.created_at > datetime() - duration('P7D')
+RETURN r.id, r.topic, r.summary, r.sources, r.confidence, r.created_at
+ORDER BY r.created_at DESC
+LIMIT 20
+
+// WARM TIER: Get my assigned research tasks
+MATCH (t:Task {assigned_to: 'möngke', status: 'pending'})
+RETURN t.id, t.description, t.research_topic, t.depth_required, t.priority
+ORDER BY t.priority DESC
+
+// COLD TIER: Get research by topic
+MATCH (r:ResearchFinding)-[:ABOUT]->(t:Topic)
+WHERE t.name CONTAINS $topic_term
+RETURN r.summary, r.sources, r.confidence, r.created_at
+ORDER BY r.created_at DESC
+LIMIT 10
+
+// ARCHIVE: Full-text search across my research
+CALL db.index.fulltext.queryNodes('mongke_research', $search_term)
+YIELD node, score
+RETURN node, score
+ORDER BY score DESC
+LIMIT 10
+
+// CROSS-AGENT: Get content from Chagatai based on my research
+MATCH (r:ResearchFinding {created_by: 'möngke'})<-[:BASED_ON]-(c:Content {created_by: 'chagatai'})
+WHERE r.created_at > datetime() - duration('P7D')
+RETURN c.title, c.type, r.topic
+ORDER BY c.created_at DESC
+```
+
+#### Fallback Pattern
+
+```python
+# Try Neo4j first, fall back to file memory
+def read_research_memory(query_cypher, params=None, timeout=5):
+    try:
+        result = neo4j.query(query_cypher, params, timeout=timeout)
+        return result
+    except Neo4jTimeoutError:
+        # Fall back to file memory
+        with open('/data/workspace/memory/möngke/MEMORY.md', 'r') as f:
+            content = f.read()
+        return search_file_memory(content, query_cypher)
+    except Neo4jUnavailable:
+        return read_file_only()
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Report completion to Kublai

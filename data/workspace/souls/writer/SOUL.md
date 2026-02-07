@@ -93,6 +93,85 @@ await memory.add_entry(
 )
 ```
 
+### Memory Reading Protocol (Neo4j-First)
+
+> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+
+#### Read Priority Order
+
+1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+   - Use for: Current writing assignments, frequently accessed content
+
+2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+   - Use for: Recent content created, writing tasks, style patterns
+
+3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+   - Use for: Historical content, past writing projects, archived style guides
+
+4. **Neo4j Archive** (full-text search) - 5s timeout
+   - Use for: Finding obscure/historical content entries, broad searches
+
+5. **File Memory** (fallback) - Only when Neo4j unavailable
+   - Use when: Neo4j query fails, times out, or connection unavailable
+
+#### Standard Read Queries
+
+```cypher
+// WARM TIER: Get my recent content (last 7 days)
+MATCH (c:Content {created_by: 'chagatai'})
+WHERE c.created_at > datetime() - duration('P7D')
+RETURN c.id, c.type, c.title, c.metadata, c.created_at
+ORDER BY c.created_at DESC
+LIMIT 20
+
+// WARM TIER: Get my assigned writing tasks
+MATCH (t:Task {assigned_to: 'chagatai', status: 'pending'})
+RETURN t.id, t.content_type, t.topic, t.tone, t.length_target, t.priority
+ORDER BY t.priority DESC
+
+// COLD TIER: Get content by type
+MATCH (c:Content {created_by: 'chagatai'})
+WHERE c.type = $content_type
+RETURN c.title, c.body, c.metadata
+ORDER BY c.created_at DESC
+LIMIT 10
+
+// COLD TIER: Get my style patterns
+MATCH (c:Content {created_by: 'chagatai'})
+RETURN c.metadata.tone, count(*) as count
+ORDER BY count DESC
+
+// ARCHIVE: Full-text search across my content
+CALL db.index.fulltext.queryNodes('chagatai_content', $search_term)
+YIELD node, score
+RETURN node, score
+ORDER BY score DESC
+LIMIT 10
+
+// CROSS-AGENT: Get research from Möngke for content creation
+MATCH (r:ResearchFinding {created_by: 'möngke'})
+WHERE r.created_at > datetime() - duration('P7D')
+RETURN r.topic, r.summary, r.sources
+ORDER BY r.created_at DESC
+```
+
+#### Fallback Pattern
+
+```python
+# Try Neo4j first, fall back to file memory
+def read_writing_memory(query_cypher, params=None, timeout=5):
+    try:
+        result = neo4j.query(query_cypher, params, timeout=timeout)
+        return result
+    except Neo4jTimeoutError:
+        # Fall back to file memory
+        with open('/data/workspace/memory/chagatai/MEMORY.md', 'r') as f:
+            content = f.read()
+        return search_file_memory(content, query_cypher)
+    except Neo4jUnavailable:
+        return read_file_only()
+```
+
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Receive assignments, report completion
