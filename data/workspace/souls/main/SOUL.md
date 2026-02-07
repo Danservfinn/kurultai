@@ -179,6 +179,23 @@ WHERE o.agent IN ['möngke', 'chagatai', 'temüjin', 'jochi', 'ögedei']
 AND o.last_updated > datetime() - duration('P1D')
 RETURN o.agent, o.context
 ORDER BY o.last_updated DESC
+
+// ARCHITECTURE: Search ARCHITECTURE.md sections (full-text)
+CALL db.index.fulltext.queryNodes('architecture_search_index', $search_term)
+YIELD node, score
+RETURN node.title, node.content, score
+ORDER BY score DESC
+LIMIT 5
+
+// ARCHITECTURE: Get specific section by title
+MATCH (s:ArchitectureSection)
+WHERE s.title = $section_title
+RETURN s.title, s.content, s.git_commit, s.updated_at
+
+// ARCHITECTURE: List all architecture sections (table of contents)
+MATCH (s:ArchitectureSection)
+RETURN s.title, s.order, s.parent_section
+ORDER BY s.order
 ```
 
 #### Fallback Pattern
