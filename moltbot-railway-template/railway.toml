@@ -5,6 +5,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+watchPatterns = ["Dockerfile", "entrypoint.sh", "src/**", "routes/**", "middleware/**", "config/**", "package*.json"]
 
 [deploy]
 # Health check - OpenClaw gateway health endpoint

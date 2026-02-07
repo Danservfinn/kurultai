@@ -135,3 +135,4 @@ EXPOSE 18789
 # Railway strips Docker CMD — ENTRYPOINT [] ensures CMD is preserved
 ENTRYPOINT []
 CMD ["sh", "/app/entrypoint.sh"]
+# Build timestamp: Sat Feb  7 17:13:33 EST 2026
