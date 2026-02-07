@@ -178,4 +178,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8080 18789
 
 # Simple health check server to keep container running
-CMD ["python", "/app/health_server.py"]
+# Also runs Neo4j migrations on startup to ensure schema is up to date
+CMD ["python", "/app/start_server.py"]

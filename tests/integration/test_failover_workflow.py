@@ -166,15 +166,9 @@ class MockMemoryFactory:
             # Normalize cypher to handle newlines and whitespace
             cypher_normalized = ' '.join(cypher.split())
             # Return appropriate result based on the Cypher query type
-            if "MERGE (h:AgentHeartbeat" in cypher_normalized:
-                # Heartbeat update - return agent name
-                return create_mock_result(single={"agent": kwargs.get("agent", "main")})
-            elif "MATCH (h:AgentHeartbeat" in cypher_normalized:
-                # Heartbeat check - return last_seen
-                if agent_available:
-                    return create_mock_result(single={"last_seen": datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)})
-                else:
-                    return create_mock_result(single={"last_seen": None})
+            if "MERGE (a:Agent" in cypher_normalized and "last_heartbeat" in cypher_normalized:
+                # Heartbeat update on Agent node - return agent name
+                return create_mock_result(single={"name": kwargs.get("agent", "main")})
             elif "CREATE (f:FailoverEvent" in cypher_normalized or "CREATE (fe:FailoverEvent" in cypher_normalized:
                 # Failover event creation - return event_id
                 return create_mock_result(single={"event_id": event_id or f"event-{time.time()}"})
@@ -182,9 +176,11 @@ class MockMemoryFactory:
                 # Failover event query
                 return create_mock_result(single={"id": event_id, "activated_at": datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)})
             elif "MATCH (a:Agent" in cypher_normalized and "{name:" in cypher_normalized:
-                # Agent query for FailoverProtocol - matches MATCH (a:Agent {name: $agent_name})
+                # Agent query — used by both FailoverMonitor and FailoverProtocol
+                now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
                 return create_mock_result(single={
-                    "last_heartbeat": datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc) if agent_available else None,
+                    "last_heartbeat": now if agent_available else None,
+                    "infra_heartbeat": now if agent_available else None,
                     "status": "active" if agent_available else "unavailable",
                     "current_task": None
                 })
@@ -254,8 +250,11 @@ class TestFailoverWorkflow:
         mock_session = Mock()
 
         def unavailable_run(cypher, **kwargs):
-            if "MATCH (h:AgentHeartbeat" in cypher:
-                return create_mock_result(single={"last_seen": old_time})
+            if "MATCH (a:Agent" in cypher and "last_heartbeat" in cypher:
+                return create_mock_result(single={
+                    "last_heartbeat": old_time,
+                    "infra_heartbeat": old_time
+                })
             elif "CREATE (f:FailoverEvent" in cypher:
                 return create_mock_result(single={"event_id": "failover-event-123"})
             return create_mock_result(single={})
@@ -333,8 +332,11 @@ class TestFailoverWorkflow:
         mock_session = Mock()
 
         def healthy_run(cypher, **kwargs):
-            if "MATCH (h:AgentHeartbeat" in cypher:
-                return create_mock_result(single={"last_seen": datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)})
+            if "MATCH (a:Agent" in cypher and "last_heartbeat" in cypher:
+                return create_mock_result(single={
+                    "last_heartbeat": datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+                    "infra_heartbeat": datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+                })
             return create_mock_result(single={})
 
         mock_session.run = Mock(side_effect=healthy_run)
@@ -413,6 +415,7 @@ class TestFailoverWorkflowWithProtocol:
             if "MATCH (a:Agent" in cypher_normalized and "{name:" in cypher_normalized:
                 return create_mock_result(single={
                     "last_heartbeat": fixed_now,
+                    "infra_heartbeat": fixed_now,
                     "status": "active",
                     "current_task": None
                 })
@@ -449,6 +452,7 @@ class TestFailoverWorkflowWithProtocol:
             if "MATCH (a:Agent" in cypher_normalized and "{name:" in cypher_normalized:
                 return create_mock_result(single={
                     "last_heartbeat": old_time,
+                    "infra_heartbeat": old_time,
                     "status": "unavailable",
                     "current_task": None
                 })
@@ -477,6 +481,7 @@ class TestFailoverWorkflowWithProtocol:
             if "MATCH (a:Agent" in cypher_normalized and "{name:" in cypher_normalized:
                 return create_mock_result(single={
                     "last_heartbeat": None,
+                    "infra_heartbeat": None,
                     "status": "unavailable",
                     "current_task": None
                 })
@@ -506,6 +511,7 @@ class TestFailoverWorkflowWithProtocol:
             if "MATCH (a:Agent" in cypher_normalized and "{name:" in cypher_normalized:
                 return create_mock_result(single={
                     "last_heartbeat": fixed_now,
+                    "infra_heartbeat": fixed_now,
                     "status": "active",
                     "current_task": None
                 })
@@ -566,6 +572,7 @@ class TestFailoverWorkflowWithProtocol:
             if "MATCH (a:Agent" in cypher_normalized and "{name:" in cypher_normalized:
                 return create_mock_result(single={
                     "last_heartbeat": fixed_now,
+                    "infra_heartbeat": fixed_now,
                     "status": "active",
                     "current_task": None
                 })
@@ -966,8 +973,11 @@ class TestFailoverEdgeCases:
         mock_session = Mock()
 
         def unavailable_run(cypher, **kwargs):
-            if "MATCH (h:AgentHeartbeat" in cypher:
-                return create_mock_result(single={"last_seen": None})
+            if "MATCH (a:Agent" in cypher and "last_heartbeat" in cypher:
+                return create_mock_result(single={
+                    "last_heartbeat": None,
+                    "infra_heartbeat": None
+                })
             return create_mock_result(single={})
 
         mock_session.run = Mock(side_effect=unavailable_run)

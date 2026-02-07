@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/security/tokenization.py
+# hypothesis_version: 6.150.2
+
+['ENC:', 'GENERAL', 'TKN', 'TKN:', 'access_count', 'contains_pii', 'context', 'created_at', 'end', 'expires_at', 'kublai_file', 'last_accessed', 'original', 'pii_detected', 'processing_steps', 'replacement', 'sender_hash', 'start', 'token_map', 'type', 'unknown', 'value']

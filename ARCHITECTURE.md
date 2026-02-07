@@ -28,6 +28,7 @@ Kurultai v0.2 is a multi-agent orchestration platform with autonomous capability
 | **File Consistency Monitoring** | Ogedei-driven workspace file monitoring with conflict detection |
 | **CBAC** | Capability-Based Access Control for learned skills |
 | **Two-Tier Heartbeat** | Infrastructure + functional heartbeat for failover detection (zero cost) |
+| **Automated Testing** | Comprehensive test framework with Jochi-powered continuous validation |
 
 ### What's New in v0.2
 
@@ -1989,6 +1990,75 @@ Proxy headers detected from untrusted address. Connection will not be treated as
 ---
 
 ## Testing & Validation
+
+### Automated Testing Framework
+
+Kurultai v0.2 includes a comprehensive testing framework spanning 7 phases and 55+ test files:
+
+```
+tests/
+├── fixtures/           # Integration harness, mock agents, test data generators
+├── interactive/        # Chat session recorder, 6 test scenarios, interactive runner
+├── integration/        # Messaging, Neo4j, heartbeat, delegation, failover tests
+├── concurrency/        # Race condition tests for concurrent access
+├── chaos/             # Cascading failure and recovery tests
+├── e2e/               # End-to-end workflow validation
+└── performance/       # pytest-benchmark performance tests
+```
+
+#### Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific category
+pytest tests/integration/ -v
+pytest tests/concurrency/ -v
+
+# Interactive test scenarios (manual)
+python tests/interactive/run_interactive_tests.py list
+python tests/interactive/run_interactive_tests.py run 0
+
+# Performance benchmarks
+pytest tests/performance/test_benchmarks.py --benchmark-only
+```
+
+#### Jochi's Automated Test Orchestrator
+
+Jochi (analyst agent) provides continuous automated testing:
+
+```bash
+# Run Jochi's test orchestrator
+python tools/kurultai/test_runner_orchestrator.py
+
+# Specific phase
+python tools/kurultai/test_runner_orchestrator.py --phase integration
+
+# Dry run
+python tools/kurultai/test_runner_orchestrator.py --dry-run
+```
+
+Jochi automatically:
+- Executes tests on schedule (smoke: 15min, full: hourly, nightly: 2AM)
+- Analyzes results and categorizes findings by severity (CRITICAL/HIGH/MEDIUM/LOW)
+- Auto-remediates simple issues (threshold constant fixes)
+- Creates tickets for complex issues in `data/workspace/tickets/`
+- Sends Signal alerts for critical findings
+
+See `docs/plans/JOCHI_TEST_AUTOMATION.md` for full configuration.
+
+#### Test Phases
+
+| Phase | Description | Tests |
+|-------|-------------|-------|
+| **Phase 0** | Test Infrastructure | Fixture imports, mock agent factory, test data generator |
+| **Phase 1** | Interactive Workflows | 6 manual chat scenarios with Kublai delegation observation |
+| **Phase 2** | Unit & Integration | Agent messaging (port 18789), Neo4j CRUD, heartbeat system |
+| **Phase 3** | Concurrent & Chaos | Race conditions, cascading failures, recovery testing |
+| **Phase 4** | E2E Workflows | Signal message flow, multi-agent collaboration, failure recovery |
+| **Phase 5** | Metrics & Observability | Prometheus metrics, Grafana dashboards |
+| **Phase 6** | Performance | Task creation latency, DAG scalability, vector similarity |
 
 ### End-to-End Authentication Test
 

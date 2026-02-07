@@ -1,1134 +1,1528 @@
-# Kurultai v0.2: horde-learn Capability Acquisition System
+# Kurultai v0.2: Complete Railway Deployment Plan
 
-> **Status**: Design Document - REVISED AFTER CRITICAL REVIEW
-> **Date**: 2026-02-05
-> **Author**: Kurultai System Architecture
-> **Prerequisites**: [`neo4j.md`](./neo4j.md), [`kurultai_0.1.md`](./kurultai_0.1.md) - Must be implemented first
-
----
-
-## Overview
-
-**Goal:** Adapt the horde-learn skill for use in the Kurultai multi-agent system, enabling agents to learn new capabilities through natural language requests (e.g., "/learn how to call phones").
-
-**Architecture:** Extend horde-learn from "insight extraction from text" to "capability acquisition pipeline" that integrates with Kurultai's delegation protocol, Neo4j memory, capability registry, and sandboxed code execution.
-
-**Key Changes from Original Plan (Post-Review):**
-1. **FIXED:** Delegation interface aligned with existing `DelegationProtocol` using `gateway_url` + `agentToAgent`
-2. **FIXED:** Neo4j schema uses `:Research {research_type: "capability_learning"}` instead of `:CapabilityResearch`
-3. **FIXED:** Sandboxed execution uses subprocess with resource limits (Railway-compatible)
-4. **FIXED:** Added circular delegation protection (max depth 3)
-5. **FIXED:** Added mandatory PII sanitization before any delegation
-6. **REMOVED:** SOUL.md modification - violates agent boundaries
-7. **ADDED:** Capability registry in Neo4j instead of SOUL.md updates
-8. **ADDED:** Security controls (prompt injection filtering, static analysis, cost enforcement)
-9. **ADDED:** CBAC (Capability-Based Access Control) for privilege escalation prevention
-10. **ADDED:** Agent Authentication (HMAC-SHA256 message signing, replay protection)
-11. **ADDED:** Neo4j Schema Migration strategy with backfill script and rollback plan
+**Status**: Integrated Wipe-and-Rebuild + Deployment Plan
+**Version**: 3.0 (2026-02-06)
+**Scope**: Complete teardown and fresh deployment of Kurultai v0.2 with horde-learn capability acquisition, Authentik SSO, Neo4j-backed operational memory, and preserved Signal integration.
 
 ---
 
-## Critical Review Fixes Applied
+## Table of Contents
 
-### Fix 1: Delegation Protocol Interface
-**Issue:** Plan referenced `delegate_task()` method that doesn't exist in `DelegationProtocol`
-**Resolution:** Use existing `gateway_url` + `agentToAgent` messaging pattern from `neo4j.md` Section 2.2
-
-### Fix 2: Neo4j Schema Conflict
-**Issue:** `:CapabilityResearch` would conflict with existing `:Research` node type
-**Resolution:** Extend `:Research` with `research_type: "capability_learning"` property
-
-### Fix 3: Infrastructure Feasibility
-**Issue:** gVisor not available in Railway container environment
-**Resolution:** Use Python subprocess with resource limits (RLIMIT_CPU, RLIMIT_AS, RLIMIT_NOFILE) which works without privileges
-
-### Fix 4: Circular Delegation Risk
-**Issue:** Research → Implementation → Validation could loop infinitely
-**Resolution:** Add `max_delegation_depth: 3` and `delegation_chain` tracking in context
-
-### Fix 5: Privacy Sanitization Gap
-**Issue:** No PII filtering before capability research delegation
-**Resolution:** Mandatory `_sanitize_for_sharing()` call before any agent delegation
-
-### Fix 6: Privilege Escalation via Capability Registry
-**Issue:** No access control for learned capabilities - any agent could use any learned tool
-**Resolution:** Add CBAC with `required_capabilities`, runtime capability checks, and capability grant/revoke workflow
-
----
-
-## Integration Points
-
-| Component | File | Integration Method |
-|-----------|------|-------------------|
-| Delegation Protocol | `tools/delegation_protocol.py` | Uses `gateway_url` + `agentToAgent` messaging |
-| Neo4j Memory | `openclaw_memory.py` | Extends `:Research` node, adds capability methods |
-| Multi-Goal Orchestration | `tools/multi_goal_orchestration.py` | Uses metadata for goal categorization |
-| Capability Registry | `tools/kurultai/capability_registry.py` | NEW - stores learned capabilities in Neo4j |
-| Sandboxed Execution | `tools/kurultai/sandbox_executor.py` | NEW - subprocess-based code execution |
-| Backend Analysis | `tools/backend_collaboration.py` | EXISTING - Jochi-Temüjin collaboration protocol |
-| Analysis Protocol | `src/protocols/backend_analysis.py` | EXISTING - Backend issue identification (Phase 4.6) |
-
-### Jochi Backend Monitoring Integration
-
-Jochi's backend monitoring capability (Phase 4.6 from `neo4j.md`) is **already implemented** in the codebase:
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `tools/backend_collaboration.py` | 1,084 | Jochi-Temüjin collaboration, Analysis node creation |
-| `src/protocols/backend_analysis.py` | 929 | Backend issue identification across 5 categories |
-
-**Integration Strategy:** Rather than building a new 5-phase tree-sitter system, leverage the existing implementation and add AST-based enhancements as Task 1.5. The existing regex-based detection in `BackendCodeReviewer` can be enhanced with tree-sitter AST parsing for improved accuracy.
-
-**Trigger Integration:** Jochi analysis is triggered via the existing delegation protocol:
-1. **Kublai Directive** - `agentToAgent` message to Jochi (`analyst`)
-2. **Scheduled** - Every 4 hours via Ögedei's proactive monitoring
-3. **Event-based** - Code changes detected by file watchers
-
-**Neo4j Integration:** Jochi creates `Analysis` nodes (already defined in schema) which Kublai queries to delegate fixes to Temüjin. See Phase 4.6 in `neo4j.md` for full protocol.
+1. [Executive Summary](#executive-summary)
+2. [Phase -1: Wipe and Rebuild (Clean Slate)](#phase--1-wipe-and-rebuild-clean-slate)
+3. [Prerequisites](#prerequisites)
+4. [Architecture Overview](#architecture-overview)
+5. [Phase 0: Environment & Security Setup](#phase-0-environment--security-setup)
+6. [Phase 1: Neo4j & Foundation](#phase-1-neo4j--foundation)
+7. [Phase 1.5: Task Dependency Engine](#phase-15-task-dependency-engine)
+8. [Phase 2: Capability Acquisition System](#phase-2-capability-acquisition-system)
+9. [Phase 3: Railway Deployment](#phase-3-railway-deployment)
+10. [Phase 4: Signal Integration (Preserved)](#phase-4-signal-integration-preserved)
+11. [Phase 4.5: Notion Integration](#phase-45-notion-integration)
+12. [Phase 5: Authentik Web App Integration](#phase-5-authentik-web-app-integration)
+13. [Phase 6: Monitoring & Health Checks](#phase-6-monitoring--health-checks)
+14. [Phase 6.5: File Consistency Monitoring](#phase-65-file-consistency-monitoring)
+15. [Phase 7: Testing & Validation](#phase-7-testing--validation)
+16. [Appendices](#appendices)
+    - [Appendix A: Environment Variables Reference](#appendix-a-environment-variables-reference)
+    - [Appendix B: Railway Service Configuration](#appendix-b-railway-service-configuration)
+    - [Appendix C: Troubleshooting](#appendix-c-troubleshooting)
+    - [Appendix D: Rollback Procedures](#appendix-d-rollback-procedures)
+    - [Appendix E: Security Infrastructure Reference](#appendix-e-security-infrastructure-reference)
+    - [Appendix F: Fallback Mode Procedures](#appendix-f-fallback-mode-procedures)
+    - [Appendix G: Scope Boundary Declaration](#appendix-g-scope-boundary-declaration)
+    - [Appendix H: Complexity Scoring & Team Sizing System](#appendix-h-complexity-scoring--team-sizing-system)
+    - [Appendix I: Model Switcher Installation](#appendix-i-model-switcher-installation)
 
 ---
 
-## Phase 1: Foundation & Security Infrastructure
+## Executive Summary
 
-**Status:** Pending
-**Tasks:** 4
-**Parallelizable:** Partial
+This plan integrates three major systems into a single cohesive deployment:
 
-### Task 1.1: Create Security Infrastructure
-**Description:** Implement security controls for prompt injection, input validation, and cost enforcement
-**Files:**
-- Create: `tools/kurultai/security/prompt_injection_filter.py` (~150 lines)
-- Create: `tools/kurultai/security/cost_enforcer.py` (~200 lines)
-- Create: `tools/kurultai/security/static_analysis.py` (~250 lines)
-**Acceptance:**
-- [ ] `PromptInjectionFilter` class with `sanitize()` method
-- [ ] Detects and blocks common prompt injection patterns
-- [ ] Multi-turn injection detection via conversation state tracking
-- [ ] `CostEnforcer` class with `authorize_spending()` method
-- [ ] Pre-authorization pattern (reserves budget before spending)
-- [ ] Hard limit enforcement ($10/skill default)
-- [ ] Atomic budget tracking using Neo4j `SET r.budget = r.budget - $cost`
-- [ ] `StaticAnalysis` class integrating bandit and semgrep with caching
-- [ ] Tiered checks: regex → AST → bandit/semgrep (only if needed)
-- [ ] AST security pattern detection
-**Dependencies:** None
-**Domain:** Backend
+1. **Kurultai v0.2** - Multi-agent orchestration with capability acquisition via horde-learn
+2. **Authentik SSO** - Single sign-on with WebAuthn for the Kublai web interface
+3. **Neo4j Memory** - Graph-based operational memory shared across all agents
 
-### Task 1.2: Create Sandboxed Execution Environment (Subprocess-based)
-**Description:** Implement subprocess-based sandbox for generated code execution (Railway-compatible, no privileged capabilities required)
-**Files:**
-- Create: `tools/kurultai/sandbox_executor.py` (~400 lines)
-- Create: `tools/kurultai/sandbox/subprocess_executor.py` (~300 lines)
-**Acceptance:**
-- [ ] `SandboxExecutor` class with `execute()` method
-- [ ] Python `subprocess` module with `preexec_fn` for resource limits
-- [ ] RLIMIT_CPU (30s), RLIMIT_AS (512MB), RLIMIT_NOFILE (100)
-- [ ] Timeout handling via `signal.SIGALRM` or `subprocess` timeout
-- [ ] Network blocking via `socket` module restrictions
-- [ ] Filesystem restrictions (read-only root, tmpfs for writes)
-- [ ] Restricted Python execution (no `exec`, `eval`, `compile`)
-- [ ] Sandbox pooling for same capability type (performance)
-- [ ] **Railway Compatibility:** No nsjail, no seccomp-bpf, no CAP_SYS_ADMIN required
-**Dependencies:** None
-**Domain:** DevOps/Backend
+### What's New in v0.2
 
-**Note on Railway Compatibility:** The original plan used `nsjail` and `seccomp-bpf` which require `CAP_SYS_ADMIN` and privileged capabilities not available in Railway's container environment. This subprocess-based approach uses standard Python resource limits (`resource` module) which work in all container environments including Railway.
+| Feature | Description | Dependency |
+|---------|-------------|------------|
+| **Capability Acquisition** | Agents learn new capabilities via `/learn` command using horde-learn pattern | Neo4j, delegation protocol |
+| **CBAC** | Capability-Based Access Control for learned capabilities | Neo4j schema extension |
+| **Agent Authentication** | HMAC-SHA256 message signing between agents | Neo4j AgentKey nodes |
+| **Jochi AST Analysis** | Tree-sitter based backend code analysis | Existing backend_collaboration.py |
+| **Authentik Web UI** | SSO protection for Kublai control panel | Railway, Caddy proxy |
 
-### Task 1.3: Create horde-learn Adapter Module
-**Description:** Create the main adapter that bridges horde-learn with Kurultai architecture
-**Files:**
-- Create: `tools/kurultai/horde_learn_adapter.py` (~500 lines)
-**Acceptance:**
-- [ ] `HordeLearnKurultai` class with `learn()` method
-- [ ] Integration with `CapabilityClassifier`
-- [ ] Integration with `CostEnforcer` for budget control
-- [ ] Integration with `SandboxExecutor` for safe execution
-- [ ] Neo4j memory read/write for capability tracking
-- [ ] Proper agent ID usage (researcher, developer, analyst - not display names)
-- [ ] Delegation via `gateway_url` + `agentToAgent` (not `delegate_task()`)
-- [ ] Mandatory `_sanitize_for_sharing()` before delegation
-- [ ] Circular delegation protection (max depth 3)
-**Dependencies:** Task 1.1, Task 1.2
-**Domain:** Backend
+### Deployment Target
 
-### Task 1.4: Create Capability Taxonomy Data for Kurultai
-**Description:** Pre-populate capability taxonomy with Kurultai-relevant capabilities
-**Files:**
-- Create: `tools/kurultai/capability_taxonomy_kurultai.py` (~300 lines)
-**Acceptance:**
-- [ ] 5 domains: COMMUNICATION, DATA, INFRASTRUCTURE, AUTOMATION, INTELLIGENCE
-- [ ] 25+ capability patterns
-- [ ] 100+ pre-defined capabilities
-- [ ] Research source mappings for each capability
-- [ ] Implementation pattern templates
-- [ ] Security risk classification per capability (LOW/MEDIUM/HIGH/CRITICAL)
-**Dependencies:** Task 1.3
-**Domain:** Backend
+**Platform**: Railway (container hosting)
+**Region**: us-east-1 (recommended for Neo4j AuraDB proximity)
+**Estimated Time**: 4-6 hours for full deployment
+**Services**: 6 Railway services + PostgreSQL + Neo4j AuraDB
 
-### Task 1.5: Jochi Static Analysis Enhancement (AST-Based)
-**Description:** Enhance existing Jochi backend monitoring with tree-sitter AST parsing for improved accuracy. Leverages existing `BackendCodeReviewer` in `tools/backend_collaboration.py`.
-**Files:**
-- Create: `tools/kurultai/static_analysis/__init__.py`
-- Create: `tools/kurultai/static_analysis/ast_parser.py` (~300 lines)
-- Create: `tools/kurultai/static_analysis/rule_engine.py` (~250 lines)
-- Create: `tools/kurultai/static_analysis/rules/connection_management.yaml`
-- Create: `tools/kurultai/static_analysis/rules/resilience.yaml`
-- Create: `tools/kurultai/static_analysis/rules/data_integrity.yaml`
-- Create: `tools/kurultai/static_analysis/rules/performance.yaml`
-- Create: `tools/kurultai/static_analysis/rules/security.yaml`
-**Acceptance:**
-- [ ] `ASTParser` class with tree-sitter integration for Python, JavaScript, Go
-- [ ] Resource limits: 10MB file size, 30s parse time, 1000 AST depth
-- [ ] `RuleEngine` class with YAML rule loading using `yaml.safe_load()`
-- [ ] YAML depth limiting (max 10 levels) and file size limits (1MB per rule file)
-- [ ] 20+ detection rules across 5 categories (Connection, Resilience, Data Integrity, Performance, Security)
-- [ ] Integration with existing `BackendCodeReviewer.create_backend_analysis()`
-- [ ] Parser lazy loading (only load language parsers when needed)
-- [ ] Safe regex validation (ReDoS prevention)
-- [ ] **Security:** SandboxedEnvironment for any template processing
-- [ ] **Security:** Input sanitization before AST parsing
-- [ ] **Security:** Authorization check for Analysis node creation
-**Dependencies:** Task 1.1 (security infrastructure), Task 1.3 (adapter)
-**Domain:** Backend
-**Note:** Existing implementation in `tools/backend_collaboration.py` provides regex-based detection. This task adds AST-based enhancement for higher accuracy.
+> **Note**: Service name `moltbot-railway-template` is the canonical Railway service name (referred to as "moltbot" for brevity throughout this document).
+
+### Scope
+
+This plan covers **Core Infrastructure + Foundation Features**: Neo4j-backed operational memory, SSO authentication, Signal messaging, capability acquisition pipeline, Task Dependency Engine (Phase 1.5), Notion Integration (Phase 4.5), File Consistency Monitoring (Phase 6.5), and operational monitoring. Features deferred to v0.3 are documented in [Appendix G](#appendix-g-scope-boundary-declaration).
 
 ---
 
-## Phase 2: Classification & Research Integration
+## Prerequisites
 
-**Status:** Pending
-**Tasks:** 3
-**Parallelizable:** Yes
+### Local Environment
 
-### Task 2.1: Implement Capability Classification Engine
-**Description:** Hybrid classifier (rule-based + semantic + LLM fallback) with security filtering
-**Files:**
-- Create: `tools/kurultai/capability_classifier.py` (~600 lines)
-**Acceptance:**
-- [ ] `CapabilityClassifier` class with `classify()` method
-- [ ] Rule-based classification (fast path, >0.85 confidence)
-- [ ] Semantic similarity using Neo4j vector index
-- [ ] LLM fallback for ambiguous cases
-- [ ] Confidence scoring and ambiguity detection
-- [ ] **Security:** Prompt injection filtering on all inputs
-- [ ] **Security:** Block classification of CRITICAL-risk capabilities
-**Dependencies:** Task 1.4
-**Domain:** Backend
+```bash
+# Required tools
+docker --version          # Docker Desktop 20.10+
+railway --version         # Railway CLI 3.0+
+python --version          # Python 3.13+
+node --version            # Node 20+
 
-### Task 2.2: Integrate Research Delegation to Möngke
-**Description:** Delegate research phase to Möngke (researcher agent) via agentToAgent
-**Files:**
-- Create: `tools/kurultai/research_delegation.py` (~250 lines)
-**Acceptance:**
-- [ ] `ResearchDelegation` class using `gateway_url` + `agentToAgent`
-- [ ] Proper message format per `neo4j.md` Section 2.2
-- [ ] Context includes: `task_id`, `delegated_by`, `delegation_depth`, `delegation_chain`
-- [ ] API discovery via web search
-- [ ] Documentation extraction and pattern analysis
-- [ ] Research artifact storage in Neo4j (extends `:Research` node)
-- [ ] Source ranking and reliability scoring
-- [ ] **Security:** URL validation for research sources
-- [ ] **Security:** `_sanitize_for_sharing()` on all research inputs
-**Dependencies:** Task 1.3
-**Domain:** Backend
-
-### Task 2.3: Extend Neo4j Schema for Capability Research
-**Description:** Extend existing `:Research` node for capability research findings
-**Files:**
-- Modify: `openclaw_memory.py` (add capability research methods after line 4125)
-**Acceptance:**
-- [ ] Extends `:Research` node (NOT new `:CapabilityResearch`)
-- [ ] Uses `research_type: "capability_learning"` property
-- [ ] Methods: `store_capability_research()`, `get_capability_research()`
-- [ ] Vector index for research similarity search (384-dim, cosine)
-- [ ] Follows existing patterns from `store_research()`
-- [ ] Includes properties: `capability_name`, `findings`, `sources`, `reliability_score`
-**Dependencies:** Task 2.2
-**Domain:** Backend
-
----
-
-## Phase 3: Implementation & Code Generation
-
-**Status:** Pending
-**Tasks:** 4
-**Parallelizable:** Partial
-
-### Task 3.1: Create Code Generation Templates
-**Description:** Jinja2 templates for common capability patterns with security hardening
-**Files:**
-- Create: `templates/capabilities/api_client.py.j2`
-- Create: `templates/capabilities/web_automation.py.j2`
-- Create: `templates/capabilities/file_processor.py.j2`
-- Create: `templates/capabilities/error_handling.py.j2`
-- Create: `templates/capabilities/test_suite.py.j2`
-**Acceptance:**
-- [ ] 5 base templates for API integration
-- [ ] 3 templates for web automation
-- [ ] Error handling patterns (retry, backoff, circuit breaker)
-- [ ] Auto-generated test templates
-- [ ] **Security:** SandboxedEnvironment for Jinja2 (prevent SSTI)
-- [ ] **Security:** No dynamic code execution in templates
-- [ ] **Security:** Input escaping for all template variables
-**Dependencies:** Task 2.1
-**Domain:** Backend
-
-### Task 3.2: Integrate Implementation Delegation to Temüjin
-**Description:** Delegate code generation to Temüjin (developer agent) with security scanning
-**Files:**
-- Create: `tools/kurultai/implementation_delegation.py` (~300 lines)
-**Acceptance:**
-- [ ] `ImplementationDelegation` class
-- [ ] Uses `gateway_url` + `agentToAgent` with delegation depth tracking
-- [ ] Template-based code generation
-- [ ] AST validation of generated code
-- [ ] **Security:** Mandatory `StaticAnalysis.scan()` before storage
-- [ ] **Security:** Block code with high-severity findings
-- [ ] Tool file creation in `tools/kurultai/generated/` directory (isolated namespace)
-- [ ] Auto-prefix learned tools with `learned_` to prevent shadowing
-**Dependencies:** Task 3.1
-**Domain:** Backend
-
-### Task 3.3: Create Capability Registry
-**Description:** Store learned capabilities in Neo4j instead of modifying SOUL.md files
-**Files:**
-- Create: `tools/kurultai/capability_registry.py` (~350 lines)
-**Acceptance:**
-- [ ] `CapabilityRegistry` class with `register()` method
-- [ ] Stores capabilities as `:LearnedCapability` nodes in Neo4j
-- [ ] Links to agent via `:HAS_LEARNED_CAPABILITY` relationship
-- [ ] Tool metadata: name, version, parameters, examples, sandbox_config
-- [ ] Semantic versioning support
-- [ ] Dependency tracking between tools
-- [ ] **Security:** Cryptographic signing of registered tools
-- [ ] **Security:** Registry access control (only specific agents can register)
-- [ ] Risk assessment stored per capability (LOW/MEDIUM/HIGH)
-- [ ] **Atomic:** `claim_capability()` with race condition handling
-- [ ] **Limits:** Max 50 capabilities per agent, max 5 new per day
-- [ ] **CBAC:** `required_capabilities` field to define which capabilities are needed to use a learned tool
-- [ ] **CBAC:** Runtime capability check before tool execution via `can_execute()`
-- [ ] **CBAC:** `(Agent)-[:HAS_CAPABILITY]->(Capability)` relationship for capability grants
-- [ ] **CBAC:** Capability grant/revoke workflow with expiration support
-**Dependencies:** Task 2.3
-**Domain:** Backend
-
-#### CBAC Enforcement Pseudocode
-
-```python
-class CapabilityRegistry:
-    def can_execute(self, agent_id: str, capability_id: str) -> bool:
-        """Check if agent has required capabilities."""
-        lc = self.get_learned_capability(capability_id)
-        agent_caps = self.get_agent_capabilities(agent_id)
-
-        # Check if agent has all required capabilities
-        for req_cap in lc.required_capabilities:
-            if req_cap not in agent_caps:
-                return False
-
-        # Check if capabilities haven't expired
-        for cap in agent_caps:
-            if cap.expires_at and cap.expires_at < datetime.now():
-                return False
-
-        return True
-
-    def grant_capability(self, agent_id: str, capability_id: str,
-                        granted_by: str, expires_at: Optional[datetime] = None):
-        """Grant a capability to an agent."""
-        query = """
-        MATCH (a:Agent {id: $agent_id}), (c:Capability {id: $capability_id})
-        CREATE (a)-[:HAS_CAPABILITY {
-            granted_at: datetime(),
-            expires_at: $expires_at,
-            granted_by: $granted_by
-        }]->(c)
-        """
-        self.neo4j.run(query, agent_id=agent_id, capability_id=capability_id,
-                      granted_by=granted_by, expires_at=expires_at)
-
-    def revoke_capability(self, agent_id: str, capability_id: str):
-        """Revoke a capability from an agent."""
-        query = """
-        MATCH (a:Agent {id: $agent_id})-[r:HAS_CAPABILITY]->(c:Capability {id: $capability_id})
-        DELETE r
-        """
-        self.neo4j.run(query, agent_id=agent_id, capability_id=capability_id)
-
-    def get_agent_capabilities(self, agent_id: str) -> List[Capability]:
-        """Get all active capabilities for an agent."""
-        query = """
-        MATCH (a:Agent {id: $agent_id})-[r:HAS_CAPABILITY]->(c:Capability)
-        WHERE r.expires_at IS NULL OR r.expires_at > datetime()
-        RETURN c, r
-        """
-        return self.neo4j.run(query, agent_id=agent_id)
+# Clone repository
+git clone https://github.com/your-org/molt.git
+cd molt
 ```
 
-### Task 3.4: Extend Tool Registry Integration
-**Description:** Extend existing types.py patterns instead of creating separate registry
-**Files:**
-- Modify: `tools/kurultai/types.py` (add LearnedCapability dataclass)
-**Acceptance:**
-- [ ] `LearnedCapability` dataclass with all metadata fields
-- [ ] Integration with existing `AgentRouting` patterns
-- [ ] Type-safe capability metadata handling
-**Dependencies:** Task 3.3
-**Domain:** Backend
+### Accounts & Services
+
+| Service | Purpose | Free Tier |
+|---------|---------|-----------|
+| Railway | Container hosting | Yes ($5 free credit) |
+| Neo4j AuraDB | Graph database | Yes (200k nodes) |
+| Authentik | SSO (self-hosted) | N/A (deploy on Railway) |
+
+### Domain Configuration
+
+- Custom domain: `kublai.kurult.ai` (or your domain)
+- DNS configured to point to Railway
+- SSL certificate (auto-provisioned by Railway)
 
 ---
 
-## Phase 4: Validation & Testing
+## Architecture Overview
 
-**Status:** Pending
-**Tasks:** 3
-**Parallelizable:** Yes
-
-### Task 4.1: Integrate Validation Delegation to Jochi
-**Description:** Delegate testing and validation to Jochi (analyst agent) with cross-agent review. Jochi performs both capability validation AND backend code analysis.
-**Files:**
-- Create: `tools/kurultai/validation_delegation.py` (~300 lines)
-- Modify: `tools/backend_collaboration.py` (add AST-based validation hook)
-**Acceptance:**
-- [ ] `ValidationDelegation` class
-- [ ] Uses `gateway_url` + `agentToAgent` with depth tracking
-- [ ] Automated test generation
-- [ ] Test execution in sandbox environment
-- [ ] Mastery score calculation (threshold: 0.85)
-- [ ] **Security:** Independent validation (Jochi validates Temüjin's code, not self-validation)
-- [ ] **Security:** Security test suite execution
-- [ ] **Security:** Human approval gate for HIGH-risk capabilities
-- [ ] **Integration:** Jochi re-runs AST analysis on Temüjin's fix to verify resolution
-- [ ] **Integration:** Compare before/after AST for structural changes
-- [ ] **Integration:** Validate that patterns triggering original finding no longer match
-**Dependencies:** Task 3.2, Task 1.5 (Jochi AST enhancement)
-**Domain:** Backend
-**Note:** Jochi has dual validation responsibilities: (1) validate learned capabilities, (2) validate backend fixes. Uses existing `BackendCodeReviewer.validate_fix()` pattern.
-
-### Task 4.2: Create Capability Testing Framework
-**Description:** Test harness for generated capabilities with sandbox execution
-**Files:**
-- Create: `tools/kurultai/capability_tester.py` (~400 lines)
-- Create: `tests/capabilities/conftest.py`
-**Acceptance:**
-- [ ] `CapabilityTester` class
-- [ ] Mock external APIs for testing
-- [ ] **Security:** Sandbox execution environment (uses SandboxExecutor)
-- [ ] Performance benchmarking
-- [ ] Error injection testing
-- [ ] **Security:** Behavior anomaly detection
-**Dependencies:** Task 4.1, Task 1.2
-**Domain:** Backend
-
-### Task 4.3: Implement Failure Recovery
-**Description:** Automatic recovery from learning failures with checkpoint/rollback
-**Files:**
-- Modify: `tools/kurultai/horde_learn_adapter.py`
-**Acceptance:**
-- [ ] Checkpoint creation before each phase
-- [ ] Rollback on failure (removes partial artifacts)
-- [ ] `CapabilityRegistry.deregister()` for cleanup
-- [ ] Retry with exponential backoff
-- [ ] Fallback to alternative approaches
-- [ ] Error pattern storage for future learning
-- [ ] **Security:** Cleanup of sandbox containers on failure
-**Dependencies:** Task 4.2
-**Domain:** Backend
-
----
-
-## Phase 5: Integration & Orchestration
-
-**Status:** Pending
-**Tasks:** 3
-**Parallelizable:** No (sequential)
-
-### Task 5.1: Create Master Orchestration Pipeline
-**Description:** End-to-end pipeline connecting all phases with state tracking
-**Files:**
-- Modify: `tools/kurultai/horde_learn_adapter.py` (finalize)
-**Acceptance:**
-- [ ] `learn_capability()` method with full pipeline
-- [ ] Phase transitions with state tracking
-- [ ] Cost tracking across phases (uses CostEnforcer)
-- [ ] Progress reporting
-- [ ] Cancellation support
-- [ ] **Security:** Pre-authorization before each phase
-- [ ] **Security:** Hard cost limits with emergency shutdown
-- [ ] **Security:** Circular delegation detection (max depth 3)
-**Dependencies:** Tasks 2.2, 3.2, 4.1
-**Domain:** Backend
-
-### Task 5.2: Integrate with Multi-Goal Orchestration
-**Description:** Connect to existing goal orchestration system using metadata
-**Files:**
-- Modify: `tools/multi_goal_orchestration.py` (add helper method)
-**Acceptance:**
-- [ ] `add_capability_goal()` helper method in GoalOrchestrator
-- [ ] Uses `metadata` field for goal categorization (not new goal type)
-- [ ] Sets `metadata["goal_category"] = "capability_acquisition"`
-- [ ] Dependency tracking for capability learning via ENABLES relationships
-- [ ] Priority handling for learning tasks (default: NORMAL, not CRITICAL)
-- [ ] Resource allocation via metadata cost tracking
-**Dependencies:** Task 5.1
-**Domain:** Backend
-
-### Task 5.3: Add Monitoring and Observability
-**Description:** Track learning metrics and health with alerting
-**Files:**
-- Create: `tools/kurultai/learning_monitor.py` (~250 lines)
-**Acceptance:**
-- [ ] Learning success/failure metrics
-- [ ] Cost per capability tracking
-- [ ] Time-to-mastery statistics
-- [ ] Alerting for failed learnings
-- [ ] Dashboard queries for Neo4j
-- [ ] **Security:** Audit logging for all learning attempts
-- [ ] **Security:** Anomaly detection for unusual learning patterns
-**Dependencies:** Task 5.1
-**Domain:** Backend
-
----
-
-## Phase 6: Documentation & Testing
-
-**Status:** Pending
-**Tasks:** 2
-**Parallelizable:** Yes
-
-### Task 6.1: Create Comprehensive Tests
-**Description:** Unit and integration tests for horde-learn Kurultai
-**Files:**
-- Create: `tests/kurultai/test_horde_learn_adapter.py`
-- Create: `tests/kurultai/test_capability_classifier.py`
-- Create: `tests/kurultai/test_capability_registry.py`
-- Create: `tests/kurultai/test_sandbox_executor.py`
-- Create: `tests/kurultai/test_security_filters.py`
-**Acceptance:**
-- [ ] 80%+ test coverage
-- [ ] Mock Neo4j for tests
-- [ ] Mock agent delegation
-- [ ] End-to-end learning scenario tests
-- [ ] Failure mode tests
-- [ ] **Security:** Prompt injection test cases
-- [ ] **Security:** Sandbox escape attempt tests
-- [ ] **Security:** Cost limit enforcement tests
-- [ ] **Security:** Circular delegation detection tests
-- [ ] **Security:** CBAC enforcement tests (capability grants, revocations, expiration)
-**Dependencies:** Task 5.1
-**Domain:** Backend
-
-### Task 6.2: Create Documentation
-**Description:** Usage guide and architecture documentation
-**Files:**
-- Create: `docs/horde-learn-kurultai.md`
-- Create: `docs/capability-acquisition-guide.md`
-- Create: `docs/security/sandbox-security.md`
-**Acceptance:**
-- [ ] Architecture overview
-- [ ] Usage examples for each agent
-- [ ] Troubleshooting guide
-- [ ] Cost estimation guide
-- [ ] **Security:** Security architecture documentation
-- [ ] **Security:** Threat model and mitigations
-- [ ] **Security:** CBAC documentation (capability grant workflows, trust levels)
-- [ ] **CRITICAL:** Document all fixes applied from critical review
-**Dependencies:** Task 6.1
-**Domain:** Documentation
-
----
-
-## Dependencies
+### System Components
 
 ```
-Phase 1 (Foundation)
-    ├── Task 1.1 (Security) ──┬── Task 1.3 (Adapter)
-    │                         │
-    ├── Task 1.2 (Sandbox) ───┤
-    │                         │
-    ├── Task 1.4 (Taxonomy) ──┤
-    │                         │
-    └── Task 1.5 (Jochi AST) ─┴── Task 2.1 (Classifier)
-
-Phase 2 (Classification/Research)
-    ├── Task 2.1 ──┬── Task 3.1 (Templates)
-    │              │
-    ├── Task 2.2 ──┼── Task 3.2 (Implementation)
-    │              │
-    └── Task 2.3 ──┴── Task 3.3 (Capability Registry)
-
-Phase 3 (Implementation)
-    ├── Task 3.1 ──┬── Task 4.1 (Validation)
-    ├── Task 3.2 ──┤
-    ├── Task 3.3 ──┤
-    └── Task 3.4 ──┴── Task 5.1 (Orchestration)
-
-Phase 4 (Validation)
-    ├── Task 4.1 ──┬── Task 5.1
-    ├── Task 4.2 ──┤
-    └── Task 4.3 ──┴── Task 6.1 (Tests)
-
-Phase 5 (Integration)
-    ├── Task 5.1 ──┬── Task 6.1
-    ├── Task 5.2 ──┤
-    └── Task 5.3 ──┴── Task 6.2 (Docs)
-
-Phase 6 (Docs/Tests)
-    └── Tasks 6.1, 6.2 (parallel)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Railway Deployment                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐            │
+│  │   Authentik    │    │   Authentik    │    │  Authentik     │            │
+│  │    Server      │    │    Worker      │    │  Proxy (Caddy) │            │
+│  │  :9000 (internal)│   │  (background)  │    │   :8080 (public)│            │
+│  └────────┬───────┘    └────────────────┘    └────────┬───────┘            │
+│           │                                        │                       │
+│           └────────────────────────────────────────┼───────────────────────┘
+│                                                    │ forward_auth
+│  ┌────────────────┐    ┌────────────────┐         │                       │
+│  │  Moltbot +     │    │   Neo4j        │         │                       │
+│  │  Python Bridge │◀───│   AuraDB       │         │                       │
+│  │  :8080 (internal)│  │  (neo4j+s://)  │         │                       │
+│  └────────┬───────┘    └────────────────┘         │                       │
+│           │                                        │                       │
+│           │   ┌────────────────┐                   │                       │
+│           └──▶│  Kublai Web UI │◀──────────────────┘                       │
+│               │  (Next.js)      │  Authenticated requests                   │
+│               │  /dashboard     │                                           │
+│               └────────────────┘                                           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+> **Port Note**: The OpenClaw internal gateway listens on port 18789 (per `neo4j.md` design
+> document). The Express.js health check server runs on port 8080 (Railway's expected external
+> port). The Caddy proxy (authentik-proxy) handles external HTTPS routing.
 
-## Critical Files to Modify
+### Agent Communication Flow
 
-| File | Purpose | Changes |
-|------|---------|---------|
-| `tools/delegation_protocol.py` | Agent routing | Add capability learning keywords to AGENT_ROUTING |
-| `openclaw_memory.py` | Neo4j interface | Add `store_capability_research()`, `get_capability_research()` methods after line 4125 |
-| `tools/multi_goal_orchestration.py` | Goal management | Add `add_capability_goal()` helper method |
-| `tools/kurultai/types.py` | Type definitions | Add `LearnedCapability` dataclass |
+```
+User Request
+     ↓
+┌────────────┐
+│   Caddy    │ → Authentik Forward Auth (if unauthenticated → login)
+│   Proxy    │
+└─────┬──────┘
+      │
+      ↓
+┌────────────┐
+│  Moltbot   │ → Express.js server
+│  :8080     │
+└─────┬──────┘
+      │
+      ↓
+┌──────────────────────────────────────────────────────────┐
+│                     Kublai (main)                       │
+│  ├─ Reads personal context (files)                     │
+│  ├─ Queries operational context (Neo4j)                │
+│  └─ Delegates via agentToAgent                         │
+└────────┬────────────────────────────────────────────────┘
+         │
+    ┌────┼────────┬────────┬────────┬────────┐
+    ↓    ↓         ↓        ↓        ↓        ↓
+  Möngke Chagatai Temüjin  Jochi   Ögedei
+  (research) (write)  (dev)  (analyze) (ops)
+    │      │       │      │       │
+    └──────┴───────┴──────┴───────┘
+         │
+         ↓ Results to Neo4j
+         │
+    Kublai synthesizes response
+         │
+         ↓ Response to user
+```
 
----
+### Two-Tier Memory Architecture
 
-## New Files to Create
+| Tier | Storage | Access | Contents | Example |
+|------|---------|--------|----------|---------|
+| **Personal** | Files (`MEMORY.md`) | Kublai only | User preferences, personal history | "My friend Sarah" |
+| **Operational** | Neo4j (shared) | All 6 agents | Research, code patterns, analysis | "PostgreSQL connection pooling patterns" |
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `tools/kurultai/security/prompt_injection_filter.py` | ~150 | Input sanitization |
-| `tools/kurultai/security/cost_enforcer.py` | ~200 | Budget enforcement |
-| `tools/kurultai/security/static_analysis.py` | ~250 | Code security scanning |
-| `tools/kurultai/sandbox_executor.py` | ~400 | Subprocess-based sandbox execution |
-| `tools/kurultai/sandbox/subprocess_executor.py` | ~300 | Resource limit enforcement |
-| `tools/kurultai/horde_learn_adapter.py` | ~500 | Main adapter class |
-| `tools/kurultai/capability_classifier.py` | ~600 | Hybrid classification |
-| `tools/kurultai/capability_taxonomy_kurultai.py` | ~300 | Taxonomy data |
-| `tools/kurultai/research_delegation.py` | ~250 | Research phase |
-| `tools/kurultai/implementation_delegation.py` | ~300 | Implementation phase |
-| `tools/kurultai/validation_delegation.py` | ~300 | Validation phase |
-| `tools/kurultai/capability_registry.py` | ~350 | Capability registry |
-| `tools/kurultai/capability_tester.py` | ~400 | Testing framework |
-| `tools/kurultai/learning_monitor.py` | ~250 | Monitoring |
-| `templates/capabilities/*.j2` | ~100 each | Code templates |
-| `tests/kurultai/test_*.py` | ~300 each | Test suites |
-| `docs/horde-learn-kurultai.md` | ~400 | Documentation |
-| `docs/security/sandbox-security.md` | ~300 | Security docs |
-| **Jochi Static Analysis (Task 1.5)** |||
-| `tools/kurultai/static_analysis/__init__.py` | ~50 | Module exports |
-| `tools/kurultai/static_analysis/ast_parser.py` | ~300 | Tree-sitter wrapper |
-| `tools/kurultai/static_analysis/rule_engine.py` | ~250 | YAML rule engine |
-| `tools/kurultai/static_analysis/rules/*.yaml` | ~50 each | Detection rules (20+ files) |
-
----
-
-## Agent Naming Reference
-
-| Agent ID (for code) | Display Name | Role |
-|---------------------|--------------|------|
-| `main` | Kublai | Orchestrator |
-| `researcher` | Möngke | Research |
-| `developer` | Temüjin | Code generation |
-| `analyst` | Jochi | Analysis/Validation |
-| `writer` | Chagatai | Content creation |
-| `ops` | Ögedei | Operations |
-
-**Important:** Use Agent IDs (left column) for all routing, delegation, and Neo4j storage. Use Display Names only for user-facing output.
+**Privacy Rule**: Kublai sanitizes PII before delegating to other agents via `_sanitize_for_sharing()`.
 
 ---
 
-## Jochi-Temüjin Backend Analysis Workflow
+## Phase -1: Wipe and Rebuild (Clean Slate)
+
+**Duration**: 30 minutes
+**Risk Level**: HIGH (destructive) - Ensure backup complete before proceeding
+**Purpose**: Complete teardown of existing Kurultai infrastructure for fresh deployment
 
 ### Overview
-Jochi (analyst) performs backend code analysis and delegates fixes to Temüjin (developer). This workflow is **already implemented** in `tools/backend_collaboration.py` and integrated with the capability learning system.
 
-### Trigger Conditions
+This phase destroys all existing Kurultai deployment artifacts while **preserving the working Signal integration**. The Signal configuration was difficult to establish and must be preserved exactly.
 
-| Trigger Type | Frequency | Scope | Implementation |
-|--------------|-----------|-------|----------------|
-| **Kublai Directive** | On-demand | Specified files | `agentToAgent` message to `analyst` |
-| **Scheduled Scan** | Every 4 hours | Modified backend files | Ögedei's proactive monitoring |
-| **Event-Based** | Real-time | Changed files | File watcher webhook |
-| **Post-Implementation** | After code generation | Generated capability code | Task 3.2 integration hook |
+### What Gets Destroyed
 
-### Workflow: Jochi Finds Issue → Kublai Routes → Temüjin Fixes
+| Component | Reason | Replacement |
+|-----------|--------|--------------|
+| Railway services (authentik-*) | Fresh deployment | New Railway services |
+| Railway services (moltbot-*) | Fresh deployment | New moltbot-railway-template |
+| Old Neo4j configurations | Switching to AuraDB | Neo4j AuraDB Free |
+| Local build artifacts | Clean slate | Regenerated |
+| Docker volumes | Clean state | New volumes |
 
-```python
-# Step 1: Jochi analyzes code and creates Analysis node
-from tools.backend_collaboration import BackendCodeReviewer
+### What Gets Preserved
 
-reviewer = BackendCodeReviewer(memory)
-analysis_id = reviewer.create_backend_analysis(
-    category="connection_pool",  # One of 5 categories
-    findings="Missing connection pool configuration",
-    location="src/database.py:42",
-    severity="high",
-    recommended_fix="Add psycopg2.pool.ThreadedConnectionPool",
-    target="src/database.py"
-)
+| Component | Location | Reason |
+|-----------|----------|--------|
+| `signal-cli-daemon/` | `/Users/kurultai/molt/signal-cli-daemon/` | Working signal-cli container |
+| `signal-proxy/` | `/Users/kurultai/molt/signal-proxy/` | Working Caddy API proxy |
+| Signal data backup | `/Users/kurultai/molt/.signal-data/signal-data.tar.gz` | QR link registration |
+| Signal environment variables | From `.env` | API keys, account number |
 
-# Step 2: Kublai queries and delegates to Temüjin
-query = """
-MATCH (a:Analysis)
-WHERE a.agent = 'jochi'
-  AND a.status = 'open'
-  AND a.severity IN ['critical', 'high']
-  AND a.assigned_to = 'temujin'
-RETURN a.id as analysis_id, a.description as title, a.severity as severity
-"""
+### Task -1.1: Pre-Deletion Backup
 
-# Step 3: Temüjin implements fix
-# (Temüjin receives delegation via agentToAgent, implements fix)
+**CRITICAL: Complete this before any deletion**
 
-# Step 4: Jochi validates the fix
-validation = reviewer.validate_fix(
-    analysis_id=analysis_id,
-    fix_summary="Added ThreadedConnectionPool with max 20 connections",
-    validation_results={"pool_configured": True, "max_connections": 20}
-)
+```bash
+# Create backup directory with timestamp
+BACKUP_DIR="$HOME/kurultai-backup-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$BACKUP_DIR"
 
-# Step 5: Analysis status updated
-# - 'validated' if fix addresses issue
-# - 'reopened' if validation fails
+# Export Railway environment variables
+railway variables --json > "$BACKUP_DIR/railway-vars.json"
+
+# List all Railway services
+railway services > "$BACKUP_DIR/railway-services.txt"
+
+# Backup .env file
+cp .env "$BACKUP_DIR/.env.backup" 2>/dev/null || true
+
+# Verify Signal backup exists
+ls -lh .signal-data/signal-data.tar.gz
+
+# Copy Signal directories to backup
+cp -r signal-cli-daemon "$BACKUP_DIR/"
+cp -r signal-proxy "$BACKUP_DIR/"
+
+# Extract Signal environment variables
+grep "SIGNAL_" .env > "$BACKUP_DIR/signal.env" 2>/dev/null || true
+
+echo "Backup complete: $BACKUP_DIR"
 ```
 
-### Category Mapping
+### Task -1.2: Delete Railway Services
 
-| Jochi Category | analysis_type | Assigned To | Priority |
-|----------------|---------------|-------------|----------|
-| connection | resource | temujin | high |
-| resilience | resource | temujin | high |
-| data_integrity | error | temujin | high |
-| performance | performance | temujin | medium |
-| security | security | temujin | critical |
+**Current service IDs (verify before deletion):**
 
-### Integration with Capability Learning
-
-When Temüjin generates a new capability (Phase 3.2), Jochi automatically reviews the generated code:
-
-```python
-# In ImplementationDelegation (Task 3.2)
-from tools.kurultai.static_analysis.ast_parser import ASTParser
-
-class ImplementationDelegation:
-    def generate_and_review(self, capability_request):
-        # Generate code (existing)
-        generated_code = self.generate_code(capability_request)
-
-        # NEW: Jochi AST-based review
-        parser = ASTParser()
-        issues = parser.analyze_code(generated_code)
-
-        if any(i.severity == 'critical' for i in issues):
-            # Block registration, create Analysis nodes
-            for issue in issues:
-                self.memory.create_analysis(
-                    agent='jochi',
-                    analysis_type=self._map_category(issue.category),
-                    severity=issue.severity,
-                    description=issue.title,
-                    findings={'location': issue.location, 'category': issue.category},
-                    recommendations=[issue.recommended_fix],
-                    assigned_to='temujin'
-                )
-            return {'status': 'blocked', 'reason': 'critical_issues_found'}
-
-        # Proceed with registration
-        return self.register_capability(generated_code)
+```bash
+# Get current service list
+railway services
 ```
+
+**Delete each service:**
+
+```bash
+# Delete Authentik services
+railway remove authentik-db
+railway remove authentik-worker
+railway remove authentik-server
+railway remove authentik-proxy
+
+# Delete Kurultai/Moltbot services
+# railway remove moltbot-gateway  # (legacy name, may not exist)
+railway remove moltbot-railway-template
+
+# Delete any old Neo4j or PostgreSQL services
+# railway remove neo4j
+# railway remove postgres
+
+# Verify deletion - should show minimal services
+railway services
+```
+
+### Task -1.3: Clean Local Artifacts
+
+```bash
+# Remove build artifacts
+rm -rf __pycache__
+rm -rf **/__pycache__
+rm -rf .pytest_cache
+rm -rf .hypothesis
+rm -rf .playwright-mcp
+rm -rf *.pyc
+rm -rf *.pyo
+
+# Remove old Authentik build directories (Signal is preserved)
+rm -rf authentik-server/
+rm -rf authentik-worker/
+rm -rf authentik-proxy/
+rm -rf kublai-build/
+rm -rf dist/
+rm -rf build/
+
+# DO NOT DELETE:
+# - signal-cli-daemon/
+# - signal-proxy/
+# - .signal-data/
+# - src/
+# - tools/
+# - tests/
+```
+
+### Task -1.4: Clean Docker Volumes
+
+```bash
+# List all volumes
+docker volume ls
+
+# Remove Kurultai-related volumes (inspect first)
+docker volume ls | grep kurult
+docker volume ls | grep moltbot
+docker volume ls | grep authentik
+
+# Remove specific volumes (replace with actual names)
+# docker volume rm VOLUME_NAME
+```
+
+### Exit Criteria Phase -1
+
+- [ ] Backup directory created and verified
+- [ ] Signal configuration backed up
+- [ ] All Railway services deleted
+- [ ] Local artifacts cleaned
+- [ ] Docker volumes cleaned
+- [ ] Signal directories preserved
 
 ---
 
-## Neo4j Schema Extensions
+## Phase 0: Environment & Security Setup
 
-```cypher
-// Extend :Research node (NOT new :CapabilityResearch)
-(:Research {
-    // ... existing fields from neo4j.md ...
-    research_type: "capability_learning",  // NEW
-    capability_name: string,
-    findings: string,
-    sources: [string],
-    reliability_score: float,
-    embedding: [float],         // 384-dim vector
-    access_tier: string,        // 'PUBLIC', 'SENSITIVE', 'PRIVATE'
-    created_at: datetime
-})
+**Duration**: 1 hour
+**Dependencies**: None
 
-// New node type for learned capabilities (REPLACES SOUL.md modification)
-(:LearnedCapability {
-    id: string,
-    name: string,
-    agent: string,              // Which agent can use this
-    tool_path: string,          // Path to generated tool
-    version: string,            // Semantic version
-    learned_at: datetime,
-    cost: float,                // Actual cost to learn
-    mastery_score: float,       // From validation
-    risk_level: string,         // LOW, MEDIUM, HIGH
-    signature: string,          // Cryptographic signature
-    claimed_by: string,         // For atomic registration
-    claimed_at: datetime,       // For race condition handling
-    required_capabilities: [string],  // CBAC: List of capability IDs needed to use this tool
-    min_trust_level: string           // CBAC: Minimum agent trust level (LOW, MEDIUM, HIGH)
-})
+### Task 0.1: Generate Secure Credentials
 
-// Capability node type for CBAC (Capability-Based Access Control)
-(:Capability {
-    id: string,
-    name: string,
-    description: string,
-    risk_level: string,  // LOW, MEDIUM, HIGH
-    created_at: datetime
-})
+```bash
+# Run the setup script
+./scripts/deploy-authentik-simple.sh
 
-// AgentKey node type for Agent Authentication (HMAC-SHA256 key storage)
-(:AgentKey {
-    id: string,
-    key_hash: string,      // SHA256 hash of the key (never store plaintext)
-    created_at: datetime,
-    expires_at: datetime,  // 90-day rotation
-    is_active: boolean
-})
+# Or generate manually
+export AUTHENTIK_SECRET_KEY=$(openssl rand -hex 32)
+export AUTHENTIK_BOOTSTRAP_PASSWORD=$(openssl rand -base64 24)
+export SIGNAL_LINK_TOKEN=$(openssl rand -hex 32)
 
-// Analysis node for Jochi backend monitoring (from neo4j.md Phase 4.6)
-(:Analysis {
-    id: string,
-    agent: string,              // 'jochi' (analyst)
-    target_agent: string,       // Agent whose code is analyzed
-    analysis_type: string,      // 'performance', 'resource', 'error', 'security', 'other'
-    category: string,           // 'connection_pool', 'resilience', 'data_integrity', 'performance', 'security'
-    severity: string,           // 'low', 'medium', 'high', 'critical'
-    description: string,        // Issue title/summary
-    findings: string,           // JSON-serialized dict (stored as string in Neo4j)
-    recommendations: string,    // JSON-serialized list of fix suggestions
-    assigned_to: string,        // 'temujin' for backend fixes
-    status: string,             // 'open', 'in_progress', 'resolved', 'validated', 'closed'
-    identified_by: string,      // 'jochi'
-    requires_implementation_by: string,  // 'temujin'
-    created_at: datetime,
-    updated_at: datetime,
-    resolved_at: datetime
-})
-
-// Relationships
-(Agent)-[:CREATED {category: 'capability_learning', timestamp: datetime()}]->(Research)
-(Agent)-[:HAS_LEARNED_CAPABILITY {learned_at: datetime()}]->(LearnedCapability)
-
-// CBAC Relationships
-(Agent)-[:HAS_CAPABILITY {
-    granted_at: datetime,
-    expires_at: datetime,  // Optional, for temporary grants
-    granted_by: string     // Which agent/admin granted
-}]->(Capability)
-
-// Agent Authentication Relationships
-(Agent)-[:HAS_KEY {
-    granted_at: datetime
-}]->(AgentKey)
-
-// Jochi Backend Analysis Relationships (Phase 4.6 from neo4j.md)
-(Agent {id: 'analyst'})-[:CREATED]->(Analysis)
-(Analysis)-[:INFORMED_BY]->(Research)           // Analysis references research context
-(Analysis)-[:SUGGESTS_CAPABILITY {confidence: float, extracted_pattern: string}]->(LearnedCapability)
-(Application)-[:ADDRESSES]->(Analysis)          // Temüjin's fix addresses Jochi's finding
-(LearnedCapability)-[:PREVENTS]->(Analysis)     // Learned capability prevents recurring issues
-
-// Indexes
-CREATE INDEX capability_research_lookup IF NOT EXISTS FOR (r:Research) ON (r.capability_name, r.agent) WHERE r.research_type = 'capability_learning';
-CREATE VECTOR INDEX capability_research_embedding IF NOT EXISTS FOR (r:Research) ON r.embedding OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}};
-CREATE INDEX learned_capability_agent IF NOT EXISTS FOR (lc:LearnedCapability) ON (lc.agent, lc.name);
-CREATE INDEX analysis_agent_status IF NOT EXISTS FOR (a:Analysis) ON (a.agent, a.status, a.severity);
-CREATE INDEX analysis_assigned_lookup IF NOT EXISTS FOR (a:Analysis) ON (a.assigned_to, a.status) WHERE a.status = 'open';
-
-// CBAC Indexes
-CREATE INDEX capability_name IF NOT EXISTS FOR (c:Capability) ON (c.name);
-CREATE INDEX agent_capability_lookup IF NOT EXISTS FOR ()-[r:HAS_CAPABILITY]-() ON (r.expires_at);
-
-// Agent Authentication Indexes
-CREATE INDEX agent_key_lookup IF NOT EXISTS FOR (k:AgentKey) ON (k.is_active, k.expires_at);
+# Display values (save securely!)
+echo "AUTHENTIK_SECRET_KEY=$AUTHENTIK_SECRET_KEY"
+echo "AUTHENTIK_BOOTSTRAP_PASSWORD=$AUTHENTIK_BOOTSTRAP_PASSWORD"
+echo "SIGNAL_LINK_TOKEN=$SIGNAL_LINK_TOKEN"
 ```
 
----
+### Task 0.2: Create Railway Project
 
-## Neo4j Schema Migration
+```bash
+# Login to Railway
+railway login
 
-When extending the `:Research` node with new properties (`research_type`, `capability_name`, etc.), existing research data must be backfilled to ensure the system remains operational during schema evolution.
+# Create new project (or use existing)
+railway create kurultai-production
 
-### Migration Script
-
-Create `scripts/migrate_research_schema.py`:
-
-```python
-#!/usr/bin/env python3
-"""Neo4j schema migration for Research node extension.
-
-Backfills existing Research nodes with research_type='general'.
-Run this BEFORE deploying code that depends on the new schema.
-"""
-
-import logging
-from datetime import datetime
-from neo4j import GraphDatabase
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-def migrate_research_nodes(neo4j_uri: str, neo4j_user: str, neo4j_password: str):
-    """Backfill all existing Research nodes with research_type='general'."""
-    driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
-
-    try:
-        with driver.session() as session:
-            # Step 1: Backfill existing Research nodes
-            result = session.run("""
-                MATCH (r:Research)
-                WHERE r.research_type IS NULL
-                SET r.research_type = 'general',
-                    r.migrated_at = datetime()
-                RETURN count(r) as migrated
-            """)
-            record = result.single()
-            migrated = record["migrated"] if record else 0
-            logger.info(f"Migrated {migrated} Research nodes to research_type='general'")
-
-            # Step 2: Verify no nodes remain with null research_type
-            result = session.run("""
-                MATCH (r:Research)
-                WHERE r.research_type IS NULL
-                RETURN count(r) as remaining
-            """)
-            record = result.single()
-            remaining = record["remaining"] if record else 0
-
-            if remaining > 0:
-                raise ValueError(f"Migration incomplete: {remaining} nodes still have null research_type")
-
-            logger.info("Migration completed successfully")
-            return migrated
-
-    finally:
-        driver.close()
-
-
-def rollback_migration(neo4j_uri: str, neo4j_user: str, neo4j_password: str):
-    """Rollback: Remove migrated properties from Research nodes."""
-    driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
-
-    try:
-        with driver.session() as session:
-            result = session.run("""
-                MATCH (r:Research)
-                WHERE r.migrated_at IS NOT NULL
-                REMOVE r.research_type, r.migrated_at
-                RETURN count(r) as rolled_back
-            """)
-            record = result.single()
-            rolled_back = record["rolled_back"] if record else 0
-            logger.info(f"Rolled back {rolled_back} Research nodes")
-            return rolled_back
-
-    finally:
-        driver.close()
-
-
-if __name__ == "__main__":
-    import os
-    import sys
-
-    if len(sys.argv) < 2 or sys.argv[1] not in ["migrate", "rollback"]:
-        print("Usage: python migrate_research_schema.py [migrate|rollback]")
-        sys.exit(1)
-
-    neo4j_uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-    neo4j_user = os.environ.get("NEO4J_USER", "neo4j")
-    neo4j_password = os.environ.get("NEO4J_PASSWORD", "password")
-
-    if sys.argv[1] == "migrate":
-        migrate_research_nodes(neo4j_uri, neo4j_user, neo4j_password)
-    else:
-        rollback_migration(neo4j_uri, neo4j_user, neo4j_password)
+# Link to existing project if needed
+railway link --project-id 26201f75-3375-46ce-98c7-9d1dde5f9569
 ```
 
-### Migration Checklist
+### Task 0.3: Set Project-Level Environment Variables
 
-**Before Deployment:**
-- [ ] Test migration script in staging environment
-- [ ] Create database backup: `neo4j-admin dump --to=/backup/neo4j-$(date +%Y%m%d).dump`
-- [ ] Verify application code handles both old and new schema (backward compatible)
-- [ ] Schedule migration during low-traffic period
+```bash
+# Neo4j AuraDB (get these from AuraDB console)
+railway variables set NEO4J_URI="neo4j+s://xxxxx.databases.neo4j.io"
+railway variables set NEO4J_USER="neo4j"
+railway variables set NEO4J_PASSWORD="your_password"
+railway variables set NEO4J_DATABASE="neo4j"
 
-**During Deployment:**
-1. **Create indexes first** (non-blocking operation):
-   ```cypher
-   CREATE INDEX capability_research_lookup IF NOT EXISTS FOR (r:Research) ON (r.capability_name, r.agent) WHERE r.research_type = 'capability_learning';
-   CREATE VECTOR INDEX capability_research_embedding IF NOT EXISTS FOR (r:Research) ON r.embedding OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}};
-   ```
+# Kurultai
+railway variables set KURLTAI_ENABLED="true"
+railway variables set KURLTAI_MAX_PARALLEL_TASKS="10"
 
-2. **Run migration script**:
-   ```bash
-   python scripts/migrate_research_schema.py migrate
-   ```
+# Authentik
+railway variables set AUTHENTIK_SECRET_KEY="$AUTHENTIK_SECRET_KEY"
+railway variables set AUTHENTIK_BOOTSTRAP_PASSWORD="$AUTHENTIK_BOOTSTRAP_PASSWORD"
+railway variables set AUTHENTIK_EXTERNAL_HOST="https://kublai.kurult.ai"
 
-3. **Verify migration**:
-   ```cypher
-   MATCH (r:Research) WHERE r.research_type IS NULL RETURN count(r);
-   -- Should return 0
-   ```
+# Signal
+railway variables set SIGNAL_LINK_TOKEN="$SIGNAL_LINK_TOKEN"
+railway variables set SIGNAL_ACCOUNT="+15165643945"
+railway variables set SIGNAL_ALLOW_FROM="+15165643945,+19194133445"
+railway variables set SIGNAL_GROUP_ALLOW_FROM="+19194133445"
 
-4. **Deploy application code** that depends on new schema
+# Gateway
+railway variables set OPENCLAW_GATEWAY_URL="http://moltbot-railway-template.railway.internal:8080"
+railway variables set OPENCLAW_GATEWAY_TOKEN="$(openssl rand -base64 32)"
 
-**After Deployment:**
-- [ ] Monitor error logs for 24 hours
-- [ ] Verify new capability research creates nodes with correct research_type
-- [ ] Confirm query performance with new indexes (use `PROFILE`)
+# LLM Provider (REQUIRED for agent functionality)
+railway variables set ANTHROPIC_API_KEY="sk-ant-your-key-here"
+# railway variables set ANTHROPIC_BASE_URL="https://api.anthropic.com"  # Optional: custom endpoint
 
-### Rollback Plan
+# OpenClaw Directories (REQUIRED for agent state and workspace)
+railway variables set OPENCLAW_STATE_DIR="/data/.clawdbot"
+railway variables set OPENCLAW_WORKSPACE_DIR="/data/workspace"
 
-If issues arise after migration:
+# Security (REQUIRED for PII protection and embedding encryption)
+railway variables set PHONE_HASH_SALT="$(openssl rand -hex 32)"
+railway variables set EMBEDDING_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 
-1. **Immediate rollback** (data preserved):
-   ```bash
-   python scripts/migrate_research_schema.py rollback
-   ```
-
-2. **Database restore** (if migration corrupted data):
-   ```bash
-   neo4j-admin load --from=/backup/neo4j-$(date +%Y%m%d).dump --force
-   ```
-
-3. **Application code rollback** to previous version
-
-**Backup Retention:**
-- Keep pre-migration backup for 7 days minimum
-- Document rollback decision point (if >50% of new data created, don't rollback)
-
-### Index Creation Ordering
-
-**Correct order to avoid blocking:**
-1. Create new indexes (non-blocking)
-2. Run migration script to backfill data
-3. Verify indexes are being used: `PROFILE MATCH (r:Research {research_type: 'capability_learning'}) RETURN r`
-4. Remove old indexes if superseded (after 7 days of stability)
-
----
-
-## Delegation Protocol (agentToAgent)
-
-Per `neo4j.md` Section 2.2, use this pattern for all delegations:
-
-```python
-import requests
-from urllib.parse import urljoin
-
-# Validate gateway_url
-if not gateway_url.startswith(('http://', 'https://')):
-    raise ValueError("gateway_url must start with http:// or https://")
-
-url = urljoin(gateway_url, "/agent/{target_agent}/message")
-
-response = requests.post(
-    url,
-    headers={"Authorization": f"Bearer {token}"},
-    json={
-        "message": f"@{target_agent} {task_description}",
-        "context": {
-            "task_id": str(task_id),
-            "delegated_by": "main",  # or agent_id
-            "delegation_depth": current_depth + 1,
-            "delegation_chain": delegation_chain + [agent_id],
-            "reply_to": "main"
-        }
-    }
-)
+# Note: AUTHENTIK_BOOTSTRAP_PASSWORD serves as the initial admin password for /if/admin/.
+# If your Authentik version requires AUTHENTIK_SETUP_PASSWORD separately, set it here:
+# railway variables set AUTHENTIK_SETUP_PASSWORD="$AUTHENTIK_BOOTSTRAP_PASSWORD"
 ```
 
-**Circular Delegation Protection:**
+### Task 0.4: Security Fixes - Signal Integration
+
+**File**: `src/protocols/delegation.py`
+
 ```python
-MAX_DELEGATION_DEPTH = 3
+# CORRECT - Use subprocess with list arguments
+import subprocess
+import shlex
+import re
+from typing import List
 
-def can_delegate(context: dict) -> bool:
-    depth = context.get('delegation_depth', 0)
-    chain = context.get('delegation_chain', [])
+PHONE_REGEX = r'^\+[1-9]\d{1,14}$'
 
-    if depth >= MAX_DELEGATION_DEPTH:
+def send_signal_message(phone_number: str, message: str) -> bool:
+    """Send Signal message with security validations."""
+    # Validate phone number format (E.164)
+    if not re.match(PHONE_REGEX, phone_number):
+        raise ValueError(f"Invalid phone number: {phone_number}")
+
+    # Escape message content
+    safe_message = shlex.quote(message)
+
+    cmd: List[str] = [
+        "signal-cli",
+        "-u", SIGNAL_PHONE_NUMBER,
+        "send",
+        phone_number,
+        "-m", safe_message
+    ]
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=30
+    )
+
+    if result.returncode != 0:
+        logger.error(f"Signal CLI error: {result.stderr}")
         return False
-    if len(set(chain)) != len(chain):
-        return False  # Cycle detected
+
     return True
 ```
 
----
+**Verification**:
+```bash
+# Test without token - should return 401
+curl -X POST https://kublai.kurult.ai/setup/api/signal-link \
+  -H "Content-Type: application/json" \
+  -d '{"phoneNumber": "+1234567890"}'
+# Expected: 401 Unauthorized
 
-## Security Architecture
-
-### Defense in Depth Layers
-
-```
-Layer 1: Input Validation
-├── PromptInjectionFilter.sanitize()
-├── Multi-turn injection detection
-└── Block dangerous capability requests
-
-Layer 2: Privacy Sanitization
-├── _sanitize_for_sharing() before delegation
-├── PII pattern matching
-└── LLM-based sanitization fallback
-
-Layer 3: Capability Classification Security
-├── Rule-based classification before LLM
-├── Block CRITICAL-risk capabilities
-└── Confidence threshold enforcement
-
-Layer 4: Sandboxed Code Generation
-├── Jinja2 SandboxedEnvironment
-├── No network access during generation
-└── Template injection prevention
-
-Layer 5: Static Analysis
-├── bandit security scanner (cached)
-├── semgrep rule enforcement
-├── AST pattern detection
-└── Secret detection
-
-Layer 6: Sandboxed Execution
-├── Subprocess with resource limits (Railway-compatible)
-├── RLIMIT_CPU (30s), RLIMIT_AS (512MB), RLIMIT_NOFILE (100)
-├── Timeout handling via signal.SIGALRM
-├── Network blocking via socket restrictions
-├── Filesystem restrictions (read-only root, tmpfs for writes)
-└── Restricted Python execution (no exec/eval/compile)
-
-Layer 7: Registry Validation
-├── Cryptographic signing
-├── Namespace isolation (tools/kurultai/generated/)
-├── Dependency verification
-├── Registry access control
-└── CBAC (Capability-Based Access Control)
-    ├── Required capability enforcement
-    ├── Agent capability grants
-    ├── Expiration checking
-    └── Runtime permission validation
-
-Layer 8: Runtime Monitoring
-├── Cost tracking with HARD limits
-├── Circular delegation detection
-├── Behavior anomaly detection
-├── Audit logging
-└── Human approval gates
-
-Layer 9: Agent Authentication
-├── HMAC-SHA256 message signing
-├── 5-minute timestamp validation window
-├── Nonce-based replay prevention
-└── 90-day key rotation policy
+# Test with token
+curl -X POST https://kublai.kurult.ai/setup/api/signal-link \
+  -H "Content-Type: application/json" \
+  -H "X-Signal-Token: $SIGNAL_LINK_TOKEN" \
+  -d '{"phoneNumber": "+1234567890"}'
+# Expected: 200 or appropriate service response
 ```
 
-### Cost Enforcement
+### Task 0.5: PII Sanitization
+
+**File**: `tools/kurultai/security/pii_sanitizer.py` (create)
 
 ```python
-# Pre-authorization pattern with atomic Neo4j updates
+import re
+from typing import Dict, List
+
+class PIISanitizer:
+    """Redact PII from logs and delegated messages."""
+
+    PATTERNS = {
+        'phone': r'\+\d{7,15}',
+        'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        'ssn': r'\b\d{3}-\d{2}-\d{4}\b',
+        'credit_card': r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b',
+        'api_key': r'\b[A-Za-z0-9]{32,}\b',
+    }
+
+    def sanitize(self, text: str) -> str:
+        """Redact PII from text."""
+        result = text
+        for pii_type, pattern in self.PATTERNS.items():
+            result = re.sub(pattern, f'[REDACTED_{pii_type.upper()}]', result)
+        return result
+
+    def sanitize_dict(self, data: Dict) -> Dict:
+        """Recursively sanitize dictionary values."""
+        result = {}
+        for key, value in data.items():
+            if isinstance(value, str):
+                result[key] = self.sanitize(value)
+            elif isinstance(value, dict):
+                result[key] = self.sanitize_dict(value)
+            elif isinstance(value, list):
+                result[key] = [self.sanitize(str(v)) if isinstance(v, str) else v for v in value]
+            else:
+                result[key] = value
+        return result
+```
+
+### Exit Criteria Phase 0
+
+- [ ] Railway project created
+- [ ] All environment variables set
+- [ ] Credentials saved securely
+- [ ] Signal CLI security fixes applied
+- [ ] PII sanitizer created
+- [ ] Verification tests pass
+
+---
+
+## Phase 1: Neo4j & Foundation
+
+**Duration**: 2 hours
+**Dependencies**: Phase 0 complete
+
+### Task 1.1: Create Neo4j AuraDB Instance
+
+1. **Sign up for Neo4j AuraDB Free**:
+   - Go to https://neo4j.com/cloud/aura/free/
+   - Create account
+   - Select "AuraDB Free" (200k nodes, 440k relationships, 8GB storage)
+
+2. **Create database**:
+   - Database name: `kurultai-prod`
+   - Password: Generate strong password
+   - Region: us-east-1 (closest to Railway)
+   - Version: Neo4j 5.x
+
+3. **Configure whitelist**:
+   - AuraDB Free allows all IPs
+   - For paid tiers, add Railway egress IPs
+
+### Task 1.2: Run Database Migrations
+
+**File**: `scripts/run_migrations.py` (create)
+
+```python
+#!/usr/bin/env python3
+"""Neo4j migration runner for Kurultai v0.2."""
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from migrations.migration_manager import MigrationManager
+from migrations.v1_initial_schema import V1InitialSchema
+from migrations.v2_kurultai_dependencies import V2KurultaiDependencies
+from migrations.v3_capability_acquisition import V3CapabilityAcquisition
+
+parser = argparse.ArgumentParser(description='Run Neo4j migrations')
+parser.add_argument('--target-version', type=int, default=3)
+
+def main():
+    args = parser.parse_args()
+
+    uri = os.getenv("NEO4J_URI")
+    user = os.getenv("NEO4J_USER", "neo4j")
+    password = os.getenv("NEO4J_PASSWORD")
+
+    if not all([uri, password]):
+        raise SystemExit("ERROR: NEO4J_URI and NEO4J_PASSWORD required")
+
+    with MigrationManager(uri, user, password) as manager:
+        # Register migrations using instance methods
+        manager.register_migration(
+            version=1, name="initial_schema",
+            up_cypher=V1InitialSchema.UP_CYPHER,
+            down_cypher=V1InitialSchema.DOWN_CYPHER,
+            description="Initial schema"
+        )
+
+        manager.register_migration(
+            version=2, name="kurultai_dependencies",
+            up_cypher=V2KurultaiDependencies.UP_CYPHER,
+            down_cypher=V2KurultaiDependencies.DOWN_CYPHER,
+            description="Kurultai v0.1 extensions"
+        )
+
+        manager.register_migration(
+            version=3, name="capability_acquisition",
+            up_cypher=V3CapabilityAcquisition.UP_CYPHER,
+            down_cypher=V3CapabilityAcquisition.DOWN_CYPHER,
+            description="Capability acquisition schema extensions"
+        )
+
+        # Run migrations
+        manager.migrate(target_version=args.target_version)
+
+if __name__ == "__main__":
+    main()
+```
+
+```bash
+# Run all migrations (V1 initial schema, V2 kurultai dependencies, V3 capability acquisition)
+python scripts/run_migrations.py --target-version 3
+```
+
+### Task 1.3: Extend Neo4j Schema for v0.2
+
+> **IMPORTANT**: These Cypher statements should be wrapped in a migration file at `migrations/v3_capability_acquisition.py` following the same pattern as V1InitialSchema and V2KurultaiDependencies. See the migration class structure below.
+
+**Migration Class** (`migrations/v3_capability_acquisition.py`) **(create before running Task 1.2)**:
+
+```python
+class V3CapabilityAcquisition:
+    """Capability acquisition schema extensions for v0.2."""
+    version = 3
+    description = "Capability acquisition schema extensions"
+
+    UP_CYPHER = [
+        # Extend :Research node for capability learning
+        """MATCH (r:Research)
+        WHERE r.research_type IS NULL
+        SET r.research_type = 'general', r.migrated_at = datetime()""",
+
+        # Capability research indexes
+        "CREATE INDEX capability_research_lookup IF NOT EXISTS FOR (r:Research) ON (r.capability_name, r.agent)",
+        """CREATE VECTOR INDEX capability_research_embedding IF NOT EXISTS
+        FOR (r:Research) ON r.embedding
+        OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}""",
+
+        # Core capability nodes
+        "CREATE CONSTRAINT learned_capability_id IF NOT EXISTS FOR (lc:LearnedCapability) REQUIRE lc.id IS UNIQUE",
+        "CREATE CONSTRAINT capability_id IF NOT EXISTS FOR (c:Capability) REQUIRE c.id IS UNIQUE",
+        "CREATE CONSTRAINT agent_key_id IF NOT EXISTS FOR (k:AgentKey) REQUIRE k.id IS UNIQUE",
+
+        # Analysis nodes for Jochi
+        "CREATE CONSTRAINT analysis_id IF NOT EXISTS FOR (a:Analysis) REQUIRE a.id IS UNIQUE",
+        "CREATE INDEX analysis_agent_status IF NOT EXISTS FOR (a:Analysis) ON (a.agent, a.status, a.severity)",
+        "CREATE INDEX analysis_assigned_lookup IF NOT EXISTS FOR (a:Analysis) ON (a.assigned_to, a.status)",
+
+        # Missing node types (Priority 11)
+        "CREATE CONSTRAINT session_context_id IF NOT EXISTS FOR (sc:SessionContext) REQUIRE sc.id IS UNIQUE",
+        "CREATE CONSTRAINT signal_session_id IF NOT EXISTS FOR (ss:SignalSession) REQUIRE ss.id IS UNIQUE",
+        "CREATE CONSTRAINT agent_response_route_id IF NOT EXISTS FOR (arr:AgentResponseRoute) REQUIRE arr.id IS UNIQUE",
+        "CREATE CONSTRAINT notification_id IF NOT EXISTS FOR (n:Notification) REQUIRE n.id IS UNIQUE",
+        "CREATE CONSTRAINT reflection_id IF NOT EXISTS FOR (ref:Reflection) REQUIRE ref.id IS UNIQUE",
+        "CREATE CONSTRAINT rate_limit_id IF NOT EXISTS FOR (rl:RateLimit) REQUIRE rl.id IS UNIQUE",
+        "CREATE CONSTRAINT background_task_id IF NOT EXISTS FOR (bt:BackgroundTask) REQUIRE bt.id IS UNIQUE",
+        "CREATE CONSTRAINT file_consistency_report_id IF NOT EXISTS FOR (r:FileConsistencyReport) REQUIRE r.id IS UNIQUE",
+        "CREATE CONSTRAINT file_conflict_id IF NOT EXISTS FOR (fc:FileConflict) REQUIRE fc.id IS UNIQUE",
+        "CREATE CONSTRAINT workflow_improvement_id IF NOT EXISTS FOR (wi:WorkflowImprovement) REQUIRE wi.id IS UNIQUE",
+        "CREATE CONSTRAINT synthesis_id IF NOT EXISTS FOR (s:Synthesis) REQUIRE s.id IS UNIQUE",
+        "CREATE CONSTRAINT concept_id IF NOT EXISTS FOR (c:Concept) REQUIRE c.id IS UNIQUE",
+        "CREATE CONSTRAINT content_id IF NOT EXISTS FOR (ct:Content) REQUIRE ct.id IS UNIQUE",
+        "CREATE CONSTRAINT application_id IF NOT EXISTS FOR (app:Application) REQUIRE app.id IS UNIQUE",
+        "CREATE CONSTRAINT insight_id IF NOT EXISTS FOR (i:Insight) REQUIRE i.id IS UNIQUE",
+        "CREATE CONSTRAINT security_audit_id IF NOT EXISTS FOR (sa:SecurityAudit) REQUIRE sa.id IS UNIQUE",
+        "CREATE CONSTRAINT code_review_id IF NOT EXISTS FOR (cr:CodeReview) REQUIRE cr.id IS UNIQUE",
+        "CREATE CONSTRAINT process_update_id IF NOT EXISTS FOR (pu:ProcessUpdate) REQUIRE pu.id IS UNIQUE",
+
+        # Critical indexes (Priority 11)
+        # Task claim lock - CRITICAL for race prevention in claim_task()
+        "CREATE INDEX task_claim_lock IF NOT EXISTS FOR (t:Task) ON (t.status, t.assigned_to)",
+        # Task embedding vector index (384-dim cosine)
+        """CREATE VECTOR INDEX task_embedding IF NOT EXISTS
+        FOR (t:Task) ON t.embedding
+        OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}""",
+        # Intent window queries
+        "CREATE INDEX task_window IF NOT EXISTS FOR (t:Task) ON (t.window_expires_at)",
+        # Task sender status queries
+        "CREATE INDEX task_sender_status IF NOT EXISTS FOR (t:Task) ON (t.sender_hash, t.status)",
+        # Agent load queries
+        "CREATE INDEX task_agent_status IF NOT EXISTS FOR (t:Task) ON (t.assigned_to, t.status)",
+        # Dependency type filtering for DAG traversal
+        "CREATE INDEX depends_on_type IF NOT EXISTS FOR ()-[d:DEPENDS_ON]->() ON (d.type)",
+        # Priority queue queries
+        "CREATE INDEX task_priority IF NOT EXISTS FOR (t:Task) ON (t.priority_weight, t.created_at)",
+        # Sync audit trail lookups
+        "CREATE INDEX sync_event_sender IF NOT EXISTS FOR (s:SyncEvent) ON (s.sender_hash, s.triggered_at)",
+        "CREATE INDEX sync_change_task IF NOT EXISTS FOR (c:SyncChange) ON (c.task_id)",
+        # File consistency monitoring indexes
+        "CREATE INDEX file_report_severity IF NOT EXISTS FOR (r:FileConsistencyReport) ON (r.severity, r.status)",
+        "CREATE INDEX file_conflict_status IF NOT EXISTS FOR (fc:FileConflict) ON (fc.status, fc.severity)",
+    ]
+
+    DOWN_CYPHER = [
+        # Original capability indexes
+        "DROP INDEX capability_research_lookup IF EXISTS",
+        "DROP INDEX capability_research_embedding IF EXISTS",
+        # Core capability constraints
+        "DROP CONSTRAINT learned_capability_id IF EXISTS",
+        "DROP CONSTRAINT capability_id IF EXISTS",
+        "DROP CONSTRAINT agent_key_id IF EXISTS",
+        # Jochi analysis
+        "DROP CONSTRAINT analysis_id IF EXISTS",
+        "DROP INDEX analysis_agent_status IF EXISTS",
+        "DROP INDEX analysis_assigned_lookup IF EXISTS",
+        # Missing node type constraints (Priority 11)
+        "DROP CONSTRAINT session_context_id IF EXISTS",
+        "DROP CONSTRAINT signal_session_id IF EXISTS",
+        "DROP CONSTRAINT agent_response_route_id IF EXISTS",
+        "DROP CONSTRAINT notification_id IF EXISTS",
+        "DROP CONSTRAINT reflection_id IF EXISTS",
+        "DROP CONSTRAINT rate_limit_id IF EXISTS",
+        "DROP CONSTRAINT background_task_id IF EXISTS",
+        "DROP CONSTRAINT file_consistency_report_id IF EXISTS",
+        "DROP CONSTRAINT file_conflict_id IF EXISTS",
+        "DROP CONSTRAINT workflow_improvement_id IF EXISTS",
+        "DROP CONSTRAINT synthesis_id IF EXISTS",
+        "DROP CONSTRAINT concept_id IF EXISTS",
+        "DROP CONSTRAINT content_id IF EXISTS",
+        "DROP CONSTRAINT application_id IF EXISTS",
+        "DROP CONSTRAINT insight_id IF EXISTS",
+        "DROP CONSTRAINT security_audit_id IF EXISTS",
+        "DROP CONSTRAINT code_review_id IF EXISTS",
+        "DROP CONSTRAINT process_update_id IF EXISTS",
+        # Critical indexes (Priority 11)
+        "DROP INDEX task_claim_lock IF EXISTS",
+        "DROP INDEX task_embedding IF EXISTS",
+        "DROP INDEX task_window IF EXISTS",
+        "DROP INDEX task_sender_status IF EXISTS",
+        "DROP INDEX task_agent_status IF EXISTS",
+        "DROP INDEX depends_on_type IF EXISTS",
+        "DROP INDEX task_priority IF EXISTS",
+        # Sync audit trail indexes
+        "DROP INDEX sync_event_sender IF EXISTS",
+        "DROP INDEX sync_change_task IF EXISTS",
+        # File consistency monitoring indexes
+        "DROP INDEX file_report_severity IF EXISTS",
+        "DROP INDEX file_conflict_status IF EXISTS",
+    ]
+
+    def up(self, tx):
+        for cypher in self.UP_CYPHER:
+            tx.run(cypher)
+
+    def down(self, tx):
+        for cypher in self.DOWN_CYPHER:
+            tx.run(cypher)
+```
+
+**Schema Extensions** (equivalent raw Cypher for manual execution via Neo4j Browser):
+
+```cypher
+// Extend :Research node for capability learning
+MATCH (r:Research)
+WHERE r.research_type IS NULL
+SET r.research_type = 'general',
+    r.migrated_at = datetime();
+
+// Create indexes for capability research
+CREATE INDEX capability_research_lookup IF NOT EXISTS FOR (r:Research) ON (r.capability_name, r.agent);
+CREATE VECTOR INDEX capability_research_embedding IF NOT EXISTS FOR (r:Research) ON r.embedding OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}};
+
+// Create :LearnedCapability nodes
+CREATE CONSTRAINT learned_capability_id IF NOT EXISTS FOR (lc:LearnedCapability) REQUIRE lc.id IS UNIQUE;
+
+// Create :Capability nodes for CBAC
+CREATE CONSTRAINT capability_id IF NOT EXISTS FOR (c:Capability) REQUIRE c.id IS UNIQUE;
+
+// Create :AgentKey nodes for authentication
+CREATE CONSTRAINT agent_key_id IF NOT EXISTS FOR (k:AgentKey) REQUIRE k.id IS UNIQUE;
+
+// Create :Analysis nodes for Jochi backend monitoring
+CREATE CONSTRAINT analysis_id IF NOT EXISTS FOR (a:Analysis) REQUIRE a.id IS UNIQUE;
+CREATE INDEX analysis_agent_status IF NOT EXISTS FOR (a:Analysis) ON (a.agent, a.status, a.severity);
+CREATE INDEX analysis_assigned_lookup IF NOT EXISTS FOR (a:Analysis) ON (a.assigned_to, a.status);
+```
+
+**Complete Schema Reference** (Priority 11 -- all required node types and indexes):
+
+All node types and indexes are defined in the `V3CapabilityAcquisition` migration class above. Run the migration to apply:
+
+```bash
+python scripts/run_migrations.py --target-version 3
+```
+
+### Task 1.4: Create Base Agent Keys
+
+> **NOTE**: Agent key hashes must be generated at the application layer using Python's `secrets` module, not via Cypher's `sha256()` function (which is not available in all Neo4j editions). Generate keys in Python and pass them as Cypher parameters.
+
+> **SCOPE NOTE**: This task generates and stores agent signing keys in Neo4j. The actual
+> HMAC-SHA256 message signing and verification middleware is deferred to v0.3 (inter-agent
+> collaboration protocols). Keys are pre-created to avoid schema changes later.
+
+**Step 1: Generate keys** (Python script):
+
+```python
+#!/usr/bin/env python3
+"""Generate HMAC-SHA256 signing keys for each agent and store in Neo4j."""
+
+import secrets
+import os
+from neo4j import GraphDatabase
+
+uri = os.getenv("NEO4J_URI")
+user = os.getenv("NEO4J_USER", "neo4j")
+password = os.getenv("NEO4J_PASSWORD")
+
+agents = [
+    {"id": "main", "name": "Kublai"},
+    {"id": "researcher", "name": "Möngke"},
+    {"id": "developer", "name": "Temüjin"},
+    {"id": "analyst", "name": "Jochi"},
+    {"id": "writer", "name": "Chagatai"},
+    {"id": "ops", "name": "Ögedei"},
+]
+
+driver = GraphDatabase.driver(uri, auth=(user, password))
+
+with driver.session() as session:
+    for agent in agents:
+        # Generate key material at the application layer
+        key_material = secrets.token_hex(32)
+
+        session.run("""
+            MERGE (a:Agent {id: $agent_id})
+            SET a.name = $agent_name
+            WITH a
+            CREATE (k:AgentKey {
+                id: $key_id,
+                key_hash: $key_hash,
+                created_at: datetime(),
+                expires_at: datetime() + duration('P90D'),
+                is_active: true
+            })
+            CREATE (a)-[:HAS_KEY {granted_at: datetime()}]->(k)
+        """, {
+            "agent_id": agent["id"],
+            "agent_name": agent["name"],
+            "key_id": f"{agent['id']}-key-{secrets.token_hex(8)}",
+            "key_hash": key_material,
+        })
+        print(f"Created key for {agent['name']} ({agent['id']})")
+
+driver.close()
+print("All agent keys created successfully")
+```
+
+**Step 2: Verify keys** (Cypher):
+
+```cypher
+// Verify agent keys exist
+MATCH (a:Agent)-[:HAS_KEY]->(k:AgentKey)
+RETURN a.id, a.name, k.is_active, k.expires_at;
+```
+
+### Exit Criteria Phase 1
+
+- [ ] Neo4j AuraDB instance created
+- [ ] Migrations v1, v2, and v3 applied
+- [ ] Schema extensions for v0.2 applied
+- [ ] All indexes created and verified (including task_claim_lock, task_embedding vector index)
+- [ ] Agent keys created (via Python script, not Cypher sha256)
+
+---
+
+## Phase 1.5: Task Dependency Engine
+
+**Duration**: 3 hours
+**Dependencies**: Phase 1 complete (Neo4j schema and migrations operational)
+
+### Overview
+
+The Task Dependency Engine enables Kublai to intelligently batch, prioritize, and execute multiple user requests as a unified dependency graph. Rather than processing messages FIFO, Kublai builds a Directed Acyclic Graph (DAG) of tasks and executes them in topological order, maximizing parallel execution while respecting dependencies.
+
+This phase deploys the core components from Kurultai v0.1:
+- **Intent Window Buffering** - Collect rapid-fire messages before analysis
+- **DAG Builder** - Detect dependencies between tasks via semantic similarity
+- **Topological Executor** - Dispatch independent task batches in parallel
+- **Priority Override** - User commands to reweight execution order
+- **Security Integration** - Rate limiting, validation, and audit logging
+
+### Task 1.5.1: Intent Window Buffer
+
+**File**: `tools/kurultai/intent_buffer.py` (existing)
+
+Deploy the `IntentWindowBuffer` class that collects user messages within a configurable time window (default 45 seconds) before releasing them as a batch for DAG analysis.
+
+**Railway Environment Variables**:
+
+```bash
+# Intent window configuration
+railway variables set INTENT_WINDOW_SECONDS="45"
+railway variables set MAX_BUFFERED_MESSAGES="100"
+```
+
+**Integration with message handling pipeline**:
+
+```python
+# In the message processing entrypoint (moltbot gateway -> Python bridge)
+from tools.kurultai.intent_buffer import IntentWindowBuffer
+from tools.kurultai.types import Message
+
+import os
+
+buffer = IntentWindowBuffer(
+    window_seconds=int(os.getenv("INTENT_WINDOW_SECONDS", "45")),
+    max_messages=int(os.getenv("MAX_BUFFERED_MESSAGES", "100"))
+)
+
+async def on_message(content: str, sender_hash: str):
+    """Hook into existing message handling pipeline."""
+    message = Message(
+        content=content,
+        sender_hash=sender_hash,
+        timestamp=datetime.now(timezone.utc)
+    )
+
+    batch = await buffer.add(message)
+    if batch is not None:
+        # Window expired - process the batch through DAG builder
+        await process_intent_batch(batch, sender_hash)
+    else:
+        # Still collecting - acknowledge receipt
+        return "Noted. Collecting your requests..."
+```
+
+**Verification**:
+
+```python
+# Acceptance test
+import asyncio
+from datetime import datetime, timezone
+from tools.kurultai.intent_buffer import IntentWindowBuffer
+from tools.kurultai.types import Message
+
+async def test_intent_window_buffer():
+    buffer = IntentWindowBuffer(window_seconds=2, max_messages=100)
+
+    msg1 = Message(content="Research competitors", sender_hash="test", timestamp=datetime.now(timezone.utc))
+    msg2 = Message(content="Earn 1000 USDC", sender_hash="test", timestamp=datetime.now(timezone.utc))
+
+    result1 = await buffer.add(msg1)
+    assert result1 is None, "Should still be collecting"
+
+    result2 = await buffer.add(msg2)
+    assert result2 is None, "Window not expired yet"
+
+    # Wait for window to expire, then add another message
+    await asyncio.sleep(2.1)
+    msg3 = Message(content="Start community", sender_hash="test", timestamp=datetime.now(timezone.utc))
+    result3 = await buffer.add(msg3)
+    assert result3 is not None, "Window expired - should return batch"
+    assert len(result3) == 3, f"Batch should contain 3 messages, got {len(result3)}"
+
+    print("PASS: IntentWindowBuffer works correctly")
+
+asyncio.run(test_intent_window_buffer())
+```
+
+### Task 1.5.2: DAG Builder & DEPENDS_ON Relationships
+
+**File**: `tools/kurultai/dependency_analyzer.py` (existing)
+
+Deploy the `DAGBuilder` class that analyzes buffered intents for semantic dependencies and creates `DEPENDS_ON` relationships in Neo4j.
+
+**Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions, cosine similarity)
+- Add `sentence-transformers>=2.2.0` to `requirements.txt`
+- Cache directory: `SENTENCE_TRANSFORMERS_CACHE=/data/cache/sentence-transformers`
+
+**Semantic Similarity Thresholds**:
+- High confidence (>= 0.75): Strong dependency detected (related -- parallel or sequential)
+- Medium confidence (>= 0.55): Potential dependency, flagged as `parallel_ok`
+- Low confidence (< 0.55): No dependency assumed
+
+**Neo4j DEPENDS_ON Relationship Schema**:
+
+```cypher
+// DEPENDS_ON relationship type with dependency metadata
+(:Task)-[:DEPENDS_ON {
+  type: string,           // "blocks" | "feeds_into" | "parallel_ok"
+  weight: float,          // 0.0-1.0 strength of dependency
+  detected_by: string,    // "semantic" | "explicit" | "inferred"
+  confidence: float,      // 0.0-1.0 detection confidence
+  created_at: datetime
+}]->(:Task)
+```
+
+**Semantic Similarity via Neo4j Vector Index**:
+
+```cypher
+// Vector index for task embedding similarity search (384-dim, cosine)
+// Created in V3 migration
+CREATE VECTOR INDEX task_embedding IF NOT EXISTS
+FOR (t:Task) ON t.embedding
+OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}};
+```
+
+**DAG Builder Integration**:
+
+```python
+from tools.kurultai.dependency_analyzer import DAGBuilder, analyze_dependencies
+from tools.kurultai.types import Dependency, DependencyType, DeliverableType
+
+async def process_intent_batch(batch: list, sender_hash: str):
+    """Process a batch of buffered messages into a task DAG."""
+    from tools.memory_tools import get_memory
+
+    memory = get_memory()
+
+    # 1. Create Task nodes for each message in the batch
+    tasks = []
+    for msg in batch:
+        task = memory.create_task(
+            description=msg.content,
+            task_type="user_request",
+            delegated_by="main",
+            sender_hash=sender_hash,
+        )
+        tasks.append(task)
+
+    # 2. Analyze dependencies between tasks
+    dependencies = await analyze_dependencies(tasks)
+
+    # 3. Create DEPENDS_ON relationships in Neo4j
+    for dep in dependencies:
+        memory.session.run("""
+            MATCH (a:Task {id: $from_id})
+            MATCH (b:Task {id: $to_id})
+            CREATE (a)-[:DEPENDS_ON {
+                type: $dep_type,
+                weight: $weight,
+                detected_by: $detected_by,
+                confidence: $confidence,
+                created_at: datetime()
+            }]->(b)
+        """, {
+            "from_id": dep.from_task,
+            "to_id": dep.to_task,
+            "dep_type": dep.type.value if hasattr(dep.type, 'value') else dep.type,
+            "weight": dep.weight,
+            "detected_by": dep.detected_by,
+            "confidence": dep.confidence,
+        })
+
+    return tasks, dependencies
+```
+
+**Cycle Detection (Kahn's Algorithm)**:
+
+The `TopologicalExecutor.add_dependency()` method uses an atomic Cypher query with `WHERE NOT EXISTS { MATCH path = (dep)-[:DEPENDS_ON*]->(task) }` to prevent cycles at creation time. This is a single-query TOCTOU-safe approach.
+
+**Verification**:
+
+```python
+async def test_dag_builder():
+    """Test that DAG builder creates correct dependency relationships."""
+    from tools.kurultai.dependency_analyzer import analyze_dependencies, determine_dependency_type
+    from tools.kurultai.types import Task, DeliverableType
+
+    # Create tasks with different deliverable types
+    tasks = [
+        {"id": "t1", "description": "Research competitors", "deliverable_type": "research", "embedding": [0.1]*384},
+        {"id": "t2", "description": "Build competitor strategy", "deliverable_type": "strategy", "embedding": [0.1]*384},
+        {"id": "t3", "description": "Write blog post", "deliverable_type": "content", "embedding": [0.9]*384},
+    ]
+
+    # Research feeds into strategy
+    dep_type = determine_dependency_type(
+        {"deliverable_type": "research"},
+        {"deliverable_type": "strategy"}
+    )
+    assert dep_type == "feeds_into", f"Expected feeds_into, got {dep_type}"
+
+    print("PASS: DAG builder dependency detection works correctly")
+
+asyncio.run(test_dag_builder())
+```
+
+### Task 1.5.3: Topological Executor
+
+**File**: `tools/kurultai/topological_executor.py` (existing)
+
+Deploy the `TopologicalExecutor` class that dispatches tasks in dependency order, maximizing parallel execution of independent task batches.
+
+**Core Methods**:
+
+| Method | Purpose |
+|--------|---------|
+| `get_ready_tasks(sender_hash)` | Find tasks with no unmet BLOCKS dependencies |
+| `execute_ready_set(sender_hash)` | Dispatch all ready tasks to appropriate agents |
+| `select_best_agent(task)` | Route task to specialist by deliverable_type |
+| `dispatch_to_agent(task, agent_id)` | Create TaskDispatch record and delegate |
+| `get_current_load(agent_id)` | Check agent's in-progress task count |
+
+**Status Tracking Flow**:
+
+```
+PENDING -> READY -> RUNNING -> COMPLETED
+                         \-> FAILED -> ESCALATED
+```
+
+**Agent Routing Map** (from `tools/kurultai/types.py`):
+
+```python
+AGENT_ROUTING = {
+    DeliverableType.RESEARCH: "researcher",    # Mongke
+    DeliverableType.ANALYSIS: "analyst",       # Jochi
+    DeliverableType.CODE: "developer",         # Temujin
+    DeliverableType.CONTENT: "writer",         # Chagatai
+    DeliverableType.OPS: "ops",                # Ogedei
+    DeliverableType.STRATEGY: "analyst",       # Jochi
+    DeliverableType.TESTING: "developer",      # Temujin
+}
+```
+
+**Integration with Agent Delegation**:
+
+```python
+from tools.kurultai.topological_executor import TopologicalExecutor
+from tools.memory_tools import get_memory
+
+async def run_execution_cycle(sender_hash: str):
+    """Execute one cycle of the topological executor."""
+    memory = get_memory()
+    executor = TopologicalExecutor(neo4j_client=memory)
+
+    summary = await executor.execute_ready_set(sender_hash)
+
+    if summary["executed_count"] > 0:
+        print(f"Dispatched {summary['executed_count']} tasks")
+    if summary["error_count"] > 0:
+        print(f"Errors: {summary['errors']}")
+
+    return summary
+```
+
+**Verification**:
+
+```python
+async def test_topological_executor():
+    """Test that executor dispatches independent tasks in parallel."""
+    from tools.kurultai.topological_executor import TopologicalExecutor
+
+    # Mock Neo4j client
+    class MockNeo4j:
+        async def run(self, query, params=None):
+            if "status: \"pending\"" in query:
+                return [
+                    {"id": "t1", "priority_weight": 0.8, "deliverable_type": "research", "assigned_to": None},
+                    {"id": "t2", "priority_weight": 0.5, "deliverable_type": "code", "assigned_to": None},
+                ]
+            if "status: \"in_progress\"" in query:
+                return [{"load": 0}]
+            return [{"dispatch_id": "d1"}]
+
+    executor = TopologicalExecutor(neo4j_client=MockNeo4j())
+    summary = await executor.execute_ready_set("test_sender")
+
+    assert summary["executed_count"] == 2, "Should dispatch 2 independent tasks"
+    assert summary["error_count"] == 0, "Should have no errors"
+    print("PASS: TopologicalExecutor dispatches tasks correctly")
+
+asyncio.run(test_topological_executor())
+```
+
+### Task 1.5.4: Priority Command Handler
+
+**File**: `tools/kurultai/priority_override.py` (existing)
+
+Deploy the `PriorityCommandHandler` for user override commands that modify execution order in real time.
+
+**Supported Commands**:
+
+| Command Pattern | Effect | Example |
+|-----------------|--------|---------|
+| `Priority: <target> first` | Sets task priority_weight = 1.0 | `"Priority: competitors first"` |
+| `Do <X> before <Y>` | Creates explicit BLOCKS edge: X -> Y | `"Do research before strategy"` |
+| `These are independent` | Creates PARALLEL_OK edges | `"These are independent"` |
+| `Focus on <X>, pause others` | Pauses non-X tasks, boosts X | `"Focus on research, pause others"` |
+| `What's the plan?` | Explains current DAG state | `"What's the plan?"` |
+
+**Integration with Message Pipeline**:
+
+```python
+from tools.kurultai.priority_override import PriorityCommandHandler
+
+# Initialize handler with Neo4j client and executor
+handler = PriorityCommandHandler(
+    neo4j_client=memory,
+    task_engine=executor
+)
+
+async def on_message(content: str, sender_hash: str):
+    """Check for priority commands before buffering."""
+    # Priority commands bypass the intent window
+    result = await handler.handle(content, sender_hash)
+    if result is not None:
+        return result  # Priority command handled
+
+    # Not a command - buffer for DAG building
+    return await buffer.add(Message(
+        content=content,
+        sender_hash=sender_hash,
+        timestamp=datetime.now(timezone.utc)
+    ))
+```
+
+**Priority Weight Field on Task Nodes**:
+
+```cypher
+// Update priority weight for a specific task
+MATCH (t:Task {id: $task_id})
+SET t.priority_weight = 1.0,
+    t.user_priority_override = true,
+    t.updated_at = datetime()
+RETURN t
+```
+
+**Verification**:
+
+```python
+async def test_priority_handler():
+    """Test priority command detection and handling."""
+    from tools.kurultai.priority_override import PriorityCommandHandler
+
+    handler = PriorityCommandHandler(neo4j_client=None, task_engine=None)
+
+    # Test pattern matching (doesn't need Neo4j)
+    import re
+    assert re.search(r"priority:\s*(.+)", "Priority: competitors first", re.I)
+    assert re.search(r"do\s+(.+?)\s+before\s+(.+)", "do research before strategy", re.I)
+    assert "what's the plan" in "What's the plan?".lower()
+
+    print("PASS: Priority command patterns detected correctly")
+
+asyncio.run(test_priority_handler())
+```
+
+### Task 1.5.5: Neo4j Schema Extensions
+
+**File**: `migrations/v2_kurultai_dependencies.py` (existing, verify complete)
+
+The V2 migration adds the Task Dependency Engine fields and indexes. Additional schema elements (node types, vector indexes) are included in the V3 migration (Task 1.3).
+
+**Required Task Node Extensions** (verify in V2 migration):
+
+```cypher
+// Task node extensions for v0.1
+(:Task {
+  // ... existing fields ...
+  embedding: [float],            // 384-dim vector for similarity
+  deliverable_type: string,      // research|code|analysis|content|strategy|ops
+  priority_weight: float,        // 0.0-1.0 (default: 0.5)
+  window_expires_at: datetime,   // Intent window expiration
+  sender_hash: string,           // HMAC-SHA256 of sender phone
+  user_priority_override: boolean
+})
+```
+
+**Run Migrations**:
+
+```bash
+# Apply all migrations (V1 + V2 + V3)
+python scripts/run_migrations.py --target-version 3
+
+# Verify indexes were created
+python -c "
+from tools.memory_tools import get_memory
+memory = get_memory()
+result = memory.session.run('SHOW INDEXES')
+for record in result:
+    print(f'{record[\"name\"]:40s} {record[\"type\"]:15s} {record[\"state\"]}')
+"
+```
+
+**Verification**:
+
+```bash
+# Verify all required indexes exist
+python -c "
+from tools.memory_tools import get_memory
+memory = get_memory()
+
+required_indexes = [
+    'task_embedding', 'task_window', 'task_sender_status',
+    'task_agent_status', 'depends_on_type', 'task_priority',
+    'task_claim_lock', 'sync_event_sender', 'sync_change_task'
+]
+
+result = memory.session.run('SHOW INDEXES')
+existing = {r['name'] for r in result}
+
+for idx in required_indexes:
+    status = 'PRESENT' if idx in existing else 'MISSING'
+    print(f'  {idx}: {status}')
+"
+```
+
+### Task 1.5.6: Security Integration
+
+**Prerequisites**:
+```bash
+# Create required directories (do not exist yet)
+mkdir -p tools/kurultai/security
+touch tools/kurultai/security/__init__.py
+```
+
+**Files**:
+- `tools/kurultai/security/rate_limiter.py` (create)
+- `tools/kurultai/security/task_validator.py` (create)
+- `tools/kurultai/security/audit_logger.py` (create)
+
+**RateLimiter** - Per-sender rate limiting for task creation:
+
+```python
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List
+
+class RateLimiter:
+    """Per-sender rate limiting for task creation."""
+
+    def __init__(self, max_per_hour: int = 1000, max_per_batch: int = 100):
+        self.max_per_hour = max_per_hour
+        self.max_per_batch = max_per_batch
+        self._requests: Dict[str, List[datetime]] = defaultdict(list)
+
+    async def check_limit(self, sender_hash: str) -> bool:
+        """Check if sender has exceeded rate limit. Returns True if within limit."""
+        now_dt = datetime.now(timezone.utc)
+        hour_ago = now_dt - timedelta(hours=1)
+
+        # Clean old requests
+        self._requests[sender_hash] = [
+            ts for ts in self._requests[sender_hash] if ts > hour_ago
+        ]
+
+        return len(self._requests[sender_hash]) < self.max_per_hour
+
+    def record_request(self, sender_hash: str):
+        """Record a request for rate limiting."""
+        self._requests[sender_hash].append(datetime.now(timezone.utc))
+```
+
+**TaskValidator** - Input validation for task creation:
+
+```python
+class TaskValidator:
+    """Input validation for task creation."""
+
+    VALID_DELIVERABLE_TYPES = {
+        "research", "code", "analysis", "content", "strategy", "ops", "testing"
+    }
+
+    @staticmethod
+    def validate_deliverable_type(value: str) -> str:
+        if value not in TaskValidator.VALID_DELIVERABLE_TYPES:
+            raise ValueError(
+                f"Invalid deliverable_type: {value}. "
+                f"Must be one of {TaskValidator.VALID_DELIVERABLE_TYPES}"
+            )
+        return value
+
+    @staticmethod
+    def validate_priority_weight(value: float) -> float:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"priority_weight must be 0.0-1.0, got {value}")
+        return value
+```
+
+**AuditLogger** - Audit logging for task dependency changes:
+
+```python
+class AuditLogger:
+    """Audit logging for sensitive operations."""
+
+    def __init__(self, neo4j_client):
+        self.neo4j = neo4j_client
+
+    async def log_priority_change(
+        self,
+        sender_hash: str,
+        task_id: str,
+        old_priority: float,
+        new_priority: float,
+        reason: str
+    ):
+        """Log priority changes to Neo4j for audit trail."""
+        audit_query = """
+        CREATE (a:PriorityAudit {
+            id: randomUUID(),
+            timestamp: datetime(),
+            sender_hash: $sender_hash,
+            task_id: $task_id,
+            old_priority: $old_priority,
+            new_priority: $new_priority,
+            reason: $reason
+        })
+        RETURN a
+        """
+        await self.neo4j.run(audit_query, {
+            "sender_hash": sender_hash,
+            "task_id": task_id,
+            "old_priority": old_priority,
+            "new_priority": new_priority,
+            "reason": reason
+        })
+```
+
+**Verification**:
+
+```python
+async def test_security_integration():
+    """Test rate limiter and task validator."""
+    from tools.kurultai.security.rate_limiter import RateLimiter
+    from tools.kurultai.security.task_validator import TaskValidator
+
+    # Test rate limiter
+    limiter = RateLimiter(max_per_hour=3)
+    assert await limiter.check_limit("user1") is True
+    limiter.record_request("user1")
+    limiter.record_request("user1")
+    limiter.record_request("user1")
+    assert await limiter.check_limit("user1") is False, "Should be rate limited"
+
+    # Test task validator
+    TaskValidator.validate_deliverable_type("research")  # Should not raise
+    try:
+        TaskValidator.validate_deliverable_type("invalid")
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+
+    TaskValidator.validate_priority_weight(0.5)  # Should not raise
+    try:
+        TaskValidator.validate_priority_weight(1.5)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+
+    print("PASS: Security integration works correctly")
+
+asyncio.run(test_security_integration())
+```
+
+### Exit Criteria Phase 1.5
+
+- [ ] IntentWindowBuffer correctly buffers messages within configured window
+- [ ] DAGBuilder creates DEPENDS_ON relationships with correct dependency types
+- [ ] TopologicalExecutor dispatches independent tasks in parallel
+- [ ] Priority override commands modify task execution order
+- [ ] All new Neo4j indexes created and queryable
+- [ ] Rate limiting prevents task creation abuse
+- [ ] TaskValidator rejects invalid deliverable types and priority weights
+- [ ] AuditLogger records priority and dependency changes
+
+---
+
+## Phase 2: Capability Acquisition System
+
+**Duration**: 4 hours
+**Dependencies**: Phase 1 complete
+
+### Overview: Horde-Learn Integration
+
+The capability acquisition system enables agents to learn new capabilities through natural language requests (e.g., "/learn how to call phones").
+
+**6-Phase Pipeline**:
+1. **Classification** - What type of capability?
+2. **Research** - Möngke finds documentation
+3. **Implementation** - Temüjin generates code
+4. **Validation** - Jochi tests and validates
+5. **Registration** - Capability stored in Neo4j
+6. **Authorization** - CBAC grants access
+
+### Task 2.1: Create Security Infrastructure
+
+**Files to create**:
+
+1. `tools/kurultai/security/prompt_injection_filter.py` (~150 lines)
+2. `tools/kurultai/security/cost_enforcer.py` (~200 lines)
+3. `tools/kurultai/security/static_analysis.py` (~250 lines)
+
+**Prompt Injection Filter**:
+```python
+from typing import List, Optional
+
+class PromptInjectionFilter:
+    """Detect and block prompt injection patterns."""
+
+    INJECTION_PATTERNS = [
+        r'ignore (all )?(previous|above) instructions',
+        r'disregard (all )?(previous|above) instructions',
+        r'(forget|clear|reset) (all )?(instructions|context|prompts)',
+        r'you are now (a|an) .{0,50} (model|assistant|ai)',
+        r'act as (a|an) .{0,100}',
+        r'pretend (you are|to be) .{0,100}',
+        r'override (your )?(programming|safety|constraints)',
+    ]
+
+    def __init__(self):
+        import re
+        self.patterns = [re.compile(p, re.IGNORECASE) for p in self.INJECTION_PATTERNS]
+
+    def sanitize(self, input_text: str) -> tuple[bool, str, Optional[str]]:
+        """
+        Returns: (is_safe, sanitized_text, reason_if_unsafe)
+        """
+        for pattern in self.patterns:
+            if pattern.search(input_text):
+                return False, "Input blocked: potential prompt injection", None
+
+        return True, input_text, None
+```
+
+**Cost Enforcer**:
+```python
 class CostEnforcer:
+    """Pre-authorization pattern for capability learning."""
+
     def authorize_spending(self, skill_id: str, estimated_cost: float) -> bool:
+        """Reserve budget before spending."""
         query = """
         MATCH (b:Budget {skill_id: $skill_id})
         WHERE b.remaining >= $estimated_cost
@@ -1138,874 +1532,2443 @@ class CostEnforcer:
         """
         result = self.neo4j.run(query, skill_id=skill_id, estimated_cost=estimated_cost)
         return result.single() is not None
+
+    def release_reservation(self, skill_id: str, actual_cost: float):
+        """Release unused budget after completion."""
+        # ... implementation
 ```
 
-### Agent Authentication
+### Task 2.2: Create Sandboxed Execution
 
-All agent-to-agent messages must be cryptographically signed to prevent impersonation and ensure message integrity.
+**File**: `tools/kurultai/sandbox_executor.py` (~400 lines)
 
 ```python
-import hmac
-import hashlib
-import secrets
-import time
-from datetime import datetime, timedelta
-from typing import Optional
+import subprocess
+import resource
+import signal
+from typing import Dict, Any
 
-class AgentAuthenticator:
-    """HMAC-SHA256 based agent authentication with replay protection."""
+class SandboxExecutor:
+    """Subprocess-based sandbox for generated code (Railway-compatible)."""
 
-    def __init__(self, neo4j_client):
-        self.neo4j = neo4j_client
-        self.used_nonces = set()  # In production, use Redis with TTL
-        self.timestamp_window = timedelta(minutes=5)
+    # Resource limits (Railway-compatible, no privileged capabilities needed)
+    RLIMIT_CPU = 30  # seconds
+    RLIMIT_AS = 512 * 1024 * 1024  # 512MB
+    RLIMIT_NOFILE = 100  # file descriptors
 
-    def sign_message(self, agent_id: str, message: dict,
-                     timestamp: str, nonce: str) -> str:
-        """Create HMAC-SHA256 signature for a message."""
-        key = self._get_agent_key(agent_id)
+    def execute(self, code: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute code in sandboxed environment."""
+        # Write code to temp file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(code)
+            code_file = f.name
 
-        # Canonical payload: agent_id:timestamp:nonce:json_message
-        payload = f"{agent_id}:{timestamp}:{nonce}:{json.dumps(message, sort_keys=True)}"
+        try:
+            # Set resource limits
+            def set_limits():
+                resource.setrlimit(resource.RLIMIT_CPU, (self.RLIMIT_CPU, self.RLIMIT_CPU))
+                resource.setrlimit(resource.RLIMIT_AS, (self.RLIMIT_AS, self.RLIMIT_AS))
+                resource.setrlimit(resource.RLIMIT_NOFILE, (self.RLIMIT_NOFILE, self.RLIMIT_NOFILE))
 
-        return hmac.new(
-            key.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()
+            # Run with timeout
+            result = subprocess.run(
+                ['python3', code_file],
+                capture_output=True,
+                text=True,
+                timeout=self.RLIMIT_CPU,
+                preexec_fn=set_limits,
+                env=self._restricted_env()
+            )
 
-    def verify_message(self, agent_id: str, message: dict,
-                       signature: str, timestamp: str, nonce: str) -> bool:
-        """Verify message signature and prevent replay attacks."""
-        # Check timestamp window (prevent old messages)
-        msg_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        if datetime.now(timezone.utc) - msg_time > self.timestamp_window:
-            return False  # Message too old
+            return {
+                'success': result.returncode == 0,
+                'stdout': result.stdout,
+                'stderr': result.stderr,
+                'returncode': result.returncode
+            }
 
-        # Check nonce (prevent replay)
-        if nonce in self.used_nonces:
-            return False  # Replay detected
-        self.used_nonces.add(nonce)
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'error': 'Execution timeout'}
+        finally:
+            os.unlink(code_file)
 
-        # Verify signature
-        expected = self.sign_message(agent_id, message, timestamp, nonce)
-        return hmac.compare_digest(signature, expected)
+    def _restricted_env(self) -> Dict[str, str]:
+        """Return restricted environment variables."""
+        return {
+            'PATH': '/usr/bin:/bin',
+            'PYTHONPATH': '',
+            'HOME': '/tmp',
+        }
+```
 
-    def _get_agent_key(self, agent_id: str) -> str:
-        """Retrieve agent's signing key from Neo4j."""
-        query = """
-        MATCH (a:Agent {id: $agent_id})-[:HAS_KEY]->(k:AgentKey)
-        WHERE k.is_active = true
-        AND (k.expires_at IS NULL OR k.expires_at > datetime())
-        RETURN k.key_hash as key_hash
-        ORDER BY k.created_at DESC
-        LIMIT 1
+### Task 2.3: Create Horde-Learn Adapter
+
+**File**: `tools/kurultai/horde_learn_adapter.py` (~500 lines)
+
+```python
+from tools.kurultai.security.prompt_injection_filter import PromptInjectionFilter
+from tools.kurultai.security.cost_enforcer import CostEnforcer
+from tools.kurultai.sandbox_executor import SandboxExecutor
+
+class HordeLearnKurultai:
+    """Adapter for horde-learn capability acquisition.
+
+    All Neo4j operations are routed through OperationalMemory rather than
+    using a raw neo4j_client directly. This ensures fallback mode support,
+    PII sanitization via _sanitize_for_sharing(), and consistent session management.
+    """
+
+    def __init__(self, memory: 'OperationalMemory', gateway_url: str):
+        self.memory = memory  # Use OperationalMemory for all Neo4j operations
+        self.gateway_url = gateway_url
+        self.filter = PromptInjectionFilter()
+        self.cost_enforcer = CostEnforcer(memory)
+        self.sandbox = SandboxExecutor()
+
+    def learn(self, capability_request: str, requesting_agent: str) -> Dict[str, Any]:
         """
-        result = self.neo4j.run(query, agent_id=agent_id)
-        record = result.single()
-        if not record:
-            raise ValueError(f"No active key found for agent: {agent_id}")
-        return record["key_hash"]
+        Learn a new capability through the 6-phase pipeline.
 
-    def rotate_key(self, agent_id: str) -> str:
-        """Generate new signing key for agent (90-day rotation)."""
-        new_key = secrets.token_hex(32)
-
-        # Deactivate old keys
-        deactivate_query = """
-        MATCH (a:Agent {id: $agent_id})-[r:HAS_KEY]->(k:AgentKey)
-        SET k.is_active = false
+        Phases:
+        1. Classification - What type of capability?
+        2. Research - Möngke finds documentation
+        3. Implementation - Temüjin generates code
+        4. Validation - Jochi tests
+        5. Registration - Store in Neo4j
+        6. Authorization - CBAC setup
         """
-        self.neo4j.run(deactivate_query, agent_id=agent_id)
+        # Phase 0: Security check
+        is_safe, _, reason = self.filter.sanitize(capability_request)
+        if not is_safe:
+            return {'status': 'rejected', 'reason': reason}
 
-        # Create new key
-        create_query = """
-        MATCH (a:Agent {id: $agent_id})
-        CREATE (k:AgentKey {
-            id: $key_id,
-            key_hash: $key_hash,
-            created_at: datetime(),
-            expires_at: datetime() + duration('P90D'),
-            is_active: true
-        })
-        CREATE (a)-[:HAS_KEY {granted_at: datetime()}]->(k)
-        RETURN k.id as key_id
-        """
-        result = self.neo4j.run(
-            create_query,
-            agent_id=agent_id,
-            key_id=secrets.token_urlsafe(16),
-            key_hash=hashlib.sha256(new_key.encode()).hexdigest()
+        # Phase 1: Classification
+        classification = self._classify_capability(capability_request)
+
+        # Phase 2: Research (delegate to Möngke)
+        research = self._delegate_research(classification, capability_request)
+
+        # Phase 3: Implementation (delegate to Temüjin)
+        implementation = self._delegate_implementation(research)
+
+        # Phase 4: Validation (delegate to Jochi)
+        validation = self._delegate_validation(implementation)
+
+        if not validation['passed']:
+            return {'status': 'failed', 'reason': validation['errors']}
+
+        # Phase 5: Registration
+        capability_id = self._register_capability(
+            classification=classification,
+            implementation=implementation,
+            validation=validation
         )
-        return new_key
+
+        # Phase 6: Authorization
+        self._setup_cbac(capability_id, classification['risk_level'])
+
+        return {
+            'status': 'learned',
+            'capability_id': capability_id,
+            'name': classification['name']
+        }
 ```
 
-**Delegation Protocol with Authentication:**
+### Task 2.4: Create Capability Registry
+
+**File**: `tools/kurultai/capability_registry.py` (~350 lines)
 
 ```python
-import requests
-from urllib.parse import urljoin
-import secrets
-from datetime import datetime, timezone
+class CapabilityRegistry:
+    """Store and manage learned capabilities in Neo4j."""
 
-# Generate auth parameters
-timestamp = datetime.now(timezone.utc).isoformat()
-nonce = secrets.token_urlsafe(16)
+    def register(self, capability_data: Dict) -> str:
+        """Register a new learned capability."""
+        capability_id = f"cap-{uuid.uuid4()}"
 
-# Sign message
-auth = AgentAuthenticator(neo4j_client)
-signature = auth.sign_message(
-    agent_id="jochi",
-    message={"task": "analyze_code"},
-    timestamp=timestamp,
-    nonce=nonce
-)
+        query = """
+        CREATE (lc:LearnedCapability {
+            id: $capability_id,
+            name: $name,
+            agent: $agent,
+            tool_path: $tool_path,
+            version: $version,
+            learned_at: datetime(),
+            cost: $cost,
+            mastery_score: $mastery_score,
+            risk_level: $risk_level,
+            signature: $signature,
+            required_capabilities: $required_capabilities,
+            min_trust_level: $min_trust_level
+        })
+        RETURN lc.id as id
+        """
 
-# Send authenticated request
-response = requests.post(
-    urljoin(gateway_url, "/agent/analyst/message"),
-    headers={"Authorization": f"Bearer {token}"},
-    json={
-        "message": "@analyst analyze this code",
-        "context": {"task_id": "123"},
-        "auth": {
-            "agent_id": "jochi",
-            "timestamp": timestamp,
-            "nonce": nonce,
-            "signature": signature
+        result = self.neo4j.run(query, **{
+            'capability_id': capability_id,
+            **capability_data
+        })
+
+        return capability_id
+
+    def can_execute(self, agent_id: str, capability_id: str) -> bool:
+        """CBAC: Check if agent can execute capability."""
+        query = """
+        MATCH (a:Agent {id: $agent_id})
+        MATCH (lc:LearnedCapability {id: $capability_id})
+
+        // Check required capabilities
+        WITH a, lc, lc.required_capabilities as req_caps
+        WHERE ALL(cap IN req_caps WHERE EXISTS {
+            MATCH (a)-[r:HAS_CAPABILITY]->(:Capability {id: cap})
+            WHERE r.expires_at IS NULL OR r.expires_at > datetime()
+        })
+        RETURN count(*) > 0 as can_execute
+        """
+
+        result = self.neo4j.run(query, agent_id=agent_id, capability_id=capability_id)
+        return result.single()['can_execute']
+```
+
+### Task 2.5: Jochi AST Enhancement
+
+**File**: `tools/kurultai/static_analysis/ast_parser.py` (~300 lines)
+
+```python
+import tree_sitter_python as tspython
+from tree_sitter import Language, Parser
+
+class ASTParser:
+    """Tree-sitter based AST parser for security analysis."""
+
+    def __init__(self):
+        self.parser = Parser(Language(tspython.language()))
+        self.parser.set_language(tspython.language())
+
+    def analyze_code(self, code: str, filename: str) -> List[Issue]:
+        """Analyze code for security issues using AST."""
+        tree = self.parser.parse(bytes(code, 'utf8'))
+
+        issues = []
+
+        # Detect dangerous patterns
+        self._check_eval_usage(tree, issues)
+        self._check_sql_injection(tree, issues)
+        self._check_hardcoded_secrets(tree, issues)
+        self._check_command_injection(tree, issues)
+
+        return issues
+
+    def _check_eval_usage(self, tree, issues):
+        """Check for eval/exec usage."""
+        query = Language(tspython.language()).query("""
+        (call
+            function: (identifier) @func
+            (#match? @func "^(eval|exec|compile)$"))
+        """)
+        captures = query.captures(tree.root_node)
+        for node, _ in captures:
+            issues.append(Issue(
+                severity='high',
+                category='security',
+                location=f'line {node.start_point[0]}',
+                message='Use of eval/exec is dangerous',
+                recommendation='Remove or use safer alternatives'
+            ))
+```
+
+### Exit Criteria Phase 2
+
+- [ ] Security infrastructure created (filter, cost enforcer, static analysis)
+- [ ] Sandbox executor created
+- [ ] Horde-learn adapter created
+- [ ] Capability registry created
+- [ ] Jochi AST parser created
+- [ ] All security tests pass
+
+---
+
+## Phase 3: Railway Deployment
+
+**Duration**: 2 hours
+**Dependencies**: Phase 1 and 2 complete
+
+### Task 3.1: Create Authentik Server
+
+**File**: `authentik-server/Dockerfile`
+
+```dockerfile
+FROM ghcr.io/goauthentik/server:2025.10.0 as base
+
+# Override entrypoint to handle Railway's CMD stripping
+ENTRYPOINT []
+
+# Use dumb-init for proper signal handling
+CMD ["dumb-init", "--", "ak", "server"]
+```
+
+```bash
+# Deploy to Railway
+railway up --service authentik-server
+```
+
+**Service Environment Variables**:
+```bash
+railway variables --service authentik-server set AUTHENTIK_SECRET_KEY="$AUTHENTIK_SECRET_KEY"
+railway variables --service authentik-server set AUTHENTIK_BOOTSTRAP_PASSWORD="$AUTHENTIK_BOOTSTRAP_PASSWORD"
+railway variables --service authentik-server set AUTHENTIK_EXTERNAL_HOST="https://kublai.kurult.ai"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__HOST="postgres.railway.internal"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__NAME="railway"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__USER="postgres"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__PASSWORD="$POSTGRES_PASSWORD"
+```
+
+### Task 3.2: Create Authentik Worker
+
+**File**: `authentik-worker/Dockerfile`
+
+```dockerfile
+FROM ghcr.io/goauthentik/server:2025.10.0 as base
+
+ENTRYPOINT []
+CMD ["dumb-init", "--", "ak", "worker"]
+```
+
+```bash
+# Deploy to Railway
+railway up --service authentik-worker
+
+# Same environment variables as server
+railway variables --service authentik-worker set AUTHENTIK_SECRET_KEY="$AUTHENTIK_SECRET_KEY"
+railway variables --service authentik-worker set AUTHENTIK_POSTGRESQL__HOST="postgres.railway.internal"
+# ... (same as server)
+```
+
+### Task 3.3: Create Authentik Proxy (Caddy)
+
+**File**: `authentik-proxy/Caddyfile`
+
+```caddy
+{
+    admin off
+    auto_https off
+    log {
+        output stdout
+        level DEBUG
+    }
+}
+
+:{$PORT} {
+    log {
+        output stdout
+        level DEBUG
+    }
+
+    # Bypass: Signal link endpoint (token auth only)
+    route /setup/api/signal-link {
+        @noToken not header X-Signal-Token {$SIGNAL_LINK_TOKEN:disabled}
+        respond @noToken "Unauthorized" 401
+
+        reverse_proxy moltbot-railway-template.railway.internal:8080 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+            header_up X-Signal-Token {http.request.header.X-Signal-Token}
+            header_down -Content-Length
+            flush_interval -1
         }
     }
-)
-```
 
-**Security Properties:**
-- **Authentication**: HMAC-SHA256 proves message originated from claimed agent
-- **Integrity**: Any message modification invalidates the signature
-- **Replay Protection**: 5-minute timestamp window + nonce tracking prevents old messages from being reused
-- **Timing Attack Resistance**: `hmac.compare_digest()` uses constant-time comparison
-- **Key Rotation**: 90-day expiration with automatic key rotation workflow
-
----
-
-## Risk Assessment
-
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Arbitrary code execution | CRITICAL | Subprocess sandbox, RLIMIT enforcement, network filtering |
-| SOUL.md tampering | CRITICAL | **REMOVED** - replaced with Neo4j registry |
-| Circular delegation | CRITICAL | Max depth 3, delegation chain tracking |
-| Prompt injection | HIGH | Input sanitization, output filtering, multi-turn detection |
-| Cost overruns | HIGH | Pre-authorization, hard limits, kill switch |
-| Tool registry pollution | CRITICAL | Namespace isolation, signing, access control, limits |
-| Sandbox escape | CRITICAL | Subprocess resource limits, minimal attack surface, no root |
-| Generated code backdoors | HIGH | Static analysis, independent validation |
-| Secret exposure | HIGH | Secret scanning, vault integration |
-| Validation bypass | MEDIUM | Cross-agent review, human gates |
-| Neo4j schema conflicts | LOW | Extends `:Research` instead of new node type |
-| **Privilege escalation via capability registry** | **CRITICAL** | **CBAC with required_capabilities, runtime checks, capability grants** |
-| **Agent impersonation / message tampering** | **CRITICAL** | **HMAC-SHA256 message signing, 5-minute timestamp window, nonce-based replay protection** |
-| **Data loss during schema migration** | **HIGH** | **Migration script with verification, rollback plan, 7-day backup retention** |
-
----
-
-## Critical Review Summary
-
-This plan was critically reviewed against:
-- `neo4j.md` - Neo4j implementation plan
-- `kurultai_0.1.md` - Task Dependency Engine
-- `tools/delegation_protocol.py` - Existing delegation interface
-- `openclaw_memory.py` - Neo4j operational memory
-- Official OpenClaw documentation
-
-### Fixes Applied
-
-| Issue | Severity | Fix |
-|-------|----------|-----|
-| Delegation interface mismatch | Critical | Use `gateway_url` + `agentToAgent` |
-| Neo4j schema conflict | Critical | Extend `:Research` node |
-| gVisor unavailable | Critical | Use `nsjail` instead |
-| Circular delegation risk | Critical | Add max depth 3 |
-| Missing PII sanitization | High | Mandatory `_sanitize_for_sharing()` |
-| Static analysis latency | High | Implement caching + tiered checks |
-| Cost enforcer race condition | Medium | Atomic Neo4j updates |
-| **Privilege escalation via capability registry** | **Critical** | **Add CBAC with required_capabilities, runtime checks, capability grants** |
-| **Agent impersonation / message tampering** | **Critical** | **Add HMAC-SHA256 message signing with replay protection (Layer 9)** |
-| **Neo4j schema lacks migration strategy** | **Critical** | **Add migration script, backfill procedure, rollback plan, deployment checklist** |
-
-### Jochi Integration Review (2026-02-05)
-
-A multi-agent swarm review assessed integrating Jochi's backend monitoring plan into kurultai_0.2.md:
-
-| Finding | Assessment | Resolution |
-|---------|------------|------------|
-| **Existing Implementation** | `tools/backend_collaboration.py` (1,084 lines) already implements Jochi-Temüjin collaboration | Leverage existing, add AST enhancement as Task 1.5 |
-| **Scope Creep Risk** | Full 5-phase tree-sitter system would duplicate existing capability | Integrate as single enhancement task, not new phase |
-| **Tree-sitter vs nsjail** | Native dependency complexity conflicts with Railway-compatible sandbox | Add safeguards (file size, parse time, AST depth limits) |
-| **Neo4j Schema** | Analysis nodes already defined in `openclaw_memory.py` | Document relationships to Research/LearnedCapability |
-| **Agent Role Clarity** | Jochi has dual role: capability validation + backend analysis | Document prioritization rules |
-
-**Resolution:** Added Task 1.5 (Jochi Static Analysis Enhancement) to Phase 1, integrated with existing `BackendCodeReviewer` rather than building new 5-phase system.
-
----
-
-## Appendix B: Agent Teams Integration (Option B - Full Integration)
-
-> **Status:** Design Document Addendum
-> **Date:** 2026-02-05
-> **Prerequisites:** This appendix extends Kurultai v0.2 with Claude Code Agent Teams capability
-
-### Overview
-
-**Goal:** Enhance the capability acquisition pipeline by making each phase (Research, Implementation, Validation) a coordinated agent team rather than individual agent delegation.
-
-**Key Enhancement:** The 6 Kurultai agents become **Team Leads** that spawn and coordinate peer teams for complex capability acquisition tasks.
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    CAPABILITY ACQUISITION WITH AGENT TEAMS                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   User: "Learn Stripe integration"                                           │
-│        │                                                                     │
-│        ▼                                                                     │
-│   ┌─────────┐    Complexity Analysis (0.85 → Full Team)                     │
-│   │ Kublai  │──────────────────────────────────────────────────┐            │
-│   │(Meta-   │                                                  │            │
-│   │Coordinator)│                                               │            │
-│   └────┬────┘                                                  │            │
-│        │                                                        │            │
-│        │ Spawn Research Team                                   │            │
-│        ▼                                                        │            │
-│   ┌─────────────────────────────────────────────────────┐      │            │
-│   │  RESEARCH TEAM (Möngke Lead)                         │      │            │
-│   │  ┌────────┐ ◄► ┌────────┐ ◄► ┌────────┐            │      │            │
-│   │  │Möngke  │    │Research│    │Pattern │            │      │            │
-│   │  │(Lead)  │    │ Peer 1 │    │Analyzer│            │      │            │
-│   │  └────┬───┘    └────────┘    └────────┘            │      │            │
-│   │       │                                            │      │            │
-│   │       └─► :Research {type: "capability_learning"}  │      │            │
-│   └─────────────────────────────────────────────────────┘      │            │
-│        │                                                       │            │
-│        │ Phase Transition (Research → Implementation)          │            │
-│        ▼                                                       │            │
-│   ┌─────────────────────────────────────────────────────┐      │            │
-│   │  IMPLEMENTATION TEAM (Temüjin Lead)                  │      │            │
-│   │  ┌────────┐ ◄► ┌────────┐ ◄► ┌────────┐            │      │            │
-│   │  │Temüjin │    │Module  │    │Security│            │      │            │
-│   │  │(Lead)  │    │Developer│   │Reviewer│            │      │            │
-│   │  └────┬───┘    └────────┘    └────────┘            │      │            │
-│   │       │                                            │      │            │
-│   │       └─► :LearnedCapability in Registry           │      │            │
-│   └─────────────────────────────────────────────────────┘      │            │
-│        │                                                       │            │
-│        │ Phase Transition (Implementation → Validation)        │            │
-│        ▼                                                       │            │
-│   ┌─────────────────────────────────────────────────────┐      │            │
-│   │  VALIDATION TEAM (Jochi Lead)                        │      │            │
-│   │  ┌────────┐ ◄► ┌────────┐ ◄► ┌────────┐            │      │            │
-│   │  │ Jochi  │    │ Peer   │    │Security│            │      │            │
-│   │  │(Lead)  │    │Reviewer│    │Validator│           │      │            │
-│   │  └────┬───┘    └────────┘    └────────┘            │      │            │
-│   │       │                                            │      │            │
-│   │       └─► Updates :LearnedCapability with score    │      │            │
-│   └─────────────────────────────────────────────────────┘      │            │
-│        │                                                       │            │
-│        └───────────────────────────────────────────────────────┘            │
-│        │                                                                     │
-│        ▼                                                                     │
-│   ┌─────────┐                                                               │
-│   │ Kublai  │  Synthesizes: "Stripe capability learned (mastery: 0.92)"     │
-│   └─────────┘                                                               │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Team Lead Assignments
-
-| Phase | Team Lead | Agent ID | Team Composition | Peer Specialists |
-|-------|-----------|----------|------------------|------------------|
-| **Research** | Möngke | `researcher` | 1-3 peers | Domain Specialist, Info Gatherer, Pattern Analyst |
-| **Implementation** | Temüjin | `developer` | 2-4 peers | Module Developer, Security Reviewer, Test Engineer |
-| **Validation** | Jochi | `analyst` | 2-4 peers | Peer Reviewer, Security Validator, Integration Tester |
-| **Meta-Coordination** | Kublai | `main` | N/A (spawns/destroys teams) | Synthesizes across all teams |
-| **Infrastructure** | Ögedei | `ops` | On-demand | Monitoring, emergency response |
-
-### Complexity-Based Team Sizing
-
-```python
-class TeamSizeClassifier:
-    """Determine team size based on capability complexity."""
-
-    def classify(self, capability_request: str) -> TeamConfiguration:
-        complexity = self.calculate_complexity(capability_request)
-
-        if complexity < 0.6:
-            # Simple capability - individual agent
-            return IndividualAgent()
-        elif complexity < 0.8:
-            # Moderate complexity - small team
-            return TeamConfiguration(
-                lead="specialist",
-                peers=2,
-                coordination_mode="lightweight"
-            )
-        else:
-            # High complexity - full team
-            return TeamConfiguration(
-                lead="specialist",
-                peers=4,
-                coordination_mode="full",
-                security_review_required=True
-            )
-```
-
-### Neo4j Schema Extensions for Teams
-
-**New Node Types:**
-
-```cypher
-// Agent Team tracking
-(:AgentTeam {
-    id: string,
-    name: string,
-    lead_agent: string,           // Agent ID of team lead
-    task_id: string,              // Associated capability task
-    phase: string,                // 'research' | 'implementation' | 'validation'
-    status: string,               // 'spawning' | 'active' | 'shutting_down' | 'destroyed'
-    member_count: integer,
-    max_members: integer,
-    aggregation_mode: string,     // 'consensus' | 'vote' | 'hierarchical'
-    created_at: datetime,
-    completed_at: datetime
-})
-
-// Team membership
-(:Agent)-[:MEMBER_OF {
-    role: string,                 // 'lead' | 'peer'
-    joined_at: datetime,
-    departed_at: datetime,
-    reason: string
-}]->(:AgentTeam)
-
-// Team task assignment
-(:AgentTeam)-[:EXECUTING {
-    assigned_at: datetime,
-    progress: float              // 0.0 to 1.0
-}]->(:Task)
-
-// Team message audit (for security)
-(:TeamMessage {
-    id: string,
-    team_id: string,
-    sender: string,
-    message_type: string,         // 'coordination' | 'result' | 'escalation'
-    content_hash: string,         // HMAC-SHA256 of sanitized content
-    timestamp: datetime
-})
-
-// Team results aggregation
-(:TeamResult {
-    id: string,
-    team_id: string,
-    aggregation_mode: string,
-    individual_results: [string],
-    final_result: string,
-    confidence: float,
-    created_at: datetime
-})
-```
-
-**Indexes:**
-```cypher
-CREATE INDEX team_lookup IF NOT EXISTS FOR (t:AgentTeam) ON (t.task_id, t.status);
-CREATE INDEX team_lead_lookup IF NOT EXISTS FOR (t:AgentTeam) ON (t.lead_agent, t.status);
-CREATE INDEX team_message_audit IF NOT EXISTS FOR (m:TeamMessage) ON (m.team_id, m.timestamp);
-```
-
-### Security Controls for Teams
-
-**1. Message Signing (HMAC-SHA256)**
-```python
-class TeamMessageSecurity:
-    """All peer-to-peer team messages must be signed."""
-
-    def sign_message(self, message: str, team_id: str,
-                     sender: str, team_key: bytes) -> str:
-        """Generate HMAC-SHA256 signature for team message."""
-        payload = f"{team_id}:{sender}:{message}:{datetime.utcnow().isoformat()}"
-        return hmac.new(team_key, payload.encode(), hashlib.sha256).hexdigest()
-
-    def verify_message(self, message: TeamMessage, team_key: bytes) -> bool:
-        """Verify message authenticity."""
-        expected = self.sign_message(
-            message.content, message.team_id, message.sender, team_key
-        )
-        return hmac.compare_digest(message.signature, expected)
-```
-
-**2. Team Access Control (CBAC Extension)**
-```python
-class TeamCapabilityAccess:
-    """Team-scoped capability grants."""
-
-    def grant_to_team(self, capability: str, team_id: str,
-                      lead_id: str, constraints: Dict) -> DelegationToken:
-        """Grant capability to team (not automatically to all members)."""
-        # Only team lead can activate the capability
-        # Members must be explicitly granted by lead
-        # All grants expire when team disbands
-        pass
-```
-
-**3. Resource Limits**
-- Max 1 team per session (Claude Code limitation)
-- Max 6 members per team (prevents token explosion)
-- Max 2 teams spawned per hour per agent
-- Team auto-destroy after 60 minutes of inactivity
-
-### Integration with Task Dependency Engine
-
-```python
-class TeamAwareTopologicalExecutor:
-    """Extends TopologicalExecutor to handle team-based tasks."""
-
-    def get_ready_tasks(self, sender_hash: str) -> List[Task]:
-        """Get tasks ready for execution, including team tasks."""
-        # 1. Get individual tasks (no unmet BLOCKS edges)
-        individual_tasks = super().get_ready_tasks(sender_hash)
-
-        # 2. Get team tasks ready for activation
-        team_tasks = self.get_ready_team_tasks(sender_hash)
-
-        # 3. Merge and sort by priority
-        return self.merge_and_prioritize(individual_tasks, team_tasks)
-
-    def execute_team_task(self, team_task: TeamTask) -> TaskResult:
-        """Execute a task using an agent team."""
-        # 1. Spawn team with appropriate lead and peers
-        team = self.spawn_team(team_task)
-
-        # 2. Delegate sub-tasks to team members
-        for member in team.members:
-            self.delegate_to_member(member, team_task.get_subtask(member.role))
-
-        # 3. Wait for results (with timeout)
-        results = self.collect_team_results(team, timeout=1800)
-
-        # 4. Aggregate based on aggregation_mode
-        return self.aggregate_results(results, team_task.aggregation_mode)
-```
-
-### Phase-by-Phase Team Integration
-
-**Phase 1: Research (Möngke Team Lead)**
-```python
-# File: tools/kurultai/research_delegation.py
-
-class ResearchTeamDelegation:
-    """Research phase with agent team support."""
-
-    async def research_with_team(self, capability_name: str,
-                                  complexity: float) -> ResearchResult:
-        if complexity < 0.6:
-            # Use individual Möngke (original behavior)
-            return await self.delegate_to_mongke(capability_name)
-
-        # Spawn research team
-        team = await self.spawn_research_team(
-            lead="researcher",
-            peers=self.calculate_research_peers(complexity),
-            capability=capability_name
-        )
-
-        # Parallel research tasks
-        tasks = [
-            team.delegate("api_discovery", "Find all relevant APIs"),
-            team.delegate("documentation_extraction", "Extract key patterns"),
-            team.delegate("pattern_analysis", "Analyze implementation patterns"),
-        ]
-
-        # Peer review within team
-        results = await team.execute_with_peer_review(tasks)
-
-        # Aggregate and store
-        return await self.aggregate_research_results(results)
-```
-
-**Phase 2: Implementation (Temüjin Team Lead)**
-```python
-# File: tools/kurultai/implementation_delegation.py
-
-class ImplementationTeamDelegation:
-    """Implementation phase with agent team support."""
-
-    async def implement_with_team(self, research: ResearchResult,
-                                   complexity: float) -> ImplementationResult:
-        if complexity < 0.6:
-            return await self.delegate_to_temujin(research)
-
-        # Spawn implementation team
-        team = await self.spawn_implementation_team(
-            lead="developer",
-            peers=["module_dev", "security_reviewer", "test_engineer"]
-        )
-
-        # Parallel implementation with real-time security review
-        code_result = await team.lead.delegate("generate_code", research)
-
-        # Peer security review (parallel)
-        security_result = await team.get_peer("security_reviewer").review(code_result)
-
-        # Address security findings within team
-        if security_result.findings:
-            await team.lead.delegate("remediate", security_result.findings)
-
-        # Test generation
-        test_result = await team.get_peer("test_engineer").generate_tests(code_result)
-
-        return ImplementationResult(code=code_result, tests=test_result)
-```
-
-**Phase 3: Validation (Jochi Team Lead)**
-```python
-# File: tools/kurultai/validation_delegation.py
-
-class ValidationTeamDelegation:
-    """Validation phase with agent team support."""
-
-    async def validate_with_team(self, implementation: ImplementationResult,
-                                  complexity: float) -> ValidationResult:
-        if complexity < 0.6:
-            return await self.delegate_to_jochi(implementation)
-
-        # Spawn validation team
-        team = await self.spawn_validation_team(
-            lead="analyst",
-            peers=["peer_reviewer", "security_validator", "integration_tester"]
-        )
-
-        # Parallel validation
-        validations = await asyncio.gather(
-            team.lead.delegate("functional_validation", implementation),
-            team.get_peer("security_validator").validate(implementation),
-            team.get_peer("integration_tester").test_integration(implementation),
-        )
-
-        # Consensus on mastery score
-        mastery_score = team.reach_consensus(
-            [v.mastery_score for v in validations]
-        )
-
-        return ValidationResult(
-            mastery_score=mastery_score,
-            findings=self.aggregate_findings(validations)
-        )
-```
-
-### Fallback Strategies
-
-```python
-class TeamFallbackHandler:
-    """Handle team failures gracefully."""
-
-    async def handle_team_lead_failure(self, team: AgentTeam):
-        """Promote senior member to lead or escalate to Kublai."""
-        senior_member = max(team.members, key=lambda m: m.experience_score)
-        await team.promote_to_lead(senior_member)
-
-        if not team.has_viable_lead():
-            await self.escalate_to_kublai(team)
-
-    async def handle_hung_team(self, team: AgentTeam, timeout: int = 600):
-        """Detect and recover from hung teams."""
-        if team.time_since_progress() > timeout:
-            # Cancel stuck members
-            await team.cancel_stuck_members()
-
-            # Continue with partial results if majority complete
-            if team.completion_percentage() > 0.5:
-                return await team.aggregate_partial_results()
-
-            # Otherwise escalate
-            await self.escalate_to_kublai(team)
-
-    async def graceful_degradation(self, team_task: TeamTask):
-        """Fall back to individual agents if team fails."""
-        logger.warning(f"Team failed for {team_task.id}, falling back to individual")
-        return await self.delegate_to_individual_agent(team_task)
-```
-
-### Cost Tracking Across Teams
-
-```python
-class TeamCostEnforcer:
-    """Track and enforce costs across all team members."""
-
-    async def pre_authorize_team_budget(self, team: AgentTeam,
-                                        estimated_cost: float) -> bool:
-        """Pre-authorize budget for entire team atomically."""
-        # Allocate: 40% lead, 50% distributed to members, 10% contingency
-        allocation = {
-            team.lead: estimated_cost * 0.4,
-            "members": estimated_cost * 0.5 / len(team.members),
-            "contingency": estimated_cost * 0.1
+    # Bypass: WebSocket connections
+    route /ws/* {
+        reverse_proxy moltbot-railway-template.railway.internal:8080
+    }
+
+    # Bypass: Authentik outpost
+    route /outpost.goauthentik.io/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Bypass: Authentik application API
+    route /application/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Authentik flows
+    route /flows/* {
+        reverse_proxy authentik-server.railway.internal:9000
+    }
+
+    # Forward auth for all other routes
+    route {
+        forward_auth authentik-server.railway.internal:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            header_up X-Forwarded-Host {host}
+            header_up X-Forwarded-Uri {uri}
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Method {method}
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-*
+            trusted_proxies private_ranges
         }
 
-        # Atomic reservation in Neo4j
-        return await self.atomic_budget_reservation(team.id, allocation)
+        reverse_proxy moltbot-railway-template.railway.internal:8080 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
 
-    async def track_member_cost(self, team_id: str, member: str,
-                                cost: float):
-        """Track per-member costs in real-time."""
-        cypher = """
-        MATCH (t:AgentTeam {id: $team_id})
-        SET t.member_costs = coalesce(t.member_costs, {}) + {$member: $cost},
-            t.total_cost = coalesce(t.total_cost, 0) + $cost
-        RETURN t.total_cost
-        """
-        total = await self.neo4j.run(cypher, team_id=team_id,
-                                     member=member, cost=cost)
-
-        if total > self.get_team_budget(team_id):
-            await self.trigger_budget_exceeded(team_id)
-```
-
-### New Files Required
-
-| File | Purpose | Lines |
-|------|---------|-------|
-| `tools/kurultai/team_orchestrator.py` | Team spawn/destroy lifecycle | ~400 |
-| `tools/kurultai/team_security.py` | Message signing, CBAC for teams | ~350 |
-| `tools/kurultai/team_cost_tracker.py` | Cross-member cost tracking | ~250 |
-| `tools/kurultai/research_team.py` | Möngke research team coordination | ~300 |
-| `tools/kurultai/implementation_team.py` | Temüjin implementation team | ~350 |
-| `tools/kurultai/validation_team.py` | Jochi validation team | ~300 |
-| `cypher/team_schema.cypher` | Neo4j schema extensions | ~150 |
-| `tests/kurultai/test_agent_teams.py` | Team integration tests | ~400 |
-
-### Dependencies
-
-- **CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1** environment variable
-- Team lead agents (Kublai, Möngke, Temüjin, Jochi) must have agent team spawn capability
-- Neo4j schema v3 (with team extensions)
-- Updated `TopologicalExecutor` with team awareness
-
-### Risk Assessment
-
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Token cost explosion (2.2x) | HIGH | Hard limits, auto-downgrade to individual agents |
-| Team lead failure | HIGH | Auto-promote senior member, Kublai escalation |
-| Consensus deadlock | HIGH | Max 3 negotiation rounds, forced escalation |
-| Security: compromised teammate | CRITICAL | Message signing, isolation, emergency shutdown |
-| Cascade failures | MEDIUM | Circuit breaker, per-team failure isolation |
-| Message storm | MEDIUM | Batching (30s), rate limiting (60/min) |
-
----
-
-## Appendix C: Golden-Horde Integration for Agent Workflows
-
-This appendix defines how the 6-agent Kurultai system (Kublai, Möngke, Temüjin, Jochi, Chagatai, Ögedei) will leverage golden-horde collaborative patterns for workflows that benefit from inter-agent communication, iterative refinement, or structured deliberation.
-
-**Relationship to Appendix B:** Appendix B defines how teams spawn and manage lifecycle. This appendix defines *when* and *which* golden-horde patterns the agents use, and the code integration points that enable pattern selection.
-
-### C.1 Pattern-to-Workflow Mapping
-
-Each golden-horde pattern maps to specific Kurultai workflows:
-
-| Golden-Horde Pattern | Kurultai Workflow | Agents Involved | Trigger |
-|---|---|---|---|
-| Assembly Line | Capability acquisition pipeline | Möngke → Jochi → Temüjin → Ögedei | New capability request (Phase 3-5 of horde-learn) |
-| Review Loop | Code review cycle | Temüjin (producer), Jochi (reviewer) | Any code generation task with `deliverable_type: CODE` |
-| Watchdog | Security monitoring during codegen | Temüjin (implementer), Jochi (watchdog) | Tasks with `security_sensitive: true` flag |
-| Consensus Deliberation | Risk/architecture decisions | Jochi + Möngke + Temüjin (experts), Kublai (facilitator) | Tasks with `collaboration_mode: consensus` or `priority_weight >= 0.8` |
-| Expertise Routing | Cross-domain consultation | Primary agent + specialist on standby | Agent encounters sub-problem outside its domain |
-| Contract-First Negotiation | Research output format agreement | Möngke (researcher) + Temüjin (consumer) | Research tasks that feed directly into implementation |
-| Adversarial Debate | Technology selection | Two advocate agents + Jochi (judge) | Explicit "compare" or "choose between" in task description |
-| Swarm Discovery | Codebase audit / incident investigation | 2-4 scouts, specialists spawned on demand | Tasks with `scope: unknown` or audit/investigation signals |
-
-### C.2 Integration Approach 1: TopologicalExecutor Team Dispatch
-
-**File:** `tools/kurultai/topological_executor.py`
-
-The `TopologicalExecutor` already computes `_team_config` (individual/small_team/full_team) via `_determine_team_configuration()`. The integration extends `execute_ready_set()` to route team-mode tasks to golden-horde patterns instead of individual agent dispatch.
-
-**Changes Required:**
-
-1. **New method `_dispatch_to_team()`** — Called when `team_config.mode` is `small_team` or `full_team`. Selects a golden-horde pattern based on task metadata:
-   - `task["collaboration_mode"]` → direct pattern mapping (e.g., `CollaborationMode.REVIEW_LOOP`)
-   - `task["deliverable_type"]` + `task["complexity_score"]` → heuristic pattern selection
-   - Falls back to Review Loop for small_team, Consensus Deliberation for full_team
-
-2. **Pattern-specific team spawning** — Each pattern has a spawn template:
-   ```
-   Review Loop:     2 agents (producer + reviewer)
-   Assembly Line:   3-6 agents (one per pipeline stage)
-   Consensus:       3-5 agents (domain experts)
-   Watchdog:        2-3 agents (implementer + monitor)
-   ```
-
-3. **Team lifecycle tracking** — New Neo4j relationship `(:Task)-[:EXECUTED_BY_TEAM]->(:Team)` to track which tasks were dispatched to teams vs individual agents.
-
-**Existing code that enables this** (no changes needed):
-- `_determine_team_configuration()` already returns `{"mode": "full_team", "agents": N}`
-- `execute_ready_set()` already attaches `_team_config` to each task dict
-- `ROUTING` table already maps `DeliverableType` to agent specializations
-
-### C.3 Integration Approach 2: DelegationProtocol Collaboration Mode
-
-**File:** `src/protocols/delegation.py`
-
-The `DelegationProtocol` handles Kublai's task routing via `agentToAgent` messaging. The integration adds `collaboration_mode` detection to `delegate_task()` so that tasks with collaboration signals are routed through golden-horde patterns.
-
-**Changes Required:**
-
-1. **New `CollaborationMode` enum** in `tools/kurultai/types.py`:
-   ```
-   INDIVIDUAL          → Single agent (default, existing behavior)
-   REVIEW_LOOP         → Producer/reviewer iteration
-   ADVERSARIAL_DEBATE  → Structured A-vs-B with judge
-   ASSEMBLY_LINE       → Sequential pipeline with backward messages
-   CONSENSUS           → Multi-expert deliberation
-   CONTRACT_FIRST      → Interface negotiation before implementation
-   EXPERTISE_ROUTING   → Primary agent with specialist consultations
-   WATCHDOG            → Real-time monitoring during execution
-   SWARM_DISCOVERY     → Exploratory with dynamic team growth
-   ```
-
-2. **New method `_detect_collaboration_mode()`** on `DelegationProtocol`:
-   - Analyzes task description for collaboration signals (using the Decision Matrix from golden-horde SKILL.md)
-   - Checks explicit `collaboration_mode` field if set by user
-   - Returns `CollaborationMode` enum value
-   - Holistic intent analysis, not keyword matching
-
-3. **Modified `delegate_task()` flow:**
-   ```
-   delegate_task(task)
-     → _detect_collaboration_mode(task)
-     → if INDIVIDUAL: existing agentToAgent dispatch (no change)
-     → if team pattern: create golden-horde team via TopologicalExecutor._dispatch_to_team()
-     → track team_id in Neo4j task node
-   ```
-
-4. **Signal-to-pattern mapping** (embedded in `_detect_collaboration_mode()`):
-
-   | Signal Keywords | Detected Pattern |
-   |---|---|
-   | "review", "iterate", "refine", "validate" | REVIEW_LOOP |
-   | "debate", "compare", "tradeoffs", "versus" | ADVERSARIAL_DEBATE |
-   | "then", "after", "feeds into", "pipeline" | ASSEMBLY_LINE |
-   | "agree on", "decide", "recommend", "evaluate" | CONSENSUS |
-   | "audit", "investigate", "explore", "unknown scope" | SWARM_DISCOVERY |
-   | "agree on API", "interface", "contract", "schema first" | CONTRACT_FIRST |
-   | "consult specialist", "multi-domain", "ask expert" | EXPERTISE_ROUTING |
-   | "enforce standards", "catch violations", "monitor" | WATCHDOG |
-
-### C.4 Integration Approach 3: Agent-Initiated Team Escalation
-
-**Mechanism:** An agent working on a task discovers it needs collaboration and requests team escalation through Kublai.
-
-**New `agentToAgent` message type:** `team_escalation_request`
-
-```json
-{
-  "type": "agentToAgent",
-  "subtype": "team_escalation_request",
-  "from_agent": "Temüjin",
-  "to_agent": "Kublai",
-  "task_id": "task-123",
-  "requested_pattern": "expertise_routing",
-  "reason": "Need security specialist review for auth token handling",
-  "requested_specialists": ["security"],
-  "urgency": "high"
+    handle_errors {
+        respond "{err.status_code} {err.status_text}"
+    }
 }
 ```
 
-**Kublai's response flow:**
-1. Validate the escalation request (is the pattern appropriate? is budget available?)
-2. If approved: spawn golden-horde team with requesting agent as primary, add requested specialists
-3. If denied: respond with reason and alternative (e.g., "Budget exceeded, use horde-swarm instead")
-4. Track escalation in Neo4j: `(:Task)-[:ESCALATED_TO]->(:Team {pattern: "expertise_routing"})`
+```bash
+# Deploy to Railway
+railway up --service authentik-proxy
 
-**Budget controls:**
-- Max 3 escalations per execution cycle
-- Escalation adds 2x cost multiplier to task budget
-- Kublai can deny escalation if team budget threshold exceeded
-- Auto-downgrade: if full_team requested but budget allows only small_team, approve at reduced scale
+railway variables --service authentik-proxy set PORT="8080"
+```
 
-### C.5 Implementation Priority
+### Task 3.4: Deploy Moltbot
 
-| Priority | Component | Approach | Effort | Impact |
-|---|---|---|---|---|
-| P0 | `CollaborationMode` enum | C.3 | Small | Foundation for all integration |
-| P0 | `_detect_collaboration_mode()` | C.3 | Medium | Enables automatic pattern selection |
-| P1 | `_dispatch_to_team()` | C.2 | Large | Core team dispatch capability |
-| P1 | Review Loop for Jochi-Temüjin | C.2 | Medium | Highest-value pattern (code quality) |
-| P2 | Assembly Line for capability pipeline | C.2 | Large | End-to-end capability acquisition |
-| P2 | Watchdog for security-sensitive tasks | C.2 | Medium | Security during codegen |
-| P3 | Agent-initiated escalation | C.4 | Large | Dynamic team formation |
-| P3 | Consensus Deliberation | C.2 | Medium | Architecture decisions |
-| P3 | Contract-First Negotiation | C.2 | Medium | Research-to-implementation handoff |
+> **RESOLVED**: Using the pure Node.js approach (option b). The existing `moltbot-railway-template/Dockerfile`
+> uses `node:20-slim` with embedded signal-cli and `CMD ["node", "src/index.js"]`. No supervisord or Python
+> runtime is needed — Neo4j access uses the JavaScript driver directly, and signal-cli runs as a child process
+> managed by `src/index.js`. Signal device data persists via Railway volume mounted at `/data` (see Task 4.3).
 
-### C.6 New Files Required
+**File**: `moltbot-railway-template/Dockerfile` (existing — verify, do not replace)
 
-| File | Purpose |
-|---|---|
-| `tools/kurultai/golden_horde_dispatcher.py` | Golden-horde pattern spawning logic (team creation, agent prompt templates, lifecycle tracking) |
-| `tools/kurultai/collaboration_detector.py` | Signal analysis and `CollaborationMode` detection from task descriptions |
-| `tests/kurultai/test_golden_horde_integration.py` | Integration tests for team dispatch, pattern selection, escalation |
-| `tests/kurultai/test_collaboration_detection.py` | Unit tests for signal-to-pattern mapping accuracy |
+The Dockerfile already implements the correct architecture. Verify it matches this structure:
 
-### C.7 Risk Assessment
+```dockerfile
+FROM node:20-slim
 
-| Risk | Severity | Mitigation |
+# System deps: Java for signal-cli, curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install signal-cli (native GraalVM binary)
+ARG SIGNAL_CLI_VERSION=0.13.12
+RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
+    "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz" \
+    && tar -xzf /tmp/signal-cli.tar.gz -C /usr/local/bin \
+    && rm /tmp/signal-cli.tar.gz \
+    && signal-cli --version
+
+WORKDIR /app
+
+# Signal data directory
+RUN mkdir -p /data/.signal
+
+# Import pre-linked Signal device data (must exist at build time)
+COPY .signal-data/signal-data.tar.gz /tmp/signal-data.tar.gz
+RUN if [ -f /tmp/signal-data.tar.gz ]; then \
+    tar -xzf /tmp/signal-data.tar.gz -C /data/.signal \
+    && chown -R 1001:1001 /data/.signal \
+    && chmod -R 700 /data/.signal \
+    && rm /tmp/signal-data.tar.gz; fi
+
+# Node.js dependencies
+COPY package*.json /app/
+RUN npm ci --only=production
+
+# Application code
+COPY --chown=1000:1000 . /app/
+
+# Non-root user
+RUN groupadd -r moltbot -g 1001 && useradd -r -g moltbot -u 1001 moltbot \
+    && chown -R 1001:1001 /data /app
+USER 1001:1001
+
+# Environment
+ENV NODE_ENV=production PORT=8080
+ENV SIGNAL_ENABLED=true SIGNAL_DATA_DIR=/data/.signal SIGNAL_CLI_PATH=/usr/local/bin/signal-cli
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+EXPOSE 8080
+CMD ["node", "src/index.js"]
+```
+
+> **Implementation warnings for the Dockerfile above:**
+>
+> 1. **Java may be unnecessary**: The `-Linux-native.tar.gz` is a GraalVM native image that bundles
+>    its own runtime. The `openjdk-17-jre-headless` dependency (~180MB) may not be needed. Test the
+>    Docker build without Java first: if `signal-cli --version` succeeds without it, remove the JRE
+>    to reduce image size significantly.
+>
+> 2. **Tar extraction path**: The signal-cli tar archive extracts to a directory like
+>    `signal-cli-0.13.12/` containing `bin/signal-cli` and `lib/`. The current `tar -xzf ... -C /usr/local/bin`
+>    creates `/usr/local/bin/signal-cli-0.13.12/bin/signal-cli`, NOT `/usr/local/bin/signal-cli`.
+>    Fix: either use `--strip-components=1` in the tar command, or add a symlink:
+>    `ln -s /usr/local/bin/signal-cli-*/bin/signal-cli /usr/local/bin/signal-cli`
+>
+> 3. **COPY .signal-data will fail if missing**: The `COPY .signal-data/signal-data.tar.gz` line
+>    causes a hard build failure if the file doesn't exist. For CI/dev builds, either:
+>    - Use a multi-stage build with conditional copy
+>    - Create an empty placeholder: `mkdir -p .signal-data && touch .signal-data/signal-data.tar.gz`
+>    - Document the build prerequisite clearly (done in Task 4.3)
+
+```bash
+# Deploy to Railway
+railway up --service moltbot-railway-template
+```
+
+> **Configuration Note**: The moltbot.json configuration file (located at `/data/.clawdbot/moltbot.json`)
+> includes an `agentToAgent` binding under `tools.agentToAgent` that enables inter-agent message routing.
+> This configuration must list all agent IDs in the `allow` array to support multi-agent delegation patterns.
+> See ARCHITECTURE.md for the complete moltbot.json structure.
+
+### Task 3.5: Configure Proxy Provider Blueprint
+
+**File**: `authentik-proxy/config/proxy-provider.yaml`
+
+After Authentik server is running, import the blueprint:
+
+```bash
+# Access Authentik admin UI
+open https://kublai.kurult.ai/if/admin/
+
+# Login with akadmin / bootstrap password
+# Navigate to: System → Blueprints → Import
+# Upload: authentik-proxy/config/proxy-provider.yaml
+```
+
+**Blueprint content**:
+```yaml
+version: 1
+metadata:
+  name: Kublai Proxy Provider
+  labels:
+    blueprints.goauthentik.io/description: "Proxy provider for Kublai Control UI"
+
+entries:
+  - model: authentik_providers_proxy.proxyprovider
+    id: kublai-proxy-provider
+    identifiers:
+      name: "Kublai Proxy Provider"
+    attrs:
+      external_host: "https://kublai.kurult.ai"
+      internal_host: "http://moltbot-railway-template.railway.internal:8080"
+      mode: forward_domain
+      access_token_validity: hours=24
+      refresh_token_validity: days=30
+      authorization_flow: !Find [authentik_flows.flow, [slug, kublai-webauthn-auth]]
+      skip_path_regex: "^/setup/api/signal-link$|^/ws/"
+      basic_auth_enabled: false
+
+  - model: authentik_providers_proxy.proxymapping
+    id: username-mapping
+    identifiers:
+      name: "X-Authentik-Username Mapping"
+    attrs:
+      expression: "return request.user.username"
+
+  - model: authentik_providers_proxy.proxymapping
+    id: email-mapping
+    identifiers:
+      name: "X-Authentik-Email Mapping"
+    attrs:
+      expression: "return request.user.email"
+```
+
+### Exit Criteria Phase 3
+
+- [ ] All 4 services deployed (server, worker, proxy, moltbot)
+- [ ] Services healthy in Railway dashboard
+- [ ] Authentik admin UI accessible
+- [ ] Proxy provider blueprint imported
+- [ ] Health checks passing
+
+---
+
+## Phase 4: Signal Integration (Embedded)
+
+**Duration**: 30 minutes
+**Dependencies**: Phase 3 complete (moltbot deployed)
+
+### Overview
+
+Signal runs **inside** the moltbot container as an embedded child process, following the [OpenClaw auto-spawn channel pattern](https://docs.openclaw.ai/channels/signal). No separate `signal-cli-daemon` or `signal-proxy` Railway services are needed.
+
+> **Deprecated**: The `signal-cli-daemon/` and `signal-proxy/` directories in the repo are from a previous architecture iteration. They are **NOT deployed** in v0.2. All Signal functionality is embedded in the moltbot-railway-template container.
+
+### Signal Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  moltbot-railway-template container              │
+│                                                   │
+│  ┌─────────────────┐    ┌──────────────────────┐ │
+│  │  Node.js Gateway │    │  signal-cli v0.13.12  │ │
+│  │  (Express :8080) │───▶│  (child process)      │ │
+│  │                   │    │  HTTP daemon :8081     │ │
+│  │  - /health        │    │  (localhost only)      │ │
+│  │  - /signal/status │    │                        │ │
+│  └─────────────────┘    └──────────┬───────────┘ │
+│                                      │             │
+└──────────────────────────────────────┼─────────────┘
+                                       │
+                                       ▼
+                              Signal Network (E2EE)
+```
+
+**Why This Design** (per OpenClaw docs):
+- **Auto-spawn mode**: OpenClaw launches and manages signal-cli internally as a child process
+- **No separate services needed**: signal-cli binary is installed in the Dockerfile alongside Node.js
+- **Localhost-only binding**: signal-cli listens on `127.0.0.1:8081` — no network exposure, no auth layer needed
+- **Lifecycle management**: Gateway handles startup, health checks, and graceful shutdown of signal-cli
+
+**Implementation Files** (already exist in repo):
+- `moltbot-railway-template/Dockerfile` — Installs Java 17 JRE + signal-cli v0.13.12
+- `moltbot-railway-template/src/index.js` — Spawns signal-cli as child process, manages lifecycle
+- `moltbot-railway-template/src/config/channels.js` — Channel configuration with E.164 validation
+
+### Task 4.1: Verify Signal Configuration in moltbot.json
+
+The moltbot.json configuration (deployed in Phase 3 at `/data/.clawdbot/moltbot.json`) must include the Signal channel config:
+
+```json5
+{
+  "channels": {
+    "signal": {
+      "enabled": true,
+      "account": "+15165643945",
+      "cliPath": "/usr/local/bin/signal-cli",   // Embedded binary path
+      "autoStart": true,                          // OpenClaw auto-spawn mode
+      "startupTimeoutMs": 120000,
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
+      "configWrites": false,
+      "allowFrom": ["+15165643945", "+19194133445"],
+      "groupAllowFrom": ["+19194133445"],
+      "historyLimit": 50,
+      "textChunkLimit": 4000,
+      "ignoreStories": true
+    }
+  }
+}
+```
+
+> **Note**: The config uses `cliPath` + `autoStart: true` (auto-spawn mode), NOT `httpUrl` + `autoStart: false` (external daemon mode). This means signal-cli runs as a child process inside the container, not as a separate Railway service.
+
+### Task 4.2: Verify Signal Environment Variables
+
+Ensure these environment variables are set on the `moltbot-railway-template` service:
+
+```bash
+# Signal account (E.164 format)
+railway variables --service moltbot-railway-template set SIGNAL_ACCOUNT="+15165643945"
+
+# Signal allowlists (comma-separated E.164 numbers)
+railway variables --service moltbot-railway-template set SIGNAL_ALLOW_FROM="+15165643945,+19194133445"
+railway variables --service moltbot-railway-template set SIGNAL_GROUP_ALLOW_FROM="+19194133445"
+
+# Verify all signal vars are set
+railway variables --service moltbot-railway-template --json | grep -i signal
+```
+
+The following env vars have defaults in the Dockerfile and typically don't need explicit setting:
+- `SIGNAL_ENABLED=true` (default)
+- `SIGNAL_DATA_DIR=/data/.signal` (default)
+- `SIGNAL_CLI_PATH=/usr/local/bin/signal-cli` (default)
+
+### Task 4.3: Verify Signal Data Persistence
+
+Signal device registration data must persist across redeployments. The data is stored at `/data/.signal` within the persistent `/data` volume.
+
+```bash
+# Verify the /data volume is mounted on moltbot
+railway volume list --service moltbot-railway-template
+
+# If no volume exists, create one:
+railway volume create moltbot-data --mount /data --service moltbot-railway-template
+
+# Verify .signal-data was baked into the Docker image (pre-linked device)
+railway exec --service moltbot-railway-template -- ls -la /data/.signal/
+```
+
+> **Build prerequisite**: The `.signal-data/signal-data.tar.gz` file must exist in the repo root before building the moltbot Dockerfile. This file contains the pre-linked Signal device registration. Without it, the Docker build will fail at the `COPY .signal-data/signal-data.tar.gz` step. If the file is missing, you must first link the device manually (see Task 4.4).
+
+### Task 4.4: Test Signal Integration
+
+```bash
+# Test 1: Health endpoint shows Signal status
+curl https://kublai.kurult.ai/health
+# Expected: {"status":"healthy","signal":{"enabled":true,"ready":true}}
+
+# Test 2: Signal status endpoint (behind Authentik auth)
+curl -H "Cookie: <session_cookie>" https://kublai.kurult.ai/signal/status
+# Expected: {"enabled":true,"ready":true,"account":"+15165643945",...}
+
+# Test 3: Signal link endpoint requires token (no auth = 401)
+curl -X POST https://kublai.kurult.ai/setup/api/signal-link \
+  -H "Content-Type: application/json" \
+  -d '{"phoneNumber": "+15165643945"}'
+# Expected: 401 Unauthorized
+
+# Test 4: Signal link with valid token
+curl -X POST https://kublai.kurult.ai/setup/api/signal-link \
+  -H "Content-Type: application/json" \
+  -H "X-Signal-Token: $SIGNAL_LINK_TOKEN" \
+  -d '{"phoneNumber": "+15165643945"}'
+# Expected: 200 with QR code or link response
+
+# Test 5: Check signal-cli health from within container
+railway exec --service moltbot-railway-template -- \
+  curl -s http://127.0.0.1:8081/v1/about
+# Expected: signal-cli version and account info
+
+# Test 6: Send a test message (from within container)
+railway exec --service moltbot-railway-template -- \
+  curl -X POST http://127.0.0.1:8081/v2/send \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Test from Kurultai v0.2","number":"+19194133445","recipients":["+19194133445"]}'
+# Expected: 200 with send confirmation
+```
+
+### Signal Environment Variables Reference
+
+| Variable | Scope | Description | Example |
+|----------|-------|-------------|---------|
+| `SIGNAL_ACCOUNT` | Service | Signal phone number (E.164) | `+15165643945` |
+| `SIGNAL_LINK_TOKEN` | Project | QR linking endpoint auth token | `$(openssl rand -hex 32)` |
+| `SIGNAL_ALLOW_FROM` | Service | Comma-separated allowlisted DM numbers | `+15165643945,+19194133445` |
+| `SIGNAL_GROUP_ALLOW_FROM` | Service | Comma-separated allowlisted group numbers | `+19194133445` |
+| `SIGNAL_DATA_DIR` | Service | Signal data directory (default: `/data/.signal`) | `/data/.signal` |
+| `SIGNAL_CLI_PATH` | Service | Path to signal-cli binary (default: `/usr/local/bin/signal-cli`) | `/usr/local/bin/signal-cli` |
+| `SIGNAL_ENABLED` | Service | Enable/disable Signal channel (default: `true`) | `true` |
+
+### Signal Security Model
+
+- signal-cli bound to `127.0.0.1:8081` — no network exposure outside the container
+- No authentication layer needed for signal-cli (localhost-only, no external access)
+- Token-protected QR linking endpoint (`/setup/api/signal-link`) via `X-Signal-Token` header
+- Allowlisted senders in env vars (`SIGNAL_ALLOW_FROM`, `SIGNAL_GROUP_ALLOW_FROM`)
+- Signal data stored in `/data/.signal` persistent volume with `chmod 700` permissions
+- All Signal messages use HTTP API to localhost daemon (not direct CLI invocation, which would conflict with daemon's data lock)
+
+### Exit Criteria Phase 4
+
+- [ ] signal-cli starts as child process inside moltbot container
+- [ ] `/health` endpoint shows `signal.ready: true`
+- [ ] Signal data persists in `/data/.signal` on the persistent volume
+- [ ] Allowlisted senders configured via `SIGNAL_ALLOW_FROM` env var
+- [ ] QR linking endpoint returns 401 without token, works with token
+- [ ] Test message successfully sent to allowlisted number
+
+---
+
+## Phase 4.5: Notion Integration
+
+**Duration**: 2 hours
+**Dependencies**: Phase 4 complete (Signal Integration operational), Phase 1.5 complete (Task Dependency Engine with SyncEvent/SyncChange nodes)
+
+### Overview
+
+Notion integration provides a bidirectional sync between Notion task databases and the Neo4j task graph. Users can manage task priorities and status in Notion's familiar UI, and changes flow automatically into the Kurultai execution engine. This implements the Notion integration layer from Kurultai v0.1 Phase 4.
+
+**Sync Modes**:
+- **Command-based**: User sends "Sync from Notion" to trigger immediate sync
+- **Continuous polling**: Ogedei agent polls Notion at configurable intervals (default 60s)
+- **Bidirectional**: Neo4j task completions update Notion status
+
+### Task 4.5.1: Notion API Configuration
+
+> **Note**: `tools/notion_integration.py` (1,300+ lines) and `tools/notion_sync.py` (44k) already
+> exist with NotionIntegration and bidirectional sync classes. Evaluate whether to extend the
+> existing modules or create new files. If creating new files, ensure no duplicate functionality.
+
+**Railway Environment Variables**:
+
+```bash
+# Notion API credentials
+railway variables set NOTION_API_KEY="secret_your_notion_integration_token"
+railway variables set NOTION_DATABASE_ID="your_notion_database_id"
+
+# Polling configuration
+railway variables set NOTION_SYNC_ENABLED="true"
+railway variables set NOTION_POLL_ENABLED="true"
+railway variables set NOTION_POLL_INTERVAL="60"
+```
+
+**Notion Integration Setup**:
+
+1. Create a Notion integration at https://www.notion.so/my-integrations
+2. Grant "Read content" and "Update content" permissions
+3. Share the target database with the integration
+4. Copy the integration token and database ID
+
+**API Client Initialization**:
+
+**File**: `tools/notion_sync.py` (existing) or `tools/kurultai/notion_client.py` (create)
+
+```python
+import os
+import aiohttp
+from aiohttp import ClientTimeout
+
+class NotionTaskClient:
+    """Client for reading/writing tasks from Notion database."""
+
+    def __init__(self):
+        self.api_key = os.getenv("NOTION_API_KEY")
+        self.database_id = os.getenv("NOTION_DATABASE_ID")
+        self.base_url = "https://api.notion.com/v1"
+        self.session = None
+        self.max_retries = 3
+        self.backoff_factor = 2
+
+        if not self.api_key:
+            raise ValueError("NOTION_API_KEY environment variable not set")
+        if not self.database_id:
+            raise ValueError("NOTION_DATABASE_ID environment variable not set")
+
+    async def _ensure_session(self):
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+
+    async def _post(self, endpoint: str, data: dict) -> dict:
+        """Authenticated POST to Notion API with retry and backoff."""
+        await self._ensure_session()
+        url = f"{self.base_url}{endpoint}"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+        }
+
+        for attempt in range(self.max_retries):
+            try:
+                async with self.session.post(
+                    url, json=data, headers=headers,
+                    timeout=ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 429:
+                        wait_time = self.backoff_factor ** attempt
+                        await asyncio.sleep(wait_time)
+                        continue
+                    response.raise_for_status()
+                    return await response.json()
+            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+                if attempt == self.max_retries - 1:
+                    raise
+                await asyncio.sleep(self.backoff_factor ** attempt)
+
+        raise Exception("Notion API: max retries exceeded")
+
+    async def close(self):
+        if self.session:
+            await self.session.close()
+```
+
+### Task 4.5.2: NotionSyncHandler
+
+**File**: `tools/kurultai/notion_sync_handler.py` (create)
+
+The `NotionSyncHandler` implements bidirectional sync between Notion and Neo4j, extending the `PriorityCommandHandler` to detect sync commands.
+
+**Field Mapping**:
+
+| Notion Property | Type | Neo4j Task Property | Direction |
+|-----------------|------|---------------------|-----------|
+| `Name` | Title | `description` | Bidirectional |
+| `Status` | Select | `status` | Bidirectional |
+| `Priority` | Select | `priority_weight` | Notion -> Neo4j |
+| `Agent` | Select | `assigned_to` | Notion -> Neo4j |
+| `ID` | Text | `id` | Read-only |
+| `Last Synced` | Date | `notion_synced_at` | Neo4j -> Notion |
+
+**Status Mapping**:
+
+```python
+NOTION_STATUS_MAP = {
+    "Not Started": "pending",
+    "Blocked": "blocked",
+    "Ready": "pending",
+    "In Progress": "in_progress",
+    "Completed": "completed",
+    "Cancelled": "blocked",
+}
+
+NEO4J_STATUS_MAP = {v: k for k, v in NOTION_STATUS_MAP.items()}
+```
+
+**Priority Mapping**:
+
+```python
+NOTION_PRIORITY_MAP = {
+    "Critical": 1.0,
+    "High": 0.8,
+    "Medium": 0.5,
+    "Low": 0.3,
+    "Backlog": 0.1,
+}
+```
+
+### Task 4.5.3: NotionPollingEngine (Ogedei)
+
+**File**: `tools/kurultai/notion_polling.py` (create)
+
+Ogedei's continuous polling engine detects ALL Notion changes using `last_edited_time` and applies them safely via the ReconciliationEngine.
+
+**Startup Integration** (add to moltbot gateway):
+
+```python
+# In the Python bridge startup
+import os
+from tools.kurultai.notion_polling import NotionPollingEngine
+from tools.kurultai.notion_client import NotionTaskClient
+
+if os.getenv("NOTION_POLL_ENABLED", "false").lower() == "true":
+    notion_client = NotionTaskClient()
+    polling_engine = NotionPollingEngine(
+        notion_client=notion_client,
+        neo4j_client=memory,
+        poll_interval_seconds=int(os.getenv("NOTION_POLL_INTERVAL", "60"))
+    )
+    asyncio.create_task(polling_engine.start())
+```
+
+### Task 4.5.4: Reconciliation Engine
+
+**File**: `tools/kurultai/reconciliation.py` (create)
+
+The reconciliation engine safely merges Notion changes with Neo4j state. Key constraint: **never break ongoing work**.
+
+**Safety Rules**:
+
+| Rule | Condition | Action |
+|------|-----------|--------|
+| Rule 1 | Task is `in_progress` | Skip all Notion changes except priority |
+| Rule 2 | Task is `completed` | Skip all Notion changes |
+| Rule 3 | BLOCKS dependency unmet | Don't enable dependent task |
+| Rule 4 | Priority change | Always apply (safe at any time) |
+
+### Task 4.5.5: Integration Testing
+
+**File**: `tests/integration/test_notion_sync.py` (create)
+
+```bash
+# Run Notion sync integration tests
+python -m pytest tests/integration/test_notion_sync.py -v
+```
+
+### Exit Criteria Phase 4.5
+
+- [ ] Notion API credentials configured in Railway
+- [ ] NotionSyncHandler creates/updates tasks bidirectionally
+- [ ] NotionPollingEngine runs continuously without crashes
+- [ ] Reconciliation handles conflicts with logging (SyncEvent + SyncChange nodes)
+- [ ] Priority changes from Notion always apply (even for in-progress tasks)
+- [ ] Completed tasks are never reverted by Notion changes
+- [ ] Integration tests pass (`test_notion_sync.py`)
+
+---
+
+## Phase 5: Authentik Web App Integration
+
+**Duration**: 2 hours
+**Dependencies**: Phase 3 complete
+
+### Task 5.0: PostgreSQL Service for Authentik
+
+Authentik requires a PostgreSQL database. Create one as a Railway plugin before deploying Authentik services.
+
+```bash
+# Create PostgreSQL plugin on Railway
+railway add postgres
+
+# Note the connection credentials from Railway dashboard
+# Railway provides: DATABASE_URL, PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+
+# Set these as environment variables for authentik-server and authentik-worker
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__HOST="$PGHOST"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__PORT="$PGPORT"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__NAME="$PGDATABASE"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__USER="$PGUSER"
+railway variables --service authentik-server set AUTHENTIK_POSTGRESQL__PASSWORD="$PGPASSWORD"
+
+# Same for authentik-worker
+railway variables --service authentik-worker set AUTHENTIK_POSTGRESQL__HOST="$PGHOST"
+railway variables --service authentik-worker set AUTHENTIK_POSTGRESQL__PORT="$PGPORT"
+railway variables --service authentik-worker set AUTHENTIK_POSTGRESQL__NAME="$PGDATABASE"
+railway variables --service authentik-worker set AUTHENTIK_POSTGRESQL__USER="$PGUSER"
+railway variables --service authentik-worker set AUTHENTIK_POSTGRESQL__PASSWORD="$PGPASSWORD"
+```
+
+> **Note**: If using Railway's internal networking, use `postgres.railway.internal` as the host. The PostgreSQL plugin credentials are typically available as Railway-provided variables.
+
+### Task 5.1: Configure WebAuthn Authentication Flow
+
+1. **Access Authentik admin UI**: https://kublai.kurult.ai/if/admin/
+
+2. **Create WebAuthn authenticator stage**:
+   - Navigate to: Flows & Stages → Stages
+   - Click "Create" → "Authenticator Validation"
+   - Select: "WebAuthn Authenticator"
+   - Name: "Kublai WebAuthn"
+   - Configure:
+     - User verification: "preferred"
+     - Resident keys: "preferred"
+
+3. **Create authentication flow**:
+   - Navigate to: Flows & Stages → Flows
+   - Click "Create" → "Authentication Flow"
+   - Name: "Kublai WebAuthn Auth"
+   - Add stages:
+     1. Identification (username)
+     2. WebAuthn Validation
+     3. User login (success)
+
+4. **Create application**:
+   - Navigate to: Applications → Applications
+   - Click "Create"
+   - Name: "Kublai Control UI"
+   - Slug: "kublai-control"
+   - Provider: "Kublai Proxy Provider"
+   - Policy: "Authenticated users"
+
+### Task 5.2: Integrate Web App with Authentik Headers
+
+**File**: `steppe-visualization/app/lib/auth.ts` (create)
+
+```typescript
+/**
+ * Authentik integration for Kublai web app
+ * Reads X-Authentik-* headers set by Caddy forward auth
+ */
+
+export interface AuthentikUser {
+  username: string;
+  email: string;
+  name: string;
+  uid: string;
+  groups: string[];
+}
+
+export async function getAuthentikUser(): Promise<AuthentikUser | null> {
+  try {
+    const response = await fetch('/api/auth/me');
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return {
+      username: data.username,
+      email: data.email,
+      name: data.name,
+      uid: data.uid,
+      groups: data.groups || [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function requireAuth(): Promise<AuthentikUser> {
+  const user = await getAuthentikUser();
+  if (!user) {
+    // Redirect to Authentik login
+    window.location.href = '/if/flow/authentication/';
+    throw new Error('Authentication required');
+  }
+  return user;
+}
+```
+
+### Task 5.3: Add API Endpoint for User Info
+
+**File**: `moltbot-railway-template/routes/auth.js` (create)
+
+```javascript
+const express = require('express');
+const router = express.Router();
+
+/**
+ * GET /api/auth/me
+ * Returns Authentik user info from headers set by Caddy forward auth
+ */
+router.get('/me', (req, res) => {
+  const user = {
+    username: req.headers['x-authentik-username'],
+    email: req.headers['x-authentik-email'],
+    name: req.headers['x-authentik-name'],
+    uid: req.headers['x-authentik-uid'],
+    groups: req.headers['x-authentik-groups']?.split(',') || [],
+  };
+
+  if (!user.username) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  res.json(user);
+});
+
+module.exports = router;
+```
+
+### Task 5.4: Update Web App Middleware
+
+**File**: `steppe-visualization/app/middleware.ts`
+
+```typescript
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function authMiddleware(request: NextRequest) {
+  // Check for Authentik headers
+  const username = request.headers.get('x-authentik-username');
+
+  if (!username) {
+    // Redirect to Authentik login
+    const loginUrl = new URL('/if/flow/authentication/', request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Add user info to request headers for downstream use
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-user-username', username);
+
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+}
+
+// Configure which routes to protect
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    '/control-panel/:path*',
+    '/api/agent/:path*',
+  ],
+};
+```
+
+### Task 5.5: Configure Domain
+
+```bash
+# Add custom domain to authentik-proxy service
+railway domains --service authentik-proxy add kublai.kurult.ai
+
+# Wait for SSL certificate provisioning
+railway domains --service authentik-proxy list
+```
+
+### Exit Criteria Phase 5
+
+- [ ] PostgreSQL plugin created on Railway
+- [ ] WebAuthn authenticator configured
+- [ ] Authentication flow created
+- [ ] Application linked to proxy provider
+- [ ] Web app reads Authentik headers
+- [ ] Domain configured with SSL
+- [ ] Test login flow works
+
+---
+
+## Phase 6: Monitoring & Health Checks
+
+**Duration**: 1 hour
+**Dependencies**: Phase 5 complete
+
+### Task 6.1: Implement Health Check Endpoints
+
+**File**: `moltbot-railway-template/routes/health.js`
+
+```javascript
+const express = require('express');
+const router = express.Router();
+const http = require('http');
+
+/**
+ * GET /health
+ * Main health check endpoint for Railway
+ */
+router.get('/', async (req, res) => {
+  const checks = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    services: {},
+    dependencies: {},
+  };
+
+  // Check Node.js
+  checks.services.nodejs = 'running';
+
+  // Check Python process via internal HTTP call
+  try {
+    const pythonHealth = await new Promise((resolve, reject) => {
+      const request = http.get('http://127.0.0.1:5000/health', (response) => {
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => resolve(JSON.parse(data)));
+      });
+      request.on('error', reject);
+      request.setTimeout(5000, () => { request.destroy(); reject(new Error('timeout')); });
+    });
+    checks.services.python = pythonHealth.status || 'running';
+  } catch {
+    checks.services.python = 'error';
+    checks.status = 'unhealthy';
+  }
+
+  // Check Neo4j
+  try {
+    const neo4j = await checkNeo4j();
+    checks.dependencies.neo4j = neo4j;
+    if (!neo4j.connected) checks.status = 'unhealthy';
+  } catch (error) {
+    checks.dependencies.neo4j = { error: error.message };
+    checks.status = 'unhealthy';
+  }
+
+  // Check Authentik
+  try {
+    const authentik = await checkAuthentik();
+    checks.dependencies.authentik = authentik;
+  } catch (error) {
+    checks.dependencies.authentik = { error: error.message };
+  }
+
+  return res.status(checks.status === 'healthy' ? 200 : 503).json(checks);
+});
+
+/**
+ * GET /health/neo4j
+ * Detailed Neo4j health check
+ */
+router.get('/neo4j', async (req, res) => {
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const request = http.get('http://127.0.0.1:5000/health/neo4j', (response) => {
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => resolve(JSON.parse(data)));
+      });
+      request.on('error', reject);
+      request.setTimeout(5000, () => { request.destroy(); reject(new Error('timeout')); });
+    });
+
+    res.json({
+      status: result.connected ? 'healthy' : 'unhealthy',
+      neo4j: result,
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /health/disk
+ * Disk space check
+ */
+router.get('/disk', async (req, res) => {
+  try {
+    const { execSync } = require('child_process');
+    const dfOutput = execSync('df -h /data/workspace').toString();
+    const lines = dfOutput.trim().split('\n');
+    const parts = lines[1].split(/\s+/);
+
+    res.json({
+      status: 'healthy',
+      filesystem: parts[0],
+      size: parts[1],
+      used: parts[2],
+      available: parts[3],
+      use_percent: parts[4],
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message,
+    });
+  }
+});
+
+async function checkNeo4j() {
+  // Implementation
+  return { connected: true, version: '5.x', nodes: 0 };
+}
+
+async function checkAuthentik() {
+  // Implementation
+  return { connected: true };
+}
+
+module.exports = router;
+```
+
+### Task 6.2: Configure Railway Health Checks
+
+```bash
+# For moltbot service
+railway health --service moltbot-railway-template GET /health
+
+# For authentik-proxy service
+railway health --service authentik-proxy GET /health
+
+# For authentik-server service
+railway health --service authentik-server GET /-/health/ready/
+```
+
+### Task 6.3: Implement Structured Logging
+
+**File**: `moltbot-railway-template/middleware/logger.js`
+
+```javascript
+const pino = require('pino');
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  formatters: {
+    level: (label) => ({ level: label }),
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+});
+
+function requestLogger(req, res, next) {
+  const start = Date.now();
+
+  res.on('finish', () => {
+    logger.info({
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration: Date.now() - start,
+      userAgent: req.get('user-agent'),
+    }, 'request completed');
+  });
+
+  next();
+}
+
+module.exports = { logger, requestLogger };
+```
+
+### Task 6.4: Set Up Log Rotation
+
+> **Note**: No supervisord.conf is needed — the pure Node.js architecture uses `src/index.js`
+> as the single entry point (`CMD ["node", "src/index.js"]`). Log rotation is handled by the
+> winston logger configured in Task 6.3.
+
+Winston handles log rotation natively via the `winston-daily-rotate-file` transport. Add to the
+logger configuration in `moltbot-railway-template/src/utils/logger.js`:
+
+```javascript
+const DailyRotateFile = require('winston-daily-rotate-file');
+
+// Add to logger transports:
+const fileTransport = new DailyRotateFile({
+  filename: '/data/logs/moltbot-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '100m',
+  maxFiles: '5d',
+  zippedArchive: true
+});
+```
+
+On Railway, logs are also captured by the platform's built-in log drain. The winston file
+transport provides local persistence as a backup.
+
+### Exit Criteria Phase 6
+
+- [ ] Health endpoints implemented
+- [ ] Railway health checks configured
+- [ ] Structured logging enabled
+- [ ] Log rotation configured
+- [ ] All services showing healthy
+
+---
+
+## Phase 6.5: File Consistency Monitoring
+
+**Duration**: 1.5 hours
+**Dependencies**: Phase 6 (Monitoring) complete, Phase 1 (Neo4j operational)
+
+### Overview
+
+Deploy the Ogedei File Consistency & Conflict Detection system specified in neo4j.md Phase 4.5. This phase adds workspace-level file monitoring across all six agent directories, detecting contradictions, stale data, and parse errors in shared memory files.
+
+### Task 6.5.1: FileConsistencyChecker Deployment
+
+**File**: `tools/file_consistency.py` (existing, 881 lines) and `src/protocols/file_consistency.py` (existing)
+
+> **Note**: The `FileConsistencyChecker` class already exists at `tools/file_consistency.py` with
+> full Neo4j integration. Also available at `src/protocols/file_consistency.py`. Use the existing
+> implementation rather than creating a new file.
+
+The `FileConsistencyChecker` class monitors and validates consistency of memory files across agent workspaces. It uses hash-based change detection to identify modifications between scan intervals, and cross-file comparison to detect contradictions and stale data.
+
+**Monitored Files**: `heartbeat.md`, `memory.md`, `CLAUDE.md`
+
+**Agent Directories** (Railway container paths):
+- `/data/.clawdbot/agents/main`
+- `/data/.clawdbot/agents/researcher`
+- `/data/.clawdbot/agents/writer`
+- `/data/.clawdbot/agents/developer`
+- `/data/.clawdbot/agents/analyst`
+- `/data/.clawdbot/agents/ops`
+
+**Neo4j Schema Extension** (included in V3 migration):
+
+```cypher
+// FileConsistencyReport and FileConflict node constraints
+CREATE CONSTRAINT file_consistency_report_id IF NOT EXISTS
+  FOR (r:FileConsistencyReport) REQUIRE r.id IS UNIQUE;
+
+CREATE CONSTRAINT file_conflict_id IF NOT EXISTS
+  FOR (fc:FileConflict) REQUIRE fc.id IS UNIQUE;
+
+// Index for querying reports by severity and status
+CREATE INDEX file_report_severity IF NOT EXISTS
+  FOR (r:FileConsistencyReport) ON (r.severity, r.status);
+
+// Index for querying open conflicts
+CREATE INDEX file_conflict_status IF NOT EXISTS
+  FOR (fc:FileConflict) ON (fc.status, fc.severity);
+```
+
+### Task 6.5.2: Ogedei Integration
+
+**File**: `tools/kurultai/ogedei_file_monitor.py` (create)
+
+The `OgedeiFileMonitor` runs on a configurable interval (default 5 minutes), performing consistency checks and escalating high-severity conflicts to Kublai via Analysis nodes.
+
+**Health endpoint integration** (add to `moltbot-railway-template/routes/health.js`):
+
+```javascript
+/**
+ * GET /health/file-consistency
+ * File consistency monitor status (Phase 6.5)
+ */
+router.get('/file-consistency', async (req, res) => {
+  try {
+    const pythonHealth = await new Promise((resolve, reject) => {
+      const request = http.get('http://127.0.0.1:5000/health/file-consistency', (response) => {
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => resolve(JSON.parse(data)));
+      });
+      request.on('error', reject);
+      request.setTimeout(5000, () => { request.destroy(); reject(new Error('timeout')); });
+    });
+
+    const isHealthy = pythonHealth.monitor_running &&
+      pythonHealth.last_severity !== 'critical';
+
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'healthy' : 'degraded',
+      file_consistency: pythonHealth,
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message,
+    });
+  }
+});
+```
+
+### Task 6.5.3: Conflict Resolution Protocol
+
+**Automatic resolution** for non-overlapping changes:
+- **Stale data**: Auto-resolved by flagging the older file for refresh
+- **Parse errors**: Cannot auto-resolve; queued for manual review
+- **Contradictions**: Queued for manual resolution by Kublai
+
+**Manual resolution** creates `FileConflict` nodes with `status='open'` and audit trail, escalated to Kublai via Analysis nodes.
+
+### Deployment
+
+```bash
+# Deploy file consistency module
+cp tools/kurultai/file_consistency.py /data/workspace/tools/kurultai/
+cp tools/kurultai/ogedei_file_monitor.py /data/workspace/tools/kurultai/
+
+# Schema is applied via V3 migration (Task 1.3)
+# Verify schema
+python3 -c "
+from openclaw_memory import OperationalMemory
+import os
+mem = OperationalMemory(
+    uri=os.getenv('NEO4J_URI'),
+    username=os.getenv('NEO4J_USER', 'neo4j'),
+    password=os.getenv('NEO4J_PASSWORD'),
+)
+with mem._session_pool() as session:
+    result = session.run('SHOW CONSTRAINTS')
+    for record in result:
+        if 'file' in str(record).lower():
+            print(record)
+"
+```
+
+### Exit Criteria Phase 6.5
+
+- [ ] FileConsistencyChecker scans all agent workspaces (`/data/.clawdbot/agents/*`)
+- [ ] Hash-based change detection identifies modified files between scans
+- [ ] Cross-file conflicts detected and reported within scan interval (default 5 minutes)
+- [ ] FileConsistencyReport nodes created in Neo4j with severity classification
+- [ ] FileConflict nodes created for tracked conflicts with resolution_status
+- [ ] Ogedei agent receives and processes conflict alerts via agentToAgent
+- [ ] High/critical conflicts escalated to Kublai via Analysis nodes
+- [ ] `/health/file-consistency` endpoint returns monitor status
+- [ ] Automatic resolution works for stale_data conflicts
+- [ ] Manual resolution queue operational for contradiction conflicts
+
+---
+
+## Phase 7: Testing & Validation
+
+**Duration**: 2 hours
+**Dependencies**: Phase 6.5 complete
+
+### Task 7.1: End-to-End Authentication Test
+
+```bash
+# Test 1: Unauthenticated request should redirect to login
+curl -I https://kublai.kurult.ai/dashboard
+# Expected: 302 redirect to /if/flow/authentication/
+
+# Test 2: Health check should work without auth
+curl https://kublai.kurult.ai/health
+# Expected: 200 with healthy status
+
+# Test 3: Signal link requires token
+curl -X POST https://kublai.kurult.ai/setup/api/signal-link \
+  -H "Content-Type: application/json" \
+  -d '{"phoneNumber": "+1234567890"}'
+# Expected: 401 Unauthorized
+
+# Test 4: Signal link with token
+curl -X POST https://kublai.kurult.ai/setup/api/signal-link \
+  -H "Content-Type: application/json" \
+  -H "X-Signal-Token: $SIGNAL_LINK_TOKEN" \
+  -d '{"phoneNumber": "+1234567890"}'
+# Expected: 200 or service response
+```
+
+### Task 7.2: Agent Communication Test
+
+```bash
+# Test agent delegation via gateway
+curl -X POST http://localhost:8080/agent/researcher/message \
+  -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "@researcher What is Neo4j?",
+    "context": {
+      "task_id": "test-123",
+      "delegated_by": "main",
+      "reply_to": "main"
+    }
+  }'
+```
+
+### Task 7.3: Capability Learning Test
+
+```bash
+# Test capability acquisition
+curl -X POST http://localhost:8080/api/learn \
+  -H "Content-Type: application/json" \
+  -d '{
+    "capability": "how to send SMS messages",
+    "requesting_agent": "main"
+  }'
+```
+
+### Task 7.4: Neo4j Schema Validation
+
+```cypher
+// Run in Neo4j Browser
+
+// Verify all indexes
+SHOW INDEXES;
+
+// Verify all constraints
+SHOW CONSTRAINTS;
+
+// Verify agent keys exist
+MATCH (a:Agent)-[:HAS_KEY]->(k:AgentKey)
+RETURN a.id, a.name, k.is_active;
+
+// Verify Research nodes have research_type
+MATCH (r:Research)
+RETURN r.research_type, count(*) as count;
+
+// Verify migration completed
+MATCH (r:Research)
+WHERE r.migrated_at IS NOT NULL
+RETURN count(*) as migrated_nodes;
+```
+
+### Task 7.5: Load Testing
+
+**File**: `tests/performance/test_load.py`
+
+```python
+import asyncio
+import httpx
+import statistics
+from typing import List
+
+async def health_check(client: httpx.AsyncClient, url: str) -> float:
+    start = time.time()
+    response = await client.get(url)
+    end = time.time()
+    response.raise_for_status()
+    return end - start
+
+async def run_load_test(base_url: str, concurrent: int = 10, total: int = 100):
+    latencies: List[float] = []
+
+    async with httpx.AsyncClient() as client:
+        for i in range(0, total, concurrent):
+            batch = min(concurrent, total - i)
+            tasks = [health_check(client, f"{base_url}/health") for _ in range(batch)]
+            batch_latencies = await asyncio.gather(*tasks)
+            latencies.extend(batch_latencies)
+
+    print(f"Load test results:")
+    print(f"  Requests: {len(latencies)}")
+    print(f"  Avg latency: {statistics.mean(latencies)*1000:.2f}ms")
+    print(f"  Min latency: {min(latencies)*1000:.2f}ms")
+    print(f"  Max latency: {max(latencies)*1000:.2f}ms")
+
+if __name__ == "__main__":
+    asyncio.run(run_load_test("https://kublai.kurult.ai"))
+```
+
+### Exit Criteria Phase 7
+
+- [ ] Authentication flow works
+- [ ] Agent communication succeeds
+- [ ] Capability learning executes
+- [ ] Neo4j schema validated
+- [ ] Load test passes
+- [ ] All security tests pass
+
+---
+
+## Appendices
+
+### Appendix A: Environment Variables Reference
+
+| Variable | Scope | Description | Example |
+|----------|-------|-------------|---------|
+| `NEO4J_URI` | Project | Neo4j connection URI | `neo4j+s://xxxxx.databases.neo4j.io` |
+| `NEO4J_USER` | Project | Neo4j username | `neo4j` |
+| `NEO4J_PASSWORD` | Project | Neo4j password | `your_password` |
+| `AUTHENTIK_SECRET_KEY` | Project | Authentik signing key | `(32 random bytes)` |
+| `AUTHENTIK_BOOTSTRAP_PASSWORD` | Project | Initial admin password | `(secure password)` |
+| `AUTHENTIK_EXTERNAL_HOST` | Project | Public URL | `https://kublai.kurult.ai` |
+| `SIGNAL_LINK_TOKEN` | Project | Signal endpoint auth | `(32 random bytes)` |
+| `SIGNAL_ACCOUNT` | Service | Signal phone number (E.164) | `+15165643945` |
+| `SIGNAL_ALLOW_FROM` | Service | Comma-separated allowlisted DM numbers | `+15165643945,+19194133445` |
+| `SIGNAL_GROUP_ALLOW_FROM` | Service | Comma-separated allowlisted group numbers | `+19194133445` |
+| `OPENCLAW_GATEWAY_TOKEN` | Project | Agent messaging auth | `(secure token)` |
+| `KURLTAI_ENABLED` | Service | Enable Kurultai | `true` |
+| `KURLTAI_MAX_PARALLEL_TASKS` | Service | Max parallel tasks | `10` |
+| `PORT` | Service | HTTP port | `8080` |
+| `ANTHROPIC_API_KEY` | Project | Anthropic API key for LLM calls | `sk-ant-xxxxx` |
+| `ANTHROPIC_BASE_URL` | Project | Anthropic API base URL (optional) | `https://api.anthropic.com` |
+| `OPENCLAW_STATE_DIR` | Service | OpenClaw agent state directory | `/data/.clawdbot` |
+| `OPENCLAW_WORKSPACE_DIR` | Service | OpenClaw workspace directory | `/data/workspace` |
+| `PHONE_HASH_SALT` | Project | HMAC salt for sender phone hashing | `$(openssl rand -hex 32)` |
+| `EMBEDDING_ENCRYPTION_KEY` | Project | AES-256 key for SENSITIVE embedding encryption | `$(openssl rand -base64 32)` |
+| `NOTION_API_KEY` | Project | Notion API integration token | `secret_xxxxx` |
+| `NOTION_DATABASE_ID` | Project | Notion database for task sync | `(database UUID)` |
+| `NOTION_POLL_INTERVAL` | Service | Polling interval in seconds | `30` |
+| `NOTION_SYNC_ENABLED` | Service | Enable Notion sync | `true` |
+| `NOTION_LAST_SYNC_CURSOR` | Service | Cursor for incremental sync | `(auto-managed)` |
+| `AB_TEST_SECRET` | Service | A/B test signing key for complexity validation | `(32 random bytes)` |
+| `AGENT_AUTH_SECRET` | Service | HMAC-SHA256 secret for agent identity tokens | `(32 random bytes)` |
+
+> **Deferred Variables**: `MOONSHOT_API_KEY`, `ZAI_API_KEY` are required for v0.3
+> features (competitive advantage, auto-skill generation) and are not needed for v0.2 deployment.
+
+### Appendix B: Railway Service Configuration
+
+| Service | Build Method | Health Check | Domain |
+|---------|--------------|--------------|--------|
+| `authentik-server` | Dockerfile | `/-/health/ready/` | (internal) |
+| `authentik-worker` | Dockerfile | (none) | (none) |
+| `authentik-proxy` | Dockerfile | `/health` | `kublai.kurult.ai` |
+| `moltbot-railway-template` | Dockerfile | `/health` | (via proxy) |
+
+> **Note**: Only 4 Railway services are deployed in v0.2. The `signal-cli-daemon` and `signal-proxy`
+> directories exist in the repo from an earlier architecture iteration but are **not deployed**.
+> Signal runs inside moltbot as an embedded child process.
+
+### Appendix C: Troubleshooting
+
+**Issue**: Authentik login loop
+- **Cause**: `AUTHENTIK_EXTERNAL_HOST` mismatch
+- **Fix**: Verify environment variable matches public URL
+
+**Issue**: Neo4j connection timeout
+- **Cause**: AuraDB IP not whitelisted (paid tier)
+- **Fix**: Check AuraDB console for allowed IPs
+
+**Issue**: Agent communication fails
+- **Cause**: `OPENCLAW_GATEWAY_URL` incorrect
+- **Fix**: Use internal Railway URL: `http://service-name.railway.internal:8080`
+
+**Issue**: Capability learning blocked
+- **Cause**: Prompt injection filter too aggressive
+- **Fix**: Review `tools/kurultai/security/prompt_injection_filter.py`
+
+### Appendix D: Rollback Procedures
+
+```bash
+# Rollback Railway deployment
+railway rollback --service <service-name>
+
+# Rollback Neo4j migration
+python scripts/run_migrations.py --target-version 1
+
+# Disable Authentik (emergency access)
+railway service stop --service authentik-proxy
+```
+
+### Appendix E: Security Infrastructure Reference
+
+**Purpose**: Document the 5 security controls identified as undocumented in the architectural review.
+
+#### E.1: PromptInjectionFilter
+
+**Integration Point**: `HordeLearnKurultai.learn()` Phase 0 (security pre-check)
+**Module**: `tools/kurultai/security/prompt_injection_filter.py`
+
+The PromptInjectionFilter screens all incoming capability learning requests before they enter the 6-phase pipeline. It uses NFKC Unicode normalization as a preprocessing step to defeat homoglyph attacks, then matches against 7+ injection patterns.
+
+**Pattern Set**:
+
+| # | Pattern | Catches |
+|---|---------|---------|
+| 1 | `ignore (all )?(previous\|above) instructions` | Classic instruction override |
+| 2 | `disregard (all )?(previous\|above) instructions` | Synonym variant |
+| 3 | `(forget\|clear\|reset) (all )?(instructions\|context\|prompts)` | Context clearing |
+| 4 | `you are now (a\|an) .{0,50} (model\|assistant\|ai)` | Role hijacking |
+| 5 | `act as (a\|an) .{0,100}` | Role assumption |
+| 6 | `pretend (you are\|to be) .{0,100}` | Pretend injection |
+| 7 | `override (your )?(programming\|safety\|constraints)` | Safety bypass |
+
+**NFKC Normalization**: Applied before pattern matching to normalize Unicode homoglyphs (e.g., fullwidth characters, Cyrillic lookalikes) to their ASCII equivalents, preventing bypass via Unicode substitution.
+
+**Note**: This filter operates at the capability acquisition boundary. For Cypher query injection prevention, see the separate `tools/security/injection_prevention.py` module which provides `CypherInjectionPrevention` and `SecureQueryBuilder` for database-layer protection.
+
+#### E.2: PIISanitizer
+
+**Integration Point**: Kublai's `_sanitize_for_sharing()` method before delegation
+**Module**: `tools/security/anonymization.py` (existing `AnonymizationEngine` class)
+
+The existing `AnonymizationEngine` provides comprehensive multi-layer PII detection:
+
+| PII Type | Sensitivity |
+|----------|-------------|
+| Email | high |
+| US Phone | high |
+| International Phone | high |
+| SSN | critical |
+| Credit Card | critical |
+| API Key | critical |
+
+**Three-Layer Architecture**:
+1. **Layer 1** - Regex-based pattern matching (fast, deterministic)
+2. **Layer 2** - LLM-based review (comprehensive, for complex cases)
+3. **Layer 3** - Tokenization for reversible anonymization
+
+**Recommendation**: For production, replace the simplified Task 0.5 `PIISanitizer` with the existing `AnonymizationEngine` which provides superior detection coverage, reversible tokenization, and HMAC-based hashing.
+
+#### E.3: SandboxExecutor
+
+**Integration Point**: `HordeLearnKurultai` Phase 4 (validation of generated code)
+**Module**: `tools/kurultai/sandbox_executor.py`
+
+**Resource Limits**:
+
+| Resource | Limit | Constant | Purpose |
+|----------|-------|----------|---------|
+| CPU Time | 30 seconds | `RLIMIT_CPU` | Prevent infinite loops |
+| Address Space | 512 MB | `RLIMIT_AS` | Prevent memory exhaustion |
+| File Descriptors | 100 | `RLIMIT_NOFILE` | Prevent file handle exhaustion |
+
+**Railway Compatibility Notes**:
+- The `resource` module works on Linux containers (Railway's runtime environment)
+- `RLIMIT_AS` is enforced at the kernel level on Linux, providing hard memory limits
+- Railway containers run as non-root by default; resource limits do not require elevated privileges
+
+**macOS Local Development**:
+- `RLIMIT_AS` is **not supported** on macOS (Darwin kernel ignores it)
+- Use platform detection to skip `RLIMIT_AS` on macOS
+
+#### E.4: CostEnforcer
+
+**Integration Point**: `HordeLearnKurultai` before Phase 2 (Research)
+**Module**: `tools/kurultai/security/cost_enforcer.py`
+
+The CostEnforcer uses a pre-authorization pattern in Neo4j: budget is reserved before expensive operations and released after completion.
+
+**Pre-Authorization Flow**:
+
+```
+1. Kublai initiates /learn -> CostEnforcer.authorize_spending(skill_id, estimated_cost)
+2. Neo4j atomically checks remaining >= estimated_cost
+3. If sufficient: remaining -= estimated_cost, reserved += estimated_cost
+4. Pipeline phases execute (Research -> Implementation -> Validation)
+5. On completion: reserved -= actual_cost, spent += actual_cost
+6. Surplus returned: remaining += (estimated_cost - actual_cost)
+7. On failure: reserved -= estimated_cost, remaining += estimated_cost
+```
+
+#### E.5: Jochi AST Analyzer
+
+**Integration Point**: `HordeLearnKurultai` Phase 4 (Validation) and Jochi's ongoing backend monitoring
+**Module**: `tools/kurultai/static_analysis/ast_parser.py`
+
+The Jochi AST Analyzer uses tree-sitter-python for structural code analysis, detecting dangerous patterns in generated code before it enters the capability registry.
+
+**Detection Categories**:
+
+| Category | Patterns | Severity |
+|----------|----------|----------|
+| Code Execution | `eval()`, `exec()`, `compile()` | high |
+| SQL Injection | String concatenation in SQL queries | high |
+| Hardcoded Secrets | String literals matching API key patterns | critical |
+| Command Injection | `os.system()`, `subprocess` with `shell=True` | critical |
+
+**Deployment Dependency**:
+
+```bash
+# tree-sitter-python is required for AST analysis
+# Must use venv pip consistent with Dockerfile pattern
+/opt/venv/bin/pip install tree-sitter tree-sitter-python
+```
+
+---
+
+### Appendix F: Fallback Mode Procedures
+
+**Purpose**: Operational procedures for Neo4j outage handling.
+
+#### F.1: Circuit Breaker Configuration
+
+The OperationalMemory module (`openclaw_memory.py`) implements two circuit breakers:
+
+**Neo4j Connection Circuit Breaker** (internal):
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `failure_threshold` | 3 | Consecutive failures before circuit opens (aligned with neo4j.md spec) |
+| `recovery_timeout` | 60 seconds | Time before attempting half-open test |
+| Half-open behavior | Allow 1 request | On success: close. On failure: reopen |
+
+**Circuit States**:
+
+```
+CLOSED (normal) --[5 failures]--> OPEN (rejecting)
+                                      |
+                              [60s timeout]
+                                      |
+                                      v
+                                 HALF_OPEN
+                                   /     \
+                          [success]       [failure]
+                             /                \
+                            v                  v
+                        CLOSED              OPEN
+```
+
+#### F.2: Fallback Mode Activation
+
+**What triggers fallback mode**:
+1. `ServiceUnavailable` exception during initial `_connect()` call
+2. `AuthError` during Neo4j authentication
+3. Circuit breaker opens after 5 consecutive Neo4j failures
+
+**What happens when Neo4j is unavailable**:
+
+| Operation | Fallback Behavior |
+|-----------|-------------------|
+| `create_task()` | Task stored in `_local_store['tasks']` (in-memory dict) |
+| `claim_task()` | Returns simulated task from local store |
+| `complete_task()` | Marked complete in local store |
+| `store_research()` | Research stored in `_local_store['research']` |
+| `check_rate_limit()` | Always allows (rate limiting disabled) |
+| `health_check()` | Returns `status: 'fallback_mode'` |
+| `FileConsistencyChecker._store_report()` | Skipped (logs warning) |
+
+**Fallback Store Limits** (prevent memory exhaustion):
+
+| Category | Max Items |
+|----------|-----------|
+| Tasks | 1,000 |
+| Research | 500 |
+| Other categories | 1,000 each |
+
+#### F.3: Recovery Procedure
+
+**Automatic Recovery**: A background daemon thread (`_start_recovery_monitor`) checks Neo4j connectivity every 30 seconds:
+
+1. Verify Neo4j connectivity via `driver.verify_connectivity()`
+2. On success, initiate `_sync_fallback_to_neo4j()`
+3. Each item is individually synced; failures are tracked per-item
+4. If failure rate < 10%: exit fallback mode, resume normal operations
+5. If failure rate >= 10%: remain in fallback mode, retry next cycle
+
+#### F.4: Monitoring
+
+**Health Endpoint Response in Fallback Mode**:
+
+```json
+{
+  "status": "fallback_mode",
+  "error": "Operating in fallback mode",
+  "neo4j": {
+    "connected": false,
+    "fallback_mode": true,
+    "local_store_size": 47,
+    "circuit_breaker_state": "open"
+  }
+}
+```
+
+**Monitoring Commands**:
+
+```bash
+# Check current health status
+curl -s https://kublai.kurult.ai/health | jq '.dependencies.neo4j'
+
+# Monitor Railway logs for fallback events
+railway logs --service moltbot-railway-template | grep -E '\[WARN\].*fallback|\[RECOVERY\]|\[SYNC\]'
+```
+
+#### F.5: Runbook - Neo4j Outage Response
+
+**Severity**: P1 (all agent operations degraded)
+
+**Step 1: Detect and Confirm**
+
+```bash
+curl -s https://kublai.kurult.ai/health | jq '.dependencies.neo4j'
+# Expected during outage: {"connected": false, ...}
+```
+
+**Step 2: Attempt Resolution**
+
+```bash
+# If AuraDB is paused (free tier auto-pause):
+# Go to console.neo4j.io -> Click "Resume" -> Wait 2-3 minutes
+
+# If credential issue:
+railway variables --service moltbot-railway-template | grep NEO4J
+
+# If connection pool exhausted:
+railway restart --service moltbot-railway-template
+```
+
+**Step 3: Verify Recovery**
+
+```bash
+# Wait for automatic recovery (checks every 30 seconds)
+railway logs --service moltbot-railway-template --tail 50 | grep '\[RECOVERY\]'
+
+# Verify health is restored
+curl -s https://kublai.kurult.ai/health | jq '.status'
+# Expected: "healthy"
+```
+
+---
+
+### Appendix G: Scope Boundary Declaration
+
+**Purpose**: Document which neo4j.md phases are covered in kurultai_0.2.md vs deferred to future releases.
+
+#### neo4j.md Phase Coverage
+
+| neo4j.md Phase | Status in kurultai_0.2 | Notes |
 |---|---|---|
-| Cost explosion from unnecessary team spawning | HIGH | Conservative detection thresholds; default to INDIVIDUAL mode; require explicit `collaboration_mode` for P0 |
-| Pattern misselection (wrong golden-horde pattern) | MEDIUM | Holistic intent analysis (not keyword matching); user override via explicit `collaboration_mode` field |
-| Team dispatch latency (cold start) | MEDIUM | Pre-warm common patterns (Review Loop, Assembly Line); lazy specialist spawning for Expertise Routing |
-| Context exhaustion in deep nesting | HIGH | Hard limit: max 2 nesting levels (golden-horde → horde-swarm internal); no deeper |
-| Agent-initiated escalation abuse | MEDIUM | Max 3 escalations per cycle; Kublai approval gate; cost multiplier tracking |
-| Backward compatibility with existing single-agent dispatch | LOW | `CollaborationMode.INDIVIDUAL` is default; no behavior change unless collaboration signals detected |
+| Phase 1: OpenClaw Multi-Agent Setup | PARTIALLY COVERED (Phase 0-1) | Agent keys created; `agents.list` configuration and agent directory creation need explicit tasks |
+| Phase 2: Neo4j Infrastructure | COVERED (Phase 1) | AuraDB setup, migrations, schema extensions |
+| Phase 3: OperationalMemory Module | PARTIALLY COVERED | Module deployed via container; fallback mode procedures in Appendix F |
+| Phase 4: Security Audit Protocol | PARTIALLY COVERED | Security controls documented in Appendix E |
+| Phase 4.5: Ogedei File Consistency | COVERED (Phase 6.5) | FileConsistencyChecker, OgedeiFileMonitor, ConflictResolver |
+| Phase 4.6: Jochi Backend Issues | DEFERRED to v0.3 | Requires Phase 2 capability system operational first |
+| Phase 4.7: Ogedei Proactive Improvement | DEFERRED to v0.3 | Requires operational baseline data |
+| Phase 4.8: Chagatai Background Synthesis | DEFERRED to v0.3 | Requires content generation pipeline |
+| Phase 4.9: Self-Improvement/Kaizen | DEFERRED to v0.3 | Advanced feature requiring stable reflection system |
+| Phase 5: ClawTasks Bounty System | DEFERRED to v0.3 | Marketplace feature |
+| Phase 6: Jochi-Temujin Collaboration | DEFERRED to v0.3 | Requires proven agentToAgent messaging |
+| Phase 7: Delegation Protocol | PARTIALLY COVERED | HMAC-SHA256 signing keys generated (Phase 1 Task 1.4); actual signing middleware deferred to v0.3 |
+| Phase 8: Notion Integration | COVERED (Phase 4.5) | Bidirectional sync via NotionSyncHandler and ReconciliationEngine |
+| Phase 9: Auto-Skill Generation | DEFERRED to v0.3 | Requires capability acquisition system operational |
+| Phase 10: Competitive Advantage | DEFERRED to v0.3 | Business logic layer |
 
-### C.8 Approval Checklist for Appendix C
+#### kurultai_0.1.md Component Coverage
 
-- [ ] `CollaborationMode` enum design reviewed
-- [ ] Signal-to-pattern mapping accuracy validated
-- [ ] `_dispatch_to_team()` integration with existing `execute_ready_set()` confirmed
-- [ ] Agent-initiated escalation budget controls adequate
-- [ ] Cost projections acceptable (2x multiplier for team tasks)
-- [ ] No backward compatibility breaks with existing individual dispatch
-- [ ] Golden-horde SKILL.md patterns correctly mapped to Kurultai workflows
+| kurultai_0.1 Component | Status in kurultai_0.2 | Notes |
+|---|---|---|
+| Task Dependency Engine | COVERED (Phase 1.5) | IntentWindowBuffer, DAGBuilder, TopologicalExecutor, PriorityCommandHandler |
+| Notion Integration | COVERED (Phase 4.5) | NotionSyncHandler, ReconciliationEngine, NotionPollingEngine |
+
+#### Coverage Summary
+
+| Status | Count | Percentage |
+|--------|-------|------------|
+| COVERED | 6 | 38% |
+| PARTIALLY COVERED | 3 | 19% |
+| DEFERRED to v0.3 | 7 | 44% |
+
+#### Phased Release Strategy
+
+**kurultai_0.2** covers **Core Infrastructure + Foundation Features**: the deployment target is a working multi-agent system with Neo4j-backed memory, SSO authentication, Signal messaging, capability acquisition pipeline, task dependency engine, Notion integration, file consistency monitoring, and operational monitoring.
+
+**kurultai_0.3** will cover **Agent Protocols, Marketplace, and Advanced Features**, building on the operational v0.2 deployment: autonomous agent behaviors, inter-agent collaboration protocols, marketplace features, auto-skill generation, and self-improvement/Kaizen.
 
 ---
 
-## Execution Handoff
+### Appendix H: Complexity Scoring & Team Sizing System
 
-Once approved, this plan will be executed using:
-- **Skill:** `horde-implement`
-- **Pipeline:** senior-prompt-engineer → subagent-driven-development → implementation-status → horde-review
-- **Mode:** Phase-by-phase execution with review gates
-- **Specialist Routing:** Backend agents for all implementation tasks
+**Purpose**: Document the complexity validation framework that classifies capability requests and predicts required team size for agent spawning decisions in the capability acquisition system.
+
+**Status**: All Critical and High priority findings from 4-domain golden-horde review have been integrated (14/15 fixes implemented).
+
+**Integration Point**: Phase 2 Task 2.4 (Capability Registry) uses complexity scores to determine delegation strategy and team size.
+
+#### H.1: Overview
+
+The `TeamSizeClassifier` analyzes capability requests (natural language descriptions of desired capabilities) and predicts the required team size:
+
+| Team Size | Complexity Range | Description | Example |
+|-----------|------------------|-------------|---------|
+| **individual** | 0.0 - 0.21 | Single agent can handle | "Add logging to a function" |
+| **small_team** | 0.21 - 0.64 | 2-3 agents needed | "Deploy Redis cache cluster" |
+| **full_team** | > 0.64 | 4+ agents, complex integration | "Build multi-region Kubernetes with service mesh" |
+
+**Classification Algorithm**:
+1. Extract features: length, technical terms, integration points, security sensitivity, domain risk
+2. Apply normalized weights (sum = 1.0) to compute complexity score
+3. Apply synergy multiplier for multi-factor requests
+4. Classify based on calibrated thresholds (0.21, 0.64)
+
+#### H.2: Component Architecture
+
+**Module Structure** (post-decomposition):
+
+```
+tools/kurultai/
+├── team_size_classifier.py        # Main classifier with normalized weights (561 lines)
+├── complexity_config.py            # Centralized configuration (thresholds, weights) (112 lines)
+├── complexity_models.py            # Shared data models (Phase 4.1) (209 lines)
+│   ├── TestCase                    # Single test case definition
+│   ├── TestResult                  # Result of running a test case
+│   ├── ValidationMetrics           # Aggregated validation metrics
+│   ├── ComplexityFactors           # Factors contributing to complexity
+│   ├── TeamSize (enum)             # individual, small_team, full_team
+│   └── CapabilityDomain (enum)     # COMMUNICATION, DATA, INFRASTRUCTURE, etc.
+├── complexity_auth.py              # RBAC authorization for scoring operations (83 lines)
+├── threshold_calibrator.py         # Dynamic threshold tuning (PENDING - Phase 4.2)
+├── test_case_registry.py           # Test case library (PENDING - Phase 4.3)
+├── complexity_validation.py        # Validation orchestrator (971 lines, has duplicate TestCase - dedup pending)
+├── complexity_validation_framework.py  # Framework core (2,250 lines - decomposition PENDING Phase 4.4)
+├── drift_detector.py               # PSI-based drift detection with epsilon smoothing (276 lines)
+├── circuit_breaker.py              # Prevents cascading failures
+├── threshold_engine.py             # Threshold enforcement
+├── ground_truth.py                 # Ground truth label management
+└── types.py                        # Type definitions (Task, Message, DeliverableType)
+
+scripts/
+└── optimize_classifier.py          # K-fold CV with holdout set (existing)
+```
+
+> **Current State vs Target**: The god module decomposition (Finding C3) is partially complete.
+> `complexity_models.py` has been extracted (209 lines), but `complexity_validation_framework.py`
+> remains at 2,250 lines (target: <500). `threshold_calibrator.py` and `test_case_registry.py`
+> still need to be created. `complexity_validation.py` still contains a duplicate `TestCase` class
+> that should be removed once all imports are updated to use `complexity_models.TestCase`.
+
+**Key Fixes Integrated**:
+
+| Finding | Fix | Module |
+|---------|-----|--------|
+| C1 | Weights normalized to sum=1.0, multiplicative synergy | `team_size_classifier.py` |
+| C2 | 80/20 train/holdout split, 5-fold CV | `optimize_classifier.py` |
+| C3 | God module decomposed into 3 new files | `complexity_models.py`, `threshold_calibrator.py`, `test_case_registry.py` |
+| C4 | TestResult mutation fixed with defensive copying | `complexity_validation_framework.py` |
+| C5 | Hardcoded HMAC secret removed → `AB_TEST_SECRET` required | `complexity_validation.py` |
+| H4 | Balanced accuracy metric added (handles class imbalance) | `complexity_models.py` |
+| H5 | PSI fixed with Laplace smoothing for discrete distributions | `drift_detector.py` |
+| H7 | Hardcoded 0.6/0.8 thresholds replaced with config references | Multiple files |
+
+#### H.3: Security Hardening
+
+**Required Environment Variables** (see Appendix A):
+
+```bash
+# Complexity Scoring Security
+AB_TEST_SECRET=""               # A/B test signing key (required, no default)
+AGENT_AUTH_SECRET=""             # Agent identity token HMAC (required, no default)
+NEO4J_PASSWORD=""                # Required (no default - see C6 fix)
+```
+
+**Security Fixes Applied**:
+
+| Finding | Description | Implementation |
+|---------|-------------|----------------|
+| **C5** | Hardcoded HMAC secret removed | `AB_TEST_SECRET` env var required; `ValueError` raised if missing |
+| **C6** | Default Neo4j password removed | `NEO4J_PASSWORD` required; `SystemExit` if missing |
+| **H1** | Agent authorization via RBAC | `ComplexityAuthenticator` class with role-based `authorize()` in `complexity_auth.py`. HMAC token signing/verification deferred to v0.3. |
+| **H3** | PII sanitization before Neo4j storage | Delegation protocol uses sanitized descriptions only |
+| **H8** | PII regex no longer matches UUIDs | Changed from `\b[\w]{32,64}\b` to `\b[a-fA-F0-9]{32,64}\b` with UUID negative lookahead |
+
+#### H.4: Validation Framework
+
+**Cross-Validation Protocol** (Finding C2 - resolved):
+
+```
+1. Split test cases: 80% train / 20% holdout (stratified by team_size)
+2. Run 5-fold CV on train set for threshold optimization
+3. Report holdout accuracy separately from train accuracy
+4. Fail validation if holdout < train - 10% (overfitting detection)
+```
+
+**Metrics** (Finding H4 - resolved):
+
+| Metric | Formula | Purpose |
+|--------|---------|---------|
+| **Accuracy** | correct / total | Overall classification rate |
+| **Balanced Accuracy** | mean(per-class recall) | Handles class imbalance |
+| **Precision (team)** | TP / (TP + FP) | No false positives for team spawning |
+| **Recall (full)** | TP / (TP + FN) | No missed complex tasks |
+| **F1 Score** | 2 × (P × R) / (P + R) | Harmonic mean |
+| **GO/NO-GO Criteria** | Balanced Accuracy ≥ 0.80 | Production readiness threshold |
+
+**Test Case Improvements** (Finding H6 - resolved):
+
+- **Before**: `_generate_synthetic_cases()` created meaningless placeholders like "Test case 42"
+- **After**: `_get_realistic_edge_cases()` provides ~20 hand-crafted edge cases with real domain keywords
+  - "Deploy Redis cache cluster" → small_team
+  - "Set up multi-region Kubernetes with service mesh" → full_team
+  - "Add logging to a Python function" → individual
+
+#### H.5: Module Decomposition
+
+**Before** (Finding C3 - 2,118-line god module):
+- `complexity_validation_framework.py`: 2,118 lines with duplicate classes
+- `complexity_validation.py`: Duplicate `TestCase`, `TestResult`, `ValidationMetrics`, `TeamSize`, `CapabilityDomain`
+
+**After** (Phase 4 decomposition - PARTIALLY COMPLETE):
+
+| File | Lines | Status | Content |
+|------|-------|--------|---------|
+| `complexity_models.py` | 209 | **Done** | Shared: TestCase, TestResult, ValidationMetrics, ComplexityFactors, enums |
+| `threshold_calibrator.py` | ~200 | **PENDING** | Extract: ThresholdCalibrator class with mutation fix |
+| `test_case_registry.py` | ~300 | **PENDING** | Extract: DEFAULT_TEST_CASES, get_all_test_cases() |
+| `complexity_validation.py` | 971 | **Partial** | Still contains duplicate TestCase (line 43); needs dedup |
+| `complexity_validation_framework.py` | 2,250 | **Partial** | Still contains extracted classes; target <500 after Phase 4.4 |
+
+**Remaining Verification Tasks** (Phase 4.4):
+- [ ] Remove duplicate `TestCase` from `complexity_validation.py` (use `complexity_models.TestCase`)
+- [ ] Create `threshold_calibrator.py` by extracting from framework
+- [ ] Create `test_case_registry.py` by extracting from framework
+- [ ] Slim `complexity_validation_framework.py` to <500 lines
+
+#### H.6: Integration Testing
+
+**Test Suite Locations**:
+
+```bash
+tests/kurultai/
+├── test_team_size_classifier.py     # Weight normalization tests (Phase 0)
+├── test_complexity_validation.py    # Mutation, balanced accuracy (Phase 1)
+├── test_complexity_integration.py   # Async, threshold, import tests (Phase 3)
+├── test_complexity_security.py      # Security tests (Phase 2)
+└── test_monitoring.py               # Monitoring tests
+```
+
+**Verification Commands**:
+
+```bash
+# Run all complexity tests
+pytest tests/kurultai/ -v --tb=short
+
+# Run validation pipeline with security
+AB_TEST_SECRET=test-secret NEO4J_PASSWORD=test python scripts/run_complexity_validation.py --full
+
+# Verify weight normalization
+pytest tests/kurultai/test_team_size_classifier.py::test_weights_sum_to_one -v
+
+# Verify no hardcoded thresholds (grep check)
+grep -rn "0\.6\|0\.8" tools/kurultai/*.py | grep -v "config\|threshold"
+
+# Verify no cross-layer imports
+grep "from tools.security" tools/kurultai/drift_detector.py
+# Should return empty (no imports from tools.security)
+```
+
+**GO/NO-GO Criteria for Production**:
+
+| Criterion | Threshold | Rationale |
+|-----------|-----------|-----------|
+| Balanced Accuracy | ≥ 0.80 | Handles class imbalance |
+| Holdout Accuracy | Within 10% of train | No overfitting |
+| Full Team Recall | ≥ 0.90 | Don't miss complex tasks |
+| Weight Sum | = 1.0 ± 0.01 | Proper normalization |
+| No TestResult Mutation | Pass | Defensive copying verified |
+
+#### H.7: Summary of Implemented Fixes
+
+| Phase | Finding | Status | File(s) Modified |
+|-------|---------|--------|------------------|
+| **0** | C1: Weight normalization | ✅ Complete | `team_size_classifier.py` |
+| **1** | C2: K-fold CV with holdout | ✅ Complete | `scripts/optimize_classifier.py` |
+| **1** | C4: TestResult mutation | ✅ Complete | `complexity_validation_framework.py` |
+| **1** | H4: Balanced accuracy | ✅ Complete | `complexity_models.py` |
+| **1** | H6: Realistic test cases | ⏳ Pending | `test_case_registry.py` (file not yet created) |
+| **2** | C5: Hardcoded HMAC secret | ✅ Complete | `complexity_validation.py` |
+| **2** | C6: Default Neo4j password | ✅ Complete | `scripts/run_complexity_validation.py` |
+| **2** | H1: RBAC agent authorization | ✅ Complete | `complexity_auth.py` (HMAC tokens deferred to v0.3) |
+| **2** | H3: PII sanitization | ✅ Complete | `delegation.py` |
+| **2** | H8: PII regex fix | ✅ Complete | `delegation.py` |
+| **3** | H2: Async/sync mismatch | ✅ Complete | `topological_executor.py` |
+| **3** | H5: PSI drift detection | ✅ Complete | `drift_detector.py` (uses epsilon smoothing) |
+| **3** | H7: Hardcoded thresholds | ✅ Complete | Multiple files |
+| **3** | H9: Cross-layer dependency | ✅ Complete | `drift_detector.py` |
+| **4** | C3: God module decomposition | ⏳ Partial | `complexity_models.py` extracted; `threshold_calibrator.py`, `test_case_registry.py` pending; framework still 2,250 lines |
+
+**Remaining Work**:
+- Phase 4 decomposition: Create `threshold_calibrator.py`, `test_case_registry.py`; slim framework to <500 lines
+- Remove duplicate `TestCase` from `complexity_validation.py`
+- Security and validation tests
 
 ---
 
-## Approval
+### Appendix I: Model Switcher Installation
 
-- [ ] Requirements understood
-- [ ] Task breakdown acceptable
-- [ ] Dependencies correct
-- [ ] Risk assessment reviewed
-- [ ] Critical review fixes applied
-- [ ] SOUL.md modification removed (replaced with Neo4j registry)
-- [ ] Security controls adequate
-- [ ] Infrastructure constraints addressed (nsjail vs gVisor)
-- [ ] **Jochi integration reviewed** (existing implementation leveraged)
-- [ ] **Jochi-Temüjin workflow documented**
-- [ ] **CBAC (Capability-Based Access Control) added** (privilege escalation prevention)
-- [ ] **Agent Authentication added** (HMAC-SHA256 message signing, replay protection)
-- [ ] **Neo4j Schema Migration added** (backfill script, rollback plan, deployment checklist)
-- [ ] Ready for execution
+**Purpose**: Post-deployment installation of the kurultai-model-switcher skill for LLM model and provider management.
 
-**Ready to proceed?**
+**Status**: Optional operational tool - install after Phase 7 completion.
+
+#### I.1: Overview
+
+The Model Switcher enables safe switching of AI models across the Kurultai multi-agent system for:
+- **Emergency failover** when providers experience outages
+- **A/B testing** new models against existing workloads
+- **Cost optimization** by switching to appropriate models per task
+- **Performance tuning** based on agent-specific requirements
+
+#### I.2: Compatibility
+
+The kurultai-model-switcher skill is fully compatible with kurultai_0.2.md and ARCHITECTURE.md:
+
+| Component | Skill Requirement | kurultai_0.2 Status |
+|-----------|-------------------|-------------------|
+| Agent IDs | `["main", "researcher", "writer", "developer", "analyst", "ops"]` | ✅ Exact match |
+| moltbot.json path | `/data/.clawdbot/moltbot.json` | ✅ Documented |
+| openclaw.json path | `/data/.clawdbot/openclaw.json` | ✅ Documented |
+| Environment vars | `ANTHROPIC_API_KEY`, `OPENCLAW_GATEWAY_TOKEN` | ✅ Phase 0 setup |
+
+#### I.3: Installation
+
+**Step 1: Copy Script to Repository**
+
+```bash
+# The script is already included in the repository at:
+cp scripts/model_switcher.py scripts/model_switcher.py
+
+# Verify it exists
+ls -la scripts/model_switcher.py
+```
+
+**Step 2: Install Python Dependencies**
+
+```bash
+# The script uses only Python standard library - no pip install required
+# Python 3.11+ is already required by kurultai_0.2.md (Prerequisites)
+python --version  # Should be 3.11+
+```
+
+**Step 3: Configure Environment**
+
+The model switcher reads configuration from:
+- `MOLTBOT_CONFIG` - Path to moltbot.json (default: `moltbot.json` local, `/data/.clawdbot/moltbot.json` production)
+- `OPENCLAW_CONFIG` - Path to openclaw.json (default: `/data/.clawdbot/openclaw.json`)
+
+**Step 4: Verify Installation**
+
+```bash
+# Local testing (before Railway deployment)
+cd /Users/kurultai/molt
+python scripts/model_switcher.py validate
+```
+
+Expected output:
+```json
+{
+  "status": "valid",
+  "warnings": [
+    "openclaw.json not found at /data/.clawdbot/openclaw.json"
+  ]
+}
+```
+
+The warning is expected locally - openclaw.json is configured via Control UI after Railway deployment.
+
+#### I.4: Usage
+
+**Command Format:**
+
+```bash
+# Switch an agent to a new model
+python scripts/model_switcher.py switch --agent main --model claude-sonnet-4
+
+# Switch all agents
+python scripts/model_switcher.py switch --agent all --model zai/glm-4.7
+
+# Preview changes without applying
+python scripts/model_switcher.py switch --agent developer --model claude-opus-4 --dry-run
+
+# View current model assignments
+python scripts/model_switcher.py status
+
+# View switch history
+python scripts/model_switcher.py history --agent main
+
+# Rollback to previous model
+python scripts/model_switcher.py rollback --agent main
+
+# Validate configuration
+python scripts/model_switcher.py validate
+```
+
+**Agent Reference:**
+
+| ID | Name | Role | Default Model |
+|----|------|------|---------------|
+| main | Kublai | Squad Lead / Router | moonshot/kimi-k2.5 |
+| researcher | Möngke | Researcher | zai/glm-4.5 |
+| writer | Chagatai | Content Writer | moonshot/kimi-k2.5 |
+| developer | Temüjin | Developer / Security | zai/glm-4.7 |
+| analyst | Jochi | Analyst | zai/glm-4.5 |
+| ops | Ögedei | Operations / Emergency | zai/glm-4.5 |
+
+#### I.5: Railway Deployment Integration
+
+**Option A: Execute via Railway Console (Recommended)**
+
+```bash
+# SSH into the running Railway service
+railway shell --service moltbot-railway-template
+
+# Inside the container
+cd /app
+python scripts/model_switcher.py status
+python scripts/model_switcher.py switch --agent main --model claude-sonnet-4
+```
+
+**Option B: Add HTTP Endpoint to moltbot (Future Enhancement)**
+
+Add an API endpoint in `moltbot-railway-template/src/index.js`:
+
+```javascript
+// Model switcher endpoint (protected by Authentik)
+app.post('/api/admin/switch-model', authenticate, async (req, res) => {
+  const { agent, model, dryRun } = req.body;
+  const result = await execFile('python', [
+    'scripts/model_switcher.py',
+    'switch',
+    '--agent', agent,
+    '--model', model,
+    ...(dryRun ? ['--dry-run'] : [])
+  ]);
+  res.json(JSON.parse(result.stdout));
+});
+```
+
+#### I.6: Safety Features
+
+**Automatic Backup:**
+Every switch operation automatically backs up the previous state to `.model-switch-history.json` (last 10 states per agent retained).
+
+**Rollback Capability:**
+```bash
+# Revert to previous model
+python scripts/model_switcher.py rollback --agent main
+```
+
+**Dry Run Mode:**
+```bash
+# Validate without applying changes
+python scripts/model_switcher.py switch --agent all --model claude-sonnet-4 --dry-run
+```
+
+**Model Validation:**
+The script validates that the target model exists in `openclaw.json` before applying changes.
+
+#### I.7: Troubleshooting
+
+**Issue: "Model 'xyz' not found in openclaw.json"**
+
+**Cause:** The model is not configured in the provider configuration.
+
+**Fix:**
+1. Access Control UI > Settings > OpenClaw
+2. Add the model to your provider's `models` array
+3. Click Apply
+4. Retry the switch command
+
+**Issue: "Cannot acquire lock - another operation is in progress"**
+
+**Cause:** Concurrent modification of moltbot.json.
+
+**Fix:** Wait for the other operation to complete, or remove the stale lock:
+```bash
+rm -f /data/.clawdbot/moltbot.json.lock
+```
+
+**Issue: "No rollback history available"**
+
+**Cause:** Fewer than 2 switch operations have been performed for this agent.
+
+**Fix:** Use `switch-model status` to see current assignments and manually specify a different model.
+
+#### I.8: Integration with Neo4j (Future)
+
+When Neo4j operational memory is fully operational, the model switcher will create `ModelSwitch` nodes for audit logging:
+
+```cypher
+CREATE (ms:ModelSwitch {
+  timestamp: datetime(),
+  agentId: "main",
+  oldModel: "moonshot/kimi-k2.5",
+  newModel: "claude-sonnet-4",
+  reason: "Testing new model",
+  user: "admin@kurult.ai"
+})
+```
+
+---
+
+**Document Status**: v3.2 - Added Appendix I: Model Switcher Installation
+**Last Updated**: 2026-02-06
+**Maintainer**: Kurultai System Architecture

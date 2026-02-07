@@ -1,0 +1,51 @@
+# skill-sync-service Railway Configuration
+services:
+  - name: skill-sync-service
+    type: Worker
+    buildCommand: npm install
+    startCommand: node src/index.js
+    env:
+      # Service Configuration
+      - key = PORT
+        value = 3000
+      - key = NODE_ENV
+        value = production
+      - key = LOG_LEVEL
+        value = info
+
+      # Skill Storage
+      - key = SKILLS_DIR
+        value = /data/skills
+      - key = BACKUP_DIR
+        value = /data/backups/skills
+      - key = MAX_SKILL_SIZE_BYTES
+        value = 102400
+
+      # GitHub Configuration
+      - key = GITHUB_WEBHOOK_SECRET
+        generate = true
+      - key = GITHUB_TOKEN
+        sync = false
+      - key = GITHUB_OWNER
+        value = Danservfinn
+      - key = GITHUB_REPO
+        value = kurultai-skills
+      - key = POLLING_INTERVAL_MIN
+        value = 5
+
+      # Neo4j Audit Logging
+      - key = NEO4J_URI
+        value = ${NEO4J_URI}
+      - key = NEO4J_USER
+        value = ${NEO4J_USER}
+      - key = NEO4J_PASSWORD
+        value = ${NEO4J_PASSWORD}
+
+      # Deployment Lock
+      - key = DEPLOYMENT_LOCK_TTL
+        value = 300
+
+    # Shared volume for skills (moltbot reads from here)
+    volumes:
+      - name: skills-data
+        mountPath: /data

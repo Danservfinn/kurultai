@@ -1,0 +1,22 @@
+# Exclude unnecessary files from migration image
+*.pyc
+__pycache__/
+.pytest_cache/
+.git/
+.github/
+.vscode/
+.idea/
+*.md
+.DS_Store
+.env.*
+*.log
+node_modules/
+moltbot-railway-template/
+steppe-visualization/
+signal-cli-daemon/
+authentik-*/
+cli/
+examples/
+tests/
+tools/
+data/

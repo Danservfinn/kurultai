@@ -34,3 +34,23 @@ orjson>=3.9.0
 
 # Cryptography (for secure token handling)
 cryptography>=41.0.0
+
+# ML/Embeddings (for semantic similarity in dependency analysis)
+sentence-transformers>=2.2.0
+
+# HTTP (used by delegation protocol)
+requests>=2.31.0
+
+# Testing dependencies
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-benchmark>=4.0.0
+pytest-xdist>=3.5.0  # Parallel test execution
+pytest-cov>=4.1.0   # Coverage reporting
+testcontainers>=4.0.0  # Real service containers for integration tests
+faker>=24.0.0  # Realistic test data generation
+freezegun>=1.5.0  # Time freezing for tests
+hypothesis>=6.100.0  # Property-based testing
+
+# Metrics and monitoring
+prometheus-client>=0.20.0

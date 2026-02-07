@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/security/injection_prevention.py
+# hypothesis_version: 6.150.2
+
+['\x00', '%\\s*\\(?\\w+', '* /', '*/', '/ *', '/*', '//', ';\\s*\\w+', 'AND', 'APOC', 'CALL', 'CONSTRAINT', 'CREATE', 'CSV', 'DATABASE', 'DELETE', 'DENY', 'DETACH DELETE', 'DROP', 'FOREACH', 'FROM', 'GDS', 'GRANT', 'INDEX', 'LIMIT', 'LOAD', 'MATCH', 'MERGE', 'OPTIONAL MATCH', 'OR', 'ORDER BY', 'PASSWORD', 'PRIVILEGE', 'REMOVE', 'RETURN', 'REVOKE', 'ROLE', 'SET', 'SKIP', 'SecureQueryBuilder', 'UNION\\s+ALL', 'USER', 'WHERE', 'WITH', 'YIELD', '\\$(\\w+)', '\\$\\w+', '\\$\\{[^}]+\\}', '\\.format\\s*\\(', '\\/\\*.*\\*\\/', '\\/\\/', '\\/\\/.*', '\\bAND\\s+\\d+=\\d+', '\\bOR\\s+\\d+=\\d+', '`', '`[^`]+`', 'backtick_escape', 'block_comment', 'boolean_and', 'boolean_or', 'line_comment', 'statement_chaining', 'template_literal', 'union_injection']

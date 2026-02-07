@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/src/protocols/__init__.py
+# hypothesis_version: 6.150.2
+
+['DelegationProtocol', 'FailoverProtocol', 'FileConflict']

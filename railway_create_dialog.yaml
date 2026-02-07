@@ -1,0 +1,96 @@
+- generic [ref=e1]:
+  - generic [ref=e9876]:
+    - generic [ref=e9877]:
+      - banner [ref=e9878]:
+        - generic [ref=e9879]:
+          - link [ref=e10498] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e10499]
+          - generic [ref=e10203]:
+            - button [ref=e10501] [cursor=pointer]:
+              - generic [ref=e10210]: kublai
+              - img [ref=e10212]
+            - button [ref=e10502] [cursor=pointer]:
+              - generic [ref=e10217]: production
+              - img [ref=e10219]
+        - navigation [ref=e9895]:
+          - generic [ref=e9897]:
+            - button [ref=e10503] [cursor=pointer]:
+              - img [ref=e10223]
+            - button [ref=e10504] [cursor=pointer]:
+              - img [ref=e10227]
+            - button [ref=e10505] [cursor=pointer]:
+              - generic [ref=e9899]:
+                - img [ref=e9901]
+                - generic [ref=e9903]: "67"
+            - button [ref=e9904] [cursor=pointer]
+      - generic [ref=e10229]:
+        - link [ref=e10507] [cursor=pointer]:
+          - /url: /project/26201f75-3375-46ce-98c7-9d1dde5f9569?environmentId=067431ed-5441-4ab1-9f99-a052c949c0b7
+          - text: Architecture
+        - link [ref=e10508] [cursor=pointer]:
+          - /url: /project/26201f75-3375-46ce-98c7-9d1dde5f9569/observability?environmentId=067431ed-5441-4ab1-9f99-a052c949c0b7
+          - text: Observability
+        - link [ref=e10509] [cursor=pointer]:
+          - /url: /project/26201f75-3375-46ce-98c7-9d1dde5f9569/logs?environmentId=067431ed-5441-4ab1-9f99-a052c949c0b7
+          - text: Logs
+        - link [ref=e10510] [cursor=pointer]:
+          - /url: /project/26201f75-3375-46ce-98c7-9d1dde5f9569/settings?environmentId=067431ed-5441-4ab1-9f99-a052c949c0b7
+          - text: Settings
+    - region [ref=e10235]:
+      - generic [ref=e10429]:
+        - img [ref=e10430]
+        - generic [ref=e10431]:
+          - generic [ref=e10433]:
+            - generic:
+              - img
+              - button [ref=e10511] [cursor=pointer]:
+                - link [ref=e10512]:
+                  - /url: /project/26201f75-3375-46ce-98c7-9d1dde5f9569/service/75d402cd-df3b-4f25-bf64-e8680a4dc624?environmentId=067431ed-5441-4ab1-9f99-a052c949c0b7
+                  - generic [ref=e10438]:
+                    - img [ref=e10440]
+                    - paragraph [ref=e10443]: moltbot-railway-template
+                  - generic [ref=e10444]:
+                    - img [ref=e10446]
+                    - paragraph [ref=e10448]:
+                      - text: Building (
+                      - time [ref=e10449]: 01:27
+                      - text: )
+          - toolbar [ref=e10513]:
+            - button [ref=e10514] [cursor=pointer]:
+              - img [ref=e10454]
+            - group [ref=e10515]:
+              - button [ref=e10516] [cursor=pointer]:
+                - img [ref=e10467]
+              - button [ref=e10517] [cursor=pointer]:
+                - img [ref=e10471]
+              - button [ref=e10518] [cursor=pointer]:
+                - img [ref=e10474]
+            - group [ref=e10519]:
+              - button [ref=e10520] [cursor=pointer]:
+                - img [ref=e10479]
+              - button [ref=e10521] [cursor=pointer]:
+                - img [ref=e10484]
+          - button [ref=e10522] [cursor=pointer]:
+            - img [ref=e10492]
+            - generic [ref=e10494]: Create
+          - img [ref=e10495]
+  - alert [ref=e8565]: kublai
+  - dialog "Create" [ref=e10524]:
+    - heading "Create" [level=3] [ref=e10526]
+    - generic [ref=e10527]:
+      - button "Dismiss"
+    - generic [ref=e10529]:
+      - generic [ref=e10593]: Database
+      - generic [ref=e10532]:
+        - combobox [expanded] [active] [ref=e10535]
+        - listbox "Suggestions" [ref=e10536]:
+          - generic [ref=e10537]:
+            - option "PostgreSQL" [ref=e10594] [cursor=pointer]:
+              - generic [ref=e10595]: PostgreSQL
+            - option "Redis" [ref=e10598] [cursor=pointer]:
+              - generic [ref=e10599]: Redis
+            - option "MongoDB" [ref=e10602] [cursor=pointer]:
+              - generic [ref=e10603]: MongoDB
+            - option "MySQL" [ref=e10606] [cursor=pointer]:
+              - generic [ref=e10607]: MySQL

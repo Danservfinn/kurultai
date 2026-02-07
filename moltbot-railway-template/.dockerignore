@@ -1,0 +1,48 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment files (don't bake secrets into images)
+.env
+.env.local
+.env.*.local
+
+# Development files
+.git
+.gitignore
+README.md
+CHANGELOG.md
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Testing
+coverage
+.nyc_output
+tests/
+__tests__/
+*.test.js
+*.spec.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Signal data (should be provided at build time, not committed)
+# Note: .signal-data/signal-data.tar.gz is needed for build
+# but should not be in version control

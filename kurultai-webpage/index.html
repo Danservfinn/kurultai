@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kurultai - A Council of AI Agents</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #0a0a0f;
+            --color-bg-elevated: #12121a;
+            --color-bg-card: #1a1a25;
+            --color-text: #e8e6e3;
+            --color-text-muted: #8a8780;
+            --color-accent-gold: #c9a227;
+            --color-accent-gold-light: #e8d5a3;
+            --color-kublai: #c9a227;
+            --color-mongke: #4a90d9;
+            --color-chagatai: #7cb342;
+            --color-temujin: #e74c3c;
+            --color-jochi: #9b59b6;
+            --color-ogedei: #1abc9c;
+            --color-neo4j: #008cc1;
+            --gradient-hero: radial-gradient(ellipse at 50% 0%, #1a1a2e 0%, #0a0a0f 60%);
+            --shadow-gold: 0 0 40px rgba(201, 162, 39, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1.5rem 3rem;
+            background: linear-gradient(to bottom, rgba(10,10,15,0.95), transparent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--color-accent-gold);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--color-accent-gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            color: var(--color-accent-gold);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--color-accent-gold);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 8rem 2rem 4rem;
+            background: var(--gradient-hero);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(201, 162, 39, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(74, 144, 217, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(156, 89, 182, 0.05) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1.25rem;
+            background: rgba(201, 162, 39, 0.1);
+            border: 1px solid rgba(201, 162, 39, 0.3);
+            border-radius: 100px;
+            font-size: 0.85rem;
+            color: var(--color-accent-gold);
+            margin-bottom: 2rem;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--color-text) 0%, var(--color-accent-gold-light) 50%, var(--color-accent-gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeInUp 0.8s ease 0.1s both;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.1rem, 2vw, 1.35rem);
+            color: var(--color-text-muted);
+            max-width: 700px;
+            margin: 0 auto 3rem;
+            font-weight: 300;
+            animation: fadeInUp 0.8s ease 0.2s both;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.8s ease 0.3s both;
+        }
+
+        .btn {
+            padding: 1rem 2.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-accent-gold), #b8941f);
+            color: var(--color-bg);
+            box-shadow: 0 4px 20px rgba(201, 162, 39, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(201, 162, 39, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--color-text);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--color-accent-gold);
+            color: var(--color-accent-gold);
+        }
+
+        /* Agent Orbit Animation */
+        .agent-orbit {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        .orbit-ring {
+            position: absolute;
+            border: 1px solid rgba(201, 162, 39, 0.15);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .orbit-ring:nth-child(1) { width: 200px; height: 200px; }
+        .orbit-ring:nth-child(2) { width: 350px; height: 350px; border-color: rgba(74, 144, 217, 0.12); }
+        .orbit-ring:nth-child(3) { width: 500px; height: 500px; border-color: rgba(156, 89, 182, 0.1); }
+
+        .orbit-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            margin: -6px;
+        }
+
+        .orbit-dot.kublai { background: var(--color-kublai); animation: orbit 20s linear infinite; }
+        .orbit-dot.mongke { background: var(--color-mongke); animation: orbit 25s linear infinite reverse; }
+        .orbit-dot.chagatai { background: var(--color-chagatai); animation: orbit 30s linear infinite; }
+        .orbit-dot.temujin { background: var(--color-temujin); animation: orbit 22s linear infinite reverse; }
+        .orbit-dot.jochi { background: var(--color-jochi); animation: orbit 28s linear infinite; }
+        .orbit-dot.ogedei { background: var(--color-ogedei); animation: orbit 24s linear infinite reverse; }
+
+        @keyframes orbit {
+            from { transform: rotate(0deg) translateX(100px) rotate(0deg); }
+            to { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
+        }
+
+        .orbit-ring:nth-child(2) .orbit-dot { animation-duration: 25s, 25s; }
+        .orbit-ring:nth-child(2) .orbit-dot.mongke { animation-name: orbit2; }
+        @keyframes orbit2 {
+            from { transform: rotate(0deg) translateX(175px) rotate(0deg); }
+            to { transform: rotate(360deg) translateX(175px) rotate(-360deg); }
+        }
+
+        /* Section Styles */
+        section {
+            padding: 6rem 2rem;
+            position: relative;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            margin-bottom: 1rem;
+            color: var(--color-text);
+        }
+
+        .section-header p {
+            color: var(--color-text-muted);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* What is Kurultai */
+        .what-is {
+            background: var(--color-bg-elevated);
+        }
+
+        .metaphor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .metaphor-card {
+            background: var(--color-bg-card);
+            border-radius: 16px;
+            padding: 2.5rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .metaphor-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(201, 162, 39, 0.2);
+            box-shadow: var(--shadow-gold);
+        }
+
+        .metaphor-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .metaphor-card:nth-child(1) .metaphor-icon { background: rgba(201, 162, 39, 0.15); }
+        .metaphor-card:nth-child(2) .metaphor-icon { background: rgba(74, 144, 217, 0.15); }
+        .metaphor-card:nth-child(3) .metaphor-icon { background: rgba(26, 188, 156, 0.15); }
+
+        .metaphor-card h3 {
+            font-size: 1.35rem;
+            margin-bottom: 0.75rem;
+            color: var(--color-text);
+        }
+
+        .metaphor-card p {
+            color: var(--color-text-muted);
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        /* Meet the Team */
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .agent-card {
+            background: var(--color-bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .agent-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--agent-color);
+            opacity: 0.8;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--agent-color);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3), 0 0 30px var(--agent-glow);
+        }
+
+        .agent-card.kublai { --agent-color: var(--color-kublai); --agent-glow: rgba(201, 162, 39, 0.15); }
+        .agent-card.mongke { --agent-color: var(--color-mongke); --agent-glow: rgba(74, 144, 217, 0.15); }
+        .agent-card.chagatai { --agent-color: var(--color-chagatai); --agent-glow: rgba(124, 179, 66, 0.15); }
+        .agent-card.temujin { --agent-color: var(--color-temujin); --agent-glow: rgba(231, 76, 60, 0.15); }
+        .agent-card.jochi { --agent-color: var(--color-jochi); --agent-glow: rgba(156, 89, 182, 0.15); }
+        .agent-card.ogedei { --agent-color: var(--color-ogedei); --agent-glow: rgba(26, 188, 156, 0.15); }
+
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .agent-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--agent-color), rgba(255,255,255,0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            border: 3px solid var(--agent-color);
+        }
+
+        .agent-title h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .agent-role {
+            color: var(--agent-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .agent-description {
+            color: var(--color-text-muted);
+            margin-bottom: 1.25rem;
+            font-size: 0.95rem;
+        }
+
+        .agent-capabilities {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .capability-tag {
+            padding: 0.35rem 0.85rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 100px;
+            font-size: 0.8rem;
+            color: var(--color-text-muted);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        /* How It Works */
+        .how-it-works {
+            background: var(--color-bg-elevated);
+        }
+
+        .workflow-diagram {
+            background: var(--color-bg-card);
+            border-radius: 24px;
+            padding: 3rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 3rem;
+        }
+
+        .workflow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .workflow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .workflow-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 2.5rem;
+            top: 4.5rem;
+            width: 2px;
+            height: calc(100% - 3rem);
+            background: linear-gradient(to bottom, var(--color-accent-gold), transparent);
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-accent-gold), #b8941f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--color-bg);
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .step-content h4 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--color-text);
+        }
+
+        .step-content p {
+            color: var(--color-text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Memory System */
+        .memory-visualization {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 2rem;
+            align-items: center;
+            margin: 3rem 0;
+        }
+
+        .memory-tier {
+            background: var(--color-bg-card);
+            border-radius: 20px;
+            padding: 2.5rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+        }
+
+        .memory-tier.personal {
+            border-color: rgba(201, 162, 39, 0.2);
+        }
+
+        .memory-tier.operational {
+            border-color: rgba(0, 140, 193, 0.2);
+        }
+
+        .memory-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        .personal .memory-icon {
+            background: rgba(201, 162, 39, 0.15);
+        }
+
+        .operational .memory-icon {
+            background: rgba(0, 140, 193, 0.15);
+        }
+
+        .memory-tier h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .memory-tier.personal h3 {
+            color: var(--color-accent-gold);
+        }
+
+        .memory-tier.operational h3 {
+            color: var(--color-neo4j);
+        }
+
+        .memory-tier > p {
+            color: var(--color-text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .memory-features {
+            text-align: left;
+            list-style: none;
+        }
+
+        .memory-features li {
+            padding: 0.5rem 0;
+            color: var(--color-text-muted);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .memory-features li::before {
+            content: '✓';
+            color: var(--color-accent-gold);
+            font-weight: 700;
+        }
+
+        .operational .memory-features li::before {
+            color: var(--color-neo4j);
+        }
+
+        .memory-arrow {
+            font-size: 2rem;
+            color: var(--color-text-muted);
+        }
+
+        .privacy-notice {
+            background: rgba(201, 162, 39, 0.08);
+            border: 1px solid rgba(201, 162, 39, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .privacy-notice .icon {
+            font-size: 1.5rem;
+        }
+
+        .privacy-notice p {
+            color: var(--color-text-muted);
+            font-size: 0.95rem;
+        }
+
+        .privacy-notice strong {
+            color: var(--color-accent-gold);
+        }
+
+        /* Architecture Diagrams */
+        .architecture {
+            background: var(--color-bg-elevated);
+        }
+
+        .diagram-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .diagram-tab {
+            padding: 0.75rem 1.5rem;
+            background: var(--color-bg-card);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 100px;
+            color: var(--color-text-muted);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+
+        .diagram-tab:hover {
+            border-color: rgba(201, 162, 39, 0.3);
+            color: var(--color-text);
+        }
+
+        .diagram-tab.active {
+            background: var(--color-accent-gold);
+            color: var(--color-bg);
+            border-color: var(--color-accent-gold);
+        }
+
+        .diagram-content {
+            background: var(--color-bg-card);
+            border-radius: 24px;
+            padding: 3rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            min-height: 500px;
+        }
+
+        .diagram-panel {
+            display: none;
+        }
+
+        .diagram-panel.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* System Overview Diagram */
+        .system-overview {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .kublai-center {
+            background: linear-gradient(135deg, rgba(201, 162, 39, 0.2), rgba(201, 162, 39, 0.05));
+            border: 2px solid var(--color-kublai);
+            border-radius: 24px;
+            padding: 2rem 3rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .kublai-center .agent-avatar {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            font-size: 2rem;
+        }
+
+        .kublai-center h4 {
+            font-size: 1.5rem;
+            color: var(--color-kublai);
+        }
+
+        .kublai-center p {
+            color: var(--color-text-muted);
+            font-size: 0.9rem;
+        }
+
+        .specialists-row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .specialist-node {
+            background: var(--color-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 1.25rem;
+            text-align: center;
+            min-width: 140px;
+            transition: all 0.3s ease;
+        }
+
+        .specialist-node:hover {
+            transform: translateY(-4px);
+            border-color: var(--agent-color);
+            box-shadow: 0 0 20px var(--agent-glow);
+        }
+
+        .specialist-node .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--agent-color), rgba(255,255,255,0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            margin: 0 auto 0.75rem;
+            font-size: 1.1rem;
+        }
+
+        .specialist-node h5 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .specialist-node p {
+            font-size: 0.8rem;
+            color: var(--color-text-muted);
+        }
+
+        .connection-lines {
+            display: flex;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .connection-line {
+            width: 2px;
+            height: 40px;
+            background: linear-gradient(to bottom, var(--color-kublai), transparent);
+        }
+
+        /* Two-Tier Memory Diagram */
+        .memory-diagram {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+
+        .memory-column {
+            background: var(--color-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .memory-column h4 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .memory-column.personal-tier h4 {
+            color: var(--color-accent-gold);
+        }
+
+        .memory-column.operational-tier h4 {
+            color: var(--color-neo4j);
+        }
+
+        .memory-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .memory-item {
+            background: var(--color-bg-card);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .memory-item .icon {
+            font-size: 1.25rem;
+        }
+
+        .memory-item span {
+            font-size: 0.9rem;
+            color: var(--color-text-muted);
+        }
+
+        /* Task Flow Diagram */
+        .task-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .flow-stage {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .flow-node {
+            background: var(--color-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 200px;
+        }
+
+        .flow-node .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--agent-color), rgba(255,255,255,0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 0.85rem;
+        }
+
+        .flow-arrow {
+            color: var(--color-text-muted);
+            font-size: 1.5rem;
+        }
+
+        .flow-action {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+            font-style: italic;
+        }
+
+        /* Messaging Diagram */
+        .messaging-diagram {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .messaging-agents {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .messaging-agent {
+            background: var(--color-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 150px;
+        }
+
+        .messaging-agent .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--agent-color), rgba(255,255,255,0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 0.85rem;
+        }
+
+        .messaging-center {
+            background: linear-gradient(135deg, rgba(0, 140, 193, 0.15), rgba(0, 140, 193, 0.05));
+            border: 2px solid var(--color-neo4j);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .messaging-center h4 {
+            color: var(--color-neo4j);
+            margin-bottom: 1rem;
+        }
+
+        .message-types {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .message-type {
+            background: var(--color-bg);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--color-bg);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding: 4rem 2rem 2rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            font-family: 'Cinzel', serif;
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--color-accent-gold);
+            margin-bottom: 1rem;
+        }
+
+        .footer-tagline {
+            color: var(--color-text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--color-accent-gold);
+        }
+
+        .footer-copy {
+            color: var(--color-text-muted);
+            font-size: 0.85rem;
+            opacity: 0.6;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            nav {
+                padding: 1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .hero {
+                padding: 6rem 1.5rem 3rem;
+            }
+
+            section {
+                padding: 4rem 1.5rem;
+            }
+
+            .memory-visualization {
+                grid-template-columns: 1fr;
+            }
+
+            .memory-arrow {
+                transform: rotate(90deg);
+            }
+
+            .memory-diagram {
+                grid-template-columns: 1fr;
+            }
+
+            .messaging-diagram {
+                grid-template-columns: 1fr;
+            }
+
+            .workflow-step:not(:last-child)::after {
+                left: 2rem;
+            }
+
+            .agent-orbit {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <a href="#" class="logo">
+            <div class="logo-icon">⚡</div>
+            Kurultai
+        </a>
+        <ul class="nav-links">
+            <li><a href="#what-is">What is Kurultai?</a></li>
+            <li><a href="#team">The Team</a></li>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="#memory">Memory</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+        </ul>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="agent-orbit">
+            <div class="orbit-ring">
+                <div class="orbit-dot kublai"></div>
+            </div>
+            <div class="orbit-ring">
+                <div class="orbit-dot mongke"></div>
+            </div>
+            <div class="orbit-ring">
+                <div class="orbit-dot chagatai"></div>
+                <div class="orbit-dot temujin"></div>
+                <div class="orbit-dot jochi"></div>
+                <div class="orbit-dot ogedei"></div>
+            </div>
+        </div>
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span>⚡</span>
+                Multi-Agent AI System
+            </div>
+            <h1>A Council of Specialized AI Agents</h1>
+            <p class="hero-subtitle">
+                Kurultai brings together six specialized AI agents working in harmony,
+                combining personal attention with collective intelligence to solve complex problems.
+            </p>
+            <div class="hero-cta">
+                <a href="#what-is" class="btn btn-primary">Discover Kurultai</a>
+                <a href="#architecture" class="btn btn-secondary">View Architecture</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- What is Kurultai -->
+    <section class="what-is" id="what-is">
+        <div class="container">
+            <div class="section-header">
+                <h2>What is Kurultai?</h2>
+                <p>Think of Kurultai as a prestigious Research Institute where a Director coordinates with department heads to solve complex problems.</p>
+            </div>
+            <div class="metaphor-grid">
+                <div class="metaphor-card">
+                    <div class="metaphor-icon">🏛️</div>
+                    <h3>The Director</h3>
+                    <p><strong>Kublai</strong> serves as the Institute Director—the first point of contact who understands your needs and coordinates with the right specialists. Every conversation starts and ends with Kublai.</p>
+                </div>
+                <div class="metaphor-card">
+                    <div class="metaphor-icon">👥</div>
+                    <h3>Department Heads</h3>
+                    <p>Five specialist agents serve as department heads: <strong>Möngke</strong> (Research), <strong>Chagatai</strong> (Writing), <strong>Temüjin</strong> (Development), <strong>Jochi</strong> (Analysis), and <strong>Ögedei</strong> (Operations).</p>
+                </div>
+                <div class="metaphor-card">
+                    <div class="metaphor-icon">📚</div>
+                    <h3>The Central Library</h3>
+                    <p><strong>Neo4j</strong> acts as the Institute's Central Library—a shared knowledge base where all agents store and retrieve operational insights, ensuring nothing is ever lost.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Meet the Team -->
+    <section id="team">
+        <div class="container">
+            <div class="section-header">
+                <h2>Meet the Team</h2>
+                <p>Six specialized agents, each with unique expertise, working together as a unified council.</p>
+            </div>
+            <div class="team-grid">
+                <div class="agent-card kublai">
+                    <div class="agent-header">
+                        <div class="agent-avatar">K</div>
+                        <div class="agent-title">
+                            <h3>Kublai</h3>
+                            <div class="agent-role">Director / Orchestrator</div>
+                        </div>
+                    </div>
+                    <p class="agent-description">
+                        The main agent and your primary point of contact. Kublai receives all incoming requests, maintains personal context, and coordinates with specialists to deliver comprehensive solutions.
+                    </p>
+                    <div class="agent-capabilities">
+                        <span class="capability-tag">Coordination</span>
+                        <span class="capability-tag">Synthesis</span>
+                        <span class="capability-tag">Privacy Review</span>
+                    </div>
+                </div>
+
+                <div class="agent-card mongke">
+                    <div class="agent-header">
+                        <div class="agent-avatar">M</div>
+                        <div class="agent-title">
+                            <h3>Möngke</h3>
+                            <div class="agent-role">Research Specialist</div>
+                        </div>
+                    </div>
+                    <p class="agent-description">
+                        The research department head. Möngke excels at gathering information, exploring topics deeply, and building comprehensive knowledge bases on any subject.
+                    </p>
+                    <div class="agent-capabilities">
+                        <span class="capability-tag">Web Research</span>
+                        <span class="capability-tag">Knowledge Synthesis</span>
+                        <span class="capability-tag">Trend Analysis</span>
+                    </div>
+                </div>
+
+                <div class="agent-card chagatai">
+                    <div class="agent-header">
+                        <div class="agent-avatar">C</div>
+                        <div class="agent-title">
+                            <h3>Chagatai</h3>
+                            <div class="agent-role">Writing Specialist</div>
+                        </div>
+                    </div>
+                    <p class="agent-description">
+                        The communications department head. Chagatai crafts compelling narratives, creates documentation, and transforms complex ideas into clear, engaging content.
+                    </p>
+                    <div class="agent-capabilities">
+                        <span class="capability-tag">Content Creation</span>
+                        <span class="capability-tag">Documentation</span>
+                        <span class="capability-tag">Copywriting</span>
+                    </div>
+                </div>
+
+                <div class="agent-card temujin">
+                    <div class="agent-header">
+                        <div class="agent-avatar">T</div>
+                        <div class="agent-title">
+                            <h3>Temüjin</h3>
+                            <div class="agent-role">Development Specialist</div>
+                        </div>
+                    </div>
+                    <p class="agent-description">
+                        The engineering department head. Temüjin writes code, reviews implementations, architects systems, and ensures technical excellence across all projects.
+                    </p>
+                    <div class="agent-capabilities">
+                        <span class="capability-tag">Code Writing</span>
+                        <span class="capability-tag">Architecture</span>
+                        <span class="capability-tag">Code Review</span>
+                    </div>
+                </div>
+
+                <div class="agent-card jochi">
+                    <div class="agent-header">
+                        <div class="agent-avatar">J</div>
+                        <div class="agent-title">
+                            <h3>Jochi</h3>
+                            <div class="agent-role">Analysis Specialist</div>
+                        </div>
+                    </div>
+                    <p class="agent-description">
+                        The analytics department head. Jochi examines data, identifies patterns, performs critical reviews, and provides deep insights that drive better decisions.
+                    </p>
+                    <div class="agent-capabilities">
+                        <span class="capability-tag">Data Analysis</span>
+                        <span class="capability-tag">Critical Review</span>
+                        <span class="capability-tag">Pattern Recognition</span>
+                    </div>
+                </div>
+
+                <div class="agent-card ogedei">
+                    <div class="agent-header">
+                        <div class="agent-avatar">Ö</div>
+                        <div class="agent-title">
+                            <h3>Ögedei</h3>
+                            <div class="agent-role">Operations Specialist</div>
+                        </div>
+                    </div>
+                    <p class="agent-description">
+                        The operations department head. Ögedei manages infrastructure, monitors system health, handles deployments, and ensures everything runs smoothly 24/7.
+                    </p>
+                    <div class="agent-capabilities">
+                        <span class="capability-tag">DevOps</span>
+                        <span class="capability-tag">Monitoring</span>
+                        <span class="capability-tag">Automation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <h2>How It Works</h2>
+                <p>A seamless delegation flow that ensures your requests reach the right expertise.</p>
+            </div>
+            <div class="workflow-diagram">
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>You Send a Request</h4>
+                            <p>Your message arrives at Kublai, the main agent. Kublai reads personal context from files and queries operational knowledge from Neo4j.</p>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Kublai Creates a Task</h4>
+                            <p>Kublai creates a Task node in Neo4j with status "pending" and identifies which specialist agent is best suited for the work.</p>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Delegation via Agent-to-Agent Messaging</h4>
+                            <p>Kublai sends a message directly to the specialist agent using OpenClaw's native agentToAgent messaging capability.</p>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h4>Specialist Claims & Completes</h4>
+                            <p>The specialist claims the task (status: "in_progress"), completes the work, stores results in Neo4j, and notifies Kublai.</p>
+                        </div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h4>Kublai Synthesizes & Responds</h4>
+                            <p>Kublai marks the task complete, synthesizes the specialist's work with personal context, and delivers the final response to you.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Memory System -->
+    <section id="memory">
+        <div class="container">
+            <div class="section-header">
+                <h2>The Memory System</h2>
+                <p>Two tiers of memory working together—personal context for Kublai, operational knowledge for all.</p>
+            </div>
+            <div class="memory-visualization">
+                <div class="memory-tier personal">
+                    <div class="memory-icon">👤</div>
+                    <h3>Personal Memory</h3>
+                    <p>File-based storage</p>
+                    <ul class="memory-features">
+                        <li>User preferences</li>
+                        <li>Personal history</li>
+                        <li>Friend names & relationships</li>
+                        <li>Private context</li>
+                        <li>Kublai-only access</li>
+                    </ul>
+                </div>
+                <div class="memory-arrow">⇄</div>
+                <div class="memory-tier operational">
+                    <div class="memory-icon">🌐</div>
+                    <h3>Operational Memory</h3>
+                    <p>Neo4j graph database</p>
+                    <ul class="memory-features">
+                        <li>Research findings</li>
+                        <li>Code patterns</li>
+                        <li>Analysis results</li>
+                        <li>Process insights</li>
+                        <li>All agents can access</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="privacy-notice">
+                <span class="icon">🔒</span>
+                <p><strong>Privacy First:</strong> Kublai reviews all content for private information before delegating. "My friend Sarah's startup" becomes "a startup in X sector" when shared with specialists.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Diagrams -->
+    <section class="architecture" id="architecture">
+        <div class="container">
+            <div class="section-header">
+                <h2>System Architecture</h2>
+                <p>Visual diagrams showing how Kurultai's components work together.</p>
+            </div>
+            <div class="diagram-tabs">
+                <button class="diagram-tab active" data-tab="overview">System Overview</button>
+                <button class="diagram-tab" data-tab="memory">Two-Tier Memory</button>
+                <button class="diagram-tab" data-tab="flow">Task Delegation</button>
+                <button class="diagram-tab" data-tab="messaging">Agent Messaging</button>
+            </div>
+            <div class="diagram-content">
+                <!-- System Overview -->
+                <div class="diagram-panel active" id="overview-panel">
+                    <div class="system-overview">
+                        <div class="kublai-center">
+                            <div class="agent-avatar" style="--agent-color: var(--color-kublai);">K</div>
+                            <h4>Kublai</h4>
+                            <p>Director & Main Agent</p>
+                        </div>
+                        <div class="connection-lines">
+                            <div class="connection-line"></div>
+                            <div class="connection-line"></div>
+                            <div class="connection-line"></div>
+                            <div class="connection-line"></div>
+                            <div class="connection-line"></div>
+                        </div>
+                        <div class="specialists-row">
+                            <div class="specialist-node mongke" style="--agent-color: var(--color-mongke); --agent-glow: rgba(74, 144, 217, 0.15);">
+                                <div class="avatar">M</div>
+                                <h5>Möngke</h5>
+                                <p>Research</p>
+                            </div>
+                            <div class="specialist-node chagatai" style="--agent-color: var(--color-chagatai); --agent-glow: rgba(124, 179, 66, 0.15);">
+                                <div class="avatar">C</div>
+                                <h5>Chagatai</h5>
+                                <p>Writing</p>
+                            </div>
+                            <div class="specialist-node temujin" style="--agent-color: var(--color-temujin); --agent-glow: rgba(231, 76, 60, 0.15);">
+                                <div class="avatar">T</div>
+                                <h5>Temüjin</h5>
+                                <p>Development</p>
+                            </div>
+                            <div class="specialist-node jochi" style="--agent-color: var(--color-jochi); --agent-glow: rgba(156, 89, 182, 0.15);">
+                                <div class="avatar">J</div>
+                                <h5>Jochi</h5>
+                                <p>Analysis</p>
+                            </div>
+                            <div class="specialist-node ogedei" style="--agent-color: var(--color-ogedei); --agent-glow: rgba(26, 188, 156, 0.15);">
+                                <div class="avatar">Ö</div>
+                                <h5>Ögedei</h5>
+                                <p>Operations</p>
+                            </div>
+                        </div>
+                        <div class="connection-lines">
+                            <div class="connection-line" style="background: linear-gradient(to bottom, transparent, var(--color-neo4j));"></div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, rgba(0, 140, 193, 0.2), rgba(0, 140, 193, 0.05)); border: 2px solid var(--color-neo4j); border-radius: 16px; padding: 1.5rem 3rem;">
+                            <h4 style="color: var(--color-neo4j); margin-bottom: 0.5rem;">📚 Neo4j</h4>
+                            <p style="color: var(--color-text-muted); font-size: 0.9rem;">Shared Operational Memory</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Two-Tier Memory -->
+                <div class="diagram-panel" id="memory-panel">
+                    <div class="memory-diagram">
+                        <div class="memory-column personal-tier">
+                            <h4>👤 Personal Memory (Files)</h4>
+                            <div class="memory-stack">
+                                <div class="memory-item">
+                                    <span class="icon">📝</span>
+                                    <span>MEMORY.md - User preferences</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">📋</span>
+                                    <span>Project context files</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">🔒</span>
+                                    <span>Private information</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">👥</span>
+                                    <span>Personal relationships</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">📌</span>
+                                    <span>Conversation history</span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                                <p style="font-size: 0.85rem; color: var(--color-text-muted);"><strong style="color: var(--color-accent-gold);">Access:</strong> Kublai only</p>
+                            </div>
+                        </div>
+                        <div class="memory-column operational-tier">
+                            <h4>🌐 Operational Memory (Neo4j)</h4>
+                            <div class="memory-stack">
+                                <div class="memory-item">
+                                    <span class="icon">📊</span>
+                                    <span>Research findings</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">💻</span>
+                                    <span>Code patterns & snippets</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">📈</span>
+                                    <span>Analysis results</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">⚙️</span>
+                                    <span>Process documentation</span>
+                                </div>
+                                <div class="memory-item">
+                                    <span class="icon">✅</span>
+                                    <span>Task tracking</span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                                <p style="font-size: 0.85rem; color: var(--color-text-muted);"><strong style="color: var(--color-neo4j);">Access:</strong> All 6 agents</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Task Flow -->
+                <div class="diagram-panel" id="flow-panel">
+                    <div class="task-flow">
+                        <div class="flow-stage">
+                            <div class="flow-node" style="--agent-color: var(--color-kublai);">
+                                <div class="avatar">K</div>
+                                <div>
+                                    <strong>Kublai</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Receives request</p>
+                                </div>
+                            </div>
+                            <span class="flow-arrow">→</span>
+                            <div class="flow-action">Creates Task in Neo4j</div>
+                        </div>
+                        <div class="flow-stage">
+                            <div class="flow-node" style="--agent-color: var(--color-kublai);">
+                                <div class="avatar">K</div>
+                                <div>
+                                    <strong>Kublai</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Delegates task</p>
+                                </div>
+                            </div>
+                            <span class="flow-arrow">→</span>
+                            <div class="flow-action">agentToAgent message</div>
+                            <span class="flow-arrow">→</span>
+                            <div class="flow-node" style="--agent-color: var(--color-mongke);">
+                                <div class="avatar">M</div>
+                                <div>
+                                    <strong>Möngke</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Claims task</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flow-stage">
+                            <div class="flow-node" style="--agent-color: var(--color-mongke);">
+                                <div class="avatar">M</div>
+                                <div>
+                                    <strong>Möngke</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Completes work</p>
+                                </div>
+                            </div>
+                            <span class="flow-arrow">→</span>
+                            <div class="flow-action">Stores results in Neo4j</div>
+                            <span class="flow-arrow">→</span>
+                            <div class="flow-action">Notifies Kublai</div>
+                        </div>
+                        <div class="flow-stage">
+                            <div class="flow-node" style="--agent-color: var(--color-kublai);">
+                                <div class="avatar">K</div>
+                                <div>
+                                    <strong>Kublai</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Synthesizes response</p>
+                                </div>
+                            </div>
+                            <span class="flow-arrow">→</span>
+                            <div class="flow-action">Delivers to user</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Messaging -->
+                <div class="diagram-panel" id="messaging-panel">
+                    <div class="messaging-diagram">
+                        <div class="messaging-agents">
+                            <div class="messaging-agent" style="--agent-color: var(--color-kublai);">
+                                <div class="avatar">K</div>
+                                <div>
+                                    <strong>Kublai</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Sender</p>
+                                </div>
+                            </div>
+                            <div class="messaging-agent" style="--agent-color: var(--color-mongke);">
+                                <div class="avatar">M</div>
+                                <div>
+                                    <strong>Möngke</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Receiver</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="messaging-center">
+                            <h4>📡 Agent-to-Agent Messaging</h4>
+                            <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">OpenClaw native capability</p>
+                            <div class="message-types">
+                                <div class="message-type">Task Delegation</div>
+                                <div class="message-type">Status Updates</div>
+                                <div class="message-type">Completion Notifications</div>
+                                <div class="message-type">Direct Queries</div>
+                            </div>
+                        </div>
+                        <div class="messaging-agents">
+                            <div class="messaging-agent" style="--agent-color: var(--color-temujin);">
+                                <div class="avatar">T</div>
+                                <div>
+                                    <strong>Temüjin</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Receiver</p>
+                                </div>
+                            </div>
+                            <div class="messaging-agent" style="--agent-color: var(--color-chagatai);">
+                                <div class="avatar">C</div>
+                                <div>
+                                    <strong>Chagatai</strong>
+                                    <p style="font-size: 0.8rem; color: var(--color-text-muted);">Receiver</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 2rem; padding: 1.5rem; background: var(--color-bg); border-radius: 12px; text-align: center;">
+                        <p style="color: var(--color-text-muted); font-size: 0.9rem;">
+                            <strong style="color: var(--color-neo4j);">Why not polling?</strong>
+                            OpenClaw agents use native <code style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.5rem; border-radius: 4px;">agentToAgent</code>
+                            messaging instead of task queue polling, enabling direct, efficient communication between agents.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">⚡ Kurultai</div>
+            <p class="footer-tagline">A council of specialized AI agents working in harmony</p>
+            <div class="footer-links">
+                <a href="#what-is">About</a>
+                <a href="#team">Team</a>
+                <a href="#architecture">Architecture</a>
+            </div>
+            <p class="footer-copy">Built with OpenClaw • Powered by Neo4j</p>
+        </div>
+    </footer>
+
+    <script>
+        // Tab switching for architecture diagrams
+        document.querySelectorAll('.diagram-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active from all tabs
+                document.querySelectorAll('.diagram-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.diagram-panel').forEach(p => p.classList.remove('active'));
+
+                // Add active to clicked tab
+                tab.classList.add('active');
+
+                // Show corresponding panel
+                const tabName = tab.getAttribute('data-tab');
+                document.getElementById(`${tabName}-panel`).classList.add('active');
+            });
+        });
+
+        // Smooth scroll for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add scroll effect to navigation
+        window.addEventListener('scroll', () => {
+            const nav = document.querySelector('nav');
+            if (window.scrollY > 100) {
+                nav.style.background = 'rgba(10, 10, 15, 0.95)';
+                nav.style.backdropFilter = 'blur(10px)';
+            } else {
+                nav.style.background = 'linear-gradient(to bottom, rgba(10,10,15,0.95), transparent)';
+                nav.style.backdropFilter = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

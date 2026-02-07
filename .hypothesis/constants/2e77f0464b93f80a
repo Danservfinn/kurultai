@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/failover_monitor.py
+# hypothesis_version: 6.150.2
+
+['=', 'FailoverMonitor', '__main__', '_generate_id', '_now', '_session', 'activated', 'activated_at', 'agent_name_idx', 'already exists', 'current_event_id', 'current_router', 'deactivated', 'deactivated_at', 'duration_seconds', 'emergency', 'event_id', 'failover_active', 'health', 'id', 'infra_heartbeat', 'is_active', 'kublai_available', 'kublai_failures', 'last_heartbeat', 'main', 'messages_queued', 'messages_routed', 'ops', 'queue', 'reason', 'research', 'threshold_seconds', 'to_native', 'triggered_by', 'urgent']

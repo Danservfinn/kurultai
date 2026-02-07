@@ -14,6 +14,7 @@ Usage:
     )
 """
 
+import random
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
@@ -1024,6 +1025,166 @@ SEMANTIC_SIMILARITY_VECTORS = {
 # Export All
 # =============================================================================
 
+# =============================================================================
+# Faker-Based Test Data Generators
+# =============================================================================
+
+try:
+    from faker import Faker
+
+    fake = Faker()
+
+    class TestDataGenerator:
+        """Generates realistic test data for Kurultai scenarios."""
+
+        TASK_TYPES = ["code", "research", "writing", "analysis", "security", "ops"]
+        TASK_STATUSES = ["pending", "in_progress", "completed", "failed", "blocked"]
+        TASK_PRIORITIES = ["low", "normal", "high", "critical"]
+        AGENT_IDS = ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
+
+        @staticmethod
+        def simple_task() -> Dict[str, Any]:
+            """Single task with no dependencies."""
+            return {
+                "id": fake.uuid4(),
+                "title": fake.sentence(),
+                "description": fake.paragraph(),
+                "type": random.choice(TestDataGenerator.TASK_TYPES),
+                "complexity": random.uniform(0.1, 0.4),
+                "status": "pending",
+                "priority": random.choice(TestDataGenerator.TASK_PRIORITIES),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+        @staticmethod
+        def complex_dag(
+            num_tasks: int = 50, dependency_ratio: float = 0.3
+        ) -> List[Dict[str, Any]]:
+            """Generate tasks with dependencies forming a valid DAG.
+
+            Args:
+                num_tasks: Number of tasks to generate
+                dependency_ratio: Ratio of dependencies per task (0.0 to 1.0)
+
+            Returns:
+                List of task dictionaries with valid DAG structure (no cycles)
+            """
+            import random
+
+            tasks = [TestDataGenerator.simple_task() for _ in range(num_tasks)]
+
+            # Add dependencies ensuring no cycles
+            for i in range(num_tasks):
+                # Can only depend on tasks with lower index
+                if i > 0:
+                    max_deps = min(int(i * dependency_ratio), i)
+                    num_deps = random.randint(0, max_deps)
+                    if num_deps > 0:
+                        # Select random tasks from earlier in the list
+                        dep_indices = random.sample(range(i), min(num_deps, i))
+                        tasks[i]["dependencies"] = [
+                            tasks[idx]["id"] for idx in dep_indices
+                        ]
+                        tasks[i]["blocked_by"] = tasks[i].get("dependencies", [])
+
+            return tasks
+
+        @staticmethod
+        def multi_agent_scenario() -> Dict[str, Any]:
+            """Scenario requiring 3+ agents."""
+            return {
+                "title": "Build a REST API with documentation",
+                "phases": [
+                    {"agent": "temujin", "task": "Implement API endpoints"},
+                    {"agent": "chagatai", "task": "Write API documentation"},
+                    {"agent": "jochi", "task": "Security review"},
+                ],
+                "expected_duration_seconds": random.randint(60, 300),
+            }
+
+        @staticmethod
+        def user_message() -> str:
+            """Generate a realistic user message."""
+            templates = [
+                f"{fake.sentence()} Please {fake.verb()} the {fake.noun()}.",
+                f"Can you help me {fake.verb()} {fake.word()}?",
+                f"I need to {fake.verb()} {fake.sentence()}",
+                f"Implement {fake.word()} with {fake.word()}",
+            ]
+            return random.choice(templates)
+
+        @staticmethod
+        def agent_heartbeat(agent_id: Optional[str] = None) -> Dict[str, Any]:
+            """Generate agent heartbeat data."""
+            return {
+                "agent_id": agent_id or random.choice(TestDataGenerator.AGENT_IDS),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": random.choice(["healthy", "stale", "unavailable"]),
+                "tasks_completed": random.randint(0, 100),
+                "tasks_failed": random.randint(0, 10),
+            }
+
+        @staticmethod
+        def notification(
+            target_agent: Optional[str] = None, source_agent: Optional[str] = None
+        ) -> Dict[str, Any]:
+            """Generate a notification."""
+            return {
+                "notification_id": fake.uuid4(),
+                "target_agent": target_agent or random.choice(
+                    TestDataGenerator.AGENT_IDS[1:]  # Not kublai
+                ),
+                "source_agent": source_agent or random.choice(TestDataGenerator.AGENT_IDS),
+                "type": random.choice(
+                    ["task_delegated", "task_completed", "task_failed", "agent_status_change"]
+                ),
+                "message": fake.sentence(),
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+        @staticmethod
+        def batch_tasks(count: int = 10) -> List[Dict[str, Any]]:
+            """Generate a batch of tasks."""
+            return [TestDataGenerator.simple_task() for _ in range(count)]
+
+        @staticmethod
+        def workflow_trace(steps: int = 5) -> List[Dict[str, Any]]:
+            """Generate a workflow trace with multiple steps."""
+            trace = []
+            for i in range(steps):
+                trace.append(
+                    {
+                        "step": i + 1,
+                        "agent": random.choice(TestDataGenerator.AGENT_IDS),
+                        "action": random.choice(
+                            ["received", "processed", "delegated", "completed"]
+                        ),
+                        "timestamp": (
+                            datetime.now(timezone.utc) + timedelta(seconds=i * 5)
+                        ).isoformat(),
+                        "details": fake.sentence(),
+                    }
+                )
+            return trace
+
+except ImportError:
+    # Faker not installed, provide stub
+    class TestDataGenerator:
+        """Stub when faker is not installed."""
+
+        @staticmethod
+        def simple_task() -> Dict[str, Any]:
+            return {"id": "stub-id", "title": "Stub task"}
+
+    import warnings
+
+    warnings.warn(
+        "faker not installed. Install with: pip install faker. "
+        "Using stub TestDataGenerator."
+    )
+
+
 __all__ = [
     # Task data
     'SAMPLE_TASK_DATA',
@@ -1062,5 +1223,8 @@ __all__ = [
     'LARGE_DAG_CONFIG',
     'CHAOS_SCENARIOS',
     'CORRUPTION_SCENARIOS',
-    'SEMANTIC_SIMILARITY_VECTORS'
+    'SEMANTIC_SIMILARITY_VECTORS',
+    # Faker-based generators
+    'TestDataGenerator',
+    'fake',
 ]

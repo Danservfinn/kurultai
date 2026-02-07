@@ -19,36 +19,53 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# E.164 phone number validation for Signal operations
+PHONE_E164_REGEX = r'^\+[1-9]\d{1,14}$'
 
-class OperationalMemory:
-    """Operational memory interface for Neo4j operations."""
 
-    def __init__(self, driver=None):
-        """Initialize with Neo4j driver."""
-        self._driver = driver
+def validate_phone_e164(phone: str) -> bool:
+    """Validate phone number against E.164 format.
 
-    def execute_query(self, query: str, parameters: Dict[str, Any] = None) -> List[Dict]:
-        """Execute a Cypher query with parameterized inputs.
+    E.164 format: + followed by 1-15 digits, first digit non-zero.
+    Example: +15165643945
 
-        Args:
-            query: Cypher query string
-            parameters: Query parameters for safe interpolation
+    Args:
+        phone: Phone number string to validate
 
-        Returns:
-            List of result records as dictionaries
-        """
-        if self._driver is None:
-            logger.warning("No Neo4j driver configured, query not executed")
-            return []
+    Returns:
+        True if valid E.164 format
 
-        parameters = parameters or {}
-        try:
-            with self._driver.session() as session:
-                result = session.run(query, parameters)
-                return [record.data() for record in result]
-        except Exception as e:
-            logger.error(f"Neo4j query failed: {e}")
-            return []
+    Raises:
+        ValueError: If phone number is invalid E.164 format
+    """
+    if not re.match(PHONE_E164_REGEX, phone):
+        raise ValueError(
+            f"Invalid phone number format. Must be E.164 (e.g. +15165643945), got: {phone[:3]}..."
+        )
+    return True
+
+
+try:
+    from openclaw_memory import OperationalMemory
+except ImportError:
+    # Fallback: minimal stub when openclaw_memory is not available
+    class OperationalMemory:
+        """Minimal stub — import openclaw_memory for full implementation."""
+        def __init__(self, driver=None):
+            self._driver = driver
+
+        def execute_query(self, query: str, parameters: Dict[str, Any] = None) -> List[Dict]:
+            if self._driver is None:
+                logger.warning("No Neo4j driver configured, query not executed")
+                return []
+            parameters = parameters or {}
+            try:
+                with self._driver.session() as session:
+                    result = session.run(query, parameters)
+                    return [record.data() for record in result]
+            except Exception as e:
+                logger.error(f"Neo4j query failed: {e}")
+                return []
 
 
 class DelegationProtocol:
@@ -94,8 +111,8 @@ class DelegationProtocol:
         "analyst": "analyst",
         "analysis": "analyst",
         "performance": "analyst",
-        "investigate": "analyst",
         "metrics": "analyst",
+        "benchmark": "analyst",
         "ops": "ops",                  # Ögedei
         "deploy": "ops",
         "monitor": "ops",
@@ -199,7 +216,9 @@ class DelegationProtocol:
         api_key_patterns = [
             r'\b(?:api[_-]?key|apikey|token|secret|password|passwd|pwd)\s*[:=]\s*["\']?[\w\-]{16,}["\']?',
             r'\b(?:sk-|pk-|ak-|bearer)\s*[\w\-]{20,}',
-            r'\b[\w]{32,64}\b',  # Long hex strings (likely keys)
+            # Long hex strings (likely keys) - restricted to hex chars only
+            # Negative lookahead for UUID format to avoid false positives
+            r'\b(?![\w-]{8}-[\w-]{4}-[\w-]{4}-[\w-]{4}-[\w-]{12})[a-fA-F0-9]{32,64}\b',
         ]
         for pattern in api_key_patterns:
             sanitized = re.sub(pattern, '[API_KEY]', sanitized, flags=re.IGNORECASE)
@@ -322,7 +341,6 @@ class DelegationProtocol:
             id: $task_id,
             status: 'pending',
             from_user: $from_user,
-            original_description: $original_description,
             sanitized_description: $sanitized_description,
             task_type: $task_type,
             target_agent: $target_agent,
@@ -339,7 +357,6 @@ class DelegationProtocol:
         parameters = {
             "task_id": task_id,
             "from_user": from_user,
-            "original_description": description,
             "sanitized_description": sanitized_description,
             "task_type": task_type or "unknown",
             "target_agent": target_agent,
@@ -554,7 +571,11 @@ _(Completed by {agent_name})_"""
         return self.memory.execute_query(query)
 
     def check_agent_availability(self, agent: str) -> bool:
-        """Check if agent is available (heartbeat within last 5 min).
+        """Check if agent is available (infra heartbeat within 120s).
+
+        Uses the infra_heartbeat written by the sidecar every 30s.
+        Agent must have heartbeat within 120s (4 missed beats) to be
+        eligible for task routing.
 
         Args:
             agent: Agent ID to check
@@ -562,18 +583,19 @@ _(Completed by {agent_name})_"""
         Returns:
             True if agent is available
         """
-        five_minutes_ago = (datetime.utcnow() - timedelta(minutes=5)).isoformat() + "Z"
+        two_minutes_ago = (datetime.utcnow() - timedelta(seconds=120)).isoformat() + "Z"
 
         query = """
         MATCH (a:Agent {name: $agent})
-        WHERE a.last_heartbeat >= datetime($five_minutes_ago)
+        WHERE (a.infra_heartbeat >= datetime($threshold)
+               OR a.last_heartbeat >= datetime($threshold))
           AND a.status IN ['active', 'idle', 'available']
         RETURN a.name as name, a.status as status, a.last_heartbeat as last_heartbeat
         """
 
         parameters = {
             "agent": agent,
-            "five_minutes_ago": five_minutes_ago
+            "threshold": two_minutes_ago
         }
 
         result = self.memory.execute_query(query, parameters)

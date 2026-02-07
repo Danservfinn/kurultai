@@ -5,25 +5,55 @@ Detects distribution shifts in complexity score features using
 Population Stability Index (PSI). When drift is detected, thresholds
 may need recalibration.
 
-Uses CypherInjectionPrevention.sanitize_property_key() (B5 fix)
-to ensure safe Cypher queries when storing drift results in Neo4j.
-
 Author: Claude (Anthropic)
 Date: 2026-02-05
+Updated: 2026-02-06 (Removed cross-layer dependency)
 """
 
 import logging
 import math
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from tools.security.injection_prevention import (
-    CypherInjectionPrevention,
-    CypherInjectionError,
-)
 from tools.kurultai.complexity_auth import ComplexityAuthenticator
 
 logger = logging.getLogger(__name__)
+
+
+# -----------------------------------------------------------------------------
+# Minimal inline sanitization (no cross-layer dependency)
+# -----------------------------------------------------------------------------
+
+def _sanitize_property_key(key: str, max_length: int = 32) -> str:
+    """Sanitize a string for safe use as a Neo4j property key.
+
+    Strips non-alphanumeric characters, converts to lowercase,
+    and truncates to max_length. This is a minimal implementation
+    to keep drift_detector self-contained within tools/kurultai/.
+
+    Args:
+        key: The property key to sanitize.
+        max_length: Maximum length for the sanitized key.
+
+    Returns:
+        A safe string for use as a Neo4j property key.
+    """
+    # Remove all characters except alphanumeric and underscore
+    safe = re.sub(r'[^a-zA-Z0-9_]', '_', key)
+    # Convert to lowercase
+    safe = safe.lower()
+    # Truncate to max length
+    safe = safe[:max_length]
+    # Remove leading/trailing underscores
+    safe = safe.strip('_')
+    # Ensure non-empty (fallback if key becomes empty)
+    return safe or 'property'
+
+
+class CypherInjectionError(Exception):
+    """Raised when a potential Cypher injection is detected."""
+    pass
 
 
 class ConceptDriftDetector:
@@ -36,7 +66,7 @@ class ConceptDriftDetector:
         PSI > 0.2  -> Significant drift, recalibration needed
 
     All Neo4j property keys are sanitized through
-    CypherInjectionPrevention.sanitize_property_key() and accessed
+    _sanitize_property_key() and accessed
     via bracket notation c[safe_key] instead of dot notation.
     """
 
@@ -153,7 +183,7 @@ class ConceptDriftDetector:
             timestamp.
         """
         # Sanitize feature name for safe downstream use in Cypher
-        safe_name = CypherInjectionPrevention.sanitize_property_key(feature_name)
+        safe_name = _sanitize_property_key(feature_name)
 
         psi = self.calculate_psi(reference_data, current_data)
         drifted = psi > threshold
@@ -209,7 +239,7 @@ class ConceptDriftDetector:
             )
 
         # B5 fix: sanitize property key before using in Cypher
-        safe_key = CypherInjectionPrevention.sanitize_property_key(feature_name)
+        safe_key = _sanitize_property_key(feature_name)
 
         if self.neo4j_client is None:
             logger.warning("No Neo4j client configured; drift result not stored")

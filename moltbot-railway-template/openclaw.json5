@@ -1,0 +1,82 @@
+// OpenClaw Gateway Configuration for Kurultai v0.2
+// Deployed to Railway at kublai.kurult.ai
+// Reference: https://docs.openclaw.ai/gateway/configuration
+{
+  // Gateway settings
+  gateway: {
+    port: 18789,
+    bind: "lan",
+    mode: "local",
+    auth: {
+      mode: "token",
+      token: "${OPENCLAW_GATEWAY_TOKEN}",
+    },
+    controlUi: {
+      enabled: true,
+      // Authentik handles auth at proxy layer — allow webchat without device identity
+      allowInsecureAuth: true,
+      dangerouslyDisableDeviceAuth: true,
+    },
+    // Trust Railway's internal proxy for X-Forwarded-* headers
+    trustedProxies: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"],
+  },
+
+  // Agent configuration
+  // Uses built-in "kimi-coding" provider (Anthropic-compatible endpoint at api.kimi.com/coding/)
+  // IMPORTANT: Built-in providers ignore custom baseUrl — must use correct provider name
+  agents: {
+    defaults: {
+      workspace: "/data/workspace",
+      model: {
+        primary: "kimi-coding/k2p5",
+      },
+    },
+    // Kurultai's 6 agents (id + name only — "description" is not a valid schema key)
+    list: [
+      { id: "main", name: "Kublai" },
+      { id: "researcher", name: "Möngke" },
+      { id: "writer", name: "Chagatai" },
+      { id: "developer", name: "Temüjin" },
+      { id: "analyst", name: "Jochi" },
+      { id: "ops", name: "Ögedei" },
+    ],
+  },
+
+  // Signal channel configuration
+  channels: {
+    signal: {
+      enabled: true,
+      account: "${SIGNAL_ACCOUNT}",
+      cliPath: "/usr/local/bin/signal-cli",
+      autoStart: true,
+      startupTimeoutMs: 120000,
+      dmPolicy: "pairing",
+      groupPolicy: "allowlist",
+      configWrites: false,
+      allowFrom: ["${SIGNAL_ACCOUNT}", "${SIGNAL_ALLOW_FROM}"],
+      // Note: groupAllowFrom removed — SIGNAL_GROUP_ALLOW_FROM env var not set
+      historyLimit: 50,
+      textChunkLimit: 4000,
+      ignoreStories: true,
+    },
+  },
+
+  // Logging
+  logging: {
+    consoleLevel: "info",
+    file: "/data/logs/openclaw.log",
+  },
+
+  // Environment — only pass safe env vars to agent sandboxes
+  // SECURITY: Do NOT use enabled:true (leaks all secrets including tokens/passwords)
+  env: {
+    shellEnv: {
+      enabled: false,
+      allowlist: [
+        "NODE_ENV",
+        "SIGNAL_ACCOUNT",
+        "SIGNAL_ALLOW_FROM",
+      ],
+    },
+  },
+}

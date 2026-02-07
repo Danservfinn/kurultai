@@ -36,19 +36,19 @@ class FailoverMonitor:
 
     Emergency Router Responsibilities (Ögedei):
     1. Detection - Monitor Kublai's health via heartbeat/last_active timestamp
-    2. Activation - Assume router role when Kublai unresponsive (60s threshold)
+    2. Activation - Assume router role when Kublai unresponsive (90s threshold)
     3. Limited Routing - Handle critical messages only, queue non-critical
     4. Notification - Alert admin when failover activated
     5. Recovery - Return control to Kublai when healthy
 
     Attributes:
         memory: OperationalMemory instance for persistence
-        FAILOVER_THRESHOLD_SECONDS: Seconds of inactivity before failover (default: 60)
+        FAILOVER_THRESHOLD_SECONDS: Seconds of inactivity before failover (default: 90)
         MAX_CONSECUTIVE_FAILURES: Failover after N consecutive failures (default: 3)
     """
 
-    # Configuration constants
-    FAILOVER_THRESHOLD_SECONDS = 60
+    # Configuration constants — aligned with two-tier heartbeat model
+    FAILOVER_THRESHOLD_SECONDS = 90   # Functional heartbeat: agent stuck/zombie
     MAX_CONSECUTIVE_FAILURES = 3
     CHECK_INTERVAL_SECONDS = 30
     RECOVERY_HEARTBEATS_REQUIRED = 3
@@ -105,9 +105,10 @@ class FailoverMonitor:
 
     def update_heartbeat(self, agent: str) -> None:
         """
-        Update agent's heartbeat timestamp.
+        Update agent's heartbeat on the Agent node.
 
-        Creates or updates an AgentHeartbeat node with the current timestamp.
+        Writes Agent.last_heartbeat (functional heartbeat). The infra
+        heartbeat (Agent.infra_heartbeat) is written by the sidecar.
 
         Args:
             agent: Agent name to update heartbeat for
@@ -115,15 +116,13 @@ class FailoverMonitor:
         Raises:
             FailoverError: If heartbeat update fails
         """
-        heartbeat_id = self._generate_id()
         now = self._now()
 
         cypher = """
-        MERGE (h:AgentHeartbeat {agent: $agent})
-        SET h.last_seen = $last_seen,
-            h.created_at = coalesce(h.created_at, $last_seen),
-            h.id = coalesce(h.id, $heartbeat_id)
-        RETURN h.agent as agent
+        MERGE (a:Agent {name: $agent})
+        ON CREATE SET a.created_at = $now
+        SET a.last_heartbeat = $now
+        RETURN a.name as name
         """
 
         with self._session() as session:
@@ -132,12 +131,7 @@ class FailoverMonitor:
                 return
 
             try:
-                result = session.run(
-                    cypher,
-                    agent=agent,
-                    last_seen=now,
-                    heartbeat_id=heartbeat_id
-                )
+                result = session.run(cypher, agent=agent, now=now)
                 record = result.single()
                 if record:
                     logger.debug(f"Heartbeat updated for agent: {agent}")
@@ -149,36 +143,51 @@ class FailoverMonitor:
 
     def is_agent_available(self, agent: str) -> bool:
         """
-        Check if agent is available (responded within threshold).
+        Check if agent is available using two-tier heartbeat model.
+
+        Checks both infra_heartbeat (gateway alive) and last_heartbeat
+        (agent working). Agent is available if either signal is fresh.
 
         Args:
             agent: Agent name to check availability for
 
         Returns:
-            True if agent has responded within FAILOVER_THRESHOLD_SECONDS
+            True if agent has heartbeat within FAILOVER_THRESHOLD_SECONDS
         """
         cypher = """
-        MATCH (h:AgentHeartbeat {agent: $agent})
-        RETURN h.last_seen as last_seen
+        MATCH (a:Agent {name: $agent})
+        RETURN a.last_heartbeat as last_heartbeat,
+               a.infra_heartbeat as infra_heartbeat
         """
 
         with self._session() as session:
             if session is None:
-                # In fallback mode, assume agent is available
                 return True
 
             try:
                 result = session.run(cypher, agent=agent)
                 record = result.single()
 
-                if record and record.get("last_seen"):
-                    last_seen = record["last_seen"]
-                    # Handle Neo4j datetime format
-                    if hasattr(last_seen, 'to_native'):
-                        last_seen = last_seen.to_native()
+                if record is None:
+                    return False
 
-                    time_since = (self._now() - last_seen).total_seconds()
-                    return time_since <= self.FAILOVER_THRESHOLD_SECONDS
+                now = self._now()
+
+                # Check functional heartbeat first (more meaningful)
+                func_hb = record.get("last_heartbeat")
+                if func_hb:
+                    if hasattr(func_hb, 'to_native'):
+                        func_hb = func_hb.to_native()
+                    if (now - func_hb).total_seconds() <= self.FAILOVER_THRESHOLD_SECONDS:
+                        return True
+
+                # Fall back to infra heartbeat
+                infra_hb = record.get("infra_heartbeat")
+                if infra_hb:
+                    if hasattr(infra_hb, 'to_native'):
+                        infra_hb = infra_hb.to_native()
+                    if (now - infra_hb).total_seconds() <= self.FAILOVER_THRESHOLD_SECONDS:
+                        return True
 
                 return False
 
@@ -709,8 +718,9 @@ class FailoverMonitor:
             List of created index names
         """
         indexes = [
-            ("CREATE INDEX agentheartbeat_agent_idx IF NOT EXISTS FOR (h:AgentHeartbeat) ON (h.agent)", "agentheartbeat_agent_idx"),
-            ("CREATE INDEX agentheartbeat_last_seen_idx IF NOT EXISTS FOR (h:AgentHeartbeat) ON (h.last_seen)", "agentheartbeat_last_seen_idx"),
+            ("CREATE INDEX agent_name_idx IF NOT EXISTS FOR (a:Agent) ON (a.name)", "agent_name_idx"),
+            ("CREATE INDEX agent_infra_heartbeat_idx IF NOT EXISTS FOR (a:Agent) ON (a.infra_heartbeat)", "agent_infra_heartbeat_idx"),
+            ("CREATE INDEX agent_last_heartbeat_idx IF NOT EXISTS FOR (a:Agent) ON (a.last_heartbeat)", "agent_last_heartbeat_idx"),
             ("CREATE INDEX failoverevent_is_active_idx IF NOT EXISTS FOR (f:FailoverEvent) ON (f.is_active)", "failoverevent_is_active_idx"),
             ("CREATE INDEX failoverevent_activated_at_idx IF NOT EXISTS FOR (f:FailoverEvent) ON (f.activated_at)", "failoverevent_activated_at_idx"),
         ]

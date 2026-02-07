@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/memory_manager.py
+# hypothesis_version: 6.150.2
+
+[0.0, 0.1, 1.0, 2.0, 5.0, 100, 200, 400, 1600, 2000, ' AND ', '%Y-%m-%d %H:%M', '=', 'NEO4J_PASSWORD', 'NEO4J_URI', 'WHERE ', '__main__', 'agent', 'archive', 'async patterns', 'cold', 'content', 'created_at', 'days', 'embedding', 'entry_type', 'general', 'hot', 'id', 'kublai', 'limit', 'neo4j', 'query_text', 'system', 'task_request', 'warm']

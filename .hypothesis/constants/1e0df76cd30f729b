@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/priority_override.py
+# hypothesis_version: 6.150.2
+
+[1.0, '## Current Task DAG\n', '## Execution Order\n', 'before', 'blocks', 'boosted_to_critical', 'current_priority', 'dep_count', 'dependencies', 'dependents', 'description', 'first', 'id', 'old_priority', 'recalculate', 'recalculate\\s+order', 'show_dag', 't', 'user_override']

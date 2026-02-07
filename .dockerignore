@@ -40,3 +40,17 @@ docs/*.md
 
 # Signal data is needed for build
 !/.signal-data/
+
+# Docker/Mutagen
+.docker
+*.sock
+**/*.sock
+*.socket
+**/*.socket
+S.gpg-agent*
+**S.gpg-agent*
+
+# GPG
+.gnupg
+**/.gnupg
+**/.gnupg/**

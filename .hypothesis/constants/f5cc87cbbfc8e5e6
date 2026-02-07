@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/scripts/check_types.py
+# hypothesis_version: 6.150.2
+
+[0.0, 'CheckResult', 'actual', 'agents', 'authentication', 'blockers', 'category', 'check_id', 'critical', 'critical_passed', 'decision', 'description', 'details', 'duration_ms', 'environment', 'expected', 'fail', 'failed_checks', 'neo4j', 'output', 'pass', 'pass_rate', 'passed_checks', 'reasoning', 'recommendations', 'skip', 'skipped_checks', 'status', 'timestamp', 'total_checks', 'warn', 'warning_checks']

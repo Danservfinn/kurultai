@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/scripts/check_auth.py
+# hypothesis_version: 6.150.2
+
+[1000, '...', '0123456789abcdef', 'AGENTS_HMAC_SECRET', 'AUTH-001', 'AUTH-002', 'AUTH-003', 'AUTH-004', 'AUTH-005', 'AUTH-006', 'AUTH-007', 'Agent-to-agent auth', 'Auth successful', 'Signature rejected', 'Signature verified', 'Token not set', 'Verification failed', 'a', 'actual', 'details', 'developer', 'different_message', 'error', 'error_type', 'expected', 'expected_length', 'fields', 'from', 'invalid', 'invalid_signature', 'is_hex', 'length', 'main', 'message', 'min_length', 'missing_fields', 'output', 'rejected', 'researcher', 'sha256', 'signature', 'signature_length', 'status', 'tested', 'timestamp', 'to', 'utf-8', 'verified', 'writer', 'wrong_token']

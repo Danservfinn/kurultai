@@ -1,0 +1,167 @@
+{
+  "dashboard": {
+    "title": "Kurultai Agent Utilization",
+    "tags": ["kurultai", "agents", "utilization", "performance"],
+    "timezone": "UTC",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Agent Utilization Percentage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kurultai_agent_utilization",
+            "legendFormat": "{{agent_id}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "description": "Current utilization percentage for each agent (active / (active + idle))",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 20},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Time by Agent",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kurultai_agent_active_seconds_total[5m])",
+            "legendFormat": "{{agent_id}}",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "description": "Rate of active processing time per agent"
+      },
+      {
+        "id": 3,
+        "title": "Idle Time by Agent",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kurultai_agent_idle_seconds_total[5m])",
+            "legendFormat": "{{agent_id}}",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "description": "Rate of idle time per agent"
+      },
+      {
+        "id": 4,
+        "title": "Current Utilization Stats",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "kurultai_agent_utilization",
+            "format": "table",
+            "instant": true,
+            "refId": "D"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "description": "Current utilization for each agent in tabular format",
+        "transformations": [
+          {
+            "id": "sortByUtil",
+            "options": {
+              "displayName": "Sort by utilization",
+              "fields": [
+                {"name": "Value"},
+                {"name": "agent_id"}
+              ],
+              "sort": [
+                {"field": "Value", "desc": true}
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Underutilized Agents",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(count by (agent_id) (kurultai_agent_utilization < 20))",
+            "refId": "E"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 8, "x": 0, "y": 24},
+        "description": "Count of agents with utilization below 20%",
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 2}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Overutilized Agents",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(count by (agent_id) (kurultai_agent_utilization > 80))",
+            "refId": "F"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 8, "x": 8, "y": 24},
+        "description": "Count of agents with utilization above 80%",
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Average Utilization",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(kurultai_agent_utilization)",
+            "refId": "G"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 8, "x": 16, "y": 24},
+        "description": "Average utilization across all agents",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 30},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 70}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

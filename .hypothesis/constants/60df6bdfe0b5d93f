@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/background_synthesis.py
+# hypothesis_version: 6.150.2
+
+[100, 300, ' AND ', '+00:00', '=', 'WHERE ', 'Z', '__main__', '_generate_id', '_now', '_session', 'agent', 'agents', 'already exists', 'busy', 'completed', 'consolidated', 'content', 'count', 'data', 'deleted', 'error', 'executed', 'failed', 'general', 'get_agent_status', 'graph_maintenance', 'high', 'id', 'in_progress', 'knowledge_synthesis', 'last_heartbeat', 'learning_agent_idx', 'learning_topic_idx', 'learnings_created', 'limit', 'list_tasks_by_status', 'low', 'normal', 'note', 'orphaned_learnings', 'orphaned_reflections', 'orphaned_tasks', 'other', 'pending', 'r', 'reason', 'reflection_count', 'result', 'running', 'status', 'synthesized', 't', 't.status = $status', 'task_id', 'task_type', 'threshold', 'topic', 'topics', 'total_cleaned', 'unknown']

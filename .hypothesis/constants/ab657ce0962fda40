@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/security/encryption.py
+# hypothesis_version: 6.150.2
+
+[100000, ':', '=', 'D', 'ENC:', 'ENC:D:', 'FieldEncryption', 'QUERY_HASH_SALT', 'R', 'default-query-salt', 'hash_value']

@@ -37,11 +37,13 @@ class FailoverProtocol:
     routing responsibilities when Kublai becomes unavailable.
     """
 
-    # Configuration constants
-    HEARTBEAT_INTERVAL_SECONDS = 30  # Expected heartbeat interval
-    MAX_MISSED_HEARTBEATS = 3  # Failover after 3 missed heartbeats (90s)
+    # Configuration constants — two-tier heartbeat model
+    HEARTBEAT_INTERVAL_SECONDS = 30  # Sidecar writes infra_heartbeat every 30s
+    MAX_MISSED_INFRA_HEARTBEATS = 4  # 120s: gateway process dead (hard failure)
+    MAX_MISSED_FUNC_HEARTBEATS = 3   # 90s: agent stuck/zombie (functional failure)
     RECOVERY_HEARTBEATS_REQUIRED = 3  # Consecutive heartbeats for recovery
-    FAILOVER_TIMEOUT_SECONDS = 90  # 3 missed heartbeats
+    INFRA_TIMEOUT_SECONDS = 120      # 4 missed beats at 30s
+    FUNC_TIMEOUT_SECONDS = 90        # 3 missed beats at 30s
 
     # Simplified routing map for failover mode
     ROUTING_MAP = {
@@ -103,30 +105,29 @@ class FailoverProtocol:
 
     def check_kublai_health(self) -> Dict[str, Any]:
         """
-        Check Kublai's health status.
+        Check Kublai's health using two-tier heartbeat model.
 
-        Returns:
-            Dict with health information:
-                - healthy: bool - Whether Kublai is healthy
-                - last_heartbeat: datetime - Last known heartbeat
-                - missed_beats: int - Number of missed heartbeats
-                - status: str - "active" | "degraded" | "unavailable"
+        Two signals checked:
+        - infra_heartbeat: written by sidecar every 30s (gateway alive)
+        - last_heartbeat: written on task claim/complete (agent working)
+
+        Returns worst-case of the two signals.
         """
         try:
-            # Query Neo4j for Kublai's agent status
             cypher = """
                 MATCH (a:Agent {name: $agent_name})
                 RETURN a.last_heartbeat as last_heartbeat,
+                       a.infra_heartbeat as infra_heartbeat,
                        a.status as status,
                        a.current_task as current_task
             """
 
             with self.memory._session() as session:
                 if session is None:
-                    # Neo4j unavailable - assume degraded
                     return {
                         "healthy": False,
                         "last_heartbeat": self._last_kublai_heartbeat,
+                        "infra_heartbeat": None,
                         "missed_beats": self._missed_heartbeats,
                         "status": KublaiStatus.UNAVAILABLE.value
                     }
@@ -135,58 +136,76 @@ class FailoverProtocol:
                 record = result.single()
 
                 if record is None:
-                    # Agent not found in database
                     self._missed_heartbeats += 1
                     return {
                         "healthy": False,
                         "last_heartbeat": None,
+                        "infra_heartbeat": None,
                         "missed_beats": self._missed_heartbeats,
                         "status": KublaiStatus.UNAVAILABLE.value
                     }
 
-                last_heartbeat = record.get("last_heartbeat")
-                status = record.get("status", "unknown")
+                now = self._now()
 
-                if last_heartbeat:
-                    # Handle Neo4j datetime format
-                    if hasattr(last_heartbeat, 'to_native'):
-                        last_heartbeat = last_heartbeat.to_native()
-                    self._last_kublai_heartbeat = last_heartbeat
-
-                    # Calculate missed heartbeats
-                    time_since = self._now() - last_heartbeat
-                    missed_beats = int(time_since.total_seconds() / self.HEARTBEAT_INTERVAL_SECONDS)
-                    self._missed_heartbeats = max(0, missed_beats)
-
-                    # Determine status
-                    if self._missed_heartbeats >= self.MAX_MISSED_HEARTBEATS:
-                        kublai_status = KublaiStatus.UNAVAILABLE
-                    elif self._missed_heartbeats >= 1:
-                        kublai_status = KublaiStatus.DEGRADED
-                    else:
-                        kublai_status = KublaiStatus.ACTIVE
-
-                    return {
-                        "healthy": kublai_status == KublaiStatus.ACTIVE,
-                        "last_heartbeat": last_heartbeat,
-                        "missed_beats": self._missed_heartbeats,
-                        "status": kublai_status.value
-                    }
+                # Check infra heartbeat (gateway alive)
+                infra_hb = record.get("infra_heartbeat")
+                infra_status = KublaiStatus.ACTIVE
+                if infra_hb:
+                    if hasattr(infra_hb, 'to_native'):
+                        infra_hb = infra_hb.to_native()
+                    infra_age = (now - infra_hb).total_seconds()
+                    if infra_age > self.INFRA_TIMEOUT_SECONDS:
+                        infra_status = KublaiStatus.UNAVAILABLE
+                    elif infra_age > self.HEARTBEAT_INTERVAL_SECONDS:
+                        infra_status = KublaiStatus.DEGRADED
                 else:
-                    # No heartbeat recorded
-                    self._missed_heartbeats = self.MAX_MISSED_HEARTBEATS
-                    return {
-                        "healthy": False,
-                        "last_heartbeat": None,
-                        "missed_beats": self._missed_heartbeats,
-                        "status": KublaiStatus.UNAVAILABLE.value
-                    }
+                    infra_status = KublaiStatus.UNAVAILABLE
+
+                # Check functional heartbeat (agent working)
+                func_hb = record.get("last_heartbeat")
+                func_status = KublaiStatus.ACTIVE
+                if func_hb:
+                    if hasattr(func_hb, 'to_native'):
+                        func_hb = func_hb.to_native()
+                    self._last_kublai_heartbeat = func_hb
+                    func_age = (now - func_hb).total_seconds()
+                    if func_age > self.FUNC_TIMEOUT_SECONDS:
+                        func_status = KublaiStatus.DEGRADED
+                else:
+                    func_status = KublaiStatus.DEGRADED
+
+                # Worst-case of the two signals determines overall status
+                status_priority = {
+                    KublaiStatus.ACTIVE: 0,
+                    KublaiStatus.DEGRADED: 1,
+                    KublaiStatus.UNAVAILABLE: 2,
+                }
+                overall = max(infra_status, func_status, key=lambda s: status_priority[s])
+
+                # Calculate missed beats from infra heartbeat (primary signal)
+                if infra_hb:
+                    self._missed_heartbeats = max(0, int(
+                        (now - infra_hb).total_seconds() / self.HEARTBEAT_INTERVAL_SECONDS
+                    ))
+                else:
+                    self._missed_heartbeats = self.MAX_MISSED_INFRA_HEARTBEATS
+
+                return {
+                    "healthy": overall == KublaiStatus.ACTIVE,
+                    "last_heartbeat": func_hb,
+                    "infra_heartbeat": infra_hb,
+                    "missed_beats": self._missed_heartbeats,
+                    "status": overall.value,
+                    "infra_status": infra_status.value,
+                    "func_status": func_status.value,
+                }
 
         except Exception as e:
             logger.error(f"Error checking Kublai health: {e}")
             return {
                 "healthy": False,
                 "last_heartbeat": self._last_kublai_heartbeat,
+                "infra_heartbeat": None,
                 "missed_beats": self._missed_heartbeats,
                 "status": KublaiStatus.UNAVAILABLE.value,
                 "error": str(e)
@@ -197,7 +216,7 @@ class FailoverProtocol:
         Determine if failover should activate.
 
         Activates when:
-        - Kublai missed 3+ heartbeats (90 seconds)
+        - Kublai missed 4+ infra heartbeats (120 seconds)
         - Kublai status is "unavailable"
         - Manual failover triggered
 
@@ -211,7 +230,7 @@ class FailoverProtocol:
             return False
 
         # Check activation conditions
-        if health["missed_beats"] >= self.MAX_MISSED_HEARTBEATS:
+        if health["missed_beats"] >= self.MAX_MISSED_INFRA_HEARTBEATS:
             logger.warning(
                 f"Failover condition met: {health['missed_beats']} missed heartbeats"
             )

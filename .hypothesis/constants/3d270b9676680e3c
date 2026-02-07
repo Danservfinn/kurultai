@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/topological_executor.py
+# hypothesis_version: 6.150.2
+
+[0.0, 0.5, 100, 'Chagatai', 'Jochi', 'Möngke', 'Temüjin', '_team_config', 'agent_id', 'agents', 'analysis', 'analyst', 'blocked', 'completed', 'complexity', 'count', 'deliverable_type', 'description', 'developer', 'error', 'full_team', 'id', 'in_progress', 'individual', 'iterations', 'load', 'mode', 'ops', 'pending', 'ready', 'researcher', 'small_team', 'status', 'task_id', 'total', 'total_errors', 'total_executed', 'writer', 'Ögedei']

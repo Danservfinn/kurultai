@@ -429,6 +429,9 @@ class OperationalMemory:
         SET t.status = 'in_progress',
             t.claimed_by = $agent,
             t.claimed_at = $claimed_at
+        WITH t
+        MATCH (a:Agent {name: $agent})
+        SET a.last_heartbeat = $claimed_at
         RETURN t
         """
 
@@ -484,6 +487,9 @@ class OperationalMemory:
         SET t.status = 'completed',
             t.completed_at = $completed_at,
             t.results = $results
+        WITH t
+        MATCH (a:Agent {name: t.claimed_by})
+        SET a.last_heartbeat = $completed_at
         RETURN t.delegated_by as delegated_by, t.claimed_by as claimed_by
         """
 
@@ -950,8 +956,8 @@ class OperationalMemory:
 
             except _get_neo4j_error() as e:
                 logger.error(f"Failed to check rate limit: {e}")
-                # Fail open - allow the request
-                return (True, 0, reset_time)
+                # Fail closed - deny the request when Neo4j is unavailable
+                return (False, 0, reset_time)
 
     def _create_rate_limit_record(
         self,
@@ -1055,7 +1061,8 @@ class OperationalMemory:
 
         with self._session() as session:
             if session is None:
-                return True
+                logger.warning(f"Fallback mode: heartbeat not persisted for {agent}")
+                return False
 
             try:
                 result = session.run(

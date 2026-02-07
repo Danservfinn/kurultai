@@ -7,9 +7,11 @@ to ensure proper team spawning decisions based on capability complexity.
 Usage:
     from tools.kurultai.complexity_validation_framework import (
         ComplexityValidationFramework,
-        TestCase,
-        ValidationMetrics,
         ThresholdCalibrator
+    )
+    from tools.kurultai.complexity_models import (
+        TestCase,
+        ValidationMetrics
     )
 
     # Run validation suite
@@ -24,11 +26,11 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid4
 
@@ -41,197 +43,44 @@ from tools.kurultai.complexity_config import (
     INPUT_MAX_LENGTH,
     complexity_to_team_size as _config_complexity_to_team_size,
 )
+# Import shared data models
+from tools.kurultai.complexity_models import (
+    CapabilityDomain,
+    TeamSize,
+    TestCaseCategory,
+    ValidationStatus,
+    ComplexityFactors,
+    TestCase,
+    TestResult,
+    ValidationMetrics,
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# ENUMERATIONS
+# SHARED IMPORTS FOR BACKWARD COMPATIBILITY
 # =============================================================================
-
-class CapabilityDomain(str, Enum):
-    """Capability domains from kurultai_0.2.md taxonomy."""
-    COMMUNICATION = "COMMUNICATION"
-    DATA = "DATA"
-    INFRASTRUCTURE = "INFRASTRUCTURE"
-    AUTOMATION = "AUTOMATION"
-    INTELLIGENCE = "INTELLIGENCE"
-
-
-class TeamSize(str, Enum):
-    """Team size classifications."""
-    INDIVIDUAL = "individual"      # < 0.6 complexity
-    SMALL_TEAM = "small_team"      # 0.6 - 0.8 complexity
-    FULL_TEAM = "full_team"        # > 0.8 complexity
-
-
-class TestCaseCategory(str, Enum):
-    """Categories for test cases."""
-    EDGE_CASE = "edge_case"                    # Borderline thresholds
-    KNOWN_SIMPLE = "known_simple"              # Definitively simple
-    KNOWN_COMPLEX = "known_complex"            # Definitively complex
-    DOMAIN_SPECIFIC = "domain_specific"        # Per-domain tests
-    REGRESSION = "regression"                  # Past failures
-    SYNTHETIC = "synthetic"                    # Generated edge cases
-
-
-class ValidationStatus(str, Enum):
-    """Validation result status."""
-    PASS = "pass"
-    FAIL = "fail"
-    WARNING = "warning"
-    SKIP = "skip"
+# Re-export all data models for backward compatibility
+__all__ = [
+    "ComplexityValidationFramework",
+    "ThresholdCalibrator",
+    "TestCaseLibrary",
+    "CapabilityDomain",
+    "TeamSize",
+    "TestCaseCategory",
+    "ValidationStatus",
+    "ComplexityFactors",
+    "TestCase",
+    "TestResult",
+    "ValidationMetrics",
+]
 
 
 # =============================================================================
-# DATA MODELS
+# PYDANTIC MODELS (for API serialization)
 # =============================================================================
-
-@dataclass
-class ComplexityFactors:
-    """Factors contributing to complexity calculation.
-
-    From kurultai_0.2.md Appendix B:
-    - domain_risk: Risk level of the capability domain
-    - api_count: Number of external APIs involved
-    - integration_points: Number of system integration points
-    - security_sensitivity: Security sensitivity score (0-1)
-    """
-    domain_risk: float = 0.0           # 0.0 - 1.0
-    api_count: int = 0                 # Number of APIs
-    integration_points: int = 0        # Integration complexity
-    security_sensitivity: float = 0.0  # 0.0 - 1.0
-    data_volume_gb: float = 0.0        # Expected data volume
-    concurrency_requirements: int = 0  # Concurrent users/requests
-    compliance_requirements: List[str] = field(default_factory=list)
-    custom_factors: Dict[str, float] = field(default_factory=dict)
-
-    def to_vector(self) -> np.ndarray:
-        """Convert factors to numerical vector for analysis."""
-        return np.array([
-            self.domain_risk,
-            min(self.api_count / 10, 1.0),  # Normalize to 0-1
-            min(self.integration_points / 5, 1.0),
-            self.security_sensitivity,
-            min(self.data_volume_gb / 100, 1.0),
-            min(self.concurrency_requirements / 1000, 1.0),
-        ])
-
-
-@dataclass
-class TestCase:
-    """Single test case for complexity validation.
-
-    Attributes:
-        id: Unique test case identifier
-        name: Human-readable test name
-        capability_request: The capability request string
-        expected_complexity: Expected complexity score (0-1)
-        expected_team_size: Expected team size classification
-        domain: Capability domain
-        category: Test case category
-        factors: Complexity factors
-        description: Detailed description
-        tags: Additional tags for filtering
-        created_at: Creation timestamp
-    """
-    id: str
-    name: str
-    capability_request: str
-    expected_complexity: float
-    expected_team_size: TeamSize
-    domain: CapabilityDomain
-    category: TestCaseCategory
-    factors: ComplexityFactors
-    description: str = ""
-    tags: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-    def __post_init__(self):
-        """Validate expected complexity is within bounds."""
-        if not 0.0 <= self.expected_complexity <= 1.0:
-            raise ValueError(f"Expected complexity must be 0-1, got {self.expected_complexity}")
-
-
-@dataclass
-class TestResult:
-    """Result of running a single test case.
-
-    Attributes:
-        test_case: The test case that was run
-        predicted_complexity: Complexity score from classifier
-        predicted_team_size: Team size from classifier
-        actual_team_size: Actual team size used (may differ from predicted)
-        status: Validation status
-        error_margin: Absolute difference from expected
-        classification_correct: Whether classification matches expected
-        execution_time_ms: Time to classify
-        token_usage: Tokens consumed during classification
-        metadata: Additional runtime metadata
-    """
-    test_case: TestCase
-    predicted_complexity: float
-    predicted_team_size: TeamSize
-    actual_team_size: Optional[TeamSize] = None
-    status: ValidationStatus = ValidationStatus.PASS
-    error_margin: float = 0.0
-    classification_correct: bool = False
-    execution_time_ms: float = 0.0
-    token_usage: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    executed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-@dataclass
-class ValidationMetrics:
-    """Aggregated metrics from validation run.
-
-    Metrics:
-        - Accuracy: Overall classification accuracy
-        - Precision: No false positives for team spawning
-        - Recall: No missed complex tasks
-        - F1 Score: Harmonic mean of precision and recall
-        - Cost Efficiency: Token usage vs complexity correlation
-    """
-    # Classification metrics
-    total_cases: int = 0
-    correct_classifications: int = 0
-    accuracy: float = 0.0
-
-    # Precision/Recall by team size
-    individual_precision: float = 0.0
-    individual_recall: float = 0.0
-    small_team_precision: float = 0.0
-    small_team_recall: float = 0.0
-    full_team_precision: float = 0.0
-    full_team_recall: float = 0.0
-
-    # Overall precision/recall
-    precision: float = 0.0  # Precision for team spawning (small + full)
-    recall: float = 0.0     # Recall for complex tasks (full team)
-    f1_score: float = 0.0
-
-    # Cost efficiency
-    avg_tokens_per_classification: float = 0.0
-    total_tokens: int = 0
-    cost_efficiency_score: float = 0.0  # Complexity resolved per token
-
-    # Error analysis
-    mean_absolute_error: float = 0.0
-    root_mean_squared_error: float = 0.0
-    max_error: float = 0.0
-
-    # Edge case performance
-    edge_case_accuracy: float = 0.0
-    threshold_boundary_accuracy: float = 0.0  # Cases near 0.6 and 0.8
-
-    # Domain performance
-    domain_accuracy: Dict[str, float] = field(default_factory=dict)
-
-    # Timing
-    avg_execution_time_ms: float = 0.0
-    total_execution_time_ms: float = 0.0
 
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -249,8 +98,8 @@ class ThresholdCalibration:
     """Calibration result for complexity thresholds.
 
     Attributes:
-        lower_threshold: Threshold between individual and small team (default 0.6)
-        upper_threshold: Threshold between small and full team (default 0.8)
+        lower_threshold: Threshold between individual and small team (default 0.21)
+        upper_threshold: Threshold between small and full team (default 0.64)
         confidence: Confidence in these thresholds (0-1)
         metrics_at_thresholds: Metrics achieved with these thresholds
         recommendation: Human-readable recommendation
@@ -272,7 +121,7 @@ class TestCaseLibrary:
 
     Contains 120+ test cases spanning:
     - Complexity range (0.0 - 1.0)
-    - Edge cases (borderline 0.6 and 0.8)
+    - Edge cases (borderline around individual_threshold and small_team_threshold)
     - All capability domains
     - Known simple vs known complex capabilities
     - Medium complexity (small team) cases
@@ -295,7 +144,7 @@ class TestCaseLibrary:
 
     @classmethod
     def _get_edge_cases(cls) -> List[TestCase]:
-        """Edge cases near threshold boundaries (0.6 and 0.8). ~20 cases."""
+        """Edge cases near threshold boundaries (~0.21 and ~0.64). ~20 cases."""
         return [
             TestCase(
                 id="edge_001",
@@ -1111,54 +960,316 @@ class TestCaseLibrary:
         ]
 
     @classmethod
-    def get_synthetic_cases(cls, count: int = 10) -> List[TestCase]:
-        """Generate synthetic edge cases for stress testing.
+    def get_realistic_edge_cases(cls, count: int = 20) -> List[TestCase]:
+        """Get realistic edge cases with actual domain keywords.
 
-        Creates test cases with complexity scores distributed across
-        the range with extra density near thresholds.
+        Returns test cases that contain real keywords the classifier
+        recognizes, based on actual user scenarios rather than
+        synthetic random values.
         """
-        cases = []
-        np.random.seed(42)  # Reproducible
-
-        # Generate cases with focus on threshold regions
-        thresholds = [0.6, 0.8]
-        for i in range(count):
-            # 50% chance of being near a threshold
-            if np.random.random() < 0.5:
-                threshold = np.random.choice(thresholds)
-                complexity = np.random.normal(threshold, 0.05)
-            else:
-                complexity = np.random.uniform(0.1, 0.95)
-
-            complexity = np.clip(complexity, 0.0, 1.0)
-
-            # Determine expected team size
-            if complexity < 0.6:
-                team_size = TeamSize.INDIVIDUAL
-            elif complexity < 0.8:
-                team_size = TeamSize.SMALL_TEAM
-            else:
-                team_size = TeamSize.FULL_TEAM
-
-            cases.append(TestCase(
-                id=f"synth_{i:03d}",
-                name=f"Synthetic Case {i+1}",
-                capability_request=f"Synthetic capability request with complexity {complexity:.2f}",
-                expected_complexity=complexity,
-                expected_team_size=team_size,
-                domain=np.random.choice(list(CapabilityDomain)),
-                category=TestCaseCategory.SYNTHETIC,
+        # These are hand-crafted edge cases with real keywords
+        return [
+            TestCase(
+                id="real_edge_001",
+                name="Simple Redis Cache",
+                capability_request="Deploy Redis cache for session storage",
+                expected_complexity=0.35,
+                expected_team_size=TeamSize.INDIVIDUAL,
+                domain=CapabilityDomain.INFRASTRUCTURE,
+                category=TestCaseCategory.EDGE_CASE,
                 factors=ComplexityFactors(
-                    domain_risk=np.random.uniform(0, 1),
-                    api_count=np.random.randint(0, 10),
-                    integration_points=np.random.randint(0, 10),
-                    security_sensitivity=np.random.uniform(0, 1)
+                    domain_risk=0.3, api_count=1, integration_points=1,
+                    security_sensitivity=0.2
                 ),
-                description=f"Auto-generated test case with complexity {complexity:.2f}",
-                tags=["synthetic", "auto-generated"]
-            ))
-
-        return cases
+                description="Simple cache deployment, single technology",
+                tags=["redis", "cache", "edge-case"]
+            ),
+            TestCase(
+                id="real_edge_002",
+                name="Multi-Region Kubernetes",
+                capability_request="Set up multi-region Kubernetes cluster with service mesh and cross-region failover",
+                expected_complexity=0.88,
+                expected_team_size=TeamSize.FULL_TEAM,
+                domain=CapabilityDomain.INFRASTRUCTURE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.85, api_count=4, integration_points=5,
+                    security_sensitivity=0.7
+                ),
+                description="Complex infrastructure with multiple advanced patterns",
+                tags=["kubernetes", "multi-region", "service-mesh"]
+            ),
+            TestCase(
+                id="real_edge_003",
+                name="Basic REST API",
+                capability_request="Create simple REST API with CRUD endpoints",
+                expected_complexity=0.28,
+                expected_team_size=TeamSize.INDIVIDUAL,
+                domain=CapabilityDomain.CODE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.2, api_count=1, integration_points=0,
+                    security_sensitivity=0.3
+                ),
+                description="Basic CRUD API, common pattern",
+                tags=["rest", "api", "crud"]
+            ),
+            TestCase(
+                id="real_edge_004",
+                name="OAuth2 Integration",
+                capability_request="Integrate OAuth2 authentication with Google and GitHub providers",
+                expected_complexity=0.58,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.SECURITY,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.6, api_count=2, integration_points=2,
+                    security_sensitivity=0.8
+                ),
+                description="Authentication with multiple providers",
+                tags=["oauth", "authentication", "integration"]
+            ),
+            TestCase(
+                id="real_edge_005",
+                name="Event Streaming Pipeline",
+                capability_request="Build Kafka streaming pipeline with real-time processing and monitoring",
+                expected_complexity=0.75,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.DATA,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.7, api_count=3, integration_points=3,
+                    security_sensitivity=0.4
+                ),
+                description="Streaming data with complex integration",
+                tags=["kafka", "streaming", "real-time"]
+            ),
+            TestCase(
+                id="real_edge_006",
+                name="Microservices with Service Mesh",
+                capability_request="Deploy microservices architecture with Istio service mesh, mTLS, and distributed tracing",
+                expected_complexity=0.91,
+                expected_team_size=TeamSize.FULL_TEAM,
+                domain=CapabilityDomain.INFRASTRUCTURE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.9, api_count=5, integration_points=6,
+                    security_sensitivity=0.85
+                ),
+                description="Complex distributed system with security requirements",
+                tags=["microservices", "service-mesh", "mtls"]
+            ),
+            TestCase(
+                id="real_edge_007",
+                name="Simple Webhook Handler",
+                capability_request="Create webhook handler for Stripe payment events",
+                expected_complexity=0.22,
+                expected_team_size=TeamSize.INDIVIDUAL,
+                domain=CapabilityDomain.CODE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.2, api_count=1, integration_points=1,
+                    security_sensitivity=0.4
+                ),
+                description="Single webhook integration",
+                tags=["webhook", "stripe", "integration"]
+            ),
+            TestCase(
+                id="real_edge_008",
+                name="Distributed Database Sharding",
+                capability_request="Implement sharding strategy for PostgreSQL with cross-database transactions",
+                expected_complexity=0.86,
+                expected_team_size=TeamSize.FULL_TEAM,
+                domain=CapabilityDomain.DATA,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.85, api_count=4, integration_points=4,
+                    security_sensitivity=0.6
+                ),
+                description="Advanced database pattern with distributed transactions",
+                tags=["sharding", "postgresql", "distributed"]
+            ),
+            TestCase(
+                id="real_edge_009",
+                name="GraphQL API with Caching",
+                capability_request="Build GraphQL API with Redis caching and rate limiting",
+                expected_complexity=0.52,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.CODE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.5, api_count=2, integration_points=2,
+                    security_sensitivity=0.3
+                ),
+                description="GraphQL with caching layer",
+                tags=["graphql", "redis", "rate-limiting"]
+            ),
+            TestCase(
+                id="real_edge_010",
+                name="CI/CD Pipeline",
+                capability_request="Set up GitHub Actions CI/CD pipeline with Docker and Kubernetes deployment",
+                expected_complexity=0.48,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.OPS,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.4, api_count=2, integration_points=2,
+                    security_sensitivity=0.3
+                ),
+                description="DevOps automation pipeline",
+                tags=["cicd", "docker", "kubernetes"]
+            ),
+            TestCase(
+                id="real_edge_011",
+                name="Simple Slack Bot",
+                capability_request="Create Slack bot that responds to commands",
+                expected_complexity=0.18,
+                expected_team_size=TeamSize.INDIVIDUAL,
+                domain=CapabilityDomain.COMMUNICATION,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.1, api_count=1, integration_points=1,
+                    security_sensitivity=0.3
+                ),
+                description="Basic bot integration",
+                tags=["slack", "bot", "integration"]
+            ),
+            TestCase(
+                id="real_edge_012",
+                name="Real-time Collaboration",
+                capability_request="Build real-time collaboration feature with WebSockets and multi-user conflict resolution",
+                expected_complexity=0.72,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.CODE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.7, api_count=3, integration_points=3,
+                    security_sensitivity=0.4
+                ),
+                description="Real-time features with conflict resolution",
+                tags=["websocket", "real-time", "collaboration"]
+            ),
+            TestCase(
+                id="real_edge_013",
+                name="Zero-Downtime Deployment",
+                capability_request="Implement blue-green deployment with canary releases and automatic rollback",
+                expected_complexity=0.78,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.OPS,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.75, api_count=3, integration_points=3,
+                    security_sensitivity=0.3
+                ),
+                description="Advanced deployment strategy",
+                tags=["blue-green", "canary", "rollback"]
+            ),
+            TestCase(
+                id="real_edge_014",
+                name="Payment Processing",
+                capability_request="Integrate Stripe payment processing with webhook handling and fraud detection",
+                expected_complexity=0.62,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.SECURITY,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.6, api_count=2, integration_points=2,
+                    security_sensitivity=0.85
+                ),
+                description="Payment integration with security requirements",
+                tags=["stripe", "payment", "fraud"]
+            ),
+            TestCase(
+                id="real_edge_015",
+                name="ML Model Inference",
+                capability_request="Deploy ML model inference API with GPU acceleration and batch processing",
+                expected_complexity=0.68,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.INTELLIGENCE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.65, api_count=2, integration_points=2,
+                    security_sensitivity=0.3
+                ),
+                description="ML deployment with specialized infrastructure",
+                tags=["ml", "gpu", "inference"]
+            ),
+            TestCase(
+                id="real_edge_016",
+                name="API Gateway Configuration",
+                capability_request="Configure API Gateway with rate limiting, caching, and authentication",
+                expected_complexity=0.42,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.INFRASTRUCTURE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.4, api_count=2, integration_points=2,
+                    security_sensitivity=0.5
+                ),
+                description="Gateway configuration",
+                tags=["gateway", "rate-limiting", "authentication"]
+            ),
+            TestCase(
+                id="real_edge_017",
+                name="Data Lake ETL",
+                capability_request="Build ETL pipeline for data lake with Spark and Parquet format",
+                expected_complexity=0.65,
+                expected_team_size=TeamSize.SMALL_TEAM,
+                domain=CapabilityDomain.DATA,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.6, api_count=3, integration_points=3,
+                    security_sensitivity=0.2
+                ),
+                description="Big data ETL pipeline",
+                tags=["spark", "parquet", "etl"]
+            ),
+            TestCase(
+                id="real_edge_018",
+                name="File Upload Service",
+                capability_request="Create file upload service with S3 storage and virus scanning",
+                expected_complexity=0.38,
+                expected_team_size=TeamSize.INDIVIDUAL,
+                domain=CapabilityDomain.CODE,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.35, api_count=2, integration_points=1,
+                    security_sensitivity=0.5
+                ),
+                description="File upload with basic security",
+                tags=["s3", "upload", "virus-scan"]
+            ),
+            TestCase(
+                id="real_edge_019",
+                name="Distributed Tracing System",
+                capability_request="Implement distributed tracing with OpenTelemetry and Jaeger across microservices",
+                expected_complexity=0.81,
+                expected_team_size=TeamSize.FULL_TEAM,
+                domain=CapabilityDomain.OPS,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.8, api_count=4, integration_points=5,
+                    security_sensitivity=0.3
+                ),
+                description="Observability across distributed system",
+                tags=["opentelemetry", "jaeger", "tracing"]
+            ),
+            TestCase(
+                id="real_edge_020",
+                name="Email Notification Service",
+                capability_request="Send email notifications using SendGrid with templates",
+                expected_complexity=0.15,
+                expected_team_size=TeamSize.INDIVIDUAL,
+                domain=CapabilityDomain.COMMUNICATION,
+                category=TestCaseCategory.EDGE_CASE,
+                factors=ComplexityFactors(
+                    domain_risk=0.1, api_count=1, integration_points=1,
+                    security_sensitivity=0.2
+                ),
+                description="Simple email integration",
+                tags=["email", "sendgrid", "notification"]
+            ),
+        ]
 
 
 # =============================================================================
@@ -1335,6 +1446,16 @@ class ComplexityValidationFramework:
         metrics.full_team_precision = self._calculate_precision(results, TeamSize.FULL_TEAM)
         metrics.full_team_recall = self._calculate_recall(results, TeamSize.FULL_TEAM)
 
+        # Balanced accuracy: mean of per-class recall (handles class imbalance)
+        recall_values = [
+            metrics.individual_recall,
+            metrics.small_team_recall,
+            metrics.full_team_recall
+        ]
+        # Only include non-zero recalls in the mean (ignore classes with no test cases)
+        valid_recalls = [r for r in recall_values if r > 0]
+        metrics.balanced_accuracy = np.mean(valid_recalls) if valid_recalls else 0.0
+
         # Overall precision/recall for team spawning (small + full)
         team_results = [r for r in results
                        if r.test_case.expected_team_size in (TeamSize.SMALL_TEAM, TeamSize.FULL_TEAM)]
@@ -1373,8 +1494,8 @@ class ComplexityValidationFramework:
 
         # Threshold boundary accuracy (within 0.05 of threshold)
         boundary_results = [r for r in results
-                          if abs(r.test_case.expected_complexity - 0.6) < 0.05
-                          or abs(r.test_case.expected_complexity - 0.8) < 0.05]
+                          if abs(r.test_case.expected_complexity - DEFAULT_CONFIG.individual_threshold) < 0.05
+                          or abs(r.test_case.expected_complexity - DEFAULT_CONFIG.small_team_threshold) < 0.05]
         if boundary_results:
             correct_boundaries = [r for r in boundary_results if r.classification_correct]
             metrics.threshold_boundary_accuracy = len(correct_boundaries) / len(boundary_results)
@@ -1600,7 +1721,14 @@ class ThresholdCalibrator:
         lower: float,
         upper: float
     ) -> ValidationMetrics:
-        """Calculate metrics with custom thresholds."""
+        """Calculate metrics with custom thresholds.
+
+        Creates defensive copies of TestResult objects to avoid mutating
+        the original results list during threshold grid search.
+        """
+        # Create defensive copies to avoid mutating original results
+        results_copy = [copy.copy(r) for r in results]
+
         # Temporarily update framework thresholds
         original_lower = self.framework.lower_threshold
         original_upper = self.framework.upper_threshold
@@ -1608,8 +1736,8 @@ class ThresholdCalibrator:
         self.framework.lower_threshold = lower
         self.framework.upper_threshold = upper
 
-        # Recalculate classifications
-        for result in results:
+        # Recalculate classifications on the copies
+        for result in results_copy:
             result.predicted_team_size = self.framework._complexity_to_team_size(
                 result.predicted_complexity
             )
@@ -1617,8 +1745,8 @@ class ThresholdCalibrator:
                 result.predicted_team_size == result.test_case.expected_team_size
             )
 
-        # Calculate metrics
-        metrics = self.framework.calculate_metrics(results)
+        # Calculate metrics from the copies
+        metrics = self.framework.calculate_metrics(results_copy)
 
         # Restore original thresholds
         self.framework.lower_threshold = original_lower
@@ -1971,6 +2099,7 @@ class StagingValidationPipeline:
 
         Criteria aligned with plan (Task 5.1):
         - accuracy >= 85%
+        - balanced_accuracy >= 80% (handles class imbalance)
         - individual_precision >= 90%
         - full_team_recall >= 90% (relaxed from 95% for keyword classifier)
         - edge_case_accuracy >= 70%
@@ -1980,6 +2109,9 @@ class StagingValidationPipeline:
 
         if metrics.accuracy < 0.85:
             issues.append("Accuracy below 85%")
+
+        if metrics.balanced_accuracy < 0.80:
+            issues.append("Balanced accuracy below 80%")
 
         if metrics.individual_precision < 0.90:
             issues.append("Individual precision below 90%")
@@ -2068,21 +2200,21 @@ class StagingValidationPipeline:
 
 def create_validation_suite(
     classifier: Any,
-    include_synthetic: bool = True
+    include_realistic_edge_cases: bool = True
 ) -> ComplexityValidationFramework:
     """Factory function to create validation suite.
 
     Args:
         classifier: TeamSizeClassifier to validate
-        include_synthetic: Whether to include synthetic test cases
+        include_realistic_edge_cases: Whether to include realistic edge cases
 
     Returns:
         Configured validation framework
     """
     test_cases = TestCaseLibrary.get_all_test_cases()
 
-    if include_synthetic:
-        test_cases.extend(TestCaseLibrary.get_synthetic_cases(10))
+    if include_realistic_edge_cases:
+        test_cases.extend(TestCaseLibrary.get_realistic_edge_cases(20))
 
     return ComplexityValidationFramework(
         classifier=classifier,

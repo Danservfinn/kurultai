@@ -18,12 +18,12 @@ entries:
       name: "Kublai Proxy Provider"
     attrs:
       external_host: "https://kublai.kurult.ai"
-      internal_host: "http://moltbot:8080"
+      internal_host: "http://moltbot-railway-template.railway.internal:18789"
       mode: forward_domain
       access_token_validity: hours=24
       refresh_token_validity: days=30
       authorization_flow: !Find [authentik_flows.flow, [slug, kublai-webauthn-auth]]
-      skip_path_regex: "^/setup/api/signal-link$"
+      skip_path_regex: "^/setup/api/signal-link$|^/ws/"
       basic_auth_enabled: false
       basic_auth_username_attribute: ""
       basic_auth_password_attribute: ""

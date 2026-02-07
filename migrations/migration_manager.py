@@ -299,6 +299,120 @@ class MigrationManager:
         )
         logger.debug(f"Registered migration v{version}: {name}")
 
+    @staticmethod
+    def _split_cypher(cypher: str) -> list:
+        """Split multi-statement Cypher into individual statements.
+
+        Removes comments and splits on semicolons, filtering empty lines.
+        """
+        statements = []
+        for raw_stmt in cypher.split(";"):
+            # Remove comment-only lines and whitespace
+            lines = []
+            for line in raw_stmt.strip().splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("//"):
+                    lines.append(line)
+            stmt = "\n".join(lines).strip()
+            if stmt:
+                statements.append(stmt)
+        return statements
+
+    @staticmethod
+    def _is_schema_statement(stmt: str) -> bool:
+        """Check if a Cypher statement is a schema modification (constraint/index)."""
+        upper = stmt.strip().upper()
+        return any(upper.startswith(prefix) for prefix in [
+            "CREATE CONSTRAINT", "DROP CONSTRAINT",
+            "CREATE INDEX", "DROP INDEX",
+            "CREATE VECTOR INDEX", "DROP VECTOR INDEX",
+        ])
+
+    def _apply_migration_split(self, session: Session, migration: MigrationRecord) -> None:
+        """Apply a migration, running schema and data statements in separate transactions.
+
+        Neo4j 5.x forbids mixing schema modifications with data modifications
+        in the same transaction.
+        """
+        start_time = datetime.utcnow()
+
+        # Check if already applied
+        result = session.run("""
+            MATCH (m:Migration {version: $version})
+            RETURN m.success as success
+        """, version=migration.version).single()
+
+        if result and result["success"]:
+            logger.info(f"Migration v{migration.version} already applied, skipping")
+            return
+
+        logger.info(f"Applying migration v{migration.version}: {migration.name}")
+
+        statements = self._split_cypher(migration.up_cypher)
+        schema_stmts = [s for s in statements if self._is_schema_statement(s)]
+        data_stmts = [s for s in statements if not self._is_schema_statement(s)]
+
+        try:
+            # Run schema statements one-by-one in auto-commit mode
+            for i, stmt in enumerate(schema_stmts, 1):
+                logger.debug(f"  Schema {i}/{len(schema_stmts)}: {stmt[:80]}...")
+                session.run(stmt)
+
+            # Run data statements in a write transaction
+            if data_stmts:
+                def run_data(tx):
+                    for i, stmt in enumerate(data_stmts, 1):
+                        logger.debug(f"  Data {i}/{len(data_stmts)}: {stmt[:80]}...")
+                        tx.run(stmt)
+                session.execute_write(run_data)
+
+            # Record migration success
+            execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            session.run("""
+                MERGE (m:Migration {version: $version})
+                SET m.name = $name,
+                    m.applied_at = datetime(),
+                    m.execution_time_ms = $execution_time,
+                    m.success = true,
+                    m.error_message = null
+            """,
+                version=migration.version,
+                name=migration.name,
+                execution_time=execution_time,
+            )
+
+            # Update control version
+            session.run("""
+                MATCH (mc:MigrationControl)
+                SET mc.version = $version,
+                    mc.last_updated = datetime()
+            """, version=migration.version)
+
+            logger.info(f"Migration v{migration.version} applied in {execution_time}ms")
+
+        except Exception as e:
+            execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            try:
+                session.run("""
+                    MERGE (m:Migration {version: $version})
+                    SET m.name = $name,
+                        m.applied_at = datetime(),
+                        m.execution_time_ms = $execution_time,
+                        m.success = false,
+                        m.error_message = $error_message
+                """,
+                    version=migration.version,
+                    name=migration.name,
+                    execution_time=execution_time,
+                    error_message=str(e)[:500]
+                )
+            except Exception as record_error:
+                logger.warning(f"Failed to record migration failure: {record_error}")
+
+            raise MigrationExecutionError(
+                f"Migration v{migration.version} failed: {e}"
+            ) from e
+
     def _apply_migration(self, tx: Transaction, migration: MigrationRecord) -> bool:
         """
         Apply a single migration within a transaction.
@@ -326,9 +440,12 @@ class MigrationManager:
                 logger.info(f"Migration v{migration.version} already applied, skipping")
                 return True
 
-            # Execute migration
+            # Execute migration — split multi-statement Cypher into individual statements
             logger.info(f"Applying migration v{migration.version}: {migration.name}")
-            tx.run(migration.up_cypher)
+            statements = self._split_cypher(migration.up_cypher)
+            for i, stmt in enumerate(statements, 1):
+                logger.debug(f"  Running statement {i}/{len(statements)}: {stmt[:80]}...")
+                tx.run(stmt)
 
             # Record migration
             execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
@@ -387,6 +504,9 @@ class MigrationManager:
         """
         Rollback a single migration within a transaction.
 
+        NOTE: This legacy method runs all statements in a single transaction.
+        For rollbacks that mix schema and data statements, use _rollback_migration_split instead.
+
         Args:
             tx: Neo4j transaction (provided by execute_write)
             migration: Migration to rollback
@@ -401,7 +521,10 @@ class MigrationManager:
 
         try:
             logger.info(f"Rolling back migration v{migration.version}: {migration.name}")
-            tx.run(migration.down_cypher)
+            statements = self._split_cypher(migration.down_cypher)
+            for i, stmt in enumerate(statements, 1):
+                logger.debug(f"  Rolling back statement {i}/{len(statements)}: {stmt[:80]}...")
+                tx.run(stmt)
 
             # Remove migration record
             tx.run("""
@@ -420,6 +543,55 @@ class MigrationManager:
             execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
             logger.info(f"Migration v{migration.version} rolled back in {execution_time}ms")
             return True
+
+        except Exception as e:
+            raise MigrationExecutionError(
+                f"Rollback of v{migration.version} failed: {e}"
+            ) from e
+
+    def _rollback_migration_split(self, session: Session, migration: MigrationRecord) -> None:
+        """Rollback a migration, splitting schema and data statements like _apply_migration_split.
+
+        Neo4j 5.x forbids mixing schema modifications (DROP INDEX/CONSTRAINT)
+        with data modifications (DELETE) in the same transaction.
+        """
+        start_time = datetime.utcnow()
+        logger.info(f"Rolling back migration v{migration.version}: {migration.name}")
+
+        statements = self._split_cypher(migration.down_cypher)
+        schema_stmts = [s for s in statements if self._is_schema_statement(s)]
+        data_stmts = [s for s in statements if not self._is_schema_statement(s)]
+
+        try:
+            # Run schema statements one-by-one in auto-commit mode
+            for i, stmt in enumerate(schema_stmts, 1):
+                logger.debug(f"  Rollback schema {i}/{len(schema_stmts)}: {stmt[:80]}...")
+                session.run(stmt)
+
+            # Run data statements in a write transaction
+            if data_stmts:
+                def run_data(tx):
+                    for i, stmt in enumerate(data_stmts, 1):
+                        logger.debug(f"  Rollback data {i}/{len(data_stmts)}: {stmt[:80]}...")
+                        tx.run(stmt)
+                session.execute_write(run_data)
+
+            # Remove migration record
+            session.run("""
+                MATCH (m:Migration {version: $version})
+                DELETE m
+            """, version=migration.version)
+
+            # Update control version to previous
+            previous_version = migration.version - 1
+            session.run("""
+                MATCH (mc:MigrationControl)
+                SET mc.version = $version,
+                    mc.last_updated = datetime()
+            """, version=previous_version)
+
+            execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            logger.info(f"Migration v{migration.version} rolled back in {execution_time}ms")
 
         except Exception as e:
             raise MigrationExecutionError(
@@ -475,12 +647,8 @@ class MigrationManager:
             for version in versions_to_apply:
                 migration = self._migrations[version]
 
-                # Use write transaction for atomicity
-                def apply_tx(tx: Transaction):
-                    return self._apply_migration(tx, migration)
-
                 try:
-                    session.execute_write(apply_tx)
+                    self._apply_migration_split(session, migration)
                 except Exception as e:
                     logger.error(f"Migration failed at v{version}: {e}")
                     raise
@@ -526,7 +694,7 @@ class MigrationManager:
 
             logger.info(f"Rolling back {len(versions_to_rollback)} migration(s)")
 
-            # Rollback migrations in reverse order
+            # Rollback migrations in reverse order (split schema/data for Neo4j 5.x)
             for version in versions_to_rollback:
                 migration = self._migrations.get(version)
 
@@ -535,11 +703,8 @@ class MigrationManager:
                         f"Cannot rollback v{version}: migration not registered"
                     )
 
-                def rollback_tx(tx: Transaction):
-                    return self._rollback_migration(tx, migration)
-
                 try:
-                    session.execute_write(rollback_tx)
+                    self._rollback_migration_split(session, migration)
                 except Exception as e:
                     logger.error(f"Rollback failed at v{version}: {e}")
                     raise

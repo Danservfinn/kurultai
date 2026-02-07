@@ -75,30 +75,19 @@ def load_classifier(module_path: Optional[str] = None) -> Any:
     """Load the TeamSizeClassifier from specified module.
 
     Args:
-        module_path: Python import path to classifier module
+        module_path: Python import path to classifier module (not used, fixed to TeamSizeClassifier)
 
     Returns:
         Loaded classifier instance
     """
-    module_path = module_path or os.getenv(
-        "CLASSIFIER_MODULE",
-        "tools.kurultai.team_size_classifier.TeamSizeClassifier",
-    )
-
-    # Dynamic import
-    parts = module_path.split(".")
-    module_name = ".".join(parts[:-1])
-    class_name = parts[-1]
-
+    # Fixed import for security - no dynamic module loading
     try:
-        module = __import__(module_name, fromlist=[class_name])
-        classifier_class = getattr(module, class_name)
-        return classifier_class()
+        from tools.kurultai.team_size_classifier import TeamSizeClassifier
+        return TeamSizeClassifier()
     except Exception as e:
         raise RuntimeError(
-            f"Failed to load classifier from '{module_path}': {e}\n"
-            "Ensure the classifier module is installed and importable. "
-            "Set the CLASSIFIER_MODULE environment variable to override."
+            f"Failed to load TeamSizeClassifier: {e}\n"
+            "Ensure the tools.kurultai module is installed and importable."
         ) from e
 
 
@@ -133,36 +122,51 @@ def load_results(input_path: str) -> Dict[str, Any]:
 
 async def run_full_validation(
     classifier: Any,
-    lower_threshold: float = 0.6,
-    upper_threshold: float = 0.8,
+    lower_threshold: float = None,  # Uses DEFAULT_CONFIG.individual_threshold if None
+    upper_threshold: float = None,  # Uses DEFAULT_CONFIG.small_team_threshold if None
     store_neo4j: bool = False
 ) -> Dict[str, Any]:
     """Run full validation suite.
 
     Args:
         classifier: TeamSizeClassifier instance
-        lower_threshold: Lower complexity threshold
-        upper_threshold: Upper complexity threshold
+        lower_threshold: Lower complexity threshold (default from config: 0.21)
+        upper_threshold: Upper complexity threshold (default from config: 0.64)
         store_neo4j: Whether to store results in Neo4j
 
     Returns:
         Validation results dictionary
     """
+    from tools.kurultai.complexity_config import DEFAULT_CONFIG
+
+    # Use config defaults if not specified
+    lower_threshold = lower_threshold if lower_threshold is not None else DEFAULT_CONFIG.individual_threshold
+    upper_threshold = upper_threshold if upper_threshold is not None else DEFAULT_CONFIG.small_team_threshold
+
     logger.info("Running full validation suite")
-    logger.info(f"Thresholds: lower={lower_threshold}, upper={upper_threshold}")
+    logger.info(f"Thresholds: lower={lower_threshold:.2f}, upper={upper_threshold:.2f}")
 
     # Create Neo4j client if needed
     neo4j_client = None
     if store_neo4j:
         try:
+            # Require NEO4J_PASSWORD to be set - no default for security
+            neo4j_password = os.getenv("NEO4J_PASSWORD")
+            if not neo4j_password:
+                raise SystemExit(
+                    "NEO4J_PASSWORD environment variable required for Neo4j storage. "
+                    "Set it in your .env file or environment."
+                )
             from neo4j import AsyncGraphDatabase
             neo4j_client = AsyncGraphDatabase.driver(
                 os.getenv("NEO4J_URI", "bolt://localhost:7687"),
                 auth=(
                     os.getenv("NEO4J_USER", "neo4j"),
-                    os.getenv("NEO4J_PASSWORD", "password")
+                    neo4j_password
                 )
             )
+        except SystemExit:
+            raise
         except Exception as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             logger.warning("Continuing without Neo4j storage")

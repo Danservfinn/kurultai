@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/drift_detector.py
+# hypothesis_version: 6.150.2
+
+[0.0, 1e-10, 1e-06, 0.1, 0.2, '[^a-zA-Z0-9_]', '_', 'agent_id', 'bins must be >= 2', 'drifted', 'feature_name', 'ground_truth', 'moderate', 'none', 'property', 'psi', 'psi_value', 'severity', 'significant', 'threshold', 'timestamp']

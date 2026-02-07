@@ -3,74 +3,189 @@
 # authentication via Authentik before allowing access.
 
 {
-    # Global options
     admin off
     auto_https off
     log {
         output stdout
         level DEBUG
     }
-    # Rate limiting for auth endpoints (using Caddy's http.ratelimit module if available)
-    # Fallback: Authentik has built-in rate limiting configured via API
 }
 
-# Listen on the Railway-assigned port
 :{$PORT} {
     log {
         output stdout
         level DEBUG
     }
 
-    # Rate limit all requests (generous limit for normal use)
-    # Note: Requires github.com/RussellLuo/caddy-ext/ratelimit or similar
-    # For now, we rely on Authentik's built-in rate limiting
-
-    # Signal SSE endpoint with token-based authentication
-    # The page itself is protected, but we add a secret token check for API access
-    handle /setup/api/signal-link {
-        # Check for valid secret token in header (set by the protected page)
-        @noToken {
-            header !X-Signal-Token {$SIGNAL_LINK_TOKEN}
-        }
+    route /setup/api/signal-link {
+        @noToken not header X-Signal-Token {$SIGNAL_LINK_TOKEN:disabled}
         respond @noToken "Unauthorized" 401
 
-        reverse_proxy moltbot.railway.internal:8080 {
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
             header_up Host {host}
-            header_up X-Real-IP {remote_host}
+            header_up X-Real-Ip {remote_host}
             header_up X-Signal-Token {http.request.header.X-Signal-Token}
-            # Enable SSE streaming
             header_down -Content-Length
-            # Keep connection alive for SSE
             flush_interval -1
         }
     }
 
-    # Forward authentication to Authentik's embedded outpost
-    forward_auth authentik-server.railway.internal:9000 {
-        uri /outpost.goauthentik.io/auth/caddy
-
-        # Headers that Authentik needs to identify the request
-        header_up X-Forwarded-Host {host}
-        header_up X-Forwarded-Uri {uri}
-        header_up X-Forwarded-Proto https
-        header_up X-Forwarded-Method {method}
-
-        # Copy authentication headers from Authentik response to upstream
-        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-*
-
-        # Trust Railway's internal network
-        trusted_proxies private_ranges
+    route /outpost.goauthentik.io/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
     }
 
-    # Reverse proxy to the moltbot service
-    reverse_proxy moltbot.railway.internal:8080 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto https
+    route /application/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
     }
 
-    # Handle errors
+    route /flows/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /-/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /if/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /api/auth/* {
+        forward_auth authentik-server.railway.internal:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            header_up X-Forwarded-Host {host}
+            header_up X-Forwarded-Uri {uri}
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Method {method}
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-*
+            trusted_proxies private_ranges
+        }
+
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # Authentik's own API — only needed when Authentik is active
+    # /api/v3/* is Authentik's REST API, /api/sentry/* is error reporting
+    route /api/v3/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    # OpenClaw gateway API — all other /api/* paths
+    route /api/* {
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /static/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /media/* {
+        reverse_proxy authentik-server.railway.internal:9000 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /ws/* {
+        forward_auth authentik-server.railway.internal:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            header_up X-Forwarded-Host {host}
+            header_up X-Forwarded-Uri {uri}
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Method {method}
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-*
+            trusted_proxies private_ranges
+        }
+
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /health {
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+        }
+    }
+
+    route /health/* {
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+        }
+    }
+
+    # Catch-all: proxy to OpenClaw gateway with Authentik forward auth
+    route {
+        forward_auth authentik-server.railway.internal:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            header_up X-Forwarded-Host {host}
+            header_up X-Forwarded-Uri {uri}
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Method {method}
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-*
+            trusted_proxies private_ranges
+        }
+
+        reverse_proxy moltbot-railway-template.railway.internal:18789 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
     handle_errors {
         respond "{err.status_code} {err.status_text}"
     }

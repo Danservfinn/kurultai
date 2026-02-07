@@ -161,11 +161,9 @@ class TopologicalExecutor:
         """
 
         try:
-            with self.neo4j._session() as session:
-                if session is None:
-                    return 0
-
-                result = session.run(query, agent_id=agent_id)
+            # Use async context manager for Neo4j async driver
+            async with self.neo4j.session() as session:
+                result = await session.run(query, agent_id=agent_id)
                 record = await result.single()
                 return record["load"] if record else 0
         except Exception:
@@ -246,11 +244,9 @@ class TopologicalExecutor:
         """
 
         try:
-            with self.neo4j._session() as session:
-                if session is None:
-                    return True
-
-                result = session.run(dispatch_query, {
+            # Use async context manager for Neo4j async driver
+            async with self.neo4j.session() as session:
+                result = await session.run(dispatch_query, {
                     "task_id": task["id"],
                     "agent_id": agent_id
                 })
@@ -276,6 +272,7 @@ class TopologicalExecutor:
         """
         total_executed = 0
         total_errors = 0
+        iteration = 0  # Initialize before loop to avoid UnboundLocalError
 
         for iteration in range(max_iterations):
             summary = await self.execute_ready_set(sender_hash)
@@ -324,17 +321,9 @@ class TopologicalExecutor:
         """
 
         try:
-            with self.neo4j._session() as session:
-                if session is None:
-                    return {
-                        "pending": 0,
-                        "in_progress": 0,
-                        "completed": 0,
-                        "blocked": 0,
-                        "total": 0
-                    }
-
-                result = session.run(query, sender_hash=sender_hash)
+            # Use async context manager for Neo4j async driver
+            async with self.neo4j.session() as session:
+                result = await session.run(query, sender_hash=sender_hash)
                 status_counts = {record["status"]: record["count"] async for record in result}
 
                 total = sum(status_counts.values())

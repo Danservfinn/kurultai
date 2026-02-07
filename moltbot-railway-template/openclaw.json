@@ -1,0 +1,76 @@
+{
+  "gateway": {
+    "port": 18789,
+    "bind": "lan",
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "controlUi": {
+      "enabled": true,
+      "allowInsecureAuth": true,
+      "dangerouslyDisableDeviceAuth": true
+    },
+    "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"]
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/data/workspace",
+      "model": {
+        "primary": "kimi-coding/k2p5"
+      }
+    },
+    "list": [
+      {
+        "id": "main",
+        "name": "Kublai"
+      },
+      {
+        "id": "researcher",
+        "name": "Möngke"
+      },
+      {
+        "id": "writer",
+        "name": "Chagatai"
+      },
+      {
+        "id": "developer",
+        "name": "Temüjin"
+      },
+      {
+        "id": "analyst",
+        "name": "Jochi"
+      },
+      {
+        "id": "ops",
+        "name": "Ögedei"
+      }
+    ]
+  },
+  "channels": {
+    "signal": {
+      "enabled": true,
+      "account": "${SIGNAL_ACCOUNT}",
+      "cliPath": "/usr/local/bin/signal-cli",
+      "autoStart": true,
+      "startupTimeoutMs": 120000,
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
+      "configWrites": false,
+      "allowFrom": ["${SIGNAL_ACCOUNT}", "${SIGNAL_ALLOW_FROM}"],
+      "historyLimit": 50,
+      "textChunkLimit": 4000,
+      "ignoreStories": true
+    }
+  },
+  "logging": {
+    "consoleLevel": "info",
+    "file": "/data/logs/openclaw.log"
+  },
+  "env": {
+    "shellEnv": {
+      "enabled": true
+    }
+  }
+}

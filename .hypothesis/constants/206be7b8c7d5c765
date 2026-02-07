@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/agent_integration.py
+# hypothesis_version: 6.150.2
+
+[1000, 'NEO4J_DATABASE', 'NEO4J_PASSWORD', 'NEO4J_URI', 'NEO4J_USER', 'No pending tasks', 'active', 'allowed', 'connected', 'count', 'database', 'error', 'fallback_mode', 'in_progress', 'neo4j', 'normal', 'password', 'reset_time', 'status', 'uri', 'username', 'writable']

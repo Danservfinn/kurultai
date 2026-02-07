@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/reflection_memory.py
+# hypothesis_version: 6.150.2
+
+[1.0, 127.5, 100, 384, ' AND ', '=', 'AND r.agent = $agent', 'WHERE ', '__main__', '_generate_id', '_now', '_session', 'agent', 'agents', 'all-MiniLM-L6-v2', 'already exists', 'by_mistake_type', 'common_themes', 'communication', 'consolidated', 'context', 'count', 'embedding', 'error', 'id', 'lesson', 'limit', 'logic', 'mistake_type', 'other', 'query_embedding', 'r', 'r.agent = $agent', 'reason', 'reflection_agent_idx', 'reflection_id', 'reflection_id_idx', 'reflection_ids', 'reflection_type_idx', 'root_cause', 'security', 'similarity', 'unknown']

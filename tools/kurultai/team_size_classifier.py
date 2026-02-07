@@ -149,25 +149,34 @@ SIMPLICITY_KEYWORDS: frozenset = frozenset({
 # =============================================================================
 # DEFAULT WEIGHTS
 # =============================================================================
+# All weights are normalized to sum to 1.0 for predictable score resolution.
+# Synergy bonuses are applied multiplicatively, not additively.
+
+_CURRENT_WEIGHT_SUM = 1.52  # Historical sum before normalization
 
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "length_factor": 0.05,
-    "technical_terms_factor": 0.28,
-    "integration_factor": 0.22,
-    "security_factor": 0.22,
-    "domain_complexity_factor": 0.30,
-    "concurrency_factor": 0.25,
-    "data_scale_factor": 0.20,
+    "length_factor": 0.05 / _CURRENT_WEIGHT_SUM,           # ~0.033
+    "technical_terms_factor": 0.28 / _CURRENT_WEIGHT_SUM,  # ~0.184
+    "integration_factor": 0.22 / _CURRENT_WEIGHT_SUM,      # ~0.145
+    "security_factor": 0.22 / _CURRENT_WEIGHT_SUM,         # ~0.145
+    "domain_complexity_factor": 0.30 / _CURRENT_WEIGHT_SUM,  # ~0.197
+    "concurrency_factor": 0.25 / _CURRENT_WEIGHT_SUM,      # ~0.164
+    "data_scale_factor": 0.20 / _CURRENT_WEIGHT_SUM,       # ~0.132
 }
+# Verify normalization at module load time
+assert abs(sum(DEFAULT_WEIGHTS.values()) - 1.0) < 0.001, (
+    f"Weights must sum to 1.0, got {sum(DEFAULT_WEIGHTS.values()):.4f}"
+)
 
-# Synergy bonus when multiple categories of keywords are active.
-# This is the key to making complex, multi-dimensional requests score high.
+# Synergy multiplier when multiple categories of keywords are active.
+# Applied multiplicatively to the base weighted sum to ensure scores
+# never exceed 1.0 before the final clamp (weights sum to 1.0).
 _SYNERGY_THRESHOLDS = [
-    # (min_active_factors, bonus)
-    (5, 0.45),   # 5+ active factors: very strong synergy
-    (4, 0.35),   # 4 active factors: strong synergy
-    (3, 0.25),   # 3 active factors: moderate synergy
-    (2, 0.12),   # 2 active factors: slight synergy
+    # (min_active_factors, additive_bonus_converted_to_multiplier)
+    (5, 0.45),   # 5+ active factors: 1.45x multiplier
+    (4, 0.35),   # 4 active factors: 1.35x multiplier
+    (3, 0.25),   # 3 active factors: 1.25x multiplier
+    (2, 0.12),   # 2 active factors: 1.12x multiplier
 ]
 
 # Threshold for a factor to be considered "active" for synergy purposes.
@@ -469,14 +478,18 @@ class TeamSizeClassifier:
     # --------------------------------------------------------------------- #
 
     def _combine_factors(self, factors: Dict[str, float]) -> float:
-        """Weighted sum of factors with synergy bonus, clamped to [0, 1].
+        """Weighted sum of factors with multiplicative synergy, clamped to [0, 1].
 
-        The synergy bonus rewards requests that span multiple complexity
+        The synergy multiplier rewards requests that span multiple complexity
         dimensions (e.g. both technical depth AND security AND concurrency).
         This ensures that genuinely complex, multi-faceted requests reach
         the high-complexity band (>0.8) even if no single factor dominates.
+
+        Synergy is applied multiplicatively (score * multiplier) rather than
+        additively (score + bonus) to ensure the final score never exceeds 1.0
+        before the final clamp, given that weights now sum to exactly 1.0.
         """
-        # Base weighted sum
+        # Base weighted sum (0-1 range due to weight normalization)
         raw = sum(
             factors.get(name, 0.0) * weight
             for name, weight in self.weights.items()
@@ -494,13 +507,17 @@ class TeamSizeClassifier:
             if factors.get(name, 0.0) >= _FACTOR_ACTIVE_THRESHOLD
         )
 
-        # Apply synergy bonus (take the first matching threshold)
+        # Apply synergy multiplier (take the first matching threshold)
+        # Multipliers are > 1.0 to boost scores for multi-factor requests
+        synergy_multiplier = 1.0
         for min_active, bonus in _SYNERGY_THRESHOLDS:
             if active_count >= min_active:
-                raw += bonus
+                # Convert additive bonus to multiplicative factor
+                # e.g., 0.45 bonus -> 1.45 multiplier for 5+ factors
+                synergy_multiplier = 1.0 + bonus
                 break
 
-        return max(0.0, min(raw, 1.0))
+        return max(0.0, min(raw * synergy_multiplier, 1.0))
 
     @staticmethod
     def _compute_confidence(

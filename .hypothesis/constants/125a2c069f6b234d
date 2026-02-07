@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/types.py
+# hypothesis_version: 6.150.2
+
+[0.5, 0.55, 0.75, 100, 'Chagatai', 'Jochi', 'Möngke', 'Temüjin', 'aborted', 'agent_id', 'agent_name', 'analysis', 'analyst', 'blocked', 'blocks', 'code', 'completed', 'confidence', 'content', 'detected_by', 'developer', 'docs', 'error_count', 'errors', 'escalated', 'executed', 'executed_count', 'feeds_into', 'from_task', 'in_progress', 'metadata', 'ops', 'parallel_ok', 'paused', 'pending', 'ready', 'reason', 'research', 'researcher', 'sender_hash', 'strategy', 'testing', 'timestamp', 'to_task', 'type', 'weight', 'writer', 'Ögedei']

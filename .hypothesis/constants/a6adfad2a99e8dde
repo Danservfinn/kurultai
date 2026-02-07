@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/intent_buffer.py
+# hypothesis_version: 6.150.2
+
+[0.0, 0.5, 100, 'count', 'newest', 'oldest', 'senders', 'time_span_seconds']

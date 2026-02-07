@@ -8,30 +8,54 @@
 
 services:
   # ===========================================================================
+  # MIGRATION RUNNER - One-shot Neo4j migration service
+  # ===========================================================================
+  migrations:
+    build:
+      context: ./railway-migrations
+      dockerfile: Dockerfile
+
+    # Environment variables
+    envFile: .env
+
+    # Environment variables for Neo4j connection
+    environment:
+      # Neo4j Connection (use Railway internal DNS)
+      - name: NEO4J_URI
+        value: "bolt://neo4j.railway.internal:7687"
+      - name: NEO4J_USER
+        value: "neo4j"
+      # NEO4J_PASSWORD inherited from Railway variables
+
+    # This is a one-shot job - it will exit after migrations complete
+    # No health check needed
+
+    # Dependencies - ensure Neo4j starts first
+    dependsOn:
+      - neo4j
+
+  # ===========================================================================
   # MOLTBOT SERVICE - Main OpenClaw Gateway
   # ===========================================================================
   moltbot:
     build:
-      context: .
+      context: ./moltbot-railway-template
       dockerfile: Dockerfile
 
-    # Port configuration (gateway runs on 18789 per moltbot.json)
+    # Port configuration - OpenClaw gateway on 18789
     ports:
       - port: 18789
         targetPort: 18789
         protocol: TCP
-      - port: 8080
-        targetPort: 8080
-        protocol: TCP
 
-    # Health check endpoint
+    # Health check endpoint (OpenClaw built-in)
     healthcheck:
       path: /health
       port: 18789
       interval: 30s
       timeout: 10s
-      startPeriod: 5s
-      retries: 3
+      startPeriod: 120s
+      retries: 5
 
     # Environment variables from .env file
     envFile: .env
@@ -41,29 +65,34 @@ services:
       # OpenClaw Gateway Configuration
       - name: OPENCLAW_GATEWAY_PORT
         value: "18789"
-      - name: OPENCLAW_CONTROL_UI_ENABLED
-        value: "true"
+      - name: OPENCLAW_STATE_DIR
+        value: "/data/.openclaw"
+      # OPENCLAW_GATEWAY_TOKEN should be set via Railway dashboard
+      # ANTHROPIC_API_KEY should be set via Railway dashboard
 
       # Neo4j Connection
       - name: NEO4J_URI
-        value: "bolt://neo4j:7687"
+        value: "bolt://neo4j.railway.internal:7687"
       - name: NEO4J_USER
         value: "neo4j"
-      # NEO4J_PASSWORD should be set via Railway dashboard or .env
+      # NEO4J_PASSWORD should be set via Railway dashboard
 
-      # Data directories
-      - name: CLAWDBOT_STATE_DIR
-        value: "/data/.clawdbot"
-      - name: CLAWDBOT_WORKSPACE_DIR
-        value: "/data/workspace"
+      # Signal Configuration
+      - name: SIGNAL_ENABLED
+        value: "true"
+      - name: SIGNAL_DATA_DIR
+        value: "/data/.signal"
+      - name: SIGNAL_CLI_PATH
+        value: "/usr/local/bin/signal-cli"
+      # SIGNAL_ACCOUNT should be set via Railway dashboard
 
-      # Python configuration
+      # Python configuration (for migrations)
       - name: PYTHONUNBUFFERED
         value: "1"
       - name: PYTHONDONTWRITEBYTECODE
         value: "1"
 
-    # Resource allocation (adjust based on needs)
+    # Resource allocation
     resources:
       cpu: 1
       memory: 2Gi
@@ -97,9 +126,9 @@ services:
         protocol: TCP
         description: "Neo4j Bolt Protocol"
 
-    # Health check using Neo4j's built-in health endpoint
+    # Health check using Neo4j 5 HTTP endpoint
     healthcheck:
-      path: /db/manage/server/jmx/domain/org.neo4j/instance%3Dkernel%230%2Cname%3DDiagnostics
+      path: /
       port: 7474
       interval: 30s
       timeout: 10s
@@ -113,9 +142,9 @@ services:
       - name: NEO4J_AUTH
         value: ${NEO4J_USER}/${NEO4J_PASSWORD}
 
-      # Plugins (APOC and GDS - Graph Data Science)
+      # Plugins (APOC only - GDS requires Enterprise Edition)
       - name: NEO4J_PLUGINS
-        value: '["apoc", "gds"]'
+        value: '["apoc"]'
 
       # Memory settings (adjust based on Railway plan)
       - name: NEO4J_dbms_memory_heap_initial__size
@@ -407,7 +436,7 @@ deploy:
 #
 # 3. Health Check Endpoints:
 #    - moltbot: http://<service>:18789/health
-#    - neo4j: http://<service>:7474/db/manage/server/jmx/...
+#    - neo4j: http://<service>:7474/
 #    - authentik-server: http://<service>:9000/-/health/ready/
 #
 # 4. Authentik Admin Access:

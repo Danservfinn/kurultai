@@ -1,0 +1,32 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python app.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = "slack-bot"
+
+[[services.ports]]
+port = 3000
+type = "HTTP"
+
+[[services.env_vars]]
+key = "SLACK_BOT_TOKEN"
+value = "${SLACK_BOT_TOKEN}"
+
+[[services.env_vars]]
+key = "SLACK_SIGNING_SECRET"
+value = "${SLACK_SIGNING_SECRET}"
+
+[[services.env_vars]]
+key = "PARSE_API_KEY"
+value = "${PARSE_API_KEY}"
+
+[[services.env_vars]]
+key = "PARSE_BASE_URL"
+value = "https://parsethe.media"

@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/complexity_config.py
+# hypothesis_version: 6.150.2
+
+[0.21, 0.64, 10.0, 25.0, 200.0, 10000, 'analyst', 'analyst_1', 'analyst_2', 'analyst_3', 'assembly_line', 'consensus', 'default_pattern', 'expertise_routing', 'facilitator', 'full_team', 'individual', 'max_rounds', 'monitor', 'primary', 'producer', 'review_loop', 'reviewer', 'reviewer_1', 'reviewer_2', 'roles', 'small_team', 'specialist', 'stage_1', 'stage_2', 'stage_3', 'validator', 'watchdog']

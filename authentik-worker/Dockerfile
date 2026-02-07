@@ -4,5 +4,6 @@ FROM ghcr.io/goauthentik/server:2025.10
 # Must run as root for proper permissions (matching docker-compose.yml)
 USER root
 
-# Run the worker using the standard command
-CMD ["worker"]
+# Override entrypoint entirely to prevent Railway from stripping CMD
+ENTRYPOINT []
+CMD ["dumb-init", "--", "ak", "worker"]

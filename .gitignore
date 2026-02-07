@@ -47,3 +47,8 @@ logs/
 local/
 tmp/
 temp/
+
+# Credentials and secrets
+authentik-credentials.txt
+*.credentials
+*.secret

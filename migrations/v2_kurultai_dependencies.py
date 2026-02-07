@@ -68,7 +68,7 @@ class V2KurultaiDependencies:
     CREATE INDEX depends_on_type IF NOT EXISTS FOR ()-[d:DEPENDS_ON]->() ON (d.type);
 
     // Priority queue queries
-    CREATE INDEX task_priority IF NOT EXISTS FOR (t:Task) ON (t.priority_weight DESC, t.created_at);
+    CREATE INDEX task_priority IF NOT EXISTS FOR (t:Task) ON (t.priority_weight, t.created_at);
 
     // Deliverable type queries
     CREATE INDEX task_deliverable_type IF NOT EXISTS FOR (t:Task) ON (t.deliverable_type);
@@ -80,11 +80,17 @@ class V2KurultaiDependencies:
     CREATE INDEX task_user_override IF NOT EXISTS FOR (t:Task) ON (t.user_priority_override);
 
     // -----------------------------------------------------
-    // 3. Attempt to create vector index (Neo4j 5.11+ only)
+    // 3. Vector indexes (Neo4j 5.11+ required)
     // -----------------------------------------------------
 
-    // This will fail on Neo4j < 5.11, which is expected
-    // The migration continues even if this fails
+    // Task embedding for semantic similarity search (384-dim)
+    CREATE VECTOR INDEX task_embedding IF NOT EXISTS
+    FOR (t:Task) ON (t.embedding)
+    OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}};
+
+    // Fulltext index for knowledge content search
+    CREATE FULLTEXT INDEX knowledge_content IF NOT EXISTS
+    FOR (t:Task) ON EACH [t.sanitized_description, t.deliverable_type];
     """
 
     # Cypher queries for rolling back the migration
@@ -114,6 +120,8 @@ class V2KurultaiDependencies:
     DROP INDEX task_deliverable_type IF EXISTS;
     DROP INDEX task_notion_synced IF EXISTS;
     DROP INDEX task_user_override IF EXISTS;
+    DROP INDEX task_embedding IF EXISTS;
+    DROP INDEX knowledge_content IF EXISTS;
 
     // -----------------------------------------------------
     // 3. Remove DEPENDS_ON relationships
@@ -180,6 +188,8 @@ class V2KurultaiDependencies:
                 "task_deliverable_type",
                 "task_notion_synced",
                 "task_user_override",
+                "task_embedding",
+                "knowledge_content",
             ],
             "relationships": ["DEPENDS_ON"],
         }
@@ -229,7 +239,7 @@ async def upgrade(driver):
         "CREATE INDEX depends_on_type IF NOT EXISTS FOR ()-[d:DEPENDS_ON]->() ON (d.type)",
 
         # Priority queue queries
-        "CREATE INDEX task_priority IF NOT EXISTS FOR (t:Task) ON (t.priority_weight DESC, t.created_at)",
+        "CREATE INDEX task_priority IF NOT EXISTS FOR (t:Task) ON (t.priority_weight, t.created_at)",
 
         # Deliverable type queries
         "CREATE INDEX task_deliverable_type IF NOT EXISTS FOR (t:Task) ON (t.deliverable_type)",

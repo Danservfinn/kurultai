@@ -1,0 +1,91 @@
+{
+  "dashboard": {
+    "title": "Kurultai Complexity Scoring",
+    "tags": ["kurultai", "complexity", "classification"],
+    "timezone": "UTC",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Classification Confidence Distribution",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(kurultai_classification_confidence_bucket[5m])) by (le) without (job, instance))",
+            "legendFormat": "P95: {{le}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "description": "95th percentile of classification confidence scores over time"
+      },
+      {
+        "id": 2,
+        "title": "Classification Bucket Counts",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum by (bucket) (rate(kurultai_classification_bucket_total[5m]))",
+            "legendFormat": "{{bucket}}",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "description": "Rate of classifications by complexity bucket (low, medium, high, very_high)"
+      },
+      {
+        "id": 3,
+        "title": "Average Classification Confidence",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(kurultai_classification_confidence)",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
+        "description": "Current average confidence score"
+      },
+      {
+        "id": 4,
+        "title": "Routing Accuracy",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "kurultai_routing_accuracy",
+            "refId": "D"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
+        "description": "Percentage of correct initial agent assignments",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 70},
+                {"color": "yellow", "value": 85},
+                {"color": "green", "value": 90}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Total Classifications",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(kurultai_classification_bucket_total)",
+            "refId": "E"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
+        "description": "Total number of classifications performed"
+      }
+    ]
+  }
+}

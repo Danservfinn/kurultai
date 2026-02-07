@@ -1,0 +1,107 @@
+{
+  "dashboard": {
+    "title": "Kurultai Delegation Latency",
+    "tags": ["kurultai", "delegation", "latency", "performance"],
+    "timezone": "UTC",
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Delegation Latency by Component",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(kurultai_delegation_latency_seconds_bucket[5m])) by (le, component) without (job, instance))",
+            "legendFormat": "P95 {{component}}: {{le}}s",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+        "description": "95th percentile latency broken down by delegation component"
+      },
+      {
+        "id": 2,
+        "title": "Classification Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kurultai_delegation_latency_seconds_sum{component=\"classification\"}[5m]) / rate(kurultai_delegation_latency_seconds_count{component=\"classification\"}[5m])",
+            "legendFormat": "Avg classification",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8},
+        "description": "Average time to classify and route a task"
+      },
+      {
+        "id": 3,
+        "title": "Neo4j Create Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kurultai_delegation_latency_seconds_sum{component=\"neo4j_create\"}[5m]) / rate(kurultai_delegation_latency_seconds_count{component=\"neo4j_create\"}[5m])",
+            "legendFormat": "Avg Neo4j write",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 8},
+        "description": "Average time to create task in Neo4j"
+      },
+      {
+        "id": 4,
+        "title": "Agent Delivery Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kurultai_delegation_latency_seconds_sum{component=\"agentToAgent\"}[5m]) / rate(kurultai_delegation_latency_seconds_count{component=\"agentToAgent\"}[5m])",
+            "legendFormat": "Avg delivery",
+            "refId": "D"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8},
+        "description": "Average time for agent-to-agent message delivery"
+      },
+      {
+        "id": 5,
+        "title": "End-to-End Task Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(kurultai_task_e2e_latency_seconds_bucket[5m])) by (le, task_type) without (job, instance))",
+            "legendFormat": "P95 {{task_type}}: {{le}}s",
+            "refId": "E"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+        "description": "95th percentile of full task completion time by task type"
+      },
+      {
+        "id": 6,
+        "title": "Latency Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(kurultai_delegation_latency_seconds_bucket[5m])) by (le, component) without (job, instance))",
+            "refId": "F"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+        "description": "P50 latency heatmap by component"
+      },
+      {
+        "id": 7,
+        "title": "Delegation Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(kurultai_task_e2e_latency_seconds_count[5m]))",
+            "legendFormat": "Delegations/sec",
+            "refId": "G"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+        "description": "Rate of task delegations per second"
+      }
+    ]
+  }
+}

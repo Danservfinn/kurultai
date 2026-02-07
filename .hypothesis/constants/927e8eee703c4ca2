@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/ground_truth.py
+# hypothesis_version: 6.150.2
+
+[0.0, 1.0, 100, 'actual_complexity', 'actual_team_size', 'agent_id', 'created_at', 'ground_truth', 'gt', 'limit', 'task_id']

@@ -1,0 +1,85 @@
+# Test Dependencies for Kublai Testing Suite
+# Install with: pip install -r test-requirements.txt
+
+# Core testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+pytest-asyncio>=0.21.0
+pytest-xdist>=3.5.0  # Parallel test execution
+pytest-timeout>=2.2.0  # Test timeout enforcement
+pytest-rerunfailures>=13.0  # Flake test rerunning
+pytest-benchmark>=4.0.0  # Performance benchmarking
+
+# Property-based testing
+hypothesis>=6.100.0
+
+# Coverage reporting
+coverage[toml]>=7.3.0
+
+# Mocking and fixtures
+responses>=0.24.0  # HTTP mocking
+freezegun>=1.4.0  # Time freezing
+faker>=23.0.0  # Fake data generation
+
+# Async testing
+anyio>=4.3.0  # Async/await testing
+asyncio>=3.4.3
+
+# Network and service mocking
+pytest-localserver>=0.6.0  # Local HTTP server
+webtest>=3.0.0  # WSGI app testing
+
+# Neo4j testing (for integration tests)
+neo4j>=5.15.0
+testcontainers>=4.5.0  # Docker-based test containers
+
+# Notion API mocking
+pytest-vcr>=1.0.0  # Record/replay HTTP interactions
+
+# Utilities
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+rich>=13.7.0  # Pretty terminal output
+
+# Type checking (test time)
+mypy>=1.8.0
+types-requests>=2.31.0
+
+# Linting and formatting (optional, for pre-commit hooks)
+black>=23.12.0
+ruff>=0.1.0
+isort>=5.13.0
+
+# Documentation testing
+pytest-doctestplus>=1.2.0
+
+# Performance profiling
+memory-profiler>=0.61.0
+py-spy>=0.3.14  # Sampling profiler
+
+# Chaos engineering
+chaostoolkit>=1.35.0
+chaostoolkit-kubernetes>=0.30.0  # Optional, for K8s chaos
+
+# Security testing
+bandit>=1.7.0  # Security linter
+safety>=2.3.0  # Dependency vulnerability scanning
+
+# JSON schema validation
+jsonschema>=4.20.0
+
+# Graph testing (for DAG tests)
+networkx>=3.2.1
+matplotlib>=3.8.0  # For DAG visualization (optional)
+
+# Time handling
+pytz>=2023.3
+dateparser>=1.2.0
+
+# Encoding/decoding
+chardet>=5.2.0
+
+# Report generation
+pytest-html>=4.1.0
+ allure-pytest>=2.13.0  # Optional, for Allure reports

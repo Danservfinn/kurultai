@@ -1,0 +1,117 @@
+# Moltbot Railway Template - OpenClaw Gateway with embedded Signal
+# Replaces Express gateway with full OpenClaw gateway including built-in webchat UI
+
+FROM node:22-bookworm-slim
+
+# =============================================================================
+# SECTION 1: System Dependencies
+# =============================================================================
+# Java for signal-cli, Python for Neo4j migrations, curl for healthcheck
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    python3 \
+    python3-pip \
+    curl \
+    ca-certificates \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+# Install Python dependencies for Neo4j migrations
+RUN pip3 install --no-cache-dir --break-system-packages \
+    neo4j>=5.15.0 \
+    pyyaml>=6.0.1 \
+    python-dotenv>=1.0.0
+
+# =============================================================================
+# SECTION 2: Install signal-cli (native GraalVM binary)
+# =============================================================================
+
+ARG SIGNAL_CLI_VERSION=0.13.12
+RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
+    "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz" \
+    && tar -xzf /tmp/signal-cli.tar.gz -C /usr/local/bin \
+    && rm /tmp/signal-cli.tar.gz \
+    && chmod +x /usr/local/bin/signal-cli \
+    && signal-cli --version
+
+# =============================================================================
+# SECTION 3: Install OpenClaw Gateway
+# =============================================================================
+# OpenClaw provides the gateway with built-in webchat UI at :18789
+
+RUN npm install -g openclaw@latest
+
+# =============================================================================
+# SECTION 4: Working Directory & Data Directories
+# =============================================================================
+
+WORKDIR /app
+
+RUN mkdir -p /data/.signal \
+    && mkdir -p /data/.openclaw \
+    && mkdir -p /data/workspace \
+    && mkdir -p /data/logs
+
+# =============================================================================
+# SECTION 5: Import Signal Data (if available)
+# =============================================================================
+
+COPY .signal-data/signal-data.tar.gz /opt/signal-data.tar.gz
+
+# =============================================================================
+# SECTION 6: Application Files
+# =============================================================================
+# Copy migration scripts, config, and operational files
+
+COPY --chown=1000:1000 migrations /app/migrations
+COPY --chown=1000:1000 openclaw_memory.py /app/
+COPY --chown=1000:1000 scripts /app/scripts
+COPY --chown=1000:1000 openclaw.json5 /app/openclaw.json5
+COPY --chown=1000:1000 openclaw.json /app/openclaw.json
+COPY --chown=1000:1000 entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# =============================================================================
+# SECTION 7: Non-Root User Setup
+# =============================================================================
+
+RUN groupadd -r moltbot -g 1001 \
+    && useradd -r -g moltbot -u 1001 moltbot \
+    && chown -R 1001:1001 /data /app
+
+# NOTE: Do NOT set USER here. entrypoint.sh runs as root to handle
+# volume permissions and signal data extraction, then drops to moltbot user.
+
+# =============================================================================
+# SECTION 8: Environment Variables
+# =============================================================================
+
+ENV NODE_ENV=production
+ENV OPENCLAW_STATE_DIR=/data/.openclaw
+ENV OPENCLAW_GATEWAY_PORT=18789
+
+# Signal Configuration
+ENV SIGNAL_ENABLED=true
+ENV SIGNAL_ACCOUNT=${SIGNAL_ACCOUNT}
+ENV SIGNAL_DATA_DIR=/data/.signal
+ENV SIGNAL_CLI_PATH=/usr/local/bin/signal-cli
+
+# =============================================================================
+# SECTION 9: Health Check
+# =============================================================================
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:18789/health || exit 1
+
+# =============================================================================
+# SECTION 10: Entry Point
+# =============================================================================
+
+EXPOSE 18789
+
+# Railway strips Docker CMD — ENTRYPOINT [] ensures CMD is preserved
+ENTRYPOINT []
+CMD ["sh", "/app/entrypoint.sh"]

@@ -369,8 +369,8 @@ class ComplexityValidator:
         # Borderline accuracy
         borderline_results = [
             r for r in self.results
-            if abs(r.predicted_complexity - 0.6) < 0.05
-            or abs(r.predicted_complexity - 0.8) < 0.05
+            if abs(r.predicted_complexity - DEFAULT_CONFIG.individual_threshold) < 0.05
+            or abs(r.predicted_complexity - DEFAULT_CONFIG.small_team_threshold) < 0.05
         ]
         borderline_accuracy = (
             sum(1 for r in borderline_results if r.correct) / len(borderline_results)
@@ -602,8 +602,8 @@ class ThresholdCalibrator:
 
     def __init__(
         self,
-        lower_threshold: float = 0.6,
-        upper_threshold: float = 0.8,
+        lower_threshold: float = None,  # Uses DEFAULT_CONFIG.individual_threshold if None
+        upper_threshold: float = None,  # Uses DEFAULT_CONFIG.small_team_threshold if None
         step_size: float = 0.02,
     ):
         self.lower = lower_threshold
@@ -695,25 +695,29 @@ class ThresholdCalibrator:
         lower, upper = config
         recommendations = []
 
-        if lower > 0.6:
+        # Compare against calibrated thresholds (not legacy 0.6/0.8)
+        default_lower = DEFAULT_CONFIG.individual_threshold
+        default_upper = DEFAULT_CONFIG.small_team_threshold
+
+        if lower > default_lower:
             recommendations.append(
-                f"RAISE lower threshold from 0.6 to {lower:.2f} to improve "
+                f"RAISE lower threshold from {default_lower:.2f} to {lower:.2f} to improve "
                 "individual precision and reduce team over-allocation."
             )
-        elif lower < 0.6:
+        elif lower < default_lower:
             recommendations.append(
-                f"LOWER lower threshold from 0.6 to {lower:.2f} to improve "
+                f"LOWER lower threshold from {default_lower:.2f} to {lower:.2f} to improve "
                 "recall for moderate-complexity tasks."
             )
 
-        if upper < 0.8:
+        if upper < default_upper:
             recommendations.append(
-                f"LOWER upper threshold from 0.8 to {upper:.2f} to ensure "
+                f"LOWER upper threshold from {default_upper:.2f} to {upper:.2f} to ensure "
                 "complex tasks get full team resources."
             )
-        elif upper > 0.8:
+        elif upper > default_upper:
             recommendations.append(
-                f"RAISE upper threshold from 0.8 to {upper:.2f} to reduce "
+                f"RAISE upper threshold from {default_upper:.2f} to {upper:.2f} to reduce "
                 "unnecessary full team allocation."
             )
 
@@ -740,8 +744,11 @@ class ABTestFramework:
 
     def assign_variant(self, request_id: str) -> str:
         """Assign request to control or variant group."""
-        secret = os.getenv("AB_TEST_SECRET", "kurultai-ab-test-default-secret").encode()
-        hash_val = int(hmac.new(secret, request_id.encode(), hashlib.sha256).hexdigest(), 16)
+        secret = os.getenv("AB_TEST_SECRET")
+        if not secret:
+            raise ValueError("AB_TEST_SECRET environment variable required for A/B testing")
+        secret_bytes = secret.encode()
+        hash_val = int(hmac.new(secret_bytes, request_id.encode(), hashlib.sha256).hexdigest(), 16)
         if hash_val % 100 < (self.traffic_split * 100):
             return "variant"
         return "control"

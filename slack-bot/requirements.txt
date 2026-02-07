@@ -1,0 +1,16 @@
+# Parse Slack Bot Requirements
+
+# Slack SDK
+slack-sdk>=3.26.0
+slack-bolt>=1.18.0
+
+# FastAPI (for HTTP mode)
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Parse client (local import)
+# -e ../.
+
+# Utilities
+python-dotenv>=1.0.0
+httpx>=0.26.0
