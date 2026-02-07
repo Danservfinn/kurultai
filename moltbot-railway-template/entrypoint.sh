@@ -209,14 +209,70 @@ fi
 # =============================================================================
 # The Express server provides the proposal API endpoints on port 8080
 # Start as background process so OpenClaw gateway can run in foreground
+
+# WORKAROUND: Railway build cache prevents Dockerfile updates.
+# If Express server files are missing, clone them from git at runtime.
+if [ ! -f /app/src/index.js ]; then
+    echo "=== Express server not found in image, installing at runtime ==="
+
+    # Create app directory structure
+    mkdir -p /app/src /app/routes /app/middleware /app/config /app/scripts
+
+    # Clone the repository to a temp location and copy Express files
+    TEMP_DIR=$(mktemp -d)
+    echo "Cloning repository to fetch Express server files..."
+
+    # Use git to fetch just the moltbot-railway-template directory
+    if command -v git >/dev/null 2>&1; then
+        git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/Danservfinn/Kurultai.git "$TEMP_DIR" 2>/dev/null || true
+
+        if [ -d "$TEMP_DIR/moltbot-railway-template" ]; then
+            cd "$TEMP_DIR"
+            git sparse-checkout set moltbot-railway-template 2>/dev/null || true
+            cd - >/dev/null
+
+            # Copy Express server files
+            cp -r "$TEMP_DIR/moltbot-railway-template/src"/* /app/src/ 2>/dev/null || true
+            cp -r "$TEMP_DIR/moltbot-railway-template/routes"/* /app/routes/ 2>/dev/null || true
+            cp -r "$TEMP_DIR/moltbot-railway-template/middleware"/* /app/middleware/ 2>/dev/null || true
+            cp -r "$TEMP_DIR/moltbot-railway-template/config"/* /app/config/ 2>/dev/null || true
+            cp -r "$TEMP_DIR/moltbot-railway-template/scripts"/* /app/scripts/ 2>/dev/null || true
+            cp "$TEMP_DIR/moltbot-railway-template/package.json" /app/ 2>/dev/null || true
+            cp "$TEMP_DIR/moltbot-railway-template/package-lock.json" /app/ 2>/dev/null || true
+
+            echo "Express server files copied from git"
+        fi
+    fi
+
+    # Clean up temp directory
+    rm -rf "$TEMP_DIR"
+
+    # Install npm dependencies if package.json was copied
+    if [ -f /app/package.json ]; then
+        echo "Installing npm dependencies..."
+        cd /app && npm install --production 2>&1 | tail -5
+    fi
+
+    # Set proper ownership
+    chown -R 1001:1001 /app/src /app/routes /app/middleware /app/config /app/scripts 2>/dev/null || true
+fi
+
+# Start the Express server
 if [ -f /app/src/index.js ]; then
     echo "Starting Express API server on port ${EXPRESS_PORT:-8080}..."
-    su -s /bin/sh moltbot -c "NODE_ENV=production PORT=${EXPRESS_PORT:-8080} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js &"
+    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_PORT:-8080} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js &"
     # Wait a moment for Express to start
-    sleep 2
-    echo "Express API server started in background"
+    sleep 3
+
+    # Verify Express started
+    if curl -sf http://localhost:${EXPRESS_PORT:-8080}/health >/dev/null 2>&1; then
+        echo "Express API server started successfully"
+    else
+        echo "WARNING: Express server may not have started properly (health check failed)"
+    fi
 else
-    echo "WARNING: Express server not found at /app/src/index.js"
+    echo "WARNING: Express server not found at /app/src/index.js after installation attempt"
 fi
 
 # =============================================================================
