@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31588 | 12:36 PM | 🔵 | Verification: Proactive Usage Encouragement Present in Updated Soul Files | ~516 |
 | #31570 | 12:31 PM | 🟣 | Comprehensive Horde Skills Redesign Deployed to Chagatai (Writer) SOUL.md | ~992 |
 | #31497 | 12:23 PM | 🔵 | Chagatai's Current SOUL.md Architecture and Capabilities | ~1016 |
 | #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |

@@ -1,51 +1,78 @@
 # skill-sync-service Railway Configuration
-services:
-  - name: skill-sync-service
-    type: Worker
-    buildCommand: npm install
-    startCommand: node src/index.js
-    env:
-      # Service Configuration
-      - key = PORT
-        value = 3000
-      - key = NODE_ENV
-        value = production
-      - key = LOG_LEVEL
-        value = info
+# This service syncs skills from GitHub to a shared /data/skills directory
 
-      # Skill Storage
-      - key = SKILLS_DIR
-        value = /data/skills
-      - key = BACKUP_DIR
-        value = /data/backups/skills
-      - key = MAX_SKILL_SIZE_BYTES
-        value = 102400
+services:
+  # ===========================================================================
+  # SKILL SYNC SERVICE - GitHub skill synchronization worker
+  # ===========================================================================
+  skill-sync-service:
+    build:
+      context: ./skill-sync-service
+      dockerfile: Dockerfile
+
+    # Health check endpoint
+    healthcheck:
+      path: /health
+      port: 3000
+      interval: 30s
+      timeout: 10s
+      startPeriod: 30s
+      retries: 5
+
+    # Environment variables
+    envFile: .env
+
+    environment:
+      # Service Configuration
+      - name: PORT
+        value: "3000"
+      - name: NODE_ENV
+        value: production
+      - name: LOG_LEVEL
+        value: info
+
+      # Skill Storage - shared with moltbot via clawdbot-data volume
+      - name: SKILLS_DIR
+        value: /data/skills
+      - name: BACKUP_DIR
+        value: /data/backups/skills
+      - name: MAX_SKILL_SIZE_BYTES
+        value: "102400"
 
       # GitHub Configuration
-      - key = GITHUB_WEBHOOK_SECRET
-        generate = true
-      - key = GITHUB_TOKEN
-        sync = false
-      - key = GITHUB_OWNER
-        value = Danservfinn
-      - key = GITHUB_REPO
-        value = kurultai-skills
-      - key = POLLING_INTERVAL_MIN
-        value = 5
+      - name: GITHUB_OWNER
+        value: Danservfinn
+      - name: GITHUB_REPO
+        value: kurultai-skills
+      - name: POLLING_INTERVAL_MIN
+        value: "5"
+      # GITHUB_WEBHOOK_SECRET and GITHUB_TOKEN set via Railway dashboard
 
-      # Neo4j Audit Logging
-      - key = NEO4J_URI
-        value = ${NEO4J_URI}
-      - key = NEO4J_USER
-        value = ${NEO4J_USER}
-      - key = NEO4J_PASSWORD
-        value = ${NEO4J_PASSWORD}
+      # Neo4j Audit Logging (shared with other services)
+      - name: NEO4J_URI
+        value: bolt://neo4j.railway.internal:7687
+      - name: NEO4J_USER
+        value: neo4j
+      # NEO4J_PASSWORD set via Railway dashboard
 
       # Deployment Lock
-      - key = DEPLOYMENT_LOCK_TTL
-        value = 300
+      - name: DEPLOYMENT_LOCK_TTL
+        value: "300"
 
-    # Shared volume for skills (moltbot reads from here)
+    # Resource allocation
+    resources:
+      cpu: 0.5
+      memory: 512Mi
+
+    # CRITICAL: Shared volume with moltbot - same name and mount path
+    # This allows skill-sync-service to write to /data/skills and moltbot to read
     volumes:
-      - name: skills-data
+      - name: clawdbot-data
         mountPath: /data
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Dependencies - ensure moltbot is ready (optional, service runs independently)
+    # dependsOn:
+    #   - moltbot

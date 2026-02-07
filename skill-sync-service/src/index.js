@@ -10,6 +10,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const winston = require('winston');
 const { Octokit } = require('octokit');
+const rateLimit = require('express-rate-limit');
 
 const { WebhookHandler } = require('./webhook/handler');
 const { GitHubPoller } = require('./poller/poller');
@@ -49,6 +50,15 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Rate limiting for webhook endpoint
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 webhooks per minute
+  message: { error: 'Too many webhook requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // =============================================================================
 // Initialize Services
@@ -107,6 +117,19 @@ async function initializeServices() {
 // Routes
 // =============================================================================
 
+// API Key middleware for manual sync endpoint
+const requireApiKey = (req, res, next) => {
+  const apiKey = process.env.MANUAL_SYNC_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+  const clientKey = req.headers['x-api-key'];
+  if (clientKey !== apiKey) {
+    return res.status(403).json({ error: 'Invalid API key' });
+  }
+  next();
+};
+
 app.get('/health', async (req, res) => {
   const deployedSkills = await deployer.listDeployed();
   const recentDeployments = auditLogger.connected
@@ -144,12 +167,12 @@ app.get('/skills', async (req, res) => {
   res.json({ skills });
 });
 
-app.post('/webhook/github', (req, res) => {
+app.post('/webhook/github', webhookLimiter, (req, res) => {
   webhookHandler.handle(req, res);
 });
 
-// Manual trigger endpoint for testing
-app.post('/api/sync', async (req, res) => {
+// Manual trigger endpoint for testing (requires API key)
+app.post('/api/sync', requireApiKey, async (req, res) => {
   if (!poller) {
     return res.status(503).json({ error: 'Poller not available' });
   }

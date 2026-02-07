@@ -18,5 +18,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #31351 | 11:23 AM | 🔵 | Signal Channel Configuration with Security Policies | ~373 |
+| #31710 | 1:09 PM | 🔵 | Primary Session Reading Signal Channel Configuration Source Code | ~716 |
 </claude-mem-context>

@@ -18,34 +18,23 @@ async function acquire(key, ttl = 300) {
 
   const lockPath = path.join(LOCK_DIR, `${key}.lock`);
   const lockId = `${process.pid}-${Date.now()}`;
+  const lockContent = `${process.pid}:${Date.now()}`;
 
   try {
-    // Check if lock exists and is valid
-    const existing = await fs.readFile(lockPath, 'utf8').catch(() => null);
-    if (existing) {
-      const [pid, timestamp] = existing.split(':');
-      const age = (Date.now() - parseInt(timestamp)) / 1000;
+    // Use O_EXCL for atomic lock creation
+    // This operation either succeeds or fails atomically
+    const flags = fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY;
+    const fd = await fs.open(lockPath, flags);
 
-      // Check if lock is expired
-      if (age < ttl) {
-        // Check if process is still running
-        try {
-          process.kill(parseInt(pid), 0);
-          throw new Error(`Lock held by process ${parseInt(pid)}`);
-        } catch (e) {
-          // Process is dead, can acquire lock
-        }
-      }
-    }
+    await fd.writeFile(lockContent);
+    await fd.close();
 
-    // Write lock
-    await fs.writeFile(lockPath, `${process.pid}:${Date.now()}`, 'utf8');
-
-    locks.set(key, { lockId, lockPath });
+    locks.set(key, { lockId, lockPath, acquiredAt: Date.now() });
 
     // Return release function
     return async () => {
       try {
+        // Only delete if we still own it
         const current = await fs.readFile(lockPath, 'utf8').catch(() => null);
         if (current && current.startsWith(`${process.pid}:`)) {
           await fs.unlink(lockPath);
@@ -56,7 +45,10 @@ async function acquire(key, ttl = 300) {
       locks.delete(key);
     };
   } catch (e) {
-    throw new Error(`Failed to acquire lock: ${e.message}`);
+    if (e.code === 'EEXIST') {
+      throw new Error(`Lock already held for key: ${key}`);
+    }
+    throw e;
   }
 }
 

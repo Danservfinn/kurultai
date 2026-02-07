@@ -735,6 +735,119 @@ Manual resolution creates `FileConflict` nodes with `status='open'` and audit tr
 
 ---
 
+## Skill Synchronization System
+
+### Overview
+Automatic synchronization of skill definitions from kurultai-skills GitHub repository to kublai gateway with zero downtime.
+
+### Architecture Diagram
+
+```
++-------------------------------------------------------------------------+
+|                         Skill Sync Architecture                         |
++-------------------------------------------------------------------------+
+|                                                                         |
+|   GitHub Repository (kurultai-skills)                                  |
+|         |                                                               |
+|         +--- Webhook (push event) ----+                                |
+|         |                              |                                |
+|         +--- Polling (every 5 min) ---+                                |
+|                                          v                             |
+|   +-------------------------------------------------------+            |
+|   |      skill-sync-service (Railway Worker)             |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  | Webhook Handler (HMAC verification,             |  |            |
+|   |  |   rate limiting, timestamp validation)          |  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  | Skill Validator (YAML frontmatter, security    |  |            |
+|   |  |   scan, required fields check)                 |  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  | Skill Deployer (atomic write, rollback,         |  |            |
+|   |  |   backup to /data/backups/skills/)             |  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  | Audit Logger (Neo4j deployment tracking)        |  |            |
+|   |  +-------------------------------------------------+  |            |
+|   +-------------------------------------------------------+            |
+|                                          |                             |
+|                                          v                             |
+|   +-------------------------------------------------------+            |
+|   |        Shared Volume: clawdbot-data                       |            |
+|   |  /data/skills/ (mounted on both services)              |            |
+|   +-------------------------------------------------------+            |
+|                                          |                             |
+|                                          v                             |
+|   +-------------------------------------------------------+            |
+|   |         moltbot (OpenClaw Gateway)                     |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  | Skill Watcher (chokidar file watching)          |  |            |
+|   |  |  - Detects: add, change, unlink events           |  |            |
+|   |  |  - Latency: 2-5 seconds                          |  |            |
+|   |  |  - Triggers: hot-reload without restart         |  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  +-------------------------------------------------+  |            |
+|   |  | Agent Registry (in-memory skill cache)           |  |            |
+|   |  +-------------------------------------------------+  |            |
+|   +-------------------------------------------------------+            |
+|                                                                         |
+|   Result: Skills updated WITHOUT disrupting active agents                |
+|                                                                         |
++-------------------------------------------------------------------------+
+```
+
+### Data Flow
+
+1. **Webhook Path** (Primary): GitHub push -> skill-sync-service -> /data/skills/ -> chokidar -> hot-reload
+2. **Polling Path** (Fallback): Every 5 minutes -> GitHub API -> skill-sync-service -> /data/skills/
+3. **Reload Path**: File change detected -> skill registry reload -> new skills available
+
+### Security Measures
+
+- HMAC-SHA256 webhook signature verification
+- 5-minute timestamp window for replay protection
+- Rate limiting: 10 webhook requests/minute
+- API key required for manual sync endpoint
+- Path traversal protection on skill filenames
+- Secret scanning in skill content (API keys, tokens)
+
+### Services
+
+| Service | Type | Purpose |
+|---------|------|---------|
+| skill-sync-service | Railway Worker | Receives webhooks, writes skills |
+| moltbot | Railway Service | OpenClaw gateway with file watcher |
+
+### Shared Volume Configuration
+
+- **Name:** `clawdbot-data`
+- **Mount Path:** `/data` (both services)
+- **Skills Directory:** `/data/skills/`
+- **Backups:** `/data/backups/skills/<deployment-id>/`
+
+### Monitoring
+
+```bash
+# skill-sync-service health
+curl https://skill-sync-service-url.railway.app/health
+
+# Check deployed skills
+curl https://skill-sync-service-url.railway.app/skills
+
+# Manual sync (requires API key)
+curl -X POST -H "x-api-key: $KEY" \
+  https://skill-sync-service-url.railway.app/api/sync
+```
+
+### Related Documentation
+
+- [Operations Runbook](operations/skill-sync-runbook.md)
+- [GitHub Webhook Setup](../github-webhook-setup.md)
+- [Hot-Reload Verification](../hot-reload-verification.md)
+
+---
+
 ## Two-Tier Heartbeat & Failover
 
 The heartbeat system uses a two-tier model to detect both infrastructure failures (gateway process dead) and functional failures (agent stuck/zombie). The **read side** (Ögedei's failover checks) and **write side** (sidecar + task operations) work together to enable reliable failover detection.

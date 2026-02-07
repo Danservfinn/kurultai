@@ -53,6 +53,7 @@ This plan integrates three major systems into a single cohesive deployment:
 | **Agent Authentication** | HMAC-SHA256 message signing between agents | Neo4j AgentKey nodes |
 | **Jochi AST Analysis** | Tree-sitter based backend code analysis | Existing backend_collaboration.py |
 | **Authentik Web UI** | SSO protection for Kublai control panel | Railway, Caddy proxy |
+| **Skill Sync** | Automatic skill deployment from GitHub via webhook + polling | skill-sync-service, shared volume |
 
 ### Deployment Target
 
@@ -62,6 +63,58 @@ This plan integrates three major systems into a single cohesive deployment:
 **Services**: 6 Railway services + PostgreSQL + Neo4j AuraDB
 
 > **Note**: Service name `moltbot-railway-template` is the canonical Railway service name (referred to as "moltbot" for brevity throughout this document).
+
+### Skill Synchronization
+
+Kublai automatically receives skill updates from the kurultai-skills GitHub repository via a hybrid webhook + polling system.
+
+#### How It Works
+
+1. Developer pushes skill update to kurultai-skills repository
+2. GitHub sends webhook to skill-sync-service on Railway
+3. skill-sync-service validates and writes skill to shared `/data/skills/` volume
+4. Moltbot detects change via chokidar file watcher
+5. Moltbot hot-reloads skill registry without restart
+
+#### Zero Downtime
+
+Skills are updated without disrupting active agents. The chokidar watcher detects file changes within 2-5 seconds and triggers a reload of the skill registry only — not the entire gateway process.
+
+#### Architecture
+
+```
++-----------------+     +------------------+     +-----------------+
+| GitHub Repo     |---->| skill-sync-      |---->| /data/skills/   |
+| kurultai-skills |     | service          |     | (shared volume) |
++-----------------+     +------------------+     +--------+--------+
+                                |                        |
+                         Polling (5min)               |
+                                |                        |
+                                |                        v
+                                |                 +-----------------+
+                                |                 | Moltbot Gateway  |
+                                +---------------->| + chokidar       |
+                                                  | watcher         |
+                                                  +-----------------+
+```
+
+#### Fallback
+
+If webhook delivery fails, a poller runs every 5 minutes to check for new commits.
+
+#### Security
+
+- HMAC-SHA256 webhook signature verification
+- 5-minute timestamp window for replay protection
+- Rate limiting: 10 webhook requests/minute
+- API key authentication on manual sync endpoint
+
+#### Operations
+
+See:
+- [Operations Runbook](operations/skill-sync-runbook.md)
+- [GitHub Webhook Setup](../github-webhook-setup.md)
+- [Hot-Reload Verification](../hot-reload-verification.md)
 
 ### Scope
 

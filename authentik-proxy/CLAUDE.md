@@ -14,12 +14,12 @@
 | #30707 | 11:16 PM | 🔵 | Authentik Proxy Environment Configuration Template | ~397 |
 | #30700 | 11:15 PM | 🔵 | Authentik Proxy Configuration with Caddy Reverse Proxy | ~496 |
 | #30526 | 6:50 PM | 🔵 | Authentik Proxy Caddyfile with Forward Auth and Moltbot Routing | ~570 |
-| #30371 | 6:25 PM | 🔵 | Kurultai Molt Repository Inventory and Gap Analysis | ~882 |
 
 ### Feb 7, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31618 | 12:52 PM | 🔵 | Caddyfile implements Authentik forward auth proxy routing for moltbot service | ~452 |
 | #31291 | 10:56 AM | ✅ | Added Authentik forward authentication to WebSocket route in Caddy proxy | ~433 |
 | #31269 | 10:48 AM | 🔵 | Comprehensive Security Audit: Custom Domain Migration and Critical Vulnerabilities Identified | ~728 |
 | #31254 | 10:45 AM | 🔵 | Caddy reverse proxy Docker image for Authentik forward authentication | ~267 |

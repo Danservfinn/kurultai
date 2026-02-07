@@ -48,7 +48,9 @@
       enabled: true,
       account: "${SIGNAL_ACCOUNT}",
       cliPath: "/usr/local/bin/signal-cli",
-      autoStart: true,
+      // signal-cli daemon started by entrypoint.sh with explicit --config path
+      httpUrl: "http://127.0.0.1:8080",
+      autoStart: false,
       startupTimeoutMs: 120000,
       dmPolicy: "pairing",
       groupPolicy: "allowlist",

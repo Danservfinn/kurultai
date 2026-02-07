@@ -10,7 +10,12 @@ mkdir -p "$SIGNAL_DATA_DIR" 2>/dev/null || true
 mkdir -p "$OPENCLAW_STATE_DIR" 2>/dev/null || true
 mkdir -p /data/logs 2>/dev/null || true
 mkdir -p /data/workspace 2>/dev/null || true
+
+# Skills directory for hot-reload (shared with skill-sync-service)
+SKILLS_DIR="${SKILLS_DIR:-/data/skills}"
+mkdir -p "$SKILLS_DIR" 2>/dev/null || true
 chown -R 1001:1001 /data 2>/dev/null || true
+echo "Skills directory: $SKILLS_DIR"
 
 # =============================================================================
 # RUN NEO4J MIGRATIONS
@@ -55,18 +60,69 @@ else
 fi
 
 # =============================================================================
-# EXTRACT SIGNAL DATA
+# EXTRACT AND START SIGNAL
 # =============================================================================
-if [ -f /opt/signal-data.tar.gz ] && [ ! -f "$SIGNAL_DATA_DIR/accounts.json" ]; then
-    echo "Extracting Signal data to $SIGNAL_DATA_DIR..."
-    tar -xzf /opt/signal-data.tar.gz --strip-components=1 -C "$SIGNAL_DATA_DIR"
-    chown -R 1001:1001 "$SIGNAL_DATA_DIR"
-    chmod -R 700 "$SIGNAL_DATA_DIR"
-    echo "Signal data extracted successfully"
-    ls -la "$SIGNAL_DATA_DIR/"
+# signal-cli --config <dir> expects: <dir>/data/accounts.json
+# We use /data/.signal as the config dir, with data/ subdirectory inside.
+# Archive structure: data/accounts.json, data/182126, data/182126.d/
+
+# Ensure correct directory structure
+if [ ! -f "$SIGNAL_DATA_DIR/data/accounts.json" ]; then
+    # Migrate old layout (--strip-components=1 put files at root without data/ prefix)
+    if [ -f "$SIGNAL_DATA_DIR/accounts.json" ]; then
+        echo "Migrating Signal data to correct directory structure..."
+        mkdir -p "$SIGNAL_DATA_DIR/data"
+        mv "$SIGNAL_DATA_DIR/accounts.json" "$SIGNAL_DATA_DIR/data/"
+        for f in "$SIGNAL_DATA_DIR"/[0-9]*; do
+            [ -e "$f" ] && mv "$f" "$SIGNAL_DATA_DIR/data/"
+        done
+    # Fresh extraction from archive
+    elif [ -f /opt/signal-data.tar.gz ]; then
+        echo "Extracting Signal data to $SIGNAL_DATA_DIR..."
+        tar -xzf /opt/signal-data.tar.gz -C "$SIGNAL_DATA_DIR"
+    fi
+    find "$SIGNAL_DATA_DIR" -name '._*' -delete 2>/dev/null
+fi
+
+chown -R 1001:1001 "$SIGNAL_DATA_DIR" 2>/dev/null || true
+chmod -R 700 "$SIGNAL_DATA_DIR" 2>/dev/null || true
+
+echo "Signal data status:"
+if [ -f "$SIGNAL_DATA_DIR/data/accounts.json" ]; then
+    echo "  accounts.json found"
+    ls -la "$SIGNAL_DATA_DIR/data/"
 else
-    echo "Signal data status:"
-    ls -la "$SIGNAL_DATA_DIR/" 2>/dev/null || echo "  (directory empty or missing)"
+    echo "  WARNING: accounts.json missing at $SIGNAL_DATA_DIR/data/"
+fi
+
+# Start signal-cli daemon BEFORE OpenClaw (with explicit --config path)
+# OpenClaw will connect to it via httpUrl instead of autoStart
+SIGNAL_CLI_PORT=8080
+if [ -f "$SIGNAL_DATA_DIR/data/accounts.json" ] && [ -x /usr/local/bin/signal-cli ]; then
+    echo "Starting signal-cli daemon on port $SIGNAL_CLI_PORT..."
+    su -s /bin/sh moltbot -c "/usr/local/bin/signal-cli --config $SIGNAL_DATA_DIR daemon --http 127.0.0.1:$SIGNAL_CLI_PORT --receive-mode on-connection --ignore-stories" &
+    SIGNAL_PID=$!
+    echo "  signal-cli PID: $SIGNAL_PID"
+
+    # Wait for daemon to become ready
+    SIGNAL_READY=false
+    for i in $(seq 1 30); do
+        sleep 2
+        if curl -sf http://127.0.0.1:$SIGNAL_CLI_PORT/v1/about > /dev/null 2>&1; then
+            SIGNAL_READY=true
+            echo "  signal-cli daemon ready after $((i*2))s"
+            break
+        fi
+        echo "  Waiting for signal-cli... (${i}/30)"
+    done
+
+    if [ "$SIGNAL_READY" = "false" ]; then
+        echo "  WARNING: signal-cli daemon not ready after 60s"
+        # Check if process is still running
+        kill -0 $SIGNAL_PID 2>/dev/null && echo "  Process still running" || echo "  Process exited"
+    fi
+else
+    echo "Skipping signal-cli daemon (missing accounts or binary)"
 fi
 
 # =============================================================================

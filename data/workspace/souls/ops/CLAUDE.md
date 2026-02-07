@@ -13,6 +13,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31577 | 12:33 PM | 🟣 | Comprehensive Horde Skills Redesign Deployed to Ögedei (Operations) SOUL.md | ~1247 |
 | #31491 | 12:22 PM | 🔵 | Ögedei's Current SOUL.md Architecture and Capabilities | ~943 |
 | #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |
 | #31385 | 12:01 PM | 🔵 | Operations Agent (Ögedei) Soul Configuration and Failover Architecture | ~560 |

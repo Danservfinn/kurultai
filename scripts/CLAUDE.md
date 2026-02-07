@@ -8,7 +8,6 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #29191 | 10:53 PM | 🔵 | Signal Verification Script Structure and Test Procedures | ~303 |
-| #28787 | 5:39 PM | 🔵 | Complexity Validation Runner - CLI Tool for Production Readiness Testing | ~846 |
 
 ### Feb 6, 2026
 
@@ -19,6 +18,7 @@
 | #30639 | " | 🟣 | Agent Key Generation Script Created | ~513 |
 | #30353 | 6:15 PM | 🟣 | model_switcher.py installed to molt/scripts directory for post-Kurultai installation | ~448 |
 | #29902 | 3:18 PM | 🔵 | Backend Domain Review Identifies 12 Critical Implementation Gaps in kurultai_0.2.md | ~1279 |
+| #29805 | 2:13 PM | 🔵 | Authentik Manual Deployment Guide for Railway | ~984 |
 | #29522 | 12:27 PM | 🔵 | Authentik Railway Deployment Automation Script | ~525 |
 
 ### Feb 7, 2026

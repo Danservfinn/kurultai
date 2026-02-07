@@ -7,24 +7,24 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31769 | 1:25 PM | ✅ | OpenClaw Signal Configuration Modified: Disable autoStart, Use httpUrl for Pre-Started Daemon | ~663 |
+| #31768 | " | 🟣 | Enhanced Signal Integration - Manual Daemon Startup Before OpenClaw Gateway | ~614 |
+| #31766 | 1:24 PM | 🔵 | Entrypoint Script Reviewed: OpenClaw Gateway Startup Configuration | ~543 |
+| #31756 | 1:19 PM | 🔴 | Signal Data Extraction Path Corrected: Use signal-cli Default Config Directory | ~668 |
+| #31754 | " | ✅ | Primary Session Fixing OpenClaw JSON Configuration - Removing Invalid allowlist Property | ~408 |
+| #31736 | 1:12 PM | 🔵 | Entrypoint Script Reveals Signal Data Extraction Bug and Migration Logic: Directory Structure Mismatch | ~839 |
+| #31735 | " | 🟣 | Primary Session Fixing Signal Data Directory Migration Issue in Entrypoint Script | ~324 |
+| #31729 | 1:11 PM | 🔵 | OpenClaw JSON5 Configuration Examined: Signal Configuration Matches Deployment, shellEnv Disabled | ~710 |
+| #31714 | 1:09 PM | 🔵 | Primary Session Re-Reading README.md First 100 Lines for Deployment Configuration Review | ~526 |
+| #31699 | 1:07 PM | 🔵 | Docker Entrypoint Script Reveals Signal Data Extraction and OpenClaw Gateway Initialization Pipeline | ~924 |
+| #31677 | 1:03 PM | 🔵 | Re-examination of openclaw.json Signal Configuration Reveals Missing Reaction Notification Settings | ~648 |
+| #31671 | " | 🔵 | Primary Session Reading Railway Deployment Template Documentation | ~834 |
+| #31669 | " | 🔵 | Primary Session Reading Container Entrypoint Script for OpenClaw Deployment Architecture | ~852 |
+| #31660 | 1:02 PM | 🔵 | Entrypoint Script Reviewed: Multi-Phase Startup with Neo4j Migrations, Signal Data, and OpenClaw | ~921 |
+| #31659 | " | 🔵 | Primary Session Reading OpenClaw Gateway Configuration for Kurultai System | ~830 |
+| #31658 | " | 🔵 | OpenClaw Gateway Configuration Examined: Signal Provider Already Defined but Requires Environment Variables | ~664 |
+| #31657 | " | 🔵 | Dockerfile Configuration Reviewed: OpenClaw Gateway with Signal and Neo4j Support | ~695 |
 | #31436 | 12:06 PM | 🔵 | OpenClaw Configuration Architecture - Complete Agent System Definition | ~581 |
 | #31435 | " | 🔵 | Moltbot Railway Dockerfile - OpenClaw Gateway Deployment Configuration | ~319 |
 | #31392 | 12:02 PM | 🔵 | OpenClaw Gateway JSON Configuration (Production Variant) | ~293 |
-| #31389 | " | 🔵 | OpenClaw Gateway Configuration for Kurultai Horde System | ~498 |
-| #31369 | 11:25 AM | 🔵 | Moltbot Container Entrypoint with Neo4j Migrations and OpenClaw Gateway | ~426 |
-| #31368 | " | 🔵 | Moltbot Package Configuration - Dependencies and Scripts | ~571 |
-| #31356 | 11:24 AM | 🔵 | Comprehensive Kurultai v0.2 System Audit Completed | ~1301 |
-| #31308 | 11:07 AM | ✅ | Skill Sync Architecture Analysis Document Created | ~877 |
-| #31292 | 10:56 AM | 🔴 | OpenClaw shellEnv Security Vulnerability Fixed | ~367 |
-| #31269 | 10:48 AM | 🔵 | Comprehensive Security Audit: Custom Domain Migration and Critical Vulnerabilities Identified | ~728 |
-| #31260 | 10:45 AM | 🔵 | OpenClaw Gateway Configuration with Multi-Agent Setup | ~428 |
-| #31259 | " | 🔵 | Reviewed OpenClaw Gateway configuration for Kurultai 6-agent system | ~576 |
-| #31031 | 2:04 AM | 🔵 | Comprehensive Documentation-Codebase Gap Analysis Completed | ~1318 |
-| #31018 | 1:37 AM | 🔵 | Neo4j.md Confirms Agent Model Specialization and Vector Index Implementation | ~724 |
-| #31000 | " | 🔵 | OpenClaw Gateway Configuration Verified with 6-Agent Specification | ~782 |
-| #30964 | 1:26 AM | 🔵 | Moltbot Dockerfile Runs Entrypoint Script | ~344 |
-| #30950 | 1:24 AM | 🔵 | Security Audit Identifies 13 Critical and High-Severity Issues in Kurultai v0.2 | ~963 |
-| #30948 | " | 🔵 | Infrastructure & DevOps Comprehensive Review: 15 Critical Issues Identified | ~853 |
-| #30938 | 1:23 AM | 🔵 | Connection Pool Configuration Implementation Verified Across Codebase | ~709 |
-| #30936 | " | 🔵 | Architecture Review Expert Task Completed: 9 Critical Issues Identified in Kurultai v0.2 | ~898 |
 </claude-mem-context>

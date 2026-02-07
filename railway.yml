@@ -110,6 +110,83 @@ services:
       - neo4j
 
   # ===========================================================================
+  # SKILL SYNC SERVICE - GitHub skill synchronization worker
+  # ===========================================================================
+  # Syncs skills from GitHub repo to shared /data/skills directory
+  # Both moltbot and skill-sync-service mount the same clawdbot-data volume
+  skill-sync-service:
+    build:
+      context: ./skill-sync-service
+      dockerfile: Dockerfile
+
+    # Health check endpoint
+    healthcheck:
+      path: /health
+      port: 3000
+      interval: 30s
+      timeout: 10s
+      startPeriod: 30s
+      retries: 5
+
+    # Environment variables
+    envFile: .env
+
+    environment:
+      # Service Configuration
+      - name: PORT
+        value: "3000"
+      - name: NODE_ENV
+        value: production
+      - name: LOG_LEVEL
+        value: info
+
+      # Skill Storage - shared with moltbot via clawdbot-data volume
+      - name: SKILLS_DIR
+        value: /data/skills
+      - name: BACKUP_DIR
+        value: /data/backups/skills
+      - name: MAX_SKILL_SIZE_BYTES
+        value: "102400"
+
+      # GitHub Configuration
+      - name: GITHUB_OWNER
+        value: Danservfinn
+      - name: GITHUB_REPO
+        value: kurultai-skills
+      - name: POLLING_INTERVAL_MIN
+        value: "5"
+      # GITHUB_WEBHOOK_SECRET and GITHUB_TOKEN set via Railway dashboard
+
+      # Neo4j Audit Logging (shared with other services)
+      - name: NEO4J_URI
+        value: bolt://neo4j.railway.internal:7687
+      - name: NEO4J_USER
+        value: neo4j
+      # NEO4J_PASSWORD set via Railway dashboard
+
+      # Deployment Lock
+      - name: DEPLOYMENT_LOCK_TTL
+        value: "300"
+
+    # Resource allocation
+    resources:
+      cpu: 0.5
+      memory: 512Mi
+
+    # CRITICAL: Shared volume with moltbot - same name and mount path
+    # This allows skill-sync-service to write to /data/skills and moltbot to read
+    volumes:
+      - name: clawdbot-data
+        mountPath: /data
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Dependencies - ensure Neo4j is ready for audit logging
+    dependsOn:
+      - neo4j
+
+  # ===========================================================================
   # NEO4J SERVICE - Graph Database
   # ===========================================================================
   neo4j:
@@ -405,6 +482,7 @@ deploy:
   # Number of replicas for each service
   replicas:
     moltbot: 1
+    skill-sync-service: 1
     neo4j: 1
     authentik-db: 1
     authentik-server: 1
@@ -434,27 +512,37 @@ deploy:
 #    - AUTHENTIK_POSTGRESQL__NAME: authentik
 #    - SIGNAL_LINK_TOKEN: Random token for SSE endpoint (generate with: openssl rand -hex 32)
 #
-# 3. Health Check Endpoints:
+# 3. Skill Sync Service Environment Variables (REQUIRED):
+#    - GITHUB_TOKEN: GitHub personal access token with repo access (for private repos)
+#    - GITHUB_WEBHOOK_SECRET: Secret for webhook validation (generate with: openssl rand -hex 32)
+#
+# 4. Health Check Endpoints:
 #    - moltbot: http://<service>:18789/health
+#    - skill-sync-service: http://<service>:3000/health
 #    - neo4j: http://<service>:7474/
 #    - authentik-server: http://<service>:9000/-/health/ready/
 #
-# 4. Authentik Admin Access:
+# 5. Authentik Admin Access:
 #    - After deployment, access Authentik at: https://kublai.kurult.ai/if/admin/
 #    - Login with: akadmin / AUTHENTIK_BOOTSTRAP_PASSWORD
 #    - Run bootstrap script: python authentik-proxy/bootstrap_authentik.py
 #
-# 5. Volume Persistence:
+# 6. Volume Persistence:
 #    - Data persists across deployments
 #    - Back up important data regularly (see scripts/backup-authentik-db.sh)
+#    - clawdbot-data volume is SHARED between moltbot and skill-sync-service
+#      - moltbot reads: /data/skills for hot-reloadable skills
+#      - skill-sync-service writes: /data/skills from GitHub
 #
-# 6. Service Dependencies:
+# 7. Service Dependencies:
 #    - authentik-db starts first
 #    - authentik-server waits for authentik-db
 #    - authentik-worker waits for authentik-server
 #    - authentik-proxy waits for authentik-server and moltbot
+#    - skill-sync-service waits for neo4j (for audit logging)
+#    - moltbot waits for neo4j
 #
-# 7. Security:
+# 8. Security:
 #    - Change default passwords before production use
 #    - Consider enabling SSL/TLS for Neo4j connections
 #    - Use Railway's private networking for service-to-service communication

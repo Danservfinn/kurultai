@@ -35,6 +35,12 @@ class WebhookHandler {
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
+    // 1.5. Verify timestamp (replay protection)
+    if (!this.verifyTimestamp(req)) {
+      this.logger.warn('Webhook timestamp validation failed');
+      return res.status(401).json({ error: 'Invalid timestamp' });
+    }
+
     // 2. Check event type
     if (eventType !== 'push') {
       this.logger.debug(`Ignoring event type: ${eventType}`);
@@ -120,8 +126,9 @@ class WebhookHandler {
    */
   verifySignature(payload, signature) {
     if (!this.githubSecret) {
-      this.logger.warn('No GitHub secret configured, skipping verification');
-      return true; // Allow in dev mode
+      // CRITICAL: Never skip verification in production
+      this.logger.error('GitHub webhook secret not configured');
+      return false; // Changed from: return true
     }
 
     if (!signature) {
@@ -131,10 +138,41 @@ class WebhookHandler {
     const hmac = crypto.createHmac('sha256', this.githubSecret);
     const digest = `sha256=${hmac.update(JSON.stringify(payload)).digest('hex')}`;
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(digest)
-    );
+    // timingSafeEqual throws if buffers have different lengths
+    // Check length first to avoid the exception
+    const sigBuffer = Buffer.from(signature);
+    const digestBuffer = Buffer.from(digest);
+
+    if (sigBuffer.length !== digestBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(sigBuffer, digestBuffer);
+  }
+
+  /**
+   * Verify webhook timestamp is within acceptable window
+   */
+  verifyTimestamp(req) {
+    // x-github-delivery is a GUID, not a timestamp
+    // Use the Date header instead
+    const timestamp = req.headers['date'];
+    if (!timestamp) {
+      this.logger.warn('Webhook missing date header');
+      return false;
+    }
+
+    const deliveryTime = new Date(timestamp).getTime();
+    const now = Date.now();
+    const ageSeconds = (now - deliveryTime) / 1000;
+
+    // Reject webhooks older than 5 minutes or from the future (> 60s)
+    if (ageSeconds > 300 || ageSeconds < -60) {
+      this.logger.warn(`Webhook timestamp out of range: ${ageSeconds}s`);
+      return false;
+    }
+
+    return true;
   }
 
   /**

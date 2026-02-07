@@ -13,6 +13,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31574 | 12:32 PM | 🟣 | Temüjin SOUL.md Upgraded from Skill Routing to Comprehensive Horde Skills Reference | ~902 |
 | #31561 | 12:30 PM | 🔵 | Primary Session Reading Temüjin's SOUL.md Before Comprehensive Horde Skills Redesign | ~585 |
 | #31507 | 12:25 PM | 🟣 | Temüjin SOUL.md Enhanced with Skill Routing Section | ~791 |
 | #31490 | 12:21 PM | 🔵 | Temüjin's Current SOUL.md Architecture and Capabilities | ~812 |
