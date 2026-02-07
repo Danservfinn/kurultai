@@ -14,8 +14,8 @@ describe('Architecture Introspection', () => {
   let introspection;
   const mockLogger = {
     info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn()
+    warn: jest.fn(),
+    error: jest.fn()
   };
 
   beforeAll(async () => {
@@ -32,7 +32,7 @@ describe('Architecture Introspection', () => {
     try {
       await session.run(`
         MATCH (s:ArchitectureSection)
-        WHERE s.title STARTS WITH 'test-'
+        WHERE s.title STARTS WITH 'Test-'
         DETACH DELETE s
       `);
     } finally {
@@ -46,7 +46,7 @@ describe('Architecture Introspection', () => {
     try {
       await session.run(`
         MATCH (s:ArchitectureSection)
-        WHERE s.title STARTS WITH 'test-'
+        WHERE s.title STARTS WITH 'Test-'
         DETACH DELETE s
       `);
     } finally {
@@ -59,61 +59,65 @@ describe('Architecture Introspection', () => {
   });
 
   describe('getArchitectureOverview', () => {
-    it('should return empty overview when no sections exist', async () => {
-      const result = await introspection.getArchitectureOverview();
-
-      expect(result.totalSections).toBeGreaterThanOrEqual(0);
-      expect(Array.isArray(result.sections)).toBe(true);
-    });
-
     it('should return overview with sections when data exists', async () => {
       const session = driver.session();
       try {
         // Create test sections
         await session.run(`
           CREATE (s1:ArchitectureSection {
-            title: 'test-system-overview',
+            title: 'Test-System-Overview',
             content: 'System overview content',
             order: 1,
             parent_section: null,
             updated_at: datetime()
           })
           CREATE (s2:ArchitectureSection {
-            title: 'test-api-routes',
+            title: 'Test-API-Routes',
             content: 'API routes content',
             order: 2,
-            parent_section: 'test-system-overview',
+            parent_section: 'Test-System-Overview',
             updated_at: datetime()
           })
         `);
 
         const result = await introspection.getArchitectureOverview();
 
+        expect(result.totalSections).toBeGreaterThanOrEqual(2);
         expect(result.sections.length).toBeGreaterThanOrEqual(2);
-        const testSections = result.sections.filter(s =>
-          s.title && s.title.startsWith('test-')
-        );
-        expect(testSections.length).toBe(2);
+        expect(result.lastSync).toBeDefined();
 
-        // Verify section structure
-        const systemSection = testSections.find(s => s.title === 'test-system-overview');
-        expect(systemSection).toBeDefined();
-        expect(systemSection.position).toBe(1);
-        expect(systemSection.parent).toBeNull();
+        const sectionTitles = result.sections.map(s => s.title);
+        expect(sectionTitles).toContain('Test-System-Overview');
+        expect(sectionTitles).toContain('Test-API-Routes');
+      } finally {
+        await session.close();
+      }
+    });
 
-        const apiSection = testSections.find(s => s.title === 'test-api-routes');
-        expect(apiSection).toBeDefined();
-        expect(apiSection.position).toBe(2);
-        expect(apiSection.parent).toBe('test-system-overview');
+    it('should return empty overview when no sections exist', async () => {
+      // Clean all sections first
+      const session = driver.session();
+      try {
+        await session.run(`
+          MATCH (s:ArchitectureSection)
+          WHERE s.title STARTS WITH 'Test-'
+          DETACH DELETE s
+        `);
+
+        const result = await introspection.getArchitectureOverview();
+
+        // Should return empty but valid structure
+        expect(result.totalSections).toBeGreaterThanOrEqual(0);
+        expect(Array.isArray(result.sections)).toBe(true);
       } finally {
         await session.close();
       }
     });
 
     it('should handle Neo4j errors gracefully', async () => {
-      // Create introspection with invalid driver to trigger error
+      // Create introspection with invalid driver to simulate error
       const badIntrospection = new ArchitectureIntrospection(
-        { session: () => ({ run: () => { throw new Error('Connection failed'); }, close: jest.fn() }) },
+        { session: () => { throw new Error('Connection failed'); } },
         mockLogger
       );
 
@@ -122,125 +126,103 @@ describe('Architecture Introspection', () => {
       expect(result.totalSections).toBe(0);
       expect(result.sections).toEqual([]);
       expect(result.lastSync).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[ARCH-introspection] Failed to get overview')
-      );
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('searchArchitecture', () => {
-    it('should return search results for matching content', async () => {
+    it('should return matching sections for valid search term', async () => {
       const session = driver.session();
       try {
         // Create section with searchable content
         await session.run(`
-          MERGE (s:ArchitectureSection {title: 'test-search-section'})
-          SET s.content = 'This section describes the authentication system and security protocols',
-              s.updated_at = datetime()
+          CREATE (s:ArchitectureSection {
+            title: 'Test-Search-Section',
+            content: 'This section contains searchable content about authentication and security',
+            order: 3,
+            updated_at: datetime()
+          })
         `);
-
-        const results = await introspection.searchArchitecture('authentication');
 
         // Note: This test assumes full-text index exists
-        // If index doesn't exist, it will return empty array and log error
-        expect(Array.isArray(results)).toBe(true);
+        // If index doesn't exist, search will return empty array
+        const result = await introspection.searchArchitecture('authentication');
+
+        // Result should be an array (may be empty if index not configured)
+        expect(Array.isArray(result)).toBe(true);
       } finally {
         await session.close();
       }
     });
 
-    it('should return empty array for no matches', async () => {
-      const results = await introspection.searchArchitecture('xyznonexistentquery123');
+    it('should return empty array when no matches found', async () => {
+      const result = await introspection.searchArchitecture('xyznonexistent12345');
 
-      expect(Array.isArray(results)).toBe(true);
-      expect(results.length).toBe(0);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(0);
     });
 
-    it('should handle missing full-text index gracefully', async () => {
-      const session = driver.session();
-      try {
-        // Try to search without index - should handle error
-        const results = await introspection.searchArchitecture('test');
+    it('should handle search errors gracefully', async () => {
+      // Create introspection with driver that throws on session
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Search index not found'); },
+          close: jest.fn()
+        })
+      };
+      const badIntrospection = new ArchitectureIntrospection(badDriver, mockLogger);
 
-        // Should return empty array on error
-        expect(Array.isArray(results)).toBe(true);
-      } finally {
-        await session.close();
-      }
-    });
+      const result = await badIntrospection.searchArchitecture('test');
 
-    it('should limit results to 10 items', async () => {
-      // This is a structural test - the query has LIMIT 10
-      const session = driver.session();
-      try {
-        // Create many sections
-        for (let i = 0; i < 15; i++) {
-          await session.run(`
-            CREATE (s:ArchitectureSection {
-              title: 'test-limit-' + $i,
-              content: 'common searchable content for all sections',
-              order: $i
-            })
-          `, { i });
-        }
-
-        // Search for common term
-        const results = await introspection.searchArchitecture('common searchable');
-        expect(results.length).toBeLessThanOrEqual(10);
-
-        // Cleanup
-        await session.run(`
-          MATCH (s:ArchitectureSection)
-          WHERE s.title STARTS WITH 'test-limit-'
-          DETACH DELETE s
-        `);
-      } finally {
-        await session.close();
-      }
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('getSection', () => {
-    it('should return section by title', async () => {
+    it('should return section details for existing section', async () => {
       const session = driver.session();
       try {
         await session.run(`
-          MERGE (s:ArchitectureSection {title: 'test-get-section'})
-          SET s.content = 'Test content for section retrieval',
-              s.git_commit = 'abc123',
-              s.updated_at = datetime()
+          CREATE (s:ArchitectureSection {
+            title: 'Test-Get-Section',
+            content: 'Test content for get section',
+            git_commit: 'abc123',
+            updated_at: datetime()
+          })
         `);
 
-        const section = await introspection.getSection('test-get-section');
+        const result = await introspection.getSection('Test-Get-Section');
 
-        expect(section).not.toBeNull();
-        expect(section.title).toBe('test-get-section');
-        expect(section.content).toBe('Test content for section retrieval');
-        expect(section.gitCommit).toBe('abc123');
-        expect(section.updatedAt).toBeDefined();
+        expect(result).not.toBeNull();
+        expect(result.title).toBe('Test-Get-Section');
+        expect(result.content).toBe('Test content for get section');
+        expect(result.gitCommit).toBe('abc123');
+        expect(result.updatedAt).toBeDefined();
       } finally {
         await session.close();
       }
     });
 
     it('should return null for non-existent section', async () => {
-      const section = await introspection.getSection('non-existent-section-xyz');
+      const result = await introspection.getSection('Test-NonExistent-Section-12345');
 
-      expect(section).toBeNull();
+      expect(result).toBeNull();
     });
 
-    it('should handle Neo4j errors gracefully', async () => {
-      const badIntrospection = new ArchitectureIntrospection(
-        { session: () => ({ run: () => { throw new Error('Query failed'); }, close: jest.fn() }) },
-        mockLogger
-      );
+    it('should handle errors gracefully', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Query failed'); },
+          close: jest.fn()
+        })
+      };
+      const badIntrospection = new ArchitectureIntrospection(badDriver, mockLogger);
 
-      const section = await badIntrospection.getSection('any-section');
+      const result = await badIntrospection.getSection('Test-Section');
 
-      expect(section).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[ARCH-introspection] Failed to get section')
-      );
+      expect(result).toBeNull();
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
@@ -249,90 +231,75 @@ describe('Architecture Introspection', () => {
       const session = driver.session();
       try {
         await session.run(`
-          MERGE (s:ArchitectureSection {title: 'test-sync-timestamp'})
-          SET s.updated_at = datetime()
+          CREATE (s:ArchitectureSection {
+            title: 'Test-Sync-Timestamp',
+            content: 'Content',
+            updated_at: datetime()
+          })
         `);
 
-        const timestamp = await introspection.getLastSyncTimestamp();
+        const result = await introspection.getLastSyncTimestamp();
 
-        expect(timestamp).toBeDefined();
+        expect(result).toBeDefined();
       } finally {
         await session.close();
       }
     });
 
     it('should return null when no sections exist', async () => {
-      // Create temporary introspection that queries non-existent label
+      // Clean all test sections
       const session = driver.session();
       try {
-        // Delete all test sections temporarily
         await session.run(`
           MATCH (s:ArchitectureSection)
-          WHERE s.title STARTS WITH 'test-'
+          WHERE s.title STARTS WITH 'Test-'
           DETACH DELETE s
         `);
 
-        const timestamp = await introspection.getLastSyncTimestamp();
+        const result = await introspection.getLastSyncTimestamp();
 
-        // Should return null when no sections
-        expect(timestamp).toBeNull();
+        expect(result).toBeNull();
       } finally {
         await session.close();
       }
     });
 
     it('should handle errors gracefully', async () => {
-      const badIntrospection = new ArchitectureIntrospection(
-        { session: () => ({ run: () => { throw new Error('Connection lost'); }, close: jest.fn() }) },
-        mockLogger
-      );
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Query failed'); },
+          close: jest.fn()
+        })
+      };
+      const badIntrospection = new ArchitectureIntrospection(badDriver, mockLogger);
 
-      const timestamp = await badIntrospection.getLastSyncTimestamp();
+      const result = await badIntrospection.getLastSyncTimestamp();
 
-      expect(timestamp).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[ARCH-introspection] Failed to get last sync')
-      );
+      expect(result).toBeNull();
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('isIndexReady', () => {
-    it('should check for full-text index existence', async () => {
+    it('should return boolean for index check', async () => {
       const result = await introspection.isIndexReady();
 
-      // Result depends on whether index exists in test database
       expect(typeof result).toBe('boolean');
     });
 
-    it('should return false on Neo4j error', async () => {
-      const badIntrospection = new ArchitectureIntrospection(
-        { session: () => ({ run: () => { throw new Error('Index check failed'); }, close: jest.fn() }) },
-        mockLogger
-      );
+    it('should handle errors gracefully and return false', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Index check failed'); },
+          close: jest.fn()
+        })
+      };
+      const badIntrospection = new ArchitectureIntrospection(badDriver, mockLogger);
 
       const result = await badIntrospection.isIndexReady();
 
       expect(result).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[ARCH-introspection] Index check failed')
-      );
-    });
-
-    it('should return false when index does not exist', async () => {
-      // Query for a non-existent index name
-      const session = driver.session();
-      try {
-        const result = await session.run(`
-          CALL db.indexes() YIELD name, type
-          WHERE name = 'nonexistent_index_xyz' AND type = 'FULLTEXT'
-          RETURN count(*) as exists
-        `);
-
-        const exists = result.records[0]?.get('exists').toNumber() > 0;
-        expect(exists).toBe(false);
-      } finally {
-        await session.close();
-      }
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 });

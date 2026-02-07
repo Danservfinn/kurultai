@@ -136,4 +136,7 @@ EXPOSE 18789
 ENTRYPOINT []
 CMD ["sh", "/app/entrypoint.sh"]
 # Build timestamp: Sat Feb  7 23:00:00 EST 2026
-# Cache-bust: v2 - Force rebuild with Express server files
+# Cache-bust: v3 - Force rebuild with Express server files
+
+# Cache-bust arg - change this to force a full rebuild
+ARG CACHE_BUST=2026-02-07-v3

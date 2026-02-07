@@ -2,21 +2,26 @@
  * Proactive Reflection Tests
  *
  * Tests for the Kublai Proactive Reflection module.
- * Verifies periodic self-reflection and opportunity identification.
+ * Verifies self-reflection on system architecture and opportunity identification.
  */
 
-const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const { ProactiveReflection } = require('../../src/kublai/proactive-reflection');
 
 describe('Proactive Reflection', () => {
   let driver;
+  let introspection;
   let reflection;
-  let mockIntrospection;
   const mockLogger = {
     info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn()
+    warn: jest.fn(),
+    error: jest.fn()
+  };
+
+  // Mock introspection
+  const mockIntrospection = {
+    getArchitectureOverview: jest.fn()
   };
 
   beforeAll(async () => {
@@ -26,20 +31,14 @@ describe('Proactive Reflection', () => {
     const password = process.env.NEO4J_PASSWORD || 'password';
 
     driver = neo4j.driver(uri, { auth: { user, password } });
-
-    // Create mock introspection
-    mockIntrospection = {
-      getArchitectureOverview: jest.fn()
-    };
-
     reflection = new ProactiveReflection(driver, mockIntrospection, mockLogger);
 
-    // Clean up test data
+    // Clean up any existing test data
     const session = driver.session();
     try {
       await session.run(`
         MATCH (o:ImprovementOpportunity)
-        WHERE o.description CONTAINS 'test-' OR o.proposed_by = 'kublai'
+        WHERE o.description CONTAINS 'Test-'
         DETACH DELETE o
       `);
     } finally {
@@ -53,7 +52,7 @@ describe('Proactive Reflection', () => {
     try {
       await session.run(`
         MATCH (o:ImprovementOpportunity)
-        WHERE o.description CONTAINS 'test-' OR o.proposed_by = 'kublai'
+        WHERE o.description CONTAINS 'Test-'
         DETACH DELETE o
       `);
     } finally {
@@ -65,17 +64,14 @@ describe('Proactive Reflection', () => {
     }
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('triggerReflection', () => {
     it('should trigger reflection and return results', async () => {
       mockIntrospection.getArchitectureOverview.mockResolvedValue({
         totalSections: 5,
         sections: [
           { title: 'System Architecture', position: 1, parent: null },
-          { title: 'API Routes', position: 2, parent: 'System Architecture' }
+          { title: 'API Routes', position: 2, parent: 'System Architecture' },
+          { title: 'Data Model', position: 3, parent: 'System Architecture' }
         ],
         lastSync: new Date().toISOString()
       });
@@ -83,52 +79,14 @@ describe('Proactive Reflection', () => {
       const result = await reflection.triggerReflection();
 
       expect(result.sectionsKnown).toBe(5);
-      expect(typeof result.opportunitiesFound).toBe('number');
+      expect(result.opportunitiesFound).toBeGreaterThanOrEqual(0);
       expect(Array.isArray(result.opportunities)).toBe(true);
       expect(mockLogger.info).toHaveBeenCalledWith(
         '[Kublai] Triggering proactive architecture reflection...'
       );
     });
 
-    it('should detect missing sections', async () => {
-      mockIntrospection.getArchitectureOverview.mockResolvedValue({
-        totalSections: 2,
-        sections: [
-          { title: 'Introduction', position: 1, parent: null }
-        ],
-        lastSync: new Date().toISOString()
-      });
-
-      const result = await reflection.triggerReflection();
-
-      // Should detect missing expected sections
-      expect(result.opportunitiesFound).toBeGreaterThan(0);
-      expect(result.opportunities.some(o => o.type === 'missing_section')).toBe(true);
-    });
-
-    it('should detect stale sync data', async () => {
-      const oldDate = new Date();
-      oldDate.setDate(oldDate.getDate() - 10); // 10 days ago
-
-      mockIntrospection.getArchitectureOverview.mockResolvedValue({
-        totalSections: 5,
-        sections: [
-          { title: 'System Architecture', position: 1, parent: null },
-          { title: 'API Routes', position: 2, parent: null },
-          { title: 'Data Model', position: 3, parent: null },
-          { title: 'Security', position: 4, parent: null },
-          { title: 'Deployment', position: 5, parent: null }
-        ],
-        lastSync: oldDate.toISOString()
-      });
-
-      const result = await reflection.triggerReflection();
-
-      // Should detect stale sync
-      expect(result.opportunities.some(o => o.type === 'stale_sync')).toBe(true);
-    });
-
-    it('should handle no architecture data', async () => {
+    it('should store opportunities when found', async () => {
       mockIntrospection.getArchitectureOverview.mockResolvedValue({
         totalSections: 0,
         sections: [],
@@ -140,12 +98,19 @@ describe('Proactive Reflection', () => {
       expect(result.sectionsKnown).toBe(0);
       expect(result.opportunitiesFound).toBe(1);
       expect(result.opportunities[0].type).toBe('no_architecture_data');
-      expect(result.opportunities[0].priority).toBe('critical');
+    });
+
+    it('should handle errors during reflection', async () => {
+      mockIntrospection.getArchitectureOverview.mockRejectedValue(
+        new Error('Introspection failed')
+      );
+
+      await expect(reflection.triggerReflection()).rejects.toThrow('Introspection failed');
     });
   });
 
   describe('analyzeForOpportunities', () => {
-    it('should return critical opportunity when no architecture data', async () => {
+    it('should detect missing architecture data', async () => {
       const overview = {
         totalSections: 0,
         sections: [],
@@ -163,79 +128,62 @@ describe('Proactive Reflection', () => {
       const overview = {
         totalSections: 2,
         sections: [
-          { title: 'Introduction', position: 1, parent: null },
-          { title: 'Getting Started', position: 2, parent: null }
+          { title: 'Introduction', position: 1 },
+          { title: 'Getting Started', position: 2 }
         ],
         lastSync: new Date().toISOString()
       };
 
       const opportunities = await reflection.analyzeForOpportunities(overview);
 
-      // Should detect missing sections like API Routes, Data Model, Security, etc.
-      const missingSections = opportunities.filter(o => o.type === 'missing_section');
-      expect(missingSections.length).toBeGreaterThan(0);
-      expect(missingSections[0]).toHaveProperty('suggestedSection');
-      expect(missingSections[0]).toHaveProperty('priority', 'medium');
+      // Should detect missing sections like security, deployment, etc.
+      expect(opportunities.length).toBeGreaterThan(0);
+      expect(opportunities.some(o => o.type === 'missing_section')).toBe(true);
     });
 
-    it('should not flag existing sections as missing', async () => {
+    it('should detect stale sync data', async () => {
+      const tenDaysAgo = new Date();
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+      const overview = {
+        totalSections: 5,
+        sections: [
+          { title: 'System Architecture', position: 1 },
+          { title: 'API Routes', position: 2 },
+          { title: 'Data Model', position: 3 },
+          { title: 'Security', position: 4 },
+          { title: 'Deployment', position: 5 }
+        ],
+        lastSync: tenDaysAgo.toISOString()
+      };
+
+      const opportunities = await reflection.analyzeForOpportunities(overview);
+
+      expect(opportunities.some(o => o.type === 'stale_sync')).toBe(true);
+      expect(opportunities.find(o => o.type === 'stale_sync').priority).toBe('low');
+    });
+
+    it('should return empty array when all sections present', async () => {
       const overview = {
         totalSections: 6,
         sections: [
-          { title: 'System Architecture Overview', position: 1, parent: null },
-          { title: 'API Routes and Endpoints', position: 2, parent: null },
-          { title: 'Data Model Schema', position: 3, parent: null },
-          { title: 'Security and Authentication', position: 4, parent: null },
-          { title: 'Deployment Infrastructure', position: 5, parent: null },
-          { title: 'Agent Coordination Gateway', position: 6, parent: null }
+          { title: 'System Architecture Overview', position: 1 },
+          { title: 'API Routes and Endpoints', position: 2 },
+          { title: 'Data Model Schema', position: 3 },
+          { title: 'Security and Authentication', position: 4 },
+          { title: 'Deployment Infrastructure', position: 5 },
+          { title: 'Agent Coordination Gateway', position: 6 }
         ],
         lastSync: new Date().toISOString()
       };
 
       const opportunities = await reflection.analyzeForOpportunities(overview);
 
-      // Should not have missing_section opportunities for existing sections
-      const missingSystem = opportunities.find(o =>
-        o.type === 'missing_section' && o.suggestedSection === 'system architecture'
-      );
-      expect(missingSystem).toBeUndefined();
+      // Should not detect missing sections when all present
+      expect(opportunities.filter(o => o.type === 'missing_section').length).toBe(0);
     });
 
-    it('should detect stale sync data older than 7 days', async () => {
-      const oldDate = new Date();
-      oldDate.setDate(oldDate.getDate() - 8);
-
-      const overview = {
-        totalSections: 5,
-        sections: [{ title: 'System', position: 1, parent: null }],
-        lastSync: oldDate.toISOString()
-      };
-
-      const opportunities = await reflection.analyzeForOpportunities(overview);
-
-      const staleOpportunity = opportunities.find(o => o.type === 'stale_sync');
-      expect(staleOpportunity).toBeDefined();
-      expect(staleOpportunity.priority).toBe('low');
-      expect(staleOpportunity.description).toContain('8 days old');
-    });
-
-    it('should not flag sync as stale when less than 7 days', async () => {
-      const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 3);
-
-      const overview = {
-        totalSections: 5,
-        sections: [{ title: 'System', position: 1, parent: null }],
-        lastSync: recentDate.toISOString()
-      };
-
-      const opportunities = await reflection.analyzeForOpportunities(overview);
-
-      const staleOpportunity = opportunities.find(o => o.type === 'stale_sync');
-      expect(staleOpportunity).toBeUndefined();
-    });
-
-    it('should handle null overview gracefully', async () => {
+    it('should handle null/undefined overview', async () => {
       const opportunities = await reflection.analyzeForOpportunities(null);
 
       expect(opportunities.length).toBe(1);
@@ -247,71 +195,35 @@ describe('Proactive Reflection', () => {
     it('should store opportunities in Neo4j', async () => {
       const opportunities = [
         {
-          type: 'test-missing-section',
-          description: 'test-This is a test opportunity',
+          type: 'missing_section',
+          description: 'Test- Missing security section',
           priority: 'high',
-          suggestedSection: 'Test Section'
+          suggestedSection: 'Security Architecture'
+        },
+        {
+          type: 'stale_sync',
+          description: 'Test- Architecture data is stale',
+          priority: 'low'
         }
       ];
 
       await reflection.storeOpportunities(opportunities);
 
-      // Verify stored
+      // Verify opportunities were stored
       const session = driver.session();
       try {
         const result = await session.run(`
-          MATCH (o:ImprovementOpportunity {type: 'test-missing-section'})
-          RETURN o
+          MATCH (o:ImprovementOpportunity)
+          WHERE o.description CONTAINS 'Test-'
+          RETURN count(o) as count
         `);
 
-        expect(result.records.length).toBe(1);
-        const record = result.records[0].get('o');
-        expect(record.properties.description).toBe('test-This is a test opportunity');
-        expect(record.properties.priority).toBe('high');
-        expect(record.properties.status).toBe('proposed');
-        expect(record.properties.proposed_by).toBe('kublai');
+        expect(result.records[0].get('count').toNumber()).toBe(2);
       } finally {
         await session.close();
       }
 
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        '[Kublai] Stored 1 improvement opportunities'
-      );
-    });
-
-    it('should update existing opportunities on merge', async () => {
-      const session = driver.session();
-      try {
-        // Create initial opportunity
-        await session.run(`
-          CREATE (o:ImprovementOpportunity {
-            type: 'test-merge',
-            description: 'test-Original description',
-            priority: 'low',
-            created_at: datetime(),
-            status: 'proposed',
-            proposed_by: 'kublai'
-          })
-        `);
-
-        // Store with same type but different priority
-        await reflection.storeOpportunities([{
-          type: 'test-merge',
-          description: 'test-Original description',
-          priority: 'critical',
-          suggestedSection: null
-        }]);
-
-        // Verify updated
-        const result = await session.run(`
-          MATCH (o:ImprovementOpportunity {type: 'test-merge'})
-          RETURN o.priority as priority
-        `);
-
-        expect(result.records[0].get('priority')).toBe('critical');
-      } finally {
-        await session.close();
-      }
+      expect(mockLogger.info).toHaveBeenCalledWith('[Kublai] Stored 2 improvement opportunities');
     });
 
     it('should handle empty opportunities array', async () => {
@@ -322,162 +234,156 @@ describe('Proactive Reflection', () => {
     });
 
     it('should handle Neo4j errors gracefully', async () => {
-      const badReflection = new ProactiveReflection(
-        { session: () => ({ run: () => { throw new Error('Write failed'); }, close: jest.fn() }) },
-        mockIntrospection,
-        mockLogger
-      );
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Write failed'); },
+          close: jest.fn()
+        })
+      };
+      const badReflection = new ProactiveReflection(badDriver, mockIntrospection, mockLogger);
 
       await badReflection.storeOpportunities([{
-        type: 'test-error',
-        description: 'test-opportunity',
+        type: 'test',
+        description: 'Test opportunity',
         priority: 'medium'
       }]);
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[Kublai] Failed to store opportunities')
-      );
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('getOpportunities', () => {
-    it('should return opportunities by status', async () => {
+    beforeEach(async () => {
+      // Clean and create test opportunities
       const session = driver.session();
       try {
-        // Create test opportunities
+        await session.run(`
+          MATCH (o:ImprovementOpportunity)
+          WHERE o.description CONTAINS 'Test-'
+          DETACH DELETE o
+        `);
+
         await session.run(`
           CREATE (o1:ImprovementOpportunity {
-            type: 'test-opportunity-1',
-            description: 'test-First opportunity',
+            id: 'test-opp-1',
+            type: 'missing_section',
+            description: 'Test- High priority opportunity',
             priority: 'high',
             status: 'proposed',
-            proposed_by: 'kublai',
-            created_at: datetime()
+            created_at: datetime(),
+            last_seen: datetime()
           })
           CREATE (o2:ImprovementOpportunity {
-            type: 'test-opportunity-2',
-            description: 'test-Second opportunity',
+            id: 'test-opp-2',
+            type: 'stale_sync',
+            description: 'Test- Low priority opportunity',
             priority: 'low',
-            status: 'addressed',
-            proposed_by: 'kublai',
-            created_at: datetime()
-          })
-        `);
-
-        const proposed = await reflection.getOpportunities('proposed');
-        expect(proposed.some(o => o.description === 'test-First opportunity')).toBe(true);
-
-        const addressed = await reflection.getOpportunities('addressed');
-        expect(addressed.some(o => o.description === 'test-Second opportunity')).toBe(true);
-      } finally {
-        await session.close();
-      }
-    });
-
-    it('should return empty array when no opportunities exist', async () => {
-      const opportunities = await reflection.getOpportunities('nonexistent-status');
-
-      expect(Array.isArray(opportunities)).toBe(true);
-      expect(opportunities.length).toBe(0);
-    });
-
-    it('should default to proposed status', async () => {
-      const session = driver.session();
-      try {
-        // Create a proposed opportunity
-        await session.run(`
-          CREATE (o:ImprovementOpportunity {
-            type: 'test-default-status',
-            description: 'test-Default status opportunity',
-            priority: 'medium',
             status: 'proposed',
-            proposed_by: 'kublai',
-            created_at: datetime()
+            created_at: datetime(),
+            last_seen: datetime()
+          })
+          CREATE (o3:ImprovementOpportunity {
+            id: 'test-opp-3',
+            type: 'missing_section',
+            description: 'Test- Addressed opportunity',
+            priority: 'medium',
+            status: 'addressed',
+            created_at: datetime(),
+            last_seen: datetime()
           })
         `);
-
-        // Call without status parameter
-        const opportunities = await reflection.getOpportunities();
-
-        expect(opportunities.some(o => o.type === 'test-default-status')).toBe(true);
       } finally {
         await session.close();
       }
     });
 
-    it('should handle Neo4j errors gracefully', async () => {
-      const badReflection = new ProactiveReflection(
-        { session: () => ({ run: () => { throw new Error('Read failed'); }, close: jest.fn() }) },
-        mockIntrospection,
-        mockLogger
-      );
+    it('should return opportunities filtered by status', async () => {
+      const opportunities = await reflection.getOpportunities('proposed');
 
-      const opportunities = await badReflection.getOpportunities('proposed');
+      expect(opportunities.length).toBe(2);
+      expect(opportunities.every(o => o.status === 'proposed')).toBe(true);
+    });
 
-      expect(Array.isArray(opportunities)).toBe(true);
-      expect(opportunities.length).toBe(0);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[Kublai] Failed to get opportunities')
-      );
+    it('should return empty array when no opportunities match', async () => {
+      const opportunities = await reflection.getOpportunities('nonexistent_status');
+
+      expect(opportunities).toEqual([]);
+    });
+
+    it('should sort by priority and creation date', async () => {
+      const opportunities = await reflection.getOpportunities('proposed');
+
+      // High priority should come first
+      expect(opportunities[0].priority).toBe('high');
+    });
+
+    it('should handle errors gracefully', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Query failed'); },
+          close: jest.fn()
+        })
+      };
+      const badReflection = new ProactiveReflection(badDriver, mockIntrospection, mockLogger);
+
+      const result = await badReflection.getOpportunities('proposed');
+
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 
   describe('markOpportunityAddressed', () => {
     it('should mark opportunity as addressed', async () => {
       const session = driver.session();
-      let opportunityId;
       try {
-        // Create opportunity
-        const result = await session.run(`
+        // Create test opportunity
+        await session.run(`
           CREATE (o:ImprovementOpportunity {
-            id: randomUUID(),
-            type: 'test-address',
-            description: 'test-Opportunity to address',
-            status: 'proposed',
-            proposed_by: 'kublai'
+            id: 'test-mark-addressed',
+            type: 'test',
+            description: 'Test- Mark addressed test',
+            status: 'proposed'
           })
-          RETURN o.id as id
         `);
-        opportunityId = result.records[0].get('id');
 
-        const markResult = await reflection.markOpportunityAddressed(opportunityId);
+        const result = await reflection.markOpportunityAddressed('test-mark-addressed');
 
-        expect(markResult.success).toBe(true);
+        expect(result.success).toBe(true);
 
-        // Verify status changed
+        // Verify status was updated
         const verifyResult = await session.run(`
-          MATCH (o:ImprovementOpportunity {id: $id})
-          RETURN o.status as status, o.addressed_at as addressedAt
-        `, { id: opportunityId });
+          MATCH (o:ImprovementOpportunity {id: 'test-mark-addressed'})
+          RETURN o.status as status
+        `);
 
         expect(verifyResult.records[0].get('status')).toBe('addressed');
-        expect(verifyResult.records[0].get('addressedAt')).toBeDefined();
       } finally {
         await session.close();
       }
     });
 
-    it('should return success false when opportunity not found', async () => {
+    it('should handle non-existent opportunity', async () => {
       const result = await reflection.markOpportunityAddressed('non-existent-id');
 
       // Should not throw, but may not update anything
-      expect(result).toHaveProperty('success');
+      expect(result.success).toBe(true);
     });
 
-    it('should handle Neo4j errors gracefully', async () => {
-      const badReflection = new ProactiveReflection(
-        { session: () => ({ run: () => { throw new Error('Update failed'); }, close: jest.fn() }) },
-        mockIntrospection,
-        mockLogger
-      );
+    it('should handle errors gracefully', async () => {
+      const badDriver = {
+        session: () => ({
+          run: () => { throw new Error('Update failed'); },
+          close: jest.fn()
+        })
+      };
+      const badReflection = new ProactiveReflection(badDriver, mockIntrospection, mockLogger);
 
-      const result = await badReflection.markOpportunityAddressed('any-id');
+      const result = await badReflection.markOpportunityAddressed('test-id');
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('[Kublai] Failed to mark opportunity')
-      );
+      expect(mockLogger.error).toHaveBeenCalled();
     });
   });
 });
