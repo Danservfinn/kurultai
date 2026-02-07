@@ -7,6 +7,9 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31562 | 12:30 PM | 🟣 | Möngke SOUL.md Enhanced with Skill Routing Section | ~732 |
+| #31502 | 12:24 PM | 🔵 | Primary Session Re-Reading All 6 SOUL.md Files - Baseline Assessment Pattern | ~371 |
+| #31488 | 12:21 PM | 🔵 | Möngke's Current SOUL.md Architecture and Capabilities | ~771 |
 | #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |
 | #31388 | 12:02 PM | 🔵 | Researcher Agent (Möngke) Soul Configuration and Research Methodology | ~601 |
 | #31382 | 12:01 PM | 🔵 | Horde Agent Soul Files Structure Identified | ~201 |

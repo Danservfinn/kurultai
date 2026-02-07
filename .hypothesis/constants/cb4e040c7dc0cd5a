@@ -1,0 +1,4 @@
+# file: /Users/kurultai/molt/tools/kurultai/complexity_models.py
+# hypothesis_version: 6.150.2
+
+[0.0, 1.0, 100, 1000, 'AUTOMATION', 'COMMUNICATION', 'DATA', 'INFRASTRUCTURE', 'INTELLIGENCE', 'domain_specific', 'edge_case', 'fail', 'full_team', 'individual', 'known_complex', 'known_simple', 'pass', 'regression', 'skip', 'small_team', 'synthetic', 'warning']

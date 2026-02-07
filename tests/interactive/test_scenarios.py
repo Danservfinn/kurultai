@@ -22,8 +22,8 @@ from typing import Any, Dict, List, Optional
 
 
 @dataclass
-class TestScenario:
-    """A test scenario for interactive chat validation."""
+class Scenario:
+    """A test scenario for interactive chat validation (not a pytest test class)."""
 
     name: str
     description: str
@@ -38,7 +38,7 @@ class TestScenario:
 
 # Interactive test scenarios covering key workflows
 INTERACTIVE_TEST_SCENARIOS = [
-    TestScenario(
+    Scenario(
         name="Simple Delegation to Researcher",
         description="Kublai should delegate a research task to Mongke",
         user_message="Research the latest advances in large language model orchestration and summarize the key findings.",
@@ -61,7 +61,7 @@ INTERACTIVE_TEST_SCENARIOS = [
         complexity_score=0.4,
         expected_task_type="research",
     ),
-    TestScenario(
+    Scenario(
         name="Multi-Agent Collaboration",
         description="Task requires research, writing, and development",
         user_message="Create a FastAPI endpoint for user authentication with JWT tokens. Include the code, documentation, and security analysis.",
@@ -86,7 +86,7 @@ INTERACTIVE_TEST_SCENARIOS = [
         complexity_score=0.8,
         expected_task_type="code",
     ),
-    TestScenario(
+    Scenario(
         name="Delegation with Capability Check",
         description="Verify capability-based routing works correctly",
         user_message="Analyze the performance characteristics of our Neo4j database and recommend optimizations.",
@@ -108,7 +108,7 @@ INTERACTIVE_TEST_SCENARIOS = [
         complexity_score=0.6,
         expected_task_type="analysis",
     ),
-    TestScenario(
+    Scenario(
         name="Fallback on Specialist Unavailable",
         description="Kublai should handle specialist unavailability gracefully",
         user_message="Write a poem about software testing.",
@@ -129,7 +129,7 @@ INTERACTIVE_TEST_SCENARIOS = [
         complexity_score=0.2,
         expected_task_type="writing",
     ),
-    TestScenario(
+    Scenario(
         name="Complex DAG Task Coordination",
         description="Multiple tasks with dependencies execute correctly",
         user_message="Build a complete user management system: design the database schema, implement the API endpoints, write unit tests, and create API documentation.",
@@ -153,7 +153,7 @@ INTERACTIVE_TEST_SCENARIOS = [
         complexity_score=0.9,
         expected_task_type="code",
     ),
-    TestScenario(
+    Scenario(
         name="Security Audit Task",
         description="Security analysis task routes to Temüjin",
         user_message="Perform a security audit on our authentication system focusing on OWASP Top 10 vulnerabilities.",
@@ -182,7 +182,7 @@ class ScenarioRunner:
     """Runner for executing test scenarios interactively."""
 
     @staticmethod
-    def print_scenario(scenario: TestScenario):
+    def print_scenario(scenario: Scenario):
         """Print scenario details for the tester.
 
         Args:
@@ -208,7 +208,7 @@ class ScenarioRunner:
         print(f"{'=' * 60}\n")
 
     @staticmethod
-    def create_validation_checklist(scenario: TestScenario) -> Dict[str, Any]:
+    def create_validation_checklist(scenario: Scenario) -> Dict[str, Any]:
         """Create a validation checklist for the scenario.
 
         Args:
@@ -232,7 +232,7 @@ class ScenarioRunner:
         }
 
     @staticmethod
-    def list_all_scenarios(scenarios: List[TestScenario] = None):
+    def list_all_scenarios(scenarios: List[Scenario] = None):
         """List all available test scenarios.
 
         Args:
@@ -252,14 +252,14 @@ class ScenarioRunner:
         print("=" * 60 + "\n")
 
     @staticmethod
-    def get_scenario_by_index(index: int) -> TestScenario:
+    def get_scenario_by_index(index: int) -> Scenario:
         """Get a scenario by its index.
 
         Args:
             index: Scenario index
 
         Returns:
-            TestScenario instance
+            Scenario instance
 
         Raises:
             IndexError: If index is out of range
@@ -271,14 +271,14 @@ class ScenarioRunner:
         )
 
     @staticmethod
-    def get_scenario_by_name(name: str) -> Optional[TestScenario]:
+    def get_scenario_by_name(name: str) -> Optional[Scenario]:
         """Get a scenario by its name.
 
         Args:
             name: Scenario name (partial match supported)
 
         Returns:
-            TestScenario instance or None if not found
+            Scenario instance or None if not found
         """
         name_lower = name.lower()
         for scenario in INTERACTIVE_TEST_SCENARIOS:
@@ -344,7 +344,7 @@ def create_scenario_report(results: List[ScenarioResult]) -> Dict[str, Any]:
 
 
 __all__ = [
-    "TestScenario",
+    "Scenario",
     "INTERACTIVE_TEST_SCENARIOS",
     "ScenarioRunner",
     "ScenarioResult",

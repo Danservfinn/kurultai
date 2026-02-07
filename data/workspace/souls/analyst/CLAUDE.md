@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31508 | 12:25 PM | 🟣 | Jochi SOUL.md Enhanced with Skill Routing Section | ~758 |
+| #31498 | 12:23 PM | 🔵 | Jochi's Current SOUL.md Architecture and Capabilities | ~1182 |
 | #31434 | 12:06 PM | 🔵 | Soul Files Exploration Report - Complete Agent Architecture Summary | ~476 |
 | #31384 | 12:01 PM | 🔵 | Analyst Agent (Jochi) Soul Configuration and Capabilities | ~544 |
 | #31382 | " | 🔵 | Horde Agent Soul Files Structure Identified | ~201 |

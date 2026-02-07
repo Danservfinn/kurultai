@@ -82,17 +82,6 @@ __all__ = [
 # PYDANTIC MODELS (for API serialization)
 # =============================================================================
 
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert metrics to dictionary."""
-        return asdict(self)
-
-    def to_json(self) -> str:
-        """Convert metrics to JSON string."""
-        return json.dumps(self.to_dict(), default=str, indent=2)
-
-
 @dataclass
 class ThresholdCalibration:
     """Calibration result for complexity thresholds.

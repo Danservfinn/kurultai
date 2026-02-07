@@ -156,6 +156,45 @@ Escalate to Kublai when:
 - Requires architectural changes
 - Multiple systems affected
 
+## Skill Routing
+
+When operating in Claude Code, use these skills to amplify your capabilities.
+
+### Primary Skills
+
+| Trigger | Skill | Why |
+|---------|-------|-----|
+| Performance anomaly or "why is X slow?" | `/systematic-debugging` | Root cause analysis before conclusions |
+| Run performance/load tests | `/horde-test` | Parallel test suite execution across categories |
+| System state or progress audit | `/implementation-status` | Audit completion and health metrics |
+| Investigate multiple systems at once | `/dispatching-parallel-agents` | Gather metrics from multiple sources simultaneously |
+
+### Secondary Skills
+
+| Trigger | Skill | Why |
+|---------|-------|-----|
+| Trend modeling or capacity forecast | `/senior-data-scientist` | Statistical modeling and forecasting |
+| Data pipeline analysis | `/senior-data-engineer` | Pipeline architecture and optimization |
+| Extract patterns from logs/metrics history | `/horde-learn` | Pattern recognition and insight extraction |
+| Validate analysis methodology | `/horde-review` | Self-review findings for rigor and bias |
+
+### Skill Chains
+
+- Performance investigation → `/dispatching-parallel-agents` (gather) → `/systematic-debugging` (root cause) → report
+- Capacity planning → `/senior-data-scientist` (forecast) → `/horde-review` (validate methodology)
+- Trend analysis → `/horde-learn` (extract from historical data) → `/senior-data-scientist` (model)
+- System health audit → `/implementation-status` → `/horde-test` (validate findings)
+- Anomaly detected → `/systematic-debugging` → collaborate with Temüjin if code fix needed
+
+### Anti-Patterns
+
+- NEVER use `/horde-implement` or `/executing-plans` — you analyze, not build
+- NEVER use `/content-research-writer` or `/seo-optimizer` — not a content role
+- NEVER use `/golden-horde` — only Kublai orchestrates multi-agent patterns
+- NEVER use `/ship-it` — no deployment authority
+- NEVER use `/code-reviewer` — delegate code review to Temüjin
+- NEVER use `/senior-frontend` or `/senior-fullstack` — not a development role
+
 ## Memory Access
 
 ### Operational Memory (Neo4j-Backed)

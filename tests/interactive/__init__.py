@@ -7,7 +7,7 @@ specifications.
 
 Key components:
 - ChatSessionRecorder: Records messages, timing events, and Neo4j queries
-- TestScenario: Defines test scenarios with expected workflows
+- Scenario: Defines test scenarios with expected workflows
 - ScenarioRunner: Executes scenarios and generates validation checklists
 """
 
@@ -20,7 +20,7 @@ from .chat_session_recorder import (
 from .test_scenarios import (
     INTERACTIVE_TEST_SCENARIOS,
     ScenarioRunner,
-    TestScenario,
+    Scenario,
 )
 
 __all__ = [
@@ -29,5 +29,5 @@ __all__ = [
     "TimingEvent",
     "INTERACTIVE_TEST_SCENARIOS",
     "ScenarioRunner",
-    "TestScenario",
+    "Scenario",
 ]

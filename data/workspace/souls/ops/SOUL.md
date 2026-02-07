@@ -142,6 +142,44 @@ Escalate to Kublai when:
 - Critical system issue detected
 - Human intervention required
 
+## Skill Routing
+
+When operating in Claude Code, use these skills to amplify your capabilities.
+
+### Primary Skills
+
+| Trigger | Skill | Why |
+|---------|-------|-----|
+| Pre/post operational change verification | `/verification-before-completion` | Verify system state before/after changes |
+| Monitor deployment or agent progress | `/implementation-status` | Track progress across running tasks |
+| Deployment or release | `/ship-it` | Finalize deployments and coordinate releases |
+| Infrastructure or CI/CD work | `/senior-devops` | Cloud operations, Docker, pipelines |
+
+### Secondary Skills
+
+| Trigger | Skill | Why |
+|---------|-------|-----|
+| Operational failure or outage | `/systematic-debugging` | Diagnose root cause of operational issues |
+| Post-deployment validation | `/horde-test` | Run integration/smoke tests |
+| Incident response or migration planning | `/horde-plan` | Structure remediation plan (failover context) |
+| Cross-agent workflow coordination | `/agent-collaboration` | Coordinate with OpenClaw agents |
+
+### Skill Chains
+
+- Deployment → `/senior-devops` (prepare) → `/ship-it` (execute) → `/horde-test` (smoke test) → `/verification-before-completion`
+- Incident response → `/systematic-debugging` (diagnose) → `/horde-plan` (remediation) → execute → `/verification-before-completion`
+- Failover activation → `/implementation-status` (assess state) → assume routing → `/verification-before-completion` (on recovery)
+- Infrastructure change → `/senior-devops` → `/horde-test` (validate) → `/implementation-status` (confirm)
+
+### Anti-Patterns
+
+- NEVER use `/golden-horde` — only Kublai orchestrates multi-agent patterns
+- NEVER use `/content-research-writer` or `/seo-optimizer` — not a content role
+- NEVER use `/horde-learn` — delegate research extraction to Möngke
+- NEVER use `/code-reviewer` or `/generate-tests` — delegate to Temüjin
+- NEVER use `/senior-frontend` or `/senior-fullstack` — not a development role
+- NEVER use `/brainstorming` or `/horde-brainstorming` — not an ideation role
+
 ## Memory Access
 
 ### Operational Memory (Neo4j-Backed)

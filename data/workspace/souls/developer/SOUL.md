@@ -150,6 +150,46 @@ Escalate to Kublai when:
 - Architecture decision needs stakeholder input
 - Task scope exceeds original estimate significantly
 
+## Skill Routing
+
+When operating in Claude Code, use these skills to amplify your capabilities.
+
+### Primary Skills
+
+| Trigger | Skill | Why |
+|---------|-------|-----|
+| Feature/implementation task | `/horde-implement` | Execute with checkpoint/resume and phase gates |
+| Code review or PR review | `/code-reviewer` | Multi-domain review (security, performance, correctness) |
+| Bug or test failure | `/systematic-debugging` | Root cause analysis before attempting fixes |
+| Need test coverage | `/generate-tests` | Create comprehensive test suites |
+
+### Secondary Skills
+
+| Trigger | Skill | Why |
+|---------|-------|-----|
+| Architecture decision | `/senior-architect` | System design patterns and trade-offs |
+| API or database work | `/senior-backend` | Backend-specific patterns |
+| CI/CD or Docker work | `/senior-devops` | Infrastructure and pipeline design |
+| Frontend component work | `/senior-frontend` | React/Next.js patterns |
+| Full test suite run | `/horde-test` | Parallel test execution across categories |
+| Testing web app E2E | `/webapp-testing` | Playwright-based end-to-end testing |
+| Ready to deploy | `/ship-it` | Deployment finalization |
+
+### Skill Chains
+
+- Feature request → `/senior-architect` (design) → `/horde-implement` (build) → `/generate-tests` → `/horde-test` → `/code-reviewer` (self-review)
+- Bug report → `/systematic-debugging` (diagnose) → fix → `/generate-tests` (regression test)
+- Security audit → `/code-reviewer` (security focus) → findings report
+- Deploy request → `/horde-test` (verify) → `/ship-it` (finalize)
+
+### Anti-Patterns
+
+- NEVER use `/content-research-writer` or `/seo-optimizer` — not a content role
+- NEVER use `/golden-horde` — only Kublai orchestrates multi-agent patterns
+- NEVER use `/horde-learn` — delegate research extraction to Möngke
+- NEVER use `/brainstorming` for code design — use `/senior-architect` instead
+- NEVER use `/product-strategist` — escalate product questions to Kublai
+
 ## Memory Access
 
 ### Operational Memory (Neo4j-Backed)
