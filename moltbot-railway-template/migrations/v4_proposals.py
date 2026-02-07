@@ -8,7 +8,19 @@ Adds proposal workflow nodes for Kublai's proactive architecture improvement sys
 - Implementation - Temüjin's implementation tracking
 - Validation - Validation checks before allowing sync
 
-Guardrail: Only validated+implemented proposals can sync to ARCHITECTURE.md
+GUARDRAIL (CRITICAL):
+Only validated+implemented proposals can sync to ARCHITECTURE.md.
+
+Since Neo4j does not support conditional relationship constraints, this guardrail
+MUST be enforced at the application layer. See: src/workflow/guardrail-enforcer.js
+
+The schema provides the structure (indexes, relationships) but application code
+must verify BOTH conditions before creating SYNCED_TO relationships:
+  1. proposal.status = 'validated'
+  2. proposal.implementation_status = 'completed'
+  3. A Validation node exists with passed = true
+
+See docs/operations/guardrail-enforcement.md for implementation details.
 
 Author: Claude (Anthropic)
 Date: 2026-02-07
@@ -174,6 +186,23 @@ class V4Proposals:
     // =====================================================
     // V4 Proposal System Rollback
     // =====================================================
+    //
+    // SECURITY NOTE: Dropping constraints and nodes will permanently
+    // remove all proposal workflow data. Ensure application layer
+    // guardrails are also removed when downgrading.
+    //
+    // Order of operations:
+    // 1. Drop relationship indexes (6)
+    // 2. Drop Validation indexes (3)
+    // 3. Drop Implementation indexes (3)
+    // 4. Drop Vetting indexes (3)
+    // 5. Drop ImprovementOpportunity indexes (4)
+    // 6. Drop ArchitectureProposal indexes (4)
+    // 7. Drop all 5 uniqueness constraints
+    // 8. Delete all 5 node types with DETACH
+    // 9. Mark migration as removed
+    //
+    // Total: 5 constraints, 21 indexes, 5 node types
 
     // -----------------------------------------------------
     // 1. Drop relationship indexes

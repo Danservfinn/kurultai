@@ -18,6 +18,10 @@ const authRoutes = require('../routes/auth');
 const healthRoutes = require('../routes/health');
 const requestLogger = require('../middleware/logger');
 
+// Import Kublai self-awareness modules
+const { ArchitectureIntrospection, ProactiveReflection, ScheduledReflection } = require('./kublai');
+const { ProposalStateMachine, ProposalMapper, ValidationHandler } = require('./workflow');
+
 // =============================================================================
 // Logger Configuration
 // =============================================================================
@@ -230,6 +234,75 @@ async function stopSignalCli() {
 }
 
 // =============================================================================
+// Kublai Self-Awareness Module Instances
+// =============================================================================
+
+let neo4jDriver = null;
+let architectureIntrospection = null;
+let proactiveReflection = null;
+let scheduledReflection = null;
+let proposalStateMachine = null;
+let proposalMapper = null;
+let validationHandler = null;
+
+/**
+ * Initialize Kublai self-awareness modules with Neo4j
+ */
+async function initKublaiModules() {
+  const NEO4J_URI = process.env.NEO4J_URI;
+  const NEO4J_USER = process.env.NEO4J_USER || 'neo4j';
+  const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD;
+
+  if (!NEO4J_URI || !NEO4J_PASSWORD) {
+    logger.warn('[Kublai] Neo4j not configured, self-awareness modules disabled');
+    return false;
+  }
+
+  try {
+    const neo4j = require('neo4j-driver');
+    neo4jDriver = neo4j.driver(
+      NEO4J_URI,
+      neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD)
+    );
+
+    // Verify connectivity
+    await neo4jDriver.verifyConnectivity();
+    logger.info('[Kublai] Neo4j connected');
+
+    // Initialize modules
+    architectureIntrospection = new ArchitectureIntrospection(neo4jDriver, logger);
+    proactiveReflection = new ProactiveReflection(neo4jDriver, architectureIntrospection, logger);
+    scheduledReflection = new ScheduledReflection(proactiveReflection, logger);
+    proposalStateMachine = new ProposalStateMachine(neo4jDriver, logger);
+    proposalMapper = new ProposalMapper(neo4jDriver, logger);
+    validationHandler = new ValidationHandler(neo4jDriver, logger);
+
+    // Start scheduled reflection
+    scheduledReflection.start();
+
+    logger.info('[Kublai] Self-awareness modules initialized');
+    return true;
+  } catch (error) {
+    logger.error('[Kublai] Failed to initialize', { error: error.message });
+    return false;
+  }
+}
+
+/**
+ * Stop Kublai modules gracefully
+ */
+async function stopKublaiModules() {
+  if (scheduledReflection) {
+    scheduledReflection.stop();
+    logger.info('[Kublai] Scheduled reflection stopped');
+  }
+  if (neo4jDriver) {
+    await neo4jDriver.close();
+    logger.info('[Kublai] Neo4j driver closed');
+  }
+}
+
+// =============================================================================
 // Express Gateway Setup
 // =============================================================================
 
@@ -262,6 +335,11 @@ app.get('/health', async (req, res) => {
     signal: {
       enabled: signalConfig.enabled,
       ready: signalCliReady
+    },
+    kublai: {
+      neo4jConnected: !!neo4jDriver,
+      reflectionScheduled: !!scheduledReflection,
+      modulesLoaded: !!(architectureIntrospection && proposalStateMachine)
     }
   };
 
@@ -271,6 +349,18 @@ app.get('/health', async (req, res) => {
     health.signal.ready = signalHealthy;
 
     if (!signalHealthy) {
+      health.status = 'degraded';
+    }
+  }
+
+  // Check Neo4j connectivity for Kublai
+  if (neo4jDriver) {
+    try {
+      const session = neo4jDriver.session();
+      await session.run('RETURN 1');
+      await session.close();
+    } catch (error) {
+      health.kublai.neo4jConnected = false;
       health.status = 'degraded';
     }
   }
@@ -317,52 +407,121 @@ app.get('/signal/status', async (req, res) => {
 // =============================================================================
 
 app.post('/api/migrate-proposals', async (req, res) => {
-  const neo4j = require('neo4j-driver');
-  const NEO4J_URI = process.env.NEO4J_URI || 'bolt://neo4j.railway.internal:7687';
-  const NEO4J_USER = process.env.NEO4J_USER || 'neo4j';
-  const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || '';
+  if (!neo4jDriver) {
+    return res.status(503).json({ error: 'Neo4j not connected' });
+  }
 
-  const driver = neo4j.driver(
-    NEO4J_URI,
-    neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD)
-  );
-
+  // Full v4 migration: 5 constraints + 17 property indexes + 6 relationship indexes
   const statements = [
-    "CREATE CONSTRAINT proposal_id IF NOT EXISTS FOR (p:ArchitectureProposal) REQUIRE p.id IS UNIQUE",
-    "CREATE CONSTRAINT opportunity_id IF NOT EXISTS FOR (o:ImprovementOpportunity) REQUIRE o.id IS UNIQUE",
-    "CREATE CONSTRAINT vetting_id IF NOT EXISTS FOR (v:Vetting) REQUIRE v.id IS UNIQUE",
-    "CREATE CONSTRAINT implementation_id IF NOT EXISTS FOR (i:Implementation) REQUIRE i.id IS UNIQUE",
-    "CREATE CONSTRAINT validation_id IF NOT EXISTS FOR (v:Validation) REQUIRE v.id IS UNIQUE",
+    // Constraints
+    "CREATE CONSTRAINT proposal_id_unique IF NOT EXISTS FOR (p:ArchitectureProposal) REQUIRE p.id IS UNIQUE",
+    "CREATE CONSTRAINT opportunity_id_unique IF NOT EXISTS FOR (o:ImprovementOpportunity) REQUIRE o.id IS UNIQUE",
+    "CREATE CONSTRAINT vetting_id_unique IF NOT EXISTS FOR (v:Vetting) REQUIRE v.id IS UNIQUE",
+    "CREATE CONSTRAINT implementation_id_unique IF NOT EXISTS FOR (i:Implementation) REQUIRE i.id IS UNIQUE",
+    "CREATE CONSTRAINT validation_id_unique IF NOT EXISTS FOR (v:Validation) REQUIRE v.id IS UNIQUE",
+    // ArchitectureProposal indexes
     "CREATE INDEX proposal_status IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.status)",
+    "CREATE INDEX proposal_priority IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.priority)",
+    "CREATE INDEX proposal_created_at IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.created_at)",
+    "CREATE INDEX proposal_implementation_status IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.implementation_status)",
+    // ImprovementOpportunity indexes
     "CREATE INDEX opportunity_status IF NOT EXISTS FOR (o:ImprovementOpportunity) ON (o.status)",
-    "CREATE INDEX proposal_priority IF NOT EXISTS FOR (p:ArchitectureProposal) ON (p.priority)"
+    "CREATE INDEX opportunity_priority IF NOT EXISTS FOR (o:ImprovementOpportunity) ON (o.priority)",
+    "CREATE INDEX opportunity_type IF NOT EXISTS FOR (o:ImprovementOpportunity) ON (o.type)",
+    "CREATE INDEX opportunity_proposed_by IF NOT EXISTS FOR (o:ImprovementOpportunity) ON (o.proposed_by)",
+    // Vetting indexes
+    "CREATE INDEX vetting_proposal IF NOT EXISTS FOR (v:Vetting) ON (v.proposal_id)",
+    "CREATE INDEX vetting_vetted_by IF NOT EXISTS FOR (v:Vetting) ON (v.vetted_by)",
+    "CREATE INDEX vetting_created_at IF NOT EXISTS FOR (v:Vetting) ON (v.created_at)",
+    // Implementation indexes
+    "CREATE INDEX implementation_proposal IF NOT EXISTS FOR (i:Implementation) ON (i.proposal_id)",
+    "CREATE INDEX implementation_status IF NOT EXISTS FOR (i:Implementation) ON (i.status)",
+    "CREATE INDEX implementation_started_at IF NOT EXISTS FOR (i:Implementation) ON (i.started_at)",
+    // Validation indexes
+    "CREATE INDEX validation_implementation IF NOT EXISTS FOR (v:Validation) ON (v.implementation_id)",
+    "CREATE INDEX validation_passed IF NOT EXISTS FOR (v:Validation) ON (v.passed)",
+    "CREATE INDEX validation_validated_at IF NOT EXISTS FOR (v:Validation) ON (v.validated_at)",
+    // Relationship indexes
+    "CREATE INDEX evolves_into IF NOT EXISTS FOR ()-[r:EVOLVES_INTO]->() ON (r.created_at)",
+    "CREATE INDEX updates_section IF NOT EXISTS FOR ()-[r:UPDATES_SECTION]->() ON (r.target_section)",
+    "CREATE INDEX synced_to IF NOT EXISTS FOR ()-[r:SYNCED_TO]->() ON (r.synced_at)",
+    "CREATE INDEX has_vetting IF NOT EXISTS FOR ()-[r:HAS_VETTING]->() ON (r.created_at)",
+    "CREATE INDEX implemented_by IF NOT EXISTS FOR ()-[r:IMPLEMENTED_BY]->() ON (r.started_at)",
+    "CREATE INDEX validated_by IF NOT EXISTS FOR ()-[r:VALIDATED_BY]->() ON (r.validated_at)"
   ];
 
   const results = [];
 
   for (const statement of statements) {
-    const session = driver.session();
+    const session = neo4jDriver.session();
     try {
       await session.run(statement);
-      results.push({ statement: statement.substring(0, 50) + '...', status: 'success' });
+      results.push({ statement: statement.substring(0, 60) + '...', status: 'success' });
     } catch (error) {
       if (error.message.includes('AlreadyExists') || error.message.includes('equivalent')) {
-        results.push({ statement: statement.substring(0, 50) + '...', status: 'skipped (exists)' });
+        results.push({ statement: statement.substring(0, 60) + '...', status: 'skipped (exists)' });
       } else {
-        results.push({ statement: statement.substring(0, 50) + '...', status: 'failed', error: error.message });
+        results.push({ statement: statement.substring(0, 60) + '...', status: 'failed', error: error.message });
       }
     } finally {
       await session.close();
     }
   }
 
-  await driver.close();
+  const succeeded = results.filter(r => r.status === 'success').length;
+  const skipped = results.filter(r => r.status.startsWith('skipped')).length;
+  const failed = results.filter(r => r.status === 'failed').length;
 
   res.json({
-    migration: '003_proposals',
+    migration: 'v4_proposals',
+    summary: { total: statements.length, succeeded, skipped, failed },
     results,
-    status: 'complete'
+    status: failed === 0 ? 'complete' : 'partial'
   });
+});
+
+// =============================================================================
+// Proposals API Endpoints
+// =============================================================================
+
+app.get('/api/proposals', async (req, res) => {
+  if (!proposalStateMachine) {
+    return res.status(503).json({ error: 'Proposal system not initialized' });
+  }
+  try {
+    const status = req.query.status || 'proposed';
+    const proposals = await proposalStateMachine.listByStatus(status);
+    res.json({ proposals, count: proposals.length });
+  } catch (error) {
+    logger.error('Failed to list proposals', { error: error.message });
+    res.status(500).json({ error: 'Failed to list proposals' });
+  }
+});
+
+app.post('/api/proposals/reflect', async (req, res) => {
+  if (!proactiveReflection) {
+    return res.status(503).json({ error: 'Reflection system not initialized' });
+  }
+  try {
+    const result = await proactiveReflection.triggerReflection();
+    res.json(result);
+  } catch (error) {
+    logger.error('Reflection trigger failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to trigger reflection' });
+  }
+});
+
+app.get('/api/proposals/ready-to-sync', async (req, res) => {
+  if (!proposalMapper) {
+    return res.status(503).json({ error: 'Proposal mapper not initialized' });
+  }
+  try {
+    const proposals = await proposalMapper.getReadyToSync();
+    res.json({ proposals, count: proposals.length });
+  } catch (error) {
+    logger.error('Failed to get ready-to-sync proposals', { error: error.message });
+    res.status(500).json({ error: 'Failed to get ready-to-sync proposals' });
+  }
 });
 
 // =============================================================================
@@ -377,9 +536,17 @@ app.get('/', (req, res) => {
     channels: {
       signal: signalConfig.enabled ? 'enabled' : 'disabled'
     },
+    kublai: {
+      selfAwareness: !!architectureIntrospection ? 'active' : 'inactive',
+      proposalSystem: !!proposalStateMachine ? 'active' : 'inactive'
+    },
     endpoints: {
       health: '/health',
-      signalStatus: '/signal/status'
+      signalStatus: '/signal/status',
+      proposals: '/api/proposals',
+      triggerReflection: '/api/proposals/reflect',
+      readyToSync: '/api/proposals/ready-to-sync',
+      migrateProposals: '/api/migrate-proposals'
     }
   });
 });
@@ -402,6 +569,9 @@ app.use((err, req, res, next) => {
 
 async function gracefulShutdown(signal) {
   logger.info(`Received ${signal}, starting graceful shutdown...`);
+
+  // Stop Kublai modules
+  await stopKublaiModules();
 
   // Stop signal-cli
   await stopSignalCli();
@@ -434,6 +604,9 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 async function main() {
   logger.info('Starting Moltbot Gateway...');
 
+  // Initialize Kublai self-awareness modules
+  const kublaiReady = await initKublaiModules();
+
   // Start signal-cli if enabled
   if (signalConfig.enabled) {
     try {
@@ -451,7 +624,8 @@ async function main() {
     logger.info(`Moltbot Gateway listening on port ${PORT}`, {
       port: PORT,
       signalEnabled: signalConfig.enabled,
-      signalReady: signalCliReady
+      signalReady: signalCliReady,
+      kublaiReady
     });
   });
 
@@ -467,4 +641,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, startSignalCli, stopSignalCli, checkSignalCliHealth, main };
+module.exports = {
+  app, startSignalCli, stopSignalCli, checkSignalCliHealth, main,
+  initKublaiModules, stopKublaiModules
+};
