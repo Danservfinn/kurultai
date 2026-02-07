@@ -9,7 +9,6 @@ FROM node:22-bookworm-slim
 # Java for signal-cli, Python for Neo4j migrations, curl for healthcheck
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-17-jre-headless \
     python3 \
     python3-pip \
     curl \
@@ -19,6 +18,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
+# Install Eclipse Temurin JRE 21 (signal-cli 0.13.x requires Java 21, class version 65.0)
+RUN curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/keyrings/adoptium.asc \
+    && echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb bookworm main" | tee /etc/apt/sources.list.d/adoptium.list \
+    && apt-get update && apt-get install -y --no-install-recommends temurin-21-jre \
+    && rm -rf /var/lib/apt/lists/* \
+    && java -version
+
 # Install Python dependencies for Neo4j migrations
 RUN pip3 install --no-cache-dir --break-system-packages \
     neo4j>=5.15.0 \
@@ -26,15 +32,18 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     python-dotenv>=1.0.0
 
 # =============================================================================
-# SECTION 2: Install signal-cli (native GraalVM binary)
+# SECTION 2: Install signal-cli (JVM version — native binary hangs on Railway)
 # =============================================================================
+# Using JVM version instead of native GraalVM binary because the native binary
+# hangs with "Failed to read local accounts list" on Railway's shared infrastructure.
+# Java 17 is already installed above.
 
 ARG SIGNAL_CLI_VERSION=0.13.12
 RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
-    "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz" \
-    && tar -xzf /tmp/signal-cli.tar.gz -C /usr/local/bin \
+    "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
+    && tar -xzf /tmp/signal-cli.tar.gz -C /opt \
     && rm /tmp/signal-cli.tar.gz \
-    && chmod +x /usr/local/bin/signal-cli \
+    && ln -sf /opt/signal-cli-${SIGNAL_CLI_VERSION}/bin/signal-cli /usr/local/bin/signal-cli \
     && signal-cli --version
 
 # =============================================================================

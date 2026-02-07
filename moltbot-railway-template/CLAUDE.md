@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #31819 | 1:41 PM | 🔵 | Primary Session Re-Reading OpenClaw Configuration - Signal httpUrl Configuration Verified | ~545 |
+| #31795 | 1:33 PM | ✅ | Deployed Moltbot to Railway Infrastructure | ~268 |
 | #31788 | 1:30 PM | 🔵 | Primary Session Reading Signal Daemon Startup Code to Identify Connection Issue | ~432 |
 | #31769 | 1:25 PM | ✅ | OpenClaw Signal Configuration Modified: Disable autoStart, Use httpUrl for Pre-Started Daemon | ~663 |
 | #31768 | " | 🟣 | Enhanced Signal Integration - Manual Daemon Startup Before OpenClaw Gateway | ~614 |
@@ -25,6 +27,4 @@
 | #31659 | " | 🔵 | Primary Session Reading OpenClaw Gateway Configuration for Kurultai System | ~830 |
 | #31658 | " | 🔵 | OpenClaw Gateway Configuration Examined: Signal Provider Already Defined but Requires Environment Variables | ~664 |
 | #31657 | " | 🔵 | Dockerfile Configuration Reviewed: OpenClaw Gateway with Signal and Neo4j Support | ~695 |
-| #31436 | 12:06 PM | 🔵 | OpenClaw Configuration Architecture - Complete Agent System Definition | ~581 |
-| #31435 | " | 🔵 | Moltbot Railway Dockerfile - OpenClaw Gateway Deployment Configuration | ~319 |
 </claude-mem-context>

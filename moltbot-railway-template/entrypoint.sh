@@ -2,11 +2,9 @@
 # Moltbot entrypoint - runs migrations, extracts Signal data, then starts OpenClaw gateway
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 
-SIGNAL_DATA_DIR="${SIGNAL_DATA_DIR:-/data/.signal}"
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
 # Ensure data directories exist with proper permissions
-mkdir -p "$SIGNAL_DATA_DIR" 2>/dev/null || true
 mkdir -p "$OPENCLAW_STATE_DIR" 2>/dev/null || true
 mkdir -p /data/logs 2>/dev/null || true
 mkdir -p /data/workspace 2>/dev/null || true
@@ -60,64 +58,50 @@ else
 fi
 
 # =============================================================================
-# EXTRACT AND START SIGNAL
+# EXTRACT SIGNAL DATA
 # =============================================================================
-# signal-cli --config <dir> expects: <dir>/data/accounts.json
-# We use /data/.signal as the config dir, with data/ subdirectory inside.
+# OpenClaw autoStarts signal-cli WITHOUT --config flag.
+# signal-cli uses default: $HOME/.local/share/signal-cli/
+# With HOME=/data (set at gateway exec), data must be at:
+#   /data/.local/share/signal-cli/data/accounts.json
 # Archive structure: data/accounts.json, data/182126, data/182126.d/
 
-# Always force-extract from archive to ensure clean state
-# Previous migrations may have created truncated or corrupted files
+SIGNAL_CLI_DATA_DIR="/data/.local/share/signal-cli"
+
 if [ -f /opt/signal-data.tar.gz ]; then
-    echo "Extracting Signal data from archive to $SIGNAL_DATA_DIR..."
-    # Remove old data/ subdir to ensure clean extraction
-    rm -rf "$SIGNAL_DATA_DIR/data" 2>/dev/null || true
-    tar -xzf /opt/signal-data.tar.gz -C "$SIGNAL_DATA_DIR"
-    find "$SIGNAL_DATA_DIR" -name '._*' -delete 2>/dev/null
-    echo "  Extracted contents:"
-    ls -la "$SIGNAL_DATA_DIR/data/"
-    echo "  accounts.json size: $(wc -c < "$SIGNAL_DATA_DIR/data/accounts.json") bytes"
+    echo "=== Extracting Signal Data ==="
+    mkdir -p "$SIGNAL_CLI_DATA_DIR"
+    # Force clean extraction every deploy to prevent corruption
+    rm -rf "$SIGNAL_CLI_DATA_DIR/data" 2>/dev/null || true
+    tar -xzf /opt/signal-data.tar.gz -C "$SIGNAL_CLI_DATA_DIR"
+    find "$SIGNAL_CLI_DATA_DIR" -name '._*' -delete 2>/dev/null
+    echo "  Extracted to: $SIGNAL_CLI_DATA_DIR"
+    echo "  Contents:"
+    ls -la "$SIGNAL_CLI_DATA_DIR/data/"
+    echo "  accounts.json size: $(wc -c < "$SIGNAL_CLI_DATA_DIR/data/accounts.json") bytes"
 fi
 
-chown -R 1001:1001 "$SIGNAL_DATA_DIR" 2>/dev/null || true
-chmod -R 700 "$SIGNAL_DATA_DIR" 2>/dev/null || true
+# Set permissions for moltbot user (OpenClaw runs as moltbot)
+# Must chown the entire .local tree since mkdir -p creates parents as root
+chown -R 1001:1001 /data/.local 2>/dev/null || true
+chmod -R 700 "$SIGNAL_CLI_DATA_DIR" 2>/dev/null || true
+# Parent dirs need traverse permission (execute bit)
+chmod 755 /data/.local /data/.local/share 2>/dev/null || true
 
 echo "Signal data status:"
-if [ -f "$SIGNAL_DATA_DIR/data/accounts.json" ]; then
-    echo "  accounts.json found"
-    ls -la "$SIGNAL_DATA_DIR/data/"
-else
-    echo "  WARNING: accounts.json missing at $SIGNAL_DATA_DIR/data/"
-fi
-
-# Start signal-cli daemon BEFORE OpenClaw (with explicit --config path)
-# OpenClaw will connect to it via httpUrl instead of autoStart
-SIGNAL_CLI_PORT=8080
-if [ -f "$SIGNAL_DATA_DIR/data/accounts.json" ] && [ -x /usr/local/bin/signal-cli ]; then
-    echo "Starting signal-cli daemon on port $SIGNAL_CLI_PORT..."
-    su -s /bin/sh moltbot -c "/usr/local/bin/signal-cli --config $SIGNAL_DATA_DIR daemon --http 127.0.0.1:$SIGNAL_CLI_PORT --receive-mode on-connection --ignore-stories" &
-    SIGNAL_PID=$!
-    echo "  signal-cli PID: $SIGNAL_PID"
-
-    # Wait for daemon to become ready
-    SIGNAL_READY=false
-    for i in $(seq 1 30); do
-        sleep 2
-        if curl -sf http://127.0.0.1:$SIGNAL_CLI_PORT/api/v1/check > /dev/null 2>&1; then
-            SIGNAL_READY=true
-            echo "  signal-cli daemon ready after $((i*2))s"
-            break
-        fi
-        echo "  Waiting for signal-cli... (${i}/30)"
+if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ]; then
+    echo "  accounts.json found at $SIGNAL_CLI_DATA_DIR/data/accounts.json"
+    echo "  accounts.json content: $(cat "$SIGNAL_CLI_DATA_DIR/data/accounts.json")"
+    echo "  signal-cli version: $(/usr/local/bin/signal-cli --version 2>&1 || echo unknown)"
+    echo "  Directory tree:"
+    find "$SIGNAL_CLI_DATA_DIR" -type f 2>/dev/null | while read -r f; do
+        echo "    $f ($(stat -c '%U:%G %a' "$f" 2>/dev/null || stat -f '%Su:%Sg %Lp' "$f" 2>/dev/null))"
     done
-
-    if [ "$SIGNAL_READY" = "false" ]; then
-        echo "  WARNING: signal-cli daemon not ready after 60s"
-        # Check if process is still running
-        kill -0 $SIGNAL_PID 2>/dev/null && echo "  Process still running" || echo "  Process exited"
-    fi
+    # Quick smoke test: list accounts as moltbot user
+    echo "  Testing signal-cli env and listAccounts as moltbot..."
+    su -s /bin/sh moltbot -c "HOME=/data; export HOME; echo HOME=\$HOME; echo XDG_DATA_HOME=\${XDG_DATA_HOME:-unset}; echo 'Expected data dir: /data/.local/share/signal-cli'; ls -la /data/.local/share/signal-cli/data/ 2>&1; echo '--- verbose listAccounts ---'; /usr/local/bin/signal-cli -v listAccounts 2>&1" || true
 else
-    echo "Skipping signal-cli daemon (missing accounts or binary)"
+    echo "  WARNING: accounts.json missing — Signal will not work"
 fi
 
 # =============================================================================

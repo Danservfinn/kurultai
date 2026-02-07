@@ -43,20 +43,22 @@
   },
 
   // Signal channel configuration
+  // OpenClaw autoStarts signal-cli daemon — data must be at $HOME/.local/share/signal-cli/
+  // With HOME=/data, that means /data/.local/share/signal-cli/data/accounts.json
   channels: {
     signal: {
       enabled: true,
       account: "${SIGNAL_ACCOUNT}",
       cliPath: "/usr/local/bin/signal-cli",
-      // signal-cli daemon started by entrypoint.sh with explicit --config path
-      httpUrl: "http://127.0.0.1:8080",
-      autoStart: false,
+      // Let OpenClaw manage the daemon (autoStart defaults to true)
+      httpHost: "127.0.0.1",
+      httpPort: 8080,
       startupTimeoutMs: 120000,
+      receiveMode: "manual",
       dmPolicy: "pairing",
       groupPolicy: "allowlist",
       configWrites: false,
       allowFrom: ["${SIGNAL_ACCOUNT}", "${SIGNAL_ALLOW_FROM}"],
-      // Note: groupAllowFrom removed — SIGNAL_GROUP_ALLOW_FROM env var not set
       historyLimit: 50,
       textChunkLimit: 4000,
       ignoreStories: true,
@@ -74,11 +76,6 @@
   env: {
     shellEnv: {
       enabled: false,
-      allowlist: [
-        "NODE_ENV",
-        "SIGNAL_ACCOUNT",
-        "SIGNAL_ALLOW_FROM",
-      ],
     },
   },
 }
