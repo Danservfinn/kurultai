@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32334 | 3:19 PM | 🔵 | Agent Soul Definition Files Inventory - Complete Personality Definitions for Six Agents | ~570 |
 | #32079 | 2:30 PM | 🔵 | Analyst CLAUDE.md Session Log Records horde-health References | ~344 |
 | #32077 | " | 🔵 | Project Repository Contains horde-health Reference in Analyst Session Log | ~230 |
 | #32056 | 2:27 PM | ✅ | Analyst SOUL.md Updated - horde-health Command References Renamed to kurultai-health | ~368 |

@@ -29,8 +29,7 @@ Kurultai v0.2 is a multi-agent orchestration platform with autonomous capability
 | **CBAC** | Capability-Based Access Control for learned skills |
 | **Two-Tier Heartbeat** | Infrastructure + functional heartbeat for failover detection (zero cost) |
 | **Automated Testing** | Comprehensive test framework with Jochi-powered continuous validation |
-
-### What's New in v0.2
+| **Kublai Self-Awareness** | Proactive architecture introspection and improvement proposals |
 
 - **Autonomous Learning**: Agents can learn new capabilities through natural language requests
 - **HMAC-SHA256 Authentication**: Cryptographic message signing between agents
@@ -43,6 +42,7 @@ Kurultai v0.2 is a multi-agent orchestration platform with autonomous capability
 - **File Consistency Monitoring**: Hash-based change detection across agent workspaces
 - **Neo4j Fallback Mode**: Circuit breaker with in-memory fallback store and automatic recovery
 - **Two-Tier Heartbeat**: Infrastructure sidecar (30s writes) + functional heartbeat (on task claim/complete) for reliable failover detection
+- **Kublai Self-Awareness System** (NEW): Proactive architecture introspection, improvement proposal workflow with Ögedei vetting and Temüjin implementation, validation guardrails before ARCHITECTURE.md sync
 
 ### Scope
 
@@ -585,6 +585,77 @@ CREATE (fe:FailoverEvent {
 RETURN fe.id
 ```
 
+#### Kublai Self-Awareness System (NEW)
+
+**Purpose**: Enables Kublai to query ARCHITECTURE.md from Neo4j and proactively propose improvements through a collaborative workflow with Ögedei and Temüjin.
+
+**Components**:
+
+| Module | Location | Purpose |
+|--------|----------|---------|
+| `ArchitectureIntrospection` | `src/kublai/architecture-introspection.js` | Query ARCHITECTURE.md sections from Neo4j |
+| `ProactiveReflection` | `src/kublai/proactive-reflection.js` | Analyze architecture for gaps and opportunities |
+| `ScheduledReflection` | `src/kublai/scheduled-reflection.js` | Weekly cron trigger (Sundays 8 PM ET) |
+| `OgedeiVetHandler` | `src/agents/ogedei/vet-handler.js` | Operational impact assessment |
+| `TemujinImplHandler` | `src/agents/temujin/impl-handler.js` | Implementation tracking |
+| `ProposalStateMachine` | `src/workflow/proposal-states.js` | 7-state proposal lifecycle |
+| `ProposalMapper` | `src/workflow/proposal-mapper.js` | Map proposals to ARCHITECTURE.md sections |
+| `ValidationHandler` | `src/workflow/validation.js` | Validation checks before sync |
+
+**Proposal Workflow States**:
+
+```
+proposed → under_review → approved → implemented → validated → synced
+           ↓               ↓
+        rejected        rejected
+```
+
+**Key Guardrail**: Only `validated` AND `implementation_status='validated'` proposals can sync to ARCHITECTURE.md. This prevents unproven changes from being documented.
+
+**Neo4j Schema** (Migration `003_proposals.cypher`):
+
+| Node Type | Purpose | Key Properties |
+|-----------|---------|----------------|
+| `:ArchitectureProposal` | Improvement proposals | `id`, `title`, `description`, `status`, `implementation_status`, `priority` |
+| `:ImprovementOpportunity` | Opportunities identified by Kublai | `id`, `type`, `description`, `priority`, `status` |
+| `:Vetting` | Ögedei's operational assessment | `id`, `proposal_id`, `vetted_by`, `assessment`, `vetted_at` |
+| `:Implementation` | Temüjin's implementation record | `id`, `proposal_id`, `status`, `progress`, `started_at`, `completed_at` |
+| `:Validation` | Validation checks | `id`, `implementation_id`, `passed`, `checks`, `status`, `validated_at` |
+
+**Relationships**:
+- `(:ImprovementOpportunity)-[:EVOLVES_INTO]->(:ArchitectureProposal)`
+- `(:ArchitectureProposal)-[:HAS_VETTING]->(:Vetting)`
+- `(:ArchitectureProposal)-[:IMPLEMENTED_BY]->(:Implementation)`
+- `(:Implementation)-[:VALIDATED_BY]->(:Validation)`
+- `(:ArchitectureProposal)-[:SYNCED_TO]->(:ArchitectureSection)`
+
+**Example Cypher** (Kublai queries architecture):
+
+```cypher
+// Get architecture overview
+MATCH (s:ArchitectureSection)
+RETURN s.title, s.order, s.parent_section
+ORDER BY s.order
+
+// Search architecture content
+CALL db.index.fulltext.queryNodes('architecture_search_index', 'security')
+YIELD node, score
+RETURN node.title, node.content, score
+ORDER BY score DESC
+LIMIT 10
+```
+
+**Example Cypher** (Get proposals ready for sync):
+
+```cypher
+// Validated proposals not yet synced
+MATCH (p:ArchitectureProposal {status: 'validated'})
+WHERE NOT EXISTS((p)-[:SYNCED_TO]->(:ArchitectureSection))
+RETURN p.id, p.title, p.target_section
+```
+
+**Operations Guide**: See `docs/operations/kublai-self-awareness.md` for full documentation.
+
 ### Operational Tier (Neo4j)
 
 **Storage**: Neo4j AuraDB (graph database)
@@ -633,6 +704,12 @@ RETURN fe.id
 | `:ProcessUpdate` | `id` | `UNIQUE(id)` | Process update records |
 | `:SyncEvent` | `id`, `sender_hash`, `triggered_at` | `UNIQUE(id)` | Notion sync audit trail |
 | `:SyncChange` | `id`, `task_id` | `UNIQUE(id)` | Individual sync change records |
+| `:ArchitectureProposal` | `id`, `title`, `status`, `implementation_status`, `priority` | `UNIQUE(id)` | **NEW** Kublai improvement proposals |
+| `:ImprovementOpportunity` | `id`, `type`, `description`, `priority`, `status` | `UNIQUE(id)` | **NEW** Opportunities identified by Kublai |
+| `:Vetting` | `id`, `proposal_id`, `vetted_by`, `assessment` | `UNIQUE(id)` | **NEW** Ögedei's operational assessment |
+| `:Implementation` | `id`, `proposal_id`, `status`, `progress` | `UNIQUE(id)` | **NEW** Temüjin's implementation record |
+| `:Validation` | `id`, `implementation_id`, `passed`, `checks` | `UNIQUE(id)` | **NEW** Validation checks |
+| `:ArchitectureSection` | `title`, `content`, `order`, `git_commit` | `UNIQUE(slug)` | **NEW** ARCHITECTURE.md sections (from sync script) |
 
 **Key Relationships**:
 - `(Agent)-[:HAS_KEY]->(AgentKey)` - Agent owns signing key
@@ -641,6 +718,11 @@ RETURN fe.id
 - `(Agent)-[:LEARNED]->(LearnedCapability)` - Capability ownership
 - `(Research)-[:CONTRIBUTED_TO]->(LearnedCapability)` - Learning lineage
 - `(Task)-[:DEPENDS_ON {type, weight, detected_by, confidence}]->(Task)` - Task dependency DAG
+- **NEW** `(ImprovementOpportunity)-[:EVOLVES_INTO]->(ArchitectureProposal)` - Opportunity becomes proposal
+- **NEW** `(ArchitectureProposal)-[:HAS_VETTING]->(Vetting)` - Ögedei's assessment
+- **NEW** `(ArchitectureProposal)-[:IMPLEMENTED_BY]->(Implementation)` - Temüjin's work
+- **NEW** `(Implementation)-[:VALIDATED_BY]->(Validation)` - Validation checks
+- **NEW** `(ArchitectureProposal)-[:SYNCED_TO]->(ArchitectureSection)` - Synced to ARCHITECTURE.md
 
 **Indexes**:
 

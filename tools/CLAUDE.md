@@ -7,13 +7,13 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #30566 | 8:49 PM | 🔵 | Notion Sync Module Evaluation - Architecture and Implementation Status | ~881 |
 | #30371 | 6:25 PM | 🔵 | Kurultai Molt Repository Inventory and Gap Analysis | ~882 |
 | #30131 | 5:06 PM | 🔵 | Kurultai v0.2 Deployment Plan Validation Complete - 30 Gaps Identified | ~1240 |
 | #30083 | 4:43 PM | 🔵 | FileConsistencyChecker Class and Methods in file_consistency.py | ~814 |
 | #29737 | 1:33 PM | 🔵 | tools/__init__.py exports 10 modules with lazy import pattern to avoid numpy recursion | ~434 |
 | #29730 | 1:32 PM | 🔵 | memory_tools.py defines wrapper functions for OperationalMemory access | ~342 |
 | #29700 | 1:20 PM | 🔵 | Notion Sync Module Uses AsyncGraphDatabase Creating Architectural Inconsistency | ~432 |
+| #29691 | 1:18 PM | 🔵 | Notion Sync Module Uses AsyncGraphDatabase While OperationalMemory Uses Synchronous Driver | ~411 |
 
 ### Feb 7, 2026
 

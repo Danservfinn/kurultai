@@ -7,10 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #31377 | 11:29 AM | ✅ | Jochi Automated Testing Deployment Guide | ~976 |
+| #32355 | 3:23 PM | 🔵 | Session Startup Workspace Loading Pattern Found - SOUL.md and CLAUDE.md Loaded at Agent Session Start | ~403 |
 | #31374 | 11:27 AM | 🔵 | Comprehensive domain switch execution plan with security fixes and rollback procedures | ~590 |
-| #31355 | 11:23 AM | 🟣 | Comprehensive Test Execution Prompt Created for Kurultai Multi-Agent Framework | ~414 |
-| #31308 | 11:07 AM | ✅ | Skill Sync Architecture Analysis Document Created | ~877 |
 | #31281 | 10:51 AM | ⚖️ | Comprehensive Domain Switch Execution Plan Created | ~534 |
 | #31031 | 2:04 AM | 🔵 | Comprehensive Documentation-Codebase Gap Analysis Completed | ~1318 |
 | #31024 | 1:37 AM | 🔵 | Neo4j.md Schema Specification: 30+ Indexes and Vector Index Design | ~643 |
@@ -27,4 +25,6 @@
 | #30974 | 1:27 AM | 🔵 | Agent-to-Agent Messaging Protocol and Task Delegation Flow | ~630 |
 | #30948 | 1:24 AM | 🔵 | Infrastructure & DevOps Comprehensive Review: 15 Critical Issues Identified | ~853 |
 | #30941 | " | 🔵 | Neo4j Connection Pool Size Specification Discrepancy: 50 vs 400 | ~591 |
+| #30936 | 1:23 AM | 🔵 | Architecture Review Expert Task Completed: 9 Critical Issues Identified in Kurultai v0.2 | ~898 |
+| #30937 | " | ⚖️ | Horde-Review Consensus-Based Architectural Audit Pattern Applied | ~653 |
 </claude-mem-context>

@@ -7,24 +7,24 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #32111 | 2:35 PM | ✅ | entrypoint.sh Enhanced with Manual Signal-CLI Daemon Spawn and Trust Management | ~619 |
-| #32095 | 2:33 PM | 🔵 | OpenClaw Signal Channel Configuration - Production Setup | ~624 |
-| #32094 | " | ✅ | Switched Signal channel to external daemon mode in openclaw.json5 | ~384 |
-| #32084 | 2:31 PM | 🔵 | Current entrypoint.sh Configuration - Simplified Signal Initialization | ~519 |
-| #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
-| #31956 | 2:07 PM | ✅ | entrypoint.sh Signal Status Logging Simplified | ~402 |
-| #31819 | 1:41 PM | 🔵 | Primary Session Re-Reading OpenClaw Configuration - Signal httpUrl Configuration Verified | ~545 |
-| #31795 | 1:33 PM | ✅ | Deployed Moltbot to Railway Infrastructure | ~268 |
-| #31788 | 1:30 PM | 🔵 | Primary Session Reading Signal Daemon Startup Code to Identify Connection Issue | ~432 |
-| #31769 | 1:25 PM | ✅ | OpenClaw Signal Configuration Modified: Disable autoStart, Use httpUrl for Pre-Started Daemon | ~663 |
-| #31768 | " | 🟣 | Enhanced Signal Integration - Manual Daemon Startup Before OpenClaw Gateway | ~614 |
-| #31766 | 1:24 PM | 🔵 | Entrypoint Script Reviewed: OpenClaw Gateway Startup Configuration | ~543 |
-| #31756 | 1:19 PM | 🔴 | Signal Data Extraction Path Corrected: Use signal-cli Default Config Directory | ~668 |
-| #31754 | " | ✅ | Primary Session Fixing OpenClaw JSON Configuration - Removing Invalid allowlist Property | ~408 |
-| #31736 | 1:12 PM | 🔵 | Entrypoint Script Reveals Signal Data Extraction Bug and Migration Logic: Directory Structure Mismatch | ~839 |
-| #31735 | " | 🟣 | Primary Session Fixing Signal Data Directory Migration Issue in Entrypoint Script | ~324 |
-| #31729 | 1:11 PM | 🔵 | OpenClaw JSON5 Configuration Examined: Signal Configuration Matches Deployment, shellEnv Disabled | ~710 |
-| #31714 | 1:09 PM | 🔵 | Primary Session Re-Reading README.md First 100 Lines for Deployment Configuration Review | ~526 |
-| #31699 | 1:07 PM | 🔵 | Docker Entrypoint Script Reveals Signal Data Extraction and OpenClaw Gateway Initialization Pipeline | ~924 |
-| #31677 | 1:03 PM | 🔵 | Re-examination of openclaw.json Signal Configuration Reveals Missing Reaction Notification Settings | ~648 |
+| #32499 | 3:41 PM | 🔵 | Complete SOUL.md and IDENTITY.md Deployment Lifecycle Analysis | ~627 |
+| #32498 | " | 🔵 | OpenClaw Agent Soul/Identity File Loading Mechanism Documented | ~675 |
+| #32484 | 3:39 PM | 🔵 | OpenClaw Bootstrap Configuration for Soul Files Documented | ~399 |
+| #32483 | " | 🔵 | OpenClaw Agent Configuration: Model and Workspace Setup | ~339 |
+| #32478 | " | 🔵 | Examined OpenClaw gateway configuration defining 6-agent orchestration architecture | ~417 |
+| #32476 | " | 🔵 | Agent Soul File Loading Mechanism Identified in OpenClaw Configuration | ~447 |
+| #32470 | " | 🔵 | OpenClaw Agent Workspace Configuration for Soul File Loading | ~368 |
+| #32461 | 3:38 PM | ✅ | Entrypoint Script Updated with Agent Soul File Deployment | ~579 |
+| #32460 | " | 🔵 | OpenClaw Gateway with Embedded Signal and Webchat Architecture | ~461 |
+| #32458 | " | 🔵 | Examined OpenClaw gateway configuration for Kurultai multi-agent system | ~371 |
+| #32457 | " | 🔵 | OpenClaw Configuration Updated - Agent Workspace Paths Now Configured for Soul File Loading | ~513 |
+| #32403 | 3:31 PM | ✅ | OpenClaw Console Logging Level Changed to Debug | ~247 |
+| #32400 | 3:30 PM | ✅ | Enabled debug logging in OpenClaw gateway configuration | ~257 |
+| #32373 | 3:25 PM | 🟣 | Entrypoint Script Enhanced - Agent Soul Files Deployment Added to Startup Sequence | ~524 |
+| #32355 | 3:23 PM | 🔵 | Session Startup Workspace Loading Pattern Found - SOUL.md and CLAUDE.md Loaded at Agent Session Start | ~403 |
+| #32345 | 3:22 PM | 🔴 | Signal Session Reset Added to Startup Pipeline | ~481 |
+| #32340 | 3:21 PM | 🔵 | Updated OpenClaw JSON5 Config - Agent-Specific Workspaces and Signal Wrapper Integration | ~544 |
+| #32337 | " | 🔵 | OpenClaw Gateway Configuration Complete - Kurultai v0.2 Railway Deployment Settings | ~550 |
+| #32336 | " | 🔵 | OpenClaw JSON Configuration Complete Review - All Settings Documented | ~442 |
+| #32314 | 3:14 PM | 🔵 | Moltbot Entrypoint Startup Sequence - Comprehensive Multi-Phase Initialization | ~557 |
 </claude-mem-context>

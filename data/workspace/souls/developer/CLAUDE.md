@@ -13,6 +13,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32334 | 3:19 PM | 🔵 | Agent Soul Definition Files Inventory - Complete Personality Definitions for Six Agents | ~570 |
+| #32284 | 3:07 PM | 🔵 | OpenClaw Agent Workspace Configuration Gap Identified - Multi-Agent Soul Files Not Being Loaded | ~500 |
 | #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
 | #31574 | 12:32 PM | 🟣 | Temüjin SOUL.md Upgraded from Skill Routing to Comprehensive Horde Skills Reference | ~902 |
 | #31561 | 12:30 PM | 🔵 | Primary Session Reading Temüjin's SOUL.md Before Comprehensive Horde Skills Redesign | ~585 |

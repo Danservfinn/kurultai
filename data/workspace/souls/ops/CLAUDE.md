@@ -13,6 +13,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32334 | 3:19 PM | 🔵 | Agent Soul Definition Files Inventory - Complete Personality Definitions for Six Agents | ~570 |
 | #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
 | #31577 | 12:33 PM | 🟣 | Comprehensive Horde Skills Redesign Deployed to Ögedei (Operations) SOUL.md | ~1247 |
 | #31491 | 12:22 PM | 🔵 | Ögedei's Current SOUL.md Architecture and Capabilities | ~943 |
