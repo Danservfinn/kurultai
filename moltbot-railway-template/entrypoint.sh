@@ -240,3 +240,4 @@ else
     echo "ERROR: OpenClaw not found. Falling back to health check server."
     exec su -s /bin/sh moltbot -c "python /app/start_server.py"
 fi
+# Test timestamp: Sat Feb  7 17:46:39 EST 2026
