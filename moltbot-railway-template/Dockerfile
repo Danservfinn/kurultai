@@ -81,7 +81,8 @@ COPY --chown=1000:1000 scripts /app/scripts
 COPY --chown=1000:1000 openclaw.json5 /app/openclaw.json5
 COPY --chown=1000:1000 openclaw.json /app/openclaw.json
 COPY --chown=1000:1000 entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY --chown=1000:1000 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
+RUN chmod +x /app/entrypoint.sh /app/signal-cli-wrapper.sh
 
 # =============================================================================
 # SECTION 7: Non-Root User Setup

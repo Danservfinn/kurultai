@@ -131,43 +131,6 @@ chown 1001:1001 "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/opencla
 echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < $OPENCLAW_STATE_DIR/openclaw.json) bytes)"
 
 # =============================================================================
-# START SIGNAL-CLI DAEMON
-# =============================================================================
-# Start signal-cli daemon ourselves (instead of letting OpenClaw auto-start it)
-# so we can pass --trust-new-identities always to handle identity key changes.
-# OpenClaw connects via httpUrl config instead of spawning its own daemon.
-if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ] && [ -n "$SIGNAL_ACCOUNT" ]; then
-    echo "=== Starting signal-cli daemon ==="
-    su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli \
-        --trust-new-identities always \
-        -a $SIGNAL_ACCOUNT \
-        daemon \
-        --http 127.0.0.1:8080 \
-        --no-receive-stdout \
-        --receive-mode on-start \
-        --ignore-stories" &
-    SIGNAL_PID=$!
-    echo "  signal-cli daemon PID: $SIGNAL_PID"
-
-    # Wait for daemon HTTP server to be ready
-    SIGNAL_READY=0
-    SIGNAL_WAIT=0
-    while [ "$SIGNAL_WAIT" -lt 60 ]; do
-        if curl -sf http://127.0.0.1:8080/v1/accounts >/dev/null 2>&1; then
-            SIGNAL_READY=1
-            echo "  signal-cli daemon ready (${SIGNAL_WAIT}s)"
-            break
-        fi
-        SIGNAL_WAIT=$((SIGNAL_WAIT + 2))
-        sleep 2
-    done
-    if [ "$SIGNAL_READY" -eq 0 ]; then
-        echo "  WARNING: signal-cli daemon did not become ready in 60s"
-    fi
-    echo "=== signal-cli daemon started ==="
-fi
-
-# =============================================================================
 # START HEARTBEAT SIDECAR
 # =============================================================================
 if [ -n "$NEO4J_PASSWORD" ] && [ -f /app/scripts/heartbeat_writer.py ]; then

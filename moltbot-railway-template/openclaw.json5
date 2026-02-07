@@ -26,19 +26,19 @@
   // IMPORTANT: Built-in providers ignore custom baseUrl — must use correct provider name
   agents: {
     defaults: {
-      workspace: "/data/workspace",
       model: {
         primary: "kimi-coding/k2p5",
       },
     },
-    // Kurultai's 6 agents (id + name only — "description" is not a valid schema key)
+    // Kurultai's 6 agents — each with its own workspace containing SOUL.md + CLAUDE.md
+    // OpenClaw loads SOUL.md, CLAUDE.md, IDENTITY.md etc. from workspace root at session start
     list: [
-      { id: "main", name: "Kublai" },
-      { id: "researcher", name: "Möngke" },
-      { id: "writer", name: "Chagatai" },
-      { id: "developer", name: "Temüjin" },
-      { id: "analyst", name: "Jochi" },
-      { id: "ops", name: "Ögedei" },
+      { id: "main", name: "Kublai", workspace: "/data/workspace/souls/main" },
+      { id: "researcher", name: "Möngke", workspace: "/data/workspace/souls/researcher" },
+      { id: "writer", name: "Chagatai", workspace: "/data/workspace/souls/writer" },
+      { id: "developer", name: "Temüjin", workspace: "/data/workspace/souls/developer" },
+      { id: "analyst", name: "Jochi", workspace: "/data/workspace/souls/analyst" },
+      { id: "ops", name: "Ögedei", workspace: "/data/workspace/souls/ops" },
     ],
   },
 
@@ -49,10 +49,10 @@
     signal: {
       enabled: true,
       account: "${SIGNAL_ACCOUNT}",
-      cliPath: "/usr/local/bin/signal-cli",
-      // Daemon pre-started in entrypoint with --trust-new-identities always
-      // httpUrl disables OpenClaw auto-start; connects to existing daemon
-      httpUrl: "http://127.0.0.1:8080",
+      // Wrapper adds --trust-new-identities always to handle identity key changes
+      cliPath: "/app/signal-cli-wrapper.sh",
+      httpHost: "127.0.0.1",
+      httpPort: 8080,
       startupTimeoutMs: 120000,
       receiveMode: "on-start",
       dmPolicy: "pairing",
@@ -69,6 +69,14 @@
   logging: {
     consoleLevel: "info",
     file: "/data/logs/openclaw.log",
+  },
+
+  // Plugins — explicitly enable Signal so doctor doesn't block it
+  plugins: {
+    allow: ["signal"],
+    entries: {
+      signal: { enabled: true },
+    },
   },
 
   // Environment — only pass safe env vars to agent sandboxes
