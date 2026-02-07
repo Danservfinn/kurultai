@@ -5,7 +5,7 @@
  * Verifies section mapping, guardrail checks, and sync readiness.
  */
 
-const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const { ProposalMapper } = require('../../src/workflow/proposal-mapper');
 

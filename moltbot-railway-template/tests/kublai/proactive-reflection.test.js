@@ -5,7 +5,7 @@
  * Verifies self-reflection on system architecture and opportunity identification.
  */
 
-const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll, beforeEach, jest } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const { ProactiveReflection } = require('../../src/kublai/proactive-reflection');
 

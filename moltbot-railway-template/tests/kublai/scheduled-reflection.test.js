@@ -5,7 +5,7 @@
  * Verifies periodic reflection scheduling and execution.
  */
 
-const { describe, it, expect, beforeEach, afterEach } = require('@jest/globals');
+const { describe, it, expect, beforeEach, afterEach, jest } = require('@jest/globals');
 const { ScheduledReflection } = require('../../src/kublai/scheduled-reflection');
 
 describe('Scheduled Reflection', () => {

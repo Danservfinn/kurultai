@@ -5,7 +5,7 @@
  * Verifies querying and understanding system architecture from Neo4j.
  */
 
-const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const { ArchitectureIntrospection } = require('../../src/kublai/architecture-introspection');
 

@@ -5,7 +5,7 @@
  * before they can sync to ARCHITECTURE.md.
  */
 
-const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const { ValidationHandler } = require('../../src/workflow/validation');
 

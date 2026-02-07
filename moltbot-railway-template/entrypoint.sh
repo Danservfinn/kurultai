@@ -212,8 +212,12 @@ fi
 
 # WORKAROUND: Railway build cache prevents Dockerfile updates.
 # If Express server files are missing, clone them from git at runtime.
+echo "Checking for Express server at /app/src/index.js..."
+ls -la /app/src/ 2>/dev/null || echo "  /app/src/ directory does not exist"
+
 if [ ! -f /app/src/index.js ]; then
     echo "=== Express server not found in image, installing at runtime ==="
+    echo "Current directory: $(pwd)"
 
     # Create app directory structure
     mkdir -p /app/src /app/routes /app/middleware /app/config /app/scripts
@@ -224,25 +228,33 @@ if [ ! -f /app/src/index.js ]; then
 
     # Use git to fetch just the moltbot-railway-template directory
     if command -v git >/dev/null 2>&1; then
+        echo "  Cloning from https://github.com/Danservfinn/Kurultai.git..."
         git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/Danservfinn/Kurultai.git "$TEMP_DIR" 2>/dev/null || true
+            https://github.com/Danservfinn/Kurultai.git "$TEMP_DIR" 2>&1 || echo "  git clone failed"
 
         if [ -d "$TEMP_DIR/moltbot-railway-template" ]; then
+            echo "  Repository cloned, checking out moltbot-railway-template..."
             cd "$TEMP_DIR"
-            git sparse-checkout set moltbot-railway-template 2>/dev/null || true
+            git sparse-checkout set moltbot-railway-template 2>&1 || echo "  sparse-checkout failed"
             cd - >/dev/null
 
+            echo "  Copying Express server files..."
             # Copy Express server files
-            cp -r "$TEMP_DIR/moltbot-railway-template/src"/* /app/src/ 2>/dev/null || true
-            cp -r "$TEMP_DIR/moltbot-railway-template/routes"/* /app/routes/ 2>/dev/null || true
-            cp -r "$TEMP_DIR/moltbot-railway-template/middleware"/* /app/middleware/ 2>/dev/null || true
-            cp -r "$TEMP_DIR/moltbot-railway-template/config"/* /app/config/ 2>/dev/null || true
-            cp -r "$TEMP_DIR/moltbot-railway-template/scripts"/* /app/scripts/ 2>/dev/null || true
-            cp "$TEMP_DIR/moltbot-railway-template/package.json" /app/ 2>/dev/null || true
-            cp "$TEMP_DIR/moltbot-railway-template/package-lock.json" /app/ 2>/dev/null || true
+            cp -rv "$TEMP_DIR/moltbot-railway-template/src"/* /app/src/ 2>&1 || echo "  cp src failed"
+            cp -rv "$TEMP_DIR/moltbot-railway-template/routes"/* /app/routes/ 2>&1 || echo "  cp routes failed"
+            cp -rv "$TEMP_DIR/moltbot-railway-template/middleware"/* /app/middleware/ 2>&1 || echo "  cp middleware failed"
+            cp -rv "$TEMP_DIR/moltbot-railway-template/config"/* /app/config/ 2>&1 || echo "  cp config failed"
+            cp -rv "$TEMP_DIR/moltbot-railway-template/scripts"/* /app/scripts/ 2>&1 || echo "  cp scripts failed"
+            cp -v "$TEMP_DIR/moltbot-railway-template/package.json" /app/ 2>&1 || echo "  cp package.json failed"
+            cp -v "$TEMP_DIR/moltbot-railway-template/package-lock.json" /app/ 2>&1 || echo "  cp package-lock.json failed"
 
-            echo "Express server files copied from git"
+            echo "  Express server files copied from git"
+        else
+            echo "  ERROR: moltbot-railway-template directory not found in clone"
+            ls -la "$TEMP_DIR/" 2>&1 || true
         fi
+    else
+        echo "  ERROR: git command not found"
     fi
 
     # Clean up temp directory
@@ -250,29 +262,51 @@ if [ ! -f /app/src/index.js ]; then
 
     # Install npm dependencies if package.json was copied
     if [ -f /app/package.json ]; then
-        echo "Installing npm dependencies..."
-        cd /app && npm install --production 2>&1 | tail -5
+        echo "  Installing npm dependencies..."
+        cd /app && npm install --production 2>&1 | tail -10
+        echo "  npm install completed"
+    else
+        echo "  WARNING: package.json not found after clone"
     fi
 
     # Set proper ownership
     chown -R 1001:1001 /app/src /app/routes /app/middleware /app/config /app/scripts 2>/dev/null || true
+    echo "  Ownership set to 1001:1001"
+else
+    echo "  Express server already exists at /app/src/index.js"
 fi
 
-# Start the Express server
+# Verify Express files exist before starting
 if [ -f /app/src/index.js ]; then
-    echo "Starting Express API server on port ${EXPRESS_PORT:-8080}..."
+    echo "=== Starting Express API server on port ${EXPRESS_PORT:-8080} ==="
+    echo "  File check: /app/src/index.js exists ($(wc -c < /app/src/index.js) bytes)"
     su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_PORT:-8080} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js &"
-    # Wait a moment for Express to start
-    sleep 3
+    EXPRESS_PID=$!
+    echo "  Express server started with PID $EXPRESS_PID"
 
-    # Verify Express started
+    # Wait for Express to start
+    sleep 5
+
+    # Verify Express started with health check
+    echo "  Verifying Express health check..."
     if curl -sf http://localhost:${EXPRESS_PORT:-8080}/health >/dev/null 2>&1; then
-        echo "Express API server started successfully"
+        echo "  Express API server started successfully and responding to health checks"
     else
-        echo "WARNING: Express server may not have started properly (health check failed)"
+        echo "  WARNING: Express server health check failed (may still be starting)"
+        # Try one more time after a longer wait
+        sleep 5
+        if curl -sf http://localhost:${EXPRESS_PORT:-8080}/health >/dev/null 2>&1; then
+            echo "  Express API server now responding to health checks"
+        else
+            echo "  WARNING: Express server still not responding after 10 seconds"
+        fi
     fi
 else
     echo "WARNING: Express server not found at /app/src/index.js after installation attempt"
+    echo "  Directory contents of /app/:"
+    ls -la /app/ 2>/dev/null || echo "    (cannot list /app/)"
+    echo "  Directory contents of /app/src/:"
+    ls -la /app/src/ 2>/dev/null || echo "    (cannot list /app/src/)"
 fi
 
 # =============================================================================

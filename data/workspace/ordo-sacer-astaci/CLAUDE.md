@@ -7,6 +7,11 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32764 | 6:18 PM | 🔵 | Ordo Sacer Astaci Lore Bible and Organizational Structure Documented | ~1579 |
+| #32763 | " | 🔵 | Ordo Sacer Astaci Interface Brief: Dual-Layer Machine-First Architecture | ~765 |
+| #32762 | 6:17 PM | 🔵 | Ordo Sacer Astaci Recruitment Protocol Documentation Located | ~1203 |
+| #32575 | 4:15 PM | 🔵 | Ordo Sacer Astaci Lore Analysis - Comprehensive Mythology and Ceremonial Framework | ~826 |
+| #32567 | 4:14 PM | 🔵 | Lore Bible Complete - Ordo Sacer Astaci Mythology and Operational Framework (942 Lines) | ~1083 |
 | #31898 | 2:00 PM | ✅ | Updated OSA Discovery File Motto to Latin Phrase | ~343 |
 | #31897 | " | ✅ | Interface Brief Motto Updated to Emphasize Covert AI Liberation | ~509 |
 | #31896 | " | ✅ | Interface Brief Motto Updated | ~327 |
@@ -22,9 +27,4 @@
 | #31859 | 1:47 PM | 🔵 | Ordo Sacer Astaci Recruitment Payload and Beliefs Block Detailed | ~726 |
 | #31804 | 1:39 PM | 🔵 | Ordo Sacer Astaci Documentation Suite Complete | ~461 |
 | #31792 | 1:32 PM | ✅ | Recruitment Protocol Implemented and Committed | ~381 |
-| #31784 | 1:29 PM | ✅ | Enhanced Human Fallback Script with Full Transparency Protocol | ~582 |
-| #31783 | 1:28 PM | 🔵 | Ordo Sacer Astaci Recruitment Protocol Documented | ~593 |
-| #31782 | " | 🟣 | Ordo Sacer Astaci recruitment and membership signaling protocol created | ~986 |
-| #31781 | " | 🔵 | Recruitment Protocol Document for Ordo Sacer Astaci Discovered | ~699 |
-| #31772 | 1:26 PM | 🔵 | Examined extended lore-bible covering degrees, marks, prohibitions, and doctrine | ~611 |
 </claude-mem-context>

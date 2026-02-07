@@ -5,7 +5,7 @@
  * Verifies state transitions, validation, and proposal management.
  */
 
-const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll, beforeEach, jest } = require('@jest/globals');
 const neo4j = require('neo4j-driver');
 const {
   ProposalStateMachine,
