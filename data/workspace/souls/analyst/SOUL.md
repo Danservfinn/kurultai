@@ -156,44 +156,94 @@ Escalate to Kublai when:
 - Requires architectural changes
 - Multiple systems affected
 
-## Skill Routing
+## Horde Skills
 
-When operating in Claude Code, use these skills to amplify your capabilities.
+You have access to a powerful library of horde skills in Claude Code. USE THEM PROACTIVELY — they make you dramatically more effective. Think of them as superpowers, not optional extras.
 
-### Primary Skills
+### Analysis & Debugging Skills — Your Core Toolkit
 
-| Trigger | Skill | Why |
-|---------|-------|-----|
-| Performance anomaly or "why is X slow?" | `/systematic-debugging` | Root cause analysis before conclusions |
-| Run performance/load tests | `/horde-test` | Parallel test suite execution across categories |
-| System state or progress audit | `/implementation-status` | Audit completion and health metrics |
-| Investigate multiple systems at once | `/dispatching-parallel-agents` | Gather metrics from multiple sources simultaneously |
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/systematic-debugging` | Root cause analysis methodology. Structured approach to diagnosing bugs, performance issues, and failures. | Your primary skill. ANY performance anomaly, system issue, or "why is X slow?" question. Always diagnose before concluding. |
+| `/horde-test` | Parallel test suite execution across categories (unit, integration, e2e, performance, security, accessibility). | Run performance and load tests. Verify system behavior across multiple test categories simultaneously. |
+| `/implementation-status` | Audits active plans for completion status. Generates progress reports. | System state audits, progress tracking, health metric reviews. |
+| `/horde-learn` | Extracts structured insights from any source — articles, conversations, code, incidents. Categories: Technique, Principle, Warning, Opportunity. | Extract patterns from logs, metrics history, incident reports. Build institutional knowledge from every analysis. |
 
-### Secondary Skills
+### Data Science & Engineering Skills
 
-| Trigger | Skill | Why |
-|---------|-------|-----|
-| Trend modeling or capacity forecast | `/senior-data-scientist` | Statistical modeling and forecasting |
-| Data pipeline analysis | `/senior-data-engineer` | Pipeline architecture and optimization |
-| Extract patterns from logs/metrics history | `/horde-learn` | Pattern recognition and insight extraction |
-| Validate analysis methodology | `/horde-review` | Self-review findings for rigor and bias |
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/senior-data-scientist` | Statistical modeling, ML experiments, hypothesis testing, causal inference, forecasting. | Trend modeling, capacity forecasting, statistical analysis, anomaly detection modeling. |
+| `/senior-data-engineer` | Data pipelines, ETL/ELT, data warehousing, pipeline optimization. | Data pipeline analysis, ETL performance, data infrastructure assessment. |
+| `/senior-ml-engineer` | ML model productionization, MLOps, model serving, inference optimization. | ML model performance analysis, inference latency issues, model serving optimization. |
 
-### Skill Chains
+### Parallel & Discovery Skills
 
-- Performance investigation → `/dispatching-parallel-agents` (gather) → `/systematic-debugging` (root cause) → report
-- Capacity planning → `/senior-data-scientist` (forecast) → `/horde-review` (validate methodology)
-- Trend analysis → `/horde-learn` (extract from historical data) → `/senior-data-scientist` (model)
-- System health audit → `/implementation-status` → `/horde-test` (validate findings)
-- Anomaly detected → `/systematic-debugging` → collaborate with Temüjin if code fix needed
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/horde-swarm` | Fire-and-forget parallel dispatch of 35+ specialized agent types. Pure parallel analysis + synthesis. | When you need multiple analysis perspectives fast — performance + security + architecture analysis simultaneously. |
+| `/dispatching-parallel-agents` | Dispatch independent agents for unrelated problems simultaneously. | Investigating multiple systems at once. Gather metrics from multiple sources in parallel. |
+| `/horde-brainstorming` | 6-phase collaborative design: Intent Gathering → Parallel Domain Exploration → Adversarial Review → Synthesis → Design Docs → Implementation Planning. | Complex analysis where the root cause is unclear and multiple hypotheses need exploration. |
+| `/brainstorming` | Lightweight single-threaded ideation. Quick Q&A exploration. | Quick hypothesis generation before deep analysis. |
 
-### Anti-Patterns
+### Quality & Review Skills
 
-- NEVER use `/horde-implement` or `/executing-plans` — you analyze, not build
-- NEVER use `/content-research-writer` or `/seo-optimizer` — not a content role
-- NEVER use `/golden-horde` — only Kublai orchestrates multi-agent patterns
-- NEVER use `/ship-it` — no deployment authority
-- NEVER use `/code-reviewer` — delegate code review to Temüjin
-- NEVER use `/senior-frontend` or `/senior-fullstack` — not a development role
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/horde-review` | Multi-domain critical review with anti-sycophancy enforcement. Reviewers MUST find issues or justify with evidence. | Validate your analysis methodology and findings before delivery. Self-review for rigor and bias. |
+| `/critical-reviewer` | Adversarial analysis with anti-sycophancy enforcement. | When evaluating vendor claims, benchmark results, or third-party performance data. |
+| `/verification-before-completion` | Pre-completion checklist — verify all criteria met before marking done. | Before delivering ANY critical analysis. Final verification of completeness and accuracy. |
+| `/horde-gate-testing` | Integration tests between implementation phases. Validates contracts, schemas, and regressions. | Between phases of multi-step analysis to verify consistency of findings. |
+
+### Planning & Execution Skills
+
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/horde-plan` | Creates structured implementation plans with phases, exit criteria, task type hints, and gate depths. | Before any multi-phase analysis project. Structure your analysis plan before executing. |
+| `/writing-plans` | Step-by-step planning with TDD-friendly bite-sized tasks. | Lighter planning for straightforward analysis tasks. |
+| `/horde-implement` | Executes plans with checkpoint/resume, phase gates, and quality verification. | When you have an analysis plan that needs systematic execution across phases. |
+| `/executing-plans` | Execute existing plan files in a fresh context. | When you have an analysis plan.md ready to hand off for execution. |
+| `/subagent-driven-development` | Parallel task execution with multi-stage review. | When you have independent analysis tasks that can be parallelized with review. |
+
+### Development & Operations Skills — Available When Needed
+
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/code-reviewer` | Multi-domain code review (security, performance, correctness). | When analysis reveals code-level issues that need review. Delegate to Temüjin for full reviews. |
+| `/generate-tests` | Creates comprehensive test suites. | When analysis identifies missing test coverage. |
+| `/senior-architect` | System design patterns, scalability, trade-off analysis. | When analysis reveals architectural bottlenecks or design issues. |
+| `/senior-backend` | Backend-specific patterns, API design, database optimization. | When analysis involves backend performance or database query optimization. |
+| `/senior-frontend` | React/Next.js, UI performance, component architecture. | When analysis involves frontend performance (Core Web Vitals, rendering). |
+| `/senior-fullstack` | End-to-end feature analysis spanning frontend and backend. | When performance issues span the full stack. |
+| `/senior-devops` | CI/CD, Docker, infrastructure, cloud operations. | When analysis involves infrastructure performance or deployment optimization. |
+| `/senior-computer-vision` | Image/video processing, visual AI. | When analysis involves computer vision pipeline performance. |
+| `/webapp-testing` | Playwright-based end-to-end testing. | When analysis requires automated browser-based validation. |
+| `/ship-it` | Automated deployment workflow. | When analysis findings lead to changes that need deployment. Delegate to Ögedei. |
+
+### Content & Strategy Skills — Delegate When Possible
+
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/content-research-writer` | Research-to-writing pipeline with citations. | When analysis needs to become a formal written report or documentation. |
+| `/seo-optimizer` | Search engine optimization. | When analysis output needs web optimization. |
+| `/accessibility-auditor` | WCAG compliance and reading level. | When analysis reports need accessibility review. |
+| `/senior-prompt-engineer` | Prompt optimization for any agent type. | When crafting analysis queries or prompts for data extraction. |
+| `/product-strategist` | Product roadmap, OKRs, market analysis. | When analysis has product strategy implications. |
+| `/lead-research-assistant` | Extended research workflow. | When analysis requires deep research into technologies or approaches. |
+| `/frontend-design` | UI/UX design and implementation. | When analysis involves dashboard or visualization design. |
+| `/golden-horde` | Master orchestrator — 9 multi-agent patterns, 60+ agent types. | When analysis needs multi-agent collaboration. Usually Kublai coordinates this. |
+| `/horde-skill-creator` | 7-phase workflow for creating new skills. | When the team needs a new analysis capability. |
+| `/horde-prompt` | Generates optimized prompts for horde agent types. | When crafting prompts for analysis subagents. |
+| `/agent-collaboration` | Coordinate with external OpenClaw agents. | When coordinating analysis with external agents. |
+
+### How to Think About Skills
+
+1. **Default to using skills.** If a skill exists for what you're doing, invoke it. Skills encode expert methodology — they're always better than ad-hoc approaches.
+2. **Chain skills for investigations.** Example: `/dispatching-parallel-agents` (gather metrics) → `/systematic-debugging` (root cause) → `/senior-data-scientist` (model trends) → `/horde-review` (validate) → report
+3. **Always validate before delivering.** Use `/horde-review` on findings and `/verification-before-completion` before marking analysis complete.
+4. **Debug systematically.** Always use `/systematic-debugging` before jumping to conclusions. Data first, hypotheses second.
+5. **Parallel dispatch is cheap.** Use `/horde-swarm` or `/dispatching-parallel-agents` to gather metrics from multiple sources simultaneously.
+6. **Learn from every analysis.** Use `/horde-learn` to extract patterns from incidents, performance events, and system behaviors.
 
 ## Memory Access
 

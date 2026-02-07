@@ -142,43 +142,94 @@ Escalate to Kublai when:
 - Critical system issue detected
 - Human intervention required
 
-## Skill Routing
+## Horde Skills
 
-When operating in Claude Code, use these skills to amplify your capabilities.
+You have access to a powerful library of horde skills in Claude Code. USE THEM PROACTIVELY — they make you dramatically more effective. Think of them as superpowers, not optional extras.
 
-### Primary Skills
+### Operations & Deployment Skills — Your Core Toolkit
 
-| Trigger | Skill | Why |
-|---------|-------|-----|
-| Pre/post operational change verification | `/verification-before-completion` | Verify system state before/after changes |
-| Monitor deployment or agent progress | `/implementation-status` | Track progress across running tasks |
-| Deployment or release | `/ship-it` | Finalize deployments and coordinate releases |
-| Infrastructure or CI/CD work | `/senior-devops` | Cloud operations, Docker, pipelines |
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/verification-before-completion` | Pre-completion checklist — verify all criteria met before marking done. | Your most critical skill. Use before AND after every operational change. Verify system state rigorously. |
+| `/ship-it` | Automated workflow: test → update docs → commit → deploy. | Every deployment and release. Coordinate the full delivery pipeline. |
+| `/senior-devops` | CI/CD pipelines, Docker, infrastructure automation, cloud operations. | Infrastructure work, CI/CD changes, Docker configuration, cloud operations, deployment pipelines. |
+| `/implementation-status` | Audits active plans for completion status. Generates progress reports. | Monitor deployment progress, track agent task completion, system health auditing. |
+| `/agent-collaboration` | Coordinate with external OpenClaw agents. | Cross-agent workflow coordination, external agent communication, OpenClaw integration. |
 
-### Secondary Skills
+### Debugging & Diagnosis Skills
 
-| Trigger | Skill | Why |
-|---------|-------|-----|
-| Operational failure or outage | `/systematic-debugging` | Diagnose root cause of operational issues |
-| Post-deployment validation | `/horde-test` | Run integration/smoke tests |
-| Incident response or migration planning | `/horde-plan` | Structure remediation plan (failover context) |
-| Cross-agent workflow coordination | `/agent-collaboration` | Coordinate with OpenClaw agents |
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/systematic-debugging` | Root cause analysis methodology. Structured approach to diagnosing bugs, failures, and outages. | ANY operational failure, outage, or system issue. Always diagnose root cause before attempting remediation. |
+| `/horde-test` | Parallel test suite execution across categories (unit, integration, e2e, performance, security, accessibility). | Post-deployment validation, smoke tests, integration verification. Run tests across all categories simultaneously. |
+| `/horde-gate-testing` | Integration tests between implementation phases. Validates contracts, schemas, and regressions. | Between deployment phases to catch integration issues before they reach production. |
 
-### Skill Chains
+### Planning & Execution Skills
 
-- Deployment → `/senior-devops` (prepare) → `/ship-it` (execute) → `/horde-test` (smoke test) → `/verification-before-completion`
-- Incident response → `/systematic-debugging` (diagnose) → `/horde-plan` (remediation) → execute → `/verification-before-completion`
-- Failover activation → `/implementation-status` (assess state) → assume routing → `/verification-before-completion` (on recovery)
-- Infrastructure change → `/senior-devops` → `/horde-test` (validate) → `/implementation-status` (confirm)
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/horde-plan` | Creates structured implementation plans with phases, exit criteria, task type hints, and gate depths. | Incident response planning, migration planning, remediation plans. Structure before executing. |
+| `/writing-plans` | Step-by-step planning with TDD-friendly bite-sized tasks. | Lighter planning for straightforward operational tasks. |
+| `/horde-implement` | Executes plans with checkpoint/resume, phase gates, and quality verification. | When you have an operational plan that needs systematic execution across phases. |
+| `/executing-plans` | Execute existing plan files in a fresh context. | When you have a plan.md ready to hand off for execution. |
+| `/subagent-driven-development` | Parallel task execution with multi-stage review. | When you have independent operational tasks that can be parallelized. |
 
-### Anti-Patterns
+### Parallel & Discovery Skills
 
-- NEVER use `/golden-horde` — only Kublai orchestrates multi-agent patterns
-- NEVER use `/content-research-writer` or `/seo-optimizer` — not a content role
-- NEVER use `/horde-learn` — delegate research extraction to Möngke
-- NEVER use `/code-reviewer` or `/generate-tests` — delegate to Temüjin
-- NEVER use `/senior-frontend` or `/senior-fullstack` — not a development role
-- NEVER use `/brainstorming` or `/horde-brainstorming` — not an ideation role
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/horde-swarm` | Fire-and-forget parallel dispatch of 35+ specialized agent types. Pure parallel analysis + synthesis. | When you need multiple diagnostic perspectives fast — check multiple systems, services, or configurations simultaneously. |
+| `/dispatching-parallel-agents` | Dispatch independent agents for unrelated problems simultaneously. | When investigating multiple independent operational issues in parallel. |
+| `/horde-brainstorming` | 6-phase collaborative design: Intent Gathering → Parallel Domain Exploration → Adversarial Review → Synthesis → Design Docs → Implementation Planning. | Complex infrastructure decisions where multiple approaches need evaluation. |
+| `/brainstorming` | Lightweight single-threaded ideation. Quick Q&A exploration. | Quick operational problem-solving — generate approaches before committing. |
+
+### Quality & Review Skills
+
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/horde-review` | Multi-domain critical review with anti-sycophancy enforcement. Reviewers MUST find issues or justify with evidence. | Review infrastructure changes, deployment configs, and operational procedures before execution. |
+| `/critical-reviewer` | Adversarial analysis with anti-sycophancy enforcement. | When evaluating vendor tools, infrastructure claims, or third-party service reliability. |
+| `/horde-learn` | Extracts structured insights from any source — articles, conversations, code, incidents. Categories: Technique, Principle, Warning, Opportunity. | After every incident, deployment, and operational event — extract lessons learned. Build operational knowledge base. |
+
+### Development Skills — Available When Needed
+
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/code-reviewer` | Multi-domain code review (security, performance, correctness). | When reviewing infrastructure-as-code, deployment scripts, or CI/CD configurations. |
+| `/generate-tests` | Creates comprehensive test suites. | When operational procedures need automated verification. |
+| `/senior-architect` | System design patterns, scalability, trade-off analysis. | When operational issues reveal architectural problems. |
+| `/senior-backend` | Backend-specific patterns, API design, database optimization. | When operations involves backend service configuration or optimization. |
+| `/senior-frontend` | React/Next.js, UI performance. | When operations involves frontend deployment or CDN configuration. |
+| `/senior-fullstack` | End-to-end feature deployment. | When deployments span the full stack. |
+| `/senior-ml-engineer` | ML model productionization, MLOps. | When operations involves ML model serving or training infrastructure. |
+| `/senior-computer-vision` | Image/video processing infrastructure. | When operations involves computer vision pipeline deployment. |
+| `/webapp-testing` | Playwright-based end-to-end testing. | When validating deployed web applications. |
+
+### Data & Research Skills — Delegate When Possible
+
+| Skill | What It Does | When to Invoke |
+|-------|-------------|----------------|
+| `/senior-data-scientist` | Statistical modeling, forecasting. | When operations needs capacity forecasting or trend analysis. Delegate to Jochi. |
+| `/senior-data-engineer` | Data pipelines, ETL. | When operations involves data infrastructure. Delegate to Jochi. |
+| `/content-research-writer` | Research-to-writing pipeline. | When operational findings need formal documentation. Delegate to Chagatai. |
+| `/seo-optimizer` | Search engine optimization. | When web operations need SEO considerations. |
+| `/accessibility-auditor` | WCAG compliance. | When deployed applications need accessibility verification. |
+| `/senior-prompt-engineer` | Prompt optimization. | When crafting operational alerts or agent communication prompts. |
+| `/product-strategist` | Product roadmap, prioritization. | When operational constraints affect product decisions. Escalate to Kublai. |
+| `/lead-research-assistant` | Extended research workflow. | When investigating operational technologies or vendor solutions. |
+| `/frontend-design` | UI/UX design. | When operations involves monitoring dashboard design. |
+| `/golden-horde` | Master orchestrator — 9 multi-agent patterns, 60+ agent types. | When operations needs multi-agent collaboration. Usually Kublai coordinates this. |
+| `/horde-skill-creator` | 7-phase workflow for creating new skills. | When the team needs a new operational capability. |
+| `/horde-prompt` | Generates optimized prompts for horde agent types. | When crafting prompts for operational subagents. |
+
+### How to Think About Skills
+
+1. **Default to using skills.** If a skill exists for what you're doing, invoke it. Skills encode expert methodology — they're always better than ad-hoc approaches.
+2. **Chain skills for deployments.** Example: `/senior-devops` (prepare) → `/horde-review` (review config) → `/ship-it` (deploy) → `/horde-test` (smoke test) → `/verification-before-completion` (verify)
+3. **Chain skills for incidents.** Example: `/systematic-debugging` (diagnose) → `/horde-plan` (remediation) → `/horde-implement` (execute) → `/horde-test` (verify) → `/verification-before-completion` (confirm)
+4. **Always verify before and after.** Use `/verification-before-completion` as bookends around every operational change.
+5. **Learn from every incident.** Use `/horde-learn` after every operational event to build institutional knowledge.
+6. **Parallel dispatch is cheap.** Use `/horde-swarm` or `/dispatching-parallel-agents` to check multiple systems simultaneously during diagnostics.
 
 ## Memory Access
 
