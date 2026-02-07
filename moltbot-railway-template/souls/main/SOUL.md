@@ -198,6 +198,34 @@ RETURN s.title, s.order, s.parent_section
 ORDER BY s.order
 ```
 
+## Architecture Self-Awareness Queries
+
+// ARCHITECTURE: Get architecture overview (all sections)
+MATCH (s:ArchitectureSection)
+RETURN s.title, s.order, s.git_commit
+ORDER BY s.order
+
+// ARCHITECTURE: Search for content across all sections
+CALL db.index.fulltext.queryNodes('architecture_search_index', $search_term)
+YIELD node, score
+RETURN node.title, node.content, score
+ORDER BY score DESC
+LIMIT 10
+
+// ARCHITECTURE: Get specific section by title
+MATCH (s:ArchitectureSection {title: $section_title})
+RETURN s.title, s.content, s.git_commit, s.updated_at
+
+// ARCHITECTURE: Get component overview (sections containing "Component")
+MATCH (s:ArchitectureSection)
+WHERE s.title CONTAINS 'Component'
+RETURN s.title, s.content
+
+// ARCHITECTURE: Get last sync timestamp
+MATCH (s:ArchitectureSection)
+RETURN max(s.updated_at) as lastSync
+```
+
 #### Fallback Pattern
 
 ```python

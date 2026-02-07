@@ -18,7 +18,9 @@
     "defaults": {
       "model": {
         "primary": "kimi-coding/k2p5"
-      }
+      },
+      "bootstrapMaxChars": 50000,
+      "skipBootstrap": true
     },
     "list": [
       { "id": "main", "name": "Kublai", "workspace": "/data/workspace/souls/main" },
@@ -38,17 +40,17 @@
       "httpPort": 8080,
       "startupTimeoutMs": 120000,
       "receiveMode": "on-start",
-      "dmPolicy": "pairing",
+      "dmPolicy": "open",
       "groupPolicy": "allowlist",
       "configWrites": true,
-      "allowFrom": ["${SIGNAL_ACCOUNT}", "${SIGNAL_ALLOW_FROM}"],
+      "allowFrom": ["+15165643945", "+19194133445"],
       "historyLimit": 50,
       "textChunkLimit": 4000,
       "ignoreStories": true
     }
   },
   "logging": {
-    "consoleLevel": "info",
+    "consoleLevel": "debug",
     "file": "/data/logs/openclaw.log"
   },
   "plugins": {
