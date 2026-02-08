@@ -25,11 +25,16 @@
 | #27789 | 2:19 PM | ✅ | Multi-agent configuration updated to use intelligent delegation instead of broadcast groups | ~344 |
 | #27788 | " | ✅ | Multi-agent implementation plan updated with Moonshot/Kimi provider configuration | ~369 |
 | #27787 | 2:18 PM | 🔵 | Multi-agent orchestrator implementation plan documented | ~326 |
-| #27782 | 1:56 PM | ✅ | Fixed Agent Role Assignment in Multi-Agent Implementation Plan | ~307 |
 
 ### Feb 6, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #30306 | 5:56 PM | 🔵 | openclaw.json model provider configuration documented across multiple files with critical requirement for models array | ~781 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #32821 | 7:00 PM | 🔵 | Agent Standing Orders Framework Documented for Autonomous Multi-Agent Operations | ~1056 |
 </claude-mem-context>

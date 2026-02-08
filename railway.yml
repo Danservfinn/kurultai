@@ -42,11 +42,16 @@ services:
       context: ./moltbot-railway-template
       dockerfile: Dockerfile
 
-    # Port configuration - OpenClaw gateway on 18789
+    # Port configuration - OpenClaw gateway on 18789, Express API on 8082
     ports:
       - port: 18789
         targetPort: 18789
         protocol: TCP
+        description: "OpenClaw Gateway"
+      - port: 8082
+        targetPort: 8082
+        protocol: TCP
+        description: "Express API Server"
 
     # Health check endpoint (OpenClaw built-in)
     healthcheck:
@@ -108,6 +113,24 @@ services:
     # Dependencies - ensure Neo4j starts first
     dependsOn:
       - neo4j
+
+    # Cron schedule for unified heartbeat
+    schedules:
+      - name: kurultai-heartbeat
+        cron: "*/5 * * * *"  # Every 5 minutes
+        command: "cd /app && python tools/kurultai/heartbeat_master.py --cycle"
+      - name: jochi-smoke-tests
+        cron: "*/15 * * * *"  # Every 15 minutes
+        command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase fixtures --phase integration --dry-run"
+      - name: jochi-hourly-tests
+        cron: "0 * * * *"  # Every hour
+        command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --dry-run"
+      - name: jochi-nightly-tests
+        cron: "0 2 * * *"  # 2 AM daily
+        command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase all --dry-run"
+      - name: kublai-weekly-reflection
+        cron: "0 20 * * 0"  # Sundays at 8 PM ET
+        command: "cd /app && curl -X POST http://localhost:8082/api/reflection/trigger -H 'Content-Type: application/json' -d '{}' || echo 'Reflection trigger endpoint not available'"
 
   # ===========================================================================
   # SKILL SYNC SERVICE - GitHub skill synchronization worker

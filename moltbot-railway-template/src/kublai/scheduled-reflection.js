@@ -44,8 +44,10 @@ class ScheduledReflection {
 
   /**
    * Execute weekly reflection
+   * @param {Object} options - Optional configuration
+   * @param {Function} options.onOpportunitiesFound - Callback when opportunities are found
    */
-  async weeklyReflection() {
+  async weeklyReflection(options = {}) {
     this.logger.info('[Kublai] Running weekly architecture reflection...');
 
     try {
@@ -56,12 +58,24 @@ class ScheduledReflection {
         opportunitiesFound: result.opportunitiesFound
       });
 
-      // If opportunities found, log them
+      // If opportunities found, log them and optionally trigger callback
       if (result.opportunitiesFound > 0) {
         this.logger.info(`[Kublai] Opportunities:`, result.opportunities);
+
+        // Call the callback if provided (e.g., to trigger delegation protocol)
+        if (options.onOpportunitiesFound && typeof options.onOpportunitiesFound === 'function') {
+          try {
+            await options.onOpportunitiesFound(result.opportunities);
+          } catch (callbackError) {
+            this.logger.error(`[Kublai] Opportunity callback failed: ${callbackError.message}`);
+          }
+        }
       }
+
+      return result;
     } catch (error) {
       this.logger.error(`[Kublai] Weekly reflection failed: ${error.message}`);
+      throw error;
     }
   }
 

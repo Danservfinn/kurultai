@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32823 | 7:00 PM | 🔵 | Kurultai v0.1 Task Dependency Engine: Comprehensive Design Document | ~2056 |
 | #32355 | 3:23 PM | 🔵 | Session Startup Workspace Loading Pattern Found - SOUL.md and CLAUDE.md Loaded at Agent Session Start | ~403 |
 | #31374 | 11:27 AM | 🔵 | Comprehensive domain switch execution plan with security fixes and rollback procedures | ~590 |
 | #31281 | 10:51 AM | ⚖️ | Comprehensive Domain Switch Execution Plan Created | ~534 |
@@ -16,15 +17,19 @@
 | #31018 | " | 🔵 | Neo4j.md Confirms Agent Model Specialization and Vector Index Implementation | ~724 |
 | #31017 | " | 🔵 | Neo4j Memory Architecture with Agent-to-Agent Messaging Specification | ~689 |
 | #30999 | 1:36 AM | 🔵 | Neo4j Memory Implementation Plan: Multi-Agent Architecture with Two-Tier Memory | ~652 |
-| #30984 | " | 🔵 | Production Architecture Documentation Found in docs/plans/architecture.md | ~914 |
-| #30985 | " | 🔵 | Environment Configuration Contradiction: neo4j+s vs bolt:// URI Strategy | ~607 |
-| #30982 | " | 🔵 | Kurultai v0.2 Completion Status: 82% with Remaining Tasks Documented | ~555 |
-| #30981 | " | 🔵 | Kurultai v0.2 Execution Guide: 82% Complete, 18% Remaining | ~630 |
-| #30980 | 1:35 AM | 🔵 | Kurultai v0.2 System Architecture Document | ~703 |
-| #30979 | " | 🔵 | Kurultai v0.2 Execution Plan with Deployment Sequence and Exit Criteria | ~592 |
-| #30974 | 1:27 AM | 🔵 | Agent-to-Agent Messaging Protocol and Task Delegation Flow | ~630 |
-| #30948 | 1:24 AM | 🔵 | Infrastructure & DevOps Comprehensive Review: 15 Critical Issues Identified | ~853 |
-| #30941 | " | 🔵 | Neo4j Connection Pool Size Specification Discrepancy: 50 vs 400 | ~591 |
-| #30936 | 1:23 AM | 🔵 | Architecture Review Expert Task Completed: 9 Critical Issues Identified in Kurultai v0.2 | ~898 |
-| #30937 | " | ⚖️ | Horde-Review Consensus-Based Architectural Audit Pattern Applied | ~653 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33266 | 3:10 PM | 🔵 | Kublai Proactive Self-Awareness Plan Structure Analyzed | ~973 |
+| #33265 | " | 🔵 | Jochi Test Automation Deployment Guide Reviewed | ~665 |
+| #33264 | " | 🔵 | Kublai Self-Understanding Plan Structure Analyzed | ~609 |
+| #33007 | 3:23 AM | 🔵 | Kurultai v0.1 Task Dependency Engine - First 500 Lines | ~726 |
+| #33004 | " | 🔵 | Kurultai v0.2 Railway Deployment Plan - First 500 Lines | ~724 |
+| #33001 | 3:22 AM | 🔵 | Kurultai v0.1 Task Dependency Engine Design | ~933 |
+| #33000 | " | 🔵 | Kurultai v0.2 Production Architecture Documentation | ~822 |
+| #32997 | 3:21 AM | 🔵 | Kurultai v0.3 Comprehensive Architecture Plan | ~962 |
+| #32996 | 3:20 AM | 🔵 | Jochi Automated Testing Deployment Guide | ~533 |
+| #32982 | 3:17 AM | 🔵 | Kurultai v0.3 Plan Document Structure and Scope | ~964 |
 </claude-mem-context>

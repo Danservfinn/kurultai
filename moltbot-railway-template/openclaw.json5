@@ -18,7 +18,30 @@
       dangerouslyDisableDeviceAuth: true,
     },
     // Trust Railway's internal proxy for X-Forwarded-* headers
-    trustedProxies: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"],
+    // IMPORTANT: OpenClaw does EXACT STRING match on IPs, NOT CIDR subnet matching.
+    // Must list individual IPs. Railway uses 100.64.0.x range (RFC 6598 CGNAT).
+    trustedProxies: [
+      "127.0.0.1",
+      "100.64.0.1", "100.64.0.2", "100.64.0.3", "100.64.0.4",
+      "100.64.0.5", "100.64.0.6", "100.64.0.7", "100.64.0.8",
+      "100.64.0.9", "100.64.0.10", "100.64.0.11", "100.64.0.12",
+      "100.64.0.13", "100.64.0.14", "100.64.0.15", "100.64.0.16",
+    ],
+  },
+
+  // Command restrictions — prevent agents from modifying gateway config at runtime
+  // CRITICAL: Without this, agents use config.patch to overwrite controlUi settings,
+  // removing dangerouslyDisableDeviceAuth and breaking webchat connections.
+  commands: {
+    config: false,
+    restart: false,
+  },
+
+  // CRITICAL: Deny the gateway tool globally to prevent agents from using config.patch
+  // which overwrites controlUi.dangerouslyDisableDeviceAuth and breaks webchat.
+  // Note: tools.deny must be at top-level (NOT agents.defaults — schema is .strict())
+  tools: {
+    deny: ["gateway"],
   },
 
   // Agent configuration

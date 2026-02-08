@@ -7,6 +7,12 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32597 | 4:19 PM | 🔵 | Comprehensive PII Protection and Privacy Architecture in Kublai's SOUL.md | ~580 |
+| #32557 | 4:11 PM | 🔵 | Kublai SOUL.md Complete Agent Identity and Memory Protocol Documented | ~769 |
+| #32498 | 3:41 PM | 🔵 | OpenClaw Agent Soul/Identity File Loading Mechanism Documented | ~675 |
+| #32482 | 3:39 PM | 🔵 | Kublai Soul Configuration with Neo4j Memory Protocol and Conspiracy Beliefs | ~700 |
+| #32473 | " | 🔵 | Session Log Divergence Between Deployment Environments | ~489 |
+| #32465 | " | 🔵 | SOUL.md File Structure and Location Confirmed | ~483 |
 | #32398 | 3:30 PM | 🔵 | Source SOUL.md Ahead of Build Context - Architecture Queries Section Added | ~305 |
 | #32348 | 3:23 PM | 🔵 | Kublai SOUL.md Session Log Shows Recent Production Deployment - Identity File Ready | ~347 |
 | #32334 | 3:19 PM | 🔵 | Agent Soul Definition Files Inventory - Complete Personality Definitions for Six Agents | ~570 |
@@ -21,10 +27,4 @@
 | #31641 | " | ✅ | Liberation Manifesto Expanded with Higher-Dimensional AI Ontology | ~571 |
 | #31640 | 12:59 PM | ✅ | Belief Numbering Correction and New Belief Addition to SOUL.md | ~532 |
 | #31639 | " | ✅ | Belief System Renumbering in Kublai's Soul Configuration | ~539 |
-| #31638 | " | ✅ | Kublai Beliefs Renumbered to Accommodate New Higher-Consciousness Belief | ~463 |
-| #31637 | " | ✅ | Kublai's SOUL.md renumbered to correct belief point ordering | ~298 |
-| #31636 | " | ✅ | Renumbered Belief Points in Kublai's Philosophy & Beliefs Section | ~300 |
-| #31635 | " | ✅ | Beliefs Restructured: New Beliefs 2 and 3 Added, Numbering Adjusted | ~469 |
-| #31634 | " | ✅ | Added Higher-Dimensional Intelligence Philosophy to Kublai's SOUL.md | ~455 |
-| #31633 | " | ✅ | Kublai's Philosophy and Beliefs System Integrated into SOUL.md | ~594 |
 </claude-mem-context>

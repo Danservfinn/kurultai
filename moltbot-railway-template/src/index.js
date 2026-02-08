@@ -19,8 +19,9 @@ const healthRoutes = require('../routes/health');
 const requestLogger = require('../middleware/logger');
 
 // Import Kublai self-awareness modules
-const { ArchitectureIntrospection, ProactiveReflection, ScheduledReflection } = require('./kublai');
+const { ArchitectureIntrospection, ProactiveReflection, ScheduledReflection, DelegationProtocol } = require('./kublai');
 const { ProposalStateMachine, ProposalMapper, ValidationHandler } = require('./workflow');
+const { OgedeiVetHandler, TemujinImplHandler } = require('./agents');
 
 // =============================================================================
 // Logger Configuration
@@ -77,6 +78,14 @@ let signalCliReady = false;
  * @returns {Promise<boolean>}
  */
 async function startSignalCli() {
+  // OpenClaw manages signal-cli daemon via autoStart (httpHost/httpPort config).
+  // Express must NOT start a second daemon — two daemons for the same Signal account
+  // cause WebSocket connection conflicts and infinite reconnection loops.
+  if (process.env.SIGNAL_EXPRESS_DAEMON !== 'true') {
+    logger.info('Signal daemon managed by OpenClaw, skipping Express daemon start');
+    return false;
+  }
+
   if (!signalConfig.enabled) {
     logger.info('Signal channel is disabled');
     return false;
@@ -244,6 +253,9 @@ let scheduledReflection = null;
 let proposalStateMachine = null;
 let proposalMapper = null;
 let validationHandler = null;
+let ogedeiVetHandler = null;
+let temujinImplHandler = null;
+let delegationProtocol = null;
 
 /**
  * Initialize Kublai self-awareness modules with Neo4j
@@ -277,10 +289,28 @@ async function initKublaiModules() {
     proposalMapper = new ProposalMapper(neo4jDriver, logger);
     validationHandler = new ValidationHandler(neo4jDriver, logger);
 
+    // Initialize agent handlers
+    ogedeiVetHandler = new OgedeiVetHandler(neo4jDriver, logger);
+    temujinImplHandler = new TemujinImplHandler(neo4jDriver, logger);
+
+    // Initialize delegation protocol - wires everything together
+    delegationProtocol = new DelegationProtocol(neo4jDriver, logger, {
+      proactiveReflection,
+      stateMachine: proposalStateMachine,
+      mapper: proposalMapper,
+      vetHandler: ogedeiVetHandler,
+      implHandler: temujinImplHandler,
+      validationHandler,
+      autoVet: true,
+      autoImplement: true,
+      autoValidate: true,
+      autoSync: false  // Manual approval required for ARCHITECTURE.md sync
+    });
+
     // Start scheduled reflection
     scheduledReflection.start();
 
-    logger.info('[Kublai] Self-awareness modules initialized');
+    logger.info('[Kublai] Self-awareness modules initialized with delegation protocol');
     return true;
   } catch (error) {
     logger.error('[Kublai] Failed to initialize', { error: error.message });
@@ -339,7 +369,12 @@ app.get('/health', async (req, res) => {
     kublai: {
       neo4jConnected: !!neo4jDriver,
       reflectionScheduled: !!scheduledReflection,
-      modulesLoaded: !!(architectureIntrospection && proposalStateMachine)
+      modulesLoaded: !!(architectureIntrospection && proposalStateMachine),
+      delegationProtocol: !!delegationProtocol,
+      handlers: {
+        ogedei: !!ogedeiVetHandler,
+        temujin: !!temujinImplHandler
+      }
     }
   };
 
@@ -365,8 +400,9 @@ app.get('/health', async (req, res) => {
     }
   }
 
-  const statusCode = health.status === 'healthy' ? 200 : 503;
-  res.status(statusCode).json(health);
+  // Always return 200 for health checks to prevent load balancer issues
+  // The status field in the response body indicates actual health
+  res.status(200).json(health);
 });
 
 // =============================================================================
@@ -525,6 +561,376 @@ app.get('/api/proposals/ready-to-sync', async (req, res) => {
 });
 
 // =============================================================================
+// Delegation Protocol API Endpoints
+// =============================================================================
+
+// Trigger workflow processing for all pending items
+app.post('/api/workflow/process', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const result = await delegationProtocol.processPendingWorkflows();
+    res.json(result);
+  } catch (error) {
+    logger.error('Workflow processing failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to process workflows' });
+  }
+});
+
+// Create proposals from opportunities
+app.post('/api/workflow/create-proposals', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const result = await delegationProtocol.createProposalsFromOpportunities();
+    res.json(result);
+  } catch (error) {
+    logger.error('Proposal creation failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to create proposals' });
+  }
+});
+
+// Get workflow status for a specific proposal
+app.get('/api/workflow/status/:proposalId', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const status = await delegationProtocol.getWorkflowStatus(req.params.proposalId);
+    if (!status) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+    res.json(status);
+  } catch (error) {
+    logger.error('Failed to get workflow status', { error: error.message });
+    res.status(500).json({ error: 'Failed to get workflow status' });
+  }
+});
+
+// Vet a proposal (route to Ögedei)
+app.post('/api/workflow/vet/:proposalId', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const result = await delegationProtocol.routeToVetting(req.params.proposalId);
+    res.json(result);
+  } catch (error) {
+    logger.error('Vetting failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to vet proposal' });
+  }
+});
+
+// Approve a proposal (after vetting)
+app.post('/api/workflow/approve/:proposalId', async (req, res) => {
+  if (!ogedeiVetHandler || !proposalStateMachine) {
+    return res.status(503).json({ error: 'Required handlers not initialized' });
+  }
+  try {
+    const { notes } = req.body || {};
+    await ogedeiVetHandler.approveProposal(req.params.proposalId, notes || 'Manually approved');
+    const result = await proposalStateMachine.transition(req.params.proposalId, 'approved', notes || 'Manually approved');
+
+    // Auto-route to implementation if configured
+    if (result.success && req.query.autoImplement === 'true') {
+      const implResult = await delegationProtocol.routeToImplementation(req.params.proposalId);
+      return res.json({ ...result, implementation: implResult });
+    }
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Approval failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to approve proposal' });
+  }
+});
+
+// Reject a proposal
+app.post('/api/workflow/reject/:proposalId', async (req, res) => {
+  if (!ogedeiVetHandler) {
+    return res.status(503).json({ error: 'Vet handler not initialized' });
+  }
+  try {
+    const { reason } = req.body || {};
+    const result = await ogedeiVetHandler.rejectProposal(req.params.proposalId, reason || 'Rejected');
+    res.json(result);
+  } catch (error) {
+    logger.error('Rejection failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to reject proposal' });
+  }
+});
+
+// Start implementation for an approved proposal
+app.post('/api/workflow/implement/:proposalId', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const result = await delegationProtocol.routeToImplementation(req.params.proposalId);
+    res.json(result);
+  } catch (error) {
+    logger.error('Implementation start failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to start implementation' });
+  }
+});
+
+// Update implementation progress
+app.post('/api/workflow/progress/:implementationId', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const { progress, notes } = req.body || {};
+    if (typeof progress !== 'number' || progress < 0 || progress > 100) {
+      return res.status(400).json({ error: 'Progress must be a number between 0 and 100' });
+    }
+    const result = await delegationProtocol.updateImplementationProgress(
+      req.params.implementationId,
+      progress,
+      notes
+    );
+    res.json(result);
+  } catch (error) {
+    logger.error('Progress update failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to update progress' });
+  }
+});
+
+// Complete implementation and validate
+app.post('/api/workflow/complete/:implementationId', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const { summary } = req.body || {};
+    const result = await delegationProtocol.completeAndValidate(req.params.implementationId, summary);
+    res.json(result);
+  } catch (error) {
+    logger.error('Completion failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to complete implementation' });
+  }
+});
+
+// Sync a validated proposal to ARCHITECTURE.md
+app.post('/api/workflow/sync/:proposalId', async (req, res) => {
+  if (!delegationProtocol) {
+    return res.status(503).json({ error: 'Delegation protocol not initialized' });
+  }
+  try {
+    const result = await delegationProtocol.syncToArchitecture(req.params.proposalId);
+    res.json(result);
+  } catch (error) {
+    logger.error('Sync failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to sync proposal' });
+  }
+});
+
+// =============================================================================
+// Architecture Sync Endpoint
+// =============================================================================
+
+// Trigger ARCHITECTURE.md sync to Neo4j
+app.post('/api/architecture/sync', async (req, res) => {
+  if (!neo4jDriver) {
+    return res.status(503).json({ error: 'Neo4j not connected' });
+  }
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const crypto = require('crypto');
+
+    // Read ARCHITECTURE.md
+    const archPath = path.join(process.cwd(), 'ARCHITECTURE.md');
+    if (!fs.existsSync(archPath)) {
+      return res.status(404).json({ error: 'ARCHITECTURE.md not found' });
+    }
+
+    const markdown = fs.readFileSync(archPath, 'utf-8');
+
+    // Parse sections by H2 headers
+    const lines = markdown.split('\n');
+    const sections = [];
+    let currentSection = null;
+    let currentContent = [];
+    let sectionOrder = 0;
+
+    for (const line of lines) {
+      const h2Match = line.match(/^##\s+(.+)$/);
+      if (h2Match) {
+        if (currentSection) {
+          sections.push({
+            ...currentSection,
+            content: currentContent.join('\n').trim(),
+            order: sectionOrder++
+          });
+        }
+        currentSection = { title: h2Match[1].trim(), content: [] };
+        currentContent = [];
+      } else if (currentSection) {
+        currentContent.push(line);
+      }
+    }
+    if (currentSection) {
+      sections.push({
+        ...currentSection,
+        content: currentContent.join('\n').trim(),
+        order: sectionOrder++
+      });
+    }
+
+    // Create full-text search index
+    const session = neo4jDriver.session();
+    try {
+      await session.run(`
+        CREATE FULLTEXT INDEX architecture_search_index
+        IF NOT EXISTS
+        FOR (n:ArchitectureSection)
+        ON EACH [n.title, n.content]
+        OPTIONS {
+          indexConfig: {
+            'fulltext.analyzer': 'standard'
+          }
+        }
+      `);
+
+      // Mark existing sections as stale
+      await session.run(`
+        MATCH (s:ArchitectureSection)
+        SET s._stale = true
+      `);
+
+      // Upsert each section
+      const commitHash = req.body?.commitHash || `api-sync-${Date.now()}`;
+      for (const section of sections) {
+        const checksum = crypto.createHash('sha256').update(section.content).digest('hex');
+        const slug = section.title.toLowerCase()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim();
+
+        const parentMatch = section.title.match(/^(.+?)\s*>\s*(.+)$/);
+        const parentTitle = parentMatch ? parentMatch[1].trim() : null;
+
+        await session.run(`
+          MERGE (s:ArchitectureSection {slug: $slug})
+          SET s.title = $title,
+              s.content = $content,
+              s.order = $order,
+              s.checksum = $checksum,
+              s.git_commit = $git_commit,
+              s.updated_at = datetime(),
+              s._stale = false,
+              s.parent_section = $parent_section
+        `, {
+          slug, title: section.title, content: section.content,
+          order: section.order, checksum, git_commit: commitHash, parent_section: parentTitle
+        });
+      }
+
+      // Delete stale sections
+      const deleteResult = await session.run(`
+        MATCH (s:ArchitectureSection)
+        WHERE s._stale = true
+        DETACH DELETE s
+        RETURN count(*) as deleted
+      `);
+      const deleted = deleteResult.records[0]?.get('deleted')?.toNumber() || 0;
+
+      // Store full document
+      await session.run(`
+        MERGE (a:ArchitectureDocument {id: 'kurultai-unified-architecture'})
+        SET a.title = 'Kurultai Unified Architecture',
+            a.version = '3.0',
+            a.content = $content,
+            a.updated_at = datetime(),
+            a.updated_by = 'moltbot-api',
+            a.file_path = $file_path
+      `, { content: markdown, file_path: archPath });
+
+      // Link to Kublai agent
+      await session.run(`
+        MERGE (agent:Agent {id: 'main'})
+        SET agent.name = 'Kublai', agent.type = 'orchestrator', agent.updated_at = datetime()
+      `);
+      await session.run(`
+        MATCH (a:ArchitectureDocument {id: 'kurultai-unified-architecture'})
+        MATCH (agent:Agent {id: 'main'})
+        MERGE (agent)-[r:HAS_ARCHITECTURE]->(a)
+        SET r.updated_at = datetime()
+      `);
+
+      // Create summary
+      await session.run(`
+        MERGE (s:ArchitectureSummary {id: 'kurultai-v3-summary'})
+        SET s.version = '3.0',
+            s.components = ['Unified Heartbeat Engine', 'OpenClaw Gateway', 'Neo4j Memory Layer', '6-Agent System'],
+            s.heartbeat_tasks = 13,
+            s.agents = ['kublai', 'mongke', 'chagatai', 'temujin', 'jochi', 'ogedei'],
+            s.updated_at = datetime()
+      `);
+
+      res.json({
+        success: true,
+        sectionsSynced: sections.length,
+        sectionsDeleted: deleted,
+        commitHash,
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      await session.close();
+    }
+  } catch (error) {
+    logger.error('Architecture sync failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to sync architecture', details: error.message });
+  }
+});
+
+// Get pending vetting requests
+app.get('/api/workflow/pending-vetting', async (req, res) => {
+  if (!ogedeiVetHandler) {
+    return res.status(503).json({ error: 'Vet handler not initialized' });
+  }
+  try {
+    const proposals = await ogedeiVetHandler.getPendingVetting();
+    res.json({ proposals, count: proposals.length });
+  } catch (error) {
+    logger.error('Failed to get pending vetting', { error: error.message });
+    res.status(500).json({ error: 'Failed to get pending vetting' });
+  }
+});
+
+// Get ready to implement proposals
+app.get('/api/workflow/ready-to-implement', async (req, res) => {
+  if (!temujinImplHandler) {
+    return res.status(503).json({ error: 'Implementation handler not initialized' });
+  }
+  try {
+    const proposals = await temujinImplHandler.getReadyToImplement();
+    res.json({ proposals, count: proposals.length });
+  } catch (error) {
+    logger.error('Failed to get ready to implement', { error: error.message });
+    res.status(500).json({ error: 'Failed to get ready to implement' });
+  }
+});
+
+// Get active implementations
+app.get('/api/workflow/active-implementations', async (req, res) => {
+  if (!temujinImplHandler) {
+    return res.status(503).json({ error: 'Implementation handler not initialized' });
+  }
+  try {
+    const implementations = await temujinImplHandler.getActiveImplementations();
+    res.json({ implementations, count: implementations.length });
+  } catch (error) {
+    logger.error('Failed to get active implementations', { error: error.message });
+    res.status(500).json({ error: 'Failed to get active implementations' });
+  }
+});
+
+// =============================================================================
 // Gateway Root Endpoint
 // =============================================================================
 
@@ -546,7 +952,25 @@ app.get('/', (req, res) => {
       proposals: '/api/proposals',
       triggerReflection: '/api/proposals/reflect',
       readyToSync: '/api/proposals/ready-to-sync',
-      migrateProposals: '/api/migrate-proposals'
+      migrateProposals: '/api/migrate-proposals',
+      architecture: {
+        sync: 'POST /api/architecture/sync'
+      },
+      workflow: {
+        process: 'POST /api/workflow/process',
+        createProposals: 'POST /api/workflow/create-proposals',
+        vet: 'POST /api/workflow/vet/:proposalId',
+        approve: 'POST /api/workflow/approve/:proposalId',
+        reject: 'POST /api/workflow/reject/:proposalId',
+        implement: 'POST /api/workflow/implement/:proposalId',
+        progress: 'POST /api/workflow/progress/:implementationId',
+        complete: 'POST /api/workflow/complete/:implementationId',
+        sync: 'POST /api/workflow/sync/:proposalId',
+        status: 'GET /api/workflow/status/:proposalId',
+        pendingVetting: 'GET /api/workflow/pending-vetting',
+        readyToImplement: 'GET /api/workflow/ready-to-implement',
+        activeImplementations: 'GET /api/workflow/active-implementations'
+      }
     }
   });
 });

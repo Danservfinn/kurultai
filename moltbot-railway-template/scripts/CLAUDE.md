@@ -19,4 +19,12 @@
 | #32631 | 4:29 PM | 🔵 | Infrastructure Heartbeat Sidecar for Agent Liveness Detection | ~440 |
 | #32598 | 4:19 PM | 🔵 | Heartbeat Sidecar Infrastructure Monitoring for Agent Network | ~349 |
 | #32555 | 4:11 PM | 🔵 | Examined infrastructure heartbeat sidecar monitoring all 6 Molt agents | ~323 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33318 | 3:20 PM | 🔵 | Neo4j Migration Runner Supports 5 Versions Including Proposal System (v4) | ~281 |
+| #33017 | 3:24 AM | 🔵 | Heartbeat Writer - Task Execution and Chat Monitoring - Lines 100-300 | ~703 |
+| #33013 | " | 🔵 | Infrastructure Heartbeat Sidecar - First 100 Lines | ~659 |
 </claude-mem-context>

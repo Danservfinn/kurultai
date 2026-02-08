@@ -7,23 +7,29 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #32710 | 4:54 PM | 🔵 | OpenClaw entrypoint script configures device identity and WebSocket authentication | ~487 |
-| #32708 | 4:53 PM | 🔵 | OpenClaw multi-agent configuration reviewed | ~370 |
-| #32672 | 4:49 PM | 🔵 | Moltbot Railway Template Package Configuration | ~324 |
-| #32665 | 4:40 PM | ✅ | Agent Extended Thinking Configuration Added | ~297 |
-| #32652 | 4:34 PM | 🔵 | Found increased bootstrapMaxChars limit and skipBootstrap flag in openclaw.json | ~298 |
-| #32648 | 4:33 PM | 🔵 | Containerized Agent Runtime with Heartbeat Sidecar and OpenClaw Gateway | ~434 |
-| #32647 | " | 🔵 | Docker Image Includes Soul Files Directory | ~297 |
-| #32638 | 4:31 PM | 🔵 | OpenClaw Gateway API and Session State Query Options Analyzed | ~748 |
-| #32633 | 4:29 PM | 🔵 | Moltbot Entrypoint Script: Agent Deployment and Signal Configuration | ~505 |
-| #32595 | 4:18 PM | 🔵 | OpenClaw Session Lifecycle Management Analysis Completed | ~602 |
-| #32593 | " | 🔵 | OpenClaw Gateway Configuration Defines Six-Agent Golden Horde Network | ~472 |
-| #32587 | 4:17 PM | 🔵 | Event Emission System and Scheduled Reflection Architecture | ~450 |
-| #32586 | " | 🔵 | Soul File Deployment Architecture in Entrypoint | ~391 |
-| #32583 | " | 🔵 | OpenClaw Configuration with 6-Agent Soul-Based Architecture | ~338 |
-| #32559 | 4:11 PM | 🔵 | OpenClaw Gateway Configuration for Kurultai Multi-Agent System | ~672 |
-| #32552 | " | 🔵 | Neo4j Integration Across Molt Agent System | ~373 |
-| #32544 | 4:07 PM | 🔵 | Complete entrypoint.sh - Comprehensive Moltbot Startup Orchestration | ~683 |
-| #32499 | 3:41 PM | 🔵 | Complete SOUL.md and IDENTITY.md Deployment Lifecycle Analysis | ~627 |
-| #32498 | " | 🔵 | OpenClaw Agent Soul/Identity File Loading Mechanism Documented | ~675 |
+| #32896 | 7:52 PM | 🔵 | Moltbot Production Entrypoint Architecture and Services | ~630 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33319 | 3:21 PM | 🔵 | Moltbot Entrypoint Script Implements Complete Deployment Pipeline with Architecture Sync | ~466 |
+| #33299 | 3:18 PM | ✅ | Updated entrypoint.sh version string for architecture sync release | ~197 |
+| #33293 | 3:16 PM | 🔵 | Dockerfile cache bust updated for architecture sync deployment | ~224 |
+| #33281 | 3:12 PM | 🟣 | Entrypoint Script: Stale Session Lock Cleanup on Deployment | ~336 |
+| #33275 | 3:11 PM | 🔵 | Entrypoint Script: Neo4j Migration Sequence with Retry Logic | ~395 |
+| #33269 | 3:10 PM | 🔵 | Moltbot Entrypoint: Agent Soul File Deployment on Startup | ~422 |
+| #33254 | 3:01 PM | 🟣 | Updated moltbot entrypoint to automatically trigger architecture sync on startup | ~310 |
+| #33252 | 3:00 PM | ✅ | Updated Dockerfile cache-bust version for architecture sync | ~173 |
+| #33251 | 2:59 PM | ✅ | Modified moltbot entrypoint.sh to auto-trigger architecture sync on startup | ~315 |
+| #33238 | 2:52 PM | 🔵 | Entrypoint starts Express API server on port 8082 after OpenClaw | ~288 |
+| #33236 | 2:51 PM | 🔵 | Examined moltbot entrypoint.sh - startup sequence and sidecar management | ~400 |
+| #33234 | " | 🔵 | Examined moltbot entrypoint.sh initialization sequence (partial) | ~410 |
+| #33232 | 2:50 PM | 🔵 | Found moltbot entrypoint.sh with comprehensive deployment logic | ~307 |
+| #33230 | " | 🔵 | Reviewed moltbot Dockerfile - complete container configuration | ~483 |
+| #33229 | 2:49 PM | 🔵 | Moltbot Dockerfile: Multi-Stage Container Build with Kurultai Tools Integration | ~458 |
+| #33226 | 2:48 PM | ✅ | Dockerfile Cache Bust and Unified Heartbeat Integration | ~361 |
+| #32957 | 2:03 AM | 🔵 | OpenClaw Gateway Configuration with 6 Concurrent Agent Instances | ~421 |
+| #32932 | 12:45 AM | 🔵 | Multi-agent architecture examined—6 concurrent independent agents with Kublai as routing coordinator | ~601 |
+| #32931 | 12:44 AM | 🔵 | Deployment Configuration Files Located | ~251 |
 </claude-mem-context>

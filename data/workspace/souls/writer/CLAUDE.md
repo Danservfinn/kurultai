@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #32334 | 3:19 PM | 🔵 | Agent Soul Definition Files Inventory - Complete Personality Definitions for Six Agents | ~570 |
 | #32045 | 2:27 PM | 🔵 | Multi-Agent SOUL Configuration Updates Staged for Commit | ~386 |
 | #31588 | 12:36 PM | 🔵 | Verification: Proactive Usage Encouragement Present in Updated Soul Files | ~516 |
 | #31570 | 12:31 PM | 🟣 | Comprehensive Horde Skills Redesign Deployed to Chagatai (Writer) SOUL.md | ~992 |

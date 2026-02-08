@@ -12,8 +12,6 @@
 | #30774 | 11:32 PM | ✅ | Caddyfile Updated - Port 9000 Changed to 18789 for OpenClaw Gateway | ~366 |
 | #30722 | 11:18 PM | 🔵 | Caddyfile Confirms Consistent Port 9000 Routing | ~327 |
 | #30707 | 11:16 PM | 🔵 | Authentik Proxy Environment Configuration Template | ~397 |
-| #30700 | 11:15 PM | 🔵 | Authentik Proxy Configuration with Caddy Reverse Proxy | ~496 |
-| #30526 | 6:50 PM | 🔵 | Authentik Proxy Caddyfile with Forward Auth and Moltbot Routing | ~570 |
 
 ### Feb 7, 2026
 
@@ -32,4 +30,11 @@
 | #30936 | 1:23 AM | 🔵 | Architecture Review Expert Task Completed: 9 Critical Issues Identified in Kurultai v0.2 | ~898 |
 | #30930 | " | 🔵 | Caddy Reverse Proxy Routes to Moltbot on Railway Internal DNS | ~410 |
 | #30910 | 1:21 AM | 🔵 | Authentik Forward Auth Proxy Configuration for OpenClaw/Moltbot | ~589 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33346 | 3:23 PM | 🔵 | Authentik Forward Auth Proxy (Caddy) Configured for Moltbot Access Control | ~373 |
+| #32966 | 2:07 AM | 🔵 | Authentik Forward Auth Proxy Routes OpenClaw Gateway Through Caddy | ~423 |
 </claude-mem-context>

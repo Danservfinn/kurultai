@@ -12,6 +12,19 @@ const { execSync } = require('child_process');
 const router = express.Router();
 
 /**
+ * GET /health
+ * Main health check endpoint (used by Railway health checks)
+ */
+router.get('/', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'moltbot-gateway',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+/**
  * GET /health/neo4j
  * Check Neo4j database connectivity via internal Railway network.
  */

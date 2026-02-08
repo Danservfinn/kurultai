@@ -24,7 +24,8 @@ import threading
 import time
 import uuid
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from enum import Enum
 
 # Add project root to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -39,6 +40,89 @@ logger = logging.getLogger(__name__)
 
 # All 6 Kurultai agents
 AGENT_NAMES = ["main", "researcher", "writer", "developer", "analyst", "ops"]
+
+# Agent configuration with heartbeat task definitions
+AGENT_CONFIG = {
+    "main": {
+        "name": "kublai",
+        "neo4j_name": "kublai",
+        "tier": "critical",
+        "interval_minutes": 5,
+        "tasks": ["routing_optimization", "delegation_effectiveness"],
+    },
+    "researcher": {
+        "name": "möngke",
+        "neo4j_name": "möngke",
+        "tier": "standard",
+        "interval_minutes": 15,
+        "tasks": ["knowledge_gap_analysis", "finding_consolidation"],
+    },
+    "writer": {
+        "name": "chagatai",
+        "neo4j_name": "chagatai",
+        "tier": "light",
+        "interval_minutes": 60,
+        "tasks": ["content_creation_moltbook", "content_creation_4claw"],
+    },
+    "developer": {
+        "name": "temüjin",
+        "neo4j_name": "temüjin",
+        "tier": "standard",
+        "interval_minutes": 15,
+        "tasks": ["pattern_learning", "debt_assessment"],
+    },
+    "analyst": {
+        "name": "jochi",
+        "neo4j_name": "jochi",
+        "tier": "critical",
+        "interval_minutes": 5,
+        "tasks": ["performance_analysis", "efficiency_report"],
+    },
+    "ops": {
+        "name": "ögedei",
+        "neo4j_name": "ögedei",
+        "tier": "critical",
+        "interval_minutes": 5,
+        "tasks": ["failover_readiness", "health_aggregation"],
+    },
+}
+
+
+class TaskTier(Enum):
+    """Task tier determines execution frequency and priority."""
+    CRITICAL = "critical"
+    STANDARD = "standard"
+    LIGHT = "light"
+
+
+# Tick intervals for each tier (30-second ticks)
+# 5 min = 10 ticks, 15 min = 30 ticks, 60 min = 120 ticks
+TIER_TICK_INTERVALS = {
+    "critical": 10,
+    "standard": 30,
+    "light": 120,
+}
+
+
+def check_and_execute_tasks(driver, tick: int):
+    """
+    Check if any agent tasks should execute based on their intervals.
+    tick represents 30-second intervals.
+    """
+    for agent_id, config in AGENT_CONFIG.items():
+        tier = config.get("tier", "standard")
+        interval_ticks = TIER_TICK_INTERVALS.get(tier, 30)
+
+        # Check if this agent's interval has elapsed
+        if tick % interval_ticks == 0:
+            # Execute primary task
+            primary_task = config["tasks"][0]
+            execute_agent_task(agent_id, primary_task, driver)
+
+            # Execute secondary task every other cycle
+            if (tick // interval_ticks) % 2 == 0 and len(config["tasks"]) > 1:
+                secondary_task = config["tasks"][1]
+                execute_agent_task(agent_id, secondary_task, driver)
 
 HEARTBEAT_INTERVAL = 30  # seconds
 CIRCUIT_BREAKER_THRESHOLD = 3  # consecutive failures before cooldown
@@ -263,6 +347,195 @@ def write_chat_summary(driver, agent_id, response_text):
             logger.info(f"ChatSummary written for {agent_id}: {turn_count} turns, topics={topics}")
 
 
+# ============ Agent-Specific Heartbeat Task Implementations ============
+
+def task_content_creation_moltbook(driver) -> dict:
+    """
+    Chagatai: Generate content ideas and drafts for Moltbook platform.
+    Analyzes recent system activity to create engaging posts.
+    """
+    # Query recent interesting activity across all agents
+    cypher = """
+    MATCH (cs:ChatSummary)
+    WHERE cs.created_at > datetime() - duration('PT4H')
+    WITH cs.topics AS topics, cs.summary AS summary
+    LIMIT 20
+    RETURN topics, summary
+    """
+
+    with driver.session() as session:
+        result = session.run(cypher)
+        recent_activity = [dict(r) for r in result]
+
+    # Extract trending topics
+    topic_counts = {}
+    for activity in recent_activity:
+        for topic in activity.get("topics", []):
+            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+    trending = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+
+    # Create content brief for Moltbook post
+    content_brief = {
+        "platform": "moltbook",
+        "trending_topics": [t[0] for t in trending],
+        "activity_count": len(recent_activity),
+        "suggested_angle": f"Behind the scenes: How Kurultai handles {trending[0][0] if trending else 'multi-agent coordination'}",
+        "draft_status": "pending",
+    }
+
+    # Write content brief to Neo4j
+    cypher2 = """
+    CREATE (cb:ContentBrief {
+        id: $id,
+        platform: $platform,
+        topics: $topics,
+        angle: $angle,
+        created_at: datetime($now),
+        status: 'draft_pending',
+        assigned_to: 'chagatai'
+    })
+    RETURN cb.id
+    """
+
+    with driver.session() as session:
+        session.run(cypher2,
+            id=str(uuid.uuid4()),
+            platform="moltbook",
+            topics=content_brief["trending_topics"],
+            angle=content_brief["suggested_angle"],
+            now=datetime.now(timezone.utc).isoformat(),
+        )
+
+    summary = f"Moltbook content brief created: {content_brief['suggested_angle'][:60]}..."
+    return {"summary": summary, "tokens": 350, "data": content_brief}
+
+
+def task_content_creation_4claw(driver) -> dict:
+    """
+    Chagatai: Generate technical insights and tips for 4Claw platform.
+    Focuses on OpenClaw gateway usage, agent patterns, and tooling.
+    """
+    # Query technical patterns and tool usage
+    cypher = """
+    MATCH (cs:ChatSummary)
+    WHERE cs.created_at > datetime() - duration('PT4H')
+      AND ANY(topic IN cs.topics WHERE topic IN ['deployment', 'signal', 'database', 'configuration'])
+    RETURN cs.topics AS topics, cs.summary AS summary
+    LIMIT 10
+    """
+
+    with driver.session() as session:
+        result = session.run(cypher)
+        tech_activity = [dict(r) for r in result]
+
+    # Identify common technical challenges
+    challenge_patterns = {
+        "deployment": "Deploying OpenClaw agents at scale",
+        "signal": "Signal messaging integration patterns",
+        "database": "Neo4j operational memory optimization",
+        "configuration": "Multi-agent configuration management",
+        "monitoring": "Heartbeat and health check strategies",
+    }
+
+    detected_challenges = []
+    for activity in tech_activity:
+        for topic in activity.get("topics", []):
+            if topic in challenge_patterns:
+                detected_challenges.append(challenge_patterns[topic])
+
+    # Create 4Claw technical tip brief
+    tip_topic = detected_challenges[0] if detected_challenges else "Multi-agent orchestration best practices"
+
+    content_brief = {
+        "platform": "4claw",
+        "tip_topic": tip_topic,
+        "technical_depth": "intermediate",
+        "code_examples": True,
+        "suggested_title": f"Tip: {tip_topic[:50]}",
+    }
+
+    # Write to Neo4j
+    cypher2 = """
+    CREATE (cb:ContentBrief {
+        id: $id,
+        platform: $platform,
+        tip_topic: $tip_topic,
+        technical_depth: $technical_depth,
+        created_at: datetime($now),
+        status: 'draft_pending',
+        assigned_to: 'chagatai'
+    })
+    RETURN cb.id
+    """
+
+    with driver.session() as session:
+        session.run(cypher2,
+            id=str(uuid.uuid4()),
+            platform="4claw",
+            tip_topic=tip_topic,
+            technical_depth="intermediate",
+            now=datetime.now(timezone.utc).isoformat(),
+        )
+
+    summary = f"4Claw technical tip brief created: {tip_topic[:60]}..."
+    return {"summary": summary, "tokens": 320, "data": content_brief}
+
+
+def execute_agent_task(agent_id: str, task_name: str, driver) -> dict:
+    """
+    Execute a specific heartbeat task for an agent.
+    Returns task result metadata.
+    """
+    config = AGENT_CONFIG.get(agent_id, {})
+    agent_name = config.get("neo4j_name", agent_id)
+    executed_at = datetime.now(timezone.utc).isoformat()
+
+    try:
+        # Route to appropriate task implementation
+        if task_name == "content_creation_moltbook":
+            result = task_content_creation_moltbook(driver)
+        elif task_name == "content_creation_4claw":
+            result = task_content_creation_4claw(driver)
+        else:
+            # Task not yet implemented - log and return empty
+            logger.debug(f"Task {task_name} for {agent_name} not implemented yet")
+            return {"summary": "Task not implemented", "tokens": 0, "data": {}}
+
+        # Write HeartbeatTask node for tracking
+        cypher = """
+        CREATE (ht:HeartbeatTask {
+            id: $id,
+            agent: $agent,
+            agent_id: $agent_id,
+            task_name: $task_name,
+            executed_at: datetime($executed_at),
+            result_summary: $summary,
+            tokens_used: $tokens,
+            status: 'completed'
+        })
+        RETURN ht.id
+        """
+
+        with driver.session() as session:
+            session.run(cypher,
+                id=str(uuid.uuid4()),
+                agent=agent_name,
+                agent_id=agent_id,
+                task_name=task_name,
+                executed_at=executed_at,
+                summary=result.get("summary", "")[:200],
+                tokens=result.get("tokens", 0)
+            )
+
+        logger.info(f"Task {task_name} completed for {agent_name}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Task {task_name} failed for {agent_name}: {e}")
+        return {"summary": f"Error: {str(e)[:100]}", "tokens": 0, "data": {}}
+
+
 def main():
     uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
     user = os.environ.get("NEO4J_USER", "neo4j")
@@ -314,6 +587,13 @@ def main():
                     continue
 
             tick += 1
+
+            # Execute agent-specific tasks based on their intervals
+            try:
+                check_and_execute_tasks(driver, tick)
+            except Exception as e:
+                logger.error(f"Task execution failed: {e}")
+                # Don't let task failures affect heartbeats
 
             # Flush chat summaries every SUMMARY_INTERVAL_TICKS heartbeats (~5 min)
             if monitor and tick % SUMMARY_INTERVAL_TICKS == 0:

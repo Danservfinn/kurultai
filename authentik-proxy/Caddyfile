@@ -17,11 +17,11 @@
         level DEBUG
     }
 
-    # Use route blocks to maintain strict order (unlike handle which gets sorted)
-    # Routes are evaluated in the order they appear here
+    # Use handle_path blocks with explicit ordering via numeric prefixes in comments
+    # Caddy sorts handle blocks by path specificity, so we use path_regexp for complex matching
 
     # 1. Signal linking endpoint (token-protected, no auth)
-    route /setup/api/signal-link {
+    handle_path /setup/api/signal-link {
         @noToken not header X-Signal-Token {$SIGNAL_LINK_TOKEN:disabled}
         respond @noToken "Unauthorized" 401
 
@@ -34,18 +34,20 @@
         }
     }
 
-    # 2. Health checks - go to Express API (NO AUTH)
-    route /health* {
+    # 2. Health checks - go to Express API (NO AUTH for health)
+    # Use handle with explicit matcher to preserve path
+    handle /health* {
         reverse_proxy moltbot-railway-template.railway.internal:8082 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-Proto https
         }
     }
 
     # 3. Express API routes - using /express prefix to avoid conflict with /api
-    # Caddy sorts handle blocks by path specificity, so we use a different prefix
-    route /express/* {
-        uri strip_prefix /express
+    # External: /express/api/proposals → Internal: /api/proposals
+    # External: /express/api/migrate-proposals → Internal: /api/migrate-proposals
+    handle_path /express/* {
         reverse_proxy moltbot-railway-template.railway.internal:8082 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -54,7 +56,7 @@
     }
 
     # 5. Authentik API (NO AUTH - Authentik handles its own auth)
-    route /api/v3/* {
+    handle_path /api/v3/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -63,7 +65,7 @@
     }
 
     # 6. Authentik outpost routes (NO AUTH)
-    route /outpost.goauthentik.io/* {
+    handle_path /outpost.goauthentik.io/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -72,7 +74,7 @@
         }
     }
 
-    route /application/* {
+    handle_path /application/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -81,7 +83,7 @@
         }
     }
 
-    route /flows/* {
+    handle_path /flows/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -90,7 +92,7 @@
         }
     }
 
-    route /-/* {
+    handle_path /-/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -99,7 +101,7 @@
         }
     }
 
-    route /if/* {
+    handle_path /if/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -108,7 +110,7 @@
         }
     }
 
-    route /static/* {
+    handle_path /static/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -117,7 +119,7 @@
         }
     }
 
-    route /media/* {
+    handle_path /media/* {
         reverse_proxy authentik-server.railway.internal:9000 {
             header_up Host {host}
             header_up X-Real-Ip {remote_host}
@@ -127,7 +129,7 @@
     }
 
     # 7. WebSocket endpoint (WITH AUTH)
-    route /ws/* {
+    handle_path /ws/* {
         forward_auth authentik-server.railway.internal:9000 {
             uri /outpost.goauthentik.io/auth/caddy
             header_up X-Forwarded-Host {host}
@@ -147,8 +149,8 @@
     }
 
     # 8. Other API routes - OpenClaw (WITH AUTH)
-    # This MUST come after /api/proposals and /api/migrate-proposals
-    route /api/* {
+    # This MUST come after /express/* routes
+    handle_path /api/* {
         forward_auth authentik-server.railway.internal:9000 {
             uri /outpost.goauthentik.io/auth/caddy
             header_up X-Forwarded-Host {host}
@@ -168,7 +170,7 @@
     }
 
     # 9. Catch-all: proxy to OpenClaw gateway with Authentik forward auth
-    route {
+    handle {
         forward_auth authentik-server.railway.internal:9000 {
             uri /outpost.goauthentik.io/auth/caddy
             header_up X-Forwarded-Host {host}

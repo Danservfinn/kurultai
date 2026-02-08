@@ -1,5 +1,11 @@
 # Kublai Self-Awareness Operations Guide
 
+> **Version:** 1.0
+> **Last Updated:** 2026-02-08
+> **Applies To:** moltbot-railway-template v2.0+
+
+---
+
 ## Overview
 
 Kublai maintains self-awareness by querying ARCHITECTURE.md from Neo4j and proposing improvements via a collaborative workflow with Ögedei (Operations) and Temüjin (Development).
@@ -7,51 +13,48 @@ Kublai maintains self-awareness by querying ARCHITECTURE.md from Neo4j and propo
 ## Architecture
 
 ```
-ARCHITECTURE.md → Neo4j (via git hook) → Kublai queries → proposes improvement
+ARCHITECTURE.md → Neo4j (via git hook) → Kublai queries → identifies opportunities
+                                                              ↓
+                                                    Creates ImprovementOpportunity
+                                                              ↓
+                                                    Evolves into ArchitectureProposal
                                                               ↓
                                                          Ögedei vets
                                                               ↓
-                                                         Temüjin implements
+                                                    Temüjin implements
                                                               ↓
-                                                         Validation
+                                                    Validation checks
                                                               ↓
-                                                         Only THEN syncs back to ARCHITECTURE.md
+                                              Only THEN syncs back to ARCHITECTURE.md
 ```
 
 ## Proposal States
 
-| State | Description | Can Transition To |
-|-------|-------------|-------------------|
-| `proposed` | Kublai creates proposal from identified opportunity | `under_review`, `rejected` |
-| `under_review` | Ögedei is vetting the proposal | `approved`, `rejected`, `proposed` |
-| `approved` | Ögedei has approved for implementation | `implemented`, `rejected` |
-| `rejected` | Proposal rejected (terminal state) | - |
-| `implemented` | Temüjin completed implementation | `validated`, `failed` |
-| `validated` | Validation checks passed | `synced` |
-| `synced` | Changes written to ARCHITECTURE.md (terminal state) | - |
+1. **proposed** - Kublai creates proposal from identified opportunity
+2. **under_review** - Ögedei reviewing operational impact
+3. **approved** - Ready for implementation
+4. **rejected** - Not proceeding
+5. **implemented** - Temüjin completed work
+6. **validated** - Validation checks passed
+7. **synced** - Changes written to ARCHITECTURE.md
 
 ## Agent Roles
 
-### Kublai
-- Queries architecture from Neo4j
-- Identifies improvement opportunities
-- Creates proposals
-- Coordinates workflow
+### Kublai (Orchestrator)
+- Queries architecture from Neo4j via `ArchitectureIntrospection`
+- Identifies improvement opportunities via `ProactiveReflection`
+- Creates proposals via `ProposalStateMachine`
+- Coordinates workflow via `DelegationProtocol`
 
 ### Ögedei (Operations)
-- Reviews proposals for operational impact
+- Reviews proposals for operational impact via `OgedeiVetHandler`
 - Assesses deployment risk
-- Provides recommendations
-- Approves or rejects proposals
+- Provides recommendations (approve, reject, approve_with_conditions)
 
 ### Temüjin (Development)
-- Implements approved proposals
-- Tracks progress
-- Completes implementation
-
-### Validation System
-- Runs checks on completed implementations
-- Only validated implementations can sync to ARCHITECTURE.md
+- Implements approved proposals via `TemujinImplHandler`
+- Tracks progress on implementations
+- Completes implementation and triggers validation
 
 ## Key Guardrail
 
@@ -60,248 +63,198 @@ ARCHITECTURE.md → Neo4j (via git hook) → Kublai queries → proposes improve
 Proposals must pass through:
 1. Creation → 2. Ögedei vetting → 3. Approval → 4. Implementation → 5. Validation → 6. Sync
 
-## Module Structure
+## Scheduled Operations
 
+### Weekly Reflection (Sundays at 8 PM ET)
 ```
-src/
-├── kublai/
-│   ├── architecture-introspection.js   # Query ARCHITECTURE.md from Neo4j
-│   ├── proactive-reflection.js         # Analyze and create opportunities
-│   └── scheduled-reflection.js         # Weekly cron trigger
-├── agents/
-│   ├── ogedei/
-│   │   └── vet-handler.js             # Operational vetting logic
-│   └── temujin/
-│       └── impl-handler.js            # Implementation tracking
-└── workflow/
-    ├── proposal-states.js             # State machine for proposals
-    ├── proposal-mapper.js             # Map proposals to ARCHITECTURE.md sections
-    └── validation.js                  # Validation checks
+cron: "0 20 * * 0"
 ```
+Kublai automatically scans architecture for:
+- Missing expected sections (system architecture, API routes, data model, security, deployment)
+- Opportunities for improvement
+- Gaps in documentation
 
-## Usage
+## API Endpoints
 
 ### Trigger Manual Reflection
-
-```javascript
-const { ProactiveReflection } = require('./src/kublai/proactive-reflection');
-const { ArchitectureIntrospection } = require('./src/kublai/architecture-introspection');
-
-const introspection = new ArchitectureIntrospection(neo4jDriver, logger);
-const reflection = new ProactiveReflection(neo4jDriver, introspection, logger);
-
-const result = await reflection.triggerReflection();
-console.log(`Found ${result.opportunitiesFound} opportunities`);
+```bash
+curl -X POST http://localhost:8082/api/reflection/trigger \
+  -H 'Content-Type: application/json' \
+  -d '{}'
 ```
 
 ### Check Pending Proposals
-
-```cypher
-// Via Neo4j directly
-MATCH (p:ArchitectureProposal {status: 'proposed'})
-RETURN p.id, p.title, p.description, p.priority
-ORDER BY p.priority DESC
+```bash
+curl http://localhost:8082/api/proposals?status=proposed
 ```
 
-### Ögedei Vetting
-
-```javascript
-const { OgedeiVetHandler } = require('./src/agents/ogedei/vet-handler');
-
-const ogedei = new OgedeiVetHandler(neo4jDriver, logger);
-
-// Vet a proposal
-const vetting = await ogedei.vetProposal(proposalId);
-
-// Approve after vetting
-await ogedei.approveProposal(proposalId, 'Looks good, low risk');
+### Ögedei Vet a Proposal
+```bash
+curl -X POST http://localhost:8082/api/vet \
+  -H 'Content-Type: application/json' \
+  -d '{"proposalId": "..."}'
 ```
 
-### Temüjin Implementation
-
-```javascript
-const { TemujinImplHandler } = require('./src/agents/temujin/impl-handler');
-
-const temujin = new TemujinImplHandler(neo4jDriver, logger);
-
-// Start implementation
-const impl = await temujin.implementProposal(proposalId);
-
-// Update progress
-await temujin.updateProgress(impl.implementationId, 50, 'Halfway done');
-
-// Complete implementation
-await temujin.completeImplementation(impl.implementationId, 'Implementation complete');
+### Temüjin Implement
+```bash
+curl -X POST http://localhost:8082/api/implement \
+  -H 'Content-Type: application/json' \
+  -d '{"proposalId": "..."}'
 ```
 
-### Validation
+### Check Health Status
+```bash
+curl http://localhost:8082/health
+```
 
-```javascript
-const { ValidationHandler } = require('./src/workflow/validation');
-
-const validator = new ValidationHandler(neo4jDriver, logger);
-
-const result = await validator.validateImplementation(implId);
-
-if (result.passed) {
-  console.log('Implementation validated!');
-} else {
-  console.log('Validation failed:', result.failedChecks);
+Response includes Kublai module status:
+```json
+{
+  "kublai": {
+    "neo4jConnected": true,
+    "reflectionScheduled": true,
+    "modulesLoaded": true,
+    "delegationProtocol": true,
+    "handlers": {
+      "ogedei": true,
+      "temujin": true
+    }
+  }
 }
 ```
 
-### Sync to ARCHITECTURE.md
+## Module Initialization
 
+Kublai modules initialize automatically on startup if Neo4j is configured:
+
+```javascript
+// From src/index.js
+const kublaiInitialized = await initKublaiModules();
+if (kublaiInitialized) {
+  logger.info('Kublai self-awareness modules initialized');
+}
+```
+
+Modules initialized:
+- `ArchitectureIntrospection` - Query ARCHITECTURE.md from Neo4j
+- `ProactiveReflection` - Identify improvement opportunities
+- `ScheduledReflection` - Weekly cron trigger
+- `ProposalStateMachine` - Manage proposal lifecycle
+- `ProposalMapper` - Map proposals to ARCHITECTURE.md sections
+- `ValidationHandler` - Validate implementations
+- `OgedeiVetHandler` - Operations vetting
+- `TemujinImplHandler` - Development implementation
+- `DelegationProtocol` - Wire everything together
+
+## Configuration
+
+### Environment Variables
 ```bash
-# Check which proposals are ready to sync
-node scripts/sync-architecture-to-neo4j.js sync-proposals
+# Required for Kublai modules
+NEO4J_URI=bolt://neo4j.railway.internal:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=<secure_password>
 
-# After manually adding to ARCHITECTURE.md, mark as synced
-node scripts/sync-architecture-to-neo4j.js mark-synced <proposalId> <sectionTitle>
+# Optional: Enable auto-vetting, auto-implementation
+KUBLAI_AUTO_VET=true
+KUBLAI_AUTO_IMPLEMENT=true
+KUBLAI_AUTO_VALIDATE=true
 ```
 
-## Cypher Queries
-
-### Get architecture overview
-
-```cypher
-MATCH (s:ArchitectureSection)
-RETURN s.title, s.order, s.parent_section
-ORDER BY s.order
-```
-
-### Search architecture content
-
-```cypher
-CALL db.index.fulltext.queryNodes('architecture_search_index', 'search term')
-YIELD node, score
-RETURN node.title, node.content, score
-ORDER BY score DESC
-LIMIT 10
-```
-
-### Get pending proposals
-
-```cypher
-MATCH (p:ArchitectureProposal {status: 'proposed'})
-RETURN p.id, p.title, p.description, p.priority
-ORDER BY p.priority DESC, p.proposed_at ASC
-```
-
-### Get proposals ready for Ögedei vetting
-
-```cypher
-MATCH (p:ArchitectureProposal {status: 'proposed'})
-WHERE NOT EXISTS((p)-[:HAS_VETTING]->(:Vetting))
-RETURN p.id, p.title, p.description
-```
-
-### Get proposals ready for Temüjin implementation
-
-```cypher
-MATCH (p:ArchitectureProposal {status: 'approved'})
-WHERE NOT EXISTS((p)-[:IMPLEMENTED_BY]->(:Implementation))
-RETURN p.id, p.title, p.description, p.approved_at
-```
-
-### Get implementations ready for validation
-
-```cypher
-MATCH (i:Implementation {status: 'completed'})
-WHERE NOT EXISTS((:Validation)-[:VALIDATES]->(i))
-MATCH (p:ArchitectureProposal)-[:IMPLEMENTED_BY]->(i)
-RETURN i.id, i.completed_at, p.title
-```
-
-### Get proposals ready to sync (validated but not synced)
-
-```cypher
-MATCH (p:ArchitectureProposal {status: 'validated'})
-WHERE NOT EXISTS((p)-[:SYNCED_TO]->(:ArchitectureSection))
-RETURN p.id, p.title, p.target_section, p.implementation_status
+### Scheduled Reflection Options
+```javascript
+// Weekly reflection with callback for opportunities
+scheduledReflection.start({
+  onOpportunitiesFound: async (opportunities) => {
+    // Trigger delegation protocol for each opportunity
+    for (const opp of opportunities) {
+      await delegationProtocol.processOpportunity(opp);
+    }
+  }
+});
 ```
 
 ## Troubleshooting
 
 ### Proposal not syncing to ARCHITECTURE.md
-
-**Symptom:** `syncValidatedProposalsToArchitectureMd()` doesn't list the proposal.
-
-**Check:**
-1. Status must be `validated`
-2. Implementation status must be `validated`
-3. No `SYNCED_TO` relationship should exist
+- Check status: must be `validated`
+- Check implementation_status: must be `validated`
+- Check for SYNCED_TO relationship in Neo4j
+- Verify `autoSync` is enabled in delegation protocol config
 
 ```cypher
-MATCH (p:ArchitectureProposal {id: '<proposalId>'})
-RETURN p.status, p.implementation_status,
-       EXISTS((p)-[:SYNCED_TO]->(:ArchitectureSection)) as isSynced
+// Query proposal status
+MATCH (p:ArchitectureProposal {id: $proposalId})
+RETURN p.status, p.implementation_status, p.synced_to_architecture
 ```
 
 ### Reflection not finding opportunities
-
-**Symptom:** `triggerReflection()` returns 0 opportunities.
-
-**Check:**
-1. ARCHITECTURE.md is synced to Neo4j (run sync script)
-2. Full-text search index exists
-
+- Verify ARCHITECTURE.md is synced to Neo4j:
+```bash
+curl -X POST http://localhost:8082/api/architecture/sync
+```
+- Check full-text search index exists:
 ```cypher
 CALL db.indexes() YIELD name, type
-WHERE name = 'architecture_search_index' AND type = 'FULLTEXT'
-RETURN count(*) > 0 as exists
+WHERE name CONTAINS 'architecture'
+RETURN name, type
+```
+- Review section titles in ArchitectureSection nodes:
+```cypher
+MATCH (s:ArchitectureSection)
+RETURN s.title, s.order
+ORDER BY s.order
 ```
 
-### Ögedei vetting not working
+### Neo4j connection failing
+- Check environment variables are set
+- Verify Neo4j service is healthy
+- Check network connectivity from moltbot to Neo4j
 
-**Symptom:** Vetting returns error or recommendation is unexpected.
+### Scheduled reflection not running
+- Check railway.yml schedules are deployed
+- Verify `scheduledReflection.start()` was called in logs
+- Check timezone configuration (America/New_York)
 
-**Check:**
-1. Proposal status is `proposed`
-2. No existing vetting for this proposal
+## Monitoring
 
-```cypher
-MATCH (p:ArchitectureProposal {id: '<proposalId>'})
-RETURN p.status,
-       EXISTS((p)-[:HAS_VETTING]->(:Vetting)) as hasVetting
+### Key Metrics
+- `kublai_reflection_opportunities_found` - Opportunities identified per reflection
+- `kublai_proposals_created` - Total proposals created
+- `kublai_proposals_by_status` - Count by status
+- `kublai_vetting_duration_ms` - Time for Ögedei vetting
+- `kublai_implementation_duration_ms` - Time for Temüjin implementation
+
+### Log Patterns
 ```
-
-### Validation failing unexpectedly
-
-**Symptom:** Implementation is complete but validation fails.
-
-**Check:**
-1. Implementation status is `completed`
-2. Progress is at 100%
-3. Summary is provided
-
-```cypher
-MATCH (i:Implementation {id: '<implId>'})
-RETURN i.status, i.progress, i.summary
+[Kublai] Running weekly architecture reflection...
+[Kublai] Reflection complete: { sectionsKnown: 12, opportunitiesFound: 2 }
+[Proposal] Created: <uuid> - Missing section: security
+[Ögedei] Vetting proposal: <uuid>
+[Ögedei] Vetting complete: approve
+[Temüjin] Implementation started: <uuid>
+[Validation] Result: PASSED
 ```
 
 ## Migration
 
-Run the proposal system migration:
+To apply the proposal schema migration:
 
 ```bash
-# Via Neo4j browser or cypher-shell
-# Load scripts/migrations/003_proposals.cypher
+# Via cypher-shell
+cypher-shell -u neo4j -p <password> < scripts/migrations/003_proposals.cypher
+
+# Or via Neo4j Browser
+# Copy contents of scripts/migrations/003_proposals.cypher and execute
 ```
 
-This creates:
-- Constraints for all proposal-related nodes
-- Indexes for querying by status and priority
-- Relationship patterns for the workflow
+Migration creates:
+- Unique constraints on proposal/opportunity IDs
+- Indexes for status queries
+- Full-text search index for proposals
 
-## API Endpoints (Future)
+## Related Documentation
 
-These endpoints could be added to moltbot for HTTP access:
-
-- `GET /api/proposals` - List proposals by status
-- `POST /api/proposals` - Create new proposal
-- `POST /api/vet/:proposalId` - Trigger Ögedei vetting
-- `POST /api/implement/:proposalId` - Start implementation
-- `POST /api/validate/:implId` - Run validation
-- `POST /api/sync/:proposalId` - Sync to ARCHITECTURE.md (manual)
-- `GET /api/reflection` - Trigger proactive reflection
+- [Kublai Self-Understanding Plan](../../docs/plans/2026-02-07-kublai-self-understanding.md)
+- [Kublai Proactive Self-Awareness Plan](../../docs/plans/2026-02-07-kublai-proactive-self-awareness.md)
+- [Architecture Sync Script](../../tools/kurultai/store_architecture_in_neo4j.py)

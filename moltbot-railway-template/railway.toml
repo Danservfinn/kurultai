@@ -8,7 +8,7 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["Dockerfile", "entrypoint.sh", "src/**", "routes/**", "middleware/**", "config/**", "package*.json"]
 
 [build.args]
-CACHE_BUST = "2026-02-08-v19-UNIFIED-HEARTBEAT"
+CACHE_BUST = "2026-02-08-v20-CRON-SCHEDULES"
 
 [deploy]
 # Health check - OpenClaw gateway health endpoint
@@ -29,6 +29,26 @@ sleepApplication = false
 name = "kurultai-heartbeat"
 schedule = "*/5 * * * *"  # Every 5 minutes
 command = "cd /app && python tools/kurultai/heartbeat_master.py --cycle"
+
+[[deploy.crons]]
+name = "jochi-smoke-tests"
+schedule = "*/15 * * * *"  # Every 15 minutes
+command = "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase fixtures --phase integration --dry-run"
+
+[[deploy.crons]]
+name = "jochi-hourly-tests"
+schedule = "0 * * * *"  # Every hour
+command = "cd /app && python tools/kurultai/test_runner_orchestrator.py --dry-run"
+
+[[deploy.crons]]
+name = "jochi-nightly-tests"
+schedule = "0 2 * * *"  # 2 AM daily
+command = "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase all --dry-run"
+
+[[deploy.crons]]
+name = "kublai-weekly-reflection"
+schedule = "0 20 * * 0"  # Sundays at 8 PM ET
+command = "cd /app && curl -X POST http://localhost:8082/api/reflection/trigger -H 'Content-Type: application/json' -d '{}' || echo 'Reflection trigger endpoint not available'"
 
 [deploy.env]
 # Signal Configuration

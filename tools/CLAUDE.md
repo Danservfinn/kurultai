@@ -11,9 +11,6 @@
 | #30131 | 5:06 PM | 🔵 | Kurultai v0.2 Deployment Plan Validation Complete - 30 Gaps Identified | ~1240 |
 | #30083 | 4:43 PM | 🔵 | FileConsistencyChecker Class and Methods in file_consistency.py | ~814 |
 | #29737 | 1:33 PM | 🔵 | tools/__init__.py exports 10 modules with lazy import pattern to avoid numpy recursion | ~434 |
-| #29730 | 1:32 PM | 🔵 | memory_tools.py defines wrapper functions for OperationalMemory access | ~342 |
-| #29700 | 1:20 PM | 🔵 | Notion Sync Module Uses AsyncGraphDatabase Creating Architectural Inconsistency | ~432 |
-| #29691 | 1:18 PM | 🔵 | Notion Sync Module Uses AsyncGraphDatabase While OperationalMemory Uses Synchronous Driver | ~411 |
 
 ### Feb 7, 2026
 
@@ -32,4 +29,12 @@
 | #30938 | 1:23 AM | 🔵 | Connection Pool Configuration Implementation Verified Across Codebase | ~709 |
 | #30936 | " | 🔵 | Architecture Review Expert Task Completed: 9 Critical Issues Identified in Kurultai v0.2 | ~898 |
 | #30933 | " | 🔵 | Notion Integration with Async HTTP Client and Reconciliation Engine | ~651 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33038 | 4:03 AM | 🔵 | Existing Notion Sync Infrastructure Found | ~400 |
+| #33012 | 3:23 AM | 🔵 | Meta Learning Engine - Rule Generation from Reflections - First 200 Lines | ~658 |
+| #33011 | " | 🔵 | Chagatai Background Synthesis Task Manager - First 200 Lines | ~591 |
 </claude-mem-context>

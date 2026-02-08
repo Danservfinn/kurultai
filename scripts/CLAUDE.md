@@ -10,16 +10,12 @@
 | #30641 | 10:12 PM | ✅ | Created Wipe and Rebuild Script for Fresh Deployments | ~416 |
 | #30640 | " | ✅ | Created Phase 7 Test Suite Runner Script | ~453 |
 | #30639 | " | 🟣 | Agent Key Generation Script Created | ~513 |
-| #30353 | 6:15 PM | 🟣 | model_switcher.py installed to molt/scripts directory for post-Kurultai installation | ~448 |
-| #29902 | 3:18 PM | 🔵 | Backend Domain Review Identifies 12 Critical Implementation Gaps in kurultai_0.2.md | ~1279 |
 
 ### Feb 7, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #32221 | 3:00 PM | 🟣 | Architecture-to-Neo4j Sync Script Implemented | ~441 |
-| #32203 | 2:58 PM | 🔄 | Architecture Sync Script Refactored for Modular Use | ~358 |
-| #32201 | " | 🟣 | Architecture Documentation Sync Script to Neo4j Created | ~552 |
+| #32829 | 7:01 PM | 🔵 | Neo4j Cypher Migration Runner Script | ~675 |
 | #31271 | 10:48 AM | 🟣 | Comprehensive verification and rollback script for custom domain migration | ~479 |
 | #31267 | 10:47 AM | 🟣 | Custom Domain Verification and Rollback Script Created | ~599 |
 | #31265 | " | 🔵 | Authentik Custom Domain Configuration Script Reviewed | ~516 |
@@ -32,4 +28,13 @@
 | #30950 | 1:24 AM | 🔵 | Security Audit Identifies 13 Critical and High-Severity Issues in Kurultai v0.2 | ~963 |
 | #30938 | 1:23 AM | 🔵 | Connection Pool Configuration Implementation Verified Across Codebase | ~709 |
 | #30927 | 1:22 AM | 🔵 | Agent Key Generation Script for HMAC-SHA256 Authentication | ~530 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33336 | 3:21 PM | ✅ | Migration 003 Verification Script Created for Production Deployment | ~336 |
+| #33189 | 2:30 PM | 🟣 | Created Railway-based architecture sync script | ~314 |
+| #33186 | 2:29 PM | 🟣 | Created railway-sync-architecture.js script | ~478 |
+| #33171 | 2:26 PM | 🔵 | Found Node.js script for syncing ARCHITECTURE.md sections to Neo4j | ~400 |
 </claude-mem-context>

@@ -8,9 +8,11 @@
 const { ArchitectureIntrospection } = require('./architecture-introspection');
 const { ProactiveReflection } = require('./proactive-reflection');
 const { ScheduledReflection } = require('./scheduled-reflection');
+const { DelegationProtocol } = require('./delegation-protocol');
 
 module.exports = {
   ArchitectureIntrospection,
   ProactiveReflection,
-  ScheduledReflection
+  ScheduledReflection,
+  DelegationProtocol
 };

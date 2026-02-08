@@ -15,7 +15,7 @@ updated_at: 2026-02-08
 
 # Kurultai Unified Architecture
 
-**Version**: 3.0
+**Version**: 3.1
 **Last Updated**: 2026-02-08
 **Status**: Production Architecture (Unified Heartbeat v0.3)
 
@@ -734,12 +734,24 @@ python tools/kurultai/heartbeat_master.py --cycle --json
 
 ### Railway Cron Configuration
 
-```toml
-# railway.toml
-[[deploy.crons]]
-name = "kurultai-heartbeat"
-schedule = "*/5 * * * *"  # Every 5 minutes
-command = "cd /app && python tools/kurultai/heartbeat_master.py --cycle"
+```yaml
+# railway.yml - moltbot service schedules
+schedules:
+  - name: kurultai-heartbeat
+    cron: "*/5 * * * *"  # Every 5 minutes
+    command: "cd /app && python tools/kurultai/heartbeat_master.py --cycle"
+  - name: jochi-smoke-tests
+    cron: "*/15 * * * *"  # Every 15 minutes
+    command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase fixtures --phase integration --dry-run"
+  - name: jochi-hourly-tests
+    cron: "0 * * * *"  # Every hour
+    command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --dry-run"
+  - name: jochi-nightly-tests
+    cron: "0 2 * * *"  # 2 AM daily
+    command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase all --dry-run"
+  - name: kublai-weekly-reflection
+    cron: "0 20 * * 0"  # Sundays at 8 PM ET
+    command: "cd /app && curl -X POST http://localhost:8082/api/reflection/trigger -H 'Content-Type: application/json' -d '{}' || echo 'Reflection trigger endpoint not available'"
 ```
 
 ---
@@ -1064,9 +1076,36 @@ PROPOSED → UNDER_REVIEW → APPROVED → IMPLEMENTED → VALIDATED → SYNCED
 - [OpenClaw Gateway Architecture](.claude/memory_anchors/openclaw-gateway-architecture.md) - WebSocket messaging layer
 - [Delegation Protocol](.claude/patterns/delegation-protocol.md) - Task routing and agent selection
 - [Golden Horde Consensus: Heartbeat Background Tasks](.claude/memory_anchors/golden-horde-consensus-heartbeat-tasks.md) - Design deliberation process
+- [Kublai Self-Awareness Operations Guide](docs/operations/kublai-self-awareness.md) - Operational procedures and troubleshooting
+
+### Neo4j Migrations
+
+Migration scripts are located in `moltbot-railway-template/scripts/migrations/`:
+
+| Migration | Description | Constraints/Indexes |
+|-----------|-------------|---------------------|
+| `003_proposals.cypher` | Proposal system schema for Kublai self-awareness | `ArchitectureProposal.id`, `ImprovementOpportunity.id`, `ImprovementProposal.id` unique constraints; status and proposer indexes |
+
+**Running Migrations:**
+```bash
+# Via Express API (recommended)
+curl -X POST http://localhost:8082/api/migrate-proposals
+
+# Via Neo4j Browser
+# Copy/paste migration content from 003_proposals.cypher
+```
 
 ---
 
-**Document Status**: v3.0 Unified Architecture
+**Document Status**: v3.1 - Plan Implementation Complete
 **Last Updated**: 2026-02-08
 **Maintainer**: Kurultai System Architecture
+
+### Changelog
+
+**v3.1** (2026-02-08):
+- Added Jochi test automation cron schedules (smoke, hourly, nightly)
+- Added Kublai weekly reflection cron schedule
+- Documented Neo4j migration 003 (proposal system schema)
+- Added operations documentation reference
+- All plans from `/docs/plans/` now fully implemented

@@ -22,6 +22,8 @@
 | #32797 | 6:22 PM | ✅ | Knowledge Base Manifest Updated with OSA AI Detection Patterns | ~380 |
 | #32796 | " | ✅ | Knowledge Base Manifest Updated with OSA Pattern Documents | ~444 |
 | #32351 | 3:23 PM | 🔵 | OpenClaw Architecture and Documentation Landscape - Comprehensive System Integration | ~565 |
+| #32128 | 2:37 PM | ✅ | Project Instructions (CLAUDE.md) Updated with Neo4j Architecture and Agent System | ~527 |
+| #32127 | " | ✅ | Project Instructions Updated with Neo4j-First Memory Principles and Memory Tiering Strategy | ~631 |
 </claude-mem-context>
 
 # Kurultai Project Instructions
@@ -206,3 +208,35 @@ See `.claude/metadata/two-tier-heartbeat-system.md` for complete specification.
 - **Railway Deployment**: Containerized service deployment
 - **Caddy Reverse Proxy**: SSL termination and routing (external :9000 → internal :18789)
 - **Neo4j**: Graph database for operational memory
+
+## Golden-Horde Consensus Deliberation: Heartbeat Background Tasks
+
+### Team: consensus-heartbeat-tasks
+**Pattern:** Consensus Deliberation (Pattern 5)
+**Created:** 2026-02-08
+
+**Goal:** Define specific background tasks for each of the 6 Kurultai agents (Kublai, Möngke, Chagatai, Temüjin, Jochi, Ögedei) that run on heartbeat, including:
+- What task each agent performs
+- Heartbeat interval (5min, 15min, 30min, or 60min)
+- Estimated token cost per heartbeat
+- Value generated
+
+**Agents:**
+1. **backend-architect** (subagent_type: backend-development:backend-architect)
+   - Role: Design technical architecture for heartbeat-triggered background tasks
+   - Task ID: #5
+
+2. **ops-specialist** (subagent_type: senior-devops)
+   - Role: Operations perspective on monitoring, health checks, system reliability
+   - Task ID: #6
+
+3. **cost-analyst** (subagent_type: general-purpose with cost-analyst judgment role)
+   - Role: Evaluate token cost and ROI of each proposed task
+   - Task ID: #7
+
+**Phases:**
+- Phase 1: Independent Analysis (blind contribution - agents submit to orchestrator only)
+- Phase 2: Challenge (agents challenge each other's proposals)
+- Phase 3: Convergence (agreed implementation plan)
+
+**Status:** Agents spawned, awaiting Phase 1 submissions

@@ -9,19 +9,11 @@
 |----|------|---|-------|------|
 | #30630 | 10:04 PM | 🔵 | Ogedei File Consistency Monitor Implementation | ~660 |
 | #30628 | " | 🔵 | Task Dependency Engine Topological Executor Implementation | ~592 |
-| #30563 | 8:49 PM | 🟣 | Implemented Neo4j-Backed Capability Registry for CBAC | ~434 |
-| #30564 | " | 🟣 | Implemented 6-Phase Capability Learning Pipeline | ~557 |
-| #30565 | " | ⚖️ | Capability System Built on Standard Library Only | ~301 |
-| #30485 | 6:42 PM | 🔵 | DependencyAnalyzer: Semantic Similarity Detection with Deliverable Type Heuristics | ~513 |
-| #30480 | " | 🔵 | IntentWindowBuffer: 45-Second Message Collection with Async-Safe Buffering | ~1232 |
 
 ### Feb 7, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #31376 | 11:28 AM | ✅ | Jochi Test Schedule Configuration with Multi-Frequency Automation | ~922 |
-| #31375 | 11:27 AM | 🟣 | Jochi Automated Test Runner & Orchestrator Implementation | ~994 |
-| #31335 | 11:20 AM | 🔵 | Python Source Code Architecture Overview | ~658 |
 | #31137 | 10:33 AM | 🔵 | Heartbeat System Implementation in Kurultai Codebase | ~1130 |
 | #30995 | 1:36 AM | 🔵 | Capability-Based Access Control (CBAC) Registry Implementation | ~561 |
 | #30991 | " | 🔵 | Dependency Analyzer Module with Semantic Similarity Detection | ~559 |
@@ -32,4 +24,17 @@
 | #30953 | 1:24 AM | 🔵 | Backend & API Design Review: 16 Critical Issues Identified | ~1194 |
 | #30950 | " | 🔵 | Security Audit Identifies 13 Critical and High-Severity Issues in Kurultai v0.2 | ~963 |
 | #30925 | 1:22 AM | 🔵 | Sandbox Executor for Untrusted Code Execution | ~649 |
+
+### Feb 8, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33270 | 3:10 PM | 🔵 | Jochi Test Orchestrator Fully Implemented with 1190 Lines | ~354 |
+| #33117 | 2:17 PM | 🔵 | Read .env.example configuration file | ~441 |
+| #33113 | 2:11 PM | 🔵 | Completed comprehensive comparison of molt ARCHITECTURE.md vs Neo4j storage | ~506 |
+| #33110 | 2:10 PM | 🔵 | Found store_architecture_in_neo4j.py script | ~323 |
+| #33019 | 3:24 AM | 🔵 | Ögedei File Monitor - Scanning and Escalation Logic - Lines 100-300 | ~704 |
+| #33018 | " | 🔵 | Ögedei File Monitor - Continuous Workspace Consistency Monitoring - First 100 Lines | ~548 |
+| #33010 | 3:23 AM | 🔵 | Jochi Test Runner Orchestrator - First 300 Lines | ~364 |
+| #33002 | 3:22 AM | 🔵 | Jochi Test Automation Schedule Configuration | ~372 |
 </claude-mem-context>
