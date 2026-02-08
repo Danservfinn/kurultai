@@ -1,6 +1,9 @@
 # Moltbot Railway Template - OpenClaw Gateway with embedded Signal
 # Replaces Express gateway with full OpenClaw gateway including built-in webchat UI
-# CACHE_BUST: 2026-02-08-v10 - Fix user ID and force fresh build
+# CACHE_BUST: 2026-02-08-v11 - Force fresh build, cache bust at top
+
+# Cache-bust arg - MUST be at top to invalidate layers below
+ARG CACHE_BUST=2026-02-08-v19-UNIFIED-HEARTBEAT
 
 FROM node:22-bookworm-slim
 
@@ -94,6 +97,10 @@ COPY --chown=1001:1001 openclaw.json /app/openclaw.json
 COPY --chown=1001:1001 entrypoint.sh /app/entrypoint.sh
 COPY --chown=1001:1001 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
 COPY --chown=1001:1001 souls /app/souls
+
+# Copy Kurultai heartbeat system tools
+COPY --chown=1001:1001 tools/kurultai /app/tools/kurultai
+
 RUN chmod +x /app/entrypoint.sh /app/signal-cli-wrapper.sh
 
 # =============================================================================
@@ -139,5 +146,4 @@ CMD ["sh", "/app/entrypoint.sh"]
 # Build timestamp: Sat Feb  7 23:00:00 EST 2026
 # Cache-bust: v3 - Force rebuild with Express server files
 
-# Cache-bust arg - change this to force a full rebuild
-ARG CACHE_BUST=2026-02-08-v10
+# Build complete

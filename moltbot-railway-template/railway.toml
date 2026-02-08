@@ -8,7 +8,7 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["Dockerfile", "entrypoint.sh", "src/**", "routes/**", "middleware/**", "config/**", "package*.json"]
 
 [build.args]
-CACHE_BUST = "2026-02-07-v5"
+CACHE_BUST = "2026-02-08-v19-UNIFIED-HEARTBEAT"
 
 [deploy]
 # Health check - OpenClaw gateway health endpoint
@@ -23,6 +23,12 @@ numReplicas = 1
 
 # Keep running
 sleepApplication = false
+
+# Cron schedules for background tasks
+[[deploy.crons]]
+name = "kurultai-heartbeat"
+schedule = "*/5 * * * *"  # Every 5 minutes
+command = "cd /app && python tools/kurultai/heartbeat_master.py --cycle"
 
 [deploy.env]
 # Signal Configuration

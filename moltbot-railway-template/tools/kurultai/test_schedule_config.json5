@@ -1,0 +1,195 @@
+/**
+ * Jochi's Automated Testing Schedule
+ *
+ * This config defines when Jochi should run the automated test suite
+ * and what actions to take based on results.
+ *
+ * Integration Options:
+ * 1. Railway Cron: Add to railway.yml under the moltbot service
+ * 2. Systemd Timer: Copy to /etc/systemd/system/jochi-test.timer
+ * 3. GitHub Actions: Schedule in .github/workflows/jochi-tests.yml
+ * 4. Cron: Copy to crontab -e
+ */
+
+{
+  // Schedule configuration for different test frequencies
+  schedules: {
+    // Quick smoke tests - run every 15 minutes
+    smoke: {
+      enabled: true,
+      interval: "*/15 * * * *",  // Cron expression
+      phases: ["fixtures", "integration"],  // Fast tests only
+      on_failure: "alert",  // Options: alert, block, ignore
+      max_duration_seconds: 300
+    },
+
+    // Full test suite - run every hour
+    hourly: {
+      enabled: true,
+      interval: "0 * * * *",
+      phases: ["all"],
+      on_failure: "alert",
+      max_duration_seconds: 1800,
+      skip_if_recent_success: true,  // Skip if last run was successful < 30min ago
+      skip_if_recent_success_within: 1800
+    },
+
+    // Comprehensive nightly - run at 2 AM daily
+    nightly: {
+      enabled: true,
+      interval: "0 2 * * *",
+      phases: ["all"],
+      on_failure: "create_tickets",
+      max_duration_seconds: 3600,
+      include_benchmarks: true,
+      include_chaos: true,
+      generate_report: true,
+      report_recipients: ["ops@example.com"]
+    },
+
+    // Pre-deployment validation - run before deployments
+    pre_deploy: {
+      enabled: false,  // Triggered manually or by CI/CD
+      interval: "manual",
+      phases: ["fixtures", "integration", "concurrent"],
+      on_failure: "block",
+      max_duration_seconds: 600,
+      require_pass_rate: 100  // Block if ANY test fails
+    },
+
+    // Weekly performance regression check
+    weekly_performance: {
+      enabled: true,
+      interval: "0 0 * * 0",  // Sunday midnight
+      phases: ["performance"],
+      on_failure: "alert",
+      max_duration_seconds: 600,
+      compare_to_baseline: true,
+      regression_threshold_percent: 10  // Alert if >10% slower
+    }
+  },
+
+  // Action configuration for Jochi's test results
+  actions: {
+    // Alert settings
+    alert: {
+      channels: {
+        signal: {
+          enabled: true,
+          phone_number: "${SIGNAL_ALERT_NUMBER}",  // From env var
+          severity_threshold: "high"  // Only alert high+ severity
+        },
+        slack: {
+          enabled: false,  // Set to true and configure webhook
+          webhook_url: "${SLACK_WEBHOOK_URL}",
+          channel: "#alerts"
+        },
+        email: {
+          enabled: false,
+          to: ["ops@example.com"],
+          subject: "Jochi Test Alert: ${EXECUTION_ID}"
+        }
+      },
+      // Rate limiting to prevent alert fatigue
+      rate_limit: {
+        max_alerts_per_hour: 5,
+        cooldown_minutes: 15,  // Wait 15min between similar alerts
+        similar_alert_threshold: 0.8  // 80% similarity = same alert
+      }
+    },
+
+    // Automatic remediation settings
+    auto_remediate: {
+      enabled: true,
+      max_fixes_per_run: 3,
+      dry_run: false,  // Set to true for testing
+      allowed_actions: [
+        "fix_threshold_constants",
+        "restart_services",
+        "clear_caches",
+        "create_tickets"
+      ],
+      prohibited_actions: [
+        "delete_data",
+        "modify_production_config"
+      ]
+    },
+
+    // Ticket creation settings
+    create_tickets: {
+      enabled: true,
+      ticket_system: "file",  // Options: file, jira, github, linear
+      output_dir: "${PROJECT_ROOT}/data/workspace/tickets",
+      severity_mapping: {
+        "critical": "highest",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      auto_assign: {
+        security: "temujin",     // Security issues to Temüjin
+        performance: "jochi",     // Performance issues to Jochi
+        infrastructure: "ogedei", // Ops issues to Ögedei
+        correctness: "kublai"     # Code bugs to Kublai
+      }
+    },
+
+    // Report generation settings
+    report: {
+      enabled: true,
+      formats: ["json", "txt", "html"],
+      output_dir: "${PROJECT_ROOT}/data/test_results",
+      retain_days: 30,  // Keep reports for 30 days
+      include_plots: true,
+      plots: [
+        "pass_rate_trend",
+        "duration_trend",
+        "failure_distribution",
+        "severity_breakdown"
+      ]
+    }
+  },
+
+  // Thresholds for test evaluation
+  thresholds: {
+    pass_rate: {
+      critical: 50,   // Below 50% = critical
+      high: 80,       // Below 80% = high
+      warning: 95     // Below 95% = warning
+    },
+    duration: {
+      unit_test_p95_max: 0.5,     // Unit tests should be < 500ms
+      integration_test_p95_max: 5.0,  // Integration tests < 5s
+      e2e_test_p95_max: 60.0       // E2E tests < 60s
+    },
+    coverage: {
+      minimum_line_coverage: 80,
+      minimum_branch_coverage: 70
+    },
+    regression: {
+      performance_increase_percent: 10,  // Alert if 10% slower
+      memory_increase_mb: 50
+    }
+  },
+
+  // Integration with Jochi agent
+  jochi_integration: {
+    // When Jochi analyzes results, these paths guide deeper investigation
+    analysis_paths: {
+      security: ["tools/kurultai/security/", "src/protocols/security_audit.py"],
+      performance: ["tools/monitoring.py", "tools/kurultai/complexity_validation.py"],
+      infrastructure: ["openclaw_memory.py", "tools/failover_monitor.py"],
+      delegation: ["src/protocols/delegation.py"]
+    },
+
+    // Jochi can spawn specialized sub-agents for detailed analysis
+    sub_agent_analysis: {
+      critical_failures: true,  // Spawn agents for critical findings
+      pattern_matching: true,   // Detect patterns across multiple failures
+      root_cause_analysis: true  // Attempt to identify root causes
+    },
+
+    // Jochi's recommendations get stored here
+    recommendations_output: "${PROJECT_ROOT}/data/jochi/recommendations/"
+  }
+}
