@@ -2,11 +2,13 @@
 title: Kurultai Unified Heartbeat System
 type: heartbeat-spec
 link: kurultai-unified-heartbeat
-tags: [heartbeat, unified-heartbeat, background-tasks, multi-agent, kurultai]
+tags: [heartbeat, unified-heartbeat, background-tasks, multi-agent, kurultai, mvs, self-awareness]
 ontological_relations:
   - relates_to: [[kurultai-architecture]]
   - relates_to: [[two-tier-heartbeat-system]]
   - relates_to: [[golden-horde-consensus-heartbeat-tasks]]
+  - relates_to: [[kublai-self-awareness]]
+  - relates_to: [[jochi-memory-curation]]
 uuid: AUTO_GENERATED
 created_at: AUTO_GENERATED
 updated_at: 2026-02-08
@@ -14,7 +16,7 @@ updated_at: 2026-02-08
 
 # Kurultai Unified Heartbeat System
 
-**Version**: 0.3
+**Version**: 0.4
 **Last Updated**: 2026-02-08
 **Status**: Production
 **Cycle Interval**: 5 minutes
@@ -23,18 +25,20 @@ updated_at: 2026-02-08
 
 ## Executive Summary
 
-The Unified Heartbeat is a consolidated background task scheduler that drives all agent operations in the Kurultai multi-agent system. It replaces fragmented scheduling with a single 5-minute heartbeat cycle coordinating all 6 agents and their 12 distinct background tasks.
+The Unified Heartbeat is a consolidated background task scheduler that drives all agent operations in the Kurultai multi-agent system. It replaces fragmented scheduling with a single 5-minute heartbeat cycle coordinating all 6 agents and their 14 distinct background tasks, integrated with Memory Value Scoring (MVS) for intelligent data retention.
 
 ### Key Benefits
 
 | Benefit | Description |
 |---------|-------------|
 | **Single Scheduler** | One 5-minute cycle drives all background tasks, eliminating race conditions |
+| **Two-Tier Health** | Infrastructure + functional heartbeats enable precise failure detection |
+| **MVS Integration** | Memory Value Scoring ensures high-value data is preserved |
 | **Clear Responsibilities** | Each agent has defined tasks with explicit frequency and token budgets |
-| **Token Budgeting** | System-wide token allocation prevents runaway costs (~8,250 tokens/cycle peak) |
+| **Token Budgeting** | System-wide token allocation prevents runaway costs (~8,650 tokens/cycle peak) |
 | **Centralized Logging** | All task results logged to Neo4j with `HeartbeatCycle` and `TaskResult` nodes |
+| **Self-Awareness** | Kublai reflects weekly on architecture, proposes improvements via workflow |
 | **Failure Handling** | Automatic ticket creation for critical test failures |
-| **Simplified Curation** | 4 operations instead of 15, with clear safety rules |
 
 ---
 
@@ -56,26 +60,44 @@ The heartbeat system uses a **two-tier model** that distinguishes between infras
 - **Failover decisions** use worst-case of both signals
 - **No false positives** from agents that are "up" but stuck
 
+### Sidecar Implementation
+
+**Location**: `scripts/heartbeat_writer.py`
+
+```python
+# Runs as background process, writes infra_heartbeat every 30s
+async def write_infra_heartbeats(driver):
+    """Batch update all 6 agents with single UNWIND query."""
+    await session.run("""
+        UNWIND $agents as agent_id
+        MATCH (a:Agent {id: agent_id})
+        SET a.infra_heartbeat = datetime()
+    """, agents=["main", "researcher", "writer", "developer", "analyst", "ops"])
+```
+
 ---
 
 ## Agent Background Task Registry
 
 ### Complete Task Listing
 
-| Agent | Task Name | Frequency | Token Budget | Description |
-|-------|-----------|-----------|--------------|-------------|
-| **Ögedei** | health_check | 5 min | 150 | Check Neo4j, agent heartbeats, disk space |
-| **Ögedei** | file_consistency | 15 min | 200 | Verify file consistency across agent workspaces |
-| **Jochi** | memory_curation_rapid | 5 min | 300 | Enforce token budgets, clean notifications |
-| **Jochi** | smoke_tests | 15 min | 800 | Run quick smoke tests via test runner |
-| **Jochi** | full_tests | 60 min | 1500 | Run full test suite with remediation |
-| **Jochi** | deep_curation | 6 hours | 2000 | Clean orphans, archive old data |
-| **Chagatai** | reflection_consolidation | 30 min | 500 | Consolidate reflections when system idle |
-| **Möngke** | knowledge_gap_analysis | 24 hours | 600 | Identify sparse knowledge areas |
-| **Möngke** | ordo_sacer_research | 24 hours | 1200 | Research esoteric concepts for Ordo Sacer Astaci |
-| **Möngke** | ecosystem_intelligence | 7 days | 2000 | Track OpenClaw/Clawdbot/Moltbot ecosystem |
-| **Kublai** | status_synthesis | 5 min | 200 | Synthesize agent status, escalate critical issues |
-| **System** | notion_sync | 60 min | 800 | Bidirectional Notion↔Neo4j task sync |
+| Agent | Task Name | Frequency | Token Budget | MVS Impact | Description |
+|-------|-----------|-----------|--------------|------------|-------------|
+| **Ögedei** | health_check | 5 min | 150 | — | Check Neo4j, agent heartbeats, disk space |
+| **Ögedei** | file_consistency | 15 min | 200 | — | Verify file consistency across agent workspaces |
+| **Jochi** | memory_curation_rapid | 5 min | 300 | Prunes low-MVS | Enforce token budgets, clean notifications |
+| **Jochi** | mvs_scoring_pass | 15 min | 400 | Updates MVS | Recalculate Memory Value Scores |
+| **Jochi** | smoke_tests | 15 min | 800 | — | Run quick smoke tests via test runner |
+| **Jochi** | full_tests | 60 min | 1500 | — | Run full test suite with remediation |
+| **Jochi** | vector_dedup | 6 hours | 800 | Merges duplicates | Near-duplicate detection via embeddings |
+| **Jochi** | deep_curation | 6 hours | 2000 | Archives cold | Delete orphans, purge tombstones, archive COLD |
+| **Chagatai** | reflection_consolidation | 30 min | 500 | Creates Synthesis | Consolidate reflections when system idle |
+| **Möngke** | knowledge_gap_analysis | 24 hours | 600 | Identifies gaps | Identify sparse knowledge areas |
+| **Möngke** | ordo_sacer_research | 24 hours | 1200 | Creates Research | Research esoteric concepts for Ordo Sacer Astaci |
+| **Möngke** | ecosystem_intelligence | 7 days | 2000 | Tracks trends | Track OpenClaw/Clawdbot/Moltbot ecosystem |
+| **Kublai** | status_synthesis | 5 min | 200 | — | Synthesize agent status, escalate critical issues |
+| **Kublai** | weekly_reflection | 7 days | 1500 | Creates Proposals | Proactive architecture analysis |
+| **System** | notion_sync | 60 min | 800 | — | Bidirectional Notion↔Neo4j task sync |
 
 ### Task Distribution by Frequency
 
@@ -85,9 +107,10 @@ Every 5 minutes (3 tasks, 650 tokens):
   - Jochi: memory_curation_rapid (300)
   - Kublai: status_synthesis (200)
 
-Every 15 minutes (2 tasks, 1000 tokens):
+Every 15 minutes (3 tasks, 1400 tokens):
   - Ögedei: file_consistency (200)
   - Jochi: smoke_tests (800)
+  - Jochi: mvs_scoring_pass (400)
 
 Every 30 minutes (1 task, 500 tokens):
   - Chagatai: reflection_consolidation (500)
@@ -96,21 +119,68 @@ Every 60 minutes (2 tasks, 2300 tokens):
   - Jochi: full_tests (1500)
   - System: notion_sync (800)
 
-Every 6 hours (1 task, 2000 tokens):
+Every 6 hours (2 tasks, 2800 tokens):
+  - Jochi: vector_dedup (800)
   - Jochi: deep_curation (2000)
 
 Every 24 hours (2 tasks, 1800 tokens):
   - Möngke: knowledge_gap_analysis (600)
   - Möngke: ordo_sacer_research (1200)
 
-Every 7 days (1 task, 2000 tokens):
+Every 7 days (2 tasks, 3500 tokens):
   - Möngke: ecosystem_intelligence (2000)
+  - Kublai: weekly_reflection (1500)
 ```
 
 ### Peak Token Usage
 
-**Peak per cycle:** ~8,250 tokens (once daily at 24-hour alignment)
-**Average per cycle:** ~1,500 tokens
+**Peak per cycle:** ~8,650 tokens (once daily at 24-hour alignment)
+**Average per cycle:** ~1,650 tokens
+
+---
+
+## Memory Value Score (MVS) Integration
+
+### MVS Formula
+
+```
+MVS = (
+    type_weight                           # 0.5 - 10.0
+    + recency_bonus                       # 0.0 - 3.0 (exponential decay)
+    + frequency_bonus                     # 0.0 - 2.0 (log-scaled access rate)
+    + quality_bonus                       # 0.0 - 2.0 (confidence/severity)
+    + centrality_bonus                    # 0.0 - 1.5 (relationship count)
+    + cross_agent_bonus                   # 0.0 - 2.0 (multi-agent access)
+    - bloat_penalty                       # 0.0 - 1.5 (tokens over target)
+) * safety_multiplier                     # 1.0 normal, 100.0 protected
+```
+
+### Type Weights
+
+| Type | Weight | Half-Life |
+|------|--------|-----------|
+| Belief (active, conf > 0.7) | 10.0 | 180 days |
+| Reflection | 8.0 | 90 days |
+| Analysis | 7.0 | 60 days |
+| Synthesis | 6.5 | 120 days |
+| Recommendation | 5.0 | 30 days |
+| CompressedContext | 4.0 | 90 days |
+| Task (active) | 3.0 | N/A (protected) |
+| MemoryEntry | 2.5 | 45 days |
+| SessionContext | 1.5 | 1 day |
+| Notification | 0.5 | 12 hours |
+
+### MVS Action Thresholds
+
+| MVS Range | Curation Action |
+|-----------|-----------------|
+| >= 50.0 | KEEP (safety-protected) |
+| >= 8.0 | KEEP |
+| 5.0 - 8.0 | KEEP, flag for compression if bloated |
+| 3.0 - 5.0 | IMPROVE (enrich metadata) or MERGE (if similar exists) |
+| 1.5 - 3.0 | DEMOTE one tier |
+| 0.5 - 1.5 | PRUNE (soft delete with 30-day tombstone) |
+| < 0.5 | PRUNE (immediate for Notifications/Sessions) |
 
 ---
 
@@ -130,6 +200,7 @@ async def health_check(driver) -> Dict:
     - Agent heartbeat ages (both infra and functional)
     - Disk space usage
     - Log file sizes
+    - MVS distribution across tiers
     """
 ```
 
@@ -150,11 +221,23 @@ Verify file consistency across agent workspaces, check ARCHITECTURE.md sync stat
 
 ### Jochi (Analyst Agent)
 
-**Role:** Memory curation, testing, analysis
+**Role:** Memory curation, MVS scoring, testing, analysis, deduplication
 
 #### memory_curation_rapid (5 min, 300 tokens)
 
 Enforce token budgets, clean expired notifications, clear stale sessions.
+
+#### mvs_scoring_pass (15 min, 400 tokens)
+
+```python
+async def mvs_scoring_pass(driver) -> Dict:
+    """
+    Recalculate MVS for entries:
+    - Sample 100 nodes per tier
+    - Update MVS scores
+    - Flag nodes for promotion/demotion
+    """
+```
 
 #### smoke_tests (15 min, 800 tokens)
 
@@ -164,6 +247,18 @@ Run quick smoke tests via test runner. On failure: create ticket for Temüjin.
 
 Run full test suite with remediation. On critical failure: create ticket immediately.
 
+#### vector_dedup (6 hours, 800 tokens)
+
+```python
+async def vector_dedup(driver) -> Dict:
+    """
+    Near-duplicate detection via embeddings:
+    - Query vector index for similarity >= 0.85
+    - Merge duplicates (keep higher MVS)
+    - Transfer relationships, tombstone merged node
+    """
+```
+
 #### deep_curation (6 hours, 2000 tokens)
 
 Delete orphaned nodes, purge tombstoned entries, archive COLD tier to file.
@@ -172,7 +267,7 @@ Delete orphaned nodes, purge tombstoned entries, archive COLD tier to file.
 
 ### Chagatai (Writer Agent)
 
-**Role:** Content creation, documentation, reflection
+**Role:** Content creation, documentation, reflection synthesis
 
 #### reflection_consolidation (30 min, 500 tokens)
 
@@ -184,17 +279,17 @@ Consolidate reflections when system idle (no pending user tasks).
 
 **Role:** Research, knowledge gathering, ecosystem tracking
 
-| Task | Frequency | Budget | Description |
-|------|-----------|--------|-------------|
-| knowledge_gap_analysis | 24h | 600 | Identify sparse knowledge areas |
-| ordo_sacer_research | 24h | 1200 | Research esoteric concepts |
-| ecosystem_intelligence | 7d | 2000 | Track ecosystem changes |
+| Task | Frequency | Budget | MVS Impact | Description |
+|------|-----------|--------|------------|-------------|
+| knowledge_gap_analysis | 24h | 600 | Identifies gaps | Identify sparse knowledge areas |
+| ordo_sacer_research | 24h | 1200 | Creates Research | Research esoteric concepts |
+| ecosystem_intelligence | 7d | 2000 | Tracks trends | Track ecosystem changes |
 
 ---
 
 ### Kublai (Main/Orchestrator Agent)
 
-**Role:** Task delegation, response synthesis, system coordination
+**Role:** Task delegation, response synthesis, system coordination, self-awareness
 
 #### status_synthesis (5 min, 200 tokens)
 
@@ -203,18 +298,52 @@ async def status_synthesis(driver) -> Dict:
     """
     Synthesize agent status:
     - Query all agent heartbeats (both tiers)
-    - Check for critical issues
+    - Check MVS distribution
+    - Identify critical issues
     - Escalate if needed
     """
 ```
 
-**Two-tier query:**
+**Two-tier query with MVS:**
 ```cypher
 MATCH (a:Agent)
+OPTIONAL MATCH (a)-[:HAS_LEARNED_CAPABILITY]->(lc:LearnedCapability)
+WITH a, count(lc) as capability_count
 RETURN a.name, a.status,
-       a.infra_heartbeat, a.last_heartbeat,
+       datetime() - a.infra_heartbeat as infra_age_seconds,
+       datetime() - a.last_heartbeat as func_age_seconds,
+       capability_count,
        a.current_task
-ORDER BY a.last_heartbeat DESC
+ORDER BY infra_age_seconds DESC
+```
+
+#### weekly_reflection (7 days, 1500 tokens)
+
+```python
+async def weekly_reflection(driver) -> Dict:
+    """
+    Proactive architecture analysis:
+    1. Query ARCHITECTURE.md sections from Neo4j
+    2. Identify improvement opportunities
+    3. Create ImprovementOpportunity nodes
+    4. Route to Ögedei for vetting
+    5. Delegate implementation to Temüjin
+    """
+```
+
+**Reflection workflow:**
+```
+Kublai analyzes architecture
+        ↓
+Creates ImprovementOpportunity
+        ↓
+Ögedei vets (operational impact)
+        ↓
+Temüjin implements (if approved)
+        ↓
+Validation checks pass
+        ↓
+ONLY THEN sync to ARCHITECTURE.md
 ```
 
 ---
@@ -259,7 +388,7 @@ class UnifiedHeartbeat:
 class HeartbeatTask:
     name: str                    # Task identifier
     agent: str                   # Agent owner (kublai, jochi, etc.)
-    frequency_minutes: int       # 5, 15, 60, 360, 1440, 10080
+    frequency_minutes: int       # 5, 15, 30, 60, 360, 1440, 10080
     max_tokens: int              # Token budget for this task
     handler: Callable            # Async function(driver) -> result
     description: str             # Human-readable description
@@ -286,15 +415,16 @@ class SimpleCuration:
 - High-confidence beliefs (>= 0.9)
 - Entries < 24 hours old
 - SystemConfig, AgentKey, Migration nodes
+- MVS >= 50.0 (safety multiplier)
 
 **Curation Operations:**
 
 | Operation | Frequency | Purpose |
 |-----------|-----------|---------|
 | `curation_rapid()` | 5 min | Enforce budgets, clean notifications/sessions |
-| `curation_standard()` | 15 min | Archive completed tasks, demote stale HOT |
+| `curation_standard()` | 15 min | Archive completed tasks, demote stale HOT, MVS scoring |
 | `curation_hourly()` | 60 min | Promote COLD entries, decay confidence |
-| `curation_deep()` | 6 hours | Delete orphans, purge tombstones, archive COLD |
+| `curation_deep()` | 6 hours | Delete orphans, purge tombstones, dedup, archive COLD |
 
 ---
 
@@ -378,6 +508,46 @@ Cycle Complete
 })
 ```
 
+### MVS-Enabled Memory Nodes
+
+```cypher
+(:MemoryEntry | :Belief | :Reflection | :Analysis | :Synthesis {
+  id: string,
+  mvs_score: float,        # Calculated Memory Value Score
+  access_count_7d: int,    # Rolling 7-day access counter
+  last_accessed: datetime,
+  last_curated_at: datetime,
+  curation_action: string, # KEEP/DEMOTE/PRUNE/PROMOTE/MERGE
+  tombstone: boolean,      # Soft-deleted flag
+  deleted_at: datetime     # When tombstoned
+})
+```
+
+### Self-Awareness Nodes (Kublai)
+
+```cypher
+(:ImprovementOpportunity {
+  id: string,
+  type: string,            # missing_section, stale_sync, api_gap, etc.
+  description: string,
+  priority: string,        # low, medium, high
+  status: string,          # proposed, under_review, approved, rejected
+  proposed_by: string,     # kublai
+  created_at: datetime
+})
+
+(:ArchitectureProposal {
+  id: string,
+  title: string,
+  description: string,
+  status: string,          # proposed, under_review, approved, implemented, validated, synced
+  implementation_status: string,  # not_started, in_progress, completed, validated
+  target_section: string,  # ARCHITECTURE.md section
+  proposed_by: string,
+  proposed_at: datetime
+})
+```
+
 ### Relationships
 
 ```cypher
@@ -386,6 +556,17 @@ Cycle Complete
 
 // Task result associated with agent
 (Agent)-[:PERFORMED]->(TaskResult)
+
+// Self-awareness workflow
+(ImprovementOpportunity)-[:EVOLVES_INTO]->(ArchitectureProposal)
+(ArchitectureProposal)-[:HAS_VETTING]->(:Vetting)
+(ArchitectureProposal)-[:IMPLEMENTED_BY]->(:Implementation)
+(Implementation)-[:VALIDATED_BY]->(:Validation)
+(ArchitectureProposal)-[:SYNCED_TO]->(:ArchitectureSection)
+
+// MVS tracking
+(Agent)-[:ACCESSED]->(MemoryEntry)
+(MemoryEntry)-[:MERGED_INTO]->(MemoryEntry)
 ```
 
 ### Required Indexes
@@ -405,6 +586,15 @@ FOR (a:Agent) ON (a.infra_heartbeat);
 
 CREATE INDEX agent_last_heartbeat IF NOT EXISTS
 FOR (a:Agent) ON (a.last_heartbeat);
+
+CREATE INDEX memory_mvs IF NOT EXISTS
+FOR (m:MemoryEntry) ON (m.mvs_score);
+
+CREATE INDEX memory_curation IF NOT EXISTS
+FOR (m:MemoryEntry) ON (m.last_curated_at, m.tier);
+
+CREATE INDEX memory_tombstone IF NOT EXISTS
+FOR (m:MemoryEntry) ON (m.tombstone, m.deleted_at);
 ```
 
 ---
@@ -429,6 +619,9 @@ python tools/kurultai/heartbeat_master.py --cycle --agent jochi
 
 # Output as JSON
 python tools/kurultai/heartbeat_master.py --cycle --json
+
+# Trigger Kublai reflection manually
+python tools/kurultai/heartbeat_master.py --trigger-reflection
 ```
 
 ---
@@ -452,7 +645,7 @@ schedules:
     command: "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase all --dry-run"
   - name: kublai-weekly-reflection
     cron: "0 20 * * 0"  # Sundays at 8 PM ET
-    command: "cd /app && curl -X POST http://localhost:8082/api/reflection/trigger -H 'Content-Type: application/json' -d '{}' || echo 'Reflection trigger endpoint not available'"
+    command: "cd /app && python tools/kurultai/heartbeat_master.py --trigger-reflection"
 ```
 
 ---
@@ -468,6 +661,7 @@ schedules:
 | Token usage | `HeartbeatCycle.total_tokens` | > 5000/cycle |
 | Infra heartbeat age | `Agent.infra_heartbeat` | > 120s |
 | Functional heartbeat age | `Agent.last_heartbeat` | > 90s |
+| Low MVS nodes | `mvs_score < 1.5` | > 1000 pending prune |
 
 ### Query Examples
 
@@ -495,7 +689,27 @@ RETURN a.name, a.status,
        datetime() - a.infra_heartbeat as infra_age_seconds,
        datetime() - a.last_heartbeat as func_age_seconds,
        a.current_task
-ORDER BY a.infra_heartbeat DESC;
+ORDER BY infra_age_seconds DESC;
+```
+
+**Get MVS distribution:**
+```cypher
+MATCH (m:MemoryEntry)
+WHERE m.mvs_score IS NOT NULL
+RETURN
+  CASE
+    WHEN m.mvs_score >= 8 THEN 'high'
+    WHEN m.mvs_score >= 3 THEN 'medium'
+    ELSE 'low'
+  END as tier,
+  count(*) as count
+```
+
+**Get pending improvement proposals:**
+```cypher
+MATCH (p:ArchitectureProposal {status: 'proposed'})
+RETURN p.title, p.description, p.priority, p.proposed_at
+ORDER BY p.proposed_at DESC;
 ```
 
 ---
@@ -520,11 +734,13 @@ ORDER BY a.infra_heartbeat DESC;
 - `smoke_tests` - System functionality
 - `full_tests` - Critical test failures
 - `health_check` - Infrastructure issues
+- `vector_dedup` - Data integrity issues
 
 **Ticket routing:**
 - Infrastructure issues → Ögedei
 - Code/test issues → Temüjin
 - Analysis issues → Jochi
+- Self-awareness workflow → Kublai
 
 ---
 
@@ -537,6 +753,8 @@ ORDER BY a.infra_heartbeat DESC;
 | `NEO4J_PASSWORD` | **Yes** | - | Neo4j password |
 | `PROJECT_ROOT` | No | `os.getcwd()` | Project root directory |
 | `HEARTBEAT_LOG_LEVEL` | No | `INFO` | Logging level |
+| `MVS_SCORING_ENABLED` | No | `true` | Enable MVS calculations |
+| `VECTOR_DEDUP_ENABLED` | No | `true` | Enable vector deduplication |
 
 ---
 
@@ -547,6 +765,8 @@ ORDER BY a.infra_heartbeat DESC;
 | Heartbeat Master | `tools/kurultai/heartbeat_master.py` |
 | Agent Tasks | `tools/kurultai/agent_tasks.py` |
 | Simple Curation | `tools/kurultai/curation_simple.py` |
+| MVS Scorer | `tools/kurultai/mvs_scorer.py` |
+| Deduplication Engine | `tools/kurultai/dedup_engine.py` |
 | Test Runner | `tools/kurultai/test_runner_orchestrator.py` |
 | Ticket Manager | `tools/kurultai/ticket_manager.py` |
 | Notion Sync | `tools/notion_sync.py` |
@@ -560,14 +780,26 @@ ORDER BY a.infra_heartbeat DESC;
 - [Kurultai Unified Architecture](ARCHITECTURE.md) - Full system architecture
 - [Two-Tier Heartbeat System](docs/plans/2026-02-07-two-tier-heartbeat-system.md) - Implementation plan
 - [Golden Horde Consensus: Heartbeat Background Tasks](.claude/memory_anchors/golden-horde-consensus-heartbeat-tasks.md) - Design deliberation
+- [Kublai Self-Awareness](docs/plans/2026-02-07-kublai-proactive-self-awareness.md) - Proactive reflection system
+- [Kurultai v0.3](docs/plans/kurultai_0.3.md) - Memory curation and MVS scoring
 
 ---
 
-**Document Status**: v0.3 - Production
+**Document Status**: v0.4 - Production
 **Last Updated**: 2026-02-08
 **Maintainer**: Kurultai System Architecture
 
 ### Changelog
+
+**v0.4** (2026-02-08):
+- Added MVS (Memory Value Score) integration with scoring thresholds
+- Added vector deduplication task (Jochi, 6 hours)
+- Added MVS scoring pass (Jochi, 15 minutes)
+- Added Kublai weekly reflection task with self-awareness workflow
+- Enhanced safety rules with MVS >= 50.0 protection
+- Added self-awareness Neo4j schema (ImprovementOpportunity, ArchitectureProposal)
+- Added MVS-related indexes (memory_mvs, memory_curation, memory_tombstone)
+- Updated token budgets to reflect new tasks (~8,650 peak)
 
 **v0.3** (2026-02-08):
 - Aligned with two-tier heartbeat system (infra + functional)
