@@ -834,6 +834,211 @@ async def _create_tickets_from_report(driver, report: Dict):
 
 ---
 
+## Kublai Self-Awareness System
+
+### Overview
+
+The Kublai Self-Awareness System enables the orchestrator agent (Kublai) to introspect on the system architecture, identify improvement opportunities, and manage proposals through a complete workflow from identification to documentation sync.
+
+**Key Capabilities:**
+- Query ARCHITECTURE.md sections from Neo4j
+- Proactively identify architecture improvement opportunities
+- Manage proposals through a 7-state workflow
+- Coordinate with Ögedei (Operations) and Temüjin (Development) agents
+- Sync validated changes back to ARCHITECTURE.md with guardrails
+
+### Architecture Components
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Kublai Self-Awareness Layer                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │                    Architecture Introspection                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │  │
+│  │  │ getOverview  │  │ searchArch   │  │ getSection   │            │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘            │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │                    Proactive Reflection                              │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │  │
+│  │  │   analyze    │  │  identify    │  │    store     │            │  │
+│  │  │   gaps       │  │ opportunities│  │ opportunities│            │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘            │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │                    Delegation Protocol                               │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │  │
+│  │  │Opportunity│→│ Proposal │→│ Vetting  │→│Implementation│        │  │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘          │  │
+│  │       ↓              ↓              ↓              ↓              │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │  │
+│  │  │  Ögedei  │  │  State   │  │ Temüjin  │  │Validation│          │  │
+│  │  │  (Ops)   │  │ Machine  │  │  (Dev)   │  │  → Sync  │          │  │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘          │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core Modules
+
+#### 1. Architecture Introspection (`src/kublai/architecture-introspection.js`)
+
+Enables Kublai to query the architecture from Neo4j:
+
+| Method | Purpose |
+|--------|---------|
+| `getArchitectureOverview()` | Returns summary of all sections |
+| `searchArchitecture(query)` | Full-text search across sections |
+| `getSection(title)` | Retrieve specific section content |
+| `getLastSyncTimestamp()` | Check when ARCHITECTURE.md was last synced |
+
+#### 2. Proactive Reflection (`src/kublai/proactive-reflection.js`)
+
+Identifies improvement opportunities by analyzing architecture:
+
+| Method | Purpose |
+|--------|---------|
+| `triggerReflection()` | Main entry point for reflection cycle |
+| `analyzeForOpportunities()` | Scans architecture for gaps |
+| `storeOpportunities()` | Persists findings to Neo4j |
+| `getOpportunities(status)` | Retrieves pending/proposed opportunities |
+
+**Opportunity Types:**
+- `missing_section` - Gaps in documentation
+- `stale_sync` - Outdated sections
+- `api_gap` - Missing API documentation
+- `security_gap` - Security documentation needs
+- `deployment_gap` - Deployment docs incomplete
+
+#### 3. Delegation Protocol (`src/kublai/delegation-protocol.js`)
+
+Orchestrates the complete proposal workflow:
+
+**Stage 1: Opportunity → Proposal**
+- Converts `ImprovementOpportunity` nodes to `ArchitectureProposal`
+- Auto-routes to Ögedei if `autoVet: true`
+
+**Stage 2: Proposal Vetting (Ögedei)**
+- Ögedei assesses operational impact
+- Recommendations: `approve`, `approve_with_review`, `approve_with_conditions`, `reject`
+- Creates `Vetting` node with assessment
+
+**Stage 3: Implementation (Temüjin)**
+- Temüjin manages code/documentation changes
+- Updates progress via `Implementation` node
+- Completes with validation trigger
+
+**Stage 4: Validation → Sync**
+- `ValidationHandler` runs automated checks
+- On pass: proposal marked `validated`
+- Guardrail check before ARCHITECTURE.md sync
+
+### Proposal State Machine
+
+**States (7 total):**
+
+```
+PROPOSED → UNDER_REVIEW → APPROVED → IMPLEMENTED → VALIDATED → SYNCED
+                ↓              ↓
+            REJECTED      (can return)
+```
+
+**State Transitions:**
+| From | To | Trigger | Actor |
+|------|-----|---------|-------|
+| PROPOSED | UNDER_REVIEW | Auto-route to Ögedei | DelegationProtocol |
+| UNDER_REVIEW | APPROVED | Ögedei approves | OgedeiVetHandler |
+| UNDER_REVIEW | REJECTED | Ögedei rejects | OgedeiVetHandler |
+| APPROVED | IMPLEMENTED | Temüjin starts work | TemujinImplHandler |
+| IMPLEMENTED | VALIDATED | Validation passes | ValidationHandler |
+| VALIDATED | SYNCED | Manual or auto sync | ProposalMapper |
+
+### Guardrails
+
+**Critical Safety Mechanisms:**
+
+1. **Dual Validation Requirement**
+   - Both `status: 'validated'` AND `implementation_status: 'validated'` required
+   - Prevents partial implementations from syncing
+
+2. **Manual Sync Approval**
+   - `autoSync: false` in DelegationProtocol config
+   - Requires explicit human approval for ARCHITECTURE.md changes
+
+3. **Section Mapping Verification**
+   - Proposals must map to existing `ArchitectureSection` nodes
+   - Prevents documentation drift
+
+4. **Query Guardrail in sync-architecture-to-neo4j.js:**
+   ```javascript
+   // Both status AND implementation_status must be 'validated'
+   MATCH (p:ArchitectureProposal {status: 'validated', implementation_status: 'validated'})
+   WHERE NOT EXISTS((p)-[:SYNCED_TO]->(:ArchitectureSection))
+   ```
+
+### Neo4j Schema
+
+**Nodes:**
+- `ArchitectureSection` - Parsed ARCHITECTURE.md sections
+- `ImprovementOpportunity` - Reflection findings
+- `ArchitectureProposal` - Formal improvement proposals
+- `Vetting` - Ögedei's operational assessment
+- `Implementation` - Temüjin's implementation tracking
+- `Validation` - Automated validation results
+
+**Relationships:**
+- `(:ImprovementOpportunity)-[:EVOLVES_INTO]->(:ArchitectureProposal)`
+- `(:ArchitectureProposal)-[:HAS_VETTING]->(:Vetting)`
+- `(:ArchitectureProposal)-[:IMPLEMENTED_BY]->(:Implementation)`
+- `(:Implementation)-[:VALIDATED_BY]->(:Validation)`
+- `(:ArchitectureProposal)-[:SYNCED_TO]->(:ArchitectureSection)`
+- `(:ArchitectureProposal)-[:UPDATES_SECTION]->(:ArchitectureSection)`
+
+### Express API Endpoints
+
+**Proposal Management:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/proposals` | GET | List proposals by status |
+| `/api/proposals/reflect` | POST | Trigger proactive reflection |
+| `/api/proposals/ready-to-sync` | GET | Get validated proposals |
+| `/api/migrate-proposals` | POST | Apply Neo4j v4 schema |
+
+**Workflow Control:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/workflow/process` | POST | Process all pending workflows |
+| `/api/workflow/vet/:id` | POST | Route proposal to Ögedei |
+| `/api/workflow/approve/:id` | POST | Approve vetted proposal |
+| `/api/workflow/implement/:id` | POST | Start implementation |
+| `/api/workflow/complete/:id` | POST | Complete and validate |
+| `/api/workflow/sync/:id` | POST | Sync to ARCHITECTURE.md |
+| `/api/workflow/status/:id` | GET | Get workflow status |
+
+### Configuration
+
+**DelegationProtocol Options:**
+```javascript
+{
+  autoVet: true,        // Auto-route to Ögedei
+  autoImplement: true,  // Auto-route to Temüjin
+  autoValidate: true,   // Auto-validate on completion
+  autoSync: false       // Require manual approval for sync
+}
+```
+
+**Environment Variables:**
+- `NEO4J_URI` - Neo4j connection string
+- `NEO4J_USER` / `NEO4J_PASSWORD` - Neo4j credentials
+- `REFLECTION_INTERVAL_MINUTES` - Reflection frequency (default: 60)
+
+---
+
 ## Scaling Considerations
 
 ### Horizontal Scaling

@@ -227,8 +227,9 @@ async function syncValidatedProposalsToArchitectureMd() {
 
   try {
     // Find proposals that are validated but not yet synced
+    // GUARDRAIL: Both status AND implementation_status must be 'validated'
     const result = await session.run(`
-      MATCH (p:ArchitectureProposal {status: 'validated'})
+      MATCH (p:ArchitectureProposal {status: 'validated', implementation_status: 'validated'})
       WHERE NOT EXISTS((p)-[:SYNCED_TO]->(:ArchitectureSection))
       RETURN p.id as id, p.title as title, p.target_section as section,
              p.description as description
