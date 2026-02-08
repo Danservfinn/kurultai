@@ -6,7 +6,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [build.args]
-CACHE_BUST = "2026-02-07-v4"
+CACHE_BUST = "2026-02-08-v46-FORCE-REBUILD-EXPRESS"
 
 [deploy]
 healthcheckPath = "/health"
