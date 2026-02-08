@@ -75,6 +75,26 @@
         }
     }
 
+    # Express API routes for Kublai proposal system — MUST come before /api/* catch-all
+    # Express runs on port 8082 (8080 is signal-cli daemon, 8081 is signal-cli HTTP)
+    route /api/proposals/* {
+        reverse_proxy moltbot-railway-template.railway.internal:8082 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
+    route /api/migrate-proposals {
+        reverse_proxy moltbot-railway-template.railway.internal:8082 {
+            header_up Host {host}
+            header_up X-Real-Ip {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+        }
+    }
+
     route /api/auth/* {
         forward_auth authentik-server.railway.internal:9000 {
             uri /outpost.goauthentik.io/auth/caddy

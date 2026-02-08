@@ -1,0 +1,18 @@
+# Authentik Proxy - Deployment Configuration
+# Caddy reverse proxy with Authentik forward auth
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[build.args]
+CACHE_BUST = "2026-02-07-v3"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+healthcheckInterval = 15
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+numReplicas = 1
+sleepApplication = false
