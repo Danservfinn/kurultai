@@ -1,9 +1,9 @@
 #!/bin/sh
 # Moltbot entrypoint - runs migrations, extracts Signal data, then starts OpenClaw gateway
 # Runs as root initially to handle volume permissions, then drops to moltbot user
-# Version: 2026-02-07-v6 (cache bust)
+# Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-07-v6) ==="
+echo "=== Entrypoint starting (version 2026-02-08-v10) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -208,82 +208,61 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -f /app/scripts/heartbeat_writer.py ]; then
 fi
 
 # =============================================================================
-# START EXPRESS API SERVER
+# VERIFY EXPRESS API SERVER FILES
 # =============================================================================
-# The Express server provides the proposal API endpoints on port 8080
-# Start as background process so OpenClaw gateway can run in foreground
+# The Express server provides the proposal API endpoints on port 8082
 
-# WORKAROUND: Railway build cache prevents Dockerfile updates.
-# If Express server files are missing, clone them from git at runtime.
 echo "Checking for Express server at /app/src/index.js..."
-ls -la /app/src/ 2>/dev/null || echo "  /app/src/ directory does not exist"
-
-if [ ! -f /app/src/index.js ]; then
-    echo "=== Express server not found in image, installing at runtime ==="
-    echo "Current directory: $(pwd)"
-
-    # Create app directory structure
-    mkdir -p /app/src /app/routes /app/middleware /app/config /app/scripts
-
-    # Clone the repository to a temp location and copy Express files
-    TEMP_DIR=$(mktemp -d)
-    echo "Cloning repository to fetch Express server files..."
-
-    # Use git to fetch just the moltbot-railway-template directory
-    if command -v git >/dev/null 2>&1; then
-        echo "  Cloning from https://github.com/Danservfinn/Kurultai.git..."
-        git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/Danservfinn/Kurultai.git "$TEMP_DIR" 2>&1 || echo "  git clone failed"
-
-        if [ -d "$TEMP_DIR/moltbot-railway-template" ]; then
-            echo "  Repository cloned, checking out moltbot-railway-template..."
-            cd "$TEMP_DIR"
-            git sparse-checkout set moltbot-railway-template 2>&1 || echo "  sparse-checkout failed"
-            cd - >/dev/null
-
-            echo "  Copying Express server files..."
-            # Copy Express server files
-            cp -rv "$TEMP_DIR/moltbot-railway-template/src"/* /app/src/ 2>&1 || echo "  cp src failed"
-            cp -rv "$TEMP_DIR/moltbot-railway-template/routes"/* /app/routes/ 2>&1 || echo "  cp routes failed"
-            cp -rv "$TEMP_DIR/moltbot-railway-template/middleware"/* /app/middleware/ 2>&1 || echo "  cp middleware failed"
-            cp -rv "$TEMP_DIR/moltbot-railway-template/config"/* /app/config/ 2>&1 || echo "  cp config failed"
-            cp -rv "$TEMP_DIR/moltbot-railway-template/scripts"/* /app/scripts/ 2>&1 || echo "  cp scripts failed"
-            cp -v "$TEMP_DIR/moltbot-railway-template/package.json" /app/ 2>&1 || echo "  cp package.json failed"
-            cp -v "$TEMP_DIR/moltbot-railway-template/package-lock.json" /app/ 2>&1 || echo "  cp package-lock.json failed"
-
-            echo "  Express server files copied from git"
-        else
-            echo "  ERROR: moltbot-railway-template directory not found in clone"
-            ls -la "$TEMP_DIR/" 2>&1 || true
-        fi
-    else
-        echo "  ERROR: git command not found"
-    fi
-
-    # Clean up temp directory
-    rm -rf "$TEMP_DIR"
-
-    # Install npm dependencies if package.json was copied
-    if [ -f /app/package.json ]; then
-        echo "  Installing npm dependencies..."
-        cd /app && npm install --production 2>&1 | tail -10
-        echo "  npm install completed"
-    else
-        echo "  WARNING: package.json not found after clone"
-    fi
-
-    # Set proper ownership
-    chown -R 1001:1001 /app/src /app/routes /app/middleware /app/config /app/scripts 2>/dev/null || true
-    echo "  Ownership set to 1001:1001"
+if [ -f /app/src/index.js ]; then
+    echo "  Express server found: $(wc -c < /app/src/index.js) bytes"
 else
-    echo "  Express server already exists at /app/src/index.js"
+    echo "  ERROR: Express server not found at /app/src/index.js"
+    echo "  Directory contents of /app/:"
+    ls -la /app/ 2>/dev/null || echo "    (cannot list /app/)"
 fi
+
+# =============================================================================
+# START OPENCLAW GATEWAY (in background)
+# =============================================================================
+# Start OpenClaw first in background so Express can start afterward
+# The gateway includes the built-in webchat UI at :18789
+echo "Starting OpenClaw Gateway on port ${OPENCLAW_GATEWAY_PORT:-18789}..."
+
+# Find the OpenClaw entry point - installed globally via npm
+OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
+OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))" 2>/dev/null || echo "")
+
+if [ -n "$OPENCLAW_DIST" ]; then
+    echo "Using OpenClaw dist: $OPENCLAW_DIST"
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
+    OPENCLAW_PID=$!
+    echo "OpenClaw gateway started with PID $OPENCLAW_PID"
+elif [ -x "$OPENCLAW_BIN" ]; then
+    echo "Using OpenClaw binary: $OPENCLAW_BIN"
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
+    OPENCLAW_PID=$!
+    echo "OpenClaw gateway started with PID $OPENCLAW_PID"
+else
+    echo "ERROR: OpenClaw not found. Falling back to health check server."
+    su -s /bin/sh moltbot -c "python /app/start_server.py" &
+    OPENCLAW_PID=$!
+fi
+
+# Wait for OpenClaw to be ready
+echo "Waiting for OpenClaw to start..."
+sleep 5
+
+# =============================================================================
+# START EXPRESS API SERVER (in background)
+# =============================================================================
+# The Express server provides the proposal API endpoints on port 8082
+# Note: Port 8080 is used by signal-cli daemon, 8081 is signal-cli HTTP interface
 
 # Verify Express files exist before starting
 if [ -f /app/src/index.js ]; then
-    echo "=== Starting Express API server on port ${EXPRESS_PORT:-8080} ==="
+    echo "=== Starting Express API server on port ${EXPRESS_PORT:-8082} ==="
     echo "  File check: /app/src/index.js exists ($(wc -c < /app/src/index.js) bytes)"
-    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_PORT:-8080} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js &"
+    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_PORT:-8082} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js" &
     EXPRESS_PID=$!
     echo "  Express server started with PID $EXPRESS_PID"
 
@@ -292,13 +271,13 @@ if [ -f /app/src/index.js ]; then
 
     # Verify Express started with health check
     echo "  Verifying Express health check..."
-    if curl -sf http://localhost:${EXPRESS_PORT:-8080}/health >/dev/null 2>&1; then
+    if curl -sf http://localhost:${EXPRESS_PORT:-8082}/health >/dev/null 2>&1; then
         echo "  Express API server started successfully and responding to health checks"
     else
         echo "  WARNING: Express server health check failed (may still be starting)"
         # Try one more time after a longer wait
         sleep 5
-        if curl -sf http://localhost:${EXPRESS_PORT:-8080}/health >/dev/null 2>&1; then
+        if curl -sf http://localhost:${EXPRESS_PORT:-8082}/health >/dev/null 2>&1; then
             echo "  Express API server now responding to health checks"
         else
             echo "  WARNING: Express server still not responding after 10 seconds"
@@ -313,25 +292,10 @@ else
 fi
 
 # =============================================================================
-# START OPENCLAW GATEWAY
+# KEEP CONTAINER RUNNING
 # =============================================================================
-# Drop to moltbot user and start the OpenClaw gateway
-# The gateway includes the built-in webchat UI at :18789
-echo "Starting OpenClaw Gateway on port ${OPENCLAW_GATEWAY_PORT:-18789}..."
-
-# Find the OpenClaw entry point - installed globally via npm
-OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
-OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))" 2>/dev/null || echo "")
-
-if [ -n "$OPENCLAW_DIST" ]; then
-    echo "Using OpenClaw dist: $OPENCLAW_DIST"
-    exec su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured"
-elif [ -x "$OPENCLAW_BIN" ]; then
-    echo "Using OpenClaw binary: $OPENCLAW_BIN"
-    exec su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured"
-else
-    echo "ERROR: OpenClaw not found. Falling back to health check server."
-    exec su -s /bin/sh moltbot -c "python /app/start_server.py"
-fi
+# Wait for all background processes
+echo "=== All services started, monitoring... ==="
+wait
 # Test timestamp: Sat Feb  7 17:46:39 EST 2026
 # Cache bust: 1770506481

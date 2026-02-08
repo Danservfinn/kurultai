@@ -1,6 +1,6 @@
 # Moltbot Railway Template - OpenClaw Gateway with embedded Signal
 # Replaces Express gateway with full OpenClaw gateway including built-in webchat UI
-# CACHE_BUST: 2026-02-07-v7 - Fix config directory path
+# CACHE_BUST: 2026-02-08-v10 - Fix user ID and force fresh build
 
 FROM node:22-bookworm-slim
 
@@ -77,23 +77,23 @@ COPY .signal-data/signal-data.tar.gz /opt/signal-data.tar.gz
 # Copy migration scripts, config, and operational files
 
 # Install Express server dependencies first (for layer caching)
-COPY --chown=1000:1000 package*.json /app/
+COPY --chown=1001:1001 package*.json /app/
 RUN npm install --production
 
 # Copy Express server source files
-COPY --chown=1000:1000 src /app/src
-COPY --chown=1000:1000 routes /app/routes
-COPY --chown=1000:1000 middleware /app/middleware
+COPY --chown=1001:1001 src /app/src
+COPY --chown=1001:1001 routes /app/routes
+COPY --chown=1001:1001 middleware /app/middleware
 # Note: config is inside src/, not at root level
 
-COPY --chown=1000:1000 migrations /app/migrations
-COPY --chown=1000:1000 openclaw_memory.py /app/
-COPY --chown=1000:1000 scripts /app/scripts
-COPY --chown=1000:1000 openclaw.json5 /app/openclaw.json5
-COPY --chown=1000:1000 openclaw.json /app/openclaw.json
-COPY --chown=1000:1000 entrypoint.sh /app/entrypoint.sh
-COPY --chown=1000:1000 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
-COPY --chown=1000:1000 souls /app/souls
+COPY --chown=1001:1001 migrations /app/migrations
+COPY --chown=1001:1001 openclaw_memory.py /app/
+COPY --chown=1001:1001 scripts /app/scripts
+COPY --chown=1001:1001 openclaw.json5 /app/openclaw.json5
+COPY --chown=1001:1001 openclaw.json /app/openclaw.json
+COPY --chown=1001:1001 entrypoint.sh /app/entrypoint.sh
+COPY --chown=1001:1001 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
+COPY --chown=1001:1001 souls /app/souls
 RUN chmod +x /app/entrypoint.sh /app/signal-cli-wrapper.sh
 
 # =============================================================================
@@ -140,4 +140,4 @@ CMD ["sh", "/app/entrypoint.sh"]
 # Cache-bust: v3 - Force rebuild with Express server files
 
 # Cache-bust arg - change this to force a full rebuild
-ARG CACHE_BUST=2026-02-07-v3
+ARG CACHE_BUST=2026-02-08-v10
