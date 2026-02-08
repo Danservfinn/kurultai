@@ -429,6 +429,9 @@ class OperationalMemory:
         SET t.status = 'in_progress',
             t.claimed_by = $agent,
             t.claimed_at = $claimed_at
+        WITH t
+        MATCH (a:Agent {name: $agent})
+        SET a.last_heartbeat = $claimed_at
         RETURN t
         """
 
@@ -484,6 +487,9 @@ class OperationalMemory:
         SET t.status = 'completed',
             t.completed_at = $completed_at,
             t.results = $results
+        WITH t
+        MATCH (a:Agent {name: t.claimed_by})
+        SET a.last_heartbeat = $completed_at
         RETURN t.delegated_by as delegated_by, t.claimed_by as claimed_by
         """
 
@@ -838,7 +844,7 @@ class OperationalMemory:
 
         with self._session() as session:
             if session is None:
-                return True
+                return False
 
             try:
                 result = session.run(cypher, notification_id=notification_id)
@@ -1006,7 +1012,7 @@ class OperationalMemory:
 
         with self._session() as session:
             if session is None:
-                return True
+                return False
 
             try:
                 result = session.run(
@@ -1055,7 +1061,7 @@ class OperationalMemory:
 
         with self._session() as session:
             if session is None:
-                return True
+                return False
 
             try:
                 result = session.run(
