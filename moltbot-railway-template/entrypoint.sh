@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-08-v10) ==="
+echo "=== Entrypoint starting (version 2026-02-08-v11) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -47,6 +47,23 @@ if [ -d /app/souls ]; then
     done
     chown -R 1001:1001 /data/workspace/souls 2>/dev/null || true
     echo "=== Soul Files Deployed ==="
+fi
+
+# =============================================================================
+# CLEAR STALE SESSION LOCKS
+# =============================================================================
+# Session locks can persist across redeployments on persistent volumes.
+# Clear stale locks to prevent "session file locked" errors.
+echo "=== Clearing Stale Session Locks ==="
+if [ -d "$OPENCLAW_STATE_DIR/agents" ]; then
+    lock_count=$(find "$OPENCLAW_STATE_DIR/agents" -name "*.lock" -type f 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$lock_count" -gt 0 ]; then
+        echo "  Found $lock_count stale lock files, removing..."
+        find "$OPENCLAW_STATE_DIR/agents" -name "*.lock" -type f -delete 2>/dev/null || true
+        echo "  Stale locks cleared"
+    else
+        echo "  No stale locks found"
+    fi
 fi
 
 # Skills directory for hot-reload (shared with skill-sync-service)
@@ -158,14 +175,11 @@ if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ] && [ -n "$SIGNAL_ACCOUNT" ];
     su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT trust --trust-all-known-keys $SIGNAL_ACCOUNT" 2>&1 || echo "  trust command returned: $?"
     echo "=== Identity Keys Trusted ==="
 
-    # Note: sendSyncRequest and send --end-session were run on 2026-02-07 to fix
-    # stale session ratchets after the linked device was offline. Sessions are now
-    # fresh. These commands are commented out to avoid rate limiting on redeploy.
-    # Uncomment if decryption errors return after extended offline periods.
-    # echo "=== Requesting Session Sync from Primary Device ==="
-    # su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT sendSyncRequest" 2>&1
+    # Session reset: uncomment if decryption errors return after extended offline periods.
+    # Runs BEFORE the daemon starts to avoid lock file conflicts.
     # echo "=== Resetting Signal Sessions ==="
-    # su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT send --end-session <NUMBER>" 2>&1
+    # su -s /bin/sh moltbot -c "HOME=/data /usr/local/bin/signal-cli -a $SIGNAL_ACCOUNT send --end-session +19194133445" 2>&1 || echo "  end-session returned: $?"
+    # echo "=== Session Reset Complete ==="
 fi
 
 # =============================================================================
@@ -283,6 +297,18 @@ if [ -f /app/src/index.js ]; then
             echo "  WARNING: Express server still not responding after 10 seconds"
         fi
     fi
+
+    # Trigger architecture sync to Neo4j
+    echo "  Triggering architecture sync to Neo4j..."
+    sleep 3
+    SYNC_RESULT=$(curl -sf -X POST http://localhost:${EXPRESS_PORT:-8082}/api/architecture/sync \
+        -H "Content-Type: application/json" \
+        -d "{\"commitHash\":\"startup-$(date +%s)\"}" 2>&1) || {
+        echo "  WARNING: Architecture sync failed: $SYNC_RESULT"
+    }
+    if [ -n "$SYNC_RESULT" ]; then
+        echo "  Architecture sync result: $SYNC_RESULT"
+    fi
 else
     echo "WARNING: Express server not found at /app/src/index.js after installation attempt"
     echo "  Directory contents of /app/:"
@@ -297,5 +323,5 @@ fi
 # Wait for all background processes
 echo "=== All services started, monitoring... ==="
 wait
-# Test timestamp: Sat Feb  7 17:46:39 EST 2026
-# Cache bust: 1770506481
+# Test timestamp: Sat Feb  8 14:52:00 EST 2026
+# Cache bust: 1770506520
