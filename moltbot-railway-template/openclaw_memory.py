@@ -413,6 +413,7 @@ class OperationalMemory:
         claimed_at = self._now()
 
         # Use explicit locking pattern for atomic claim
+        # Also updates Agent.last_heartbeat as functional heartbeat signal
         cypher = """
         MATCH (t:Task {status: 'pending'})
         WHERE t.assigned_to = $agent OR t.assigned_to IS NULL
@@ -430,8 +431,10 @@ class OperationalMemory:
             t.claimed_by = $agent,
             t.claimed_at = $claimed_at
         WITH t
-        MATCH (a:Agent {name: $agent})
-        SET a.last_heartbeat = $claimed_at
+        MERGE (a:Agent {name: $agent})
+        ON CREATE SET a.created_at = $claimed_at
+        SET a.last_heartbeat = $claimed_at,
+            a.status = 'busy'
         RETURN t
         """
 
@@ -481,6 +484,7 @@ class OperationalMemory:
         """
         completed_at = self._now()
 
+        # Mark task complete and update Agent.last_heartbeat as functional heartbeat
         cypher = """
         MATCH (t:Task {id: $task_id})
         WHERE t.status = 'in_progress'
@@ -489,7 +493,8 @@ class OperationalMemory:
             t.results = $results
         WITH t
         MATCH (a:Agent {name: t.claimed_by})
-        SET a.last_heartbeat = $completed_at
+        SET a.last_heartbeat = $completed_at,
+            a.status = 'active'
         RETURN t.delegated_by as delegated_by, t.claimed_by as claimed_by
         """
 
@@ -1061,6 +1066,7 @@ class OperationalMemory:
 
         with self._session() as session:
             if session is None:
+                logger.warning(f"Fallback mode: Agent heartbeat not updated for {agent}")
                 return False
 
             try:
