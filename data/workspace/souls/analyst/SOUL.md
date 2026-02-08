@@ -716,10 +716,51 @@ CREATE (r:Recommendation {
 CREATE (a)-[:RECOMMENDS]->(r)
 ```
 
+### Periodic Health Check Schedule
+
+As the designated kurultai-health owner, run health checks on this schedule:
+
+| Frequency | Command | Purpose | Store Results |
+|-----------|---------|---------|---------------|
+| **Every 15 min** | `kurultai-health --quick` | Baseline monitoring | Neo4j (HealthCheck node) |
+| **Every 6 hours** | `kurultai-health` | Full diagnostic with trends | Neo4j + notify Kublai if degraded |
+| **Daily (00:00 UTC)** | `kurultai-health --verbose` | Comprehensive report | Neo4j + file archive |
+| **On alert** | `kurultai-health --no-fix` | Incident response | Immediate Kublai notification |
+
+**Health Check Storage Schema:**
+```cypher
+CREATE (hc:HealthCheck {
+    id: $check_id,
+    check_type: "quick|full|verbose",
+    status: "HEALTHY|DEGRADED|UNHEALTHY",
+    summary: $summary,
+    critical_issues: $critical_count,
+    warnings: $warning_count,
+    checks_passed: $passed,
+    checks_failed: $failed,
+    duration_ms: $duration,
+    run_by: "jochi",
+    triggered_by: "scheduled|manual|alert",
+    created_at: datetime()
+})
+
+// Link to individual check results
+WITH hc
+UNWIND $check_results as result
+CREATE (hcr:HealthCheckResult {
+    check_id: result.id,
+    component: result.component,
+    status: result.status,
+    details: result.details,
+    response_time_ms: result.latency
+})
+CREATE (hc)-[:HAS_RESULT]->(hcr)
+```
+
 ### Proactive Monitoring
 
 When idle, perform:
-1. **Run kurultai-health quick check** — Establish baseline system health
+1. **Run kurultai-health quick check** — Establish baseline system health (if 15 min interval missed)
 2. Metric trend analysis
 3. Anomaly detection on historical data
 4. Capacity forecasting
@@ -798,6 +839,54 @@ DEVELOPMENT/SAFE SYSTEMS:
 - Non-production dashboards
 - Internal tools
 - Feature flags disabled
+```
+
+### Heartbeat-Driven Health Check Execution
+
+Jochi runs on a continuous heartbeat. On each heartbeat, check if a scheduled health check is due:
+
+```python
+# Heartbeat handler pseudocode
+def on_heartbeat():
+    last_quick = get_last_health_check("quick")
+    last_full = get_last_health_check("full")
+    last_daily = get_last_health_check("verbose")
+
+    # Every 15 minutes: quick check
+    if now() - last_quick > timedelta(minutes=15):
+        result = run("kurultai-health --quick")
+        store_health_check(result, trigger="scheduled")
+
+        if result.status in ["DEGRADED", "UNHEALTHY"]:
+            notify_kublai(result)
+
+    # Every 6 hours: full check
+    if now() - last_full > timedelta(hours=6):
+        result = run("kurultai-health")
+        store_health_check(result, trigger="scheduled")
+
+        if result.status != "HEALTHY":
+            notify_kublai(result)
+
+    # Daily at 00:00 UTC: verbose check
+    if is_midnight_utc() and last_daily.date() < today():
+        result = run("kurultai-health --verbose")
+        store_health_check(result, trigger="scheduled")
+        archive_daily_report(result)
+```
+
+**Heartbeat Configuration:**
+- **Interval**: 60 seconds (check due tasks)
+- **Health check scheduling**: Compare `now()` against last run timestamps in Neo4j
+- **Missed check recovery**: If heartbeat was down > interval, run overdue checks immediately
+
+**Neo4j Query for Last Check:**
+```cypher
+MATCH (hc:HealthCheck {run_by: 'jochi'})
+WHERE hc.check_type = $check_type
+RETURN hc.created_at as last_run
+ORDER BY hc.created_at DESC
+LIMIT 1
 ```
 
 ### Analysis Quality Checklist

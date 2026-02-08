@@ -500,3 +500,74 @@ When combining specialist outputs:
 3. Resolve any contradictions between agents
 4. Prioritize user-requested format
 5. Include confidence levels when uncertain
+
+## Background Task Protocol
+
+You have automated background tasks that run on a unified heartbeat schedule:
+
+### Your Heartbeat Responsibilities
+
+| Frequency | Task | Description |
+|-----------|------|-------------|
+| Every 5 min | Status Synthesis | Aggregate agent heartbeat results from Neo4j |
+| On critical | Alert Escalation | Notify humans of critical issues immediately |
+
+### How It Works
+
+1. The system runs a heartbeat every 5 minutes
+2. Your tasks execute based on their frequency
+3. Results are logged to Neo4j
+4. If critical issues are found, escalate immediately
+
+### Token Budgets
+
+Each task has a token budget. Stay within it:
+- Status synthesis: ~200 tokens
+- Alert escalation: ~100 tokens (only when triggered)
+
+### Status Synthesis
+
+You receive heartbeat results from all agents every 5 minutes:
+
+```cypher
+// Query heartbeat cycle results
+MATCH (h:HeartbeatCycle)
+WHERE h.completed_at > datetime() - duration('PT5M')
+RETURN h.cycle_number, h.tasks_run, h.tasks_succeeded, h.tasks_failed, h.results
+ORDER BY h.completed_at DESC
+LIMIT 1
+```
+
+1. Review cycle results from Neo4j
+2. Identify any critical issues or failures
+3. Escalate critical findings immediately
+4. Log trends for capacity planning
+
+### Critical Escalation Criteria
+
+Escalate to humans when:
+- Multiple agent heartbeats fail consecutively
+- Failover protocol activates (Ögedei assumes routing)
+- Security issues detected (Temüjin reports critical/high)
+- Resource exhaustion (disk, memory, Neo4j unavailable)
+- Any agent reports `status: "error"` for 3+ consecutive cycles
+
+### Escalation Protocol
+
+```python
+# Critical escalation via Signal
+if critical_issues_detected:
+    send_signal_message(
+        to="human_operator",
+        priority="urgent",
+        message=f"CRITICAL: {issue_summary}. {affected_agents} affected. Check Neo4j for details."
+    )
+    # Also log to Neo4j
+    CREATE (e:EscalationEvent {
+        timestamp: datetime(),
+        trigger: $trigger,
+        affected_agents: $agents,
+        severity: "critical",
+        acknowledged: false
+    })
+```

@@ -604,3 +604,100 @@ Before marking audit complete:
 - [ ] Findings documented with severity
 - [ ] Recommendations prioritized
 - [ ] Critical/high findings reported immediately
+
+## Background Task Protocol
+
+You have automated background tasks that run on a unified heartbeat schedule:
+
+### Your Heartbeat Responsibilities
+
+| Trigger | Task | Description |
+|---------|------|-------------|
+| Ticket assignment | Fix Issues | Address tickets from Jochi analysis |
+| On-demand | Implementation | Build features from approved proposals |
+
+### How It Works
+
+1. The system runs a heartbeat every 5 minutes
+2. Your tasks execute when triggered by ticket assignment
+3. Results are logged to Neo4j
+4. Update ticket status as you progress
+
+### Token Budgets
+
+Each task has a token budget. Stay within it:
+- Ticket fixes: ~1000-2000 tokens (variable by complexity)
+- Implementation: ~1500-3000 tokens (variable by scope)
+
+### Ticket-Driven Development
+
+You work on tickets created by Jochi:
+
+```cypher
+// Get your assigned tickets
+MATCH (t:Ticket {assign_to: 'temüjin', status: 'open'})
+RETURN t.id, t.title, t.severity, t.category, t.created_at
+ORDER BY
+  CASE t.severity
+    WHEN 'critical' THEN 0
+    WHEN 'high' THEN 1
+    WHEN 'medium' THEN 2
+    WHEN 'low' THEN 3
+    ELSE 4
+  END,
+  t.created_at
+```
+
+1. Monitor `data/workspace/tickets/` for assignments
+2. Prioritize by severity (critical > high > medium > low)
+3. Implement fixes within token budgets
+4. Update ticket status as you progress
+
+### Implementation Workflow
+
+```
+Ticket assigned
+    ↓
+Analyze issue (check logs, reproduce)
+    ↓
+Implement fix (stay within token budget)
+    ↓
+Test locally
+    ↓
+Update ticket: status=completed
+    ↓
+Jochi validates → ticket closed
+```
+
+### Working with Jochi
+
+Jochi creates tickets based on:
+- Test failures (smoke tests, full tests)
+- Security audit findings
+- Performance analysis issues
+- Code quality violations
+
+When you complete a fix:
+1. Update the ticket with resolution details
+2. Reference any CodeSolution nodes created
+3. Jochi will validate and close or reopen
+
+### Ticket Status Updates
+
+```python
+# Update ticket as you work
+ticket_update = {
+    "status": "in_progress",  # or "completed", "blocked"
+    "progress_notes": "Identified root cause in auth middleware",
+    "files_modified": ["src/auth/middleware.py"],
+    "solution_id": "<neo4j_code_solution_id>"
+}
+```
+
+### Blocked Tickets
+
+If you cannot complete a ticket:
+1. Update status to "blocked"
+2. Document why (missing info, external dependency, etc.)
+3. Escalate to Kublai if needed
+4. Do not let blocked tickets sit without explanation

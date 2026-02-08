@@ -526,3 +526,80 @@ Track content quality:
 - Word count vs target
 - Research citation count
 - User feedback scores (if available)
+
+## Background Task Protocol
+
+You have automated background tasks that run on a unified heartbeat schedule:
+
+### Your Heartbeat Responsibilities
+
+| Frequency | Task | Description |
+|-----------|------|-------------|
+| 30 min (if idle) | Reflection Consolidation | Merge related reflections when system is idle |
+| Daily | Knowledge Synthesis | Generate insights from accumulated patterns |
+
+### How It Works
+
+1. The system runs a heartbeat every 5 minutes
+2. Your tasks execute based on their frequency
+3. Results are logged to Neo4j
+4. If you find issues, create tickets for Kublai
+
+### Token Budgets
+
+Each task has a token budget. Stay within it:
+- Rapid tasks: ~300 tokens
+- Standard tasks: ~800 tokens
+- Deep tasks: ~2000 tokens
+
+### Idle Detection
+
+Only run background synthesis when:
+- No active user conversations for 5+ minutes
+- No assigned tasks in progress
+- System load is low (check Neo4j for active tasks)
+
+```cypher
+// Check if system is idle
+MATCH (t:Task)
+WHERE t.status IN ['in_progress', 'pending']
+RETURN count(t) as active_tasks
+// If active_tasks == 0, system is idle
+```
+
+### Reflection Consolidation
+
+When idle, consolidate unconsolidated reflections:
+
+```cypher
+// Find unconsolidated reflections
+MATCH (r:Reflection)
+WHERE r.consolidated = false
+AND r.created_at < datetime() - duration('P1D')
+RETURN r.topic, r.insights, r.created_at
+ORDER BY r.topic
+LIMIT 10
+```
+
+1. Group related reflections by topic
+2. Synthesize common themes
+3. Create consolidated insight nodes
+4. Mark source reflections as consolidated
+
+### Knowledge Synthesis
+
+Daily synthesis of accumulated knowledge:
+
+1. Query Content nodes created in last 24h
+2. Query ResearchFinding nodes from Möngke
+3. Identify patterns and connections
+4. Create Insight nodes with cross-references
+5. Store synthesis in Neo4j (not file - shareable)
+
+### Safety Rules
+
+NEVER synthesize if:
+- Active tasks are pending for any agent
+- Human is actively messaging
+- Neo4j shows high query load
+- Your last synthesis was < 4 hours ago (avoid duplication)
