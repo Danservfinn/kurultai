@@ -1,5 +1,8 @@
 FROM caddy:2-alpine
 
+# Cache bust to force rebuild when Caddyfile changes
+ARG CACHE_BUST=2026-02-07-v4
+
 # Copy the Caddyfile configuration
 COPY Caddyfile /etc/caddy/Caddyfile
 
