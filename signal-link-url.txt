@@ -1,1 +1,1 @@
-sgnl://linkdevice?uuid=MuPHk5oJuI0jXb8pkuU3CA%3D%3D&pub_key=BUItmxSOw6jE9F81vgopegFCrHm5OwaN7wBoRmXcpBsa
+sgnl://linkdevice?uuid=JoApSPQKY44qZsca1vVlyA%3D%3D&pub_key=BWGYyiC7bMYbLTvERRnSv%2BWnDnz%2FQbqgJUBqIvdrcIAD
