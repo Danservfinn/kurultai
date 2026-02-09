@@ -38,49 +38,49 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# All 6 Kurultai agents
-AGENT_NAMES = ["main", "researcher", "writer", "developer", "analyst", "ops"]
+# All 6 Kurultai agents (PascalCase names to match functional heartbeat hooks)
+AGENT_NAMES = ["Kublai", "Möngke", "Chagatai", "Temüjin", "Jochi", "Ögedei"]
 
 # Agent configuration with heartbeat task definitions
 AGENT_CONFIG = {
-    "main": {
-        "name": "kublai",
-        "neo4j_name": "kublai",
+    "Kublai": {
+        "name": "Kublai",
+        "neo4j_name": "Kublai",
         "tier": "critical",
         "interval_minutes": 5,
         "tasks": ["routing_optimization", "delegation_effectiveness"],
     },
-    "researcher": {
-        "name": "möngke",
-        "neo4j_name": "möngke",
+    "Möngke": {
+        "name": "Möngke",
+        "neo4j_name": "Möngke",
         "tier": "standard",
         "interval_minutes": 15,
         "tasks": ["knowledge_gap_analysis", "finding_consolidation"],
     },
-    "writer": {
-        "name": "chagatai",
-        "neo4j_name": "chagatai",
+    "Chagatai": {
+        "name": "Chagatai",
+        "neo4j_name": "Chagatai",
         "tier": "light",
         "interval_minutes": 60,
         "tasks": ["content_creation_moltbook", "content_creation_4claw"],
     },
-    "developer": {
-        "name": "temüjin",
-        "neo4j_name": "temüjin",
+    "Temüjin": {
+        "name": "Temüjin",
+        "neo4j_name": "Temüjin",
         "tier": "standard",
         "interval_minutes": 15,
         "tasks": ["pattern_learning", "debt_assessment"],
     },
-    "analyst": {
-        "name": "jochi",
-        "neo4j_name": "jochi",
+    "Jochi": {
+        "name": "Jochi",
+        "neo4j_name": "Jochi",
         "tier": "critical",
         "interval_minutes": 5,
         "tasks": ["performance_analysis", "efficiency_report"],
     },
-    "ops": {
-        "name": "ögedei",
-        "neo4j_name": "ögedei",
+    "Ögedei": {
+        "name": "Ögedei",
+        "neo4j_name": "Ögedei",
         "tier": "critical",
         "interval_minutes": 5,
         "tasks": ["failover_readiness", "health_aggregation"],
