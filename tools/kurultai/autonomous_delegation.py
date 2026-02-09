@@ -2,7 +2,8 @@
 """
 Autonomous Task Delegation System for Kublai
 
-Automatically delegates pending tasks to specialist agents via Neo4j AgentMessage nodes.
+Automatically delegates pending tasks to specialist agents via Neo4j AgentMessage nodes
+AND triggers agent spawn via OpenClaw HTTP API.
 Run as part of Kublai's 5-minute heartbeat cycle.
 """
 
@@ -10,6 +11,8 @@ import os
 import sys
 import json
 import uuid
+import urllib.request
+import urllib.error
 from datetime import datetime
 from neo4j import GraphDatabase
 
@@ -22,6 +25,10 @@ AGENT_ID_MAP = {
     'Ögedei': 'ops'
 }
 
+# OpenClaw Gateway configuration
+GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', 'http://localhost:18789')
+GATEWAY_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN')
+
 def get_neo4j_driver():
     """Get Neo4j driver from environment."""
     uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
@@ -30,6 +37,60 @@ def get_neo4j_driver():
     if not password:
         raise ValueError("NEO4J_PASSWORD not set")
     return GraphDatabase.driver(uri, auth=(user, password))
+
+def spawn_agent(agent_id):
+    """Trigger agent spawn via OpenClaw HTTP API."""
+    if not GATEWAY_TOKEN:
+        print(f"   ⚠️  OPENCLAW_GATEWAY_TOKEN not set, cannot spawn {agent_id}")
+        return False
+    
+    # Try multiple possible endpoints for agent spawning
+    endpoints = [
+        f"{GATEWAY_URL}/api/agents/{agent_id}/spawn",
+        f"{GATEWAY_URL}/api/agents/{agent_id}/message",
+        f"{GATEWAY_URL}/api/v1/agents/{agent_id}/spawn",
+    ]
+    
+    headers = {
+        'Authorization': f'Bearer {GATEWAY_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
+    payload = json.dumps({
+        'action': 'spawn',
+        'context': 'check_pending_tasks',
+        'triggered_by': 'kublai_autonomous_delegation'
+    }).encode('utf-8')
+    
+    for endpoint in endpoints:
+        try:
+            req = urllib.request.Request(
+                endpoint,
+                data=payload,
+                headers=headers,
+                method='POST'
+            )
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status in [200, 201, 202]:
+                    print(f"   🚀 Spawned {agent_id} via API")
+                    return True
+                else:
+                    print(f"   ⚠️  Spawn returned status {response.status}")
+                    
+        except urllib.error.HTTPError as e:
+            # Try next endpoint
+            continue
+        except urllib.error.URLError as e:
+            # Try next endpoint
+            continue
+        except Exception as e:
+            # Try next endpoint
+            continue
+    
+    # If we get here, all endpoints failed
+    print(f"   ⚠️  Could not spawn {agent_id} via API (agent may need manual trigger)")
+    return False
 
 def get_pending_tasks(driver):
     """Get pending tasks for specialist agents that haven't been delegated."""
@@ -57,19 +118,19 @@ def check_existing_delegation(driver, task_id):
         return result.single()['count'] > 0
 
 def delegate_task(driver, task):
-    """Create delegation message for a task."""
+    """Create delegation message for a task and trigger agent spawn."""
     agent_name = task['agent']
     agent_id = AGENT_ID_MAP.get(agent_name)
     task_id = task['task_id']
     
     if not agent_id:
         print(f"  ⚠️  Unknown agent: {agent_name}")
-        return False
+        return False, None
     
     # Check if already delegated
     if check_existing_delegation(driver, task_id):
         print(f"  ⏭️  Task {task_id[:8]}... already delegated, skipping")
-        return False
+        return False, None
     
     # Create delegation message
     message_payload = {
@@ -105,18 +166,20 @@ def delegate_task(driver, task):
                 t.delegated_at = datetime()
         ''', task_id=task_id)
     
-    return True
+    return True, agent_id
 
 def main():
     """Main delegation loop."""
-    print("🤖 Autonomous Task Delegation")
-    print("=" * 50)
+    print("🤖 Autonomous Task Delegation + Agent Spawning")
+    print("=" * 60)
     
     try:
         driver = get_neo4j_driver()
     except Exception as e:
         print(f"❌ Failed to connect to Neo4j: {e}")
         sys.exit(1)
+    
+    spawned_agents = set()  # Track which agents we've spawned this cycle
     
     try:
         # Get pending tasks
@@ -129,21 +192,34 @@ def main():
         print(f"📋 Found {len(tasks)} pending tasks\n")
         
         delegated_count = 0
+        spawned_count = 0
+        
         for task in tasks:
             agent_name = task['agent']
+            agent_id = AGENT_ID_MAP.get(agent_name)
             desc = task['desc'][:40] + "..." if len(task['desc']) > 40 else task['desc']
             
             print(f"📤 {agent_name:10} | {task['task_type']:12} | {desc}")
             
-            if delegate_task(driver, task):
+            # Delegate the task
+            delegated, agent_id = delegate_task(driver, task)
+            
+            if delegated:
                 print(f"   ✅ Delegated successfully")
                 delegated_count += 1
+                
+                # Spawn the agent (only once per agent per cycle)
+                if agent_id and agent_id not in spawned_agents:
+                    if spawn_agent(agent_id):
+                        spawned_count += 1
+                    spawned_agents.add(agent_id)
             else:
                 print(f"   ⏭️  Skipped (already delegated)")
             print()
         
-        print("=" * 50)
+        print("=" * 60)
         print(f"✅ Delegated {delegated_count}/{len(tasks)} tasks")
+        print(f"🚀 Spawned {spawned_count} agents via API")
         
     except Exception as e:
         print(f"❌ Error during delegation: {e}")
