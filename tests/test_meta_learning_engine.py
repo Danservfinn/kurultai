@@ -291,13 +291,16 @@ class TestMetaLearningIntegration:
         """Test reflection clustering."""
         engine, mock_session = engine_with_mocked_session
         
-        # Mock query results
+        # Mock query results - need to make result iterable
+        mock_record1 = Mock()
+        mock_record1.data.return_value = {'id': 'r1', 'agent': 'a1', 'topic': 'test', 'insights': ['i1'], 'task_type': 't1', 'created_at': datetime.utcnow()}
+        mock_record2 = Mock()
+        mock_record2.data.return_value = {'id': 'r2', 'agent': 'a1', 'topic': 'test', 'insights': ['i2'], 'task_type': 't1', 'created_at': datetime.utcnow()}
+        mock_record3 = Mock()
+        mock_record3.data.return_value = {'id': 'r3', 'agent': 'a1', 'topic': 'test', 'insights': ['i3'], 'task_type': 't1', 'created_at': datetime.utcnow()}
+        
         mock_result = Mock()
-        mock_result.data.return_value = [
-            {'id': 'r1', 'agent': 'a1', 'topic': 'test', 'insights': ['i1'], 'task_type': 't1', 'created_at': datetime.utcnow()},
-            {'id': 'r2', 'agent': 'a1', 'topic': 'test', 'insights': ['i2'], 'task_type': 't1', 'created_at': datetime.utcnow()},
-            {'id': 'r3', 'agent': 'a1', 'topic': 'test', 'insights': ['i3'], 'task_type': 't1', 'created_at': datetime.utcnow()},
-        ]
+        mock_result.__iter__ = Mock(return_value=iter([mock_record1, mock_record2, mock_record3]))
         mock_session.run.return_value = mock_result
         
         clusters = engine.cluster_reflections(min_cluster_size=3)

@@ -443,97 +443,110 @@ class TestGitIntegration:
             assert injector.enable_git is False
     
     @patch('tools.kurultai.soul_injector.subprocess.run')
-    def test_git_commit(self, mock_run, temp_souls_dir, sample_rule):
+    def test_git_commit(self, mock_run):
         """Test git commit functionality."""
         mock_run.return_value = Mock(
             returncode=0,
             stdout="abc123def456\n",
         )
         
-        injector = SOULInjector(
-            souls_base_path=temp_souls_dir,
-            enable_git=True,
-        )
-        
-        # Create test file
-        agent_id = 'test_agent'
-        agent_dir = os.path.join(injector.souls_base_path, agent_id)
-        os.makedirs(agent_dir, exist_ok=True)
-        
-        file_path = os.path.join(agent_dir, 'SOUL.md')
-        with open(file_path, 'w') as f:
-            f.write("# SOUL.md\n\n## Identity\n\nTest.")
-        
-        # Inject with git
-        record = injector.inject_rules(agent_id, [sample_rule])
-        
-        assert record.git_commit_hash is not None
-        assert record.git_commit_hash == "abc123def456"
-
-
-class TestSyncWithMetaLearning:
-    """Tests for integration with MetaLearningEngine."""
-    
-    def test_sync_with_meta_learning_engine(self, temp_souls_dir):
-        """Test syncing with meta learning engine."""
-        from tools.kurultai.meta_learning_engine import MetaLearningEngine, MetaRule
-        
-        # Create mock engine
-        mock_engine = Mock(spec=MetaLearningEngine)
-        
-        # Create test rules
-        rule1 = MetaRule(
-            id="rule-1",
-            name="rule_one",
-            description="Test rule one",
-            rule_type="general",
-            source_cluster_id="c1",
-            target_agents=["temujin"],
-            conditions=[],
-            actions=[],
-        )
-        rule2 = MetaRule(
-            id="rule-2",
-            name="rule_two",
-            description="Test rule two",
-            rule_type="general",
-            source_cluster_id="c2",
-            target_agents=["chagatai"],
-            conditions=[],
-            actions=[],
-        )
-        
-        mock_engine.rules = {
-            "rule-1": rule1,
-            "rule-2": rule2,
-        }
-        mock_engine.inject_rules.return_value = {
-            "temujin": ["rule-1"],
-            "chagatai": ["rule-2"],
+        sample_rule = {
+            'id': 'rule-123',
+            'name': 'test_error_handling',
+            'description': 'Always handle errors properly',
+            'rule_type': 'error_handling',
+            'priority': 3,
+            'effectiveness_score': 0.85,
+            'conditions': ['error_rate > 0.1'],
+            'actions': ['Add try-except blocks', 'Log errors'],
         }
         
-        # Create injector
-        injector = SOULInjector(
-            souls_base_path=temp_souls_dir,
-            enable_git=False,
-        )
-        
-        # Create test files
-        for agent_id in ['temujin', 'chagatai']:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            injector = SOULInjector(
+                souls_base_path=tmpdir,
+                enable_git=True,
+            )
+            
+            # Create test file
+            agent_id = 'test_agent'
             agent_dir = os.path.join(injector.souls_base_path, agent_id)
             os.makedirs(agent_dir, exist_ok=True)
             
             file_path = os.path.join(agent_dir, 'SOUL.md')
             with open(file_path, 'w') as f:
-                f.write(f"# SOUL.md\n\n## Identity\n\n{agent_id}.")
+                f.write("# SOUL.md\n\n## Identity\n\nTest.")
+            
+            # Inject with git
+            record = injector.inject_rules(agent_id, [sample_rule])
+            
+            assert record.git_commit_hash is not None
+            assert record.git_commit_hash == "abc123def456"
+
+
+class TestSyncWithMetaLearning:
+    """Tests for integration with MetaLearningEngine."""
+    
+    def test_sync_with_meta_learning_engine(self):
+        """Test syncing with meta learning engine."""
+        from tools.kurultai.meta_learning_engine import MetaLearningEngine, MetaRule
         
-        # Sync
-        result = injector.sync_with_meta_learning_engine(mock_engine)
-        
-        assert result['agents_processed'] == 2
-        assert result['rules_injected'] == 2
-        assert 'temujin' in result['records']
-        assert 'chagatai' in result['records']
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create mock engine
+            mock_engine = Mock(spec=MetaLearningEngine)
+            
+            # Create test rules
+            rule1 = MetaRule(
+                id="rule-1",
+                name="rule_one",
+                description="Test rule one",
+                rule_type="general",
+                source_cluster_id="c1",
+                target_agents=["temujin"],
+                conditions=[],
+                actions=[],
+            )
+            rule2 = MetaRule(
+                id="rule-2",
+                name="rule_two",
+                description="Test rule two",
+                rule_type="general",
+                source_cluster_id="c2",
+                target_agents=["chagatai"],
+                conditions=[],
+                actions=[],
+            )
+            
+            mock_engine.rules = {
+                "rule-1": rule1,
+                "rule-2": rule2,
+            }
+            mock_engine.inject_rules.return_value = {
+                "temujin": ["rule-1"],
+                "chagatai": ["rule-2"],
+            }
+            
+            # Create injector
+            injector = SOULInjector(
+                souls_base_path=tmpdir,
+                enable_git=False,
+            )
+            
+            # Create test files
+            for agent_id, mapped_dir in [('temujin', 'developer'), ('chagatai', 'writer')]:
+                agent_dir = os.path.join(injector.souls_base_path, mapped_dir)
+                os.makedirs(agent_dir, exist_ok=True)
+                
+                file_path = os.path.join(agent_dir, 'SOUL.md')
+                with open(file_path, 'w') as f:
+                    f.write(f"# SOUL.md\n\n## Identity\n\n{agent_id}.")
+            
+            # Sync
+            result = injector.sync_with_meta_learning_engine(mock_engine)
+            
+            assert result['agents_processed'] == 2
+            assert result['rules_injected'] == 2
+            assert 'temujin' in result['records']
+            assert 'chagatai' in result['records']
 
 
 if __name__ == "__main__":
