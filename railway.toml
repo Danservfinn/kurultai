@@ -1,0 +1,111 @@
+# Railway Configuration for Kurultai Multi-Agent System
+# Generated: 2026-02-09
+# Based on ARCHITECTURE.md v3.1
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "./entrypoint.sh"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Environment variables required:
+# - NEO4J_URI
+# - NEO4J_PASSWORD
+# - OPENCLAW_GATEWAY_TOKEN
+# - SIGNAL_ACCOUNT (for Signal integration)
+
+[deploy.env]
+NEO4J_URI = "bolt://neo4j.railway.internal:7687"
+NEO4J_USER = "neo4j"
+OPENCLAW_GATEWAY_URL = "http://localhost:18789"
+PROJECT_ROOT = "/app"
+
+# Cron schedules for automated tasks
+[[schedules]]
+name = "kurultai-heartbeat"
+cron = "*/5 * * * *"  # Every 5 minutes
+command = "cd /app && python tools/kurultai/heartbeat_master.py --cycle"
+
+[[schedules]]
+name = "jochi-smoke-tests"
+cron = "*/15 * * * *"  # Every 15 minutes
+command = "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase fixtures --phase integration --dry-run"
+
+[[schedules]]
+name = "jochi-hourly-tests"
+cron = "0 * * * *"  # Every hour
+command = "cd /app && python tools/kurultai/test_runner_orchestrator.py --dry-run"
+
+[[schedules]]
+name = "jochi-nightly-tests"
+cron = "0 2 * * *"  # 2 AM daily
+command = "cd /app && python tools/kurultai/test_runner_orchestrator.py --phase all --dry-run"
+
+[[schedules]]
+name = "kublai-weekly-reflection"
+cron = "0 20 * * 0"  # Sundays at 8 PM ET
+command = "cd /app && python tools/kurultai/heartbeat_master.py --trigger-reflection"
+
+# Agent spawning schedules - wake up dormant agents to check for tasks
+[[schedules]]
+name = "spawn-mongke"
+cron = "*/10 * * * *"  # Every 10 minutes
+command = "cd /app && python tools/kurultai/agent_spawner.py --agent researcher --check-tasks"
+
+[[schedules]]
+name = "spawn-chagatai"
+cron = "*/10 * * * *"  # Every 10 minutes
+command = "cd /app && python tools/kurultai/agent_spawner.py --agent writer --check-tasks"
+
+[[schedules]]
+name = "spawn-temujin"
+cron = "*/10 * * * *"  # Every 10 minutes
+command = "cd /app && python tools/kurultai/agent_spawner.py --agent developer --check-tasks"
+
+[[schedules]]
+name = "spawn-jochi"
+cron = "*/10 * * * *"  # Every 10 minutes
+command = "cd /app && python tools/kurultai/agent_spawner.py --agent analyst --check-tasks"
+
+[[schedules]]
+name = "spawn-ogedei"
+cron = "*/10 * * * *"  # Every 10 minutes
+command = "cd /app && python tools/kurultai/agent_spawner.py --agent ops --check-tasks"
+
+# MVS scoring and curation
+[[schedules]]
+name = "jochi-mvs-scoring"
+cron = "*/15 * * * *"  # Every 15 minutes
+command = "cd /app && python tools/kurultai/mvs_scorer.py --pass"
+
+[[schedules]]
+name = "jochi-vector-dedup"
+cron = "0 */6 * * *"  # Every 6 hours
+command = "cd /app && python tools/kurultai/dedup_engine.py"
+
+# Notion sync
+[[schedules]]
+name = "notion-sync"
+cron = "0 * * * *"  # Every hour
+command = "cd /app && python tools/notion_sync.py --bidirectional"
+
+[deploy.healthcheck]
+timeout = 300
+path = "/health"
+interval = 30
+
+[deploy.resources]
+# Neo4j needs memory
+memory = "4Gi"
+cpu = "2"
+
+[deploy.volumes]
+# Persistent storage for Neo4j
+neo4j-data = "/data/neo4j"
+signal-data = "/data/signal"
+logs = "/data/logs"
