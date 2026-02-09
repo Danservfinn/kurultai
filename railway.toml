@@ -26,6 +26,13 @@ OPENCLAW_GATEWAY_URL = "http://localhost:18789"
 PROJECT_ROOT = "/app"
 
 # Cron schedules for automated tasks
+
+# Weekly reflection cron (P3-T25)
+[[schedules]]
+name = "ogedei-weekly-reflection"
+cron = "0 0 * * 0"  # Sundays at midnight UTC
+command = "cd /app && python -m tools.kurultai.reflection_trigger"
+
 [[schedules]]
 name = "kurultai-heartbeat"
 cron = "*/5 * * * *"  # Every 5 minutes

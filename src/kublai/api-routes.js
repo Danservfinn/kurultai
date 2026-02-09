@@ -183,6 +183,359 @@ function createRoutes(neo4jDriver) {
     res.json(result);
   });
 
+  // ===========================================
+  // Subscription Management Routes
+  // ===========================================
+
+  /**
+   * POST /api/subscriptions
+   * Create a new subscription
+   * Body: { subscriber, topic, filter?, target? }
+   */
+  router.post('/subscriptions', async (req, res) => {
+    const { subscriber, topic, filter, target } = req.body;
+    
+    if (!subscriber || !topic) {
+      return res.status(400).json({
+        status: 'error',
+        error: 'Missing required fields: subscriber, topic'
+      });
+    }
+    
+    const session = neo4jDriver.session();
+    try {
+      const subscriptionId = require('uuid').v4();
+      const filterJson = filter ? JSON.stringify(filter) : null;
+      
+      // Ensure subscriber agent exists
+      await session.run(`
+        MERGE (a:Agent {id: $agent_id})
+        ON CREATE SET a.created_at = datetime()
+      `, { agent_id: subscriber });
+      
+      if (target) {
+        // Subscribe to specific target
+        await session.run(`
+          MERGE (target:Agent {id: $target_id})
+          ON CREATE SET target.created_at = datetime()
+          MATCH (sub:Agent {id: $subscriber_id})
+          CREATE (sub)-[s:SUBSCRIBES_TO {
+            id: $sub_id,
+            topic: $topic,
+            filter: $filter,
+            created_at: datetime(),
+            subscriber_id: $subscriber_id,
+            target_id: $target_id
+          }]->(target)
+        `, {
+          subscriber_id: subscriber,
+          target_id: target,
+          sub_id: subscriptionId,
+          topic: topic,
+          filter: filterJson
+        });
+      } else {
+        // Subscribe to all agents
+        await session.run(`
+          MATCH (sub:Agent {id: $subscriber_id})
+          MERGE (all:AllAgents)
+          ON CREATE SET all.created_at = datetime()
+          CREATE (sub)-[s:SUBSCRIBES_TO {
+            id: $sub_id,
+            topic: $topic,
+            filter: $filter,
+            created_at: datetime(),
+            subscriber_id: $subscriber_id,
+            target_id: '*'
+          }]->(all)
+        `, {
+          subscriber_id: subscriber,
+          sub_id: subscriptionId,
+          topic: topic,
+          filter: filterJson
+        });
+      }
+      
+      res.status(201).json({
+        status: 'success',
+        subscription_id: subscriptionId,
+        subscriber: subscriber,
+        target: target || '*',
+        topic: topic,
+        filter: filter,
+        created_at: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        error: error.message
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  /**
+   * GET /api/subscriptions
+   * List subscriptions for an agent
+   * Query: agent (required)
+   */
+  router.get('/subscriptions', async (req, res) => {
+    const { agent } = req.query;
+    
+    if (!agent) {
+      return res.status(400).json({
+        status: 'error',
+        error: 'Missing required query parameter: agent'
+      });
+    }
+    
+    const session = neo4jDriver.session();
+    try {
+      const result = await session.run(`
+        MATCH (sub:Agent {id: $agent_id})-[s:SUBSCRIBES_TO]->(target)
+        RETURN s.id as id,
+               s.topic as topic,
+               s.filter as filter,
+               s.created_at as created_at,
+               s.target_id as target_id,
+               target.id as target_agent_id
+      `, { agent_id: agent });
+      
+      const subscriptions = result.records.map(r => ({
+        id: r.get('id'),
+        topic: r.get('topic'),
+        filter: r.get('filter') ? JSON.parse(r.get('filter')) : null,
+        created_at: r.get('created_at'),
+        target_id: r.get('target_id') || r.get('target_agent_id')
+      }));
+      
+      res.json({
+        status: 'success',
+        agent: agent,
+        subscriptions: subscriptions
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        error: error.message
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  /**
+   * DELETE /api/subscriptions/:id
+   * Remove a subscription by ID
+   */
+  router.delete('/subscriptions/:id', async (req, res) => {
+    const { id } = req.params;
+    
+    const session = neo4jDriver.session();
+    try {
+      const result = await session.run(`
+        MATCH ()-[s:SUBSCRIBES_TO {id: $sub_id}]->()
+        DELETE s
+        RETURN count(s) as removed
+      `, { sub_id: id });
+      
+      const removed = result.single().get('removed');
+      
+      if (removed === 0) {
+        return res.status(404).json({
+          status: 'not_found',
+          error: 'Subscription not found'
+        });
+      }
+      
+      res.json({
+        status: 'success',
+        removed: removed,
+        subscription_id: id
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        error: error.message
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  /**
+   * POST /api/events/dispatch
+   * Trigger event dispatch to subscribers
+   * Body: { event_type, payload, publisher?, target? }
+   */
+  router.post('/events/dispatch', async (req, res) => {
+    const { event_type, payload, publisher = 'system', target } = req.body;
+    
+    if (!event_type) {
+      return res.status(400).json({
+        status: 'error',
+        error: 'Missing required field: event_type'
+      });
+    }
+    
+    const session = neo4jDriver.session();
+    try {
+      const notificationId = require('uuid').v4();
+      
+      // Find matching subscribers
+      let subscriberQuery = `
+        MATCH (sub:Agent)-[s:SUBSCRIBES_TO]->(target)
+        WHERE s.topic = $topic 
+           OR s.topic = '*'
+           OR $topic STARTS WITH replace(s.topic, '.*', '.')
+      `;
+      
+      if (target) {
+        subscriberQuery += `
+          AND (s.target_id = $target OR s.target_id = '*')
+        `;
+      }
+      
+      subscriberQuery += `
+        RETURN sub.id as subscriber_id,
+               s.id as subscription_id,
+               s.filter as filter,
+               s.topic as subscription_topic
+      `;
+      
+      const subResult = await session.run(subscriberQuery, { 
+        topic: event_type,
+        target: target
+      });
+      
+      const subscribers = subResult.records.map(r => ({
+        agent_id: r.get('subscriber_id'),
+        subscription_id: r.get('subscription_id'),
+        filter: r.get('filter') ? JSON.parse(r.get('filter')) : null,
+        topic: r.get('subscription_topic')
+      }));
+      
+      // Log notification
+      await session.run(`
+        CREATE (n:NotificationLog {
+          id: $id,
+          topic: $topic,
+          payload: $payload,
+          publisher: $publisher,
+          timestamp: datetime(),
+          subscriber_count: $count,
+          status: 'dispatched'
+        })
+      `, {
+        id: notificationId,
+        topic: event_type,
+        payload: JSON.stringify(payload || {}),
+        publisher: publisher,
+        count: subscribers.length
+      });
+      
+      // Create delivery relationships
+      for (const sub of subscribers) {
+        await session.run(`
+          MATCH (n:NotificationLog {id: $notif_id})
+          MATCH (a:Agent {id: $agent_id})
+          CREATE (n)-[:DELIVERED_TO {
+            timestamp: datetime(),
+            status: 'delivered',
+            subscription_id: $sub_id
+          }]->(a)
+        `, {
+          notif_id: notificationId,
+          agent_id: sub.agent_id,
+          sub_id: sub.subscription_id
+        });
+      }
+      
+      res.json({
+        status: 'dispatched',
+        notification_id: notificationId,
+        topic: event_type,
+        publisher: publisher,
+        timestamp: new Date().toISOString(),
+        subscriber_count: subscribers.length,
+        subscribers: subscribers.map(s => s.agent_id)
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        error: error.message
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  /**
+   * GET /api/events/logs
+   * Get notification logs
+   * Query: topic?, status?, limit?
+   */
+  router.get('/events/logs', async (req, res) => {
+    const { topic, status, limit = 100 } = req.query;
+    
+    const session = neo4jDriver.session();
+    try {
+      let query = `
+        MATCH (n:NotificationLog)
+        WHERE 1=1
+      `;
+      const params = { limit: parseInt(limit) };
+      
+      if (topic) {
+        query += ` AND n.topic = $topic`;
+        params.topic = topic;
+      }
+      
+      if (status) {
+        query += ` AND n.status = $status`;
+        params.status = status;
+      }
+      
+      query += `
+        RETURN n.id as id,
+               n.topic as topic,
+               n.payload as payload,
+               n.publisher as publisher,
+               n.timestamp as timestamp,
+               n.status as status,
+               n.subscriber_count as subscriber_count
+        ORDER BY n.timestamp DESC
+        LIMIT $limit
+      `;
+      
+      const result = await session.run(query, params);
+      
+      const logs = result.records.map(r => ({
+        id: r.get('id'),
+        topic: r.get('topic'),
+        payload: r.get('payload') ? JSON.parse(r.get('payload')) : null,
+        publisher: r.get('publisher'),
+        timestamp: r.get('timestamp'),
+        status: r.get('status'),
+        subscriber_count: r.get('subscriber_count')
+      }));
+      
+      res.json({
+        status: 'success',
+        count: logs.length,
+        logs: logs
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        error: error.message
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
   return router;
 }
 

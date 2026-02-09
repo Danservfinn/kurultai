@@ -216,9 +216,72 @@ echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < 
 # =============================================================================
 # START HEARTBEAT SIDECAR
 # =============================================================================
-if [ -n "$NEO4J_PASSWORD" ] && [ -f /app/scripts/heartbeat_writer.py ]; then
-    echo "Starting heartbeat writer sidecar..."
-    su -s /bin/sh moltbot -c "NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD python /app/scripts/heartbeat_writer.py &"
+# This sidecar writes infra_heartbeat every 30s for failover detection
+HEARTBEAT_WRITER_PID=""
+
+# Check for heartbeat_writer.py in multiple locations
+HEARTBEAT_WRITER_PATH=""
+for path in "/app/scripts/heartbeat_writer.py" "/app/tools/kurultai/heartbeat_writer.py"; do
+    if [ -f "$path" ]; then
+        HEARTBEAT_WRITER_PATH="$path"
+        break
+    fi
+done
+
+if [ -n "$NEO4J_PASSWORD" ] && [ -n "$HEARTBEAT_WRITER_PATH" ]; then
+    echo "=== Starting Heartbeat Writer Sidecar ==="
+    echo "  Script: $HEARTBEAT_WRITER_PATH"
+
+    # Ensure log directory exists
+    mkdir -p /data/logs
+
+    # Export environment for the sidecar
+    export HEARTBEAT_INTERVAL="${HEARTBEAT_INTERVAL:-30}"
+    export CIRCUIT_BREAKER_THRESHOLD="${CIRCUIT_BREAKER_THRESHOLD:-3}"
+    export CIRCUIT_BREAKER_PAUSE="${CIRCUIT_BREAKER_PAUSE:-60}"
+    export LOG_LEVEL="${HEARTBEAT_LOG_LEVEL:-INFO}"
+
+    # Start sidecar as moltbot user
+    su -s /bin/sh moltbot -c "
+        cd /app && \
+        NEO4J_URI=$NEO4J_URI \
+        NEO4J_USER=${NEO4J_USER:-neo4j} \
+        NEO4J_PASSWORD=$NEO4J_PASSWORD \
+        HEARTBEAT_INTERVAL=$HEARTBEAT_INTERVAL \
+        CIRCUIT_BREAKER_THRESHOLD=$CIRCUIT_BREAKER_THRESHOLD \
+        CIRCUIT_BREAKER_PAUSE=$CIRCUIT_BREAKER_PAUSE \
+        LOG_LEVEL=$LOG_LEVEL \
+        python $HEARTBEAT_WRITER_PATH >> /data/logs/heartbeat_writer.log 2>&1
+    " &
+
+    HEARTBEAT_WRITER_PID=$!
+    echo "  Heartbeat writer started with PID $HEARTBEAT_WRITER_PID"
+    echo "  Configuration:"
+    echo "    - Interval: ${HEARTBEAT_INTERVAL}s"
+    echo "    - Circuit breaker threshold: ${CIRCUIT_BREAKER_THRESHOLD} failures"
+    echo "    - Circuit breaker pause: ${CIRCUIT_BREAKER_PAUSE}s"
+    echo "    - Log level: ${LOG_LEVEL}"
+    echo "  Logs: /data/logs/heartbeat_writer.log"
+
+    # Verify it started
+    sleep 2
+    if kill -0 $HEARTBEAT_WRITER_PID 2>/dev/null; then
+        echo "  ✅ Heartbeat writer is running"
+    else
+        echo "  ⚠️  Heartbeat writer may have failed to start (check logs)"
+    fi
+    echo "=========================================="
+elif [ -z "$NEO4J_PASSWORD" ]; then
+    echo "=== Heartbeat Writer Skipped ==="
+    echo "  Reason: NEO4J_PASSWORD not set"
+    echo "=========================================="
+else
+    echo "=== Heartbeat Writer Skipped ==="
+    echo "  Reason: heartbeat_writer.py not found"
+    echo "  Checked paths:"
+    echo "    - /app/scripts/heartbeat_writer.py"
+    echo "    - /app/tools/kurultai/heartbeat_writer.py"
+    echo "=========================================="
 fi
 
 # =============================================================================
