@@ -16,6 +16,26 @@ from contextlib import contextmanager
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Embedding support for vector indexes
+_embedding_available = False
+_EmbeddingGenerator = None
+
+def _import_embedding():
+    """Lazy import embedding generator."""
+    global _embedding_available, _EmbeddingGenerator
+    if not _embedding_available:
+        try:
+            from tools.kurultai.semantic_search import EmbeddingGenerator
+            _EmbeddingGenerator = EmbeddingGenerator
+            _embedding_available = True
+        except ImportError:
+            _embedding_available = False
+
+def _get_embedding_generator():
+    """Get embedding generator, importing if necessary."""
+    _import_embedding()
+    return _EmbeddingGenerator
+
 # Lazy imports for neo4j to avoid numpy recursion issues during test collection
 # The neo4j driver imports numpy which can cause RecursionError when pytest's -W error is enabled
 _neo4j_imported = False
@@ -256,6 +276,10 @@ class OperationalMemory:
             "max_transaction_retry_time": max_retry_time
         }
         self._initialize_driver()
+        
+        # Initialize embedding generator for vector indexes
+        self._embedding_generator = None
+        self._embedding_enabled = True
 
     def _initialize_driver(self) -> None:
         """Initialize Neo4j driver with connection pooling."""
@@ -4180,6 +4204,261 @@ class OperationalMemory:
             self._driver.close()
             self._driver = None
             logger.info("Neo4j driver closed")
+
+    # ===================================================================
+    # Vector Embedding Support (Phase 2)
+    # ===================================================================
+
+    def _get_embedding(self, text: str) -> Optional[List[float]]:
+        """
+        Generate embedding vector for text.
+        
+        Args:
+            text: Text to embed
+            
+        Returns:
+            Embedding vector (384 dimensions) or None if unavailable
+        """
+        if not self._embedding_enabled:
+            return None
+            
+        if self._embedding_generator is None:
+            EmbeddingGen = _get_embedding_generator()
+            if EmbeddingGen:
+                try:
+                    self._embedding_generator = EmbeddingGen()
+                except Exception as e:
+                    logger.warning(f"Failed to initialize embedding generator: {e}")
+                    self._embedding_enabled = False
+                    return None
+            else:
+                self._embedding_enabled = False
+                return None
+        
+        try:
+            return self._embedding_generator.generate(text)
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding: {e}")
+            return None
+
+    def create_belief(
+        self,
+        statement: str,
+        agent: str,
+        confidence: float = 0.5,
+        source: Optional[str] = None,
+        generate_embedding: bool = True
+    ) -> str:
+        """
+        Create a Belief node with optional vector embedding.
+        
+        Args:
+            statement: The belief statement
+            agent: Agent creating the belief
+            confidence: Confidence level (0-1)
+            source: Source of the belief
+            generate_embedding: Whether to generate embedding
+            
+        Returns:
+            Belief ID
+        """
+        belief_id = self._generate_id()
+        now = self._now()
+        
+        # Generate embedding if enabled
+        embedding = None
+        if generate_embedding:
+            embedding = self._get_embedding(statement)
+        
+        cypher = """
+        CREATE (b:Belief {
+            id: $belief_id,
+            statement: $statement,
+            agent: $agent,
+            confidence: $confidence,
+            source: $source,
+            belief_embedding: COALESCE($embedding, []),
+            created_at: $created_at
+        })
+        RETURN b.id as id
+        """
+        
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Belief creation simulated for {agent}")
+                return belief_id
+                
+            try:
+                result = session.run(
+                    cypher,
+                    belief_id=belief_id,
+                    statement=statement,
+                    agent=agent,
+                    confidence=confidence,
+                    source=source,
+                    embedding=embedding,
+                    created_at=now
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Belief created: {belief_id} (agent: {agent}, embedding: {embedding is not None})")
+                    return record["id"]
+                else:
+                    raise RuntimeError("Belief creation failed: no record returned")
+            except _get_neo4j_error() as e:
+                logger.error(f"Failed to create belief: {e}")
+                raise
+
+    def create_memory_entry(
+        self,
+        description: str,
+        agent: str,
+        memory_type: str = "observation",
+        importance: float = 0.5,
+        related_task_id: Optional[str] = None,
+        generate_embedding: bool = True
+    ) -> str:
+        """
+        Create a MemoryEntry node with optional vector embedding.
+        
+        Args:
+            description: Memory description
+            agent: Agent creating the memory
+            memory_type: Type of memory (observation, insight, decision, etc.)
+            importance: Importance level (0-1)
+            related_task_id: Optional related task ID
+            generate_embedding: Whether to generate embedding
+            
+        Returns:
+            Memory entry ID
+        """
+        memory_id = self._generate_id()
+        now = self._now()
+        
+        # Generate embedding if enabled
+        embedding = None
+        if generate_embedding:
+            embedding = self._get_embedding(description)
+        
+        cypher = """
+        CREATE (m:MemoryEntry {
+            id: $memory_id,
+            description: $description,
+            agent: $agent,
+            memory_type: $memory_type,
+            importance: $importance,
+            memory_entry_embedding: COALESCE($embedding, []),
+            related_task_id: $related_task_id,
+            created_at: $created_at
+        })
+        RETURN m.id as id
+        """
+        
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Memory creation simulated for {agent}")
+                return memory_id
+                
+            try:
+                result = session.run(
+                    cypher,
+                    memory_id=memory_id,
+                    description=description,
+                    agent=agent,
+                    memory_type=memory_type,
+                    importance=importance,
+                    embedding=embedding,
+                    related_task_id=related_task_id,
+                    created_at=now
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Memory entry created: {memory_id} (agent: {agent}, embedding: {embedding is not None})")
+                    return record["id"]
+                else:
+                    raise RuntimeError("Memory entry creation failed: no record returned")
+            except _get_neo4j_error() as e:
+                logger.error(f"Failed to create memory entry: {e}")
+                raise
+
+    def create_research(
+        self,
+        topic: str,
+        findings: str,
+        agent: str,
+        source_urls: Optional[List[str]] = None,
+        generate_embedding: bool = True
+    ) -> str:
+        """
+        Create a Research node with optional vector embedding.
+        
+        Args:
+            topic: Research topic
+            findings: Research findings
+            agent: Agent creating the research
+            source_urls: List of source URLs
+            generate_embedding: Whether to generate embedding
+            
+        Returns:
+            Research ID
+        """
+        research_id = self._generate_id()
+        now = self._now()
+        
+        # Generate embedding if enabled (combine topic and findings)
+        embedding = None
+        if generate_embedding:
+            text_to_embed = f"{topic} {findings}"
+            embedding = self._get_embedding(text_to_embed)
+        
+        cypher = """
+        CREATE (r:Research {
+            id: $research_id,
+            topic: $topic,
+            findings: $findings,
+            agent: $agent,
+            research_embedding: COALESCE($embedding, []),
+            source_urls: COALESCE($source_urls, []),
+            created_at: $created_at
+        })
+        RETURN r.id as id
+        """
+        
+        with self._session() as session:
+            if session is None:
+                logger.warning(f"Fallback mode: Research creation simulated for {agent}")
+                return research_id
+                
+            try:
+                result = session.run(
+                    cypher,
+                    research_id=research_id,
+                    topic=topic,
+                    findings=findings,
+                    agent=agent,
+                    embedding=embedding,
+                    source_urls=source_urls,
+                    created_at=now
+                )
+                record = result.single()
+                if record:
+                    logger.info(f"Research created: {research_id} (agent: {agent}, embedding: {embedding is not None})")
+                    return record["id"]
+                else:
+                    raise RuntimeError("Research creation failed: no record returned")
+            except _get_neo4j_error() as e:
+                logger.error(f"Failed to create research: {e}")
+                raise
+
+    def enable_embeddings(self, enabled: bool = True) -> None:
+        """
+        Enable or disable embedding generation.
+        
+        Args:
+            enabled: Whether to enable embeddings
+        """
+        self._embedding_enabled = enabled
+        logger.info(f"Embeddings {'enabled' if enabled else 'disabled'}")
 
     def __enter__(self):
         """Context manager entry."""

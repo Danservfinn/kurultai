@@ -32,7 +32,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from openclaw_memory import OperationalMemory
 
+# Import message signing
+try:
+    from tools.kurultai.message_signer import AgentMessageSigner, VerificationResult
+    HAS_SIGNING = True
+except ImportError:
+    HAS_SIGNING = False
+
 logger = logging.getLogger(__name__)
+
+# Message signing configuration
+SIGNING_ENABLED = os.environ.get('AGENT_SIGNING_ENABLED', 'true').lower() == 'true'
 
 
 class TaskType(Enum):
@@ -87,6 +97,11 @@ class DelegationResult:
     error: Optional[str] = None
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
+    # Signature fields for secure delegation
+    signature: Optional[str] = None
+    signature_valid: Optional[bool] = None
+    signed_by: Optional[str] = None
+    signed_at: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -98,7 +113,11 @@ class DelegationResult:
             "message": self.message,
             "error": self.error,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "signature": self.signature,
+            "signature_valid": self.signature_valid,
+            "signed_by": self.signed_by,
+            "signed_at": self.signed_at
         }
 
 
@@ -565,10 +584,11 @@ class DelegationProtocol:
         context: Dict[str, Any],
         suggested_agent: str | None = None,
         priority: str = "normal",
-        delegated_by: str = "main"
+        delegated_by: str = "main",
+        sign_message: bool = True
     ) -> DelegationResult:
         """
-        Full delegation workflow with privacy protection.
+        Full delegation workflow with privacy protection and optional signing.
 
         Steps:
         1. Query personal memory for user context
@@ -576,8 +596,9 @@ class DelegationProtocol:
         3. Sanitize content for privacy
         4. Determine target agent
         5. Create task in Neo4j
-        6. Delegate via agentToAgent (if gateway configured)
-        7. Store delegation record
+        6. Sign delegation message (if enabled)
+        7. Delegate via agentToAgent (if gateway configured)
+        8. Store delegation record
 
         Args:
             task_description: The task to delegate
@@ -585,12 +606,15 @@ class DelegationProtocol:
             suggested_agent: Optional agent suggestion
             priority: Task priority (low, normal, high, critical)
             delegated_by: Agent doing the delegation (default: main/Kublai)
+            sign_message: Whether to sign the delegation message
 
         Returns:
-            DelegationResult with task details
+            DelegationResult with task details and signature
         """
         started_at = datetime.now(timezone.utc)
         task_id = str(uuid.uuid4())
+        signature = None
+        signed_at = None
 
         try:
             # Step 1: Query personal memory
@@ -623,21 +647,41 @@ class DelegationProtocol:
                 context=context
             )
 
-            # Step 6: Delegate via agentToAgent if gateway configured
+            # Step 6: Sign delegation message if enabled
+            if sign_message and HAS_SIGNING and SIGNING_ENABLED and target_agent != "main":
+                try:
+                    signer = AgentMessageSigner(agent_id=delegated_by)
+                    delegation_message = {
+                        "action": "delegate",
+                        "task_id": task_id,
+                        "description": sanitized_description,
+                        "priority": priority,
+                        "target_agent": target_agent
+                    }
+                    sign_result = signer.sign_message(delegation_message, to_agent=target_agent)
+                    signature = sign_result.signature
+                    signed_at = sign_result.timestamp
+                    logger.info(f"Delegation message signed for {target_agent}")
+                except Exception as e:
+                    logger.warning(f"Failed to sign delegation: {e}")
+
+            # Step 7: Delegate via agentToAgent if gateway configured
             if self.gateway_url and target_agent != "main":
                 self._send_to_agent(
                     task_id=task_id,
                     target_agent=target_agent,
-                    description=sanitized_description
+                    description=sanitized_description,
+                    signature=signature
                 )
 
-            # Step 7: Store delegation record
+            # Step 8: Store delegation record with signature
             self._store_delegation_record(
                 task_id=task_id,
                 target_agent=target_agent,
                 personal_context=personal_context,
                 operational_context=operational_context,
-                sanitization_counts=sanitization_counts
+                sanitization_counts=sanitization_counts,
+                signature=signature
             )
 
             agent_name = self.AGENT_NAMES.get(target_agent, target_agent.capitalize())
@@ -649,7 +693,11 @@ class DelegationProtocol:
                 agent_name=agent_name,
                 message=f"Task delegated to {agent_name} (ID: {task_id})",
                 started_at=started_at,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=datetime.now(timezone.utc),
+                signature=signature,
+                signature_valid=signature is not None,
+                signed_by=delegated_by if signature else None,
+                signed_at=signed_at
             )
 
         except Exception as e:
@@ -717,17 +765,23 @@ class DelegationProtocol:
         self,
         task_id: str,
         target_agent: str,
-        description: str
+        description: str,
+        signature: Optional[str] = None
     ) -> bool:
         """
         Send task to agent via agentToAgent messaging.
 
+        Args:
+            task_id: Task identifier
+            target_agent: Target agent ID
+            description: Task description
+            signature: Optional message signature
+
         Note: This requires the gateway to be configured.
         If not configured, the task is still stored in Neo4j for pickup.
         """
-        # This would integrate with the Signal/agentToAgent system
-        # For now, we just log it
-        logger.info(f"Would send to {target_agent} via agentToAgent: {description[:100]}")
+        sig_info = f" [signed: {signature[:20]}...]" if signature else " [unsigned]"
+        logger.info(f"Would send to {target_agent} via agentToAgent: {description[:100]}{sig_info}")
         return True
 
     def _store_delegation_record(
@@ -736,15 +790,18 @@ class DelegationProtocol:
         target_agent: str,
         personal_context: PersonalContext,
         operational_context: List[Dict],
-        sanitization_counts: Dict[str, int]
+        sanitization_counts: Dict[str, int],
+        signature: Optional[str] = None
     ) -> None:
         """Store delegation record for synthesis."""
         # This stores information needed for response synthesis
+        sig_note = f" (signed: {signature[:20]}...)" if signature else ""
         logger.debug(
             f"Storing delegation record for {task_id}: "
             f"target={target_agent}, "
             f"sanitized={sum(sanitization_counts.values())} items, "
             f"operational_context={len(operational_context)} items"
+            f"{sig_note}"
         )
 
     def store_results(
