@@ -5,6 +5,24 @@
 
 ## Background Tasks
 
+### Task 0: Autonomous Task Orchestration
+**Schedule**: Every 5 minutes (first priority)
+**Description**: Ensure all tasks get assigned, delegated, and started autonomously
+
+**Actions**:
+1. Find pending tasks without assignees → Auto-assign based on capability matching
+2. Find assigned tasks without AgentMessages → Create delegation messages
+3. Find agents with pending tasks but dormant → Trigger spawn
+4. Find ready tasks (assigned + messaged) → Auto-start to in_progress
+
+**Agent Capability Mapping**:
+- Möngke → research, web_search, api_analysis
+- Chagatai → writing, documentation, content
+- Temüjin → development, coding, implementation
+- Jochi → analysis, security, testing, audit
+- Ögedei → operations, monitoring, health_check
+- Kublai → orchestration, routing, synthesis
+
 ### Task 1: Status Synthesis
 **Schedule**: Every 5 minutes
 **Description**: Aggregate agent heartbeat results from Neo4j

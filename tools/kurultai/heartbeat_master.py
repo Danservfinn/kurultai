@@ -120,6 +120,18 @@ class UnifiedHeartbeat:
         logger.info(f"Heartbeat cycle #{self.cycle_count} starting")
         logger.info(f"=" * 60)
 
+        # AUTONOMOUS ORCHESTRATION - Step 0
+        # Ensure all tasks get assigned, delegated, and started
+        try:
+            from .autonomous_orchestrator import get_orchestrator
+            orchestrator = get_orchestrator(self.driver)
+            orch_stats = await orchestrator.orchestrate_cycle()
+            if orch_stats['tasks_assigned'] > 0 or orch_stats['tasks_started'] > 0:
+                logger.info(f"🤖 Autonomous Orchestration: {orch_stats['tasks_assigned']} assigned, "
+                          f"{orch_stats['tasks_started']} started, {orch_stats['messages_created']} messages")
+        except Exception as e:
+            logger.warning(f"Autonomous orchestration error: {e}")
+
         results = []
         tasks_run = 0
         tasks_succeeded = 0
