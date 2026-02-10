@@ -439,9 +439,9 @@ TASK_REGISTRY = {
     'reflection_consolidation': {'fn': reflection_consolidation, 'agent': 'chagatai', 'freq': 30},
     
     # Möngke (Researcher)
-    'knowledge_gap_analysis': {'fn': knowledge_gap_analysis, 'agent': 'möngke', 'freq': 1440},
-    'ordo_sacer_research': {'fn': ordo_sacer_research, 'agent': 'möngke', 'freq': 1440},
-    'ecosystem_intelligence': {'fn': ecosystem_intelligence, 'agent': 'möngke', 'freq': 10080},
+    'knowledge_gap_analysis': {'fn': knowledge_gap_analysis, 'agent': 'möngke', 'freq': 60},
+    'ordo_sacer_research': {'fn': ordo_sacer_research, 'agent': 'möngke', 'freq': 60},
+    'ecosystem_intelligence': {'fn': ecosystem_intelligence, 'agent': 'möngke', 'freq': 60},
     
     # Kublai (Main)
     'status_synthesis': {'fn': status_synthesis, 'agent': 'kublai', 'freq': 5},
