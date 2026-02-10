@@ -139,7 +139,10 @@ class IdentityManager:
             return False
 
         if self.neo4j_password is None:
-            raise ValueError("Neo4j password is required")
+            if not self.fallback_mode:
+                raise ValueError("Neo4j password is required")
+            logger.warning("No Neo4j password provided, operating in fallback mode")
+            return False
 
         try:
             self._driver = self._GraphDatabase.driver(
@@ -650,6 +653,110 @@ class IdentityManager:
             return json.loads(metadata_str.replace("'", '"'))
         except:
             return {}
+
+    # ===================================================================
+    # Relationship Methods (Integration with Relationship Tracking System)
+    # ===================================================================
+
+    def record_relationship_fact(
+        self,
+        person_id: str,
+        related_person: str,
+        relationship_type: str,
+        strength: float = 0.5,
+        context: str = "",
+        confidence: float = 0.5
+    ) -> Optional[Any]:
+        """
+        Record a relationship fact about a person.
+        
+        This integrates with the relationship tracking system by storing
+        relationship information as a fact with RELATIONSHIP type.
+        
+        Args:
+            person_id: Person's unique ID
+            related_person: Name or ID of related person
+            relationship_type: Type of relationship (friend, colleague, etc.)
+            strength: Relationship strength 0.0-1.0
+            context: Additional context
+            confidence: Confidence in this fact
+            
+        Returns:
+            Created Fact object or None
+        """
+        fact_value = f"{relationship_type}:{related_person}:{strength:.2f}"
+        if context:
+            fact_value += f":{context[:100]}"
+            
+        return self.add_fact(
+            person_id=person_id,
+            fact_type=FactType.RELATIONSHIP,
+            key=f"knows_{related_person.lower().replace(' ', '_')}",
+            value=fact_value,
+            privacy_level=PrivacyLevel.PRIVATE,
+            confidence=confidence
+        )
+
+    def get_relationship_facts(
+        self,
+        person_id: str,
+        min_confidence: float = 0.0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all relationship facts for a person.
+        
+        Args:
+            person_id: Person's unique ID
+            min_confidence: Minimum confidence threshold
+            
+        Returns:
+            List of parsed relationship facts
+        """
+        facts = self.get_facts(
+            person_id=person_id,
+            fact_type=FactType.RELATIONSHIP,
+            min_confidence=min_confidence,
+            limit=50
+        )
+        
+        relationships = []
+        for fact in facts:
+            # Parse fact value: "type:person:strength:context"
+            parts = fact.fact_value.split(":")
+            if len(parts) >= 3:
+                relationships.append({
+                    "related_person": parts[1],
+                    "relationship_type": parts[0],
+                    "strength": float(parts[2]),
+                    "context": parts[3] if len(parts) > 3 else "",
+                    "confidence": fact.confidence,
+                    "discovered_at": fact.created_at
+                })
+        
+        return relationships
+
+    def get_primary_human_relationship(
+        self,
+        person_id: str,
+        primary_human: str = "Danny"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a person's relationship to the primary human.
+        
+        Args:
+            person_id: Person's unique ID
+            primary_human: Name of primary human (default: Danny)
+            
+        Returns:
+            Relationship dict or None
+        """
+        relationships = self.get_relationship_facts(person_id)
+        
+        for rel in relationships:
+            if rel["related_person"].lower() == primary_human.lower():
+                return rel
+        
+        return None
 
 
 # =============================================================================
