@@ -62,7 +62,27 @@
 - Security issues detected
 - Resource exhaustion
 
+### Task 4: Hourly Task List Updates (Via Ögedei)
+**Schedule**: Every 5 minutes, trigger at :00 of each hour
+**Description**: Send updated task list to user via Notion + Signal
+
+**Actions**:
+1. Check if current minute is :00 (top of hour)
+2. Query Ögedei for task status from Notion
+3. Generate formatted task list:
+   - Danny's active tasks (from Notion)
+   - Kublai's active tasks (from Neo4j + Notion)
+   - Current focus items
+   - System status
+4. Send via Signal to +19194133445
+
+**Integration**:
+- Ögedei manages tasks in Notion "Kurultai Business Operations" database
+- Tasks synced bidirectionally with Neo4j
+- Updates sent hourly at :00 UTC
+
 ## Heartbeat Response Rules
 - If nothing needs attention → reply `HEARTBEAT_OK`
 - If tasks delegated → reply with delegation summary
+- If hourly update sent → reply with task summary
 - If critical issues → alert text only (no HEARTBEAT_OK)
