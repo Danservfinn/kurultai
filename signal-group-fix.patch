@@ -1,0 +1,15 @@
+--- a/deliver-Ck-fH_m-.js
++++ b/deliver-Ck-fH_m-.js
+@@ -2147,7 +2147,11 @@ function returnRaw(raw) {
+ function normalizeTargetForProvider(provider, raw) {
+ 	if (!raw) return;
+ 	const providerId = normalizeChannelId(provider);
+-	return ((providerId ? getChannelPlugin(providerId) : void 0)?.messaging?.normalizeTarget?.(raw) ?? (raw.trim().toLowerCase() || void 0)) || void 0;
++	const trimmed = raw.trim();
++	// Don't lowercase group: targets (Signal group IDs are base64 and case-sensitive)
++	const shouldPreserveCase = trimmed.toLowerCase().startsWith("group:");
++	const normalized = shouldPreserveCase ? trimmed : trimmed.toLowerCase();
++	return ((providerId ? getChannelPlugin(providerId) : void 0)?.messaging?.normalizeTarget?.(raw) ?? normalized) || void 0;
+ }
+ function buildTargetResolverSignature(channel) {
+ 	const resolver = getChannelPlugin(channel)?.messaging?.targetResolver;
