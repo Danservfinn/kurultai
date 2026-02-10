@@ -36,11 +36,34 @@ def get_driver():
 
 def health_check(driver) -> Dict:
     """
-    P2A-T1: Health check (5 min, 150 tokens)
-    Check Neo4j, agent heartbeats, disk space, log sizes
+    P2A-T1: Enhanced health check (5 min, 150 tokens)
+    Comprehensive monitoring: Signal, System, Neo4j, Agents, Tasks, Security, External APIs
     """
-    print("  🏥 Running health check...")
+    print("  🏥 Running comprehensive health check...")
     
+    # Import health checkers
+    try:
+        from health.health_orchestrator import HealthOrchestrator
+        
+        orchestrator = HealthOrchestrator(driver)
+        result = orchestrator.run_full_health_check()
+        
+        return {
+            'status': 'success' if result['healthy_count'] == result['total_checks'] else 'warning',
+            'summary': result['summary'],
+            'healthy': result['healthy_count'],
+            'warnings': result['warning_count'],
+            'critical': result['critical_count'],
+            'total': result['total_checks']
+        }
+    except Exception as e:
+        # Fallback to basic health check if orchestrator fails
+        print(f"  ⚠️  Health orchestrator error: {e}")
+        return _basic_health_check(driver)
+
+
+def _basic_health_check(driver) -> Dict:
+    """Fallback basic health check if orchestrator fails"""
     issues = []
     
     with driver.session() as session:
@@ -61,32 +84,12 @@ def health_check(driver) -> Dict:
         stale_agents = [r['name'] for r in result]
         if stale_agents:
             issues.append(f"Stale heartbeats: {', '.join(stale_agents)}")
-        
-        # Check disk space (mock)
-        # In production, this would check actual disk usage
-        
-        # Check log sizes (mock)
-        
-        # Create health report
-        session.run('''
-            CREATE (h:HealthCheck {
-                id: $id,
-                timestamp: datetime(),
-                issues: $issues,
-                issue_count: $count,
-                status: $status
-            })
-        ''', 
-            id=f"health_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            issues=json.dumps(issues),
-            count=len(issues),
-            status='healthy' if not issues else 'degraded'
-        )
     
     return {
         'status': 'success' if not issues else 'warning',
         'issues_found': len(issues),
-        'issues': issues
+        'issues': issues,
+        'note': 'Fallback basic check (orchestrator unavailable)'
     }
 
 
