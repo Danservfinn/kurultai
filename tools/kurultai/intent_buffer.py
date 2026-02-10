@@ -12,7 +12,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
-from .types import Message, DEFAULT_WINDOW_SECONDS, DEFAULT_MAX_MESSAGES
+from .kurultai_types import Message, DEFAULT_WINDOW_SECONDS, DEFAULT_MAX_MESSAGES
 
 
 class IntentWindowBuffer:

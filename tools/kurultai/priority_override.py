@@ -10,7 +10,7 @@ Date: 2026-02-04
 import re
 from typing import Optional, List, Dict, Any
 
-from .types import Task
+from .kurultai_types import Task
 
 
 class PriorityCommandHandler:

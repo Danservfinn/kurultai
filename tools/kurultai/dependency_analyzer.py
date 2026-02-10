@@ -9,7 +9,7 @@ Date: 2026-02-04
 
 from typing import List, Optional
 
-from .types import (
+from .kurultai_types import (
     Dependency,
     DependencyType,
     Task,

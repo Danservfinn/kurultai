@@ -14,7 +14,7 @@ Author: Claude (Anthropic)
 Date: 2026-02-04
 """
 
-from .types import (
+from .kurultai_types import (
     TaskStatus,
     DependencyType,
     DeliverableType,

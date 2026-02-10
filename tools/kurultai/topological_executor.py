@@ -13,7 +13,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional
 
 from .complexity_config import ComplexityConfig, DEFAULT_CONFIG, complexity_to_team_size
-from .types import Task, ExecutionSummary, MAX_TASKS_PER_AGENT, DeliverableType
+from .kurultai_types import Task, ExecutionSummary, MAX_TASKS_PER_AGENT, DeliverableType
 
 logger = logging.getLogger(__name__)
 
