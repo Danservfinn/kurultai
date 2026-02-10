@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from tools.identity_manager import IdentityManager, PersonIdentity
 from tools.relationship_detector import (
-    RelationshipDetector, 
+    RelationshipDetector,
     RelationshipType,
     DetectedRelationship
 )
@@ -47,14 +47,14 @@ class RelationshipContext:
 class RelationshipManager:
     """
     Manages relationships between people in the identity system.
-    
+
     Integrates with:
     - IdentityManager for person data
     - RelationshipDetector for single conversation analysis
     - RelationshipAnalyzer for batch/horde analysis
     - Neo4j for persistent storage
     """
-    
+
     def __init__(
         self,
         identity_manager: Optional[IdentityManager] = None,
@@ -70,7 +70,7 @@ class RelationshipManager:
         self.neo4j_password = neo4j_password
         self.database = database
         self.primary_human = primary_human
-        
+
         self._detector = RelationshipDetector(primary_human=primary_human)
         self._analyzer = RelationshipAnalyzer(
             neo4j_uri=neo4j_uri,
@@ -79,15 +79,15 @@ class RelationshipManager:
             database=database,
             primary_human=primary_human
         )
-        
+
         self._driver = None
         self._initialized = False
-        
+
     def initialize(self) -> bool:
         """Initialize the relationship manager."""
         # Initialize analyzer
         self._analyzer.initialize()
-        
+
         # Connect to Neo4j if we have credentials
         if self.neo4j_password:
             try:
@@ -102,22 +102,22 @@ class RelationshipManager:
                 return True
             except Exception as e:
                 logger.warning(f"Neo4j connection failed: {e}")
-        
+
         self._initialized = True
         logger.info("RelationshipManager initialized (memory-only mode)")
         return True
-    
+
     def close(self):
         """Close connections."""
         self._analyzer.close()
         if self._driver:
             self._driver.close()
             self._driver = None
-    
+
     # ===================================================================
     # Core Relationship Operations
     # ===================================================================
-    
+
     def record_relationship(
         self,
         person_a_id: str,
@@ -130,7 +130,7 @@ class RelationshipManager:
     ) -> bool:
         """
         Record a relationship between two people.
-        
+
         Args:
             person_a_id: First person's ID
             person_b_id: Second person's ID
@@ -139,16 +139,16 @@ class RelationshipManager:
             context: Context description
             confidence: Confidence in this relationship
             source: Source of the detection
-            
+
         Returns:
             True if successful
         """
         if not self._driver:
             logger.warning("No Neo4j connection, cannot store relationship")
             return False
-        
+
         now = datetime.now(timezone.utc)
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 session.run("""
@@ -185,14 +185,14 @@ class RelationshipManager:
                     source=source,
                     now=now
                 )
-            
+
             logger.debug(f"Recorded relationship: {person_a_id} -> {person_b_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to record relationship: {e}")
             return False
-    
+
     def get_relationship(
         self,
         person_a_id: str,
@@ -200,17 +200,17 @@ class RelationshipManager:
     ) -> Optional[Dict[str, Any]]:
         """
         Get relationship between two people.
-        
+
         Args:
             person_a_id: First person's ID
             person_b_id: Second person's ID
-            
+
         Returns:
             Relationship dict or None
         """
         if not self._driver:
             return None
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 result = session.run("""
@@ -230,16 +230,16 @@ class RelationshipManager:
                     person_a_id=person_a_id,
                     person_b_id=person_b_id
                 )
-                
+
                 record = result.single()
                 if record:
                     return record["relationship"]
                 return None
-                
+
         except Exception as e:
             logger.error(f"Failed to get relationship: {e}")
             return None
-    
+
     def get_person_relationships(
         self,
         person_id: str,
@@ -248,23 +248,23 @@ class RelationshipManager:
     ) -> List[Dict[str, Any]]:
         """
         Get all relationships for a person.
-        
+
         Args:
             person_id: Person's ID
             min_strength: Minimum strength threshold
             relationship_type: Optional type filter
-            
+
         Returns:
             List of relationship dicts
         """
         if not self._driver:
             return []
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 # Build query based on filters
                 type_filter = "AND r.type = $rel_type" if relationship_type else ""
-                
+
                 result = session.run(f"""
                     MATCH (p:Person {{id: $person_id}})-[r:KNOWS]-(other:Person)
                     WHERE r.strength >= $min_strength {type_filter}
@@ -283,23 +283,23 @@ class RelationshipManager:
                     min_strength=min_strength,
                     rel_type=relationship_type.value if relationship_type else None
                 )
-                
+
                 return [record["relationship"] for record in result]
-                
+
         except Exception as e:
             logger.error(f"Failed to get person relationships: {e}")
             return []
-    
+
     def get_relationship_to_primary(
         self,
         person_id: str
     ) -> Optional[Dict[str, Any]]:
         """
         Get a person's relationship to the primary human.
-        
+
         Args:
             person_id: Person's ID
-            
+
         Returns:
             Relationship dict or None
         """
@@ -310,16 +310,16 @@ class RelationshipManager:
             f"slack:{self.primary_human}",
             self.primary_human
         ]
-        
+
         for primary_id in primary_ids:
             rel = self.get_relationship(person_id, primary_id)
             if rel:
                 return rel
-        
+
         # Try by name lookup
         if not self._driver:
             return None
-            
+
         try:
             with self._driver.session(database=self.database) as session:
                 result = session.run("""
@@ -338,20 +338,20 @@ class RelationshipManager:
                     person_id=person_id,
                     primary_name=self.primary_human
                 )
-                
+
                 record = result.single()
                 if record:
                     return record["relationship"]
                 return None
-                
+
         except Exception as e:
             logger.error(f"Failed to get relationship to primary: {e}")
             return None
-    
+
     # ===================================================================
     # Detection and Analysis Integration
     # ===================================================================
-    
+
     def analyze_and_record(
         self,
         conversation_text: str,
@@ -361,13 +361,13 @@ class RelationshipManager:
     ) -> List[DetectedRelationship]:
         """
         Analyze a conversation and record any detected relationships.
-        
+
         Args:
             conversation_text: Text to analyze
             speaker_id: Speaker's person ID
             speaker_name: Speaker's display name
             conversation_id: Optional conversation identifier
-            
+
         Returns:
             List of recorded relationships
         """
@@ -378,7 +378,7 @@ class RelationshipManager:
             speaker_name=speaker_name,
             conversation_id=conversation_id
         )
-        
+
         # Record each detected relationship
         recorded = []
         for rel in detected:
@@ -391,7 +391,7 @@ class RelationshipManager:
                     name=other_id
                 )
                 other_id = person.id
-            
+
             success = self.record_relationship(
                 person_a_id=speaker_id,
                 person_b_id=other_id,
@@ -401,12 +401,12 @@ class RelationshipManager:
                 confidence=rel.confidence,
                 source=f"detection:{conversation_id or 'unknown'}"
             )
-            
+
             if success:
                 recorded.append(rel)
-        
+
         return recorded
-    
+
     def analyze_conversation_batch(
         self,
         conversations: List[Dict[str, Any]],
@@ -414,11 +414,11 @@ class RelationshipManager:
     ) -> List[AggregatedRelationship]:
         """
         Analyze a batch of conversations using the horde pattern.
-        
+
         Args:
             conversations: List of conversation dicts
             focus_on_primary: Whether to focus on primary human relationships
-            
+
         Returns:
             List of aggregated relationships
         """
@@ -426,13 +426,13 @@ class RelationshipManager:
             conversations=conversations,
             focus_on_primary=focus_on_primary
         )
-        
+
         # Store the aggregated relationships
         for rel in result.aggregated_relationships:
             self._store_aggregated_relationship(rel)
-        
+
         return result.aggregated_relationships
-    
+
     def update_relationship_strength(
         self,
         person_a_id: str,
@@ -441,18 +441,18 @@ class RelationshipManager:
     ) -> bool:
         """
         Update relationship strength based on new interaction.
-        
+
         Args:
             person_a_id: First person's ID
             person_b_id: Second person's ID
             strength_delta: Change in strength (-1.0 to 1.0)
-            
+
         Returns:
             True if successful
         """
         if not self._driver:
             return False
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 session.run("""
@@ -476,21 +476,21 @@ class RelationshipManager:
         except Exception as e:
             logger.error(f"Failed to update relationship strength: {e}")
             return False
-    
+
     # ===================================================================
     # Context Building
     # ===================================================================
-    
+
     def get_relationship_context(
         self,
         person_id: str
     ) -> Optional[RelationshipContext]:
         """
         Build comprehensive relationship context for a person.
-        
+
         Args:
             person_id: Person's ID
-            
+
         Returns:
             RelationshipContext or None
         """
@@ -498,7 +498,7 @@ class RelationshipManager:
         person = None
         if self.identity_manager:
             person = self.identity_manager.get_person(person_id)
-        
+
         if not person:
             person = PersonIdentity(
                 id=person_id,
@@ -506,7 +506,7 @@ class RelationshipManager:
                 handle=person_id,
                 channel="unknown"
             )
-        
+
         # Get all relationships
         relationships_data = self.get_person_relationships(person_id)
         relationships = [
@@ -527,7 +527,7 @@ class RelationshipManager:
             )
             for r in relationships_data
         ]
-        
+
         # Get relationship to primary
         rel_to_primary_data = self.get_relationship_to_primary(person_id)
         rel_to_primary = None
@@ -544,20 +544,20 @@ class RelationshipManager:
                 conflicting_assessments=0,
                 discovered_at=datetime.now(timezone.utc),
                 last_updated=rel_to_primary_data.get(
-                    "last_updated", 
+                    "last_updated",
                     datetime.now(timezone.utc)
                 ),
                 all_evidence=[],
                 agent_votes={rel_to_primary_data["type"]: 1}
             )
-        
+
         # Extract shared contexts from relationship data
         shared_contexts = list(set(
             r.get("context", "")
             for r in relationships_data
             if r.get("context")
         ))[:10]
-        
+
         # Build communication patterns
         communication_patterns = {
             "total_relationships": len(relationships),
@@ -569,7 +569,7 @@ class RelationshipManager:
                 r.relationship_type.value for r in relationships
             ))
         }
-        
+
         return RelationshipContext(
             person=person,
             relationships=relationships,
@@ -577,16 +577,16 @@ class RelationshipManager:
             shared_contexts=shared_contexts,
             communication_patterns=communication_patterns
         )
-    
+
     # ===================================================================
     # Statistics and Reporting
     # ===================================================================
-    
+
     def get_relationship_stats(self) -> Dict[str, Any]:
         """Get statistics about tracked relationships."""
         if not self._driver:
             return {"error": "No Neo4j connection"}
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 # Count by type
@@ -596,7 +596,7 @@ class RelationshipManager:
                     ORDER BY count DESC
                 """)
                 by_type = {r["type"]: r["count"] for r in type_result}
-                
+
                 # Average strength
                 strength_result = session.run("""
                     MATCH ()-[r:KNOWS]-()
@@ -605,7 +605,7 @@ class RelationshipManager:
                            min(r.strength) as min_strength
                 """)
                 strength_stats = strength_result.single()
-                
+
                 # Relationships to primary human
                 primary_result = session.run("""
                     MATCH (p:Person)-[r:KNOWS]-(primary:Person)
@@ -614,7 +614,7 @@ class RelationshipManager:
                     RETURN count(*) as count
                 """, primary_name=self.primary_human)
                 primary_count = primary_result.single()["count"]
-                
+
                 return {
                     "total_relationships": sum(by_type.values()),
                     "by_type": by_type,
@@ -624,11 +624,11 @@ class RelationshipManager:
                     "primary_human_relationships": primary_count,
                     "primary_human_name": self.primary_human
                 }
-                
+
         except Exception as e:
             logger.error(f"Failed to get stats: {e}")
             return {"error": str(e)}
-    
+
     def find_common_connections(
         self,
         person_a_id: str,
@@ -636,17 +636,17 @@ class RelationshipManager:
     ) -> List[Dict[str, Any]]:
         """
         Find people who know both person A and person B.
-        
+
         Args:
             person_a_id: First person's ID
             person_b_id: Second person's ID
-            
+
         Returns:
             List of common connections
         """
         if not self._driver:
             return []
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 result = session.run("""
@@ -660,25 +660,471 @@ class RelationshipManager:
                     person_a_id=person_a_id,
                     person_b_id=person_b_id
                 )
-                
+
                 return [
                     {"name": r["name"], "id": r["id"], "strength": r["connection_strength"]}
                     for r in result
                 ]
-                
+
         except Exception as e:
             logger.error(f"Failed to find common connections: {e}")
             return []
-    
+
+    # ===================================================================
+    # Full Social Graph Methods
+    # ===================================================================
+
+    def build_full_social_graph(
+        self,
+        min_confidence: float = 0.3,
+        min_strength: float = 0.2,
+        respect_privacy: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Build the complete social graph of all tracked relationships.
+
+        Args:
+            min_confidence: Minimum confidence threshold
+            min_strength: Minimum relationship strength
+            respect_privacy: Only return relationships observed in conversations
+
+        Returns:
+            Social graph dict with nodes, edges, and analytics
+        """
+        if not self._driver:
+            return {"error": "No database connection"}
+
+        try:
+            with self._driver.session(database=self.database) as session:
+                # Get all relationships meeting criteria
+                privacy_filter = "AND r.is_explicit = true" if respect_privacy else ""
+
+                result = session.run(f"""
+                    MATCH (p1:Person)-[r:KNOWS]-(p2:Person)
+                    WHERE r.confidence >= $min_confidence
+                      AND r.strength >= $min_strength
+                      {privacy_filter}
+                    RETURN p1.id as person_a, p1.name as name_a,
+                           p2.id as person_b, p2.name as name_b,
+                           r.type as rel_type, r.strength as strength,
+                           r.confidence as confidence,
+                           r.discovered_via as discovered_via,
+                           r.is_explicit as is_explicit
+                    LIMIT 1000
+                """,
+                    min_confidence=min_confidence,
+                    min_strength=min_strength
+                )
+
+                nodes = {}
+                edges = []
+
+                for record in result:
+                    # Add nodes
+                    person_a_id = record["person_a"]
+                    person_b_id = record["person_b"]
+
+                    nodes[person_a_id] = {
+                        "id": person_a_id,
+                        "name": record["name_a"] or person_a_id
+                    }
+                    nodes[person_b_id] = {
+                        "id": person_b_id,
+                        "name": record["name_b"] or person_b_id
+                    }
+
+                    # Add edge
+                    edges.append({
+                        "source": person_a_id,
+                        "target": person_b_id,
+                        "type": record["rel_type"],
+                        "strength": record["strength"],
+                        "confidence": record["confidence"],
+                        "discovered_via": record.get("discovered_via", "unknown"),
+                        "is_explicit": record.get("is_explicit", True)
+                    })
+
+                # Get graph analytics
+                analytics = self._compute_social_graph_analytics(nodes, edges)
+
+                return {
+                    "nodes": list(nodes.values()),
+                    "edges": edges,
+                    "analytics": analytics,
+                    "total_nodes": len(nodes),
+                    "total_edges": len(edges)
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to build social graph: {e}")
+            return {"error": str(e)}
+
+    def get_all_relationships(
+        self,
+        person_id: Optional[str] = None,
+        min_confidence: float = 0.3,
+        include_inferred: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all relationships in the system, optionally filtered by person.
+
+        Args:
+            person_id: Optional person to filter by
+            min_confidence: Minimum confidence threshold
+            include_inferred: Whether to include inferred relationships
+
+        Returns:
+            List of relationship dicts
+        """
+        if not self._driver:
+            return []
+
+        try:
+            with self._driver.session(database=self.database) as session:
+                # Build query based on filters
+                person_filter = "AND (p1.id = $person_id OR p2.id = $person_id)" if person_id else ""
+                inferred_filter = "" if include_inferred else "AND (r.is_explicit IS NULL OR r.is_explicit = true)"
+
+                result = session.run(f"""
+                    MATCH (p1:Person)-[r:KNOWS]-(p2:Person)
+                    WHERE r.confidence >= $min_confidence
+                      {person_filter}
+                      {inferred_filter}
+                    RETURN p1.id as person_a, p1.name as name_a,
+                           p2.id as person_b, p2.name as name_b,
+                           r.type as rel_type, r.strength as strength,
+                           r.confidence as confidence,
+                           r.context as context,
+                           r.discovered_via as discovered_via,
+                           r.discovered_in_conversation_with as discovered_with,
+                           r.is_explicit as is_explicit,
+                           r.last_updated as last_updated
+                    ORDER BY r.strength DESC
+                    LIMIT 500
+                """,
+                    person_id=person_id,
+                    min_confidence=min_confidence
+                )
+
+                return [
+                    {
+                        "person_a": r["person_a"],
+                        "name_a": r["name_a"],
+                        "person_b": r["person_b"],
+                        "name_b": r["name_b"],
+                        "type": r["rel_type"],
+                        "strength": r["strength"],
+                        "confidence": r["confidence"],
+                        "context": r["context"],
+                        "discovered_via": r.get("discovered_via", "unknown"),
+                        "discovered_with": r.get("discovered_with"),
+                        "is_explicit": r.get("is_explicit", True),
+                        "last_updated": r.get("last_updated")
+                    }
+                    for r in result
+                ]
+
+        except Exception as e:
+            logger.error(f"Failed to get all relationships: {e}")
+            return []
+
+    def find_clusters_and_communities(self) -> List[Dict[str, Any]]:
+        """
+        Find clusters/communities in the social graph.
+
+        Returns:
+            List of cluster dicts with members and properties
+        """
+        if not self._driver:
+            return []
+
+        try:
+            with self._driver.session(database=self.database) as session:
+                # Use Neo4j's community detection (if available) or basic clustering
+                result = session.run("""
+                    MATCH (p:Person)-[r:KNOWS]-(other:Person)
+                    WHERE r.strength >= 0.4
+                    WITH p, collect(other) as neighbors
+                    RETURN p.id as person_id, p.name as name,
+                           [n in neighbors | n.id] as connections
+                """)
+
+                # Build adjacency list for clustering
+                graph = {}
+                for record in result:
+                    person_id = record["person_id"]
+                    connections = record["connections"]
+                    graph[person_id] = set(connections)
+
+                # Find connected components (simple clustering)
+                visited = set()
+                clusters = []
+                cluster_id = 0
+
+                for node in graph:
+                    if node in visited:
+                        continue
+
+                    # BFS to find connected component
+                    component = []
+                    queue = [node]
+
+                    while queue:
+                        current = queue.pop(0)
+                        if current in visited:
+                            continue
+                        visited.add(current)
+                        component.append(current)
+
+                        for neighbor in graph.get(current, []):
+                            if neighbor not in visited:
+                                queue.append(neighbor)
+
+                    if len(component) >= 2:
+                        clusters.append({
+                            "cluster_id": f"cluster_{cluster_id}",
+                            "members": component,
+                            "size": len(component)
+                        })
+                        cluster_id += 1
+
+                # Sort by size
+                clusters.sort(key=lambda c: c["size"], reverse=True)
+                return clusters
+
+        except Exception as e:
+            logger.error(f"Failed to find clusters: {e}")
+            return []
+
+    def find_bridge_people(self) -> List[Dict[str, Any]]:
+        """
+        Find people who bridge different communities.
+
+        Returns:
+            List of bridge people with their betweenness scores
+        """
+        if not self._driver:
+            return []
+
+        try:
+            # Get clusters first
+            clusters = self.find_clusters_and_communities()
+            if len(clusters) < 2:
+                return []
+
+            # Build person-to-cluster mapping
+            person_to_cluster = {}
+            for cluster in clusters:
+                for member in cluster["members"]:
+                    person_to_cluster[member] = cluster["cluster_id"]
+
+            with self._driver.session(database=self.database) as session:
+                result = session.run("""
+                    MATCH (p:Person)-[r:KNOWS]-(other:Person)
+                    WHERE r.strength >= 0.4
+                    RETURN p.id as person_id, collect(other.id) as connections
+                """)
+
+                bridge_scores = []
+                for record in result:
+                    person_id = record["person_id"]
+                    connections = record["connections"]
+
+                    # Count connections to different clusters
+                    own_cluster = person_to_cluster.get(person_id)
+                    connected_clusters = set()
+
+                    for conn in connections:
+                        conn_cluster = person_to_cluster.get(conn)
+                        if conn_cluster and conn_cluster != own_cluster:
+                            connected_clusters.add(conn_cluster)
+
+                    if len(connected_clusters) >= 1:
+                        bridge_scores.append({
+                            "person_id": person_id,
+                            "betweenness_score": len(connected_clusters),
+                            "connects_clusters": list(connected_clusters),
+                            "bridge_strength": sum(1 for c in connections
+                                                   if person_to_cluster.get(c) in connected_clusters)
+                        })
+
+                # Sort by betweenness score
+                bridge_scores.sort(key=lambda b: b["betweenness_score"], reverse=True)
+                return bridge_scores[:20]
+
+        except Exception as e:
+            logger.error(f"Failed to find bridge people: {e}")
+            return []
+
+    def get_influence_network(self, top_n: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get the influence network based on relationship strength and centrality.
+
+        Args:
+            top_n: Number of top influencers to return
+
+        Returns:
+            List of people with influence scores
+        """
+        if not self._driver:
+            return []
+
+        try:
+            with self._driver.session(database=self.database) as session:
+                # Calculate influence based on weighted degree centrality
+                result = session.run("""
+                    MATCH (p:Person)-[r:KNOWS]-(other:Person)
+                    WHERE r.strength >= 0.3
+                    WITH p, sum(r.strength) as total_strength, count(other) as connection_count
+                    RETURN p.id as person_id, p.name as name,
+                           total_strength, connection_count,
+                           (total_strength * connection_count) as influence_score
+                    ORDER BY influence_score DESC
+                    LIMIT $top_n
+                """, top_n=top_n)
+
+                return [
+                    {
+                        "person_id": r["person_id"],
+                        "name": r["name"],
+                        "influence_score": round(r["influence_score"], 2),
+                        "total_connection_strength": round(r["total_strength"], 2),
+                        "connection_count": r["connection_count"]
+                    }
+                    for r in result
+                ]
+
+        except Exception as e:
+            logger.error(f"Failed to get influence network: {e}")
+            return []
+
+    def _compute_social_graph_analytics(
+        self,
+        nodes: Dict[str, Dict],
+        edges: List[Dict]
+    ) -> Dict[str, Any]:
+        """Compute basic analytics for the social graph."""
+        total_nodes = len(nodes)
+        total_edges = len(edges)
+
+        # Compute density
+        max_edges = total_nodes * (total_nodes - 1) / 2 if total_nodes > 1 else 0
+        density = round(total_edges / max_edges, 3) if max_edges > 0 else 0
+
+        # Average degree
+        avg_degree = round(2 * total_edges / total_nodes, 2) if total_nodes > 0 else 0
+
+        # Relationship type distribution
+        rel_types = {}
+        for edge in edges:
+            rel_type = edge.get("type", "unknown")
+            rel_types[rel_type] = rel_types.get(rel_type, 0) + 1
+
+        return {
+            "total_nodes": total_nodes,
+            "total_edges": total_edges,
+            "density": density,
+            "average_degree": avg_degree,
+            "relationship_type_distribution": rel_types
+        }
+
+    # ===================================================================
+    # Privacy-Respecting Methods
+    # ===================================================================
+
+    def record_observed_relationship(
+        self,
+        person_a_id: str,
+        person_b_id: str,
+        relationship_type: RelationshipType,
+        strength: float,
+        context: str,
+        confidence: float,
+        discovered_in_conversation: str,
+        is_explicit: bool = True
+    ) -> bool:
+        """
+        Record a relationship observed in a conversation (privacy-respecting).
+
+        Only tracks relationships mentioned in conversations with Kurultai,
+        never infers relationships outside observed interactions.
+
+        Args:
+            person_a_id: First person's ID
+            person_b_id: Second person's ID
+            relationship_type: Type of relationship
+            strength: Relationship strength
+            context: Context description
+            confidence: Confidence in this observation
+            discovered_in_conversation: Who mentioned this relationship
+            is_explicit: Whether explicitly stated or inferred from context
+
+        Returns:
+            True if successful
+        """
+        if not self._driver:
+            logger.warning("No Neo4j connection, cannot store relationship")
+            return False
+
+        now = datetime.now(timezone.utc)
+
+        try:
+            with self._driver.session(database=self.database) as session:
+                session.run("""
+                    MERGE (p1:Person {id: $person_a_id})
+                    MERGE (p2:Person {id: $person_b_id})
+                    MERGE (p1)-[r:KNOWS]-(p2)
+                    ON CREATE SET
+                        r.type = $rel_type,
+                        r.strength = $strength,
+                        r.context = $context,
+                        r.discovered_at = $now,
+                        r.last_updated = $now,
+                        r.confidence = $confidence,
+                        r.evidence_count = 1,
+                        r.discovered_via = 'conversation',
+                        r.discovered_in_conversation_with = $discovered_with,
+                        r.is_explicit = $is_explicit,
+                        r.privacy_level = 'observed'
+                    ON MATCH SET
+                        r.strength = CASE
+                            WHEN r.strength IS NULL THEN $strength
+                            ELSE (r.strength * 0.7 + $strength * 0.3)
+                        END,
+                        r.last_updated = $now,
+                        r.confidence = CASE
+                            WHEN r.confidence IS NULL THEN $confidence
+                            ELSE (r.confidence * 0.9 + $confidence * 0.1)
+                        END,
+                        r.evidence_count = COALESCE(r.evidence_count, 0) + 1
+                """,
+                    person_a_id=person_a_id,
+                    person_b_id=person_b_id,
+                    rel_type=relationship_type.value,
+                    strength=round(strength, 2),
+                    context=context[:500],
+                    confidence=round(confidence, 2),
+                    discovered_with=discovered_in_conversation,
+                    is_explicit=is_explicit,
+                    now=now
+                )
+
+            logger.debug(f"Recorded observed relationship: {person_a_id} <-> {person_b_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to record observed relationship: {e}")
+            return False
+
     # ===================================================================
     # Private Helpers
     # ===================================================================
-    
+
     def _store_aggregated_relationship(self, rel: AggregatedRelationship):
         """Store an aggregated relationship in Neo4j."""
         if not self._driver:
             return
-        
+
         try:
             with self._driver.session(database=self.database) as session:
                 session.run("""
@@ -725,10 +1171,10 @@ class RelationshipManager:
 def extend_identity_system_with_relationships(identity_system):
     """
     Extend a KurultaiIdentitySystem with relationship capabilities.
-    
+
     Args:
         identity_system: KurultaiIdentitySystem instance
-        
+
     Returns:
         RelationshipManager instance
     """
@@ -754,22 +1200,22 @@ def get_person_network(
 ) -> Dict[str, Any]:
     """
     Get a person's relationship network.
-    
+
     Args:
         person_id: Person's ID
         depth: How many hops to traverse (1 = direct connections)
         min_strength: Minimum relationship strength
-        
+
     Returns:
         Network dict with nodes and edges
     """
     manager = RelationshipManager()
     manager.initialize()
-    
+
     try:
         if not manager._driver:
             return {"error": "No database connection"}
-        
+
         with manager._driver.session() as session:
             # Get network up to specified depth
             result = session.run("""
@@ -782,18 +1228,18 @@ def get_person_network(
                 depth=depth,
                 min_strength=min_strength
             )
-            
+
             nodes = {}
             edges = []
-            
+
             for record in result:
                 center = record["center"]
                 connected = record["connected"]
                 rels = record["rels"]
-                
+
                 nodes[center["id"]] = {"id": center["id"], "name": center.get("name")}
                 nodes[connected["id"]] = {"id": connected["id"], "name": connected.get("name")}
-                
+
                 for rel in rels:
                     edges.append({
                         "source": center["id"],
@@ -801,13 +1247,13 @@ def get_person_network(
                         "type": rel.get("type"),
                         "strength": rel.get("strength")
                     })
-            
+
             return {
                 "nodes": list(nodes.values()),
                 "edges": edges,
                 "center": person_id
             }
-            
+
     finally:
         manager.close()
 
@@ -818,11 +1264,11 @@ def get_person_network(
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    
+
     # Example usage
     manager = RelationshipManager(primary_human="Danny")
     manager.initialize()
-    
+
     # Record some relationships
     manager.record_relationship(
         person_a_id="signal:alice",
@@ -832,7 +1278,7 @@ if __name__ == "__main__":
         context="Work together on Kurultai project",
         confidence=0.9
     )
-    
+
     manager.record_relationship(
         person_a_id="signal:bob",
         person_b_id="signal:danny",
@@ -841,17 +1287,17 @@ if __name__ == "__main__":
         context="Long-time friends from college",
         confidence=0.85
     )
-    
+
     # Get relationships
     print("\nDanny's relationships:")
     rels = manager.get_person_relationships("signal:danny")
     for rel in rels:
         print(f"  - {rel['person']}: {rel['type']} (strength: {rel['strength']})")
-    
+
     # Get stats
     print("\nRelationship stats:")
     stats = manager.get_relationship_stats()
     print(f"  Total: {stats.get('total_relationships')}")
     print(f"  By type: {stats.get('by_type')}")
-    
+
     manager.close()

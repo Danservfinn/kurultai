@@ -33,6 +33,16 @@ FOR (a:RelationshipAnalysis) ON (a.id);
 CREATE INDEX relationship_analysis_timestamp IF NOT EXISTS
 FOR (a:RelationshipAnalysis) ON (a.timestamp);
 
+// Indexes for privacy and discovery tracking
+CREATE INDEX relationship_discovered_via IF NOT EXISTS
+FOR ()-[r:KNOWS]-() ON (r.discovered_via);
+
+CREATE INDEX relationship_is_explicit IF NOT EXISTS
+FOR ()-[r:KNOWS]-() ON (r.is_explicit);
+
+CREATE INDEX relationship_privacy_level IF NOT EXISTS
+FOR ()-[r:KNOWS]-() ON (r.privacy_level);
+
 // =============================================================================
 // Person-to-Person Relationship (:KNOWS)
 // =============================================================================
@@ -62,7 +72,11 @@ CREATE (p1)-[:KNOWS {
     last_updated: datetime(),
     confidence: 0.85,
     evidence_count: 5,
-    source: "conversation_analysis"
+    source: "conversation_analysis",
+    discovered_via: "conversation",              // How was this discovered
+    discovered_in_conversation_with: "Danny",  // Who mentioned this
+    is_explicit: true,                         // Explicitly stated or inferred
+    privacy_level: "observed"                  // observed, inferred, sensitive
 }]->(p2);
 */
 

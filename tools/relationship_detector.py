@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class RelationshipType(Enum):
     """Types of relationships between people."""
+    # Positive/Neutral relationships
     FRIEND = "friend"                    # Personal connection
     COLLEAGUE = "colleague"              # Professional connection
     FAMILY = "family"                    # Family member
@@ -27,6 +28,11 @@ class RelationshipType(Enum):
     MENTOR = "mentor"                    # Guidance provider
     MENTEE = "mentee"                    # Guidance recipient
     ACQUAINTANCE = "acquaintance"        # Casual connection
+    COLLABORATOR = "collaborator"        # Active collaboration
+    
+    # Negative/Complex relationships
+    RIVAL = "rival"                      # Competitive relationship
+    STRANGER = "stranger"                # No relationship
     UNKNOWN = "unknown"                  # Relationship unclear
 
 
@@ -63,6 +69,11 @@ class DetectedRelationship:
     confidence: float
     evidence_count: int
     evidence: List[RelationshipEvidence] = field(default_factory=list)
+    # Privacy and discovery tracking
+    discovered_via: str = "conversation"  # How was this discovered
+    discovered_in_conversation_with: Optional[str] = None  # Who mentioned this
+    is_explicit: bool = True              # Explicitly stated or inferred
+    privacy_level: str = "observed"       # observed, inferred, sensitive
 
 
 class RelationshipDetector:
@@ -122,6 +133,22 @@ class RelationshipDetector:
             "acquaintance", "know of", "heard of", "met once",
             "briefly met", "ran into", "saw at", "someone I know",
             "not close", "don't know well", "casual"
+        ],
+        RelationshipType.COLLABORATOR: [
+            "collaborator", "collaborate", "working together",
+            "joint project", "partnership", "co-author",
+            "co-creator", " teammate on", "fellow",
+            "co-conspirator", "ally", "confederate"
+        ],
+        RelationshipType.RIVAL: [
+            "rival", "competitor", "opponent", "adversary",
+            "enemy", "nemesis", "arch-rival", "competition",
+            "competing with", "against", "opposed to",
+            "frenemy", "thorn in my side"
+        ],
+        RelationshipType.STRANGER: [
+            "stranger", "don't know", "never met", "unknown person",
+            "no idea who", "never heard of", "random person"
         ]
     }
     
@@ -173,10 +200,16 @@ class RelationshipDetector:
         speaker_id: str,
         speaker_name: Optional[str] = None,
         conversation_id: Optional[str] = None,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
+        other_participants: Optional[List[str]] = None
     ) -> List[DetectedRelationship]:
         """
-        Analyze a conversation for relationship clues.
+        Analyze a conversation for ALL relationship clues between ALL people.
+        
+        This builds a complete social graph by detecting:
+        - Speaker's relationships to others
+        - Relationships between people mentioned in conversation
+        - Third-party relationships (A talking about B's relationship to C)
         
         Args:
             conversation_text: The conversation text to analyze
@@ -184,31 +217,38 @@ class RelationshipDetector:
             speaker_name: Display name of the speaker
             conversation_id: Optional conversation identifier
             timestamp: Optional conversation timestamp
+            other_participants: Other people in the conversation
             
         Returns:
-            List of detected relationships
+            List of ALL detected relationships in the conversation
         """
         if timestamp is None:
             timestamp = datetime.now(timezone.utc)
             
         speaker_name = speaker_name or speaker_id
-        relationships: List[DetectedRelationship] = []
+        all_relationships: List[DetectedRelationship] = []
         
-        # Extract mentions of other people
+        # Build list of all people mentioned in the conversation
         mentioned_people = self._extract_people_mentions(conversation_text, speaker_name)
+        mentioned_people.add(speaker_name)
+        if other_participants:
+            mentioned_people.update(other_participants)
         
+        # Detect speaker's relationships to others
         for person_name in mentioned_people:
-            # Analyze relationship to this person
+            if person_name == speaker_name:
+                continue
+                
             clue = self._analyze_relationship_clue(
                 conversation_text, person_name, speaker_name
             )
             
-            if clue.confidence > 0.3:  # Minimum confidence threshold
+            if clue.confidence > 0.2:  # Lower threshold for broader detection
                 evidence = RelationshipEvidence(
                     source_conversation=conversation_id or "unknown",
                     timestamp=timestamp,
                     clue=clue,
-                    supporting_text=clue.context[:200]  # Truncate for storage
+                    supporting_text=clue.context[:200]
                 )
                 
                 relationship = DetectedRelationship(
@@ -221,17 +261,35 @@ class RelationshipDetector:
                     last_updated=timestamp,
                     confidence=clue.confidence,
                     evidence_count=1,
-                    evidence=[evidence]
+                    evidence=[evidence],
+                    discovered_via="conversation",
+                    discovered_in_conversation_with=speaker_name,
+                    is_explicit=True
                 )
                 
-                relationships.append(relationship)
-                
-                logger.debug(
-                    f"Detected relationship: {speaker_name} -> {person_name} "
-                    f"({clue.relationship_type.value}, confidence: {clue.confidence:.2f})"
-                )
+                all_relationships.append(relationship)
         
-        return relationships
+        # Detect third-party relationships (A talking about B's relationship to C)
+        third_party_rels = self._detect_third_party_relationships(
+            conversation_text, mentioned_people, speaker_name, conversation_id, timestamp
+        )
+        all_relationships.extend(third_party_rels)
+        
+        # Detect inferred relationships from context
+        inferred_rels = self._detect_inferred_relationships(
+            conversation_text, mentioned_people, speaker_name, conversation_id, timestamp
+        )
+        all_relationships.extend(inferred_rels)
+        
+        # Merge duplicate relationships
+        merged = self._merge_duplicate_relationships(all_relationships)
+        
+        logger.debug(
+            f"Detected {len(merged)} unique relationships from {speaker_name} "
+            f"({len(all_relationships)} raw detections)"
+        )
+        
+        return merged
     
     def analyze_for_primary_human(
         self,
@@ -498,8 +556,216 @@ class RelationshipDetector:
             last_updated=datetime.now(timezone.utc),
             confidence=round(new_confidence, 2),
             evidence_count=len(all_evidence),
-            evidence=all_evidence[-20:]  # Keep last 20 evidence items
+            evidence=all_evidence[-20:],  # Keep last 20 evidence items
+            discovered_via=existing.discovered_via,
+            discovered_in_conversation_with=existing.discovered_in_conversation_with,
+            is_explicit=existing.is_explicit
         )
+    
+    def _detect_third_party_relationships(
+        self,
+        text: str,
+        all_people: Set[str],
+        speaker_name: str,
+        conversation_id: Optional[str],
+        timestamp: datetime
+    ) -> List[DetectedRelationship]:
+        """
+        Detect relationships between people that the speaker is talking about.
+        
+        Example: "Alice and Bob are colleagues" - detects relationship
+        between Alice and Bob, even if neither is the speaker.
+        
+        Args:
+            text: Conversation text
+            all_people: All people mentioned
+            speaker_name: Name of the speaker
+            conversation_id: Conversation ID
+            timestamp: Timestamp
+            
+        Returns:
+            List of third-party relationships
+        """
+        relationships = []
+        text_lower = text.lower()
+        
+        # Pattern: "X and Y are [relationship]"
+        for person_a in all_people:
+            for person_b in all_people:
+                if person_a >= person_b:  # Avoid duplicates and self-references
+                    continue
+                
+                # Look for patterns indicating relationship between A and B
+                patterns = [
+                    rf"{re.escape(person_a)}\s+(?:and|&)\s+{re.escape(person_b)}\s+(?:are|were|is|was)",
+                    rf"{re.escape(person_b)}\s+(?:and|&)\s+{re.escape(person_a)}\s+(?:are|were|is|was)",
+                    rf"{re.escape(person_a)}\s+(?:is|was)\s+{re.escape(person_b)}['s]?\s+(\w+)",
+                    rf"{re.escape(person_b)}\s+(?:is|was)\s+{re.escape(person_a)}['s]?\s+(\w+)",
+                ]
+                
+                for pattern in patterns:
+                    matches = re.finditer(pattern, text_lower)
+                    for match in matches:
+                        # Determine relationship type from context
+                        context_start = max(0, match.start() - 100)
+                        context_end = min(len(text), match.end() + 100)
+                        context = text[context_start:context_end]
+                        
+                        clue = self._analyze_relationship_clue(
+                            context, person_b, person_a
+                        )
+                        
+                        if clue.confidence > 0.3:
+                            evidence = RelationshipEvidence(
+                                source_conversation=conversation_id or "unknown",
+                                timestamp=timestamp,
+                                clue=clue,
+                                supporting_text=context[:200]
+                            )
+                            
+                            rel = DetectedRelationship(
+                                person_a=person_a,
+                                person_b=person_b,
+                                relationship_type=clue.relationship_type,
+                                strength=clue.confidence * 0.8,  # Slightly lower for third-party
+                                context=context[:500],
+                                discovered_at=timestamp,
+                                last_updated=timestamp,
+                                confidence=clue.confidence * 0.8,
+                                evidence_count=1,
+                                evidence=[evidence],
+                                discovered_via="third_party_mention",
+                                discovered_in_conversation_with=speaker_name,
+                                is_explicit=True
+                            )
+                            relationships.append(rel)
+        
+        return relationships
+    
+    def _detect_inferred_relationships(
+        self,
+        text: str,
+        all_people: Set[str],
+        speaker_name: str,
+        conversation_id: Optional[str],
+        timestamp: datetime
+    ) -> List[DetectedRelationship]:
+        """
+        Infer relationships from contextual clues.
+        
+        Examples:
+        - People mentioned together frequently may know each other
+        - People working on same projects
+        - People at same events
+        
+        Args:
+            text: Conversation text
+            all_people: All people mentioned
+            speaker_name: Name of the speaker
+            conversation_id: Conversation ID
+            timestamp: Timestamp
+            
+        Returns:
+            List of inferred relationships
+        """
+        relationships = []
+        
+        # If multiple people mentioned in same context, they may know each other
+        if len(all_people) >= 3:  # Speaker + at least 2 others
+            people_list = list(all_people)
+            
+            # Check for co-occurrence patterns
+            for i, person_a in enumerate(people_list):
+                for person_b in people_list[i+1:]:
+                    # Skip if already have explicit relationship
+                    # Look for contextual clues they know each other
+                    if self._check_contextual_clues(text, person_a, person_b):
+                        evidence = RelationshipEvidence(
+                            source_conversation=conversation_id or "unknown",
+                            timestamp=timestamp,
+                            clue=RelationshipClue(
+                                person_name=person_b,
+                                relationship_type=RelationshipType.ACQUAINTANCE,
+                                confidence=0.3,
+                                context=f"Co-mentioned in conversation with {speaker_name}",
+                                indicators=["co-occurrence"]
+                            ),
+                            supporting_text=text[:200]
+                        )
+                        
+                        rel = DetectedRelationship(
+                            person_a=person_a,
+                            person_b=person_b,
+                            relationship_type=RelationshipType.ACQUAINTANCE,
+                            strength=0.3,
+                            context=f"Mentioned together in conversation",
+                            discovered_at=timestamp,
+                            last_updated=timestamp,
+                            confidence=0.3,
+                            evidence_count=1,
+                            evidence=[evidence],
+                            discovered_via="inferred_cooccurrence",
+                            discovered_in_conversation_with=speaker_name,
+                            is_explicit=False  # Mark as inferred
+                        )
+                        relationships.append(rel)
+        
+        return relationships
+    
+    def _check_contextual_clues(self, text: str, person_a: str, person_b: str) -> bool:
+        """Check if there's contextual evidence two people know each other."""
+        text_lower = text.lower()
+        a_lower = person_a.lower()
+        b_lower = person_b.lower()
+        
+        # Check if they appear close to each other
+        a_positions = [m.start() for m in re.finditer(re.escape(a_lower), text_lower)]
+        b_positions = [m.start() for m in re.finditer(re.escape(b_lower), text_lower)]
+        
+        for ap in a_positions:
+            for bp in b_positions:
+                if abs(ap - bp) < 200:  # Within 200 chars
+                    return True
+        
+        return False
+    
+    def _merge_duplicate_relationships(
+        self,
+        relationships: List[DetectedRelationship]
+    ) -> List[DetectedRelationship]:
+        """
+        Merge duplicate relationships between the same people.
+        
+        Args:
+            relationships: List of relationships (may contain duplicates)
+            
+        Returns:
+            List of unique relationships (merged)
+        """
+        # Group by person pair
+        grouped: Dict[Tuple[str, str], List[DetectedRelationship]] = {}
+        
+        for rel in relationships:
+            # Normalize pair order
+            pair = tuple(sorted([rel.person_a, rel.person_b]))
+            
+            if pair not in grouped:
+                grouped[pair] = []
+            grouped[pair].append(rel)
+        
+        # Merge each group
+        merged = []
+        for pair, rels in grouped.items():
+            if len(rels) == 1:
+                merged.append(rels[0])
+            else:
+                # Merge all relationships for this pair
+                base = rels[0]
+                for rel in rels[1:]:
+                    base = self.merge_relationships(base, rel)
+                merged.append(base)
+        
+        return merged
 
 
 # =============================================================================

@@ -93,6 +93,42 @@ class HordeAnalysisResult:
     conflicts_resolved: int
     errors: List[str]
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Graph analytics results
+    graph_analytics: Optional['GraphAnalytics'] = None
+
+
+@dataclass
+class GraphAnalytics:
+    """Social graph analytics results."""
+    total_nodes: int
+    total_edges: int
+    clusters: List['Cluster']
+    bridge_people: List['BridgePerson']
+    isolated_individuals: List[str]
+    influence_scores: Dict[str, float]
+    density: float
+    average_clustering: float
+
+
+@dataclass
+class Cluster:
+    """A community/cluster in the social graph."""
+    cluster_id: str
+    members: List[str]
+    size: int
+    internal_edges: int
+    external_edges: int
+    cohesion_score: float
+    dominant_relationship_types: List[str]
+
+
+@dataclass
+class BridgePerson:
+    """Someone who connects different communities."""
+    person_id: str
+    betweenness_score: float
+    connects_clusters: List[str]
+    bridge_strength: float
 
 
 class RelationshipAnalyzer:
@@ -741,6 +777,268 @@ class RelationshipAnalyzer:
             )
         except Exception as e:
             logger.warning(f"Failed to store relationship: {e}")
+
+    # ===================================================================
+    # Graph Analytics
+    # ===================================================================
+
+    def compute_graph_analytics(
+        self,
+        relationships: List[AggregatedRelationship]
+    ) -> GraphAnalytics:
+        """
+        Compute social graph analytics from relationships.
+
+        Args:
+            relationships: List of aggregated relationships
+
+        Returns:
+            GraphAnalytics with computed metrics
+        """
+        # Build adjacency list
+        graph = self._build_graph(relationships)
+        
+        # Find clusters
+        clusters = self._find_clusters(graph, relationships)
+        
+        # Find bridge people
+        bridge_people = self._find_bridge_people(graph, clusters, relationships)
+        
+        # Find isolated individuals
+        isolated = self._find_isolated_individuals(graph)
+        
+        # Compute influence scores
+        influence_scores = self._compute_influence_scores(graph, relationships)
+        
+        # Compute graph metrics
+        total_nodes = len(graph)
+        total_edges = sum(len(neighbors) for neighbors in graph.values()) // 2
+        density = self._compute_density(total_nodes, total_edges)
+        avg_clustering = self._compute_average_clustering(graph)
+        
+        return GraphAnalytics(
+            total_nodes=total_nodes,
+            total_edges=total_edges,
+            clusters=clusters,
+            bridge_people=bridge_people,
+            isolated_individuals=isolated,
+            influence_scores=influence_scores,
+            density=density,
+            average_clustering=avg_clustering
+        )
+
+    def _build_graph(
+        self,
+        relationships: List[AggregatedRelationship]
+    ) -> Dict[str, Set[str]]:
+        """Build adjacency list from relationships."""
+        graph: Dict[str, Set[str]] = {}
+        
+        for rel in relationships:
+            if rel.person_a not in graph:
+                graph[rel.person_a] = set()
+            if rel.person_b not in graph:
+                graph[rel.person_b] = set()
+            
+            # Only add edge if strength is above threshold
+            if rel.avg_strength >= 0.3:
+                graph[rel.person_a].add(rel.person_b)
+                graph[rel.person_b].add(rel.person_a)
+        
+        return graph
+
+    def _find_clusters(
+        self,
+        graph: Dict[str, Set[str]],
+        relationships: List[AggregatedRelationship]
+    ) -> List[Cluster]:
+        """
+        Find clusters/communities in the graph using connected components.
+        """
+        visited = set()
+        clusters = []
+        cluster_id = 0
+        
+        for node in graph:
+            if node in visited:
+                continue
+            
+            # BFS to find connected component
+            component = []
+            queue = [node]
+            
+            while queue:
+                current = queue.pop(0)
+                if current in visited:
+                    continue
+                visited.add(current)
+                component.append(current)
+                
+                for neighbor in graph.get(current, []):
+                    if neighbor not in visited:
+                        queue.append(neighbor)
+            
+            if len(component) >= 2:
+                internal_edges = 0
+                external_edges = 0
+                
+                for member in component:
+                    for neighbor in graph.get(member, []):
+                        if neighbor in component:
+                            internal_edges += 1
+                        else:
+                            external_edges += 1
+                
+                internal_edges //= 2
+                
+                total_edges = internal_edges + external_edges
+                cohesion = internal_edges / total_edges if total_edges > 0 else 0
+                
+                rel_types = {}
+                for rel in relationships:
+                    if rel.person_a in component and rel.person_b in component:
+                        rel_type = rel.relationship_type.value
+                        rel_types[rel_type] = rel_types.get(rel_type, 0) + 1
+                
+                dominant_types = sorted(
+                    rel_types.keys(),
+                    key=lambda x: rel_types[x],
+                    reverse=True
+                )[:3]
+                
+                clusters.append(Cluster(
+                    cluster_id=f"cluster_{cluster_id}",
+                    members=component,
+                    size=len(component),
+                    internal_edges=internal_edges,
+                    external_edges=external_edges,
+                    cohesion_score=round(cohesion, 2),
+                    dominant_relationship_types=dominant_types
+                ))
+                cluster_id += 1
+        
+        clusters.sort(key=lambda c: c.size, reverse=True)
+        return clusters
+
+    def _find_bridge_people(
+        self,
+        graph: Dict[str, Set[str]],
+        clusters: List[Cluster],
+        relationships: List[AggregatedRelationship]
+    ) -> List[BridgePerson]:
+        """Find people who bridge different clusters."""
+        if len(clusters) < 2:
+            return []
+        
+        person_to_cluster: Dict[str, str] = {}
+        for cluster in clusters:
+            for member in cluster.members:
+                person_to_cluster[member] = cluster.cluster_id
+        
+        bridge_candidates: Dict[str, Set[str]] = {}
+        
+        for person in graph:
+            connected_clusters = set()
+            for neighbor in graph.get(person, []):
+                neighbor_cluster = person_to_cluster.get(neighbor)
+                if neighbor_cluster:
+                    connected_clusters.add(neighbor_cluster)
+            
+            own_cluster = person_to_cluster.get(person)
+            if own_cluster:
+                connected_clusters.discard(own_cluster)
+            
+            if len(connected_clusters) >= 1:
+                bridge_candidates[person] = connected_clusters
+        
+        bridge_people = []
+        
+        for person, connected_clusters in bridge_candidates.items():
+            external_connections = sum(
+                1 for neighbor in graph.get(person, [])
+                if person_to_cluster.get(neighbor) in connected_clusters
+            )
+            
+            betweenness = external_connections / len(graph.get(person, {1}))
+            
+            bridge_people.append(BridgePerson(
+                person_id=person,
+                betweenness_score=round(betweenness, 2),
+                connects_clusters=list(connected_clusters),
+                bridge_strength=external_connections
+            ))
+        
+        bridge_people.sort(key=lambda b: b.betweenness_score, reverse=True)
+        return bridge_people[:20]
+
+    def _find_isolated_individuals(
+        self,
+        graph: Dict[str, Set[str]]
+    ) -> List[str]:
+        """Find people with few or no connections."""
+        isolated = []
+        
+        for person, neighbors in graph.items():
+            if len(neighbors) <= 1:
+                isolated.append(person)
+        
+        return isolated
+
+    def _compute_influence_scores(
+        self,
+        graph: Dict[str, Set[str]],
+        relationships: List[AggregatedRelationship]
+    ) -> Dict[str, float]:
+        """Compute influence scores for each person."""
+        scores = {}
+        
+        strength_lookup = {}
+        for rel in relationships:
+            pair = tuple(sorted([rel.person_a, rel.person_b]))
+            strength_lookup[pair] = rel.avg_strength
+        
+        for person in graph:
+            total_strength = 0
+            for neighbor in graph.get(person, []):
+                pair = tuple(sorted([person, neighbor]))
+                total_strength += strength_lookup.get(pair, 0.5)
+            
+            score = total_strength / max(len(graph) - 1, 1)
+            scores[person] = round(score, 3)
+        
+        return scores
+
+    def _compute_density(self, nodes: int, edges: int) -> float:
+        """Compute graph density."""
+        if nodes <= 1:
+            return 0.0
+        max_edges = nodes * (nodes - 1) / 2
+        return round(edges / max_edges, 3) if max_edges > 0 else 0.0
+
+    def _compute_average_clustering(
+        self,
+        graph: Dict[str, Set[str]]
+    ) -> float:
+        """Compute average clustering coefficient."""
+        clustering_scores = []
+        
+        for node in graph:
+            neighbors = graph.get(node, set())
+            if len(neighbors) < 2:
+                continue
+            
+            triangles = 0
+            neighbor_list = list(neighbors)
+            for i, n1 in enumerate(neighbor_list):
+                for n2 in neighbor_list[i+1:]:
+                    if n2 in graph.get(n1, set()):
+                        triangles += 1
+            
+            possible = len(neighbors) * (len(neighbors) - 1) / 2
+            if possible > 0:
+                clustering_scores.append(triangles / possible)
+        
+        return round(sum(clustering_scores) / len(clustering_scores), 3) if clustering_scores else 0.0
 
 
 # =============================================================================
