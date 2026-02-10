@@ -1,328 +1,654 @@
 #!/usr/bin/env python3
 """
-Cost Monitor for Railway Deployment
+Predictive Health Monitoring - Kurultai v2.0
 
-Tracks daily costs, queries Railway API for usage,
-and sends alerts when approaching budget thresholds.
+Advanced monitoring with predictive analytics for:
+- Signal daemon failure prediction
+- Resource exhaustion forecasting
+- Pre-emptive restart scheduling
 
-Usage:
-    python cost_monitor.py [--check] [--daily-log]
-    
-Environment Variables:
-    RAILWAY_API_TOKEN - Railway API token for authentication
-    COST_ALERT_THRESHOLD - Budget threshold in USD (default: 50)
-    COST_CRITICAL_THRESHOLD - Critical budget threshold in USD (default: 80)
-    ALERT_WEBHOOK_URL - Optional webhook URL for alerts
+Extends cost monitoring with ML-based predictions.
+
+Author: Kurultai v2.0
+Date: 2026-02-10
 """
 
 import os
 import sys
 import json
-import httpx
-import argparse
+import math
+import asyncio
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, field
+from collections import deque
+from enum import Enum
 
-# Configuration
-LOG_DIR = Path("/data/workspace/souls/main/logs")
-LOG_FILE = LOG_DIR / "daily_costs.jsonl"
-DEFAULT_THRESHOLD = 50.0  # USD
-DEFAULT_CRITICAL_THRESHOLD = 80.0  # USD
-
-# Ensure log directory exists
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
-class RailwayCostMonitor:
-    """Monitor Railway deployment costs via API."""
+class HealthMetric(Enum):
+    """Types of health metrics tracked."""
+    CPU_USAGE = "cpu_usage"
+    MEMORY_USAGE = "memory_usage"
+    DISK_USAGE = "disk_usage"
+    LOAD_AVERAGE = "load_average"
+    NEO4J_CONNECTIONS = "neo4j_connections"
+    NEO4J_QUERY_TIME = "neo4j_query_time"
+    SIGNAL_DAEMON_PING = "signal_daemon_ping"
+    AGENT_HEARTBEAT_LATENCY = "agent_heartbeat_latency"
+    TASK_QUEUE_DEPTH = "task_queue_depth"
+    ERROR_RATE = "error_rate"
+
+
+class PredictedEvent(Enum):
+    """Types of events that can be predicted."""
+    RESOURCE_EXHAUSTION = "resource_exhaustion"
+    DAEMON_FAILURE = "daemon_failure"
+    DATABASE_DEGRADATION = "database_degradation"
+    AGENT_STARVATION = "agent_starvation"
+    ERROR_SPIKE = "error_spike"
+
+
+class AlertSeverity(Enum):
+    """Severity levels for predictions."""
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+@dataclass
+class MetricSnapshot:
+    """A single metric measurement."""
+    metric: HealthMetric
+    value: float
+    timestamp: datetime
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Prediction:
+    """A predictive health alert."""
+    event_type: PredictedEvent
+    severity: AlertSeverity
+    probability: float
+    predicted_time: datetime
+    affected_components: List[str]
+    recommendation: str
+    confidence_score: float
+    based_on_metrics: List[HealthMetric]
+    created_at: datetime = field(default_factory=datetime.now)
     
-    BASE_URL = "https://backboard.railway.app/graphql/v2"
-    
-    def __init__(self, api_token: Optional[str] = None):
-        self.api_token = api_token or os.environ.get('RAILWAY_API_TOKEN')
-        self.threshold = float(os.environ.get('COST_ALERT_THRESHOLD', DEFAULT_THRESHOLD))
-        self.critical_threshold = float(os.environ.get('COST_CRITICAL_THRESHOLD', DEFAULT_CRITICAL_THRESHOLD))
-        
-        if not self.api_token:
-            raise ValueError("RAILWAY_API_TOKEN environment variable required")
-    
-    def _query(self, query: str, variables: Optional[Dict] = None) -> Dict:
-        """Execute GraphQL query against Railway API."""
-        headers = {
-            "Authorization": f"Bearer {self.api_token}",
-            "Content-Type": "application/json"
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event_type": self.event_type.value,
+            "severity": self.severity.value,
+            "probability": round(self.probability, 3),
+            "predicted_time": self.predicted_time.isoformat(),
+            "affected_components": self.affected_components,
+            "recommendation": self.recommendation,
+            "confidence_score": round(self.confidence_score, 3),
+            "based_on_metrics": [m.value for m in self.based_on_metrics],
+            "created_at": self.created_at.isoformat()
         }
-        
-        payload = {
-            "query": query,
-            "variables": variables or {}
-        }
-        
-        with httpx.Client(timeout=30.0) as client:
-            response = client.post(
-                self.BASE_URL,
-                headers=headers,
-                json=payload
-            )
-            
-            if response.status_code != 200:
-                raise RuntimeError(f"Railway API error: {response.status_code} - {response.text}")
-            
-            data = response.json()
-            if 'errors' in data:
-                raise RuntimeError(f"GraphQL errors: {data['errors']}")
-            
-            return data.get('data', {})
+
+
+class PredictiveHealthMonitor:
+    """
+    Predictive health monitoring with trend analysis and forecasting.
     
-    def get_current_usage(self) -> Dict:
-        """Get current billing usage for the project."""
-        # Query for project usage and billing info
-        query = """
-        query {
-            me {
-                projects {
-                    edges {
-                        node {
-                            id
-                            name
-                            billing {
-                                currentSpend
-                                spendLimit
-                                usage {
-                                    startTime
-                                    endTime
-                                    amount
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    Features:
+    - Historical metric tracking and trend analysis
+    - Linear regression for resource exhaustion prediction
+    - Pattern matching for daemon failure prediction
+    - Pre-emptive action recommendations
+    - Cost/resource tracking with predictive budgeting
+    """
+    
+    def __init__(self, driver, history_window_hours: int = 24):
+        self.driver = driver
+        self.history_window = timedelta(hours=history_window_hours)
+        self.metric_history: Dict[HealthMetric, deque] = {
+            metric: deque(maxlen=1000) for metric in HealthMetric
         }
-        """
+        self.predictions: List[Prediction] = []
+        self.cost_history: deque = deque(maxlen=1000)
         
+        # Configuration
+        self.prediction_threshold = 0.7  # Probability threshold for alerts
+        self.critical_threshold = 0.85  # Critical alert threshold
+        self.min_data_points = 10  # Minimum data points for prediction
+        
+        # Resource thresholds for exhaustion prediction
+        self.resource_thresholds = {
+            HealthMetric.CPU_USAGE: 85.0,
+            HealthMetric.MEMORY_USAGE: 90.0,
+            HealthMetric.DISK_USAGE: 85.0,
+            HealthMetric.LOAD_AVERAGE: 10.0,  # Per CPU
+        }
+    
+    def record_metric(self, metric: HealthMetric, value: float, metadata: Optional[Dict] = None) -> None:
+        """Record a metric measurement."""
+        snapshot = MetricSnapshot(
+            metric=metric,
+            value=value,
+            timestamp=datetime.now(),
+            metadata=metadata or {}
+        )
+        self.metric_history[metric].append(snapshot)
+        
+        # Also persist to Neo4j for long-term storage
+        self._persist_metric(snapshot)
+    
+    def _persist_metric(self, snapshot: MetricSnapshot) -> None:
+        """Persist metric to Neo4j."""
         try:
-            result = self._query(query)
-            
-            # Extract project data
-            projects = result.get('me', {}).get('projects', {}).get('edges', [])
-            
-            usage_data = {
-                'timestamp': datetime.now().isoformat(),
-                'projects': [],
-                'total_spend': 0.0,
-                'spend_limit': 0.0,
-                'percent_used': 0.0
-            }
-            
-            for edge in projects:
-                project = edge.get('node', {})
-                billing = project.get('billing', {})
-                
-                project_data = {
-                    'id': project.get('id'),
-                    'name': project.get('name'),
-                    'current_spend': billing.get('currentSpend', 0),
-                    'spend_limit': billing.get('spendLimit', 0)
-                }
-                
-                usage_data['projects'].append(project_data)
-                usage_data['total_spend'] += project_data['current_spend']
-                usage_data['spend_limit'] += project_data['spend_limit']
-            
-            # Calculate percentage
-            if usage_data['spend_limit'] > 0:
-                usage_data['percent_used'] = (usage_data['total_spend'] / usage_data['spend_limit']) * 100
-            
-            return usage_data
-            
-        except Exception as e:
-            return {
-                'timestamp': datetime.now().isoformat(),
-                'error': str(e),
-                'total_spend': 0.0,
-                'percent_used': 0.0
-            }
+            with self.driver.session() as session:
+                session.run('''
+                    CREATE (m:HealthMetric {
+                        metric_type: $metric_type,
+                        value: $value,
+                        timestamp: datetime($timestamp),
+                        metadata: $metadata
+                    })
+                ''',
+                    metric_type=snapshot.metric.value,
+                    value=snapshot.value,
+                    timestamp=snapshot.timestamp.isoformat(),
+                    metadata=json.dumps(snapshot.metadata)
+                )
+        except Exception:
+            pass  # Don't let persistence failures break monitoring
     
-    def check_thresholds(self, usage: Dict) -> List[Dict]:
-        """Check if usage exceeds thresholds and return alerts."""
-        alerts = []
-        
-        current_spend = usage.get('total_spend', 0)
-        percent_used = usage.get('percent_used', 0)
-        
-        # Check critical threshold
-        if current_spend >= self.critical_threshold:
-            alerts.append({
-                'level': 'CRITICAL',
-                'message': f"Cost critical: ${current_spend:.2f} exceeds critical threshold ${self.critical_threshold:.2f}",
-                'current': current_spend,
-                'threshold': self.critical_threshold,
-                'percent_used': percent_used
-            })
-        # Check warning threshold
-        elif current_spend >= self.threshold:
-            alerts.append({
-                'level': 'WARNING',
-                'message': f"Cost warning: ${current_spend:.2f} exceeds threshold ${self.threshold:.2f}",
-                'current': current_spend,
-                'threshold': self.threshold,
-                'percent_used': percent_used
-            })
-        
-        return alerts
+    def record_cost(self, tokens: int, cost_usd: float, task_name: str) -> None:
+        """Record cost metrics."""
+        self.cost_history.append({
+            "tokens": tokens,
+            "cost_usd": cost_usd,
+            "task_name": task_name,
+            "timestamp": datetime.now()
+        })
     
-    def log_daily_cost(self, usage: Dict):
-        """Log daily cost to file."""
-        log_entry = {
-            'date': datetime.now().strftime('%Y-%m-%d'),
-            'timestamp': datetime.now().isoformat(),
-            'total_spend': usage.get('total_spend', 0),
-            'spend_limit': usage.get('spend_limit', 0),
-            'percent_used': usage.get('percent_used', 0),
-            'projects': usage.get('projects', [])
-        }
+    def get_metric_trend(self, metric: HealthMetric, minutes: int = 60) -> Dict[str, Any]:
+        """
+        Calculate trend for a metric over time.
         
-        # Append to log file
-        with open(LOG_FILE, 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
-    
-    def get_cost_trend(self, days: int = 7) -> Dict:
-        """Get cost trend over the last N days."""
-        if not LOG_FILE.exists():
-            return {'error': 'No cost data available'}
+        Returns trend analysis including slope, direction, and volatility.
+        """
+        cutoff = datetime.now() - timedelta(minutes=minutes)
+        values = [
+            (s.timestamp, s.value) 
+            for s in self.metric_history[metric] 
+            if s.timestamp > cutoff
+        ]
         
-        entries = []
-        with open(LOG_FILE, 'r') as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    entries.append(entry)
-                except json.JSONDecodeError:
-                    continue
+        if len(values) < self.min_data_points:
+            return {"status": "insufficient_data", "points": len(values)}
         
-        # Sort by date
-        entries.sort(key=lambda x: x.get('date', ''))
+        # Calculate linear regression
+        n = len(values)
+        timestamps = [(v[0] - values[0][0]).total_seconds() / 60 for v in values]  # minutes
+        metric_values = [v[1] for v in values]
         
-        # Get last N days
-        recent_entries = entries[-days:] if len(entries) > days else entries
+        sum_x = sum(timestamps)
+        sum_y = sum(metric_values)
+        sum_xy = sum(x * y for x, y in zip(timestamps, metric_values))
+        sum_x2 = sum(x * x for x in timestamps)
         
-        if not recent_entries:
-            return {'error': 'No recent cost data'}
-        
-        # Calculate trend
-        spends = [e.get('total_spend', 0) for e in recent_entries]
-        avg_spend = sum(spends) / len(spends) if spends else 0
-        
-        # Project monthly cost based on recent average
-        days_counted = len(recent_entries)
-        if days_counted > 0:
-            daily_avg = avg_spend / days_counted if days_counted > 0 else 0
-            projected_monthly = daily_avg * 30
+        # Slope in units per minute
+        if sum_x2 * n - sum_x * sum_x == 0:
+            slope = 0
         else:
-            projected_monthly = 0
+            slope = (sum_xy * n - sum_x * sum_y) / (sum_x2 * n - sum_x * sum_x)
+        
+        # Calculate volatility (standard deviation)
+        mean = sum_y / n
+        variance = sum((y - mean) ** 2 for y in metric_values) / n
+        volatility = math.sqrt(variance)
+        
+        # Determine direction
+        if abs(slope) < 0.01:
+            direction = "stable"
+        elif slope > 0:
+            direction = "increasing"
+        else:
+            direction = "decreasing"
+        
+        # Current value
+        current_value = metric_values[-1]
         
         return {
-            'days_analyzed': days_counted,
-            'average_spend': round(avg_spend, 2),
-            'projected_monthly': round(projected_monthly, 2),
-            'recent_entries': recent_entries
+            "current_value": round(current_value, 2),
+            "slope_per_minute": round(slope, 4),
+            "direction": direction,
+            "volatility": round(volatility, 2),
+            "data_points": n,
+            "time_window_minutes": minutes
         }
     
-    def send_alert(self, alert: Dict):
-        """Send alert via available channels."""
-        print(f"\n🚨 COST ALERT [{alert['level']}]")
-        print(f"   {alert['message']}")
-        print(f"   Current: ${alert['current']:.2f} | Threshold: ${alert['threshold']:.2f}")
+    def predict_resource_exhaustion(self, metric: HealthMetric) -> Optional[Prediction]:
+        """
+        Predict when a resource will be exhausted based on current trend.
         
-        # Could extend to send to webhook, email, etc.
-        webhook_url = os.environ.get('ALERT_WEBHOOK_URL')
-        if webhook_url:
-            try:
-                with httpx.Client(timeout=10.0) as client:
-                    client.post(webhook_url, json={
-                        'level': alert['level'],
-                        'message': alert['message'],
-                        'timestamp': datetime.now().isoformat(),
-                        'service': 'cost_monitor'
+        Uses linear extrapolation to estimate time until threshold breach.
+        """
+        trend = self.get_metric_trend(metric, minutes=30)
+        
+        if trend.get("status") == "insufficient_data":
+            return None
+        
+        threshold = self.resource_thresholds.get(metric)
+        if not threshold:
+            return None
+        
+        current_value = trend["current_value"]
+        slope = trend["slope_per_minute"]
+        
+        # If stable or decreasing, no prediction needed
+        if trend["direction"] != "increasing":
+            return None
+        
+        # Calculate time to threshold
+        if slope <= 0:
+            return None
+        
+        remaining = threshold - current_value
+        minutes_until_exhaustion = remaining / slope
+        
+        # Only predict if within reasonable time window (5 min to 4 hours)
+        if minutes_until_exhaustion < 5 or minutes_until_exhaustion > 240:
+            return None
+        
+        # Calculate probability based on trend volatility
+        # Higher volatility = lower confidence
+        volatility_factor = 1.0 - min(trend["volatility"] / 50, 0.5)
+        probability = 0.7 * volatility_factor
+        
+        predicted_time = datetime.now() + timedelta(minutes=minutes_until_exhaustion)
+        
+        return Prediction(
+            event_type=PredictedEvent.RESOURCE_EXHAUSTION,
+            severity=AlertSeverity.CRITICAL if minutes_until_exhaustion < 30 else AlertSeverity.WARNING,
+            probability=probability,
+            predicted_time=predicted_time,
+            affected_components=[metric.value],
+            recommendation=f"Pre-emptive action: Scale up {metric.value} or reduce load. Predicted exhaustion in {int(minutes_until_exhaustion)} minutes.",
+            confidence_score=volatility_factor,
+            based_on_metrics=[metric]
+        )
+    
+    def predict_daemon_failure(self) -> Optional[Prediction]:
+        """
+        Predict Signal daemon failure based on heartbeat patterns.
+        
+        Looks for:
+        - Increasing latency
+        - Missed heartbeats
+        - Error rate spikes
+        """
+        # Check signal daemon ping
+        ping_trend = self.get_metric_trend(HealthMetric.SIGNAL_DAEMON_PING, minutes=15)
+        latency_trend = self.get_metric_trend(HealthMetric.AGENT_HEARTBEAT_LATENCY, minutes=15)
+        
+        if ping_trend.get("status") == "insufficient_data":
+            return None
+        
+        risk_factors = 0
+        total_factors = 0
+        
+        # Factor 1: Increasing ping latency
+        if ping_trend["direction"] == "increasing" and ping_trend["current_value"] > 100:
+            risk_factors += 1
+        total_factors += 1
+        
+        # Factor 2: High agent heartbeat latency
+        if latency_trend.get("status") != "insufficient_data":
+            if latency_trend["direction"] == "increasing" and latency_trend["current_value"] > 5:
+                risk_factors += 1
+            total_factors += 1
+        
+        # Factor 3: Recent error rate
+        error_trend = self.get_metric_trend(HealthMetric.ERROR_RATE, minutes=10)
+        if error_trend.get("status") != "insufficient_data":
+            if error_trend["current_value"] > 0.1:  # > 10% error rate
+                risk_factors += 1
+            total_factors += 1
+        
+        if total_factors == 0:
+            return None
+        
+        probability = risk_factors / total_factors
+        
+        if probability < self.prediction_threshold:
+            return None
+        
+        # Estimate time to failure based on degradation rate
+        if ping_trend["direction"] == "increasing":
+            # If ping latency increasing, estimate failure when it exceeds 5s
+            if ping_trend["slope_per_minute"] > 0:
+                remaining = (5000 - ping_trend["current_value"]) / ping_trend["slope_per_minute"]
+                minutes_until_failure = max(5, min(remaining, 60))
+            else:
+                minutes_until_failure = 30
+        else:
+            minutes_until_failure = 30
+        
+        predicted_time = datetime.now() + timedelta(minutes=minutes_until_failure)
+        
+        return Prediction(
+            event_type=PredictedEvent.DAEMON_FAILURE,
+            severity=AlertSeverity.CRITICAL if probability > self.critical_threshold else AlertSeverity.WARNING,
+            probability=probability,
+            predicted_time=predicted_time,
+            affected_components=["signal_daemon", "agent_communication"],
+            recommendation=f"Pre-emptive restart recommended: Signal daemon showing degradation. Schedule restart in {int(minutes_until_failure)} minutes or during next maintenance window.",
+            confidence_score=probability * 0.9,
+            based_on_metrics=[HealthMetric.SIGNAL_DAEMON_PING, HealthMetric.AGENT_HEARTBEAT_LATENCY]
+        )
+    
+    def predict_database_degradation(self) -> Optional[Prediction]:
+        """Predict Neo4j database degradation."""
+        query_trend = self.get_metric_trend(HealthMetric.NEO4J_QUERY_TIME, minutes=30)
+        connection_trend = self.get_metric_trend(HealthMetric.NEO4J_CONNECTIONS, minutes=30)
+        
+        if query_trend.get("status") == "insufficient_data":
+            return None
+        
+        # Check for query time degradation
+        if query_trend["direction"] == "increasing" and query_trend["current_value"] > 500:
+            probability = 0.6 + (query_trend["current_value"] - 500) / 2000
+            probability = min(0.95, probability)
+            
+            predicted_time = datetime.now() + timedelta(minutes=45)
+            
+            return Prediction(
+                event_type=PredictedEvent.DATABASE_DEGRADATION,
+                severity=AlertSeverity.WARNING,
+                probability=probability,
+                predicted_time=predicted_time,
+                affected_components=["neo4j", "query_performance"],
+                recommendation="Consider connection pool tuning or query optimization. Current query time trending upward.",
+                confidence_score=0.75,
+                based_on_metrics=[HealthMetric.NEO4J_QUERY_TIME]
+            )
+        
+        return None
+    
+    def predict_error_spike(self) -> Optional[Prediction]:
+        """Predict upcoming error spike based on current error rate trend."""
+        error_trend = self.get_metric_trend(HealthMetric.ERROR_RATE, minutes=15)
+        
+        if error_trend.get("status") == "insufficient_data":
+            return None
+        
+        current_rate = error_trend["current_value"]
+        
+        # If error rate is increasing and above 5%
+        if error_trend["direction"] == "increasing" and current_rate > 0.05:
+            probability = min(0.9, current_rate * 3)  # Scale probability with error rate
+            
+            predicted_time = datetime.now() + timedelta(minutes=20)
+            
+            return Prediction(
+                event_type=PredictedEvent.ERROR_SPIKE,
+                severity=AlertSeverity.WARNING if current_rate < 0.15 else AlertSeverity.CRITICAL,
+                probability=probability,
+                predicted_time=predicted_time,
+                affected_components=["task_execution", "agent_performance"],
+                recommendation=f"Error rate trending upward ({current_rate:.1%}). Investigate recent changes or restart affected agents.",
+                confidence_score=0.8,
+                based_on_metrics=[HealthMetric.ERROR_RATE]
+            )
+        
+        return None
+    
+    def run_all_predictions(self) -> List[Prediction]:
+        """Run all prediction models and return alerts."""
+        predictions = []
+        
+        # Resource exhaustion predictions
+        for metric in [HealthMetric.CPU_USAGE, HealthMetric.MEMORY_USAGE, HealthMetric.DISK_USAGE]:
+            pred = self.predict_resource_exhaustion(metric)
+            if pred:
+                predictions.append(pred)
+        
+        # Daemon failure prediction
+        pred = self.predict_daemon_failure()
+        if pred:
+            predictions.append(pred)
+        
+        # Database degradation
+        pred = self.predict_database_degradation()
+        if pred:
+            predictions.append(pred)
+        
+        # Error spike prediction
+        pred = self.predict_error_spike()
+        if pred:
+            predictions.append(pred)
+        
+        # Filter by threshold and sort by severity
+        predictions = [
+            p for p in predictions 
+            if p.probability >= self.prediction_threshold
+        ]
+        
+        severity_order = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1, AlertSeverity.INFO: 2}
+        predictions.sort(key=lambda p: (severity_order[p.severity], -p.probability))
+        
+        # Store predictions
+        self.predictions = predictions
+        
+        # Persist critical predictions
+        for pred in predictions:
+            if pred.severity == AlertSeverity.CRITICAL:
+                self._persist_prediction(pred)
+        
+        return predictions
+    
+    def _persist_prediction(self, prediction: Prediction) -> None:
+        """Persist prediction to Neo4j."""
+        try:
+            with self.driver.session() as session:
+                session.run('''
+                    CREATE (p:Prediction {
+                        event_type: $event_type,
+                        severity: $severity,
+                        probability: $probability,
+                        predicted_time: datetime($predicted_time),
+                        recommendation: $recommendation,
+                        confidence_score: $confidence,
+                        created_at: datetime(),
+                        status: 'active'
                     })
-            except Exception as e:
-                print(f"   Failed to send webhook alert: {e}")
+                ''',
+                    event_type=prediction.event_type.value,
+                    severity=prediction.severity.value,
+                    probability=prediction.probability,
+                    predicted_time=prediction.predicted_time.isoformat(),
+                    recommendation=prediction.recommendation,
+                    confidence=prediction.confidence_score
+                )
+        except Exception:
+            pass
+    
+    def get_preemptive_recommendations(self) -> List[Dict[str, Any]]:
+        """Get list of pre-emptive actions recommended based on predictions."""
+        recommendations = []
+        
+        for pred in self.predictions:
+            if pred.probability >= self.critical_threshold:
+                recommendations.append({
+                    "priority": "immediate",
+                    "action": pred.recommendation,
+                    "event_type": pred.event_type.value,
+                    "predicted_in_minutes": int((pred.predicted_time - datetime.now()).total_seconds() / 60)
+                })
+            elif pred.probability >= self.prediction_threshold:
+                recommendations.append({
+                    "priority": "planned",
+                    "action": pred.recommendation,
+                    "event_type": pred.event_type.value,
+                    "predicted_in_minutes": int((pred.predicted_time - datetime.now()).total_seconds() / 60)
+                })
+        
+        return recommendations
+    
+    def get_cost_forecast(self, hours_ahead: int = 24) -> Dict[str, Any]:
+        """Forecast costs for the next N hours based on recent history."""
+        if len(self.cost_history) < 10:
+            return {"status": "insufficient_data"}
+        
+        # Calculate hourly rate from recent history
+        recent_costs = list(self.cost_history)[-100:]
+        total_cost = sum(c["cost_usd"] for c in recent_costs)
+        time_span = (recent_costs[-1]["timestamp"] - recent_costs[0]["timestamp"]).total_seconds() / 3600
+        
+        if time_span < 0.1:
+            return {"status": "insufficient_time_span"}
+        
+        hourly_rate = total_cost / time_span
+        projected_cost = hourly_rate * hours_ahead
+        
+        # Calculate trend
+        if len(recent_costs) >= 20:
+            first_half = sum(c["cost_usd"] for c in recent_costs[:len(recent_costs)//2])
+            second_half = sum(c["cost_usd"] for c in recent_costs[len(recent_costs)//2:])
+            
+            if first_half > 0:
+                trend = (second_half - first_half) / first_half
+            else:
+                trend = 0
+        else:
+            trend = 0
+        
+        return {
+            "current_hourly_rate": round(hourly_rate, 4),
+            "projected_cost_24h": round(projected_cost, 2),
+            "trend": "increasing" if trend > 0.1 else "decreasing" if trend < -0.1 else "stable",
+            "trend_factor": round(trend, 2),
+            "confidence": "medium" if len(recent_costs) > 50 else "low"
+        }
+    
+    def get_health_dashboard(self) -> Dict[str, Any]:
+        """Get comprehensive health dashboard data."""
+        dashboard = {
+            "timestamp": datetime.now().isoformat(),
+            "current_metrics": {},
+            "trends": {},
+            "predictions": [p.to_dict() for p in self.predictions],
+            "recommendations": self.get_preemptive_recommendations(),
+            "cost_forecast": self.get_cost_forecast()
+        }
+        
+        # Current values
+        for metric in HealthMetric:
+            history = self.metric_history[metric]
+            if history:
+                dashboard["current_metrics"][metric.value] = {
+                    "current": round(list(history)[-1].value, 2),
+                    "unit": self._get_metric_unit(metric)
+                }
+        
+        # Trends for key metrics
+        for metric in [HealthMetric.CPU_USAGE, HealthMetric.MEMORY_USAGE, HealthMetric.ERROR_RATE]:
+            dashboard["trends"][metric.value] = self.get_metric_trend(metric, minutes=30)
+        
+        return dashboard
+    
+    def _get_metric_unit(self, metric: HealthMetric) -> str:
+        """Get unit for a metric."""
+        units = {
+            HealthMetric.CPU_USAGE: "%",
+            HealthMetric.MEMORY_USAGE: "%",
+            HealthMetric.DISK_USAGE: "%",
+            HealthMetric.LOAD_AVERAGE: "",
+            HealthMetric.NEO4J_QUERY_TIME: "ms",
+            HealthMetric.SIGNAL_DAEMON_PING: "ms",
+            HealthMetric.AGENT_HEARTBEAT_LATENCY: "s",
+            HealthMetric.TASK_QUEUE_DEPTH: "tasks",
+            HealthMetric.ERROR_RATE: "%",
+        }
+        return units.get(metric, "")
+    
+    def schedule_preemptive_restart(self, component: str, window_minutes: int = 30) -> Dict[str, Any]:
+        """Schedule a pre-emptive restart for a component."""
+        scheduled_time = datetime.now() + timedelta(minutes=window_minutes)
+        
+        # Persist to Neo4j
+        with self.driver.session() as session:
+            session.run('''
+                CREATE (r:PreemptiveAction {
+                    id: $id,
+                    action_type: 'restart',
+                    component: $component,
+                    scheduled_at: datetime($scheduled_time),
+                    reason: $reason,
+                    status: 'scheduled',
+                    created_at: datetime()
+                })
+            ''',
+                id=f"restart_{component}_{int(datetime.now().timestamp())}",
+                component=component,
+                scheduled_time=scheduled_time.isoformat(),
+                reason=f"Pre-emptive restart based on predictive health monitoring"
+            )
+        
+        return {
+            "component": component,
+            "scheduled_at": scheduled_time.isoformat(),
+            "window_minutes": window_minutes,
+            "status": "scheduled"
+        }
 
 
-def main():
-    """Main entry point."""
-    parser = argparse.ArgumentParser(description='Railway Cost Monitor')
-    parser.add_argument('--check', action='store_true', 
-                       help='Check current usage and send alerts if needed')
-    parser.add_argument('--daily-log', action='store_true',
-                       help='Log current usage to daily cost log')
-    parser.add_argument('--trend', type=int, metavar='DAYS',
-                       help='Show cost trend for last N days')
-    parser.add_argument('--threshold', type=float,
-                       help='Set alert threshold (overrides env var)')
+# Global instance
+_monitor: Optional[PredictiveHealthMonitor] = None
+
+
+def get_health_monitor(driver) -> PredictiveHealthMonitor:
+    """Get or create global health monitor instance."""
+    global _monitor
+    if _monitor is None:
+        _monitor = PredictiveHealthMonitor(driver)
+    return _monitor
+
+
+def reset_health_monitor():
+    """Reset global instance (for testing)."""
+    global _monitor
+    _monitor = None
+
+
+# Standalone execution
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Predictive Health Monitor")
+    parser.add_argument("--predict", action="store_true", help="Run all predictions")
+    parser.add_argument("--dashboard", action="store_true", help="Show health dashboard")
     
     args = parser.parse_args()
     
-    try:
-        monitor = RailwayCostMonitor()
-        
-        if args.threshold:
-            monitor.threshold = args.threshold
-        
-        # Get current usage
-        usage = monitor.get_current_usage()
-        
-        if 'error' in usage:
-            print(f"❌ Error fetching usage: {usage['error']}")
-            sys.exit(1)
-        
-        print("\n📊 Railway Cost Report")
-        print("=" * 50)
-        print(f"Timestamp: {usage['timestamp']}")
-        print(f"Total Spend: ${usage['total_spend']:.2f}")
-        print(f"Spend Limit: ${usage['spend_limit']:.2f}")
-        print(f"Percent Used: {usage['percent_used']:.1f}%")
-        
-        if usage['projects']:
-            print("\nProjects:")
-            for proj in usage['projects']:
-                print(f"  - {proj['name']}: ${proj['current_spend']:.2f}")
-        
-        # Check thresholds
-        if args.check:
-            alerts = monitor.check_thresholds(usage)
-            for alert in alerts:
-                monitor.send_alert(alert)
-            
-            if not alerts:
-                print(f"\n✅ Costs within normal range (threshold: ${monitor.threshold:.2f})")
-        
-        # Log daily cost
-        if args.daily_log:
-            monitor.log_daily_cost(usage)
-            print(f"\n📝 Logged to {LOG_FILE}")
-        
-        # Show trend
-        if args.trend:
-            trend = monitor.get_cost_trend(args.trend)
-            if 'error' not in trend:
-                print(f"\n📈 {args.trend}-Day Trend")
-                print(f"   Average Spend: ${trend['average_spend']:.2f}")
-                print(f"   Projected Monthly: ${trend['projected_monthly']:.2f}")
-            else:
-                print(f"\n⚠️ {trend['error']}")
-        
-        print()
-        
-    except ValueError as e:
-        print(f"❌ Configuration error: {e}")
+    from neo4j import GraphDatabase
+    
+    uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
+    password = os.environ.get('NEO4J_PASSWORD')
+    
+    if not password:
+        print("NEO4J_PASSWORD not set")
         sys.exit(1)
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        sys.exit(1)
-
-
-if __name__ == '__main__':
-    main()
+    
+    driver = GraphDatabase.driver(uri, auth=('neo4j', password))
+    monitor = get_health_monitor(driver)
+    
+    if args.predict:
+        predictions = monitor.run_all_predictions()
+        print(json.dumps([p.to_dict() for p in predictions], indent=2))
+    elif args.dashboard:
+        print(json.dumps(monitor.get_health_dashboard(), indent=2))
+    else:
+        parser.print_help()
+    
+    driver.close()

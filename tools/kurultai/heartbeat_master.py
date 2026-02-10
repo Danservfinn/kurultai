@@ -117,8 +117,49 @@ class UnifiedHeartbeat:
         started_at = cycle_start
 
         logger.info(f"=" * 60)
-        logger.info(f"Heartbeat cycle #{self.cycle_count} starting")
+        logger.info(f"Heartbeat cycle #{self.cycle_count} starting (Kurultai v2.0)")
         logger.info(f"=" * 60)
+
+        # PHASE 3: PREDICTIVE HEALTH MONITORING
+        try:
+            from ..cost_monitor import get_health_monitor
+            monitor = get_health_monitor(self.driver)
+            
+            # Record current metrics if psutil available
+            try:
+                import psutil
+                monitor.record_metric(
+                    monitor.__class__.__dict__['__module__'].split('.')[-1].replace('_', '.'),
+                    psutil.cpu_percent(interval=0.5)
+                )
+                monitor.record_metric(
+                    monitor.__class__.__dict__['__module__'].split('.')[-1].replace('_', '.'),
+                    psutil.virtual_memory().percent
+                )
+            except ImportError:
+                pass
+            
+            # Run predictions
+            predictions = monitor.run_all_predictions()
+            if predictions:
+                critical = [p for p in predictions if p.severity.value == 'critical']
+                if critical:
+                    logger.warning(f"⚠️  {len(critical)} critical predictions detected!")
+                    for p in critical:
+                        logger.warning(f"   - {p.event_type.value}: {p.recommendation}")
+        except Exception as e:
+            logger.debug(f"Predictive monitoring not available: {e}")
+
+        # PHASE 3: DYNAMIC TASK GENERATION
+        try:
+            from ..dynamic_task_generator import get_task_generator
+            generator = get_task_generator(self.driver)
+            gen_result = await generator.run_generation_cycle()
+            if gen_result['tasks_generated'] > 0:
+                logger.info(f"🎯 Dynamic Task Generation: {gen_result['tasks_generated']} tasks, "
+                          f"{gen_result['tasks_persisted']} persisted")
+        except Exception as e:
+            logger.debug(f"Dynamic task generation not available: {e}")
 
         # AUTONOMOUS ORCHESTRATION - Step 0
         # Ensure all tasks get assigned, delegated, and started

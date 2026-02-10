@@ -1661,6 +1661,176 @@ def notion_sync(driver) -> Dict:
 
 
 # ============================================================================
+# PHASE 3: Kurultai v2.0 Enhanced Tasks
+# ============================================================================
+
+def predictive_health_check(driver) -> Dict:
+    """
+    P3-T1: Predictive Health Check (5 min, 200 tokens)
+    
+    Advanced monitoring with predictive analytics:
+    - Resource exhaustion forecasting
+    - Daemon failure prediction
+    - Pre-emptive restart recommendations
+    """
+    print("  🔮 Running predictive health check...")
+    
+    try:
+        from ..cost_monitor import get_health_monitor
+        
+        monitor = get_health_monitor(driver)
+        
+        # Record current metrics
+        try:
+            import psutil
+            monitor.record_metric(
+                monitor.__class__.__dict__.get('__module__', '').split('.')[-1].replace('_', '.'),
+                psutil.cpu_percent(interval=0.5)
+            )
+            monitor.record_metric(
+                monitor.__class__.__dict__.get('__module__', '').split('.')[-1].replace('_', '.'),
+                psutil.virtual_memory().percent
+            )
+        except ImportError:
+            pass
+        
+        # Run all predictions
+        predictions = monitor.run_all_predictions()
+        
+        # Get recommendations
+        recommendations = monitor.get_preemptive_recommendations()
+        
+        # Schedule pre-emptive actions for critical predictions
+        scheduled_actions = []
+        for pred in predictions:
+            if pred.probability >= 0.85:
+                if pred.event_type.value == 'daemon_failure':
+                    action = monitor.schedule_preemptive_restart('signal_daemon', window_minutes=30)
+                    scheduled_actions.append(action)
+        
+        return {
+            'status': 'success',
+            'predictions_count': len(predictions),
+            'critical_predictions': len([p for p in predictions if p.severity.value == 'critical']),
+            'recommendations': len(recommendations),
+            'scheduled_actions': scheduled_actions,
+            'predictions': [p.to_dict() for p in predictions[:5]]  # Limit output
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'message': 'Predictive health monitoring requires cost_monitor module'
+        }
+
+
+def workspace_curation(driver) -> Dict:
+    """
+    P3-T2: Intelligent Workspace Curation (6 hours, 1000 tokens)
+    
+    AI-powered workspace management:
+    - Auto-name untitled pages
+    - Suggest page consolidations
+    - Auto-archive inactive content
+    """
+    print("  🎨 Running workspace curation...")
+    
+    try:
+        from ..workspace_curator import get_workspace_curator
+        
+        curator = get_workspace_curator(driver)
+        
+        # Run curation cycle in dry-run mode (review before applying)
+        results = curator.run_curation_cycle(dry_run=True)
+        
+        # Apply auto-titling for high-confidence suggestions
+        auto_titled = 0
+        for page in results.get('untitled_pages', []):
+            if page.get('confidence', 0) > 0.7 and page.get('suggested'):
+                if curator.apply_title_suggestion(page['path'], page['suggested']):
+                    auto_titled += 1
+        
+        return {
+            'status': 'success',
+            'untitled_pages_found': len(results.get('untitled_pages', [])),
+            'auto_titled': auto_titled,
+            'consolidation_suggestions': len(results.get('consolidation_suggestions', [])),
+            'archive_candidates': len(results.get('archive_candidates', [])),
+            'curation_stats': curator.get_curation_stats()
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'message': 'Workspace curation requires workspace_curator module'
+        }
+
+
+def collaboration_orchestration(driver) -> Dict:
+    """
+    P3-T3: Agent Collaboration Orchestration (15 min, 500 tokens)
+    
+    Multi-agent task orchestration:
+    - Monitor for collaboration opportunities
+    - Spawn agent teams for complex tasks
+    - Synthesize results from multiple agents
+    """
+    print("  🤝 Running collaboration orchestration...")
+    
+    try:
+        from ..agent_collaboration import get_collaboration_protocol
+        
+        protocol = get_collaboration_protocol(driver)
+        
+        # Check for pending tasks that need collaboration
+        with driver.session() as session:
+            result = session.run('''
+                MATCH (t:Task)
+                WHERE t.status = 'pending'
+                  AND t.requires_collaboration = true
+                  AND t.collaboration_id IS NULL
+                RETURN t.id as id, t.title as title, t.description as description
+                LIMIT 5
+            ''')
+            
+            collaborations_initiated = 0
+            for record in result:
+                # Create collaboration for complex task
+                task = protocol.create_from_template(
+                    "complex_implementation",
+                    record['title'],
+                    record['description'],
+                    context={"task_id": record['id']}
+                )
+                
+                if task:
+                    # Update task with collaboration reference
+                    session.run('''
+                        MATCH (t:Task {id: $task_id})
+                        SET t.collaboration_id = $collab_id,
+                            t.status = 'collaborating'
+                    ''', task_id=record['id'], collab_id=task.id)
+                    
+                    collaborations_initiated += 1
+        
+        return {
+            'status': 'success',
+            'collaborations_initiated': collaborations_initiated,
+            'active_collaborations': len(protocol.active_collaborations),
+            'stats': protocol.get_collaboration_stats()
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'message': 'Collaboration orchestration requires agent_collaboration module'
+        }
+
+
+# ============================================================================
 # Task Registry
 # ============================================================================
 
@@ -1691,6 +1861,11 @@ TASK_REGISTRY = {
     
     # System
     'notion_sync': {'fn': notion_sync, 'agent': 'system', 'freq': 60},
+    
+    # PHASE 3: Kurultai v2.0 Enhanced Tasks
+    'predictive_health_check': {'fn': predictive_health_check, 'agent': 'ögedei', 'freq': 5},
+    'workspace_curation': {'fn': workspace_curation, 'agent': 'jochi', 'freq': 360},
+    'collaboration_orchestration': {'fn': collaboration_orchestration, 'agent': 'kublai', 'freq': 15},
 }
 
 
@@ -1738,6 +1913,10 @@ async def register_all_tasks(hb):
         'status_synthesis': {'tokens': 200, 'desc': 'Agent status aggregation'},
         'weekly_reflection': {'tokens': 1500, 'desc': 'Weekly system analysis'},
         'notion_sync': {'tokens': 800, 'desc': 'Notion bidirectional sync'},
+        # PHASE 3 Tasks
+        'predictive_health_check': {'tokens': 200, 'desc': 'Predictive health monitoring'},
+        'workspace_curation': {'tokens': 1000, 'desc': 'AI-powered workspace curation'},
+        'collaboration_orchestration': {'tokens': 500, 'desc': 'Multi-agent collaboration'},
     }
     
     for task_name, config in TASK_REGISTRY.items():
