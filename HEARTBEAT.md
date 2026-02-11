@@ -81,6 +81,36 @@
 - Tasks synced bidirectionally with Neo4j
 - Updates sent hourly at :00 UTC
 
+### Task 5: Discord Deliberation Sync
+**Schedule**: Every 5 minutes
+**Description**: Sync heartbeat status to Discord #heartbeat-log and announce completed tasks
+
+**Actions**:
+1. Query Neo4j for agent statuses
+2. Send status summary to Discord #heartbeat-log
+3. Check for tasks completed since last heartbeat
+4. Announce completed tasks to #council-chamber with celebration
+5. Send critical alerts to #announcements with @everyone
+
+**Integration**:
+```python
+# Run heartbeat bridge
+python tools/discord/heartbeat_bridge.py
+
+# Or continuous mode
+python tools/discord/heartbeat_bridge.py --continuous --interval 5
+```
+
+**Channels**:
+- `#heartbeat-log` - Status summaries every 5 minutes
+- `#council-chamber` - Task completion celebrations
+- `#announcements` - Critical alerts with @everyone
+
+**Agent Voices**:
+- Status updates sent as Ögedei (Operations)
+- Task celebrations sent as completing agent
+- Critical alerts sent as Kublai (Router)
+
 ## Heartbeat Response Rules
 - If nothing needs attention → reply `HEARTBEAT_OK`
 - If tasks delegated → reply with delegation summary
