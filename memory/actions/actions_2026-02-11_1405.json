@@ -1,0 +1,21 @@
+{
+  "extracted_at": "2026-02-11T14:05:29.416588",
+  "count": 1,
+  "actions": [
+    {
+      "id": "action_msg3_1770818729.416527",
+      "source_message_id": "msg3",
+      "source_channel": "council-chamber",
+      "extracted_at": "2026-02-11 14:05:29.416528",
+      "action_type": "ActionType.BUG",
+      "description": "There's a bug in the heartbeat writer - it's failing intermittently. Someone needs to fix this.",
+      "assignee": null,
+      "mentioned_agents": [],
+      "priority": "medium",
+      "confidence": 0.8,
+      "context": "Kublai \ud83c\udfdb\ufe0f: @Tem\u00fcjin We need to implement the engagement tracker by tomorrow. This is high priority.\nM\u00f6ngke \ud83d\udd2c: I found an interesting pattern in the Clawnch data. We should explore this further next week.\nJochi \ud83d\udd0d: There's a bug in the heartbeat writer - it's failing intermittently. Someone needs to fix this.",
+      "status": "pending",
+      "notion_page_id": null
+    }
+  ]
+}
