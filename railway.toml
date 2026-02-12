@@ -114,5 +114,5 @@ cpu = "2"
 [deploy.volumes]
 # Persistent storage for Neo4j
 neo4j-data = "/data/neo4j"
-signal-data = "/data/signal"
+signal-data = "/data/.signal"
 logs = "/data/logs"
