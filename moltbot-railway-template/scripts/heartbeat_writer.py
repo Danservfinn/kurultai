@@ -170,9 +170,9 @@ class ChatMonitor(threading.Thread):
                 self._stop_event.wait(10)  # reconnect delay
 
     def _handle_handshake(self, ws):
-        """Complete OpenClaw connect.challenge -> connect handshake."""
+        """Complete OpenClaw connect handshake (updated for protocol v3)."""
         challenge = json.loads(ws.recv())
-        nonce = challenge.get('params', {}).get('nonce', '')
+        # Note: challenge response is no longer required in newer OpenClaw protocol
 
         ws.send(json.dumps({
             "type": "req",
@@ -190,7 +190,7 @@ class ChatMonitor(threading.Thread):
                     "platform": "linux",
                     "mode": "backend",
                 },
-                "challenge": {"nonce": nonce},
+                # Removed deprecated "challenge" parameter
             },
         }))
         ws.recv()  # connect response
