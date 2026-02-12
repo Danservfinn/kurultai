@@ -218,17 +218,39 @@ echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < 
 # =============================================================================
 # This sidecar writes infra_heartbeat every 30s for failover detection
 HEARTBEAT_WRITER_PID=""
+HEARTBEAT_PID_FILE="/tmp/heartbeat_writer.pid"
+
+# Check if heartbeat_writer is already running
+if [ -f "$HEARTBEAT_PID_FILE" ]; then
+    OLD_PID=$(cat "$HEARTBEAT_PID_FILE" 2>/dev/null)
+    if kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "=== Heartbeat Writer Already Running ==="
+        echo "  PID: $OLD_PID"
+        echo "=========================================="
+        # Skip starting a new instance
+        HEARTBEAT_WRITER_PATH="skip"
+    else
+        # Stale PID file, remove it
+        rm -f "$HEARTBEAT_PID_FILE"
+    fi
+fi
 
 # Check for heartbeat_writer.py in multiple locations
-HEARTBEAT_WRITER_PATH=""
-for path in "/app/scripts/heartbeat_writer.py" "/app/tools/kurultai/heartbeat_writer.py"; do
-    if [ -f "$path" ]; then
-        HEARTBEAT_WRITER_PATH="$path"
-        break
-    fi
-done
+if [ "$HEARTBEAT_WRITER_PATH" != "skip" ]; then
+    HEARTBEAT_WRITER_PATH=""
+    for path in "/app/scripts/heartbeat_writer.py" "/app/tools/kurultai/heartbeat_writer.py"; do
+        if [ -f "$path" ]; then
+            HEARTBEAT_WRITER_PATH="$path"
+            break
+        fi
+    done
+fi
 
-if [ -n "$NEO4J_PASSWORD" ] && [ -n "$HEARTBEAT_WRITER_PATH" ]; then
+if [ "$HEARTBEAT_WRITER_PATH" = "skip" ]; then
+    echo "=== Heartbeat Writer Already Running ==="
+    echo "  PID: $OLD_PID"
+    echo "=========================================="
+elif [ -n "$NEO4J_PASSWORD" ] && [ -n "$HEARTBEAT_WRITER_PATH" ]; then
     echo "=== Starting Heartbeat Writer Sidecar ==="
     echo "  Script: $HEARTBEAT_WRITER_PATH"
 
@@ -255,6 +277,7 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -n "$HEARTBEAT_WRITER_PATH" ]; then
     " &
 
     HEARTBEAT_WRITER_PID=$!
+    echo $HEARTBEAT_WRITER_PID > "$HEARTBEAT_PID_FILE"
     echo "  Heartbeat writer started with PID $HEARTBEAT_WRITER_PID"
     echo "  Configuration:"
     echo "    - Interval: ${HEARTBEAT_INTERVAL}s"
@@ -269,6 +292,7 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -n "$HEARTBEAT_WRITER_PATH" ]; then
         echo "  ✅ Heartbeat writer is running"
     else
         echo "  ⚠️  Heartbeat writer may have failed to start (check logs)"
+        rm -f "$HEARTBEAT_PID_FILE"
     fi
     echo "=========================================="
 elif [ -z "$NEO4J_PASSWORD" ]; then
