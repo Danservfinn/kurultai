@@ -53,10 +53,15 @@ command = "cd /app && curl -X POST http://localhost:8082/api/reflection/trigger 
 [deploy.env]
 # Signal Configuration
 SIGNAL_ENABLED = "true"
-SIGNAL_DATA_DIR = "/data/.signal"
+SIGNAL_DATA_DIR = "/data/.local/share/signal-cli"
 SIGNAL_CLI_PATH = "/usr/local/bin/signal-cli"
 
 # OpenClaw Gateway Configuration
 NODE_ENV = "production"
 OPENCLAW_GATEWAY_PORT = "18789"
 OPENCLAW_STATE_DIR = "/data/.openclaw"
+
+[deploy.volumes]
+# Persistent storage for Signal (must match signal-cli default location)
+signal-data = "/data/.local/share/signal-cli"
+logs = "/data/logs"
