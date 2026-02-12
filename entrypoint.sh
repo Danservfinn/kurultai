@@ -120,8 +120,22 @@ fi
 HEARTBEAT_WRITER_PID=""
 
 HEARTBEAT_WRITER_PATH="${WORKSPACE_DIR}/tools/kurultai/heartbeat_writer.py"
+PID_FILE="/tmp/heartbeat_writer.pid"
 
-if [ -n "$NEO4J_PASSWORD" ] && [ -f "$HEARTBEAT_WRITER_PATH" ]; then
+# Check if heartbeat_writer is already running
+if [ -f "$PID_FILE" ]; then
+    OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
+    if kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "=== Heartbeat Writer Already Running ==="
+        echo "  PID: $OLD_PID"
+        echo "=========================================="
+    else
+        # Stale PID file, remove it
+        rm -f "$PID_FILE"
+    fi
+fi
+
+if [ -n "$NEO4J_PASSWORD" ] && [ -f "$HEARTBEAT_WRITER_PATH" ] && [ ! -f "$PID_FILE" ]; then
     echo "=== Starting Heartbeat Writer Sidecar ==="
     echo "  Script: $HEARTBEAT_WRITER_PATH"
     echo "  Configuration:"
@@ -142,6 +156,7 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -f "$HEARTBEAT_WRITER_PATH" ]; then
     python "$HEARTBEAT_WRITER_PATH" >> "$LOGS_DIR/heartbeat_writer.log" 2>&1 &
 
     HEARTBEAT_WRITER_PID=$!
+    echo $HEARTBEAT_WRITER_PID > "$PID_FILE"
     echo "  Heartbeat writer started with PID $HEARTBEAT_WRITER_PID"
 
     # Verify it started
@@ -150,6 +165,7 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -f "$HEARTBEAT_WRITER_PATH" ]; then
         echo "  ✅ Heartbeat writer is running"
     else
         echo "  ⚠️  Heartbeat writer may have failed to start (check logs)"
+        rm -f "$PID_FILE"
     fi
     echo "=========================================="
 
