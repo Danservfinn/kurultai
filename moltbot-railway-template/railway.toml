@@ -8,7 +8,7 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["Dockerfile", "entrypoint.sh", "src/**", "routes/**", "middleware/**", "config/**", "package*.json"]
 
 [build.args]
-CACHE_BUST = "2026-02-08-v20-CRON-SCHEDULES"
+CACHE_BUST = "2026-02-12-v1-FIXED-WEBSOCKET-SIGNAL"
 
 [deploy]
 # Health check - OpenClaw gateway health endpoint
