@@ -141,6 +141,9 @@ def _handle_signal(signum, frame):
 class ChatMonitor(threading.Thread):
     """Passive WebSocket listener that buffers agent responses."""
 
+    MAX_BACKOFF = 120  # max reconnect delay in seconds
+    INITIAL_BACKOFF = 5  # initial reconnect delay in seconds
+
     def __init__(self, ws_url, token):
         super().__init__(daemon=True)
         self.ws_url = ws_url
@@ -150,24 +153,43 @@ class ChatMonitor(threading.Thread):
         self._stop_event = threading.Event()
 
     def run(self):
-        """Connect to WebSocket, handle events. Reconnect on failure."""
+        """Connect to WebSocket, handle events. Reconnect with exponential backoff."""
         try:
             import websocket
         except ImportError:
             logger.warning("websocket-client not installed, ChatMonitor disabled")
             return
 
+        backoff = self.INITIAL_BACKOFF
+
         while not self._stop_event.is_set():
+            ws = None
             try:
                 ws = websocket.WebSocket()
                 ws.settimeout(60)
                 ws.connect(self.ws_url)
                 self._handle_handshake(ws)
                 logger.info("ChatMonitor connected to gateway WebSocket")
-                self._listen(ws)
+                was_stable = self._listen(ws)
+                if was_stable:
+                    backoff = self.INITIAL_BACKOFF  # reset backoff after stable connection
+                # _listen() returned — connection was lost
+                logger.info("ChatMonitor disconnected, will reconnect")
             except Exception as e:
                 logger.warning(f"ChatMonitor connection error: {e}")
-                self._stop_event.wait(10)  # reconnect delay
+            finally:
+                if ws:
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
+
+            # Always backoff before reconnecting (whether normal return or exception)
+            if self._stop_event.is_set():
+                break
+            logger.info(f"ChatMonitor reconnecting in {backoff}s")
+            self._stop_event.wait(backoff)
+            backoff = min(backoff * 2, self.MAX_BACKOFF)
 
     def _handle_handshake(self, ws):
         """Complete OpenClaw connect.challenge -> connect handshake."""
@@ -196,7 +218,8 @@ class ChatMonitor(threading.Thread):
         ws.recv()  # connect response
 
     def _listen(self, ws):
-        """Listen for agent events, buffer response text."""
+        """Listen for agent events, buffer response text. Returns True if ran >60s (stable)."""
+        started = time.monotonic()
         while not self._stop_event.is_set():
             try:
                 raw = ws.recv()
@@ -227,6 +250,8 @@ class ChatMonitor(threading.Thread):
                     agent_id = payload.get('agentId', 'unknown')
                     with self.lock:
                         self.buffer.setdefault(agent_id, []).append('\n---TURN_END---\n')
+
+        return (time.monotonic() - started) > 60  # stable if listened >60s
 
     def flush(self):
         """Return and clear buffered responses per agent. Thread-safe."""
