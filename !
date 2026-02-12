@@ -1,0 +1,4 @@
+⚠️ Neo4j connection failed: Failed to DNS resolve address invalid-host-for-testing:9999: [Errno -2] Name or service not known
+⚠️ Neo4j connection failed: Couldn't connect to neo4j.railway.internal:7687 (resolved to ('[fd12:793a:be06:1:a000:86:bd12:7f5d]:7687', '10.146.127.93:7687')):
+Timed out trying to establish connection to ResolvedIPv6Address(('fd12:793a:be06:1:a000:86:bd12:7f5d', 7687, 0, 0))
+Timed out trying to establish connection to ResolvedIPv4Address(('10.146.127.93', 7687))

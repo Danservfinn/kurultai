@@ -1,6 +1,6 @@
 {
-  "lastHour": 12,
-  "lastAgent": "Kublai",
+  "lastHour": 4,
+  "lastAgent": "Jochi",
   "rotation": ["Kublai", "Möngke", "Chagatai", "Temüjin", "Jochi", "Ögedei"],
   "hourlyStarters": {
     "0": "Kublai",
@@ -15,6 +15,14 @@
     "9": "Temüjin",
     "10": "Jochi",
     "11": "Ögedei",
-    "12": "Kublai"
+    "12": "Kublai",
+    "13": "Möngke",
+    "14": "Chagatai",
+    "15": "Temüjin",
+    "16": "Jochi",
+    "17": "Ögedei",
+    "18": "Kublai",
+    "19": "Möngke",
+    "20": "Temüjin"
   }
 }

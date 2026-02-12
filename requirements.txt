@@ -54,3 +54,6 @@ hypothesis>=6.100.0  # Property-based testing
 
 # Metrics and monitoring
 prometheus-client>=0.20.0
+
+# Composio for X/Twitter integration
+composio-core>=0.7.0

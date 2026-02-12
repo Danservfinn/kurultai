@@ -1,20 +1,89 @@
 #!/bin/sh
 # Workspace entrypoint for Kurultai multi-agent system
 # Runs heartbeat writer sidecar alongside the main application
-# This is a simplified entrypoint for development/testing
+# Includes Neo4j IPv6 connectivity fixes for Railway deployment
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-NEO4J_URI="${NEO4J_URI:-bolt://localhost:7687}"
+NEO4J_URI="${NEO4J_URI:-bolt://neo4j.railway.internal:7687}"
 NEO4J_USER="${NEO4J_USER:-neo4j}"
 HEARTBEAT_INTERVAL="${HEARTBEAT_INTERVAL:-30}"
 CIRCUIT_BREAKER_THRESHOLD="${CIRCUIT_BREAKER_THRESHOLD:-3}"
 CIRCUIT_BREAKER_PAUSE="${CIRCUIT_BREAKER_PAUSE:-60}"
 LOG_LEVEL="${HEARTBEAT_LOG_LEVEL:-INFO}"
+NEO4J_MAX_RETRIES="${NEO4J_MAX_RETRIES:-30}"
+NEO4J_RETRY_DELAY="${NEO4J_RETRY_DELAY:-2}"
 
 WORKSPACE_DIR="/data/workspace/souls/main"
 LOGS_DIR="${WORKSPACE_DIR}/logs"
+SCRIPTS_DIR="${WORKSPACE_DIR}/scripts"
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+
+# Test Neo4j connectivity
+test_neo4j_connection() {
+    python3 "${SCRIPTS_DIR}/neo4j_connection_helper.py" --test 2>/dev/null
+    return $?
+}
+
+# Wait for Neo4j to be ready with retry logic
+wait_for_neo4j() {
+    echo ""
+    echo "=== Waiting for Neo4j Connection ==="
+    echo "  URI: $NEO4J_URI"
+    echo "  Max retries: $NEO4J_MAX_RETRIES"
+    echo "  Retry delay: ${NEO4J_RETRY_DELAY}s"
+    echo ""
+    
+    local attempt=0
+    while [ $attempt -lt $NEO4J_MAX_RETRIES ]; do
+        attempt=$((attempt + 1))
+        
+        if python3 "${SCRIPTS_DIR}/neo4j_connection_helper.py" --test 2>/dev/null; then
+            echo ""
+            echo "✅ Neo4j is ready! (connected on attempt $attempt)"
+            echo "===================================="
+            return 0
+        fi
+        
+        if [ $attempt -eq 1 ]; then
+            echo "  Attempt $attempt/$NEO4J_MAX_RETRIES: Neo4j not ready yet..."
+        elif [ $attempt -lt $NEO4J_MAX_RETRIES ]; then
+            echo "  Attempt $attempt/$NEO4J_MAX_RETRIES: Retrying..."
+        fi
+        
+        # On 5th retry, show diagnostic info
+        if [ $attempt -eq 5 ]; then
+            echo ""
+            echo "  ⚠️  Multiple connection failures. Running diagnostics..."
+            echo "  (This is normal if Neo4j is still starting up)"
+            echo ""
+            
+            # Try to resolve the hostname
+            if command -v getent >/dev/null 2>&1; then
+                echo "  DNS Resolution:"
+                getent hosts neo4j.railway.internal 2>/dev/null | head -1 | sed 's/^/    /' || echo "    neo4j.railway.internal: Could not resolve"
+                getent hosts neo4j 2>/dev/null | head -1 | sed 's/^/    /' || echo "    neo4j: Could not resolve"
+            fi
+        fi
+        
+        sleep $NEO4J_RETRY_DELAY
+    done
+    
+    echo ""
+    echo "❌ Neo4j connection failed after $NEO4J_MAX_RETRIES attempts"
+    echo ""
+    echo "Possible solutions:"
+    echo "  1. Ensure Neo4j service is running in Railway Dashboard"
+    echo "  2. Apply the IPv6 fix (see docs/NEO4J_IPV6_FIX.md)"
+    echo "  3. Run diagnostics: python3 scripts/neo4j_connection_helper.py --diagnose"
+    echo ""
+    
+    return 1
+}
 
 # =============================================================================
 # STARTUP
@@ -25,6 +94,25 @@ echo "Neo4j: $NEO4J_URI"
 
 # Create logs directory
 mkdir -p "$LOGS_DIR"
+
+# =============================================================================
+# NEO4J CONNECTIVITY CHECK
+# =============================================================================
+if [ -n "$NEO4J_PASSWORD" ]; then
+    if wait_for_neo4j; then
+        echo ""
+        echo "Neo4j connectivity: ✅ OK"
+    else
+        echo ""
+        echo "Neo4j connectivity: ⚠️  FAILED (will retry during operation)"
+        echo "Continuing startup..."
+    fi
+    echo ""
+else
+    echo ""
+    echo "NEO4J_PASSWORD not set, skipping connectivity check"
+    echo ""
+fi
 
 # =============================================================================
 # START HEARTBEAT WRITER SIDECAR

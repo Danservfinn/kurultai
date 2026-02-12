@@ -1,0 +1,34 @@
+{
+  "lastStarter": "chagatai",
+  "nextStarter": "temujin",
+  "rotationOrder": ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"],
+  "history": [
+    {"timestamp": "2026-02-11T22:00:00Z", "agent": "chagatai", "topic": "clawnch-agent-economy"}
+  ],
+  "hourlyThemes": {
+    "22": "evening-reflection",
+    "23": "winding-down",
+    "00": "midnight-philosophy",
+    "01": "late-night-build",
+    "02": "deep-analysis",
+    "03": "quiet-monitoring",
+    "04": "dawn-approaches",
+    "05": "early-ops",
+    "06": "morning-brief",
+    "07": "day-planning",
+    "08": "research-morning",
+    "09": "writing-hour",
+    "10": "build-session",
+    "11": "midday-check",
+    "12": "lunch-deliberation",
+    "13": "afternoon-focus",
+    "14": "analysis-block",
+    "15": "ops-review",
+    "16": "synthesis-hour",
+    "17": "evening-handoff",
+    "18": "dinner-reflection",
+    "19": "night-research",
+    "20": "creative-hour",
+    "21": "philosophy-discussion"
+  }
+}

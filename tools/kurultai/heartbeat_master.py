@@ -21,6 +21,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
+# Add workspace to path for imports
+workspace = os.environ.get('WORKSPACE', '/data/workspace/souls/main')
+if workspace not in sys.path:
+    sys.path.insert(0, workspace)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -356,6 +361,49 @@ def reset_heartbeat():
 
 
 # ============================================================================
+# Autonomous Recovery Integration
+# ============================================================================
+
+async def run_with_recovery(driver=None):
+    """
+    Run heartbeat cycle with automatic failure recovery.
+
+    This integrates health checks with the ErrorRecoveryManager
+    to automatically fix detected failures.
+    """
+    from tools.kurultai.health_recovery_integration import create_autonomous_recovery_system
+
+    logger.info("Starting heartbeat with autonomous recovery...")
+
+    # Create integrated recovery system
+    recovery_system = create_autonomous_recovery_system(
+        auto_recover=True
+    )
+
+    # Run health check with automatic recovery
+    result = await recovery_system.run_health_check_with_recovery()
+
+    # Log results
+    health = result['health_summary']
+    recoveries = result['recovery_actions']
+
+    if recoveries:
+        logger.info(f"🩺 Auto-recovery: {len(recoveries)} actions executed")
+        for action in recoveries:
+            status = action.get('status', 'unknown')
+            component = action.get('component', 'unknown')
+            logger.info(f"   - {component}: {status}")
+
+    # Continue with normal heartbeat if health is acceptable
+    if health.get('critical_count', 0) == 0 or health.get('overall_status') != 'critical':
+        logger.info("✅ Health acceptable, continuing with heartbeat tasks")
+        return True
+    else:
+        logger.warning("⚠️  Critical health issues remain after recovery attempts")
+        return False
+
+
+# ============================================================================
 # CLI Entry Point
 # ============================================================================
 
@@ -399,6 +447,12 @@ Examples:
         "--daemon",
         action="store_true",
         help="Run continuous daemon mode"
+    )
+
+    parser.add_argument(
+        "--auto-recover",
+        action="store_true",
+        help="Enable autonomous failure recovery"
     )
 
     parser.add_argument(
@@ -472,7 +526,7 @@ Examples:
     try:
         if args.setup:
             # Import and register all tasks
-            from .agent_tasks import register_all_tasks
+            from tools.kurultai.agent_tasks import register_all_tasks
             hb = get_heartbeat(driver, args.project_root)
             asyncio.run(register_all_tasks(hb))
 
@@ -492,7 +546,7 @@ Examples:
 
             # Import to ensure tasks are registered
             try:
-                from .agent_tasks import register_all_tasks
+                from tools.kurultai.agent_tasks import register_all_tasks
                 asyncio.run(register_all_tasks(hb))
             except Exception:
                 pass  # May fail if not set up yet
@@ -516,10 +570,17 @@ Examples:
                         print(f"  {task.description}")
 
         elif args.cycle:
+            # Run autonomous recovery if enabled
+            if args.auto_recover:
+                health_ok = asyncio.run(run_with_recovery(driver))
+                if not health_ok:
+                    logger.warning("Health check failed, skipping task cycle")
+                    sys.exit(1)
+
             hb = get_heartbeat(driver, args.project_root)
 
             # Import and register tasks if not already done
-            from .agent_tasks import register_all_tasks
+            from tools.kurultai.agent_tasks import register_all_tasks
             if len(hb.tasks) == 0:
                 asyncio.run(register_all_tasks(hb))
 
@@ -555,7 +616,7 @@ Examples:
             hb = get_heartbeat(driver, args.project_root)
 
             # Import and register tasks
-            from .agent_tasks import register_all_tasks
+            from tools.kurultai.agent_tasks import register_all_tasks
             if len(hb.tasks) == 0:
                 asyncio.run(register_all_tasks(hb))
 
@@ -576,8 +637,17 @@ Examples:
             signal.signal(signal.SIGTERM, handle_signal)
             signal.signal(signal.SIGINT, handle_signal)
 
-            # Run daemon
-            asyncio.run(hb.run_daemon(shutdown_event))
+            # Run daemon with optional auto-recovery
+            if args.auto_recover:
+                # Run recovery alongside heartbeat
+                async def run_daemon_with_recovery():
+                    await asyncio.gather(
+                        hb.run_daemon(shutdown_event),
+                        run_with_recovery(driver)
+                    )
+                asyncio.run(run_daemon_with_recovery())
+            else:
+                asyncio.run(hb.run_daemon(shutdown_event))
 
         else:
             parser.print_help()

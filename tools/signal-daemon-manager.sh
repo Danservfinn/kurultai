@@ -50,7 +50,7 @@ start_daemon() {
     signal-cli --trust-new-identities always \
         -a +15165643945 \
         daemon \
-        --http 127.0.0.1:8080 \
+        --http 127.0.0.1:8081 \
         --no-receive-stdout \
         --receive-mode on-start \
         --ignore-stories \
@@ -64,7 +64,7 @@ start_daemon() {
     
     # Verify it's working
     if kill -0 $daemon_pid 2>/dev/null; then
-        if curl -s http://127.0.0.1:8080/api/v1/rpc \
+        if curl -s http://127.0.0.1:8081/api/v1/rpc \
            -X POST \
            -H "Content-Type: application/json" \
            -d '{"jsonrpc":"2.0","id":"1","method":"version"}' \
@@ -105,7 +105,7 @@ status_daemon() {
         echo "✅ Signal daemon running (PID: $pid)"
         
         # Check API responsiveness
-        if curl -s http://127.0.0.1:8080/api/v1/rpc \
+        if curl -s http://127.0.0.1:8081/api/v1/rpc \
            -X POST \
            -H "Content-Type: application/json" \
            -d '{"jsonrpc":"2.0","id":"1","method":"version"}' \

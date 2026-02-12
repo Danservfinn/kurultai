@@ -258,9 +258,10 @@ services:
       # - name: NEO4J_ACCEPT_LICENSE_AGREEMENT
       #   value: "yes"
 
-      # Enable remote connections
+      # Enable remote connections on both IPv4 and IPv6
+      # "::" enables dual-stack (IPv4 + IPv6) - required for Railway internal networking
       - name: NEO4J_dbms_default__listen__address
-        value: "0.0.0.0"
+        value: "::"
 
       # Logging configuration
       - name: NEO4J_dbms_logs_debug_level
