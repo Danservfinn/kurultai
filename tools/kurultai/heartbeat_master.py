@@ -268,7 +268,21 @@ class UnifiedHeartbeat:
 
     async def _log_cycle(self, result: CycleResult):
         """Log heartbeat cycle results to Neo4j."""
+        cycle_id = f"cycle-{result.cycle_number}-{int(result.started_at.timestamp())}"
+        """Log heartbeat cycle results to Neo4j."""
         try:
+            # Validate driver connection first
+            if self.driver is None:
+                logger.error("Cannot log cycle: Neo4j driver is None")
+                return
+
+            # Test connectivity before attempting write
+            try:
+                self.driver.verify_connectivity()
+            except Exception as conn_err:
+                logger.error(f"Neo4j connectivity check failed: {conn_err}")
+                return
+
             cypher = """
             CREATE (hc:HeartbeatCycle {
                 id: $id,
@@ -281,37 +295,68 @@ class UnifiedHeartbeat:
                 total_tokens: $total_tokens,
                 duration_seconds: $duration_seconds
             })
-            WITH hc
+            RETURN hc.id AS cycle_id
+            """
+
+            # Separate query for task results to handle empty results gracefully
+            cypher_results = """
+            MATCH (hc:HeartbeatCycle {id: $cycle_id})
             UNWIND $results AS result
             CREATE (tr:TaskResult {
                 agent: result.agent,
                 task_name: result.task,
                 status: result.status,
                 started_at: datetime(result.started_at),
-                summary: COALESCE(result.result.summary, result.error, 'Unknown')
+                summary: COALESCE(result.result[\"summary\"], result.error, 'Unknown')
             })
             CREATE (hc)-[:HAS_RESULT]->(tr)
-            RETURN hc.id AS cycle_id
+            RETURN count(tr) AS result_count
             """
 
             duration = (result.completed_at - result.started_at).total_seconds()
+            cycle_id = f"cycle-{result.cycle_number}-{int(result.started_at.timestamp())}"
 
-            with self.driver.session() as session:
-                session.run(cypher,
-                    id=f"cycle-{result.cycle_number}-{int(result.started_at.timestamp())}",
-                    cycle_number=result.cycle_number,
-                    started_at=result.started_at.isoformat(),
-                    completed_at=result.completed_at.isoformat(),
-                    tasks_run=result.tasks_run,
-                    tasks_succeeded=result.tasks_succeeded,
-                    tasks_failed=result.tasks_failed,
-                    total_tokens=result.total_tokens,
-                    duration_seconds=duration,
-                    results=result.results
-                )
+            # Run synchronous Neo4j operation in thread pool to avoid blocking event loop
+            def _execute_write():
+                with self.driver.session() as session:
+                    # Create the HeartbeatCycle node first
+                    cycle_result = session.run(cypher,
+                        id=cycle_id,
+                        cycle_number=result.cycle_number,
+                        started_at=result.started_at.isoformat(),
+                        completed_at=result.completed_at.isoformat(),
+                        tasks_run=result.tasks_run,
+                        tasks_succeeded=result.tasks_succeeded,
+                        tasks_failed=result.tasks_failed,
+                        total_tokens=result.total_tokens,
+                        duration_seconds=duration
+                    )
+                    record = cycle_result.single()
+                    created_cycle_id = record["cycle_id"] if record else cycle_id
+
+                    # Create TaskResult nodes if there are any results
+                    if result.results:
+                        result_count = session.run(cypher_results,
+                            cycle_id=created_cycle_id,
+                            results=result.results
+                        ).single()["result_count"]
+                        logger.debug(f"Created {result_count} TaskResult nodes for cycle {created_cycle_id}")
+
+                    return created_cycle_id
+
+            # Use asyncio.to_thread for Python 3.9+ or run_in_executor for older versions
+            try:
+                logged_cycle_id = await asyncio.to_thread(_execute_write)
+                logger.info(f"✓ Logged heartbeat cycle to Neo4j: {logged_cycle_id}")
+            except AttributeError:
+                # Python < 3.9 fallback
+                loop = asyncio.get_event_loop()
+                logged_cycle_id = await loop.run_in_executor(None, _execute_write)
+                logger.info(f"✓ Logged heartbeat cycle to Neo4j: {logged_cycle_id}")
 
         except Exception as e:
             logger.error(f"Failed to log cycle to Neo4j: {e}")
+            logger.exception("Full traceback:")
             # Don't let logging failure break the cycle
 
     async def run_daemon(self, shutdown_event: Optional[asyncio.Event] = None):
@@ -581,8 +626,16 @@ Examples:
 
             # Import and register tasks if not already done
             from tools.kurultai.agent_tasks import register_all_tasks
+            logger.debug(f"Task count before registration: {len(hb.tasks)}")
             if len(hb.tasks) == 0:
-                asyncio.run(register_all_tasks(hb))
+                logger.info("No tasks registered, calling register_all_tasks...")
+                try:
+                    asyncio.run(register_all_tasks(hb))
+                    logger.info(f"Successfully registered {len(hb.tasks)} tasks")
+                    for task in hb.tasks:
+                        logger.debug(f"  - {task.agent}/{task.name}: {task.description}")
+                except Exception as e:
+                    logger.exception(f"Failed to register tasks: {e}")
 
             # Filter to specific agent if requested
             if args.agent:

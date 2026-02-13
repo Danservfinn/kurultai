@@ -2404,8 +2404,9 @@ async def register_all_tasks(hb):
         desc = task_configs.get(task_name, {}).get('desc', '')
         
         # Create async wrapper for sync function
+        # FIX: Use default argument to capture fn by VALUE, not reference
         async def make_handler(fn):
-            async def handler(driver):
+            async def handler(driver, fn=fn):  # Capture fn at definition time
                 return fn(driver)
             return handler
         
