@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-13-v26-SIGNAL-PRESERVE) ==="
+echo "=== Entrypoint starting (version 2026-02-13-v27-SIGNAL-RELINK-FIX) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -126,13 +126,21 @@ fi
 SIGNAL_CLI_DATA_DIR="/data/.local/share/signal-cli"
 
 # SIGNAL_FORCE_RELINK=1 wipes stale data so device can be re-linked
+SIGNAL_RELINKED=0
 if [ "$SIGNAL_FORCE_RELINK" = "1" ]; then
     echo "=== SIGNAL_FORCE_RELINK: Wiping stale Signal data ==="
     rm -rf "$SIGNAL_CLI_DATA_DIR/data" 2>/dev/null || true
-    echo "  Wiped. After deploy, re-link with: signal-cli link -n OpenClaw"
+    SIGNAL_RELINKED=1
+    echo "  Wiped. Signal will not start until device is re-linked."
+    echo "  To re-link: railway shell, then: HOME=/data signal-cli link -n OpenClaw"
+    echo "  After linking, set SIGNAL_FORCE_RELINK=0 and redeploy."
 fi
 
-if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ]; then
+if [ "$SIGNAL_RELINKED" = "1" ]; then
+    echo "=== Signal: Skipping data extraction (FORCE_RELINK active) ==="
+    echo "  Signal daemon will fail until device is re-linked."
+    mkdir -p "$SIGNAL_CLI_DATA_DIR/data"
+elif [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ]; then
     echo "=== Signal Data Already on Volume ==="
     echo "  Preserving existing signal-cli data (credentials may have been renewed at runtime)"
     echo "  Contents:"
@@ -173,7 +181,7 @@ fi
 # After being offline, the linked device may have stale identity keys.
 # Trust all known keys to prevent "untrusted identities" errors on send
 # and "decryption failed" errors on receive.
-if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ] && [ -n "$SIGNAL_ACCOUNT" ]; then
+if [ "$SIGNAL_RELINKED" != "1" ] && [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ] && [ -n "$SIGNAL_ACCOUNT" ]; then
     echo "=== Trusting Signal Identity Keys ==="
     # Trust each number in SIGNAL_ALLOW_FROM (comma-separated)
     if [ -n "$SIGNAL_ALLOW_FROM" ]; then
