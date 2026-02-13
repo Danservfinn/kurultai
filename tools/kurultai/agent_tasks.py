@@ -2371,7 +2371,7 @@ def run_task(task_name: str, driver=None) -> Dict:
 
 async def register_all_tasks(hb):
     """Register all tasks with the heartbeat system."""
-    from heartbeat_master import HeartbeatTask
+    from heartbeat_master import HeartbeatTask, CRITICAL_TASKS
     
     task_configs = {
         'health_check': {'tokens': 150, 'desc': 'System health monitoring'},
@@ -2403,6 +2403,9 @@ async def register_all_tasks(hb):
         tokens = task_configs.get(task_name, {}).get('tokens', 500)
         desc = task_configs.get(task_name, {}).get('desc', '')
         
+        # Determine criticality - CRITICAL tasks always run
+        criticality = 'CRITICAL' if task_name in CRITICAL_TASKS else 'ADAPTIVE'
+        
         # Create async wrapper for sync function
         # FIX: Use default argument to capture fn by VALUE, not reference
         async def make_handler(fn):
@@ -2417,7 +2420,8 @@ async def register_all_tasks(hb):
             max_tokens=tokens,
             handler=await make_handler(config['fn']),
             description=desc,
-            enabled=True
+            enabled=True,
+            criticality=criticality
         ))
 
 

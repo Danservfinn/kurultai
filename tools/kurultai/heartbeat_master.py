@@ -21,6 +21,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
+# Import psutil for memory checking
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+
 # Add workspace to path for imports
 workspace = os.environ.get('WORKSPACE', '/data/workspace/souls/main')
 if workspace not in sys.path:
@@ -35,6 +42,34 @@ logging.basicConfig(
 logger = logging.getLogger("kurultai.heartbeat")
 
 
+# ============================================================================
+# Memory Pressure Utilities
+# ============================================================================
+
+def get_memory_percent() -> float:
+    """Get current memory usage percentage. Returns 0 if psutil unavailable."""
+    if not HAS_PSUTIL:
+        return 0.0
+    try:
+        return psutil.virtual_memory().percent
+    except Exception as e:
+        logger.warning(f"Failed to get memory percent: {e}")
+        return 0.0
+
+
+# ============================================================================
+# Task Criticality Levels
+# ============================================================================
+
+CRITICAL_TASKS = frozenset([
+    'health_check',
+    'memory_curation_rapid',
+    'status_synthesis',
+])
+
+# All other tasks are ADAPTIVE by default
+
+
 @dataclass
 class HeartbeatTask:
     """A task that runs on heartbeat."""
@@ -45,13 +80,39 @@ class HeartbeatTask:
     handler: Callable[[Any], Awaitable[Dict]]  # async function(driver) -> result
     description: str = ""  # Human-readable description
     enabled: bool = True  # Can be disabled per task
+    criticality: str = 'ADAPTIVE'  # 'CRITICAL' or 'ADAPTIVE'
 
-    def should_run(self, cycle_count: int) -> bool:
-        """Determine if task should run this cycle."""
+    def should_run(self, cycle_count: int) -> Dict[str, Any]:
+        """
+        Determine if task should run this cycle.
+        
+        Returns a dict with:
+        - should_run: bool - whether the task should execute
+        - reason: str - explanation for decision
+        - memory_percent: float - current memory usage (if checked)
+        """
         if not self.enabled:
-            return False
-        # Every 5 min cycle - check if this task's interval aligns
-        return cycle_count % (self.frequency_minutes // 5) == 0
+            return {'should_run': False, 'reason': 'disabled'}
+        
+        # Check frequency alignment (every 5 min cycle)
+        if cycle_count % (self.frequency_minutes // 5) != 0:
+            return {'should_run': False, 'reason': 'frequency'}
+        
+        # Check memory pressure for ADAPTIVE tasks
+        if self.criticality == 'ADAPTIVE':
+            mem_pct = get_memory_percent()
+            if mem_pct > 70:
+                logger.warning(
+                    f"⏸️  Skipping {self.agent}/{self.name} due to memory pressure "
+                    f"({mem_pct:.1f}% > 70%)"
+                )
+                return {
+                    'should_run': False,
+                    'reason': 'memory_pressure',
+                    'memory_percent': mem_pct
+                }
+        
+        return {'should_run': True, 'reason': 'scheduled'}
 
 
 @dataclass
@@ -63,6 +124,7 @@ class CycleResult:
     tasks_run: int
     tasks_succeeded: int
     tasks_failed: int
+    tasks_skipped_memory: int = 0  # Tasks skipped due to memory pressure
     results: List[Dict[str, Any]] = field(default_factory=list)
     total_tokens: int = 0
 
@@ -182,13 +244,27 @@ class UnifiedHeartbeat:
         tasks_run = 0
         tasks_succeeded = 0
         tasks_failed = 0
+        tasks_skipped_memory = 0
         total_tokens = 0
 
         # Sort tasks by agent for consistent ordering
         sorted_tasks = sorted(self.tasks, key=lambda t: (t.agent, t.name))
 
         for task in sorted_tasks:
-            if not task.should_run(self.cycle_count):
+            should_run_result = task.should_run(self.cycle_count)
+            
+            if not should_run_result['should_run']:
+                # Track memory-pressure skips
+                if should_run_result.get('reason') == 'memory_pressure':
+                    tasks_skipped_memory += 1
+                    results.append({
+                        "agent": task.agent,
+                        "task": task.name,
+                        "status": "skipped",
+                        "reason": "memory_pressure",
+                        "memory_percent": should_run_result.get('memory_percent'),
+                        "skipped_due_to_memory": True
+                    })
                 continue
 
             tasks_run += 1
@@ -250,6 +326,7 @@ class UnifiedHeartbeat:
             tasks_run=tasks_run,
             tasks_succeeded=tasks_succeeded,
             tasks_failed=tasks_failed,
+            tasks_skipped_memory=tasks_skipped_memory,
             results=results,
             total_tokens=total_tokens
         )
@@ -260,7 +337,7 @@ class UnifiedHeartbeat:
         duration = (cycle_end - started_at).total_seconds()
         logger.info(f"=" * 60)
         logger.info(f"Cycle #{self.cycle_count} complete in {duration:.1f}s")
-        logger.info(f"Tasks: {tasks_run} run, {tasks_succeeded} succeeded, {tasks_failed} failed")
+        logger.info(f"Tasks: {tasks_run} run, {tasks_succeeded} succeeded, {tasks_failed} failed, {tasks_skipped_memory} skipped (memory)")
         logger.info(f"Total tokens: {total_tokens}")
         logger.info(f"=" * 60)
 
