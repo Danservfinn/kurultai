@@ -192,9 +192,9 @@ class ChatMonitor(threading.Thread):
             backoff = min(backoff * 2, self.MAX_BACKOFF)
 
     def _handle_handshake(self, ws):
-        """Complete OpenClaw connect.challenge -> connect handshake."""
-        challenge = json.loads(ws.recv())
-        nonce = challenge.get('params', {}).get('nonce', '')
+        """Complete OpenClaw connect handshake."""
+        # Read server greeting (may be connect.challenge or similar)
+        ws.recv()
 
         ws.send(json.dumps({
             "type": "req",
@@ -212,7 +212,6 @@ class ChatMonitor(threading.Thread):
                     "platform": "linux",
                     "mode": "backend",
                 },
-                "challenge": {"nonce": nonce},
             },
         }))
         resp = json.loads(ws.recv())
