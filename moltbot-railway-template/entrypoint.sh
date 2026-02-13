@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-13-v25-NEO4J-ENV-FIX) ==="
+echo "=== Entrypoint starting (version 2026-02-13-v26-SIGNAL-PRESERVE) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -125,17 +125,31 @@ fi
 
 SIGNAL_CLI_DATA_DIR="/data/.local/share/signal-cli"
 
-if [ -f /opt/signal-data.tar.gz ]; then
-    echo "=== Extracting Signal Data ==="
-    mkdir -p "$SIGNAL_CLI_DATA_DIR"
-    # Force clean extraction every deploy to prevent corruption
+# SIGNAL_FORCE_RELINK=1 wipes stale data so device can be re-linked
+if [ "$SIGNAL_FORCE_RELINK" = "1" ]; then
+    echo "=== SIGNAL_FORCE_RELINK: Wiping stale Signal data ==="
     rm -rf "$SIGNAL_CLI_DATA_DIR/data" 2>/dev/null || true
+    echo "  Wiped. After deploy, re-link with: signal-cli link -n OpenClaw"
+fi
+
+if [ -f "$SIGNAL_CLI_DATA_DIR/data/accounts.json" ]; then
+    echo "=== Signal Data Already on Volume ==="
+    echo "  Preserving existing signal-cli data (credentials may have been renewed at runtime)"
+    echo "  Contents:"
+    ls -la "$SIGNAL_CLI_DATA_DIR/data/"
+    echo "  accounts.json size: $(wc -c < "$SIGNAL_CLI_DATA_DIR/data/accounts.json") bytes"
+elif [ -f /opt/signal-data.tar.gz ]; then
+    echo "=== Extracting Signal Data (first deploy) ==="
+    mkdir -p "$SIGNAL_CLI_DATA_DIR"
     tar -xzf /opt/signal-data.tar.gz -C "$SIGNAL_CLI_DATA_DIR"
     find "$SIGNAL_CLI_DATA_DIR" -name '._*' -delete 2>/dev/null
     echo "  Extracted to: $SIGNAL_CLI_DATA_DIR"
     echo "  Contents:"
     ls -la "$SIGNAL_CLI_DATA_DIR/data/"
     echo "  accounts.json size: $(wc -c < "$SIGNAL_CLI_DATA_DIR/data/accounts.json") bytes"
+else
+    echo "  WARNING: No signal data found — Signal will not work"
+    echo "  Link a device: signal-cli link -n OpenClaw"
 fi
 
 # Set permissions for moltbot user (OpenClaw runs as moltbot)
