@@ -56,7 +56,7 @@
       "receiveMode": "on-start",
       "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
-      "configWrites": true,
+      "configWrites": false,
       "allowFrom": ["+15165643945", "+19194133445"],
       "historyLimit": 50,
       "textChunkLimit": 4000,

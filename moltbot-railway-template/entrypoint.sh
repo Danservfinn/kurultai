@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-08-v20-ARCH-SYNC) ==="
+echo "=== Entrypoint starting (version 2026-02-13-v24-CONFIG-LOCKDOWN) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -207,11 +207,15 @@ done
 # =============================================================================
 # Always copy config to the state directory to pick up config changes
 # OpenClaw reads from ~/.openclaw/openclaw.json
+# CRITICAL: Config must be root-owned and read-only to prevent agent config drift.
+# The Kimi agent uses `exec` tool to rewrite openclaw.json at runtime, which
+# changes model, wipes trustedProxies, and triggers gateway restarts.
 echo "Installing OpenClaw configuration..."
 cp /app/openclaw.json "$OPENCLAW_STATE_DIR/openclaw.json"
 cp /app/openclaw.json5 "$OPENCLAW_STATE_DIR/openclaw.json5"
-chown 1001:1001 "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/openclaw.json5"
-echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < $OPENCLAW_STATE_DIR/openclaw.json) bytes)"
+chown root:root "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/openclaw.json5"
+chmod 444 "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/openclaw.json5"
+echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < $OPENCLAW_STATE_DIR/openclaw.json) bytes) [read-only, root-owned]"
 
 # =============================================================================
 # START HEARTBEAT SIDECAR
