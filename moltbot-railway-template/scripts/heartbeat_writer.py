@@ -215,7 +215,9 @@ class ChatMonitor(threading.Thread):
                 "challenge": {"nonce": nonce},
             },
         }))
-        ws.recv()  # connect response
+        resp = json.loads(ws.recv())
+        if resp.get('error'):
+            raise ConnectionError(f"Connect rejected: {resp['error']}")
 
     def _listen(self, ws):
         """Listen for agent events, buffer response text. Returns True if ran >60s (stable)."""

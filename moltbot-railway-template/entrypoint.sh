@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-13-v24-CONFIG-LOCKDOWN) ==="
+echo "=== Entrypoint starting (version 2026-02-13-v25-NEO4J-ENV-FIX) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -252,12 +252,12 @@ OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))"
 
 if [ -n "$OPENCLAW_DIST" ]; then
     echo "Using OpenClaw dist: $OPENCLAW_DIST"
-    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
     OPENCLAW_PID=$!
     echo "OpenClaw gateway started with PID $OPENCLAW_PID"
 elif [ -x "$OPENCLAW_BIN" ]; then
     echo "Using OpenClaw binary: $OPENCLAW_BIN"
-    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
     OPENCLAW_PID=$!
     echo "OpenClaw gateway started with PID $OPENCLAW_PID"
 else
