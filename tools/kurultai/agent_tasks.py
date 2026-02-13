@@ -2301,6 +2301,139 @@ def trigger_deliberations(driver) -> Dict:
 
 
 # ============================================================================
+# Self-Improvement Workflow - Convert Opportunities to Proposals
+# ============================================================================
+
+def create_proposals_from_opportunities(driver) -> Dict:
+    """
+    Convert ImprovementOpportunity nodes to ArchitectureProposal nodes.
+    
+    Automated workflow progression:
+    1. Find ImprovementOpportunity nodes with status 'identified' or 'proposed'
+    2. Create corresponding ArchitectureProposal nodes
+    3. Link opportunities to proposals
+    4. Trigger vetting workflow
+    
+    P2-TASK: Self-improvement workflow (15 min, 400 tokens)
+    """
+    print("  🔄 Creating proposals from opportunities...")
+    
+    result = {
+        'status': 'success',
+        'opportunities_found': 0,
+        'proposals_created': 0,
+        'errors': [],
+        'proposals': []
+    }
+    
+    try:
+        with driver.session() as session:
+            # Find opportunities that need proposals
+            opportunities_result = session.run("""
+                MATCH (o:ImprovementOpportunity)
+                WHERE o.status IN ['identified', 'proposed']
+                  AND (o.proposal_created IS NULL OR o.proposal_created = false)
+                RETURN id(o) as opp_internal_id,
+                       o.title as title,
+                       o.description as description,
+                       o.category as category,
+                       o.severity as severity,
+                       o.type as opp_type
+                LIMIT 5
+            """)
+            
+            opportunities = [dict(record) for record in opportunities_result]
+            result['opportunities_found'] = len(opportunities)
+            
+            if not opportunities:
+                print("    ℹ️  No opportunities pending proposal creation")
+                return result
+            
+            print(f"    Found {len(opportunities)} opportunities to convert")
+            
+            for opp in opportunities:
+                try:
+                    opp_internal_id = opp.get('opp_internal_id')
+                    title = opp.get('title', 'Untitled Opportunity')
+                    description = opp.get('description', '')
+                    category = opp.get('category', 'improvement')
+                    severity = opp.get('severity', 'medium')
+                    opp_type = opp.get('opp_type', 'general')
+                    
+                    # Generate proposal ID
+                    import uuid
+                    proposal_id = f"prop-{uuid.uuid4().hex[:8]}"
+                    
+                    # Create ArchitectureProposal node
+                    proposal_result = session.run("""
+                        CREATE (p:ArchitectureProposal {
+                            id: $proposal_id,
+                            title: $title,
+                            description: $description,
+                            status: 'proposed',
+                            priority: $priority,
+                            category: $category,
+                            implementation_status: 'pending',
+                            created_at: datetime(),
+                            proposed_by: 'system',
+                            auto_generated: true,
+                            source_opportunity: $opp_internal_id
+                        })
+                        RETURN p.id as id
+                    """, {
+                        'proposal_id': proposal_id,
+                        'title': title,
+                        'description': description[:500],  # Truncate for storage
+                        'priority': severity if severity in ['critical', 'high', 'medium', 'low'] else 'medium',
+                        'category': category,
+                        'opp_internal_id': str(opp_internal_id)
+                    })
+                    
+                    record = proposal_result.single()
+                    if record:
+                        created_id = record['id']
+                        
+                        # Link opportunity to proposal
+                        session.run("""
+                            MATCH (o:ImprovementOpportunity)
+                            WHERE id(o) = $opp_internal_id
+                            MATCH (p:ArchitectureProposal {id: $proposal_id})
+                            CREATE (o)-[r:GENERATED_PROPOSAL {
+                                created_at: datetime(),
+                                auto: true
+                            }]->(p)
+                            SET o.proposal_created = true,
+                                o.status = 'converted',
+                                o.updated_at = datetime()
+                        """, {'opp_internal_id': opp_internal_id, 'proposal_id': created_id})
+                        
+                        result['proposals_created'] += 1
+                        result['proposals'].append({
+                            'proposal_id': created_id,
+                            'opportunity_internal_id': opp_internal_id,
+                            'title': title
+                        })
+                        
+                        print(f"    ✅ Created proposal: {created_id} from opportunity {opp_internal_id}")
+                
+                except Exception as e:
+                    print(f"    ❌ Error creating proposal for opportunity {opp.get('opp_internal_id', 'unknown')}: {e}")
+                    result['errors'].append(str(e))
+            
+            if result['proposals_created'] > 0:
+                print(f"    ✅ Created {result['proposals_created']} proposals from opportunities")
+            else:
+                print("    ⚠️  No proposals created")
+    
+    except Exception as e:
+        print(f"    ❌ Error in create_proposals_from_opportunities: {e}")
+        result['status'] = 'error'
+        result['errors'].append(str(e))
+    
+    return result
+
+
+# ============================================================================
 # Task Registry
 # ============================================================================
 
@@ -2328,6 +2461,7 @@ TASK_REGISTRY = {
     # Kublai (Main)
     'status_synthesis': {'fn': status_synthesis, 'agent': 'kublai', 'freq': 5},
     'weekly_reflection': {'fn': weekly_reflection, 'agent': 'kublai', 'freq': 10080},
+    'create_proposals_from_opportunities': {'fn': create_proposals_from_opportunities, 'agent': 'kublai', 'freq': 15},
     
     # System
     'notion_sync': {'fn': notion_sync, 'agent': 'system', 'freq': 60},
@@ -2388,6 +2522,7 @@ async def register_all_tasks(hb):
         'ecosystem_intelligence': {'tokens': 2000, 'desc': 'Ecosystem tracking'},
         'status_synthesis': {'tokens': 200, 'desc': 'Agent status aggregation'},
         'weekly_reflection': {'tokens': 1500, 'desc': 'Weekly system analysis'},
+        'create_proposals_from_opportunities': {'tokens': 400, 'desc': 'Convert ImprovementOpportunity to ArchitectureProposal'},
         'notion_sync': {'tokens': 800, 'desc': 'Notion bidirectional sync'},
         # Task Execution - CRITICAL: Executes pending tasks
         'execute_pending_tasks': {'tokens': 500, 'desc': 'Execute pending Notion/Neo4j tasks'},
