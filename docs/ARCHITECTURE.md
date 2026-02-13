@@ -1,6 +1,6 @@
 # Kurultai System Architecture
 
-**Version**: 2.0.1  
+**Version**: 2.0.2  
 **Last Updated**: 2026-02-13  
 **Status**: Production Ready  
 **Classification**: Technical Architecture Document
@@ -2356,6 +2356,15 @@ Layer 9: Agent Authentication
 
 ## Changelog
 
+### v2.0.2 - 2026-02-13
+- **Heartbeat System**: Critical bug fixes and operational validation
+  - **FIXED**: Python closure variable capture bug in `agent_tasks.py` (all tasks now execute correct handlers)
+  - **FIXED**: Neo4j logging in `heartbeat_master.py` (HeartbeatCycle and TaskResult nodes now created)
+  - **VERIFIED**: 20 tasks registered and executing successfully
+  - **VERIFIED**: HeartbeatCycle nodes persisting to Neo4j (2+ cycles logged)
+  - **VERIFIED**: TaskResult nodes created for each executed task
+  - **STATUS**: System fully operational
+
 ### v2.0.1 - 2026-02-13
 - **Heartbeat System**: Synced Section 8 with HEARTBEAT.md v0.4
   - Corrected task count: 15 → 14 tasks
@@ -2372,7 +2381,7 @@ Layer 9: Agent Authentication
 
 ---
 
-*Document Version: 2.0.1*  
+*Document Version: 2.0.2*  
 *Last Updated: 2026-02-13*  
 *Maintained by: Kurultai System*  
 *Classification: Technical Architecture*
