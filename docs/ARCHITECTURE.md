@@ -1,7 +1,7 @@
 # Kurultai System Architecture
 
-**Version**: 2.0  
-**Last Updated**: 2026-02-10  
+**Version**: 2.0.1  
+**Last Updated**: 2026-02-13  
 **Status**: Production Ready  
 **Classification**: Technical Architecture Document
 
@@ -21,6 +21,10 @@
 10. [Configuration](#10-configuration)
 11. [Deployment Guide](#11-deployment-guide)
 12. [Operational Runbook](#12-operational-runbook)
+- [Appendix A: Security Layers](#appendix-a-security-layers)
+- [Appendix B: Glossary](#appendix-b-glossary)
+- [Appendix C: Related Documentation](#appendix-c-related-documentation)
+- [Changelog](#changelog)
 
 ---
 
@@ -1503,7 +1507,12 @@ NOTION_DATABASE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 ### 5-Minute Unified Heartbeat
 
-The unified heartbeat consolidates all background operations into a single 5-minute cycle, replacing fragmented scheduling with coordinated task execution.
+The unified heartbeat consolidates all background operations into a single 5-minute cycle, coordinating **14 distinct tasks** across 6 agents with integrated Memory Value Scoring (MVS) for intelligent data retention.
+
+**Version**: 0.4 (synced with HEARTBEAT.md)  
+**Cycle Interval**: 5 minutes  
+**Peak Token Usage**: ~8,650 tokens/cycle (daily alignment)  
+**Average Token Usage**: ~1,650 tokens/cycle
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
@@ -1516,28 +1525,24 @@ The unified heartbeat consolidates all background operations into a single 5-min
 │   ┌─────────────────────────────────────────────────────────────────────────────────┐   │
 │   │                           Cycle Execution                                         │   │
 │   │                                                                                   │   │
-│   │   Phase 1: Predictive Monitoring                                                  │   │
-│   │   ├─ Record current metrics                                                       │   │
-│   │   └─ Run failure predictions                                                      │   │
+│   │   Phase 1: Filter Tasks by Frequency Predicate                                    │   │
+│   │   ├─ Check which tasks are due (5min, 15min, 30min, 60min, 6hr, 24hr, 7d)        │   │
+│   │   └─ Skip disabled tasks                                                          │   │
 │   │                                                                                   │   │
-│   │   Phase 2: Dynamic Task Generation                                                │   │
-│   │   ├─ Check for knowledge gaps                                                     │   │
-│   │   └─ Generate new tasks if needed                                                 │   │
+│   │   Phase 2: Execute Due Tasks (Token-Budgeted)                                     │   │
+│   │   ├─ Run each task with timeout (default 60s)                                     │   │
+│   │   ├─ Enforce per-task token budgets                                               │   │
+│   │   └─ Collect results (success/error/timeout)                                      │   │
 │   │                                                                                   │   │
-│   │   Phase 3: Autonomous Orchestration                                               │   │
-│   │   ├─ Find pending tasks without assignees                                         │   │
-│   │   ├─ Auto-assign based on capability matching                                     │   │
-│   │   └─ Create delegation messages                                                   │   │
+│   │   Phase 3: MVS Scoring & Curation (Jochi)                                         │   │
+│   │   ├─ Recalculate Memory Value Scores                                              │   │
+│   │   ├─ Promote/demote entries between HOT/WARM/COLD tiers                           │   │
+│   │   └─ Archive or prune low-value data                                              │   │
 │   │                                                                                   │   │
-│   │   Phase 4: Execute Due Tasks                                                      │   │
-│   │   ├─ Filter tasks by frequency predicate                                          │   │
-│   │   ├─ Execute with timeout (token-based)                                           │   │
-│   │   └─ Collect results                                                              │   │
-│   │                                                                                   │   │
-│   │   Phase 5: Logging & Escalation                                                   │   │
-│   │   ├─ Log results to Neo4j                                                         │   │
+│   │   Phase 4: Logging & Escalation                                                   │   │
+│   │   ├─ Log results to Neo4j (HeartbeatCycle + TaskResult nodes)                     │   │
 │   │   ├─ Create tickets for critical failures                                         │   │
-│   │   └─ Send alerts if needed                                                        │   │
+│   │   └─ Send alerts if thresholds breached                                           │   │
 │   │                                                                                   │   │
 │   └───────────────────────────────────────────────────────────────────────────────────┘   │
 │        │                                                                                │
@@ -1546,6 +1551,122 @@ The unified heartbeat consolidates all background operations into a single 5-min
 │                                                                                         │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Two-Tier Heartbeat Architecture
+
+The system distinguishes between **infrastructure health** (gateway process alive) and **functional health** (agent actually processing work):
+
+| Tier | Property | Written By | Threshold | Meaning |
+|------|----------|------------|-----------|---------|
+| **Infrastructure** | `Agent.infra_heartbeat` | Python sidecar (every 30s) | 120s (4 missed) | Gateway process alive |
+| **Functional** | `Agent.last_heartbeat` | Agent activity (claim/complete) | 90s (3 missed) | Agent functionally working |
+
+**Failover Logic**: Uses worst-case of both signals to avoid false positives from "up but stuck" agents.
+
+### Agent Background Task Registry (14 Tasks)
+
+| Agent | Task Name | Frequency | Token Budget | MVS Impact | Description |
+|-------|-----------|-----------|--------------|------------|-------------|
+| **Ögedei** | health_check | 5 min | 150 | — | Check Neo4j, agent heartbeats, disk space |
+| **Ögedei** | file_consistency | 15 min | 200 | — | Verify file consistency across agent workspaces |
+| **Jochi** | memory_curation_rapid | 5 min | 300 | Prunes low-MVS | Enforce token budgets, clean notifications |
+| **Jochi** | mvs_scoring_pass | 15 min | 400 | Updates MVS | Recalculate Memory Value Scores |
+| **Jochi** | smoke_tests | 15 min | 800 | — | Run quick smoke tests via test runner |
+| **Jochi** | full_tests | 60 min | 1500 | — | Run full test suite with remediation |
+| **Jochi** | vector_dedup | 6 hours | 800 | Merges duplicates | Near-duplicate detection via embeddings |
+| **Jochi** | deep_curation | 6 hours | 2000 | Archives cold | Delete orphans, purge tombstones, archive COLD |
+| **Chagatai** | reflection_consolidation | 30 min | 500 | Creates Synthesis | Consolidate reflections when system idle |
+| **Möngke** | knowledge_gap_analysis | 24 hours | 600 | Identifies gaps | Identify sparse knowledge areas |
+| **Möngke** | ordo_sacer_research | 24 hours | 1200 | Creates Research | Research esoteric concepts for Ordo Sacer Astaci |
+| **Möngke** | ecosystem_intelligence | 7 days | 2000 | Tracks trends | Track OpenClaw/Clawdbot/Moltbot ecosystem |
+| **Kublai** | status_synthesis | 5 min | 200 | — | Synthesize agent status, escalate critical issues |
+| **Kublai** | weekly_reflection | 7 days | 1500 | Creates Proposals | Proactive architecture analysis |
+| **System** | notion_sync | 60 min | 800 | — | Bidirectional Notion↔Neo4j task sync |
+
+### Task Distribution by Frequency
+
+```
+Every 5 minutes (3 tasks, 650 tokens):
+  - Ögedei: health_check (150)
+  - Jochi: memory_curation_rapid (300)
+  - Kublai: status_synthesis (200)
+
+Every 15 minutes (3 tasks, 1400 tokens):
+  - Ögedei: file_consistency (200)
+  - Jochi: smoke_tests (800)
+  - Jochi: mvs_scoring_pass (400)
+
+Every 30 minutes (1 task, 500 tokens):
+  - Chagatai: reflection_consolidation (500)
+
+Every 60 minutes (2 tasks, 2300 tokens):
+  - Jochi: full_tests (1500)
+  - System: notion_sync (800)
+
+Every 6 hours (2 tasks, 2800 tokens):
+  - Jochi: vector_dedup (800)
+  - Jochi: deep_curation (2000)
+
+Every 24 hours (2 tasks, 1800 tokens):
+  - Möngke: knowledge_gap_analysis (600)
+  - Möngke: ordo_sacer_research (1200)
+
+Every 7 days (2 tasks, 3500 tokens):
+  - Möngke: ecosystem_intelligence (2000)
+  - Kublai: weekly_reflection (1500)
+```
+
+### Memory Value Score (MVS) Integration
+
+MVS determines data retention priority based on multiple factors:
+
+```
+MVS = (
+    type_weight                           # 0.5 - 10.0
+    + recency_bonus                       # 0.0 - 3.0 (exponential decay)
+    + frequency_bonus                     # 0.0 - 2.0 (log-scaled access rate)
+    + quality_bonus                       # 0.0 - 2.0 (confidence/severity)
+    + centrality_bonus                    # 0.0 - 1.5 (relationship count)
+    + cross_agent_bonus                   # 0.0 - 2.0 (multi-agent access)
+    - bloat_penalty                       # 0.0 - 1.5 (tokens over target)
+) * safety_multiplier                     # 1.0 normal, 100.0 protected
+```
+
+#### Type Weights
+
+| Type | Weight | Half-Life |
+|------|--------|-----------|
+| Belief (active, conf > 0.7) | 10.0 | 180 days |
+| Reflection | 8.0 | 90 days |
+| Analysis | 7.0 | 60 days |
+| Synthesis | 6.5 | 120 days |
+| Recommendation | 5.0 | 30 days |
+| CompressedContext | 4.0 | 90 days |
+| Task (active) | 3.0 | N/A (protected) |
+| MemoryEntry | 2.5 | 45 days |
+| SessionContext | 1.5 | 1 day |
+| Notification | 0.5 | 12 hours |
+
+#### MVS Action Thresholds
+
+| MVS Range | Curation Action |
+|-----------|-----------------|
+| >= 50.0 | KEEP (safety-protected) |
+| >= 8.0 | KEEP |
+| 5.0 - 8.0 | KEEP, flag for compression if bloated |
+| 3.0 - 5.0 | IMPROVE (enrich metadata) or MERGE (if similar exists) |
+| 1.5 - 3.0 | DEMOTE one tier |
+| 0.5 - 1.5 | PRUNE (soft delete with 30-day tombstone) |
+| < 0.5 | PRUNE (immediate for Notifications/Sessions) |
+
+### Curation Tiers
+
+| Tier | Token Budget | Purpose |
+|------|--------------|---------|
+| **HOT** | 1,600 tokens | In-memory, immediate access |
+| **WARM** | 400 tokens | Lazy-loaded, 2s timeout |
+| **COLD** | 200 tokens | On-demand, 5s timeout |
+| **Archive** | — | File-based, manual query |
 
 ### Task Delegation
 
@@ -1744,7 +1865,7 @@ def status_synthesis(driver) -> Dict:
 └── tools/                             # Agent tools
     ├── kurultai/                      # Core Kurultai framework
     │   ├── heartbeat_master.py        # Unified heartbeat
-    │   ├── agent_tasks.py             # All 15 task implementations
+    │   ├── agent_tasks.py             # All 14 task implementations
     │   ├── agent_spawner.py           # Agent lifecycle management
     │   ├── capability_registry.py     # Capability management
     │   ├── curation_simple.py         # Memory curation
@@ -2223,7 +2344,35 @@ Layer 9: Agent Authentication
 
 ---
 
-*Document Version: 2.0*  
-*Last Updated: 2026-02-10*  
+## Appendix C: Related Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [HEARTBEAT.md](./HEARTBEAT.md) | **Authoritative source** for heartbeat system details (v0.4) |
+| [SOUL.md](./SOUL.md) | Agent identity and philosophy definitions |
+| [IDENTITY.md](./IDENTITY.md) | Agent role and voice specifications |
+
+---
+
+## Changelog
+
+### v2.0.1 - 2026-02-13
+- **Heartbeat System**: Synced Section 8 with HEARTBEAT.md v0.4
+  - Corrected task count: 15 → 14 tasks
+  - Added complete task registry table with token budgets
+  - Added MVS formula and thresholds
+  - Added two-tier heartbeat architecture details
+  - Added curation tier specifications
+
+### v2.0 - 2026-02-10
+- Initial production release
+- Multi-agent orchestration platform
+- Unified heartbeat system
+- Capability acquisition pipeline
+
+---
+
+*Document Version: 2.0.1*  
+*Last Updated: 2026-02-13*  
 *Maintained by: Kurultai System*  
 *Classification: Technical Architecture*
