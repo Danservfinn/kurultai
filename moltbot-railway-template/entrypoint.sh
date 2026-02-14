@@ -234,9 +234,8 @@ done
 # changes model, wipes trustedProxies, and triggers gateway restarts.
 echo "Installing OpenClaw configuration..."
 cp /app/openclaw.json "$OPENCLAW_STATE_DIR/openclaw.json"
-cp /app/openclaw.json5 "$OPENCLAW_STATE_DIR/openclaw.json5"
-chown root:root "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/openclaw.json5"
-chmod 444 "$OPENCLAW_STATE_DIR/openclaw.json" "$OPENCLAW_STATE_DIR/openclaw.json5"
+chown root:root "$OPENCLAW_STATE_DIR/openclaw.json"
+chmod 444 "$OPENCLAW_STATE_DIR/openclaw.json"
 echo "OpenClaw config installed at $OPENCLAW_STATE_DIR/openclaw.json ($(wc -c < $OPENCLAW_STATE_DIR/openclaw.json) bytes) [read-only, root-owned]"
 
 # =============================================================================

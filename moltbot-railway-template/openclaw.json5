@@ -76,15 +76,15 @@
   },
 
   // Signal channel configuration
-  // Express server manages signal-cli daemon on port 8081
-  // OpenClaw connects to externally-managed daemon via httpUrl
+  // OpenClaw auto-starts signal-cli daemon on port 8080
   channels: {
     signal: {
       enabled: true,
       account: "${SIGNAL_ACCOUNT}",
-      // Connect to Express-managed signal-cli daemon (external mode)
-      httpUrl: "http://127.0.0.1:8081",
-      autoStart: false,
+      cliPath: "/app/signal-cli-wrapper.sh",
+      httpHost: "127.0.0.1",
+      httpPort: 8080,
+      startupTimeoutMs: 120000,
       receiveMode: "on-start",
       dmPolicy: "allowlist",
       groupPolicy: "allowlist",

@@ -92,7 +92,8 @@ COPY --chown=1001:1001 middleware /app/middleware
 COPY --chown=1001:1001 migrations /app/migrations
 COPY --chown=1001:1001 openclaw_memory.py /app/
 COPY --chown=1001:1001 scripts /app/scripts
-COPY --chown=1001:1001 openclaw.json5 /app/openclaw.json5
+# Only copy JSON (not JSON5) to ensure OpenClaw uses correct config
+# COPY --chown=1001:1001 openclaw.json5 /app/openclaw.json5
 COPY --chown=1001:1001 openclaw.json /app/openclaw.json
 COPY --chown=1001:1001 entrypoint.sh /app/entrypoint.sh
 COPY --chown=1001:1001 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
