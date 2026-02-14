@@ -349,5 +349,5 @@ fi
 # Wait for all background processes
 echo "=== All services started, monitoring... ==="
 wait
-# Test timestamp: Sat Feb  8 14:52:00 EST 2026
-# Cache bust: 1770506520
+# Test timestamp: Fri Feb 13 19:20:00 EST 2026
+# Cache bust: 1739493600
