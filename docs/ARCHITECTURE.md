@@ -1,7 +1,7 @@
 # Kurultai System Architecture
 
-**Version**: 2.0.2  
-**Last Updated**: 2026-02-13  
+**Version**: 2.1.0  
+**Last Updated**: 2026-02-14  
 **Status**: Production Ready  
 **Classification**: Technical Architecture Document
 
@@ -15,12 +15,13 @@
 4. [Task System](#4-task-system)
 5. [Background Tasks (Detailed)](#5-background-tasks-detailed)
 6. [v2.0 Major Enhancements](#6-v20-major-enhancements)
-7. [Infrastructure](#7-infrastructure)
-8. [Heartbeat System](#8-heartbeat-system)
-9. [File Structure](#9-file-structure)
-10. [Configuration](#10-configuration)
-11. [Deployment Guide](#11-deployment-guide)
-12. [Operational Runbook](#12-operational-runbook)
+7. [Memory Protection System (v2.1)](#7-memory-protection-system-v21)
+8. [Infrastructure](#8-infrastructure)
+9. [Heartbeat System](#9-heartbeat-system)
+10. [File Structure](#10-file-structure)
+11. [Configuration](#11-configuration)
+12. [Deployment Guide](#12-deployment-guide)
+13. [Operational Runbook](#13-operational-runbook)
 - [Appendix A: Security Layers](#appendix-a-security-layers)
 - [Appendix B: Glossary](#appendix-b-glossary)
 - [Appendix C: Related Documentation](#appendix-c-related-documentation)
@@ -1204,7 +1205,113 @@ def route_request(request, context):
 
 ---
 
-## 7. Infrastructure
+## 7. Memory Protection System (v2.1)
+
+### Overview
+
+The Memory Protection System was added in v2.1 to prevent the OOM (Out of Memory) crashes observed on 2026-02-13. The system implements four layers of memory safety:
+
+1. **Circuit Breaker** — Prevents retry storms on failing endpoints
+2. **Bounded Concurrency** — Limits simultaneous agent runs
+3. **Memory-Adaptive Heartbeats** — Skips non-critical tasks under memory pressure
+4. **Per-Run Memory Limits** — Monitors and preempts excessive memory usage
+
+### Circuit Breaker Pattern
+
+**Purpose:** Protect endpoints from being hammered with retries when underlying services fail.
+
+**Implementation:** `/app/src/circuit-breaker.js`
+
+```javascript
+class CircuitBreaker {
+  constructor(options) {
+    this.failureThreshold = 3;    // Open after 3 failures
+    this.timeoutDuration = 60000; // 60s cooldown
+    this.state = 'CLOSED';        // CLOSED → OPEN → HALF_OPEN
+  }
+}
+```
+
+**States:**
+| State | Behavior | Transition |
+|-------|----------|------------|
+| **CLOSED** | Requests pass through | 3 failures → OPEN |
+| **OPEN** | Reject with 503, Retry-After: 60 | 60s timeout → HALF_OPEN |
+| **HALF_OPEN** | Allow 1 test request | Success → CLOSED, Fail → OPEN |
+
+**Protected Endpoints:**
+- `/api/architecture/sync` — Protected from Neo4j syntax error retry loops
+
+### Bounded Concurrency Limiter
+
+**Purpose:** Prevent memory exhaustion from simultaneous long-running agent runs.
+
+**Implementation:** `/app/src/concurrency-limiter.js`
+
+**Configuration:**
+```javascript
+MAX_CONCURRENT_RUNS = 6     // Was 2
+MAX_QUEUE_DEPTH = 10        // Was 5
+MAX_RUN_MEMORY_MB = 512     // Per-run limit
+```
+
+**Behavior:**
+- Max 6 concurrent agent runs
+- Max 10 queued runs
+- Per-session deduplication (same session can't have 2 active runs)
+- Memory monitoring every 5 seconds
+- Preemptive kill if run exceeds 512MB
+
+**Endpoints:**
+- `POST /api/run/embedded` — Acquire slot (429 if at capacity)
+- `GET /metrics/concurrency` — Real-time metrics
+
+### Memory-Adaptive Heartbeat
+
+**Purpose:** Reduce system load when memory pressure is high.
+
+**Implementation:** `heartbeat_master.py`
+
+**Task Categorization:**
+| Criticality | Tasks | Behavior >70% Memory |
+|-------------|-------|----------------------|
+| **CRITICAL** | health_check, memory_curation_rapid, status_synthesis | Always run |
+| **ADAPTIVE** | All other 18 tasks | Skip with warning log |
+
+**Memory Thresholds:**
+- 70% — Skip ADAPTIVE tasks
+- 85% — Aggressive curation (future)
+- 95% — Emergency measures (future)
+
+### Per-Run Memory Monitoring
+
+**Implementation:** Integrated into concurrency limiter
+
+```javascript
+// Check every 5 seconds
+if (limiter.checkMemoryLimit(sessionId, 512)) {
+  limiter.preemptRun(sessionId, 'Memory limit exceeded');
+}
+```
+
+**Preemption Flow:**
+1. SIGTERM (graceful shutdown)
+2. 5s wait
+3. SIGKILL if still running
+4. Slot released to queue
+
+### Memory Targets
+
+| Metric | Target | Current |
+|--------|--------|---------|
+| Steady-state memory | <512MB | ~350MB |
+| Peak under load | <1GB | Monitored |
+| Max concurrent runs | 6 | Enforced |
+| Max queue depth | 10 | Enforced |
+
+---
+
+## 8. Infrastructure
 
 ### Railway Deployment Architecture
 
@@ -2356,6 +2463,42 @@ Layer 9: Agent Authentication
 
 ## Changelog
 
+### v2.1.0 - 2026-02-14
+- **Memory Protection System**: Four-layer architecture to prevent OOM crashes
+  - **ADDED**: Circuit breaker pattern (`/app/src/circuit-breaker.js`) — prevents retry storms on failing endpoints
+  - **ADDED**: Bounded concurrency limiter (`/app/src/concurrency-limiter.js`) — max 6 concurrent runs, 10 queue depth, 512MB per-run limit
+  - **ADDED**: Memory-adaptive heartbeat — skips 18 ADAPTIVE tasks when memory >70%, always runs 3 CRITICAL tasks
+  - **ADDED**: Per-run memory monitoring with preemption — kills runs exceeding 512MB
+  - **VERIFIED**: Architecture sync operational (17 sections synced to Neo4j)
+  - **RESULT**: Prevents 2026-02-13 OOM crash scenario
+
+- **Self-Improvement Workflow**: Automated opportunity-to-proposal pipeline
+  - **ADDED**: `create_proposals_from_opportunities` task (every 15 min, 400 tokens)
+  - **ADDED**: Automatic conversion of ImprovementOpportunity → ArchitectureProposal nodes
+  - **ADDED**: GENERATED_PROPOSAL relationship linking opportunities to proposals
+  - **CHANGED**: Delegation protocol workflow — human approval required before implementation (autoSync: true, autoImplement: false)
+  - **RESULT**: 2 proposals created and marked implemented from resolved opportunities
+
+- **Task System Expansion**: 14 → 21 tasks
+  - **ADDED**: `execute_pending_tasks` (5 min) — executes pending Notion/Neo4j tasks
+  - **ADDED**: `trigger_deliberations` (5 min) — purpose-driven agent communication triggers
+  - **ADDED**: `create_proposals_from_opportunities` (15 min) — self-improvement workflow
+  - **ADDED**: `predictive_health_check` (5 min) — ML-based failure prediction
+  - **ADDED**: `workspace_curation` (6 hours) — AI-powered Notion organization
+  - **ADDED**: `collaboration_orchestration` (15 min) — multi-agent coordination
+  - **ADDED**: Task criticality levels (CRITICAL vs ADAPTIVE) for memory-adaptive behavior
+
+- **Integration Updates**
+  - **ADDED**: Moltbook API integration — automated posting with verification challenge handling
+  - **FIXED**: Notion sync now properly reflects completed tasks (Signal P0 fix, heartbeat bug)
+  - **VERIFIED**: Signal 2-way messaging operational
+  - **VERIFIED**: Discord integration active (Kurultai Council server)
+
+- **Infrastructure Hardening**
+  - **ENABLED**: Context compaction (safeguard mode) — prevents 262k token crashes
+  - **FIXED**: WebSocket storm — single heartbeat_writer instance
+  - **FIXED**: Heartbeat Neo4j logging — closure variable capture bug resolved
+
 ### v2.0.2 - 2026-02-13
 - **Heartbeat System**: Critical bug fixes and operational validation
   - **FIXED**: Python closure variable capture bug in `agent_tasks.py` (all tasks now execute correct handlers)
@@ -2381,7 +2524,7 @@ Layer 9: Agent Authentication
 
 ---
 
-*Document Version: 2.0.2*  
-*Last Updated: 2026-02-13*  
+*Document Version: 2.1.0*  
+*Last Updated: 2026-02-14*  
 *Maintained by: Kurultai System*  
 *Classification: Technical Architecture*
