@@ -23,6 +23,14 @@ const { ArchitectureIntrospection, ProactiveReflection, ScheduledReflection, Del
 const { ProposalStateMachine, ProposalMapper, ValidationHandler } = require('./workflow');
 const { OgedeiVetHandler, TemujinImplHandler } = require('./agents');
 
+// Import Discord transport (optional)
+let DiscordTransport;
+try {
+  DiscordTransport = require('./discord').DiscordTransport;
+} catch (error) {
+  // Will log after logger is initialized
+}
+
 // =============================================================================
 // Logger Configuration
 // =============================================================================
@@ -256,6 +264,7 @@ let validationHandler = null;
 let ogedeiVetHandler = null;
 let temujinImplHandler = null;
 let delegationProtocol = null;
+let discordTransport = null;
 
 /**
  * Initialize Kublai self-awareness modules with Neo4j
@@ -375,6 +384,10 @@ app.get('/health', async (req, res) => {
         ogedei: !!ogedeiVetHandler,
         temujin: !!temujinImplHandler
       }
+    },
+    discord: {
+      enabled: !!discordTransport,
+      channelId: process.env.DISCORD_CHANNEL_ID
     }
   };
 
@@ -940,7 +953,8 @@ app.get('/', (req, res) => {
     description: 'OpenClaw Gateway with embedded Signal integration',
     version: process.env.npm_package_version || '1.0.0',
     channels: {
-      signal: signalConfig.enabled ? 'enabled' : 'disabled'
+      signal: signalConfig.enabled ? 'enabled' : 'disabled',
+      discord: discordTransport ? 'enabled' : 'disabled'
     },
     kublai: {
       selfAwareness: !!architectureIntrospection ? 'active' : 'inactive',
@@ -997,6 +1011,16 @@ async function gracefulShutdown(signal) {
   // Stop Kublai modules
   await stopKublaiModules();
 
+  // Stop Discord transport
+  if (discordTransport) {
+    try {
+      await discordTransport.disconnect();
+      logger.info('Discord transport disconnected');
+    } catch (error) {
+      logger.error('Error disconnecting Discord transport', { error: error.message });
+    }
+  }
+
   // Stop signal-cli
   await stopSignalCli();
 
@@ -1043,13 +1067,39 @@ async function main() {
     }
   }
 
+  // Initialize Discord transport if configured
+  if (DiscordTransport && process.env.DISCORD_BOT_TOKEN) {
+    try {
+      logger.info('Initializing Discord transport...');
+      discordTransport = new DiscordTransport(logger);
+      await discordTransport.initialize();
+
+      // Connect to OpenClaw gateway if available
+      const { DiscordOpenClawBridge } = require('./discord');
+      const bridge = new DiscordOpenClawBridge(discordTransport, logger);
+      const bridgeConnected = await bridge.connect();
+      if (bridgeConnected) {
+        discordTransport.setBridge(bridge);
+        logger.info('Discord bridge connected to OpenClaw gateway');
+      }
+
+      logger.info('Discord transport initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize Discord transport, continuing without Discord', {
+        error: error.message
+      });
+      discordTransport = null;
+    }
+  }
+
   // Start HTTP server
   const server = app.listen(PORT, () => {
     logger.info(`Moltbot Gateway listening on port ${PORT}`, {
       port: PORT,
       signalEnabled: signalConfig.enabled,
       signalReady: signalCliReady,
-      kublaiReady
+      kublaiReady,
+      discordEnabled: !!discordTransport
     });
   });
 
@@ -1067,5 +1117,5 @@ if (require.main === module) {
 
 module.exports = {
   app, startSignalCli, stopSignalCli, checkSignalCliHealth, main,
-  initKublaiModules, stopKublaiModules
+  initKublaiModules, stopKublaiModules, discordTransport
 };
