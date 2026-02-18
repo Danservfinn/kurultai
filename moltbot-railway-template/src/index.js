@@ -1,7 +1,7 @@
 /**
  * Moltbot Railway Template - Gateway Entry Point
  * OpenClaw Gateway with embedded Signal integration
- * Version: 2026-02-18-v39 - Webchat assets route fix
+ * Version: 2026-02-18-v40 - WebSocket URL rewrite fix
  */
 
 const express = require('express');
@@ -949,28 +949,107 @@ app.get('/api/workflow/active-implementations', async (req, res) => {
 // =============================================================================
 
 const http = require('http');
+const net = require('net');
+const url = require('url');
 
-app.get('/webchat', (req, res) => {
-  // Proxy to OpenClaw webchat on internal port 18790
-  // (Express uses PORT=18789 for Railway routing)
+// WebSocket URL rewriting configuration
+// Rewrites private Tailscale IPs to public Railway URL in HTML/JS responses
+const PUBLIC_WS_URL = process.env.PUBLIC_GATEWAY_URL || 'wss://moltbot-railway-template-production-c0a3.up.railway.app/ws';
+const PRIVATE_IP_PATTERNS = [
+  /ws:\/\/100\.\d+\.\d+\.\d+:\d+/g,  // Tailscale ws://100.x.y.z:port
+  /wss:\/\/100\.\d+\.\d+\.\d+:\d+/g, // Tailscale wss://100.x.y.z:port
+  /ws:\/\/localhost:\d+/g,             // localhost ws
+  /wss:\/\/localhost:\d+/g,            // localhost wss
+];
+
+/**
+ * Rewrite WebSocket URLs in HTML/JS content from private IPs to public URL
+ * @param {string} content - The content to rewrite
+ * @returns {string} - Rewritten content
+ */
+function rewriteWebSocketUrls(content) {
+  let rewritten = content;
+
+  // Replace private IP patterns with public URL
+  PRIVATE_IP_PATTERNS.forEach(pattern => {
+    rewritten = rewritten.replace(pattern, PUBLIC_WS_URL);
+  });
+
+  return rewritten;
+}
+
+/**
+ * Proxy webchat request with response rewriting for WebSocket URLs
+ * @param {object} req - Express request
+ * @param {object} res - Express response
+ * @param {string} path - Path to proxy to OpenClaw
+ */
+function proxyWebchatWithRewrite(req, res, path = '/') {
   const options = {
     hostname: 'localhost',
     port: 18790,
-    path: '/',
-    method: 'GET'
+    path: path,
+    method: 'GET',
+    headers: {
+      ...req.headers,
+      host: 'localhost:18790'
+    }
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
+    const contentType = proxyRes.headers['content-type'] || '';
+    const isHtml = contentType.includes('text/html');
+    const isJs = contentType.includes('javascript');
+
+    // Only rewrite HTML and JS responses
+    if (isHtml || isJs) {
+      let body = '';
+      proxyRes.setEncoding('utf8');
+
+      proxyRes.on('data', (chunk) => {
+        body += chunk;
+      });
+
+      proxyRes.on('end', () => {
+        const rewritten = rewriteWebSocketUrls(body);
+
+        // Update content-length header if it exists
+        if (proxyRes.headers['content-length']) {
+          proxyRes.headers['content-length'] = Buffer.byteLength(rewritten);
+        }
+
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        res.end(rewritten);
+
+        if (rewritten !== body) {
+          logger.info('Rewrote WebSocket URLs in response', {
+            path: req.path,
+            contentType,
+            originalLength: body.length,
+            newLength: rewritten.length
+          });
+        }
+      });
+    } else {
+      // Non-HTML/JS content, just pipe through
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
   });
 
   proxyReq.on('error', (err) => {
-    logger.error('Webchat proxy error', { error: err.message });
+    logger.error('Webchat proxy error', { error: err.message, path: req.path });
     res.status(502).json({ error: 'Webchat unavailable', message: err.message });
   });
 
   proxyReq.end();
+}
+
+app.get('/webchat', (req, res) => {
+  // Proxy to OpenClaw webchat on internal port 18790
+  // (Express uses PORT=18789 for Railway routing)
+  // Rewrite WebSocket URLs from private IPs to public URL
+  proxyWebchatWithRewrite(req, res, '/');
 });
 
 // Webchat assets proxy - MUST come before /webchat/* catch-all
@@ -1014,24 +1093,8 @@ app.get('/webchat/*', (req, res) => {
   }
 
   logger.info('Proxying webchat SPA route', { path: req.path });
-  const options = {
-    hostname: 'localhost',
-    port: 18790,
-    path: '/',
-    method: 'GET'
-  };
-
-  const proxyReq = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
-  });
-
-  proxyReq.on('error', (err) => {
-    logger.error('Webchat proxy error', { error: err.message });
-    res.status(502).json({ error: 'Webchat unavailable', message: err.message });
-  });
-
-  proxyReq.end();
+  // Use the same rewriting proxy to ensure WebSocket URLs are correct
+  proxyWebchatWithRewrite(req, res, '/');
 });
 
 // =============================================================================
@@ -1210,7 +1273,85 @@ async function main() {
   }
 
   // Start HTTP server first (before Discord init to pass health checks)
-  const server = app.listen(PORT, () => {
+  const server = http.createServer(app);
+
+  // Handle WebSocket upgrade - proxy to OpenClaw on port 18790
+  server.on('upgrade', (req, socket, head) => {
+    if (req.url === '/ws' || req.url.startsWith('/ws')) {
+      logger.info('Proxying WebSocket upgrade to OpenClaw', { url: req.url });
+
+      const options = {
+        hostname: 'localhost',
+        port: 18790,
+        path: req.url,
+        method: req.method,
+        headers: req.headers
+      };
+
+      const proxyReq = http.request(options, (proxyRes) => {
+        // Write the upgrade response
+        socket.write(`HTTP/1.1 ${proxyRes.statusCode} ${proxyRes.statusMessage}\r\n`);
+
+        // Copy headers
+        Object.entries(proxyRes.headers).forEach(([key, value]) => {
+          if (value) socket.write(`${key}: ${value}\r\n`);
+        });
+
+        socket.write('\r\n');
+        proxyRes.pipe(socket);
+      });
+
+      proxyReq.on('error', (err) => {
+        logger.error('WebSocket proxy error', { error: err.message, url: req.url });
+        socket.end();
+      });
+
+      proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+        // Handle the upgrade response from OpenClaw
+        socket.write(`HTTP/1.1 101 Switching Protocols\r\n`);
+
+        // Copy headers from the upgrade response
+        Object.entries(proxyRes.headers).forEach(([key, value]) => {
+          if (value) socket.write(`${key}: ${value}\r\n`);
+        });
+
+        socket.write('\r\n');
+
+        // Pipe the sockets together for bidirectional communication
+        proxySocket.pipe(socket);
+        socket.pipe(proxySocket);
+
+        // Handle socket errors
+        proxySocket.on('error', (err) => {
+          logger.error('WebSocket proxy socket error (OpenClaw side)', { error: err.message });
+          socket.end();
+        });
+
+        socket.on('error', (err) => {
+          logger.error('WebSocket client socket error', { error: err.message });
+          proxySocket.end();
+        });
+
+        // Handle socket closure
+        proxySocket.on('close', () => {
+          socket.end();
+        });
+
+        socket.on('close', () => {
+          proxySocket.end();
+        });
+      });
+
+      proxyReq.end();
+    } else {
+      // Reject other WebSocket connections
+      logger.warn('Rejecting WebSocket upgrade for unknown path', { url: req.url });
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+    }
+  });
+
+  server.listen(PORT, () => {
     logger.info(`Moltbot Gateway listening on port ${PORT}`, {
       port: PORT,
       signalEnabled: signalConfig.enabled,
