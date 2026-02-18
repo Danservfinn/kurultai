@@ -261,6 +261,17 @@ else
 fi
 
 # =============================================================================
+# START OPENCLAW GATEWAY (in background)
+# =============================================================================
+# Start OpenClaw first in background so Express can start afterward
+# OpenClaw uses internal port 18790 (Express uses PORT=18789 for Railway routing)
+OPENCLAW_INTERNAL_PORT=18790
+echo "Starting OpenClaw Gateway on internal port ${OPENCLAW_INTERNAL_PORT}..."
+
+# Find the OpenClaw entry point - installed globally via npm
+OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
+
+# =============================================================================
 # FIX WEBCHAT WEBSOCKET URL PLACEHOLDER
 # =============================================================================
 # The OpenClaw Control UI has a hardcoded placeholder ws://100.x.y.z:18789
@@ -282,20 +293,17 @@ if [ -n "$OPENCLAW_DIST" ]; then
             echo "  Backup created"
         fi
 
-        # Get the public URL - use RAILWAY_PUBLIC_DOMAIN if available, fallback to constructing from service info
+        # Get the public URL - use RAILWAY_PUBLIC_DOMAIN if available
         if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
             PUBLIC_URL="wss://${RAILWAY_PUBLIC_DOMAIN}"
         else
-            # Fallback: construct from known Railway URL pattern
-            # Service name: moltbot-railway-template, Railway domain: up.railway.app
+            # Fallback: construct from known Railway URL
             PUBLIC_URL="wss://moltbot-railway-template-production-c0a3.up.railway.app"
         fi
 
-        # Replace the hardcoded Tailscale placeholder
-        sed -i 's/ws:\/\/100\.x\.y\.z:18789/'"$PUBLIC_URL"'/g' "$JS_FILE"
-
-        # Also replace any ws://localhost:18789 variants that might be hardcoded
-        sed -i 's/ws:\/\/localhost:18789/'"$PUBLIC_URL"'/g' "$JS_FILE"
+        # Replace the hardcoded placeholders
+        sed -i 's|ws://100\.x\.y\.z:18789|'$PUBLIC_URL'|g' "$JS_FILE"
+        sed -i 's|ws://localhost:18789|'$PUBLIC_URL'|g' "$JS_FILE"
 
         # Verify the change
         if grep -q "$PUBLIC_URL" "$JS_FILE"; then
@@ -309,17 +317,6 @@ if [ -n "$OPENCLAW_DIST" ]; then
 else
     echo "  WARNING: OpenClaw not found, skipping WebSocket URL fix"
 fi
-
-# =============================================================================
-# START OPENCLAW GATEWAY (in background)
-# =============================================================================
-# Start OpenClaw first in background so Express can start afterward
-# OpenClaw uses internal port 18790 (Express uses PORT=18789 for Railway routing)
-OPENCLAW_INTERNAL_PORT=18790
-echo "Starting OpenClaw Gateway on internal port ${OPENCLAW_INTERNAL_PORT}..."
-
-# Find the OpenClaw entry point - installed globally via npm
-OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
 
 if [ -n "$OPENCLAW_DIST" ]; then
     echo "Using OpenClaw dist: $OPENCLAW_DIST"
