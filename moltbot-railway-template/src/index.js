@@ -1080,12 +1080,14 @@ async function main() {
 
   // Initialize Discord transport asynchronously (don't block startup)
   if (DiscordTransport && process.env.DISCORD_BOT_TOKEN) {
+    logger.info('Starting Discord initialization async task...');
     (async () => {
       try {
-        logger.info('Initializing Discord transport...');
+        logger.info('STEP 1: Creating Discord transport instance...');
         discordTransport = new DiscordTransport(logger);
+        logger.info('STEP 2: Calling transport.initialize()...');
         await discordTransport.initialize();
-        logger.info('Discord transport initialized successfully');
+        logger.info('STEP 3: Transport initialized, setting up bridge...');
 
         // Connect to OpenClaw gateway if available (non-critical)
         try {
@@ -1102,13 +1104,19 @@ async function main() {
           });
           // Don't nullify transport - bridge is optional
         }
+        logger.info('STEP 4: Discord initialization COMPLETE - transport is ready');
       } catch (error) {
-        logger.error('Failed to initialize Discord transport, continuing without Discord', {
-          error: error.message
+        logger.error('STEP FAILED: Discord initialization failed', {
+          error: error.message,
+          stack: error.stack,
+          type: error.constructor.name
         });
         discordTransport = null;
       }
     })();
+    logger.info('Discord initialization async task started');
+  } else {
+    logger.info('Discord not initialized: DiscordTransport=' + !!DiscordTransport + ', DISCORD_BOT_TOKEN=' + !!process.env.DISCORD_BOT_TOKEN);
   }
 
   // Make server available for graceful shutdown
