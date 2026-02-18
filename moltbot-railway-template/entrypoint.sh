@@ -318,6 +318,9 @@ else
     echo "  WARNING: OpenClaw not found at $OPENCLAW_GLOBAL, skipping WebSocket URL fix"
 fi
 
+# Find OpenClaw dist path for startup
+OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))" 2>/dev/null || echo "")
+
 if [ -n "$OPENCLAW_DIST" ]; then
     echo "Using OpenClaw dist: $OPENCLAW_DIST"
     # NOTE: --bind is NOT specified here - it comes from openclaw.json (127.0.0.1)
