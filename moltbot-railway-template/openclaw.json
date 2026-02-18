@@ -65,6 +65,23 @@
       "historyLimit": 50,
       "textChunkLimit": 4000,
       "ignoreStories": true
+    },
+    "discord": {
+      "enabled": true,
+      "token": "${DISCORD_BOT_TOKEN}",
+      "dmPolicy": "allowlist",
+      "allowFrom": ["discord:*"],
+      "guilds": {
+        "1470999747753017354": {
+          "requireMention": false,
+          "channels": {
+            "1471001039565094912": {
+              "requireMention": false,
+              "allowKublai": true
+            }
+          }
+        }
+      }
     }
   },
   "logging": {
@@ -72,9 +89,10 @@
     "file": "/data/logs/openclaw.log"
   },
   "plugins": {
-    "allow": ["signal"],
+    "allow": ["signal", "discord"],
     "entries": {
-      "signal": { "enabled": true }
+      "signal": { "enabled": true },
+      "discord": { "enabled": true }
     }
   },
   "env": {

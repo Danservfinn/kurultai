@@ -7,24 +7,34 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #33497 | 6:42 PM | ✅ | Optimized Heartbeat Changes Pushed to GitHub | ~351 |
 | #33496 | 6:41 PM | 🟣 | Functional Heartbeat Hooks Committed with ARCHITECTURE.md Sync | ~449 |
 | #33488 | 6:34 PM | 🔵 | Merge Conflict in claim_task Functional Heartbeat Implementation | ~369 |
-| #33481 | 6:30 PM | ✅ | HEARTBEAT.md v0.4 Re-Staged After Stash Restoration | ~225 |
-| #33479 | 6:29 PM | 🔵 | HEARTBEAT.md v0.4 Structure Verification | ~410 |
-| #33475 | 6:25 PM | 🟣 | Optimized HEARTBEAT.md v0.4 with MVS and Kublai Self-Awareness | ~636 |
-| #33472 | 6:24 PM | ✅ | HEARTBEAT.md v0.4 Staged for Git Commit | ~450 |
-| #33469 | 6:20 PM | ✅ | HEARTBEAT.md Upgraded from v0.3 to v0.4 with MVS, Self-Awareness, and Vector Deduplication | ~462 |
-| #33464 | 6:02 PM | 🔵 | Current HEARTBEAT.md v0.3 - Production Unified Heartbeat System | ~762 |
-| #33459 | 6:01 PM | 🔵 | Current ARCHITECTURE.md: Unified Heartbeat v3.1 with Kublai Self-Awareness | ~673 |
-| #33424 | 5:16 PM | ✅ | HEARTBEAT.md Committed to Main Branch | ~484 |
-| #33411 | 5:13 PM | ✅ | HEARTBEAT.md Updated to Align with Two-Tier Heartbeat Architecture | ~1343 |
-| #33409 | 5:05 PM | 🔵 | HEARTBEAT.md Verification - Document Successfully Created and Validated | ~1197 |
-| #33408 | 5:04 PM | 🟣 | HEARTBEAT.md - Unified Heartbeat System Documentation | ~1449 |
-| #33407 | 5:01 PM | 🔵 | ARCHITECTURE.md v3.1 - Unified Heartbeat System Architecture | ~1209 |
-| #33401 | 4:51 PM | ✅ | Updated entrypoint to v25-ARCH-SYNC for final architecture synchronization deployment | ~196 |
-| #33400 | 4:50 PM | ✅ | Updated Dockerfile cache bust to v25-ARCH-SYNC for fresh deployment attempt | ~251 |
-| #33398 | 4:49 PM | ✅ | Copied ARCHITECTURE.md to moltbot-railway-template directory | ~162 |
-| #33391 | 4:40 PM | ✅ | Updated Dockerfile to copy ARCHITECTURE.md and add timestamp comment | ~262 |
-| #33390 | 4:39 PM | 🔵 | Confirmed entrypoint.sh shows v24-ARCH-COPY version in local source | ~203 |
-| #33389 | " | 🔵 | Dockerfile CACHE_BUST updated to v24-ARCH-COPY | ~130 |
+
+### Feb 9, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33561 | 5:18 AM | 🔵 | Complete Kurultai health check reports all subsystems healthy - Neo4j operational, self-awareness enabled, agents tracked | ~495 |
+| #33560 | 5:17 AM | 🔵 | Unified heartbeat system orchestrates 14 background tasks across 6 agents with 5-minute cycle and MVS-driven curation | ~631 |
+| #33526 | 5:13 AM | 🔵 | Infrastructure health check complete - all subsystems healthy on Railway deployment | ~452 |
+| #33525 | 5:12 AM | 🔵 | Signal health check reveals critical daemon connectivity issue - expected for local dev environment | ~489 |
+| #33517 | " | 🔵 | Package.json defines Express API server with Signal and OpenClaw integration dependencies | ~315 |
+| #33516 | 5:11 AM | 🔵 | Entrypoint orchestrates Signal data extraction, migrations, and multi-service startup | ~549 |
+| #33515 | " | 🔵 | signal-cli wrapper automatically trusts new Signal identities | ~210 |
+| #33514 | " | 🔵 | Dockerfile configures OpenClaw gateway with Java 21 and signal-cli | ~443 |
+| #33513 | " | 🔵 | OpenClaw gateway configuration loaded - Signal channel configured | ~368 |
+
+### Feb 12, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #33639 | 11:22 PM | 🔵 | OpenClaw configuration files copied with moltbot user ownership in Docker build | ~362 |
+| #33637 | 11:21 PM | 🔵 | Entrypoint script version mismatch between source and production deployment | ~317 |
+| #33635 | " | 🔵 | Conflicting configWrites settings across OpenClaw configuration files | ~350 |
+| #33634 | " | ✅ | Signal channel configWrites disabled in OpenClaw gateway configuration | ~255 |
+| #33633 | " | 🔴 | OpenClaw configuration locked as read-only to prevent agent-driven config drift | ~341 |
+| #33632 | " | 🔵 | entrypoint.sh starts heartbeat sidecar after OpenClaw config installation but before gateway startup | ~471 |
+| #33627 | 11:20 PM | 🔵 | OpenClaw gateway configuration specifies token-based authentication and 6 Kurultai agents | ~389 |
+| #33587 | 12:52 AM | 🔵 | Heartbeat sidecar started via entrypoint without explicit token passing or error handling | ~572 |
 </claude-mem-context>

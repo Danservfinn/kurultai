@@ -10,15 +10,15 @@
 | #32902 | 7:52 PM | 🟣 | Express API Server - Proposal System and Kublai Integration Endpoints | ~638 |
 | #32707 | 4:53 PM | 🔴 | Added Error Handling to Proposal Endpoints | ~287 |
 | #32684 | 4:51 PM | 🔵 | Completed Moltbot Gateway Implementation with Kublai Integration | ~622 |
-| #32683 | 4:50 PM | 🟣 | Proposals API Endpoints and Root Endpoint Enhancements | ~419 |
-| #32682 | " | ✅ | Module Exports Updated with Kublai Functions | ~190 |
-| #32681 | " | 🟣 | Kublai Module Graceful Shutdown Integrated | ~223 |
-| #32680 | " | 🟣 | Kublai Module Initialization Integrated into Server Startup | ~292 |
 
 ### Feb 8, 2026
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #33370 | 3:48 PM | ✅ | Added detailed logging to architecture sync endpoint in Express server | ~256 |
+| #33366 | 3:41 PM | ✅ | Added debug logging to POST /api/architecture/sync endpoint | ~181 |
+| #33365 | 3:37 PM | 🔵 | Found Express PORT configuration defaulting to 8080 | ~226 |
+| #33363 | 3:34 PM | 🔵 | Reviewed POST /api/architecture/sync endpoint implementation | ~362 |
 | #33311 | 3:20 PM | 🔵 | Moltbot Gateway Entry Point Complete with Full Kublai Integration and Proposal APIs | ~643 |
 | #33277 | 3:11 PM | 🔵 | DelegationProtocol Initialization with Automation Flags | ~386 |
 | #33276 | " | 🔵 | Kublai Modules Initialization in Gateway Bootstrap | ~441 |
