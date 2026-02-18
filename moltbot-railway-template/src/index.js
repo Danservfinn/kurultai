@@ -972,6 +972,28 @@ app.get('/webchat', (req, res) => {
   proxyReq.end();
 });
 
+// SPA route handling - serve index.html for all /webchat/* routes
+app.get('/webchat/*', (req, res) => {
+  const options = {
+    hostname: 'localhost',
+    port: 18790,
+    path: '/',
+    method: 'GET'
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    logger.error('Webchat proxy error', { error: err.message });
+    res.status(502).json({ error: 'Webchat unavailable', message: err.message });
+  });
+
+  proxyReq.end();
+});
+
 // =============================================================================
 // Discord Test Endpoint
 // =============================================================================
