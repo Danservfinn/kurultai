@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-18-v46-JS-REWRITE) ==="
+echo "=== Entrypoint starting (version 2026-02-18-v47-WEBSOCKET-FIX) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
