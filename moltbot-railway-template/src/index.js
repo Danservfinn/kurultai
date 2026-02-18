@@ -971,6 +971,36 @@ app.get('/webchat', (req, res) => {
   proxyReq.end();
 });
 
+// =============================================================================
+// Discord Test Endpoint
+// =============================================================================
+
+app.post('/api/discord/test', async (req, res) => {
+  try {
+    if (!discordTransport || !discordTransport.client) {
+      return res.status(503).json({ error: 'Discord not initialized' });
+    }
+
+    const message = req.body.message || 'Hello from Kurultai! 👋 This is a test message.';
+
+    // Send message to Discord
+    const result = await discordTransport.client.sendMessage(message);
+
+    res.json({
+      success: true,
+      message: 'Message sent to Discord',
+      messageId: result.id || result[0]?.id,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Discord test message failed', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Proxy webchat assets
 app.use('/assets', (req, res) => {
   const options = {
