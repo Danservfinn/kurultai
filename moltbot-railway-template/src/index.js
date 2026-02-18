@@ -1069,9 +1069,43 @@ app.use('/webchat/assets', (req, res) => {
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
-    logger.info('Asset proxy response', { statusCode: proxyRes.statusCode, path: assetPath, contentType: proxyRes.headers['content-type'], contentLength: proxyRes.headers['content-length'] });
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
+    const contentType = proxyRes.headers['content-type'] || '';
+    const isJs = contentType.includes('javascript');
+
+    // Rewrite JS responses to fix WebSocket URLs
+    if (isJs) {
+      let body = '';
+      proxyRes.setEncoding('utf8');
+
+      proxyRes.on('data', (chunk) => {
+        body += chunk;
+      });
+
+      proxyRes.on('end', () => {
+        const rewritten = rewriteWebSocketUrls(body);
+
+        if (rewritten !== body) {
+          logger.info('Rewrote WebSocket URLs in JS asset', {
+            path: assetPath,
+            originalLength: body.length,
+            newLength: rewritten.length
+          });
+        }
+
+        // Update content-length header
+        if (proxyRes.headers['content-length']) {
+          proxyRes.headers['content-length'] = Buffer.byteLength(rewritten);
+        }
+
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        res.end(rewritten);
+      });
+    } else {
+      // Non-JS assets, just pipe through
+      logger.info('Asset proxy response', { statusCode: proxyRes.statusCode, path: assetPath, contentType: proxyRes.headers['content-type'] });
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
   });
 
   proxyReq.on('error', (err) => {
