@@ -346,7 +346,7 @@ async function stopKublaiModules() {
 // =============================================================================
 
 const app = express();
-const PORT = process.env.EXPRESS_PORT || process.env.PORT || 8082;
+const PORT = process.env.EXPRESS_SERVER_PORT || process.env.EXPRESS_PORT || process.env.PORT || 8082;
 
 // Security middleware
 app.use(helmet({
