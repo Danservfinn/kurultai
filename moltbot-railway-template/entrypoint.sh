@@ -261,6 +261,56 @@ else
 fi
 
 # =============================================================================
+# FIX WEBCHAT WEBSOCKET URL PLACEHOLDER
+# =============================================================================
+# The OpenClaw Control UI has a hardcoded placeholder ws://100.x.y.z:18789
+# in the compiled JavaScript. Replace it with the actual public Railway URL.
+
+# Find the OpenClaw installation path
+OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))" 2>/dev/null || echo "")
+if [ -n "$OPENCLAW_DIST" ]; then
+    OPENCLAW_DIR=$(dirname "$OPENCLAW_DIST")
+    JS_FILE=$(find "$OPENCLAW_DIR" -name "index-*.js" -path "*/control-ui/assets/*" 2>/dev/null | head -1)
+
+    if [ -n "$JS_FILE" ]; then
+        echo "=== Fixing WebSocket URL in OpenClaw Control UI ==="
+        echo "  Found JS file: $JS_FILE"
+
+        # Backup original if not already backed up
+        if [ ! -f "${JS_FILE}.backup" ]; then
+            cp "$JS_FILE" "${JS_FILE}.backup"
+            echo "  Backup created"
+        fi
+
+        # Get the public URL - use RAILWAY_PUBLIC_DOMAIN if available, fallback to constructing from service info
+        if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
+            PUBLIC_URL="wss://${RAILWAY_PUBLIC_DOMAIN}"
+        else
+            # Fallback: construct from known Railway URL pattern
+            # Service name: moltbot-railway-template, Railway domain: up.railway.app
+            PUBLIC_URL="wss://moltbot-railway-template-production-c0a3.up.railway.app"
+        fi
+
+        # Replace the hardcoded Tailscale placeholder
+        sed -i 's/ws:\/\/100\.x\.y\.z:18789/'"$PUBLIC_URL"'/g' "$JS_FILE"
+
+        # Also replace any ws://localhost:18789 variants that might be hardcoded
+        sed -i 's/ws:\/\/localhost:18789/'"$PUBLIC_URL"'/g' "$JS_FILE"
+
+        # Verify the change
+        if grep -q "$PUBLIC_URL" "$JS_FILE"; then
+            echo "  Fixed: WebSocket URL set to $PUBLIC_URL"
+        else
+            echo "  WARNING: Could not verify URL replacement"
+        fi
+    else
+        echo "  WARNING: Could not find OpenClaw Control UI JS file to patch"
+    fi
+else
+    echo "  WARNING: OpenClaw not found, skipping WebSocket URL fix"
+fi
+
+# =============================================================================
 # START OPENCLAW GATEWAY (in background)
 # =============================================================================
 # Start OpenClaw first in background so Express can start afterward
@@ -270,7 +320,6 @@ echo "Starting OpenClaw Gateway on internal port ${OPENCLAW_INTERNAL_PORT}..."
 
 # Find the OpenClaw entry point - installed globally via npm
 OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
-OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))" 2>/dev/null || echo "")
 
 if [ -n "$OPENCLAW_DIST" ]; then
     echo "Using OpenClaw dist: $OPENCLAW_DIST"

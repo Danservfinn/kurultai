@@ -3,7 +3,7 @@
 # CACHE_BUST: 2026-02-08-v11 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v44-FORCE-REBUILD
+ARG CACHE_BUST=2026-02-18-v45-WEBSOCKET-FIX
 
 FROM node:22-bookworm-slim
 
