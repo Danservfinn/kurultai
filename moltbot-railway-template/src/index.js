@@ -1067,41 +1067,43 @@ async function main() {
     }
   }
 
-  // Initialize Discord transport if configured
-  if (DiscordTransport && process.env.DISCORD_BOT_TOKEN) {
-    try {
-      logger.info('Initializing Discord transport...');
-      discordTransport = new DiscordTransport(logger);
-      await discordTransport.initialize();
-
-      // Connect to OpenClaw gateway if available
-      const { DiscordOpenClawBridge } = require('./discord');
-      const bridge = new DiscordOpenClawBridge(discordTransport, logger);
-      const bridgeConnected = await bridge.connect();
-      if (bridgeConnected) {
-        discordTransport.setBridge(bridge);
-        logger.info('Discord bridge connected to OpenClaw gateway');
-      }
-
-      logger.info('Discord transport initialized successfully');
-    } catch (error) {
-      logger.error('Failed to initialize Discord transport, continuing without Discord', {
-        error: error.message
-      });
-      discordTransport = null;
-    }
-  }
-
-  // Start HTTP server
+  // Start HTTP server first (before Discord init to pass health checks)
   const server = app.listen(PORT, () => {
     logger.info(`Moltbot Gateway listening on port ${PORT}`, {
       port: PORT,
       signalEnabled: signalConfig.enabled,
       signalReady: signalCliReady,
       kublaiReady,
-      discordEnabled: !!discordTransport
+      discordEnabled: false // Will update after Discord init
     });
   });
+
+  // Initialize Discord transport asynchronously (don't block startup)
+  if (DiscordTransport && process.env.DISCORD_BOT_TOKEN) {
+    (async () => {
+      try {
+        logger.info('Initializing Discord transport...');
+        discordTransport = new DiscordTransport(logger);
+        await discordTransport.initialize();
+
+        // Connect to OpenClaw gateway if available
+        const { DiscordOpenClawBridge } = require('./discord');
+        const bridge = new DiscordOpenClawBridge(discordTransport, logger);
+        const bridgeConnected = await bridge.connect();
+        if (bridgeConnected) {
+          discordTransport.setBridge(bridge);
+          logger.info('Discord bridge connected to OpenClaw gateway');
+        }
+
+        logger.info('Discord transport initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize Discord transport, continuing without Discord', {
+          error: error.message
+        });
+        discordTransport = null;
+      }
+    })();
+  }
 
   // Make server available for graceful shutdown
   global.server = server;
