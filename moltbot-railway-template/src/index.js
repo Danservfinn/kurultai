@@ -944,6 +944,55 @@ app.get('/api/workflow/active-implementations', async (req, res) => {
 });
 
 // =============================================================================
+// OpenClaw Webchat Proxy
+// =============================================================================
+
+const http = require('http');
+
+app.get('/webchat', (req, res) => {
+  // Proxy to OpenClaw webchat on port 18789
+  const options = {
+    hostname: 'localhost',
+    port: 18789,
+    path: '/',
+    method: 'GET'
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    logger.error('Webchat proxy error', { error: err.message });
+    res.status(502).json({ error: 'Webchat unavailable', message: err.message });
+  });
+
+  proxyReq.end();
+});
+
+// Proxy webchat assets
+app.use('/assets', (req, res) => {
+  const options = {
+    hostname: 'localhost',
+    port: 18789,
+    path: '/assets' + req.path,
+    method: 'GET'
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    res.status(502).json({ error: 'Asset unavailable' });
+  });
+
+  proxyReq.end();
+});
+
+// =============================================================================
 // Gateway Root Endpoint
 // =============================================================================
 
