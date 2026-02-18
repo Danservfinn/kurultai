@@ -23,13 +23,13 @@ const { ArchitectureIntrospection, ProactiveReflection, ScheduledReflection, Del
 const { ProposalStateMachine, ProposalMapper, ValidationHandler } = require('./workflow');
 const { OgedeiVetHandler, TemujinImplHandler } = require('./agents');
 
-// Import Discord transport (optional) - TEMPORARILY DISABLED FOR TESTING
-let DiscordTransport = null;
-// try {
-//   DiscordTransport = require('./discord').DiscordTransport;
-// } catch (error) {
-//   // Will log after logger is initialized
-// }
+// Import Discord transport (optional)
+let DiscordTransport;
+try {
+  DiscordTransport = require('./discord').DiscordTransport;
+} catch (error) {
+  // Will log after logger is initialized
+}
 
 // =============================================================================
 // Logger Configuration
