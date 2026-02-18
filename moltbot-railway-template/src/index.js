@@ -1,7 +1,7 @@
 /**
  * Moltbot Railway Template - Gateway Entry Point
  * OpenClaw Gateway with embedded Signal integration
- * Version: 2026-02-18-v40 - WebSocket URL rewrite fix
+ * Version: 2026-02-18-v58 - WebSocket URL rewrite fix
  */
 
 const express = require('express');
@@ -1161,22 +1161,63 @@ app.post('/api/discord/test', async (req, res) => {
   }
 });
 
-// Proxy webchat assets
+// Proxy webchat assets with WebSocket URL rewriting
 app.use('/assets', (req, res) => {
+  const assetPath = '/assets' + req.path;
+
   const options = {
     hostname: 'localhost',
     port: 18790,
-    path: '/assets' + req.path,
-    method: 'GET'
+    path: assetPath,
+    method: 'GET',
+    headers: {
+      ...req.headers,
+      host: 'localhost:18790'
+    }
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res);
+    const contentType = proxyRes.headers['content-type'] || '';
+    const isJs = contentType.includes('javascript');
+
+    // Rewrite JS responses to fix WebSocket URLs
+    if (isJs) {
+      let body = '';
+      proxyRes.setEncoding('utf8');
+
+      proxyRes.on('data', (chunk) => {
+        body += chunk;
+      });
+
+      proxyRes.on('end', () => {
+        const rewritten = rewriteWebSocketUrls(body);
+
+        if (rewritten !== body) {
+          logger.info('Rewrote WebSocket URLs in /assets JS', {
+            path: assetPath
+          });
+        }
+
+        // Update content-length header
+        if (proxyRes.headers['content-length']) {
+          proxyRes.headers['content-length'] = Buffer.byteLength(rewritten);
+        }
+
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        res.end(rewritten);
+      });
+    } else {
+      // Non-JS assets, just pipe through
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
   });
 
   proxyReq.on('error', (err) => {
-    res.status(502).json({ error: 'Asset unavailable' });
+    logger.error('/assets proxy error', { error: err.message, path: assetPath });
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Asset unavailable' });
+    }
   });
 
   proxyReq.end();
