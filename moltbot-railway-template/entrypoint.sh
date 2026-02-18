@@ -207,6 +207,47 @@ if [ -n "$JS_FILE" ] && [ -f "$JS_FILE" ]; then
 fi
 
 # =============================================================================
+# PATCH OPENCLAW GATEWAY TO ALLOW WEBCHAT DEVICE AUTH BYPASS
+# =============================================================================
+# The dangerouslyDisableDeviceAuth setting only applies to Control UI (client.id = "openclaw-control-ui")
+# but webchat uses client.id = "webchat". This patch allows webchat to also bypass device auth.
+GATEWAY_CLI_FILE="/usr/local/lib/node_modules/openclaw/dist/gateway-cli-BYMlAFfC.js"
+if [ -f "$GATEWAY_CLI_FILE" ]; then
+    echo "Patching OpenClaw gateway for webchat device auth bypass..."
+    node -e "
+const fs = require('fs');
+const file = '$GATEWAY_CLI_FILE';
+let content = fs.readFileSync(file, 'utf8');
+let modified = false;
+
+// Patch disableControlUiDeviceAuth to include webchat
+const oldDisable = 'const disableControlUiDeviceAuth = isControlUi && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
+const newDisable = 'const disableControlUiDeviceAuth = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
+if (content.includes(oldDisable)) {
+    content = content.replace(oldDisable, newDisable);
+    modified = true;
+    console.log('  - Patched disableControlUiDeviceAuth');
+}
+
+// Patch allowInsecureControlUi to include webchat
+const oldAllow = 'const allowInsecureControlUi = isControlUi && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
+const newAllow = 'const allowInsecureControlUi = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
+if (content.includes(oldAllow)) {
+    content = content.replace(oldAllow, newAllow);
+    modified = true;
+    console.log('  - Patched allowInsecureControlUi');
+}
+
+if (modified) {
+    fs.writeFileSync(file, content);
+    console.log('Gateway patched successfully');
+} else {
+    console.log('Gateway already patched or patterns not found');
+}
+"
+fi
+
+# =============================================================================
 # START OPENCLAW GATEWAY
 # =============================================================================
 OPENCLAW_INTERNAL_PORT=18790
