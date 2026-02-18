@@ -1006,7 +1006,7 @@ app.post('/api/discord/test', async (req, res) => {
 app.use('/assets', (req, res) => {
   const options = {
     hostname: 'localhost',
-    port: 18789,
+    port: 18790,
     path: '/assets' + req.path,
     method: 'GET'
   };
