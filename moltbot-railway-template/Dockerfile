@@ -132,10 +132,10 @@ ENV SIGNAL_ACCOUNT=${SIGNAL_ACCOUNT}
 # SECTION 9: Health Check
 # =============================================================================
 
-# Health check on Express server (port 8082) - more reliable than OpenClaw
+# Health check on Express server - use Railway's PORT env var (default 8082)
 # OpenClaw on 18789 is optional; Express is the primary service
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-    CMD curl -f http://localhost:8082/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8082}/health || exit 1
 
 # =============================================================================
 # SECTION 10: Entry Point

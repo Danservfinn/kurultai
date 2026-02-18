@@ -294,14 +294,18 @@ sleep 5
 # =============================================================================
 # START EXPRESS API SERVER (in background)
 # =============================================================================
-# The Express server provides the proposal API endpoints on port 8082
+# The Express server provides the proposal API endpoints
 # Note: Port 8080 is used by signal-cli daemon, 8081 is signal-cli HTTP interface
+# Use Railway's PORT env var if set, otherwise default to 8082
+
+# Determine Express port - use Railway's PORT if available
+EXPRESS_SERVER_PORT=${PORT:-${EXPRESS_PORT:-8082}}
 
 # Verify Express files exist before starting
 if [ -f /app/src/index.js ]; then
-    echo "=== Starting Express API server on port ${EXPRESS_PORT:-8082} ==="
+    echo "=== Starting Express API server on port ${EXPRESS_SERVER_PORT} ==="
     echo "  File check: /app/src/index.js exists ($(wc -c < /app/src/index.js) bytes)"
-    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_PORT:-8082} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js" &
+    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_SERVER_PORT} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js" &
     EXPRESS_PID=$!
     echo "  Express server started with PID $EXPRESS_PID"
 
@@ -310,13 +314,13 @@ if [ -f /app/src/index.js ]; then
 
     # Verify Express started with health check
     echo "  Verifying Express health check..."
-    if curl -sf http://localhost:${EXPRESS_PORT:-8082}/health >/dev/null 2>&1; then
+    if curl -sf http://localhost:${EXPRESS_SERVER_PORT}/health >/dev/null 2>&1; then
         echo "  Express API server started successfully and responding to health checks"
     else
         echo "  WARNING: Express server health check failed (may still be starting)"
         # Try one more time after a longer wait
         sleep 5
-        if curl -sf http://localhost:${EXPRESS_PORT:-8082}/health >/dev/null 2>&1; then
+        if curl -sf http://localhost:${EXPRESS_SERVER_PORT}/health >/dev/null 2>&1; then
             echo "  Express API server now responding to health checks"
         else
             echo "  WARNING: Express server still not responding after 10 seconds"
@@ -326,7 +330,7 @@ if [ -f /app/src/index.js ]; then
     # Trigger architecture sync to Neo4j
     echo "  Triggering architecture sync to Neo4j..."
     sleep 3
-    SYNC_RESULT=$(curl -sf -X POST http://localhost:${EXPRESS_PORT:-8082}/api/architecture/sync \
+    SYNC_RESULT=$(curl -sf -X POST http://localhost:${EXPRESS_SERVER_PORT}/api/architecture/sync \
         -H "Content-Type: application/json" \
         -d "{\"commitHash\":\"startup-$(date +%s)\"}" 2>&1) || {
         echo "  WARNING: Architecture sync failed: $SYNC_RESULT"
