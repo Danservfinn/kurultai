@@ -298,8 +298,9 @@ sleep 5
 # Note: Port 8080 is used by signal-cli daemon, 8081 is signal-cli HTTP interface
 # Use Railway's PORT env var if set, otherwise default to 8082
 
-# Determine Express port - use Railway's PORT if available
-EXPRESS_SERVER_PORT=${PORT:-${EXPRESS_PORT:-8082}}
+# Determine Express port - use separate port to avoid conflict with OpenClaw
+# Railway's PORT is used by OpenClaw (18789), Express uses different port
+EXPRESS_SERVER_PORT=${EXPRESS_PORT:-8082}
 
 # Verify Express files exist before starting
 if [ -f /app/src/index.js ]; then
