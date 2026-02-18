@@ -975,7 +975,7 @@ app.get('/webchat', (req, res) => {
 // Webchat assets proxy - MUST come before /webchat/* catch-all
 app.use('/webchat/assets', (req, res) => {
   const assetPath = '/assets' + req.path;
-  logger.debug('Proxying webchat asset', { originalPath: req.path, assetPath, method: req.method });
+  logger.info('Proxying webchat asset', { originalPath: req.path, assetPath, method: req.method });
 
   const options = {
     hostname: 'localhost',
@@ -989,7 +989,7 @@ app.use('/webchat/assets', (req, res) => {
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
-    logger.debug('Asset proxy response', { statusCode: proxyRes.statusCode, path: assetPath });
+    logger.info('Asset proxy response', { statusCode: proxyRes.statusCode, path: assetPath, contentType: proxyRes.headers['content-type'], contentLength: proxyRes.headers['content-length'] });
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
@@ -1012,7 +1012,7 @@ app.get('/webchat/*', (req, res) => {
     return res.status(404).json({ error: 'Asset not found', path: req.path });
   }
 
-  logger.debug('Proxying webchat SPA route', { path: req.path });
+  logger.info('Proxying webchat SPA route', { path: req.path });
   const options = {
     hostname: 'localhost',
     port: 18790,
