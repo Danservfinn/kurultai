@@ -1,9 +1,9 @@
 #!/bin/sh
 # Moltbot entrypoint - runs migrations, extracts Signal data, then starts OpenClaw gateway
 # Runs as root initially to handle volume permissions, then drops to moltbot user
-# Version: 2026-02-18-v52-CLEAN
+# Version: 2026-02-18-v63-TOKEN-BYPASS
 
-echo "=== Entrypoint starting (version 2026-02-18-v52-CLEAN) ==="
+echo "=== Entrypoint starting (version 2026-02-18-v63-TOKEN-BYPASS) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
