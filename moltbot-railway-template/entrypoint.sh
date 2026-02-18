@@ -274,12 +274,15 @@ OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))"
 
 if [ -n "$OPENCLAW_DIST" ]; then
     echo "Using OpenClaw dist: $OPENCLAW_DIST"
-    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_INTERNAL_PORT} --allow-unconfigured" &
+    # NOTE: --bind is NOT specified here - it comes from openclaw.json (127.0.0.1)
+    # This prevents OpenClaw from generating Tailscale IP URLs in the webchat
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD node $OPENCLAW_DIST gateway --port ${OPENCLAW_INTERNAL_PORT} --allow-unconfigured" &
     OPENCLAW_PID=$!
     echo "OpenClaw gateway started with PID $OPENCLAW_PID"
 elif [ -x "$OPENCLAW_BIN" ]; then
     echo "Using OpenClaw binary: $OPENCLAW_BIN"
-    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_INTERNAL_PORT} --allow-unconfigured" &
+    # NOTE: --bind is NOT specified here - it comes from openclaw.json (127.0.0.1)
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD $OPENCLAW_BIN gateway --port ${OPENCLAW_INTERNAL_PORT} --allow-unconfigured" &
     OPENCLAW_PID=$!
     echo "OpenClaw gateway started with PID $OPENCLAW_PID"
 else
