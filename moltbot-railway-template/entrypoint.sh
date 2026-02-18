@@ -247,6 +247,25 @@ if (content.includes(oldSkip)) {
     console.log('  - Patched canSkipDevice');
 }
 
+// Patch token authentication to respect allowInsecureControlUi
+// When allowInsecureControlUi is true, skip token validation for webchat/control-ui
+const oldTokenCheck = "if (validated.token !== expectedToken)";
+const newTokenCheck = "if (!allowInsecureControlUi && validated.token !== expectedToken)";
+if (content.includes(oldTokenCheck)) {
+    content = content.replace(oldTokenCheck, newTokenCheck);
+    modified = true;
+    console.log('  - Patched token authentication check');
+}
+
+// Alternative token check pattern (look for token validation)
+const oldTokenAuth = 'if (getAuthToken() !== expectedToken)';
+const newTokenAuth = 'if (!allowInsecureControlUi && getAuthToken() !== expectedToken)';
+if (content.includes(oldTokenAuth)) {
+    content = content.replace(oldTokenAuth, newTokenAuth);
+    modified = true;
+    console.log('  - Patched token auth check (alt)');
+}
+
 if (modified) {
     fs.writeFileSync(file, content);
     console.log('Gateway patched successfully');
