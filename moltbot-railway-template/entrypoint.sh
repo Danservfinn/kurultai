@@ -238,6 +238,15 @@ if (content.includes(oldAllow)) {
     console.log('  - Patched allowInsecureControlUi');
 }
 
+// Patch canSkipDevice to respect allowControlUiBypass
+const oldSkip = 'const canSkipDevice = sharedAuthOk;';
+const newSkip = 'const canSkipDevice = sharedAuthOk || allowControlUiBypass;';
+if (content.includes(oldSkip)) {
+    content = content.replace(oldSkip, newSkip);
+    modified = true;
+    console.log('  - Patched canSkipDevice');
+}
+
 if (modified) {
     fs.writeFileSync(file, content);
     console.log('Gateway patched successfully');
