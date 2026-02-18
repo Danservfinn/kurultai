@@ -3,7 +3,7 @@
 # CACHE_BUST: 2026-02-08-v11 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v55-SIMPLE-PATCH
+ARG CACHE_BUST=2026-02-18-v56-RUNTIME-PATCH
 
 FROM node:22-bookworm-slim
 
@@ -56,14 +56,6 @@ RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
 # OpenClaw provides the gateway with built-in webchat UI at :18789
 
 RUN npm install -g openclaw@latest
-
-# Patch OpenClaw webchat WebSocket URL at build time
-# Fixes the hardcoded ws://100.x.y.z:18789 placeholder
-RUN OPENCLAW_JS="$(npm root -g)/openclaw/dist/control-ui/assets/index-"*.js && \
-    cp "$OPENCLAW_JS" "$OPENCLAW_JS.backup" && \
-    sed -i 's|ws://100\.x\.y\.z:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$OPENCLAW_JS" && \
-    sed -i 's|ws://localhost:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$OPENCLAW_JS" && \
-    echo "Patched OpenClaw WebSocket URL in $(basename $OPENCLAW_JS)"
 
 # =============================================================================
 # SECTION 4: Working Directory & Data Directories

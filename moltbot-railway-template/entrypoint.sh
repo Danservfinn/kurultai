@@ -194,6 +194,19 @@ if [ -n "$NEO4J_PASSWORD" ] && [ -f /app/scripts/heartbeat_writer.py ]; then
 fi
 
 # =============================================================================
+# PATCH WEBCHAT WEBSOCKET URL (RUNTIME)
+# =============================================================================
+# The OpenClaw Control UI has a hardcoded placeholder ws://100.x.y.z:18789
+# Replace it with the actual public Railway URL so webchat works
+JS_FILE=$(ls /usr/local/lib/node_modules/openclaw/dist/control-ui/assets/index-*.js 2>/dev/null | head -1)
+if [ -n "$JS_FILE" ] && [ -f "$JS_FILE" ]; then
+    echo "Patching WebSocket URL in: $(basename $JS_FILE)"
+    sed -i 's|ws://100\.x\.y\.z:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$JS_FILE"
+    sed -i 's|ws://localhost:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$JS_FILE"
+    echo "WebSocket URL patched"
+fi
+
+# =============================================================================
 # START OPENCLAW GATEWAY
 # =============================================================================
 OPENCLAW_INTERNAL_PORT=18790
