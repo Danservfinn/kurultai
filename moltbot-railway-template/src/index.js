@@ -950,10 +950,11 @@ app.get('/api/workflow/active-implementations', async (req, res) => {
 const http = require('http');
 
 app.get('/webchat', (req, res) => {
-  // Proxy to OpenClaw webchat on port 18789
+  // Proxy to OpenClaw webchat on internal port 18790
+  // (Express uses PORT=18789 for Railway routing)
   const options = {
     hostname: 'localhost',
-    port: 18789,
+    port: 18790,
     path: '/',
     method: 'GET'
   };

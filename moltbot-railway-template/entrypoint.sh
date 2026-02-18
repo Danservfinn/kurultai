@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-17-v31-PORT-FIX) ==="
+echo "=== Entrypoint starting (version 2026-02-18-v35-EXPRESS-ON-PORT-ENV) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -264,8 +264,8 @@ fi
 # START OPENCLAW GATEWAY (in background)
 # =============================================================================
 # Start OpenClaw first in background so Express can start afterward
-# The gateway includes the built-in webchat UI at :18789
-echo "Starting OpenClaw Gateway on port ${OPENCLAW_GATEWAY_PORT:-18789}..."
+# OpenClaw uses internal port 18790 (Express uses PORT=18789 for Railway routing)
+echo "Starting OpenClaw Gateway on internal port ${OPENCLAW_INTERNAL_PORT}..."
 
 # Find the OpenClaw entry point - installed globally via npm
 OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
@@ -273,12 +273,12 @@ OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))"
 
 if [ -n "$OPENCLAW_DIST" ]; then
     echo "Using OpenClaw dist: $OPENCLAW_DIST"
-    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD node $OPENCLAW_DIST gateway --bind lan --port ${OPENCLAW_INTERNAL_PORT} --allow-unconfigured" &
     OPENCLAW_PID=$!
     echo "OpenClaw gateway started with PID $OPENCLAW_PID"
 elif [ -x "$OPENCLAW_BIN" ]; then
     echo "Using OpenClaw binary: $OPENCLAW_BIN"
-    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789} --allow-unconfigured" &
+    su -s /bin/sh moltbot -c "HOME=/data OPENCLAW_STATE_DIR=$OPENCLAW_STATE_DIR NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD $OPENCLAW_BIN gateway --bind lan --port ${OPENCLAW_INTERNAL_PORT} --allow-unconfigured" &
     OPENCLAW_PID=$!
     echo "OpenClaw gateway started with PID $OPENCLAW_PID"
 else
@@ -296,13 +296,17 @@ sleep 5
 # =============================================================================
 # The Express server provides the proposal API endpoints
 # Note: Port 8080 is used by signal-cli daemon, 8081 is signal-cli HTTP interface
-# Use Railway's PORT env var if set, otherwise default to 8082
+# Express MUST use Railway's PORT env var (18789) for external routing
+# OpenClaw gateway will use a different internal port (18790)
 
- # Determine Express port - use separate port to avoid conflict with OpenClaw
-# Railway's PORT is used by OpenClaw (18789), Express uses different port
-echo "DEBUG: EXPRESS_PORT env var = '${EXPRESS_PORT}'"
-EXPRESS_SERVER_PORT=${EXPRESS_PORT:-8082}
+# Determine Express port - MUST use Railway's PORT for external access
+echo "DEBUG: PORT env var = '${PORT}'"
+EXPRESS_SERVER_PORT=${PORT:-8082}
 echo "DEBUG: EXPRESS_SERVER_PORT = '${EXPRESS_SERVER_PORT}'"
+
+# OpenClaw uses a different port internally (not Railway's PORT)
+OPENCLAW_INTERNAL_PORT=18790
+echo "DEBUG: OPENCLAW_INTERNAL_PORT = '${OPENCLAW_INTERNAL_PORT}'"
 
 # Verify Express files exist before starting
 if [ -f /app/src/index.js ]; then

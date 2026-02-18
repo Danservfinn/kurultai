@@ -3,7 +3,7 @@
 # CACHE_BUST: 2026-02-08-v11 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v33-DISCORD-FIX-DEPLOYED
+ARG CACHE_BUST=2026-02-18-v35-PORT-FIX-EXPRESS-ON-18789
 
 FROM node:22-bookworm-slim
 
@@ -132,10 +132,10 @@ ENV SIGNAL_ACCOUNT=${SIGNAL_ACCOUNT}
 # SECTION 9: Health Check
 # =============================================================================
 
-# Health check on Express server (port 8082)
-# Express runs on 8082, OpenClaw runs on PORT (18789)
+# Health check on Express server (port 18789 - Railway PORT)
+# Express runs on PORT (18789), OpenClaw runs on internal port (18790)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-    CMD curl -f http://localhost:8082/health || exit 1
+    CMD curl -f http://localhost:18789/health || exit 1
 
 # =============================================================================
 # SECTION 10: Entry Point
