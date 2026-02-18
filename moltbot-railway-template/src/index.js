@@ -1085,17 +1085,23 @@ async function main() {
         logger.info('Initializing Discord transport...');
         discordTransport = new DiscordTransport(logger);
         await discordTransport.initialize();
-
-        // Connect to OpenClaw gateway if available
-        const { DiscordOpenClawBridge } = require('./discord');
-        const bridge = new DiscordOpenClawBridge(discordTransport, logger);
-        const bridgeConnected = await bridge.connect();
-        if (bridgeConnected) {
-          discordTransport.setBridge(bridge);
-          logger.info('Discord bridge connected to OpenClaw gateway');
-        }
-
         logger.info('Discord transport initialized successfully');
+
+        // Connect to OpenClaw gateway if available (non-critical)
+        try {
+          const { DiscordOpenClawBridge } = require('./discord');
+          const bridge = new DiscordOpenClawBridge(discordTransport, logger);
+          const bridgeConnected = await bridge.connect();
+          if (bridgeConnected) {
+            discordTransport.setBridge(bridge);
+            logger.info('Discord bridge connected to OpenClaw gateway');
+          }
+        } catch (bridgeError) {
+          logger.warn('Discord bridge connection failed, but transport is still active', {
+            error: bridgeError.message
+          });
+          // Don't nullify transport - bridge is optional
+        }
       } catch (error) {
         logger.error('Failed to initialize Discord transport, continuing without Discord', {
           error: error.message
