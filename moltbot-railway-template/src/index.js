@@ -1,6 +1,7 @@
 /**
  * Moltbot Railway Template - Gateway Entry Point
  * OpenClaw Gateway with embedded Signal integration
+ * Version: 2026-02-18-v39 - Webchat assets route fix
  */
 
 const express = require('express');
