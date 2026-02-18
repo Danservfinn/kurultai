@@ -3,7 +3,7 @@
 # Runs as root initially to handle volume permissions, then drops to moltbot user
 # Version: 2026-02-07-v9 (Express port 8082 to avoid signal-cli conflict)
 
-echo "=== Entrypoint starting (version 2026-02-18-v35-EXPRESS-ON-PORT-ENV) ==="
+echo "=== Entrypoint starting (version 2026-02-18-v38-FIX-OPENCLAW-PORT) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -265,6 +265,7 @@ fi
 # =============================================================================
 # Start OpenClaw first in background so Express can start afterward
 # OpenClaw uses internal port 18790 (Express uses PORT=18789 for Railway routing)
+OPENCLAW_INTERNAL_PORT=18790
 echo "Starting OpenClaw Gateway on internal port ${OPENCLAW_INTERNAL_PORT}..."
 
 # Find the OpenClaw entry point - installed globally via npm
@@ -304,8 +305,7 @@ echo "DEBUG: PORT env var = '${PORT}'"
 EXPRESS_SERVER_PORT=${PORT:-8082}
 echo "DEBUG: EXPRESS_SERVER_PORT = '${EXPRESS_SERVER_PORT}'"
 
-# OpenClaw uses a different port internally (not Railway's PORT)
-OPENCLAW_INTERNAL_PORT=18790
+# OpenClaw already started above on port 18790
 echo "DEBUG: OPENCLAW_INTERNAL_PORT = '${OPENCLAW_INTERNAL_PORT}'"
 
 # Verify Express files exist before starting
