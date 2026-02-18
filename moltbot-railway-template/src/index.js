@@ -973,30 +973,46 @@ app.get('/webchat', (req, res) => {
 });
 
 // Webchat assets proxy - MUST come before /webchat/* catch-all
-app.get('/webchat/assets/*', (req, res) => {
-  const assetPath = req.path.replace('/webchat', '');
+app.use('/webchat/assets', (req, res) => {
+  const assetPath = '/assets' + req.path;
+  logger.debug('Proxying webchat asset', { originalPath: req.path, assetPath, method: req.method });
+
   const options = {
     hostname: 'localhost',
     port: 18790,
     path: assetPath,
-    method: 'GET'
+    method: req.method,
+    headers: {
+      ...req.headers,
+      host: 'localhost:18790'
+    }
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
+    logger.debug('Asset proxy response', { statusCode: proxyRes.statusCode, path: assetPath });
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
 
   proxyReq.on('error', (err) => {
     logger.error('Webchat assets proxy error', { error: err.message, path: assetPath });
-    res.status(502).json({ error: 'Asset unavailable', message: err.message });
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Asset unavailable', message: err.message });
+    }
   });
 
   proxyReq.end();
 });
 
-// SPA route handling - serve index.html for all /webchat/* routes
+// SPA route handling - serve index.html for all /webchat/* routes (except assets)
 app.get('/webchat/*', (req, res) => {
+  // Skip if this is an asset request (should have been handled by /webchat/assets above)
+  if (req.path.startsWith('/webchat/assets/')) {
+    logger.warn('Asset request reached catch-all route', { path: req.path });
+    return res.status(404).json({ error: 'Asset not found', path: req.path });
+  }
+
+  logger.debug('Proxying webchat SPA route', { path: req.path });
   const options = {
     hostname: 'localhost',
     port: 18790,
