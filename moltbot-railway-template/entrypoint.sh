@@ -308,7 +308,7 @@ echo "DEBUG: EXPRESS_SERVER_PORT = '${EXPRESS_SERVER_PORT}'"
 if [ -f /app/src/index.js ]; then
     echo "=== Starting Express API server on port ${EXPRESS_SERVER_PORT} ==="
     echo "  File check: /app/src/index.js exists ($(wc -c < /app/src/index.js) bytes)"
-    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production PORT=${EXPRESS_SERVER_PORT} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js" &
+    su -s /bin/sh moltbot -c "cd /app && NODE_ENV=production EXPRESS_PORT=${EXPRESS_SERVER_PORT} PORT=${EXPRESS_SERVER_PORT} NEO4J_URI=$NEO4J_URI NEO4J_USER=${NEO4J_USER:-neo4j} NEO4J_PASSWORD=$NEO4J_PASSWORD SIGNAL_ACCOUNT=$SIGNAL_ACCOUNT node /app/src/index.js" &
     EXPRESS_PID=$!
     echo "  Express server started with PID $EXPRESS_PID"
 

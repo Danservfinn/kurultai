@@ -76,8 +76,7 @@
           "requireMention": false,
           "channels": {
             "1471001039565094912": {
-              "requireMention": false,
-              "allowKublai": true
+              "requireMention": false
             }
           }
         }
