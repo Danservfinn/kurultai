@@ -201,8 +201,8 @@ fi
 JS_FILE=$(ls /usr/local/lib/node_modules/openclaw/dist/control-ui/assets/index-*.js 2>/dev/null | head -1)
 if [ -n "$JS_FILE" ] && [ -f "$JS_FILE" ]; then
     echo "Patching WebSocket URL in: $(basename $JS_FILE)"
-    sed -i 's|ws://100\.x\.y\.z:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$JS_FILE"
-    sed -i 's|ws://localhost:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$JS_FILE"
+    sed -i 's|ws://100\.x\.y\.z:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app/ws|g' "$JS_FILE"
+    sed -i 's|ws://localhost:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app/ws|g' "$JS_FILE"
     echo "WebSocket URL patched"
 fi
 
