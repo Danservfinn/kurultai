@@ -972,6 +972,29 @@ app.get('/webchat', (req, res) => {
   proxyReq.end();
 });
 
+// Webchat assets proxy - MUST come before /webchat/* catch-all
+app.get('/webchat/assets/*', (req, res) => {
+  const assetPath = req.path.replace('/webchat', '');
+  const options = {
+    hostname: 'localhost',
+    port: 18790,
+    path: assetPath,
+    method: 'GET'
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    logger.error('Webchat assets proxy error', { error: err.message, path: assetPath });
+    res.status(502).json({ error: 'Asset unavailable', message: err.message });
+  });
+
+  proxyReq.end();
+});
+
 // SPA route handling - serve index.html for all /webchat/* routes
 app.get('/webchat/*', (req, res) => {
   const options = {
