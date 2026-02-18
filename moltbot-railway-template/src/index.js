@@ -1180,6 +1180,16 @@ app.use('/assets', (req, res) => {
     const contentType = proxyRes.headers['content-type'] || '';
     const isJs = contentType.includes('javascript');
 
+    // Always add cache-busting headers to prevent stale assets
+    const headers = {
+      ...proxyRes.headers,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    };
+    delete headers['etag'];
+    delete headers['last-modified'];
+
     // Rewrite JS responses to fix WebSocket URLs
     if (isJs) {
       let body = '';
@@ -1199,16 +1209,16 @@ app.use('/assets', (req, res) => {
         }
 
         // Update content-length header
-        if (proxyRes.headers['content-length']) {
-          proxyRes.headers['content-length'] = Buffer.byteLength(rewritten);
+        if (headers['content-length']) {
+          headers['content-length'] = Buffer.byteLength(rewritten);
         }
 
-        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        res.writeHead(proxyRes.statusCode, headers);
         res.end(rewritten);
       });
     } else {
-      // Non-JS assets, just pipe through
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      // Non-JS assets, just pipe through with cache headers
+      res.writeHead(proxyRes.statusCode, headers);
       proxyRes.pipe(res);
     }
   });
