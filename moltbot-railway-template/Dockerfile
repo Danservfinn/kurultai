@@ -3,7 +3,7 @@
 # CACHE_BUST: 2026-02-08-v11 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v53-CLEAN-ENTRYPOINT
+ARG CACHE_BUST=2026-02-18-v54-REMOVED-PATCH
 
 FROM node:22-bookworm-slim
 
@@ -56,21 +56,6 @@ RUN curl -fsSL -o /tmp/signal-cli.tar.gz \
 # OpenClaw provides the gateway with built-in webchat UI at :18789
 
 RUN npm install -g openclaw@latest
-
-# Patch OpenClaw Control UI WebSocket URL placeholder at build time
-# The compiled JS has a hardcoded ws://100.x.y.z:18789 that needs to be replaced
-# with the actual public Railway URL for the webchat to work
-RUN OPENCLAW_GLOBAL="$(npm root -g)/openclaw" && \
-    JS_FILE=$(find "$OPENCLAW_GLOBAL" -name "index-*.js" -path "*/control-ui/assets/*" 2>/dev/null | head -1) && \
-    if [ -n "$JS_FILE" ]; then \
-        echo "Patching OpenClaw WebSocket URL in: $JS_FILE" && \
-        cp "$JS_FILE" "$JS_FILE.backup" && \
-        sed -i 's|ws://100\\.x\\.y\\.z:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$JS_FILE" && \
-        sed -i 's|ws://localhost:18789|wss://moltbot-railway-template-production-c0a3.up.railway.app|g' "$JS_FILE" && \
-        echo "WebSocket URL patched successfully"; \
-    else \
-        echo "WARNING: Could not find OpenClaw Control UI JS file to patch"; \
-    fi
 
 # =============================================================================
 # SECTION 4: Working Directory & Data Directories
