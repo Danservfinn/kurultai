@@ -277,14 +277,14 @@ OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")
 # The OpenClaw Control UI has a hardcoded placeholder ws://100.x.y.z:18789
 # in the compiled JavaScript. Replace it with the actual public Railway URL.
 
-# Find the OpenClaw installation path
-OPENCLAW_DIST=$(node -e "console.log(require.resolve('openclaw/dist/index.js'))" 2>/dev/null || echo "")
-if [ -n "$OPENCLAW_DIST" ]; then
-    OPENCLAW_DIR=$(dirname "$OPENCLAW_DIST")
-    JS_FILE=$(find "$OPENCLAW_DIR" -name "index-*.js" -path "*/control-ui/assets/*" 2>/dev/null | head -1)
+echo "=== Fixing WebSocket URL in OpenClaw Control UI ==="
+
+# Find OpenClaw global install path (npm root -g gives the global node_modules)
+OPENCLAW_GLOBAL=$(npm root -g 2>/dev/null)/openclaw
+if [ -d "$OPENCLAW_GLOBAL" ]; then
+    JS_FILE=$(find "$OPENCLAW_GLOBAL" -name "index-*.js" -path "*/control-ui/assets/*" 2>/dev/null | head -1)
 
     if [ -n "$JS_FILE" ]; then
-        echo "=== Fixing WebSocket URL in OpenClaw Control UI ==="
         echo "  Found JS file: $JS_FILE"
 
         # Backup original if not already backed up
@@ -302,8 +302,8 @@ if [ -n "$OPENCLAW_DIST" ]; then
         fi
 
         # Replace the hardcoded placeholders
-        sed -i 's|ws://100\.x\.y\.z:18789|'$PUBLIC_URL'|g' "$JS_FILE"
-        sed -i 's|ws://localhost:18789|'$PUBLIC_URL'|g' "$JS_FILE"
+        sed -i "s|ws://100\\.x\\.y\\.z:18789|$PUBLIC_URL|g" "$JS_FILE"
+        sed -i "s|ws://localhost:18789|$PUBLIC_URL|g" "$JS_FILE"
 
         # Verify the change
         if grep -q "$PUBLIC_URL" "$JS_FILE"; then
@@ -315,7 +315,7 @@ if [ -n "$OPENCLAW_DIST" ]; then
         echo "  WARNING: Could not find OpenClaw Control UI JS file to patch"
     fi
 else
-    echo "  WARNING: OpenClaw not found, skipping WebSocket URL fix"
+    echo "  WARNING: OpenClaw not found at $OPENCLAW_GLOBAL, skipping WebSocket URL fix"
 fi
 
 if [ -n "$OPENCLAW_DIST" ]; then
