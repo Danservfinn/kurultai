@@ -1383,18 +1383,7 @@ async function main() {
         headers: req.headers
       };
 
-      const proxyReq = http.request(options, (proxyRes) => {
-        // Write the upgrade response
-        socket.write(`HTTP/1.1 ${proxyRes.statusCode} ${proxyRes.statusMessage}\r\n`);
-
-        // Copy headers
-        Object.entries(proxyRes.headers).forEach(([key, value]) => {
-          if (value) socket.write(`${key}: ${value}\r\n`);
-        });
-
-        socket.write('\r\n');
-        proxyRes.pipe(socket);
-      });
+      const proxyReq = http.request(options);
 
       proxyReq.on('error', (err) => {
         logger.error('WebSocket proxy error', { error: err.message, url: req.url });
@@ -1403,14 +1392,19 @@ async function main() {
 
       proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
         // Handle the upgrade response from OpenClaw
-        socket.write(`HTTP/1.1 101 Switching Protocols\r\n`);
-
-        // Copy headers from the upgrade response
+        // Write the 101 response to the client
+        let response = 'HTTP/1.1 101 Switching Protocols\r\n';
         Object.entries(proxyRes.headers).forEach(([key, value]) => {
-          if (value) socket.write(`${key}: ${value}\r\n`);
+          if (value) response += `${key}: ${value}\r\n`;
         });
+        response += '\r\n';
 
-        socket.write('\r\n');
+        socket.write(response);
+
+        // If there's initial data, write it
+        if (proxyHead && proxyHead.length > 0) {
+          socket.write(proxyHead);
+        }
 
         // Pipe the sockets together for bidirectional communication
         proxySocket.pipe(socket);
@@ -1435,6 +1429,19 @@ async function main() {
         socket.on('close', () => {
           proxySocket.end();
         });
+      });
+
+      proxyReq.on('response', (proxyRes) => {
+        // If we get a regular response (not 101), forward it
+        if (proxyRes.statusCode !== 101) {
+          let response = `HTTP/1.1 ${proxyRes.statusCode} ${proxyRes.statusMessage}\r\n`;
+          Object.entries(proxyRes.headers).forEach(([key, value]) => {
+            if (value) response += `${key}: ${value}\r\n`;
+          });
+          response += '\r\n';
+          socket.write(response);
+          proxyRes.pipe(socket);
+        }
       });
 
       proxyReq.end();
