@@ -41,7 +41,7 @@
       "thinkingDefault": "high"
     },
     "list": [
-      { "id": "main", "name": "Kublai", "workspace": "/data/workspace/souls/main", "model": "openrouter/google/gemini-3.1-pro-preview" },
+      { "id": "main", "name": "Kublai", "workspace": "/data/workspace/souls/main", "model": "kimi-coding/k2p5" },
       { "id": "researcher", "name": "Möngke", "workspace": "/data/workspace/souls/researcher" },
       { "id": "writer", "name": "Chagatai", "workspace": "/data/workspace/souls/writer" },
       { "id": "developer", "name": "Temüjin", "workspace": "/data/workspace/souls/developer" },
