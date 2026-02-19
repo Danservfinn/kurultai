@@ -214,17 +214,66 @@ fi
 GATEWAY_CLI_FILE=$(ls /usr/local/lib/node_modules/openclaw/dist/gateway-cli-*.js 2>/dev/null | head -1)
 if [ -n "$GATEWAY_CLI_FILE" ] && [ -f "$GATEWAY_CLI_FILE" ]; then
     echo "Patching OpenClaw gateway for webchat device auth bypass: $(basename $GATEWAY_CLI_FILE)..."
+    cat > /tmp/patch-gateway.js << 'NODE_SCRIPT_EOF'
+const fs = require('fs');
+const path = require('path');
 
-    # Patch 1: allowInsecureControlUi - include webchat
-    sed -i 's/const allowInsecureControlUi = isControlUi && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;/const allowInsecureControlUi = (isControlUi || isWebchat) \&\& configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;/g' "$GATEWAY_CLI_FILE" 2>/dev/null && echo "  - Patched allowInsecureControlUi" || true
+// Find the gateway file dynamically
+const distDir = '/usr/local/lib/node_modules/openclaw/dist';
+let gatewayFile = null;
+try {
+    const files = fs.readdirSync(distDir);
+    gatewayFile = files.find(f => f.startsWith('gateway-cli-') && f.endsWith('.js'));
+    if (!gatewayFile) {
+        console.log('No gateway-cli file found');
+        process.exit(0);
+    }
+    gatewayFile = path.join(distDir, gatewayFile);
+} catch (e) {
+    console.log('Error finding gateway file:', e.message);
+    process.exit(0);
+}
 
-    # Patch 2: disableControlUiDeviceAuth - include webchat
-    sed -i 's/const disableControlUiDeviceAuth = isControlUi && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;/const disableControlUiDeviceAuth = (isControlUi || isWebchat) \&\& configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;/g' "$GATEWAY_CLI_FILE" 2>/dev/null && echo "  - Patched disableControlUiDeviceAuth" || true
+console.log('Patching file:', path.basename(gatewayFile));
+let content = fs.readFileSync(gatewayFile, 'utf8');
+let modified = false;
 
-    # Patch 3: canSkipDevice - allow bypass without sharedAuthOk
-    sed -i 's/const canSkipDevice = sharedAuthOk;/const canSkipDevice = sharedAuthOk || allowControlUiBypass;/g' "$GATEWAY_CLI_FILE" 2>/dev/null && echo "  - Patched canSkipDevice" || true
+// Patch 1: allowInsecureControlUi - include webchat
+const oldAllow = 'const allowInsecureControlUi = isControlUi && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
+const newAllow = 'const allowInsecureControlUi = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
+if (content.includes(oldAllow)) {
+    content = content.replace(oldAllow, newAllow);
+    modified = true;
+    console.log('  - Patched allowInsecureControlUi');
+}
 
-    echo "Gateway patching complete"
+// Patch 2: disableControlUiDeviceAuth - include webchat
+const oldDisable = 'const disableControlUiDeviceAuth = isControlUi && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
+const newDisable = 'const disableControlUiDeviceAuth = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
+if (content.includes(oldDisable)) {
+    content = content.replace(oldDisable, newDisable);
+    modified = true;
+    console.log('  - Patched disableControlUiDeviceAuth');
+}
+
+// Patch 3: canSkipDevice - allow bypass without sharedAuthOk
+const oldSkip = 'const canSkipDevice = sharedAuthOk;';
+const newSkip = 'const canSkipDevice = sharedAuthOk || allowControlUiBypass;';
+if (content.includes(oldSkip)) {
+    content = content.replace(oldSkip, newSkip);
+    modified = true;
+    console.log('  - Patched canSkipDevice');
+}
+
+if (modified) {
+    fs.writeFileSync(gatewayFile, content);
+    console.log('Gateway patched successfully');
+} else {
+    console.log('Gateway already patched or patterns not found');
+}
+NODE_SCRIPT_EOF
+    node /tmp/patch-gateway.js
+    rm -f /tmp/patch-gateway.js
 fi
 
 # =============================================================================
