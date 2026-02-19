@@ -1,9 +1,9 @@
 #!/bin/sh
 # Moltbot entrypoint - runs migrations, extracts Signal data, then starts OpenClaw gateway
 # Runs as root initially to handle volume permissions, then drops to moltbot user
-# Version: 2026-02-18-v63-TOKEN-BYPASS
+# Version: 2026-02-18-v65-FIXED
 
-echo "=== Entrypoint starting (version 2026-02-18-v63-TOKEN-BYPASS) ==="
+echo "=== Entrypoint starting (version 2026-02-18-v65-FIXED) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -214,9 +214,9 @@ fi
 GATEWAY_CLI_FILE="/usr/local/lib/node_modules/openclaw/dist/gateway-cli-BYMlAFfC.js"
 if [ -f "$GATEWAY_CLI_FILE" ]; then
     echo "Patching OpenClaw gateway for webchat device auth bypass..."
-    node -e "
+    cat > /tmp/patch-gateway.js << 'NODE_SCRIPT_EOF'
 const fs = require('fs');
-const file = '$GATEWAY_CLI_FILE';
+const file = '/usr/local/lib/node_modules/openclaw/dist/gateway-cli-BYMlAFfC.js';
 let content = fs.readFileSync(file, 'utf8');
 let modified = false;
 
@@ -249,8 +249,8 @@ if (content.includes(oldSkip)) {
 
 // Patch token authentication to respect allowInsecureControlUi
 // When allowInsecureControlUi is true, skip token validation for webchat/control-ui
-const oldTokenCheck = "if (validated.token !== expectedToken)";
-const newTokenCheck = "if (!allowInsecureControlUi && validated.token !== expectedToken)";
+const oldTokenCheck = 'if (validated.token !== expectedToken)';
+const newTokenCheck = 'if (!allowInsecureControlUi && validated.token !== expectedToken)';
 if (content.includes(oldTokenCheck)) {
     content = content.replace(oldTokenCheck, newTokenCheck);
     modified = true;
@@ -272,7 +272,9 @@ if (modified) {
 } else {
     console.log('Gateway already patched or patterns not found');
 }
-"
+NODE_SCRIPT_EOF
+    node /tmp/patch-gateway.js
+    rm -f /tmp/patch-gateway.js
 fi
 
 # =============================================================================

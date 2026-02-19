@@ -1,9 +1,9 @@
 # Moltbot Railway Template - OpenClaw Gateway with embedded Signal
 # Replaces Express gateway with full OpenClaw gateway including built-in webchat UI
-# CACHE_BUST: 2026-02-18-v64 - Force fresh build, cache bust at top
+# CACHE_BUST: 2026-02-18-v65 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v64-FORCE-REBUILD
+ARG CACHE_BUST=2026-02-18-v65-FIXED
 
 FROM node:22-bookworm-slim
 
@@ -96,7 +96,7 @@ COPY --chown=1001:1001 scripts /app/scripts
 # COPY --chown=1001:1001 openclaw.json5 /app/openclaw.json5
 COPY --chown=1001:1001 openclaw.json /app/openclaw.json
 COPY --chown=1001:1001 entrypoint.sh /app/entrypoint.sh
-RUN echo "ENTRYPOINT_VERSION=2026-02-18-v64-FORCE-REBUILD"
+RUN echo "ENTRYPOINT_VERSION=2026-02-18-v65-FIXED"
 COPY --chown=1001:1001 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
 COPY --chown=1001:1001 souls /app/souls
 
