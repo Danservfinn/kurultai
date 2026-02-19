@@ -1,9 +1,9 @@
 #!/bin/sh
 # Moltbot entrypoint - runs migrations, extracts Signal data, then starts OpenClaw gateway
 # Runs as root initially to handle volume permissions, then drops to moltbot user
-# Version: 2026-02-18-v65-FIXED
+# Version: 2026-02-18-v66-PATCHED
 
-echo "=== Entrypoint starting (version 2026-02-18-v65-FIXED) ==="
+echo "=== Entrypoint starting (version 2026-02-18-v66-PATCHED) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -211,66 +211,69 @@ fi
 # =============================================================================
 # The dangerouslyDisableDeviceAuth setting only applies to Control UI (client.id = "openclaw-control-ui")
 # but webchat uses client.id = "webchat". This patch allows webchat to also bypass device auth.
-GATEWAY_CLI_FILE="/usr/local/lib/node_modules/openclaw/dist/gateway-cli-BYMlAFfC.js"
-if [ -f "$GATEWAY_CLI_FILE" ]; then
-    echo "Patching OpenClaw gateway for webchat device auth bypass..."
+GATEWAY_CLI_FILE=$(ls /usr/local/lib/node_modules/openclaw/dist/gateway-cli-*.js 2>/dev/null | head -1)
+if [ -n "$GATEWAY_CLI_FILE" ] && [ -f "$GATEWAY_CLI_FILE" ]; then
+    echo "Patching OpenClaw gateway for webchat device auth bypass: $(basename $GATEWAY_CLI_FILE)..."
     cat > /tmp/patch-gateway.js << 'NODE_SCRIPT_EOF'
 const fs = require('fs');
-const file = '/usr/local/lib/node_modules/openclaw/dist/gateway-cli-BYMlAFfC.js';
+const glob = require('glob');
+
+// Find the gateway file
+const files = glob.sync('/usr/local/lib/node_modules/openclaw/dist/gateway-cli-*.js');
+if (files.length === 0) {
+    console.log('No gateway-cli file found');
+    process.exit(0);
+}
+
+const file = files[0];
 let content = fs.readFileSync(file, 'utf8');
 let modified = false;
 
-// Patch disableControlUiDeviceAuth to include webchat
-const oldDisable = 'const disableControlUiDeviceAuth = isControlUi && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
-const newDisable = 'const disableControlUiDeviceAuth = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
-if (content.includes(oldDisable)) {
-    content = content.replace(oldDisable, newDisable);
+// Patch 1: allowInsecureControlUi - include webchat
+// Line: const allowInsecureControlUi = isControlUi && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;
+const allowInsecurePattern = /const allowInsecureControlUi = isControlUi && configSnapshot\.gateway\?\.controlUi\?\.allowInsecureAuth === true;/g;
+const allowInsecureReplacement = 'const allowInsecureControlUi = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
+if (allowInsecurePattern.test(content)) {
+    content = content.replace(allowInsecurePattern, allowInsecureReplacement);
     modified = true;
-    console.log('  - Patched disableControlUiDeviceAuth');
+    console.log('  - Patched allowInsecureControlUi to include webchat');
 }
 
-// Patch allowInsecureControlUi to include webchat
-const oldAllow = 'const allowInsecureControlUi = isControlUi && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
-const newAllow = 'const allowInsecureControlUi = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.allowInsecureAuth === true;';
-if (content.includes(oldAllow)) {
-    content = content.replace(oldAllow, newAllow);
+// Patch 2: disableControlUiDeviceAuth - include webchat
+// Line: const disableControlUiDeviceAuth = isControlUi && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;
+const disableDevicePattern = /const disableControlUiDeviceAuth = isControlUi && configSnapshot\.gateway\?\.controlUi\?\.dangerouslyDisableDeviceAuth === true;/g;
+const disableDeviceReplacement = 'const disableControlUiDeviceAuth = (isControlUi || isWebchat) && configSnapshot.gateway?.controlUi?.dangerouslyDisableDeviceAuth === true;';
+if (disableDevicePattern.test(content)) {
+    content = content.replace(disableDevicePattern, disableDeviceReplacement);
     modified = true;
-    console.log('  - Patched allowInsecureControlUi');
+    console.log('  - Patched disableControlUiDeviceAuth to include webchat');
 }
 
-// Patch canSkipDevice to respect allowControlUiBypass
-const oldSkip = 'const canSkipDevice = sharedAuthOk;';
-const newSkip = 'const canSkipDevice = sharedAuthOk || allowControlUiBypass;';
-if (content.includes(oldSkip)) {
-    content = content.replace(oldSkip, newSkip);
+// Patch 3: canSkipDevice - allow bypass without sharedAuthOk
+// Line: const canSkipDevice = sharedAuthOk;
+const canSkipPattern = /const canSkipDevice = sharedAuthOk;/g;
+const canSkipReplacement = 'const canSkipDevice = sharedAuthOk || allowControlUiBypass;';
+if (canSkipPattern.test(content)) {
+    content = content.replace(canSkipPattern, canSkipReplacement);
     modified = true;
-    console.log('  - Patched canSkipDevice');
+    console.log('  - Patched canSkipDevice to allow ControlUi bypass');
 }
 
-// Patch token authentication to respect allowInsecureControlUi
-// When allowInsecureControlUi is true, skip token validation for webchat/control-ui
-const oldTokenCheck = 'if (validated.token !== expectedToken)';
-const newTokenCheck = 'if (!allowInsecureControlUi && validated.token !== expectedToken)';
-if (content.includes(oldTokenCheck)) {
-    content = content.replace(oldTokenCheck, newTokenCheck);
+// Patch 4: The HTTPS/localhost check for Control UI - include webchat
+// Line: if (isControlUi && !allowControlUiBypass) {
+const insecureCheckPattern = /if \(isControlUi && !allowControlUiBypass\) \{/g;
+const insecureCheckReplacement = 'if ((isControlUi || isWebchat) && !allowControlUiBypass) {';
+if (insecureCheckPattern.test(content)) {
+    content = content.replace(insecureCheckPattern, insecureCheckReplacement);
     modified = true;
-    console.log('  - Patched token authentication check');
-}
-
-// Alternative token check pattern (look for token validation)
-const oldTokenAuth = 'if (getAuthToken() !== expectedToken)';
-const newTokenAuth = 'if (!allowInsecureControlUi && getAuthToken() !== expectedToken)';
-if (content.includes(oldTokenAuth)) {
-    content = content.replace(oldTokenAuth, newTokenAuth);
-    modified = true;
-    console.log('  - Patched token auth check (alt)');
+    console.log('  - Patched HTTPS check to include webchat');
 }
 
 if (modified) {
     fs.writeFileSync(file, content);
     console.log('Gateway patched successfully');
 } else {
-    console.log('Gateway already patched or patterns not found');
+    console.log('Gateway already patched or patterns not found (this is OK if webchat works)');
 }
 NODE_SCRIPT_EOF
     node /tmp/patch-gateway.js
