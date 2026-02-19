@@ -216,16 +216,25 @@ if [ -n "$GATEWAY_CLI_FILE" ] && [ -f "$GATEWAY_CLI_FILE" ]; then
     echo "Patching OpenClaw gateway for webchat device auth bypass: $(basename $GATEWAY_CLI_FILE)..."
     cat > /tmp/patch-gateway.js << 'NODE_SCRIPT_EOF'
 const fs = require('fs');
-const glob = require('glob');
+const path = require('path');
 
 // Find the gateway file
-const files = glob.sync('/usr/local/lib/node_modules/openclaw/dist/gateway-cli-*.js');
-if (files.length === 0) {
-    console.log('No gateway-cli file found');
+const distDir = '/usr/local/lib/node_modules/openclaw/dist';
+let gatewayFile = null;
+try {
+    const files = fs.readdirSync(distDir);
+    gatewayFile = files.find(f => f.startsWith('gateway-cli-') && f.endsWith('.js'));
+    if (!gatewayFile) {
+        console.log('No gateway-cli file found in ' + distDir);
+        process.exit(0);
+    }
+    gatewayFile = path.join(distDir, gatewayFile);
+} catch (e) {
+    console.log('Error reading dist dir: ' + e.message);
     process.exit(0);
 }
 
-const file = files[0];
+const file = gatewayFile;
 let content = fs.readFileSync(file, 'utf8');
 let modified = false;
 
