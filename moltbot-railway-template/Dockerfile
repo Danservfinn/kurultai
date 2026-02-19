@@ -3,7 +3,7 @@
 # CACHE_BUST: 2026-02-18-v65 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v66-PATCHED
+ARG CACHE_BUST=2026-02-18-v67-FORCE
 
 FROM node:22-bookworm-slim
 
@@ -96,7 +96,7 @@ COPY --chown=1001:1001 scripts /app/scripts
 # COPY --chown=1001:1001 openclaw.json5 /app/openclaw.json5
 COPY --chown=1001:1001 openclaw.json /app/openclaw.json
 COPY --chown=1001:1001 entrypoint.sh /app/entrypoint.sh
-RUN echo "ENTRYPOINT_VERSION=2026-02-18-v66-PATCHED"
+RUN echo "ENTRYPOINT_VERSION=2026-02-18-v67-FORCE"
 COPY --chown=1001:1001 signal-cli-wrapper.sh /app/signal-cli-wrapper.sh
 COPY --chown=1001:1001 souls /app/souls
 
