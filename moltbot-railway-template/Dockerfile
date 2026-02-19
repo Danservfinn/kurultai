@@ -1,9 +1,9 @@
 # Moltbot Railway Template - OpenClaw Gateway with embedded Signal
 # Replaces Express gateway with full OpenClaw gateway including built-in webchat UI
-# CACHE_BUST: 2026-02-18-v65 - Force fresh build, cache bust at top
+# CACHE_BUST: 2026-02-19-v70 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-18-v68-WEBCHAT-FIX
+ARG CACHE_BUST=2026-02-19-v70-FORCE-DEPLOY
 
 FROM node:22-bookworm-slim
 
