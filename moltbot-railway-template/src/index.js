@@ -1372,7 +1372,7 @@ async function main() {
 
   // Handle WebSocket upgrade - proxy to OpenClaw on port 18790
   server.on('upgrade', (req, socket, head) => {
-    if (req.url === '/ws' || req.url.startsWith('/ws')) {
+    if (req.url === '/ws' || req.url.startsWith('/ws') || req.url === '/') {
       logger.info('Proxying WebSocket upgrade to OpenClaw', { url: req.url });
 
       const options = {
