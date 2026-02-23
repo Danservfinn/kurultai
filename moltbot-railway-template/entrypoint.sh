@@ -1,9 +1,9 @@
 #!/bin/sh
 # Moltbot entrypoint - runs migrations, extracts Signal data, then starts OpenClaw gateway
 # Runs as root initially to handle volume permissions, then drops to moltbot user
-# Version: 2026-02-19-v70-FORCE-DEPLOY
+# Version: 2026-02-23-v71-PORT-FIX
 
-echo "=== Entrypoint starting (version 2026-02-19-v70-FORCE-DEPLOY) ==="
+echo "=== Entrypoint starting (version 2026-02-23-v71-PORT-FIX) ==="
 
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 
@@ -279,7 +279,7 @@ fi
 # =============================================================================
 # START OPENCLAW GATEWAY
 # =============================================================================
-OPENCLAW_INTERNAL_PORT=18790
+OPENCLAW_INTERNAL_PORT=18789
 echo "Starting OpenClaw Gateway on internal port ${OPENCLAW_INTERNAL_PORT}..."
 
 OPENCLAW_BIN=$(which openclaw 2>/dev/null || echo "/usr/local/bin/openclaw")

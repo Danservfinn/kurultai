@@ -1,7 +1,7 @@
 /**
  * Moltbot Railway Template - Gateway Entry Point
  * OpenClaw Gateway with embedded Signal integration
- * Version: 2026-02-18-v58 - WebSocket URL rewrite fix
+ * Version: 2026-02-23-v71 - Port 18789 fix
  */
 
 const express = require('express');
@@ -987,12 +987,12 @@ function rewriteWebSocketUrls(content) {
 function proxyWebchatWithRewrite(req, res, path = '/') {
   const options = {
     hostname: 'localhost',
-    port: 18790,
+    port: 18789,
     path: path,
     method: 'GET',
     headers: {
       ...req.headers,
-      host: 'localhost:18790'
+      host: 'localhost:18789'
     }
   };
 
@@ -1046,7 +1046,7 @@ function proxyWebchatWithRewrite(req, res, path = '/') {
 }
 
 app.get('/webchat', (req, res) => {
-  // Proxy to OpenClaw webchat on internal port 18790
+  // Proxy to OpenClaw webchat on internal port 18789
   // (Express uses PORT=18789 for Railway routing)
   // Rewrite WebSocket URLs from private IPs to public URL
   proxyWebchatWithRewrite(req, res, '/');
@@ -1059,12 +1059,12 @@ app.use('/webchat/assets', (req, res) => {
 
   const options = {
     hostname: 'localhost',
-    port: 18790,
+    port: 18789,
     path: assetPath,
     method: req.method,
     headers: {
       ...req.headers,
-      host: 'localhost:18790'
+      host: 'localhost:18789'
     }
   };
 
@@ -1177,12 +1177,12 @@ app.use('/assets', (req, res) => {
 
   const options = {
     hostname: 'localhost',
-    port: 18790,
+    port: 18789,
     path: assetPath,
     method: 'GET',
     headers: {
       ...req.headers,
-      host: 'localhost:18790'
+      host: 'localhost:18789'
     }
   };
 
@@ -1370,14 +1370,14 @@ async function main() {
   // Start HTTP server first (before Discord init to pass health checks)
   const server = http.createServer(app);
 
-  // Handle WebSocket upgrade - proxy to OpenClaw on port 18790
+  // Handle WebSocket upgrade - proxy to OpenClaw on port 18789
   server.on('upgrade', (req, socket, head) => {
     if (req.url === '/ws' || req.url.startsWith('/ws') || req.url === '/') {
       logger.info('Proxying WebSocket upgrade to OpenClaw', { url: req.url });
 
       const options = {
         hostname: 'localhost',
-        port: 18790,
+        port: 18789,
         path: req.url,
         method: req.method,
         headers: req.headers

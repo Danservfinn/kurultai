@@ -3,7 +3,7 @@
 # CACHE_BUST: 2026-02-19-v70 - Force fresh build, cache bust at top
 
 # Cache-bust arg - MUST be at top to invalidate layers below
-ARG CACHE_BUST=2026-02-19-v70-FORCE-DEPLOY
+ARG CACHE_BUST=2026-02-23-v71-PORT-FIX
 
 FROM node:22-bookworm-slim
 
@@ -144,9 +144,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
 
 EXPOSE 18789
 
-# Railway strips Docker CMD — ENTRYPOINT [] ensures CMD is preserved
-ENTRYPOINT []
-CMD ["sh", "/app/entrypoint.sh"]
+# Use ENTRYPOINT to ensure entrypoint.sh always runs
+ENTRYPOINT ["/app/entrypoint.sh"]
 # Build timestamp: Sat Feb  7 23:00:00 EST 2026
 # Cache-bust: v3 - Force rebuild with Express server files
 
