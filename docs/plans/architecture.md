@@ -587,6 +587,412 @@ PORT=18789
 
 ---
 
+## OpenClaw Infrastructure (Mac Mini)
+
+> **CRITICAL PRINCIPLE:** OpenClaw runs exclusively from the Mac Mini (kublai.local). It must never run from the MacBook Pro or any other development machine.
+
+### Rationale
+
+The decision to centralize OpenClaw on the Mac Mini addresses several operational requirements:
+
+1. **Dedicated Infrastructure**: The Mac Mini provides always-on, low-power compute suitable for hosting persistent services
+2. **Network Stability**: Static Tailscale IP (100.69.84.64) and stable LAN presence
+3. **Separation of Concerns**: Development work (MacBook Pro) is separated from production infrastructure (Mac Mini)
+4. **Service Continuity**: LaunchAgent auto-start ensures services resume after reboots
+5. **Cloudflare Tunnel**: Provides secure public access without exposing the local network
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              PUBLIC INTERNET                                │
+│                                                                             │
+│  User Request ──▶ https://kublai.kurult.ai ──▶ Cloudflare Edge            │
+│                                                        │                    │
+└────────────────────────────────────────────────────────┼────────────────────┘
+                                                         │
+                                    Cloudflare Tunnel (cloudflared)
+                                                         │
+┌────────────────────────────────────────────────────────┼────────────────────┐
+│                      MAC MINI (kublai.local)           │                    │
+│                                                        ▼                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     CLOUDFLARED DAEMON                              │   │
+│  │  ┌─────────────────┐    ┌─────────────────────────────────────────┐ │   │
+│  │  │   Tunnel ID     │    │  Ingress Rules                          │ │   │
+│  │  │   dece3379-...  │───▶│  kublai.kurult.ai ──▶ localhost:18789  │ │   │
+│  │  └─────────────────┘    └─────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     OPENCLAW GATEWAY                                │   │
+│  │                         Port 18789                                  │   │
+│  │  ┌───────────────────────────────────────────────────────────────┐  │   │
+│  │  │  Features:                                                    │  │   │
+│  │  │  • WebSocket agent messaging                                  │  │   │
+│  │  │  • Control UI at /health (webchat)                            │  │   │
+│  │  │  • Token-based authentication                                 │  │   │
+│  │  │  • Google Gemini 3.1 Pro (OAuth)                              │  │   │
+│  │  └───────────────────────────────────────────────────────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     AGENT WORKSPACE                                 │   │
+│  │  ~/.openclaw/agents/main/                                           │   │
+│  │  ├─ agent/SOUL.md (agent persona)                                   │   │
+│  │  ├─ agent/auth.json (Google OAuth credentials)                      │   │
+│  │  └─ workspace/ (agent working directory)                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Hardware Specifications
+
+- **Host**: kublai.local
+- **Network**: Tailscale (100.69.84.64) + LAN (192.168.x.x)
+- **OS**: macOS (Darwin)
+- **User**: kublai (UID 501)
+
+### Software Stack
+
+| Component | Version | Location |
+|-----------|---------|----------|
+| Node.js | v22.14.0 | `~/local/bin/node` |
+| OpenClaw | v2026.2.23 | `~/local/lib/node_modules/openclaw/` |
+| Cloudflared | Latest | `/opt/homebrew/bin/cloudflared` |
+
+### Configuration Files
+
+#### OpenClaw Configuration (`~/.openclaw/openclaw.json`)
+
+```json
+{
+  "env": { "shellEnv": { "enabled": false } },
+  "logging": {
+    "file": "/Users/kublai/.openclaw/logs/openclaw.log",
+    "consoleLevel": "debug"
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google-gemini-cli/gemini-3.1-pro-preview-customtools"
+      },
+      "skipBootstrap": true,
+      "bootstrapMaxChars": 50000,
+      "compaction": { "mode": "safeguard" }
+    },
+    "list": [
+      {
+        "id": "main",
+        "name": "Kublai",
+        "workspace": "/Users/kublai/.openclaw/agents/main",
+        "model": "google-gemini-cli/gemini-3.1-pro-preview-customtools"
+      }
+    ]
+  },
+  "tools": { "deny": ["gateway"] },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "config": false,
+    "restart": false
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "lan",
+    "controlUi": {
+      "enabled": true,
+      "allowInsecureAuth": true,
+      "dangerouslyDisableDeviceAuth": true,
+      "allowedOrigins": [
+        "http://localhost:18789",
+        "https://kublai.kurult.ai"
+      ]
+    },
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "trustedProxies": [
+      "127.0.0.1",
+      "100.64.0.1", "100.64.0.2", "100.64.0.3",
+      "100.64.0.4", "100.64.0.5", "100.64.0.6",
+      "100.64.0.7", "100.64.0.8", "100.64.0.9",
+      "100.64.0.10"
+    ]
+  },
+  "plugins": {
+    "allow": ["google-gemini-cli-auth"],
+    "entries": {
+      "google-gemini-cli-auth": { "enabled": true }
+    }
+  }
+}
+```
+
+**Key Configuration Notes:**
+- `bind: "lan"` allows access from the local network (including Tailscale)
+- `dangerouslyDisableDeviceAuth: true` bypasses device pairing for operator role
+- `allowedOrigins` explicitly lists permitted CORS origins for the Control UI
+- `trustedProxies` includes Tailscale's 100.64.0.0/10 range for proxy header trust
+- Model uses `google-gemini-cli/` prefix (OAuth flow) not built-in `google/` provider
+
+#### Google OAuth Configuration (`~/.openclaw/agents/main/agent/auth.json`)
+
+```json
+{
+  "google-gemini-cli": {
+    "type": "oauth",
+    "access": "ya29.a0ATkoCc...",
+    "refresh": "1//01F_0aksOUf...",
+    "expires": 1771944999792,
+    "email": "d@kurult.ai",
+    "projectId": "lunar-rhino-wj8c5"
+  }
+}
+```
+
+**OAuth Setup:**
+- Provider: `google-gemini-cli` (separate from built-in OpenClaw Google provider)
+- Requires browser-based OAuth flow via OpenClaw CLI
+- Credentials stored per-agent in `auth.json`
+- Token auto-refresh handled by OpenClaw
+
+#### Cloudflared Configuration (`~/.cloudflared/config.yml`)
+
+```yaml
+tunnel: dece3379-b569-49f1-b4d6-a3be767f992a
+credentials-file: /Users/kublai/.cloudflared/dece3379-b569-49f1-b4d6-a3be767f992a.json
+
+ingress:
+  - hostname: kublai.kurult.ai
+    service: http://localhost:18789
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404
+```
+
+### LaunchAgent Service Definitions
+
+#### OpenClaw LaunchAgent (`~/Library/LaunchAgents/com.openclaw.gateway.plist`)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.openclaw.gateway</string>
+    <key>Comment</key>
+    <string>OpenClaw Gateway (Mac Mini)</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Users/kublai/local/bin/node</string>
+      <string>/Users/kublai/local/lib/node_modules/openclaw/openclaw.mjs</string>
+      <string>gateway</string>
+      <string>--bind</string>
+      <string>lan</string>
+      <string>--port</string>
+      <string>18789</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/kublai</string>
+    <key>StandardOutPath</key>
+    <string>/Users/kublai/.openclaw/logs/gateway.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/kublai/.openclaw/logs/gateway.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOME</key>
+      <string>/Users/kublai</string>
+      <key>PATH</key>
+      <string>/Users/kublai/local/bin:/usr/local/bin:/usr/bin:/bin</string>
+      <key>OPENCLAW_GATEWAY_TOKEN</key>
+      <string>***</string>
+    </dict>
+  </dict>
+</plist>
+```
+
+**Critical Implementation Detail:**
+The ProgramArguments uses the direct path to node and the openclaw.mjs script (not the wrapper). This is required because the shebang (`#!/usr/bin/env node`) fails in launchd context when node is not in the standard system PATH.
+
+#### Cloudflared LaunchAgent (`~/Library/LaunchAgents/com.cloudflared.kublai.plist`)
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.cloudflared.kublai</string>
+    <key>Comment</key>
+    <string>Cloudflared Tunnel for kublai.kurult.ai</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/opt/homebrew/bin/cloudflared</string>
+      <string>tunnel</string>
+      <string>run</string>
+      <string>kublai-mac-mini</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/kublai</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOME</key>
+      <string>/Users/kublai</string>
+      <key>PATH</key>
+      <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+  </dict>
+</plist>
+```
+
+### Service Management Commands
+
+#### OpenClaw
+
+```bash
+# Check status
+launchctl list | grep openclaw
+
+# Stop service
+launchctl stop com.openclaw.gateway
+
+# Start service
+launchctl start com.openclaw.gateway
+
+# Restart service
+launchctl stop com.openclaw.gateway && launchctl start com.openclaw.gateway
+
+# View logs
+tail -f ~/.openclaw/logs/gateway.log
+tail -f ~/.openclaw/logs/gateway.err.log
+
+# Manual test (bypass LaunchAgent)
+/Users/kublai/local/bin/node \
+  /Users/kublai/local/lib/node_modules/openclaw/openclaw.mjs \
+  gateway --bind lan --port 18789
+```
+
+#### Cloudflared
+
+```bash
+# Check status
+launchctl list | grep cloudflared
+
+# Stop tunnel
+launchctl stop com.cloudflared.kublai
+
+# Start tunnel
+launchctl start com.cloudflared.kublai
+
+# Test tunnel manually
+cloudflared tunnel run kublai-mac-mini
+```
+
+#### Health Verification
+
+```bash
+# Local health check
+curl http://localhost:18789/health
+
+# External health check
+curl https://kublai.kurult.ai/health
+
+# Full status check
+ssh kublai@100.69.84.64 '
+  echo "=== OpenClaw ===" && \
+  launchctl list | grep openclaw && \
+  echo "" && \
+  echo "=== Cloudflared ===" && \
+  launchctl list | grep cloudflared && \
+  echo "" && \
+  echo "=== Port Binding ===" && \
+  lsof -i :18789 | head -3
+'
+```
+
+### Network Architecture
+
+#### Traffic Flow
+
+1. **Public Request**: `https://kublai.kurult.ai`
+2. **Cloudflare Edge**: TLS termination, DDoS protection
+3. **Cloudflared Tunnel**: Authenticated connection to Mac Mini
+4. **Local HTTP**: `http://localhost:18789` (inside tunnel)
+5. **OpenClaw Gateway**: Request handling, agent routing
+
+#### Security Boundaries
+
+| Layer | Security Measure |
+|-------|------------------|
+| Public Internet | Cloudflare proxy, TLS 1.3 |
+| Tunnel | Cloudflared authenticated tunnel |
+| Local Network | Tailscale encryption (optional direct access) |
+| Gateway | Token-based auth, CORS restrictions |
+| Agent | OAuth token storage (per-agent) |
+
+### Model Configuration
+
+Current working configuration:
+- **Model**: `google-gemini-cli/gemini-3.1-pro-preview-customtools`
+- **Provider**: Google Gemini via OAuth (google-gemini-cli-auth plugin)
+- **Auth**: OAuth 2.0 flow completed, refresh token stored
+
+**Important**: The `google-gemini-cli/` prefix uses a separate OAuth-based provider distinct from the built-in `google/` provider. It requires explicit OAuth setup via `openclaw auth login google-gemini-cli`.
+
+### Troubleshooting Guide
+
+#### "pairing required" Error
+
+**Cause**: Device identity mismatch when `dangerouslyDisableDeviceAuth` is not enabled or proxy is untrusted.
+
+**Solution**: Ensure `trustedProxies` includes the actual client IP (not CIDR notation - OpenClaw does string matching, not CIDR matching).
+
+#### "Gateway failed to start: non-loopback Control UI requires gateway.controlUi.allowedOrigins"
+
+**Cause**: Missing `allowedOrigins` in `gateway.controlUi` configuration.
+
+**Solution**: Add explicit origins as shown in configuration above.
+
+#### "env: node: No such file or directory"
+
+**Cause**: LaunchAgent using shebang but node is in `~/local/bin/` not system PATH.
+
+**Solution**: Use explicit node path in ProgramArguments.
+
+#### "No API key found for provider"
+
+**Cause**: Auth file missing or incorrect provider name.
+
+**Solution**: Verify `~/.openclaw/agents/main/agent/auth.json` exists and uses correct provider key (`google-gemini-cli` not `google`).
+
+### Backup Requirements
+
+Essential files to backup:
+- `~/.openclaw/openclaw.json` - Main configuration
+- `~/.openclaw/agents/main/agent/auth.json` - OAuth credentials
+- `~/.cloudflared/dece3379-b569-49f1-b4d6-a3be767f992a.json` - Tunnel credentials
+- `~/.cloudflared/config.yml` - Tunnel configuration
+- `~/Library/LaunchAgents/com.openclaw.gateway.plist` - Service definition
+
+---
+
 **Document Status**: v2.0 Architecture
-**Last Updated**: 2026-02-06
+**Last Updated**: 2026-02-24
 **Maintainer**: Kurultai System Architecture
