@@ -30,9 +30,11 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │  HOURLY CYCLE (Every 60 minutes)                        │   │
+│  │  HOURLY CYCLE (Every 60 minutes - ONE AGENT ONLY)      │   │
 │  │                                                          │   │
 │  │  1. TRIGGER → Heartbeat fires reflection task          │   │
+│  │       • Rotate: 1 of 6 agents selected per hour        │   │
+│  │       • Sequence: Kublai → Möngke → Temüjin → ...      │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
 │  │  2. GATHER CONTEXT → Query ENTIRE Neo4j database       │   │
@@ -54,35 +56,47 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 │  │       • Propose pruning candidates                     │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  4. REFLECT → Gemini CLI (context-rich prompt)         │   │
-│  │       Agent: "Based on ALL my knowledge..."            │   │
+│  │  4. REFLECT → Agent's Gemini CLI                       │   │
+│  │       Agent expresses:                                 │   │
+│  │       • WANTS: "I want to be better at..."             │   │
+│  │       • DESIRES: "I wish I could..."                   │   │
+│  │       • PROPOSALS: "I propose we..."                   │   │
 │  │       Model: gemini-3.1-pro-preview                    │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  5. PROPOSE → Improvement with confidence score        │   │
+│  │  5. STORE → Save reflection to Neo4j                   │   │
+│  │       • Raw reflection text                            │   │
+│  │       • Structured wants/desires/proposals             │   │
+│  │       • Priority/confidence scores                     │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  6. SAFETY CHECK → Guardian validates                  │   │
-│  │       • Scope allowed?                                 │   │
-│  │       • Goal aligned?                                  │   │
-│  │       • Can rollback?                                  │   │
-│  │       • Sandbox passed?                                │   │
+│  │  6. KUBLAI REVIEW → Kublai's Gemini CLI                │   │
+│  │       • Query: "Should I approve this proposal?"       │   │
+│  │       • Consider: Impact, alignment, risk              │   │
+│  │       • Output: Approve / Reject / Human consult       │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  7. IMPLEMENT → If approved (low risk)                 │   │
+│  │  7. DECISION GATE → Route based on criticality         │   │
+│  │       • LOW risk → Auto-implement                      │   │
+│  │       • MEDIUM risk → Kublai decides                   │   │
+│  │       • HIGH risk / CRITICAL → Consult human           │   │
+│  │       │                                                  │   │
+│  │       ▼                                                  │   │
+│  │  8. IMPLEMENT → If approved                            │   │
 │  │       • Apply code improvements                        │   │
-│  │       • Execute memory pruning (if approved)           │   │
+│  │       • Execute memory pruning                         │   │
+│  │       • Update configurations                          │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  8. VALIDATE → Measure for 24 hours                    │   │
+│  │  9. VALIDATE → Measure for 24 hours                    │   │
 │  │       • Baseline comparison                            │   │
-│  │       • Metric tracking                                │   │
+│  │       • Track metrics                                  │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  9. DECIDE → Keep, iterate, or rollback                │   │
-│  │       • Success: Commit + propagate                    │   │
+│  │  10. DECIDE → Keep, iterate, or rollback               │   │
+│  │       • Success: Commit + document                     │   │
 │  │       • Failure: Auto-rollback                         │   │
-│  │       • Unclear: Human review                          │   │
+│  │       • Feedback to proposing agent                    │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
@@ -114,9 +128,795 @@ Each with **dedicated Gemini 3.1 Pro Preview CLI** and **isolated knowledge cont
 
 ---
 
-## IMPLEMENTATION: PHASE 1 (TODAY)
+## STEP 2: AGENT REFLECTION MODULE (Updated)
 
-### Step 1: Neo4j Schema (15 minutes)
+**File:** `tools/kurultai/agent_reflection.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Agent Reflection System
+ONE agent per hour expresses wants, desires, and proposals
+Kublai reviews and decides using Gemini CLI
+"""
+
+import os
+import json
+import time
+import hashlib
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, field
+from enum import Enum
+
+from neo4j import GraphDatabase
+from tools.kurultai.agent_gemini import get_agent_gemini, kublai_gemini
+
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'myStrongPassword123')
+
+# Agent rotation schedule (one per hour)
+AGENT_ROTATION = [
+    "kublai",    # Hour 0, 6, 12, 18
+    "mongke",    # Hour 1, 7, 13, 19
+    "temujin",   # Hour 2, 8, 14, 20
+    "chagatai",  # Hour 3, 9, 15, 21
+    "jochi",     # Hour 4, 10, 16, 22
+    "ogedei"     # Hour 5, 11, 17, 23
+]
+
+
+@dataclass
+class AgentReflection:
+    """Structured reflection from an agent."""
+    agent_id: str
+    timestamp: datetime
+    raw_reflection: str
+    wants: List[str] = field(default_factory=list)
+    desires: List[str] = field(default_factory=list)
+    proposals: List[Dict[str, Any]] = field(default_factory=list)
+    memory_pruning_suggestions: List[str] = field(default_factory=list)
+    confidence_score: float = 0.5
+    priority: str = "medium"  # low, medium, high, critical
+
+
+class AgentReflectionSystem:
+    """System for one agent per hour to reflect and propose."""
+    
+    def __init__(self):
+        self.driver = GraphDatabase.driver(
+            NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD)
+        )
+    
+    def get_current_reflector(self) -> str:
+        """Get which agent should reflect this hour (round-robin)."""
+        hour = datetime.now().hour
+        # Each agent gets 4 slots per day (24h / 6 agents)
+        agent_index = hour % 6
+        return AGENT_ROTATION[agent_index]
+    
+    def gather_full_context(self, agent_id: str) -> Dict[str, Any]:
+        """
+        Query ENTIRE Neo4j database for complete context.
+        """
+        context = {
+            "timestamp": datetime.now().isoformat(),
+            "reflecting_agent": agent_id,
+            "query_time_range": "complete_database"
+        }
+        
+        with self.driver.session() as session:
+            # 1. All agents and their status
+            result = session.run("""
+                MATCH (a:Agent)
+                RETURN a.name as name, a.status as status, a.role as role
+            """)
+            context["all_agents"] = [dict(r) for r in result]
+            
+            # 2. All tasks (recent and historical)
+            result = session.run("""
+                MATCH (t:Task)
+                RETURN t.id as id, t.agent as agent, t.status as status,
+                       t.timestamp as timestamp, t.type as type
+                ORDER BY t.timestamp DESC LIMIT 100
+            """)
+            context["recent_tasks"] = [dict(r) for r in result]
+            
+            # 3. All task outcomes (performance data)
+            result = session.run("""
+                MATCH (to:TaskOutcome)
+                WHERE to.timestamp > datetime() - duration('P7D')
+                RETURN to.agent as agent, to.status as status,
+                       to.timestamp as timestamp, to.tokens_used as tokens
+                ORDER BY to.timestamp DESC LIMIT 200
+            """)
+            context["task_outcomes"] = [dict(r) for r in result]
+            
+            # 4. All previous reflections
+            result = session.run("""
+                MATCH (r:Reflection)
+                RETURN r.agent as agent, r.timestamp as timestamp,
+                       r.key_observation as observation, r.proposed_change as proposal
+                ORDER BY r.timestamp DESC LIMIT 50
+            """)
+            context["previous_reflections"] = [dict(r) for r in result]
+            
+            # 5. Discovered patterns
+            result = session.run("""
+                MATCH (p:Pattern)
+                RETURN p.description as pattern, p.agent as agent,
+                       p.confidence as confidence, p.frequency as freq
+                ORDER BY p.confidence DESC
+            """)
+            context["patterns"] = [dict(r) for r in result]
+            
+            # 6. Learned capabilities
+            result = session.run("""
+                MATCH (lc:LearnedCapability)
+                RETURN lc.name as name, lc.description as desc,
+                       lc.learned_by as learned_by, lc.usage_count as usage
+            """)
+            context["capabilities"] = [dict(r) for r in result]
+            
+            # 7. User-fed information (tagged)
+            result = session.run("""
+                MATCH (n)
+                WHERE n.source = 'user_fed' OR n.tags CONTAINS 'user_input'
+                RETURN n.timestamp as timestamp, n.content as content,
+                       labels(n) as labels
+                ORDER BY n.timestamp DESC LIMIT 20
+            """)
+            context["user_fed_information"] = [dict(r) for r in result]
+            
+            # 8. Architecture knowledge
+            result = session.run("""
+                MATCH (s:ArchitectureSection)
+                RETURN s.title as title, s.content as content
+            """)
+            context["architecture"] = [dict(r) for r in result]
+            
+            # 9. Graph statistics
+            result = session.run("""
+                CALL apoc.meta.stats()
+                YIELD nodeCount, relCount, labels
+                RETURN nodeCount, relCount, labels
+            """)
+            stats = result.single()
+            context["graph_stats"] = {
+                "node_count": stats["nodeCount"],
+                "relationship_count": stats["relCount"],
+                "labels": stats["labels"]
+            }
+            
+            # 10. Cross-agent interactions
+            result = session.run("""
+                MATCH (a1:Agent)-[r:DELEGATED_TO|SHARED_WITH]-(a2:Agent)
+                RETURN a1.name as from_agent, type(r) as relation,
+                       a2.name as to_agent, count(*) as count
+            """)
+            context["agent_interactions"] = [dict(r) for r in result]
+        
+        return context
+    
+    def check_memory_files(self, agent_id: str) -> List[Dict[str, Any]]:
+        """
+        Analyze agent's memory files for pruning candidates.
+        """
+        import os
+        from pathlib import Path
+        
+        memory_dir = Path(f"~/.openclaw/agents/{agent_id}/memory").expanduser()
+        if not memory_dir.exists():
+            return []
+        
+        pruning_candidates = []
+        
+        for file_path in memory_dir.glob("*.md"):
+            stat = file_path.stat()
+            size_mb = stat.st_size / (1024 * 1024)
+            age_days = (datetime.now().timestamp() - stat.st_mtime) / 86400
+            
+            # Flag for pruning if:
+            # - Larger than 10MB
+            # - Older than 90 days
+            # - Not accessed in 30 days
+            if size_mb > 10 or age_days > 90:
+                pruning_candidates.append({
+                    "file": str(file_path),
+                    "size_mb": round(size_mb, 2),
+                    "age_days": round(age_days, 1),
+                    "reason": "large_file" if size_mb > 10 else "old_file"
+                })
+        
+        return pruning_candidates
+    
+    def perform_agent_reflection(self, agent_id: str) -> AgentReflection:
+        """
+        ONE agent reflects, expressing wants, desires, and proposals.
+        """
+        # Get agent's Gemini instance
+        agent_gemini = get_agent_gemini(agent_id)
+        
+        # Gather complete context
+        context = self.gather_full_context(agent_id)
+        
+        # Check memory files for pruning
+        memory_issues = self.check_memory_files(agent_id)
+        
+        # Build expressive prompt
+        prompt = f"""
+=== YOUR IDENTITY ===
+You are {agent_id}, an AI agent in the Kurultai system.
+Your role: {context.get('reflecting_agent', 'specialist agent')}
+
+=== COMPLETE SYSTEM KNOWLEDGE (from Neo4j) ===
+
+Graph Statistics:
+- Total Nodes: {context['graph_stats']['node_count']}
+- Total Relationships: {context['graph_stats']['relationship_count']}
+- Node Types: {list(context['graph_stats']['labels'].keys())}
+
+All Agents in System:
+{json.dumps(context['all_agents'], indent=2)}
+
+Your Recent Performance (Last 7 Days):
+{json.dumps([o for o in context['task_outcomes'] if o['agent'] == agent_id][:10], indent=2)}
+
+Previous Reflections (What you've learned):
+{json.dumps([r for r in context['previous_reflections'] if r['agent'] == agent_id][:5], indent=2)}
+
+Successful Patterns You've Discovered:
+{json.dumps([p for p in context['patterns'] if p['agent'] == agent_id][:5], indent=2)}
+
+Cross-Agent Activity:
+{json.dumps(context['agent_interactions'], indent=2)}
+
+User-Fed Information (Priority):
+{json.dumps(context['user_fed_information'][:5], indent=2)}
+
+Memory Files Requiring Attention:
+{json.dumps(memory_issues, indent=2)}
+
+=== YOUR REFLECTION TASK ===
+
+It is your turn to reflect. Express yourself authentically:
+
+1. WANTS (What do you want to improve?)
+   - "I want to be better at..."
+   - "I want more/less of..."
+   - "I want the system to..."
+
+2. DESIRES (What do you wish for?)
+   - "I wish I could..."
+   - "I wish the team would..."
+   - "I wish our users had..."
+
+3. PROPOSALS (Concrete changes you suggest)
+   - Specific, actionable improvements
+   - Include: what, why, expected impact
+   - Rate confidence (0.0-1.0) and priority (low/medium/high/critical)
+
+4. MEMORY PRUNING (if needed)
+   - Identify stale/outdated memory entries
+   - Suggest what to archive or delete
+
+Be honest about frustrations, aspirations, and observations.
+Your reflection will be reviewed by Kublai for possible implementation.
+
+Format your response as:
+WANTS:
+- ...
+
+DESIRES:
+- ...
+
+PROPOSALS:
+1. [Description] | Confidence: X.X | Priority: Y
+
+MEMORY_PRUNING:
+- File X because...
+"""
+        
+        # Query agent's Gemini
+        reflection_text = agent_gemini.query(prompt)
+        
+        # Parse structured data from reflection
+        parsed = self._parse_reflection(reflection_text)
+        
+        reflection = AgentReflection(
+            agent_id=agent_id,
+            timestamp=datetime.now(),
+            raw_reflection=reflection_text,
+            wants=parsed.get('wants', []),
+            desires=parsed.get('desires', []),
+            proposals=parsed.get('proposals', []),
+            memory_pruning_suggestions=parsed.get('memory_pruning', []),
+            confidence_score=parsed.get('avg_confidence', 0.5),
+            priority=parsed.get('highest_priority', 'medium')
+        )
+        
+        # Store in Neo4j
+        self._store_reflection(reflection)
+        
+        return reflection
+    
+    def _parse_reflection(self, text: str) -> Dict[str, Any]:
+        """Parse structured data from agent's reflection text."""
+        lines = text.split('\n')
+        
+        parsed = {
+            'wants': [],
+            'desires': [],
+            'proposals': [],
+            'memory_pruning': [],
+            'avg_confidence': 0.5,
+            'highest_priority': 'medium'
+        }
+        
+        current_section = None
+        confidences = []
+        priorities = []
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('WANTS:') or line.startswith('### WANTS'):
+                current_section = 'wants'
+            elif line.startswith('DESIRES:') or line.startswith('### DESIRES'):
+                current_section = 'desires'
+            elif line.startswith('PROPOSALS:') or line.startswith('### PROPOSALS'):
+                current_section = 'proposals'
+            elif line.startswith('MEMORY_PRUNING:') or line.startswith('### MEMORY'):
+                current_section = 'memory_pruning'
+            elif line.startswith('- ') and current_section:
+                content = line[2:]
+                if current_section == 'proposals':
+                    # Try to extract confidence and priority
+                    proposal = {'description': content}
+                    if 'Confidence:' in content:
+                        parts = content.split('|')
+                        proposal['description'] = parts[0].strip()
+                        for part in parts[1:]:
+                            if 'Confidence:' in part:
+                                try:
+                                    conf = float(part.split(':')[1].strip())
+                                    proposal['confidence'] = conf
+                                    confidences.append(conf)
+                                except:
+                                    pass
+                            if 'Priority:' in part:
+                                prio = part.split(':')[1].strip().lower()
+                                proposal['priority'] = prio
+                                priorities.append(prio)
+                    parsed['proposals'].append(proposal)
+                else:
+                    parsed[current_section].append(content)
+        
+        # Calculate aggregate scores
+        if confidences:
+            parsed['avg_confidence'] = sum(confidences) / len(confidences)
+        if priorities:
+            priority_order = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+            max_priority = max(priorities, key=lambda x: priority_order.get(x, 0))
+            parsed['highest_priority'] = max_priority
+        
+        return parsed
+    
+    def _store_reflection(self, reflection: AgentReflection):
+        """Store reflection in Neo4j."""
+        with self.driver.session() as session:
+            session.run("""
+                CREATE (r:AgentReflection {
+                    id: $id,
+                    agent: $agent,
+                    timestamp: datetime(),
+                    raw_text: $raw,
+                    wants: $wants,
+                    desires: $desires,
+                    proposals: $proposals,
+                    memory_pruning: $memory,
+                    confidence: $confidence,
+                    priority: $priority,
+                    reviewed: false,
+                    implemented: false
+                })
+            """,
+            id=f"{reflection.agent_id}-{int(time.time())}",
+            agent=reflection.agent_id,
+            raw=reflection.raw_reflection[:3000],
+            wants=json.dumps(reflection.wants),
+            desires=json.dumps(reflection.desires),
+            proposals=json.dumps(reflection.proposals),
+            memory=json.dumps(reflection.memory_pruning_suggestions),
+            confidence=reflection.confidence_score,
+            priority=reflection.priority
+            )
+    
+    def close(self):
+        self.driver.close()
+
+
+# Heartbeat task integration
+async def hourly_agent_reflection_task():
+    """
+    Heartbeat task: ONE agent reflects per hour.
+    """
+    system = AgentReflectionSystem()
+    try:
+        # Determine which agent reflects this hour
+        agent_id = system.get_current_reflector()
+        
+        # Perform reflection
+        reflection = system.perform_agent_reflection(agent_id)
+        
+        # Queue for Kublai review (next step)
+        # This would trigger Kublai's review task
+        
+        return {
+            "status": "success",
+            "reflecting_agent": agent_id,
+            "proposals_count": len(reflection.proposals),
+            "priority": reflection.priority,
+            "awaiting_kublai_review": True
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+    finally:
+        system.close()
+
+
+if __name__ == "__main__":
+    print("Testing Agent Reflection System...")
+    print(f"Current hour: {datetime.now().hour}")
+    print(f"Current reflector: {AgentReflectionSystem().get_current_reflector()}")
+```
+
+---
+
+## STEP 3: KUBLAI REVIEW MODULE
+
+**File:** `tools/kurultai/kublai_review.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Kublai Review System
+Kublai reviews agent reflections using Gemini CLI
+Decides: implement, reject, or consult human
+"""
+
+import os
+import json
+from datetime import datetime
+from typing import Dict, List, Any, Optional
+from enum import Enum
+from dataclasses import dataclass
+
+from neo4j import GraphDatabase
+from tools.kurultai.agent_gemini import kublai_gemini
+
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'myStrongPassword123')
+
+
+class ReviewDecision(Enum):
+    IMPLEMENT = "implement"           # Auto-implement (low risk)
+    REJECT = "reject"                 # Don't implement
+    CONSULT_HUMAN = "consult_human"   # Critical - needs human approval
+    DEFER = "defer"                   # Decide later, gather more data
+
+
+class KublaiReviewSystem:
+    """
+    Kublai reviews agent proposals and makes implementation decisions.
+    Uses Gemini CLI for intelligent evaluation.
+    """
+    
+    def __init__(self):
+        self.driver = GraphDatabase.driver(
+            NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD)
+        )
+        self.kublai = kublai_gemini()
+    
+    def get_pending_reflections(self) -> List[Dict[str, Any]]:
+        """Get all unreviewed agent reflections."""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (r:AgentReflection)
+                WHERE r.reviewed = false
+                RETURN r.id as id, r.agent as agent, r.raw_text as text,
+                       r.proposals as proposals, r.priority as priority,
+                       r.confidence as confidence, r.timestamp as timestamp
+                ORDER BY r.priority DESC, r.timestamp ASC
+            """)
+            return [dict(r) for r in result]
+    
+    def review_proposal(self, reflection_id: str) -> Dict[str, Any]:
+        """
+        Kublai reviews a single proposal using Gemini CLI.
+        """
+        # Get full reflection details
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (r:AgentReflection {id: $id})
+                RETURN r
+            """, id=reflection_id)
+            record = result.single()
+            if not record:
+                return {"error": "Reflection not found"}
+            
+            reflection = dict(record['r'])
+        
+        # Build review prompt for Kublai
+        prompt = f"""
+=== KUBLAI REVIEW TASK ===
+
+You are Kublai, Squad Lead of the Kurultai.
+Your role: Review proposals from your agents and decide their fate.
+
+=== PROPOSAL TO REVIEW ===
+
+From Agent: {reflection['agent']}
+Timestamp: {reflection['timestamp']}
+Priority: {reflection['priority']}
+Confidence: {reflection['confidence']}
+
+Raw Reflection:
+{reflection['raw_text'][:2000]}
+
+Parsed Proposals:
+{reflection['proposals']}
+
+=== YOUR REVIEW CRITERIA ===
+
+1. IMPACT: How much would this improve the system?
+   - Minimal (cosmetic, preference) → LOW impact
+   - Moderate (efficiency, quality) → MEDIUM impact
+   - Significant (capability, reliability) → HIGH impact
+
+2. RISK: What could go wrong?
+   - Isolated to one agent → LOW risk
+   - Affects multiple agents → MEDIUM risk
+   - System-wide or safety-critical → HIGH risk
+
+3. ALIGNMENT: Does this fit our mission?
+   - Advances agent capabilities → YES
+   - Improves human experience → YES
+   - Creates complexity without benefit → NO
+
+4. REVERSIBILITY: Can we undo this?
+   - Configuration change → YES
+   - Code modification with tests → YES
+   - Schema or architectural change → MAYBE
+
+=== DECISION OPTIONS ===
+
+A. IMPLEMENT - Approve and execute immediately
+   Use when: LOW risk, HIGH alignment, reversible
+
+B. REJECT - Do not implement
+   Use when: Misaligned, too risky, or not beneficial
+
+C. CONSULT_HUMAN - Critical decision needs human
+   Use when: HIGH risk, system-wide impact, safety concern
+   OR when: Uncertain about consequences
+
+D. DEFER - Decide later, gather more data
+   Use when: Interesting but needs more thought
+
+=== YOUR RESPONSE FORMAT ===
+
+DECISION: [IMPLEMENT | REJECT | CONSULT_HUMAN | DEFER]
+
+CONFIDENCE: [0.0-1.0]
+
+RATIONALE:
+- Impact assessment: ...
+- Risk assessment: ...
+- Alignment check: ...
+- Final reasoning: ...
+
+IMPLEMENTATION_NOTES (if applicable):
+- Steps to implement
+- Tests to run
+- Rollback plan
+
+HUMAN_CONTEXT (if CONSULT_HUMAN):
+- Why this needs your input
+- What decision is needed
+- What are the trade-offs
+"""
+        
+        # Query Kublai's Gemini
+        review_response = self.kublai.query(prompt)
+        
+        # Parse decision
+        decision = self._parse_decision(review_response)
+        
+        # Store review
+        self._store_review(reflection_id, decision, review_response)
+        
+        # Execute decision
+        if decision['decision'] == ReviewDecision.IMPLEMENT:
+            self._queue_implementation(reflection_id, decision)
+        elif decision['decision'] == ReviewDecision.CONSULT_HUMAN:
+            self._notify_human(reflection_id, decision)
+        
+        return decision
+    
+    def _parse_decision(self, response: str) -> Dict[str, Any]:
+        """Parse Kublai's review response."""
+        lines = response.split('\n')
+        
+        decision_data = {
+            'decision': ReviewDecision.DEFER,
+            'confidence': 0.5,
+            'rationale': '',
+            'implementation_notes': '',
+            'human_context': ''
+        }
+        
+        current_section = None
+        
+        for line in lines:
+            line = line.strip()
+            
+            if line.startswith('DECISION:'):
+                dec_text = line.split(':')[1].strip().upper()
+                if 'IMPLEMENT' in dec_text:
+                    decision_data['decision'] = ReviewDecision.IMPLEMENT
+                elif 'REJECT' in dec_text:
+                    decision_data['decision'] = ReviewDecision.REJECT
+                elif 'CONSULT' in dec_text or 'HUMAN' in dec_text:
+                    decision_data['decision'] = ReviewDecision.CONSULT_HUMAN
+                elif 'DEFER' in dec_text:
+                    decision_data['decision'] = ReviewDecision.DEFER
+            
+            elif line.startswith('CONFIDENCE:'):
+                try:
+                    conf = float(line.split(':')[1].strip())
+                    decision_data['confidence'] = max(0.0, min(1.0, conf))
+                except:
+                    pass
+            
+            elif line.startswith('RATIONALE:'):
+                current_section = 'rationale'
+            elif line.startswith('IMPLEMENTATION_NOTES:'):
+                current_section = 'implementation'
+            elif line.startswith('HUMAN_CONTEXT:'):
+                current_section = 'human'
+            elif current_section and line and not line.startswith('==='):
+                decision_data[current_section] += line + '\n'
+        
+        return decision_data
+    
+    def _store_review(self, reflection_id: str, decision: Dict, raw_response: str):
+        """Store review decision in Neo4j."""
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (r:AgentReflection {id: $ref_id})
+                CREATE (rev:Review {
+                    id: $rev_id,
+                    timestamp: datetime(),
+                    decision: $decision,
+                    confidence: $confidence,
+                    rationale: $rationale,
+                    raw_response: $raw
+                })
+                CREATE (r)-[:REVIEWED_BY]->(rev)
+                SET r.reviewed = true,
+                    r.review_decision = $decision
+            """,
+            ref_id=reflection_id,
+            rev_id=f"review-{reflection_id}-{int(datetime.now().timestamp())}",
+            decision=decision['decision'].value,
+            confidence=decision['confidence'],
+            rationale=decision['rationale'][:1000],
+            raw=raw_response[:2000]
+            )
+    
+    def _queue_implementation(self, reflection_id: str, decision: Dict):
+        """Queue proposal for implementation."""
+        # Add to implementation queue (for async processing)
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (r:AgentReflection {id: $id})
+                CREATE (imp:ImplementationQueue {
+                    id: $imp_id,
+                    queued_at: datetime(),
+                    status: 'pending',
+                    notes: $notes
+                })
+                CREATE (r)-[:QUEUED_FOR]->(imp)
+            """,
+            id=reflection_id,
+            imp_id=f"imp-{reflection_id}",
+            notes=decision.get('implementation_notes', '')[:500]
+            )
+    
+    def _notify_human(self, reflection_id: str, decision: Dict):
+        """Notify human for critical decision."""
+        # Signal notification to human
+        human_context = decision.get('human_context', 'Critical decision needed')
+        
+        # Store human notification
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (r:AgentReflection {id: $id})
+                CREATE (hn:HumanNotification {
+                    id: $notif_id,
+                    timestamp: datetime(),
+                    status: 'pending',
+                    context: $context,
+                    urgency: 'high'
+                })
+                CREATE (r)-[:AWAITS_HUMAN_DECISION]->(hn)
+            """,
+            id=reflection_id,
+            notif_id=f"human-{reflection_id}",
+            context=human_context[:1000]
+            )
+        
+        # TODO: Send Signal message to human
+        # This would integrate with your Signal channel
+        print(f"🚨 HUMAN CONSULTATION REQUIRED: {reflection_id}")
+        print(f"Context: {human_context[:200]}...")
+    
+    def process_all_pending(self) -> List[Dict[str, Any]]:
+        """Process all pending reflections."""
+        pending = self.get_pending_reflections()
+        results = []
+        
+        for reflection in pending:
+            decision = self.review_proposal(reflection['id'])
+            results.append({
+                'reflection_id': reflection['id'],
+                'agent': reflection['agent'],
+                'decision': decision['decision'].value,
+                'confidence': decision['confidence']
+            })
+        
+        return results
+    
+    def close(self):
+        self.driver.close()
+
+
+# Heartbeat integration
+async def kublai_review_task():
+    """
+    Heartbeat task: Kublai reviews pending agent reflections.
+    Runs after agent reflection task completes.
+    """
+    system = KublaiReviewSystem()
+    try:
+        results = system.process_all_pending()
+        
+        # Summary
+        implement_count = sum(1 for r in results if r['decision'] == 'implement')
+        consult_count = sum(1 for r in results if r['decision'] == 'consult_human')
+        
+        return {
+            "status": "success",
+            "reviewed_count": len(results),
+            "approved": implement_count,
+            "consult_human": consult_count,
+            "details": results
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+    finally:
+        system.close()
+
+
+if __name__ == "__main__":
+    print("Testing Kublai Review System...")
+    system = KublaiReviewSystem()
+    pending = system.get_pending_reflections()
+    print(f"Pending reflections: {len(pending)}")
+    system.close()
+```
 
 ```cypher
 // Run this in Neo4j Browser or via Python
