@@ -13,11 +13,12 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 
 | Traditional | Our System |
 |-------------|------------|
-| Generic logging | Context-rich, knowledge-aware reflections |
-| Manual analysis | Automated pattern detection |
+| Generic logging | Context-rich, **full Neo4j database query** |
+| Limited context | **Complete knowledge graph traversal** |
+| Manual analysis | Automated pattern detection + **memory pruning** |
+| Growing forever | **Self-pruning memory management** |
 | Hopeful improvements | Validated, measured, rollback-capable changes |
 | Isolated agents | Cross-pollination with adaptation |
-| Vague "learning" | Explicit meta-learning tracker |
 
 ---
 
@@ -791,6 +792,365 @@ tracker = BaselineTracker()
 
 ---
 
+### Step 4 (NEW): Full Neo4j Database Query Module (20 minutes)
+
+**File:** `tools/kurultai/neo4j_context_query.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Complete Neo4j Database Query for Reflection Context
+Queries ENTIRE database, not just specific sources
+"""
+
+import os
+from typing import Dict, List, Any
+from neo4j import GraphDatabase
+
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'myStrongPassword123')
+
+
+class Neo4jContextQuery:
+    """
+    Queries the ENTIRE Neo4j database for reflection context.
+    No data source is excluded - full knowledge access.
+    """
+    
+    def __init__(self):
+        self.driver = GraphDatabase.driver(
+            NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD)
+        )
+    
+    def query_all_nodes(self, agent_id: str = None) -> Dict[str, List[Dict]]:
+        """
+        Query ALL node types from Neo4j.
+        This is comprehensive - every piece of stored knowledge.
+        """
+        context = {}
+        
+        with self.driver.session() as session:
+            # Get all node labels in database
+            labels_result = session.run("""
+                CALL db.labels() YIELD label
+                RETURN collect(label) as labels
+            """)
+            labels = labels_result.single()['labels']
+            
+            # For each label, get recent nodes
+            for label in labels:
+                query = f"""
+                    MATCH (n:{label})
+                    """ + ("""WHERE n.agent = $agent OR n.learned_by = $agent OR n.created_by = $agent
+                    """ if agent_id else "") + f"""
+                    RETURN n LIMIT 50
+                """
+                
+                result = session.run(query, agent=agent_id) if agent_id else session.run(query)
+                nodes = [dict(record['n'].items()) for record in result]
+                
+                if nodes:
+                    context[label] = nodes
+        
+        return context
+    
+    def query_relationships(self, agent_id: str = None) -> List[Dict]:
+        """Query all relationship types and their connections."""
+        
+        with self.driver.session() as session:
+            query = """
+                MATCH (a)-[r]->(b)
+            """ + ("WHERE a.agent = $agent OR b.agent = $agent" if agent_id else "") + """
+                RETURN type(r) as rel_type, 
+                       labels(a)[0] as from_label, 
+                       labels(b)[0] as to_label,
+                       count(*) as count
+                LIMIT 100
+            """
+            
+            result = session.run(query, agent=agent_id) if agent_id else session.run(query)
+            return [dict(r) for r in result]
+    
+    def query_user_fed_information(self, agent_id: str = None) -> List[Dict]:
+        """
+        Query information specifically fed by user.
+        These are high-value insights provided directly.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (n)
+                WHERE n.source = 'user_fed' 
+                   OR n.user_provided = true
+                   OR n.feed_type IS NOT NULL
+                """ + ("AND (n.agent = $agent OR n.target_agent = $agent)" if agent_id else "") + """
+                RETURN n ORDER BY n.timestamp DESC LIMIT 20
+            """, agent=agent_id)
+            
+            return [dict(record['n'].items()) for record in result]
+    
+    def get_complete_reflection_context(self, agent_id: str) -> Dict[str, Any]:
+        """
+        Get COMPLETE context from Neo4j for reflection.
+        This includes EVERYTHING - no data source excluded.
+        """
+        return {
+            'all_nodes_by_type': self.query_all_nodes(agent_id),
+            'relationship_patterns': self.query_relationships(agent_id),
+            'user_fed_insights': self.query_user_fed_information(agent_id),
+            'database_summary': self._get_database_summary(),
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def _get_database_summary(self) -> Dict[str, int]:
+        """Get counts of all node types."""
+        with self.driver.session() as session:
+            result = session.run("""
+                CALL apoc.meta.stats() YIELD labels
+                RETURN labels
+            """)
+            record = result.single()
+            return record['labels'] if record else {}
+    
+    def close(self):
+        self.driver.close()
+
+
+# Usage in reflection:
+# context_query = Neo4jContextQuery()
+# full_context = context_query.get_complete_reflection_context("kublai")
+# Include full_context in Gemini prompt for maximum knowledge access
+```
+
+---
+
+### Step 5 (NEW): Memory File Pruning Module (20 minutes)
+
+**File:** `tools/kurultai/memory_pruner.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Memory File Pruning System
+Part of hourly reflection - analyzes and prunes memory files
+"""
+
+import os
+import json
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Tuple
+from pathlib import Path
+
+# Paths to agent memory files
+AGENT_MEMORY_PATHS = {
+    'kublai': '/Users/kublai/.openclaw/agents/main/memory/',
+    'mongke': '/Users/kublai/.openclaw/agents/researcher/memory/',
+    'chagatai': '/Users/kublai/.openclaw/agents/writer/memory/',
+    'temujin': '/Users/kublai/.openclaw/agents/developer/memory/',
+    'jochi': '/Users/kublai/.openclaw/agents/analyst/memory/',
+    'ogedei': '/Users/kublai/.openclaw/agents/ops/memory/',
+}
+
+# Max file sizes (in bytes) before pruning consideration
+MAX_FILE_SIZES = {
+    'daily_notes': 500 * 1024,      # 500KB
+    'long_term': 2 * 1024 * 1024,   # 2MB
+    'conversation': 1 * 1024 * 1024 # 1MB
+}
+
+# Retention policies
+RETENTION_DAYS = {
+    'daily_notes': 90,      # Keep 90 days of daily notes
+    'conversation': 30,     # Keep 30 days of conversation logs
+    'long_term': None       # Long-term memory never expires
+}
+
+
+class MemoryPruner:
+    """
+    Analyzes and prunes memory files during hourly reflection.
+    Part of self-improvement cycle.
+    """
+    
+    def __init__(self, agent_id: str):
+        self.agent_id = agent_id
+        self.memory_path = AGENT_MEMORY_PATHS.get(agent_id)
+    
+    def analyze_memory_files(self) -> Dict[str, Any]:
+        """
+        Analyze all memory files for this agent.
+        Returns pruning candidates and statistics.
+        """
+        if not self.memory_path or not os.path.exists(self.memory_path):
+            return {'error': 'Memory path not found'}
+        
+        analysis = {
+            'total_files': 0,
+            'total_size_bytes': 0,
+            'pruning_candidates': [],
+            'large_files': [],
+            'old_files': [],
+            'redundant_entries': []
+        }
+        
+        for root, dirs, files in os.walk(self.memory_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                stats = os.stat(file_path)
+                
+                file_info = {
+                    'path': file_path,
+                    'size': stats.st_size,
+                    'modified': datetime.fromtimestamp(stats.st_mtime),
+                    'age_days': (datetime.now() - datetime.fromtimestamp(stats.st_mtime)).days
+                }
+                
+                analysis['total_files'] += 1
+                analysis['total_size_bytes'] += stats.st_size
+                
+                # Check if file is too large
+                file_type = self._classify_file(file)
+                max_size = MAX_FILE_SIZES.get(file_type, 500 * 1024)
+                
+                if stats.st_size > max_size:
+                    file_info['reason'] = f'Exceeds {max_size/1024:.0f}KB limit'
+                    analysis['large_files'].append(file_info)
+                
+                # Check if file is too old
+                retention = RETENTION_DAYS.get(file_type)
+                if retention and file_info['age_days'] > retention:
+                    file_info['reason'] = f'Older than {retention} days'
+                    analysis['old_files'].append(file_info)
+                
+                # Check for redundant entries (if it's a structured file)
+                if file.endswith('.json') or file.endswith('.md'):
+                    redundancy = self._check_redundancy(file_path)
+                    if redundancy['redundant_count'] > 0:
+                        analysis['redundant_entries'].append({
+                            'path': file_path,
+                            'redundant_count': redundancy['redundant_count'],
+                            'suggested_removals': redundancy['removals']
+                        })
+        
+        # Combine all candidates
+        analysis['pruning_candidates'] = (
+            analysis['large_files'] + 
+            analysis['old_files'] +
+            [{'path': r['path'], 'reason': 'Redundant entries'} for r in analysis['redundant_entries']]
+        )
+        
+        return analysis
+    
+    def _classify_file(self, filename: str) -> str:
+        """Classify file type for retention policy."""
+        if 'daily' in filename.lower() or filename.startswith('202'):
+            return 'daily_notes'
+        elif 'conversation' in filename.lower() or 'chat' in filename.lower():
+            return 'conversation'
+        elif 'long' in filename.lower() or 'memory' in filename.lower():
+            return 'long_term'
+        return 'daily_notes'
+    
+    def _check_redundancy(self, file_path: str) -> Dict[str, Any]:
+        """Check for redundant or duplicate entries in a file."""
+        # Placeholder - implement based on file format
+        return {'redundant_count': 0, 'removals': []}
+    
+    def generate_pruning_proposal(self) -> Dict[str, Any]:
+        """
+        Generate a pruning proposal for the reflection process.
+        This is presented to Gemini for consideration.
+        """
+        analysis = self.analyze_memory_files()
+        
+        proposal = {
+            'agent': self.agent_id,
+            'timestamp': datetime.now().isoformat(),
+            'current_state': {
+                'total_files': analysis.get('total_files', 0),
+                'total_size_mb': analysis.get('total_size_bytes', 0) / (1024 * 1024)
+            },
+            'pruning_opportunities': {
+                'large_files_count': len(analysis.get('large_files', [])),
+                'old_files_count': len(analysis.get('old_files', [])),
+                'redundant_entries_count': len(analysis.get('redundant_entries', []))
+            },
+            'specific_candidates': [
+                {
+                    'file': os.path.basename(c['path']),
+                    'size_kb': c.get('size', 0) / 1024,
+                    'reason': c.get('reason')
+                }
+                for c in analysis.get('pruning_candidates', [])[:5]  # Top 5
+            ],
+            'estimated_savings_mb': sum(
+                c.get('size', 0) for c in analysis.get('pruning_candidates', [])
+            ) / (1024 * 1024)
+        }
+        
+        return proposal
+    
+    def execute_pruning(self, approved_removals: List[str]) -> Dict[str, Any]:
+        """
+        Execute approved pruning operations.
+        Called after reflection approves the proposal.
+        """
+        results = {
+            'files_removed': [],
+            'entries_pruned': 0,
+            'space_reclaimed_bytes': 0,
+            'errors': []
+        }
+        
+        for file_path in approved_removals:
+            try:
+                if os.path.exists(file_path):
+                    size = os.path.getsize(file_path)
+                    os.remove(file_path)
+                    results['files_removed'].append(file_path)
+                    results['space_reclaimed_bytes'] += size
+            except Exception as e:
+                results['errors'].append({
+                    'file': file_path,
+                    'error': str(e)
+                })
+        
+        return results
+
+
+def get_memory_pruning_context(agent_id: str) -> str:
+    """
+    Get memory pruning context for reflection prompt.
+    """
+    pruner = MemoryPruner(agent_id)
+    proposal = pruner.generate_pruning_proposal()
+    
+    return f"""
+=== MEMORY FILE ANALYSIS ===
+
+Current Memory State:
+- Total files: {proposal['current_state']['total_files']}
+- Total size: {proposal['current_state']['total_size_mb']:.2f} MB
+
+Pruning Opportunities:
+- Large files: {proposal['pruning_opportunities']['large_files_count']}
+- Old files: {proposal['pruning_opportunities']['old_files_count']}
+- Redundant entries: {proposal['pruning_opportunities']['redundant_entries_count']}
+
+Top Candidates for Removal:
+{json.dumps(proposal['specific_candidates'], indent=2)}
+
+Estimated space savings: {proposal['estimated_savings_mb']:.2f} MB
+
+Should we prune these memory files? Consider:
+1. Are the old files still relevant?
+2. Can large files be archived/summarized?
+3. Are redundant entries truly duplicate?
+"""
+```
+
+---
+
 ## IMPLEMENTATION: PHASE 2 (THIS WEEK)
 
 ### Week 1: Pilot with Kublai Only
@@ -912,17 +1272,24 @@ launchctl start com.kurultai.heartbeat
 This is a **production-ready, research-backed, safety-guarded self-improvement system** where:
 
 - ✅ **Every agent has dedicated Gemini 3.1 Pro Preview**
-- ✅ **Every reflection uses complete Neo4j knowledge history**
+- ✅ **Every reflection queries the ENTIRE Neo4j database** (full knowledge access)
+- ✅ **Memory files are pruned as part of reflection** (self-managing storage)
 - ✅ **Every improvement is validated with explicit baselines**
 - ✅ **Every change passes safety guardian**
 - ✅ **Cross-agent learning happens automatically**
 - ✅ **Rollbacks are automatic if things go wrong**
 
-**The system gets smarter every hour, safely.**
+**The system gets smarter every hour, with full knowledge access and self-pruning memory.**
 
 ---
 
-*Ready for implementation.*  
-*Tested concepts.*  
-*Safety first.*  
-*Let's build it.* 🚀
+## UPDATED FILES LIST
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `tools/kurultai/self_improvement.py` | Core reflection system | ~400 |
+| `tools/kurultai/neo4j_context_query.py` | **Full database query** | ~150 |
+| `tools/kurultai/memory_pruner.py` | **Memory pruning system** | ~250 |
+| `tools/kurultai/improvement_guardian.py` | Safety validation | ~200 |
+| `tools/kurultai/baseline_tracker.py` | Metric validation | ~150 |
+| This document | Complete plan | ~1100 |
