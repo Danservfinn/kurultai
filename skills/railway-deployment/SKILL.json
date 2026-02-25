@@ -1,0 +1,20 @@
+{
+  "name": "railway-deployment",
+  "version": "1.0.0",
+  "description": "Manage deployments for the parse project on Railway, including updating dev environment and promoting to production",
+  "author": "Kublai",
+  "tags": ["railway", "deployment", "devops", "parse"],
+  "commands": [
+    "railway link",
+    "railway up",
+    "railway logs",
+    "railway deployment list",
+    "railway variable list",
+    "railway status"
+  ],
+  "environments": {
+    "dev": "6eeb0167-dc20-4cba-bff9-2ba6195f4ced",
+    "production": "ddffb290-bd85-46bf-afaf-a9fedc9b4545"
+  },
+  "project_id": "fca280f7-9d85-4fc4-afee-2856f7ec619b"
+}
