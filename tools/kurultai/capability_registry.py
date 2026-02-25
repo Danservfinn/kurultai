@@ -63,6 +63,7 @@ class CapabilityRegistry:
         category: str,
         code_hash: str,
         learned_by: str,
+        storage_uri: str = None,  # Phase 4: S3 URI for stateless storage
         required_capabilities: Optional[List[str]] = None
     ) -> str:
         """
@@ -88,6 +89,7 @@ class CapabilityRegistry:
             description: $description,
             category: $category,
             code_hash: $code_hash,
+            storage_uri: $storage_uri,
             learned_by: $learned_by,
             learned_at: datetime(),
             version: 1,
@@ -103,6 +105,7 @@ class CapabilityRegistry:
                 "description": description,
                 "category": category,
                 "code_hash": code_hash,
+                "storage_uri": storage_uri,
                 "learned_by": learned_by
             }
         )
