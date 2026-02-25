@@ -15,9 +15,9 @@ updated_at: 2026-02-25
 
 # Kurultai Unified Architecture
 
-**Version**: 4.0
+**Version**: 4.1
 **Last Updated**: 2026-02-25
-**Status**: Production Architecture (Unified Heartbeat v4.0 - Async Execution)
+**Status**: Production Architecture (Self-Improvement System v1.0 Added)
 
 ---
 
@@ -34,6 +34,14 @@ The **Unified Heartbeat Architecture** (v4.0) introduces enterprise-grade async 
 - **FastAPI Unification**: Single Python runtime replaces Express.js bridge
 - **Database Efficiency**: Telemetry moved out of Neo4j (50-200 writes/cycle → 0)
 - **Scalability**: Workers can scale horizontally with Redis queue
+
+### Key v4.1 Improvements (Self-Improvement)
+
+- **Autonomous Reflection**: One agent per hour reflects on performance and proposes improvements
+- **Kublai Review**: Squad lead reviews proposals with full ARCHITECTURE.md + codebase context
+- **Human-in-the-Loop**: Critical changes require human approval via Signal
+- **Baseline Validation**: All changes measured for 24h before commit/rollback decision
+- **Memory Pruning**: Self-management of agent memory files to prevent bloat
 
 ---
 
@@ -295,6 +303,9 @@ class SimpleCuration:
 | **Möngke** | ecosystem_intelligence | 7 days | 2000 | Track OpenClaw/Clawdbot/Moltbot ecosystem |
 | **Kublai** | status_synthesis | 5 min | 200 | Synthesize agent status, escalate critical issues |
 | **System** | notion_sync | 60 min | 800 | Bidirectional Notion↔Neo4j task sync |
+| **System** | agent_reflection | 60 min | 3000 | One agent reflects per hour (round-robin) |
+| **Kublai** | kublai_review | 60 min | 4000 | Review proposals with ARCHITECTURE.md + codebase context |
+| **System** | validate_improvements | 60 min | 1500 | Validate improvements after 24h baseline measurement |
 
 ### Task Distribution by Frequency
 
@@ -314,10 +325,13 @@ Every 30 minutes (1 task):
   - Chagatai: reflection_consolidation (500 tokens)
   Subtotal: 500 tokens
 
-Every 60 minutes (2 tasks):
+Every 60 minutes (5 tasks):
   - Jochi: full_tests (1500 tokens)
   - System: notion_sync (800 tokens)
-  Subtotal: 2300 tokens
+  - System: agent_reflection (3000 tokens)
+  - Kublai: kublai_review (4000 tokens)
+  - System: validate_improvements (1500 tokens)
+  Subtotal: 11,800 tokens
 
 Every 6 hours (1 task):
   - Jochi: deep_curation (2000 tokens)
@@ -344,8 +358,278 @@ The maximum token usage occurs at cycle numbers divisible by 288 (every 24 hours
 - **6-hour tasks:** 2000 tokens (if aligned)
 - **24-hour tasks:** 1800 tokens
 
-**Peak per cycle:** ~8,250 tokens (worst case, once per day)
-**Average per cycle:** ~1,500 tokens
+**Peak per cycle:** ~18,050 tokens (worst case, once per day)
+**Average per cycle:** ~3,500 tokens
+
+---
+
+## Self-Improvement System (v1.0)
+
+The Kurultai now features an autonomous self-improvement system where agents reflect on their performance, propose improvements, and Kublai reviews and implements changes with human oversight for critical decisions.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SELF-IMPROVEMENT SYSTEM ARCHITECTURE                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  HOURLY CYCLE (10 Steps):                                                    │
+│                                                                              │
+│  1. TRIGGER ────────▶ Heartbeat fires reflection (one agent per hour)       │
+│       │                                                                      │
+│  2. GATHER ─────────▶ Query ENTIRE Neo4j database (all nodes, relations)    │
+│       │                                                                      │
+│  3. PRUNE CHECK ────▶ Analyze memory files for stale/outdated entries       │
+│       │                                                                      │
+│  4. REFLECT ────────▶ Agent's Gemini CLI (wants, desires, proposals)        │
+│       │                                                                      │
+│  5. STORE ──────────▶ Save reflection to Neo4j (AgentReflection node)       │
+│       │                                                                      │
+│  6. KUBLAI REVIEW ──▶ Kublai's Gemini CLI with full context:                │
+│       │                • ARCHITECTURE.md (46KB)                              │
+│       │                • Entire codebase (tools/, src/, scripts/)            │
+│       │                • Neo4j graph statistics                              │
+│       │                                                                      │
+│  7. DECISION GATE ──▶ Route based on criticality:                           │
+│       │                • LOW: Auto-implement                                 │
+│       │                • MEDIUM: Kublai decides                              │
+│       │                • HIGH: Consult human (Signal notification)           │
+│       │                                                                      │
+│  8. IMPLEMENT ──────▶ Apply approved changes:                               │
+│       │                • Code improvements                                   │
+│       │                • Memory pruning (if approved)                        │
+│       │                • Configuration updates                               │
+│       │                                                                      │
+│  9. VALIDATE ───────▶ Measure for 24 hours vs baseline                      │
+│       │                                                                      │
+│  10. DECIDE ────────▶ Commit, rollback, or iterate:                         │
+│                        • >10% better: Commit and document                   │
+│                        • <-10% worse: Auto-rollback                         │
+│                        • Otherwise: Iterate or keep                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Agent Rotation Schedule
+
+One agent reflects per hour in round-robin sequence:
+
+| Hour Modulo | Agent | Reflections/Day |
+|-------------|-------|-----------------|
+| 0, 6, 12, 18 | Kublai | 4 |
+| 1, 7, 13, 19 | Möngke | 4 |
+| 2, 8, 14, 20 | Temüjin | 4 |
+| 3, 9, 15, 21 | Chagatai | 4 |
+| 4, 10, 16, 22 | Jochi | 4 |
+| 5, 11, 17, 23 | Ögedei | 4 |
+
+**Total: 24 reflections/day (4 per agent)**
+
+### Reflection Expression Format
+
+Agents express themselves authentically in four categories:
+
+```
+WANTS (Improvement targets):
+- "I want to be better at parallel research tasks"
+- "I want faster response times for code generation"
+
+DESIRES (Aspirations):
+- "I wish I could access real-time web data"
+- "I wish our error messages were more actionable"
+
+PROPOSALS (Concrete changes):
+1. "Add caching layer for Neo4j queries" | Confidence: 0.85 | Priority: high
+2. "Implement connection pooling for Gemini CLI" | Confidence: 0.90 | Priority: medium
+
+MEMORY_PRUNING:
+- Archive ~/.openclaw/agents/mongke/memory/2025-10-*.md (older than 90 days)
+- Compress ~/.openclaw/agents/temujin/memory/debug_logs.md (10MB+)
+```
+
+### Kublai Review Process
+
+Kublai evaluates proposals using **Gemini 3.1 Pro Preview** with complete system context:
+
+#### Context Sources (3)
+
+1. **ARCHITECTURE.md** (`_load_architecture_md()`)
+   - Full 46KB system design document
+   - Checked for architectural alignment
+
+2. **Codebase Scan** (`_scan_codebase()`)
+   - Scans `tools/`, `src/`, `scripts/` directories
+   - Identifies existing implementations
+   - Prevents duplicate functionality
+   - Lists files that would need modification
+
+3. **Neo4j Graph** (`_gather_neo4j_context()`)
+   - Total nodes/relationships count
+   - Active agents and their status
+   - Discovered patterns
+   - Recent activity metrics
+
+#### Review Criteria (5)
+
+| Criterion | Assessment |
+|-----------|------------|
+| **Architectural Fit** | Matches ARCHITECTURE.md? Extends existing patterns? |
+| **Impact** | Minimal (cosmetic) / Moderate (efficiency) / Significant (capability) |
+| **Risk** | Low (isolated) / Medium (multi-agent) / High (system-wide) |
+| **Alignment** | Advances mission? Creates value? |
+| **Reversibility** | Can we undo this if needed? |
+
+#### Decision Outcomes (4)
+
+| Decision | Criteria | Action |
+|----------|----------|--------|
+| **IMPLEMENT** | Low risk, fits architecture, reversible | Auto-execute with 24h validation |
+| **REJECT** | Misaligned, too risky, violates architecture | Log reason, notify proposing agent |
+| **CONSULT_HUMAN** | High risk, system-wide, uncertain | Signal notification to human |
+| **DEFER** | Interesting but needs validation | Queue for later reconsideration |
+
+### Neo4j Schema (6 Node Types)
+
+```cypher
+// Agent Reflection (stores agent's self-expression)
+(:AgentReflection {
+    id: string,              // Unique identifier
+    agent: string,           // Agent name
+    timestamp: datetime,     // When reflected
+    raw_text: string,        // Full reflection text
+    wants: list,             // JSON array of wants
+    desires: list,           // JSON array of desires
+    proposals: list,         // JSON array of proposals
+    memory_pruning: list,    // Files to prune
+    confidence: float,       // Average confidence
+    priority: string,        // low/medium/high/critical
+    reviewed: boolean        // Has Kublai reviewed?
+})
+
+// Review (Kublai's evaluation)
+(:Review {
+    id: string,
+    timestamp: datetime,
+    decision: string,        // implement/reject/consult_human/defer
+    confidence: float,
+    architectural_analysis: string,
+    codebase_analysis: string,
+    rationale: string,
+    raw_response: string     // Full Gemini response
+})
+-[:REVIEWED_BY]->(:AgentReflection)
+
+// Implementation Queue (approved changes)
+(:ImplementationQueue {
+    id: string,
+    agent: string,
+    queued_at: datetime,
+    status: string,          // pending/implemented/validated
+    notes: string,           // Implementation notes
+    implemented_at: datetime,
+    validation_result: string
+})
+-[:QUEUED_FOR]->(:AgentReflection)
+
+// Baseline (pre-change metrics)
+(:Baseline {
+    id: string,
+    change_id: string,
+    agent: string,
+    metric: string,          // success_rate/avg_tokens/etc
+    value: float,            // Baseline measurement
+    timestamp: datetime,
+    sample_size: int
+})
+
+// Validation (post-implementation measurement)
+(:Validation {
+    id: string,
+    timestamp: datetime,
+    metric: string,
+    baseline: float,
+    current: float,
+    improvement_pct: float,
+    decision: string,        // commit/rollback/keep/iterate
+    reason: string,
+    sample_size: int
+})
+-[:VALIDATED_BY]->(:ImplementationQueue)
+
+// Human Notification (critical escalations)
+(:HumanNotification {
+    id: string,
+    timestamp: datetime,
+    status: string,          // pending/acknowledged/resolved
+    context: string,         // Why human input needed
+    urgency: string          // low/medium/high/critical
+})
+-[:AWAITS_HUMAN_DECISION]->(:AgentReflection)
+```
+
+### Heartbeat Integration
+
+Three new tasks registered in `agent_tasks.py`:
+
+```python
+# Hour :00 - Agent Reflection
+HeartbeatTask(
+    name="agent_reflection",
+    agent="system",
+    frequency_minutes=60,
+    max_tokens=3000,
+    handler=agent_reflection_handler,
+    description="One agent reflects per hour (round-robin)"
+)
+
+# Hour :10 - Kublai Review
+HeartbeatTask(
+    name="kublai_review",
+    agent="kublai",
+    frequency_minutes=60,
+    max_tokens=4000,
+    handler=kublai_review_handler,
+    description="Kublai reviews with ARCHITECTURE.md + codebase context"
+)
+
+# Hour :30 - Validation
+HeartbeatTask(
+    name="validate_improvements",
+    agent="system",
+    frequency_minutes=60,
+    max_tokens=1500,
+    handler=validate_improvements_handler,
+    description="Validate improvements after 24h baseline measurement"
+)
+```
+
+### Implementation Files
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `tools/kurultai/agent_reflection.py` | One agent reflects per hour | ~400 |
+| `tools/kurultai/kublai_review.py` | Review with full context | ~450 |
+| `tools/kurultai/baseline_tracker.py` | Baseline capture and validation | ~280 |
+| `tools/kurultai/self_improvement_tasks.py` | Task definitions | ~70 |
+| `scripts/setup_self_improvement_schema.py` | Neo4j schema setup | ~120 |
+
+### Safety Features
+
+1. **Human-in-the-Loop**: Critical changes require human approval via Signal
+2. **Baseline Validation**: All changes measured for 24h before commit/rollback
+3. **Architectural Guardrails**: Kublai checks ARCHITECTURE.md before implementing
+4. **Duplicate Prevention**: Codebase scan identifies existing implementations
+5. **Auto-Rollback**: >10% degradation triggers automatic rollback
+6. **Reversibility Check**: All changes must have documented rollback plans
+
+### Metrics Tracked
+
+- **Success Rate**: Task completion percentage
+- **Token Efficiency**: Tokens per task
+- **Time to Completion**: Average task duration
+- **Error Recovery Rate**: Successful recoveries from failures
+- **Cross-Task Transfer**: Success on new vs trained tasks
 
 ---
 
