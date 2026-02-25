@@ -1159,6 +1159,16 @@ curl -X POST http://localhost:8082/api/migrate-proposals
 
 ### Changelog
 
+**v4.1** (2026-02-25):
+- **Multi-Agent Gemini CLI** - Each of 6 agents has dedicated Gemini 3.1 Pro Preview instance
+  - Isolated contexts per agent (~/.gemini-{agent}/)
+  - Shared authentication (d@kurult.ai)
+  - Python API for programmatic access
+  - Command-line wrappers (gemini-kublai, gemini-mongke, etc.)
+  - Rollback capability via setup script
+- **Model Upgrade** - All agents now use gemini-3.1-pro-preview (was flash)
+- **Temujin Dashboard** - System health monitor generated via agent Gemini CLI
+
 **v4.0** (2026-02-25):
 - Migrated to Async Execution Engine with Redis/RQ
 - Replaced Express.js with FastAPI unified backend
