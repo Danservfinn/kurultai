@@ -31,7 +31,61 @@ from typing import Any, Dict, List, Optional, Set
 from .heartbeat_master import HeartbeatTask, UnifiedHeartbeat
 from .curation_simple import SimpleCuration
 
+# Self-improvement system imports
+from .agent_reflection import hourly_agent_reflection_task
+from .kublai_review import kublai_review_task
+from .baseline_tracker import validate_improvements_task
+
 logger = logging.getLogger("kurultai.agent_tasks")
+
+
+# ============================================================================
+# Self-Improvement System Handlers
+# ============================================================================
+
+async def agent_reflection_handler(driver) -> Dict:
+    """
+    One agent reflects per hour (round-robin).
+    Agent expresses wants, desires, and proposals.
+    """
+    try:
+        result = await hourly_agent_reflection_task()
+        logger.info(f"Agent reflection complete: {result.get('reflecting_agent', 'unknown')} "
+                   f"with {result.get('proposals_count', 0)} proposals")
+        return result
+    except Exception as e:
+        logger.error(f"Agent reflection failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+async def kublai_review_handler(driver) -> Dict:
+    """
+    Kublai reviews pending proposals with full context.
+    Decides: implement, reject, or consult human.
+    """
+    try:
+        result = await kublai_review_task()
+        logger.info(f"Kublai review complete: {result.get('reviewed_count', 0)} reviewed, "
+                   f"{result.get('approved', 0)} approved, "
+                   f"{result.get('consult_human', 0)} need human consultation")
+        return result
+    except Exception as e:
+        logger.error(f"Kublai review failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+async def validate_improvements_handler(driver) -> Dict:
+    """
+    Validate improvements after 24h measurement.
+    Decides: commit, rollback, keep, or iterate.
+    """
+    try:
+        result = await validate_improvements_task()
+        logger.info(f"Validation complete: {result.get('validated_count', 0)} improvements checked")
+        return result
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 # ============================================================================
@@ -884,6 +938,34 @@ async def register_all_tasks(hb: UnifiedHeartbeat):
         max_tokens=800,
         handler=notion_sync,
         description="Bidirectional Notion↔Neo4j task sync"
+    ))
+
+    # === Self-Improvement System - Hourly ===
+    hb.register(HeartbeatTask(
+        name="agent_reflection",
+        agent="system",
+        frequency_minutes=60,
+        max_tokens=3000,
+        handler=agent_reflection_handler,
+        description="One agent reflects per hour (round-robin), expresses wants/desires/proposals"
+    ))
+
+    hb.register(HeartbeatTask(
+        name="kublai_review",
+        agent="kublai",
+        frequency_minutes=60,
+        max_tokens=4000,
+        handler=kublai_review_handler,
+        description="Kublai reviews proposals with ARCHITECTURE.md + codebase context"
+    ))
+
+    hb.register(HeartbeatTask(
+        name="validate_improvements",
+        agent="system",
+        frequency_minutes=60,
+        max_tokens=1500,
+        handler=validate_improvements_handler,
+        description="Validate improvements after 24h baseline measurement"
     ))
 
     logger.info(f"Registered {len(hb.tasks)} tasks total")
