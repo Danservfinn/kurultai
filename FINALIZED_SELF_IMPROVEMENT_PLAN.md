@@ -34,39 +34,51 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 │  │  1. TRIGGER → Heartbeat fires reflection task          │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  2. GATHER CONTEXT → Query 6 Neo4j knowledge sources   │   │
+│  │  2. GATHER CONTEXT → Query ENTIRE Neo4j database       │   │
 │  │       • Recent metrics (last hour)                     │   │
 │  │       • Successful patterns (historical)               │   │
 │  │       • Previous validated insights                    │   │
 │  │       • Learned capabilities                           │   │
 │  │       • Weekly performance trends                      │   │
 │  │       • Cross-agent learnings                          │   │
+│  │       • New user-fed information                       │   │
+│  │       • Architecture sections                          │   │
+│  │       • Task outcomes (all types)                      │   │
+│  │       • Full graph traversal                           │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  3. REFLECT → Gemini CLI (context-rich prompt)         │   │
+│  │  3. MEMORY PRUNING CHECK → Analyze memory files        │   │
+│  │       • Check memory file sizes                        │   │
+│  │       • Identify stale/outdated entries                │   │
+│  │       • Propose pruning candidates                     │   │
+│  │       │                                                  │   │
+│  │       ▼                                                  │   │
+│  │  4. REFLECT → Gemini CLI (context-rich prompt)         │   │
 │  │       Agent: "Based on ALL my knowledge..."            │   │
 │  │       Model: gemini-3.1-pro-preview                    │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  4. PROPOSE → Improvement with confidence score        │   │
+│  │  5. PROPOSE → Improvement with confidence score        │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  5. SAFETY CHECK → Guardian validates                  │   │
+│  │  6. SAFETY CHECK → Guardian validates                  │   │
 │  │       • Scope allowed?                                 │   │
 │  │       • Goal aligned?                                  │   │
 │  │       • Can rollback?                                  │   │
 │  │       • Sandbox passed?                                │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  6. IMPLEMENT → If approved (low risk)                 │   │
+│  │  7. IMPLEMENT → If approved (low risk)                 │   │
+│  │       • Apply code improvements                        │   │
+│  │       • Execute memory pruning (if approved)           │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  7. VALIDATE → Measure for 24 hours                    │   │
+│  │  8. VALIDATE → Measure for 24 hours                    │   │
 │  │       • Baseline comparison                            │   │
 │  │       • Metric tracking                                │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  8. DECIDE → Keep, iterate, or rollback                │   │
+│  │  9. DECIDE → Keep, iterate, or rollback                │   │
 │  │       • Success: Commit + propagate                    │   │
 │  │       • Failure: Auto-rollback                         │   │
 │  │       • Unclear: Human review                          │   │
