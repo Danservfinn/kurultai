@@ -29,6 +29,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger("kurultai.heartbeat")
 
+# Phase 2 v4.0: RQ Integration for async execution
+USE_ASYNC_QUEUE = os.getenv("USE_ASYNC_QUEUE", "true").lower() == "true"
+if USE_ASYNC_QUEUE:
+    try:
+        from redis import Redis
+        from rq import Queue
+        redis_conn = Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+        task_queue = Queue("kurultai-tasks", connection=redis_conn)
+        logger.info("🚀 Async execution enabled (RQ)")
+    except ImportError:
+        logger.warning("⚠️ Redis/RQ not available, falling back to synchronous execution")
+        USE_ASYNC_QUEUE = False
+        task_queue = None
+else:
+    task_queue = None
+
 
 @dataclass
 class HeartbeatTask:
@@ -136,6 +152,43 @@ class UnifiedHeartbeat:
             tasks_run += 1
             task_start = datetime.now(timezone.utc)
 
+            # Phase 2 v4.0: Async execution via RQ
+            if USE_ASYNC_QUEUE and task_queue:
+                try:
+                    logger.info(f"Enqueuing {task.agent}/{task.name} (async)")
+                    
+                    # Enqueue task to RQ with 15 minute timeout
+                    job = task_queue.enqueue(
+                        'tools.kurultai.worker.execute_task',
+                        task.name,
+                        task.agent,
+                        job_timeout='15m',
+                        job_id=f"{task.agent}-{task.name}-{self.cycle_count}"
+                    )
+                    
+                    tasks_succeeded += 1  # Enqueue succeeded
+                    results.append({
+                        "agent": task.agent,
+                        "task": task.name,
+                        "status": "queued",
+                        "started_at": task_start.isoformat(),
+                        "job_id": job.id
+                    })
+                    logger.info(f"✓ {task.agent}/{task.name} queued (job: {job.id})")
+                    
+                except Exception as e:
+                    tasks_failed += 1
+                    logger.error(f"✗ Failed to enqueue {task.agent}/{task.name}: {e}")
+                    results.append({
+                        "agent": task.agent,
+                        "task": task.name,
+                        "status": "enqueue_failed",
+                        "started_at": task_start.isoformat(),
+                        "error": str(e)
+                    })
+                
+                continue  # Skip synchronous execution
+
             # Calculate timeout based on token budget (~100 tokens/sec)
             timeout = max(30, task.max_tokens / 100)
 
@@ -209,51 +262,34 @@ class UnifiedHeartbeat:
         return cycle_result
 
     async def _log_cycle(self, result: CycleResult):
-        """Log heartbeat cycle results to Neo4j."""
+        """Log heartbeat cycle results to structured stdout (Phase 1 v4.0)."""
         try:
-            cypher = """
-            CREATE (hc:HeartbeatCycle {
-                id: $id,
-                cycle_number: $cycle_number,
-                started_at: datetime($started_at),
-                completed_at: datetime($completed_at),
-                tasks_run: $tasks_run,
-                tasks_succeeded: $tasks_succeeded,
-                tasks_failed: $tasks_failed,
-                total_tokens: $total_tokens,
-                duration_seconds: $duration_seconds
-            })
-            WITH hc
-            UNWIND $results AS result
-            CREATE (tr:TaskResult {
-                agent: result.agent,
-                task_name: result.task,
-                status: result.status,
-                started_at: datetime(result.started_at),
-                summary: COALESCE(result.result.summary, result.error, 'Unknown')
-            })
-            CREATE (hc)-[:HAS_RESULT]->(tr)
-            RETURN hc.id AS cycle_id
-            """
-
             duration = (result.completed_at - result.started_at).total_seconds()
-
-            with self.driver.session() as session:
-                session.run(cypher,
-                    id=f"cycle-{result.cycle_number}-{int(result.started_at.timestamp())}",
-                    cycle_number=result.cycle_number,
-                    started_at=result.started_at.isoformat(),
-                    completed_at=result.completed_at.isoformat(),
-                    tasks_run=result.tasks_run,
-                    tasks_succeeded=result.tasks_succeeded,
-                    tasks_failed=result.tasks_failed,
-                    total_tokens=result.total_tokens,
-                    duration_seconds=duration,
-                    results=result.results
-                )
+            
+            # Structured JSON logging for Railway to capture
+            log_entry = {
+                "event": "heartbeat_cycle_complete",
+                "cycle_number": result.cycle_number,
+                "started_at": result.started_at.isoformat(),
+                "completed_at": result.completed_at.isoformat(),
+                "duration_seconds": duration,
+                "tasks_run": result.tasks_run,
+                "tasks_succeeded": result.tasks_succeeded,
+                "tasks_failed": result.tasks_failed,
+                "total_tokens": result.total_tokens,
+                "results": result.results
+            }
+            
+            # Log as JSON for structured logging systems
+            logger.info(json.dumps(log_entry))
+            
+            # Also log summary in human-readable format
+            logger.info(f"Cycle #{result.cycle_number}: {result.tasks_run} tasks, "
+                       f"{result.tasks_succeeded} ok, {result.tasks_failed} failed, "
+                       f"{result.total_tokens} tokens, {duration:.1f}s")
 
         except Exception as e:
-            logger.error(f"Failed to log cycle to Neo4j: {e}")
+            logger.error(f"Failed to log cycle: {e}")
             # Don't let logging failure break the cycle
 
     async def run_daemon(self, shutdown_event: Optional[asyncio.Event] = None):

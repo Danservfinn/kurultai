@@ -326,6 +326,7 @@ class MigrationManager:
             "CREATE CONSTRAINT", "DROP CONSTRAINT",
             "CREATE INDEX", "DROP INDEX",
             "CREATE VECTOR INDEX", "DROP VECTOR INDEX",
+            "CREATE FULLTEXT INDEX", "DROP FULLTEXT INDEX",
         ])
 
     def _apply_migration_split(self, session: Session, migration: MigrationRecord) -> None:

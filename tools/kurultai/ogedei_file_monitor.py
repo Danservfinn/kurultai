@@ -10,7 +10,7 @@ The monitor is named after Ögedei, the operations agent in the 6-agent OpenClaw
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -41,12 +41,12 @@ class OgedeiFileMonitor:
 
     # Agent workspace directories
     AGENT_WORKSPACES = {
-        "main": "data/workspace/souls/main/",          # Kublai (squad lead)
-        "developer": "data/workspace/souls/developer/",  # Temujin
-        "researcher": "data/workspace/souls/researcher/", # Mongke
-        "analyst": "data/workspace/souls/analyst/",      # Jochi
-        "writer": "data/workspace/souls/writer/",        # Chagatai
-        "ops": "data/workspace/souls/ops/",              # Ogedei
+        "main": ".openclaw/agents/main",          # Kublai (squad lead)
+        "developer": ".openclaw/agents/developer",  # Temujin
+        "researcher": ".openclaw/agents/researcher", # Mongke
+        "analyst": ".openclaw/agents/analyst",      # Jochi
+        "writer": ".openclaw/agents/writer",        # Chagatai
+        "ops": ".openclaw/agents/ops",              # Ogedei
     }
 
     # Files to monitor in each workspace
@@ -63,7 +63,7 @@ class OgedeiFileMonitor:
         memory: Optional[Any] = None,
         interval: Optional[int] = None,
         enabled: Optional[bool] = None,
-        base_path: str = "/Users/kurultai/molt"
+        base_path: str = "/Users/kublai/kurultai/kublai-repo"
     ):
         """
         Initialize the OgedeiFileMonitor.
@@ -432,6 +432,71 @@ class OgedeiFileMonitor:
             "neo4j_available": self.use_neo4j,
             "monitored_files_count": len(self.checker.monitored_files)
         }
+
+    def scan_agent_workspace(self, agent_id: str) -> List[Dict]:
+        """
+        Scan a specific agent workspace for file consistency issues.
+
+        Args:
+            agent_id: Agent ID (main, developer, researcher, analyst, writer, ops)
+
+        Returns:
+            List of issues found in the workspace
+        """
+        if agent_id not in self.AGENT_WORKSPACES:
+            logger.warning(f"Unknown agent_id: {agent_id}")
+            return []
+
+        workspace_rel = self.AGENT_WORKSPACES[agent_id]
+        workspace_path = Path(self.base_path) / workspace_rel
+
+        issues = []
+
+        try:
+            # Check if workspace exists
+            if not workspace_path.exists():
+                issues.append({
+                    "agent": agent_id,
+                    "path": str(workspace_path),
+                    "issue": "Workspace directory does not exist",
+                    "severity": "medium"
+                })
+                return issues
+
+            # Check for required files
+            required_files = ["AGENTS.md", "SOUL.md", "IDENTITY.md"]
+            for req_file in required_files:
+                file_path = workspace_path / req_file
+                if not file_path.exists():
+                    issues.append({
+                        "agent": agent_id,
+                        "file": req_file,
+                        "issue": f"Required file missing: {req_file}",
+                        "severity": "low"
+                    })
+
+            # Check for recent modifications (files modified in last 24 hours)
+            recent_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
+            for file_path in workspace_path.glob("*.md"):
+                try:
+                    stat = file_path.stat()
+                    mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+                    if mtime > recent_threshold:
+                        issues.append({
+                            "agent": agent_id,
+                            "file": str(file_path.name),
+                            "issue": f"Recently modified ({mtime.isoformat()})",
+                            "severity": "info"
+                        })
+                except Exception as e:
+                    logger.debug(f"Could not stat {file_path}: {e}")
+
+            logger.info(f"Scanned {agent_id} workspace: {len(issues)} issues found")
+            return issues
+
+        except Exception as e:
+            logger.error(f"Error scanning {agent_id} workspace: {e}")
+            return [{"agent": agent_id, "issue": f"Scan failed: {str(e)}", "severity": "high"}]
 
 
 # =============================================================================

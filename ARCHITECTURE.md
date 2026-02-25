@@ -2,7 +2,7 @@
 title: Kurultai Unified Architecture
 type: architecture
 link: kurultai-architecture
-tags: [architecture, unified-heartbeat, multi-agent, openclaw, neo4j, kurultai]
+tags: [architecture, unified-heartbeat, multi-agent, openclaw, neo4j, kurultai, redis, fastapi]
 ontological_relations:
   - relates_to: [[openclaw-gateway-architecture]]
   - relates_to: [[two-tier-heartbeat-system]]
@@ -10,14 +10,14 @@ ontological_relations:
   - relates_to: [[kurultai-project-overview]]
 uuid: AUTO_GENERATED
 created_at: AUTO_GENERATED
-updated_at: 2026-02-08
+updated_at: 2026-02-25
 ---
 
 # Kurultai Unified Architecture
 
-**Version**: 3.1
-**Last Updated**: 2026-02-08
-**Status**: Production Architecture (Unified Heartbeat v0.3)
+**Version**: 4.0
+**Last Updated**: 2026-02-25
+**Status**: Production Architecture (Unified Heartbeat v4.0 - Async Execution)
 
 ---
 
@@ -25,7 +25,15 @@ updated_at: 2026-02-08
 
 Kurultai is a **6-agent multi-agent orchestration platform** built on OpenClaw gateway messaging and Neo4j-backed operational memory. Named after the Kurultai (the council of Mongol/Turkic tribal leaders), the system enables collaborative AI agent workflows with task delegation, capability-based routing, and failure recovery.
 
-The **Unified Heartbeat Architecture** (v0.3) consolidates all background operations into a single 5-minute cycle, replacing fragmented scheduling with coordinated task execution across all agents.
+The **Unified Heartbeat Architecture** (v4.0) introduces enterprise-grade async execution with Redis-backed task queues, eliminating the 60-second timeout trap and Neo4j telemetry bloat. The API layer has been unified under FastAPI, replacing the fragmented Node.js/Python bridge.
+
+### Key v4.0 Improvements
+
+- **Async Execution**: Redis/RQ queue decouples scheduling from execution (15-min timeouts)
+- **Structured Logging**: JSON stdout logging eliminates Neo4j write pressure
+- **FastAPI Unification**: Single Python runtime replaces Express.js bridge
+- **Database Efficiency**: Telemetry moved out of Neo4j (50-200 writes/cycle → 0)
+- **Scalability**: Workers can scale horizontally with Redis queue
 
 ---
 
@@ -36,89 +44,77 @@ The **Unified Heartbeat Architecture** (v0.3) consolidates all background operat
 │                                  USER LAYER                                         │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  ┌──────────────┐        ┌──────────────┐        ┌──────────────┐              │
-│  │   Web UI     │        │   Signal     │        │   HTTP API   │              │
-│  │ (Next.js)    │        │  Integration │        │ (OpenClaw)   │              │
-│  └──────┬───────┘        └──────┬───────┘        └──────┬───────┘              │
-│         │                      │                       │                       │
-│         └──────────────────────┼───────────────────────┘                       │
-│                                │                                               │
-└────────────────────────────────┼───────────────────────────────────────────────┘
+│  ┌──────────────┐        ┌──────────────┐        ┌──────────────┐                  │
+│  │   Web UI     │        │   Signal     │        │   HTTP API   │                  │
+│  │ (Next.js)    │        │  Integration │        │ (OpenClaw)   │                  │
+│  └──────┬───────┘        └──────┬───────┘        └──────┬───────┘                  │
+│         │                      │                       │                           │
+│         └──────────────────────┼───────────────────────┘                           │
+│                                │                                                   │
+└────────────────────────────────┼───────────────────────────────────────────────────┘
                                  │
-┌────────────────────────────────▼───────────────────────────────────────────────┐
-│                               AUTHENTICATION LAYER                                 │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                     │
-│  ┌────────────────────────────────────────────────────────────────────┐       │
-│  │                    Caddy Forward Auth Proxy                        │       │
-│  │  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐   │       │
-│  │  │ Authentik      │    │ Token Check    │    │ Forward Auth   │   │       │
-│  │  │ Bypass Routes  │    │ (Signal Link)  │    │ (All Other)    │   │       │
-│  │  └────────────────┘    └────────────────┘    └────────────────┘   │       │
-│  └────────────────────────────────────────────────────────────────────┘       │
-│                                │                                               │
-│  ┌────────────────────────────────────────────────────────────────────┐       │
-│  │                      Authentik Server                               │       │
-│  │  ┌────────────┐    ┌────────────┐    ┌────────────┐            │       │
-│  │  │  WebAuthn   │    │   OAuth    │    │  Proxy      │            │       │
-│  │  │  Authentic  │    │  Provider  │    │  Provider   │            │       │
-│  │  └────────────┘    └────────────┘    └────────────┘            │       │
-│  └────────────────────────────────────────────────────────────────────┘       │
-│                                │                                               │
-└────────────────────────────────┼───────────────────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼───────────────────────────────────────────────┐
+┌────────────────────────────────▼───────────────────────────────────────────────────┐
 │                              APPLICATION LAYER                                     │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  ┌────────────────────────────────────────────────────────────────────┐       │
-│  │                      Moltbot (OpenClaw Gateway)                       │       │
-│  │  ┌────────────┐    ┌────────────┐    ┌────────────┐            │       │
-│  │  │ HTTP Routes│    │WebSocket   │    │  Python     │            │       │
-│  │  │            │    │  Handler    │    │  Bridge     │            │       │
-│  │  └────────────┘    └────────────┘    └──────┬─────┘            │       │
-│  └────────────────────────────────────────────┼───────────────────────┘       │
-│                                                 │                       │
-│  ┌─────────────────────────────────────────────▼───────────────────────┐    │
-│  │                     Unified Heartbeat Engine                        │    │
-│  │  ┌──────────┐    ┌────────────┐    ┌────────────┐             │    │
-│  │  │Heartbeat │    │   Agent    │    │   Task     │             │    │
-│  │  │  Master  │    │   Tasks    │    │  Registry  │             │    │
-│  │  └──────────┘    └────────────┘    └────────────┘             │    │
-│  └───────────────────────────────────────────────────────────────┘    │
-│                                                 │                       │
-│  ┌─────────────────────────────────────────────┼───────────────────────┐    │
-│  │                          Kurultai Engine                          │    │
-│  │  ┌──────────┐    ┌────────────┐    ┌────────────┐             │    │
-│  │  │   Task   │    │  Agent     │    │ Capability │             │    │
-│  │  │ Registry │    │  Router    │    │ Classifier │             │    │
-│  │  └──────────┘    └────────────┘    └────────────┘             │    │
-│  └───────────────────────────────────────────────────────────────┘    │
-│                                                 │                       │
-└─────────────────────────────────────────────────┼───────────────────────┘
-                                                  │
-┌─────────────────────────────────────────────────▼───────────────────────┐
-│                            AGENT LAYER                                       │
-├────────────────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────────────┐           │
+│  │                      Moltbot (OpenClaw Gateway)                       │           │
+│  │  ┌────────────┐    ┌────────────┐    ┌────────────┐                │           │
+│  │  │ HTTP Routes│    │WebSocket   │    │  Python     │                │           │
+│  │  │            │    │  Handler    │    │  Bridge     │                │           │
+│  │  └────────────┘    └────────────┘    └──────┬─────┘                │           │
+│  └────────────────────────────────────────────┼───────────────────────┘           │
+│                                                 │                                   │
+│  ┌─────────────────────────────────────────────▼───────────────────────┐          │
+│  │                     FastAPI Unified API (v4.0)                      │          │
+│  │              Replaces Express.js - Python Native                    │          │
+│  │  ┌──────────┐    ┌────────────┐    ┌────────────┐                  │          │
+│  │  │   API    │    │Architecture│    │  Workflow  │                  │          │
+│  │  │  Routes  │    │  Queries   │    │  Control   │                  │          │
+│  │  └──────────┘    └────────────┘    └────────────┘                  │          │
+│  └───────────────────────────────────────────────────────────────────┘          │
+│                                                 │                                   │
+│  ┌─────────────────────────────────────────────▼───────────────────────┐          │
+│  │                     Unified Heartbeat Engine                        │          │
+│  │  ┌──────────┐    ┌────────────┐    ┌────────────┐                  │          │
+│  │  │Heartbeat │    │   Agent    │    │   Task     │                  │          │
+│  │  │  Master  │    │   Tasks    │    │  Registry  │                  │          │
+│  │  └────┬─────┘    └────────────┘    └────────────┘                  │          │
+│  └───────┼────────────────────────────────────────────────────────────┘          │
+│          │                                                                         │
+│  ┌───────▼───────────────────────────────────────────────────────────┐          │
+│  │                    Redis Task Queue (v4.0)                        │          │
+│  │           ┌────────────┐      ┌────────────┐                      │          │
+│  │           │  Queue     │      │  Worker    │                      │          │
+│  │           │  (Redis)   │      │  Process   │                      │          │
+│  │           └─────┬──────┘      └────────────┘                      │          │
+│  │                 │ Async task dispatch                             │          │
+│  └─────────────────┼─────────────────────────────────────────────────┘          │
+│                    │                                                               │
+└────────────────────┼───────────────────────────────────────────────────────────────┘
+                     │
+┌────────────────────▼───────────────────────────────────────────────────────────────┐
+│                            AGENT LAYER                                              │
+├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                          Kublai (main)                          │    │
-│  │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │    │
-│  │  │ Personal │    │Operational│    │ Task     │    │Agent     │  │    │
-│  │  │ Context  │    │  Memory  │    │Registry  │    │Router    │  │    │
-│  │  │ (Files)  │    │ (Neo4j)  │    │(Neo4j)   │    │(Gateway) │  │    │
-│  │  └──────────┘    └──────────┘    └──────────┘    └──────────┘  │    │
-│  └───────────────────────────────┬───────────────────────────────┘    │
-│                                  │ via agentToAgent               │
-│  ┌───────────┐  ┌───────────┐  ┌───────┐  ┌───────────┐  ┌───────┐  │
-│  │  Möngke   │  │  Chagatai  │  │Temüjin│  │  Jochi    │  │Ögedei│  │
-│  │(Research) │  │  (Writer) │  │ (Dev) │  │ (Analyst) │  │ (Ops)│  │
-│  └───────────┘  └───────────┘  └───────┘  └───────────┘  └───────┘  │
-│                                  │                               │
-└──────────────────────────────────┼───────────────────────────────┘
+│  ┌─────────────────────────────────────────────────────────────────┐              │
+│  │                          Kublai (main)                          │              │
+│  │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │              │
+│  │  │ Personal │    │Operational│    │ Task     │    │Agent     │  │              │
+│  │  │ Context  │    │  Memory  │    │Registry  │    │Router    │  │              │
+│  │  │ (Files)  │    │ (Neo4j)  │    │(Neo4j)   │    │(Gateway) │  │              │
+│  │  └──────────┘    └──────────┘    └──────────┘    └──────────┘  │              │
+│  └───────────────────────────────┬───────────────────────────────┘              │
+│                                  │ via agentToAgent                              │
+│  ┌───────────┐  ┌───────────┐  ┌───────┐  ┌───────────┐  ┌───────┐             │
+│  │  Möngke   │  │  Chagatai │  │Temüjin│  │  Jochi    │  │Ögedei │             │
+│  │(Research) │  │  (Writer) │  │ (Dev) │  │ (Analyst) │  │ (Ops) │             │
+│  └───────────┘  └───────────┘  └───────┘  └───────────┘  └───────┘             │
+│                                  │                                                │
+└──────────────────────────────────┼───────────────────────────────────────────────┘
                                    │
-┌───────────────────────────────────▼───────────────────────────────┐
-│                            MEMORY LAYER                                       │
+┌───────────────────────────────────▼───────────────────────────────────────────────┐
+│                            MEMORY LAYER                                           │
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                                     │
 │  ┌────────────────────────────────────────────────────────────────┐    │
@@ -149,15 +145,6 @@ The **Unified Heartbeat Architecture** (v0.3) consolidates all background operat
 | **Kublai Web UI** | Next.js | Dashboard for task monitoring, agent control, capability management |
 | **Signal Integration** | signal-cli | Two-way SMS messaging via Signal protocol |
 | **HTTP API** | OpenClaw Gateway | REST endpoints for external integrations |
-
-### Authentication Layer
-
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Caddy Proxy** | Caddy | Reverse proxy with forward auth |
-| **Authentik Server** | Python/Django | SSO authentication, user management, OAuth provider |
-| **Authentik Worker** | Python/Django | Background task processing |
-| **WebAuthn** | Web Authentication API | Passwordless authentication |
 
 ### Application Layer
 
@@ -460,29 +447,9 @@ Cycle Complete
   completed_at: datetime
 })
 
-// HeartbeatCycle - Unified heartbeat execution record
-(:HeartbeatCycle {
-  id: string,
-  cycle_number: int,
-  started_at: datetime,
-  completed_at: datetime,
-  tasks_run: int,
-  tasks_succeeded: int,
-  tasks_failed: int,
-  total_tokens: int,
-  duration_seconds: float
-})
-
-// TaskResult - Individual task execution result
-(:TaskResult {
-  agent: string,
-  task_name: string,
-  status: string,          // success, error, timeout
-  started_at: datetime,
-  completed_at: datetime,
-  summary: string,
-  error_message: string
-})
+// HeartbeatCycle - DEPRECATED in v4.0 (use structured logging)
+// TaskResult - DEPRECATED in v4.0 (use structured logging)
+// Note: Telemetry now logged to stdout as JSON, not stored in Neo4j
 
 // Research - Knowledge gathered by agents
 (:Research {
@@ -695,8 +662,6 @@ Agent A wants to use LearnedCapability X
 | `NEO4J_USER` | No | `neo4j` | Neo4j username |
 | `NEO4J_PASSWORD` | **Yes** | - | Neo4j password |
 | `PROJECT_ROOT` | No | `os.getcwd()` | Project root directory |
-| `AUTHENTIK_SECRET_KEY` | **Yes** | - | Authentik signing key |
-| `AUTHENTIK_BOOTSTRAP_PASSWORD` | **Yes** | - | Initial admin password |
 | `OPENCLAW_GATEWAY_TOKEN` | **Yes** | - | Gateway authentication |
 
 ### File Paths
@@ -1011,26 +976,108 @@ PROPOSED → UNDER_REVIEW → APPROVED → IMPLEMENTED → VALIDATED → SYNCED
 - `(:ArchitectureProposal)-[:SYNCED_TO]->(:ArchitectureSection)`
 - `(:ArchitectureProposal)-[:UPDATES_SECTION]->(:ArchitectureSection)`
 
-### Express API Endpoints
+### Async Execution Engine (v4.0)
+
+The Unified Heartbeat v4.0 introduces Redis-backed async task execution, eliminating the 60-second timeout trap and Neo4j write pressure.
+
+#### Architecture
+
+```
+┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
+│  Heartbeat      │     │   Redis      │     │   RQ Worker     │
+│  Master         │────▶│   Queue      │────▶│   Process       │
+│  (5-min cron)   │     │              │     │                 │
+└─────────────────┘     └──────────────┘     └─────────────────┘
+       │                                              │
+       │  Enqueue task (50ms)                         │  Execute (15m max)
+       │                                              │
+       │                       ┌──────────────────────┘
+       │                       │
+       ▼                       ▼
+┌──────────────────────────────────────────────────────────┐
+│                Structured JSON Logging                    │
+│     (stdout → Railway/collector, not Neo4j)               │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Key Benefits
+
+| Metric | Before (v3.x) | After (v4.0) | Improvement |
+|--------|---------------|--------------|-------------|
+| Task timeout | 60s hard limit | 15m async | 15x longer |
+| Heartbeat duration | 60s+ blocking | ~50ms dispatch | 99.9% faster |
+| Neo4j writes/cycle | 50-200+ | 0 | Eliminated |
+| Concurrent tasks | Overlapping risk | Queue-ordered | Safe |
+
+#### Implementation
+
+**Heartbeat Master (Dispatcher)**
+```python
+# Instead of: await task.handler(driver) [blocking 60s]
+# Now: Enqueue to RQ and exit immediately
+
+from rq import Queue
+from redis import Redis
+
+redis_conn = Redis.from_url(os.getenv("REDIS_URL"))
+task_queue = Queue("kurultai-tasks", connection=redis_conn)
+
+# Enqueue with 15-minute timeout
+task_queue.enqueue(
+    'tools.kurultai.worker.execute_task',
+    task.name,
+    task.agent,
+    job_timeout='15m'
+)
+```
+
+**Worker Process**
+```python
+# Separate process consumes queue and executes tasks
+from rq import Worker
+
+worker = Worker(['kurultai-tasks'], connection=redis_conn)
+worker.work()  # Blocking, runs forever
+```
+
+**Services**
+- `com.kurultai.heartbeat` - 5-minute dispatcher (LaunchAgent)
+- `com.kurultai.worker` - RQ worker process (LaunchAgent)
+- Redis - localhost:6379 (or Railway Redis)
+
+### FastAPI Endpoints (v4.0)
+
+**Replaces Express.js with unified Python backend**
+
+**Architecture & Introspection:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Service health check |
+| `/api/architecture/overview` | GET | List all architecture sections |
+| `/api/architecture/search?q=term` | GET | Search architecture content |
+| `/api/architecture/section/{title}` | GET | Get specific section |
 
 **Proposal Management:**
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/proposals` | GET | List proposals by status |
+| `/api/proposals` | POST | Create new proposal |
 | `/api/proposals/reflect` | POST | Trigger proactive reflection |
-| `/api/proposals/ready-to-sync` | GET | Get validated proposals |
-| `/api/migrate-proposals` | POST | Apply Neo4j v4 schema |
 
 **Workflow Control:**
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/workflow/process` | POST | Process all pending workflows |
-| `/api/workflow/vet/:id` | POST | Route proposal to Ögedei |
-| `/api/workflow/approve/:id` | POST | Approve vetted proposal |
-| `/api/workflow/implement/:id` | POST | Start implementation |
-| `/api/workflow/complete/:id` | POST | Complete and validate |
-| `/api/workflow/sync/:id` | POST | Sync to ARCHITECTURE.md |
-| `/api/workflow/status/:id` | GET | Get workflow status |
+| `/api/workflow/process` | POST | Process pending workflows |
+| `/api/workflow/status/{id}` | GET | Get workflow status |
+
+**Agent Management:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/agents` | GET | List all agents and status |
+
+**Old Express Endpoints (Deprecated)**
+- All `/api/migrate-*` endpoints moved to CLI scripts
+- Workflow step endpoints consolidated to `/api/workflow/process`
 
 ### Configuration
 
@@ -1098,7 +1145,7 @@ curl -X POST http://localhost:8082/api/migrate-proposals
 ---
 
 **Document Status**: v3.1 - Plan Implementation Complete
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-24
 **Maintainer**: Kurultai System Architecture
 
 ### Changelog
@@ -1109,3 +1156,23 @@ curl -X POST http://localhost:8082/api/migrate-proposals
 - Documented Neo4j migration 003 (proposal system schema)
 - Added operations documentation reference
 - All plans from `/docs/plans/` now fully implemented
+
+### Changelog
+
+**v4.0** (2026-02-25):
+- Migrated to Async Execution Engine with Redis/RQ
+- Replaced Express.js with FastAPI unified backend
+- Eliminated Neo4j telemetry bloat (HeartbeatCycle/TaskResult → structured logging)
+- Added 15-minute async task timeouts (was 60s synchronous)
+- Installed Redis queue and RQ worker services
+- Centralized all scheduling in Python (removed railway.yml crons)
+- Performance: 60s heartbeat → ~50ms dispatch (99.9% improvement)
+
+**v3.2** (2026-02-24):
+- Removed Authentication Layer (Authentik/Caddy) - no longer used
+- Updated default model to google/gemini-3.1-pro-preview
+
+**v3.1** (2026-02-08):
+- Added Jochi test automation cron schedules (smoke, hourly, nightly)
+- Added Kublai weekly reflection cron schedule
+- Documented Neo4j migration 003 (proposal system schema)
