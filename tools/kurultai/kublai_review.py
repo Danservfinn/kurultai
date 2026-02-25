@@ -329,7 +329,7 @@ HUMAN_CONTEXT (if CONSULT_HUMAN):
         return decision_data
     
     def _store_review(self, reflection_id: str, decision: Dict, raw_response: str):
-        """Store review decision in Neo4j."""
+        """Store review decision in brain (Neo4j)."""
         with self.driver.session() as session:
             session.run("""
                 MATCH (r:AgentReflection {id: $ref_id})

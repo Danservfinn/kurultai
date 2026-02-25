@@ -61,7 +61,7 @@ class AgentReflectionSystem:
         return AGENT_ROTATION[agent_index]
     
     def gather_full_context(self, agent_id: str) -> Dict[str, Any]:
-        """Query ENTIRE Neo4j database for complete context."""
+        """Query ENTIRE brain (Neo4j) database for complete context."""
         context = {
             "timestamp": datetime.now().isoformat(),
             "reflecting_agent": agent_id,
@@ -187,7 +187,7 @@ class AgentReflectionSystem:
 === YOUR IDENTITY ===
 You are {agent_id}, an AI agent in the Kurultai system.
 
-=== COMPLETE SYSTEM KNOWLEDGE (from Neo4j) ===
+=== COMPLETE SYSTEM KNOWLEDGE (from brain (Neo4j)) ===
 
 Graph Statistics:
 - Total Nodes: {context['graph_stats']['node_count']}
@@ -325,7 +325,7 @@ MEMORY_PRUNING:
         return parsed
     
     def _store_reflection(self, reflection: AgentReflection):
-        """Store reflection in Neo4j."""
+        """Store reflection in brain (Neo4j)."""
         with self.driver.session() as session:
             session.run("""
                 CREATE (r:AgentReflection {

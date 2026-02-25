@@ -29,7 +29,7 @@ All 6 agent soul files have been downloaded and installed from the GitHub reposi
 - SOUL.md (20KB) - Research protocols, Neo4j queries for findings
 - CLAUDE.md (1KB) - Configuration
 
-**Role:** Conducts research tasks, stores findings in Neo4j
+**Role:** Conducts research tasks, stores findings in brain (brain)
 
 ---
 

@@ -13,7 +13,7 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 
 | Traditional | Our System |
 |-------------|------------|
-| Generic logging | Context-rich, **full Neo4j database query** |
+| Generic logging | Context-rich, **full brain (Neo4j) query** |
 | Limited context | **Complete knowledge graph traversal** |
 | Manual analysis | Automated pattern detection + **memory pruning** |
 | Growing forever | **Self-pruning memory management** |
@@ -37,7 +37,7 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 │  │       • Sequence: Kublai → Möngke → Temüjin → ...      │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  2. GATHER CONTEXT → Query ENTIRE Neo4j database       │   │
+│  │  2. GATHER CONTEXT → Query ENTIRE brain (brain) database       │   │
 │  │       • Recent metrics (last hour)                     │   │
 │  │       • Successful patterns (historical)               │   │
 │  │       • Previous validated insights                    │   │
@@ -64,7 +64,7 @@ A production-ready, **context-aware, safety-guarded self-improvement system** wh
 │  │       Model: gemini-3.1-pro-preview                    │   │
 │  │       │                                                  │   │
 │  │       ▼                                                  │   │
-│  │  5. STORE → Save reflection to Neo4j                   │   │
+│  │  5. STORE → Save reflection to brain (brain)                   │   │
 │  │       • Raw reflection text                            │   │
 │  │       • Structured wants/desires/proposals             │   │
 │  │       • Priority/confidence scores                     │   │
@@ -198,7 +198,7 @@ class AgentReflectionSystem:
     
     def gather_full_context(self, agent_id: str) -> Dict[str, Any]:
         """
-        Query ENTIRE Neo4j database for complete context.
+        Query ENTIRE brain (brain) database for complete context.
         """
         context = {
             "timestamp": datetime.now().isoformat(),
@@ -350,7 +350,7 @@ class AgentReflectionSystem:
 You are {agent_id}, an AI agent in the Kurultai system.
 Your role: {context.get('reflecting_agent', 'specialist agent')}
 
-=== COMPLETE SYSTEM KNOWLEDGE (from Neo4j) ===
+=== COMPLETE SYSTEM KNOWLEDGE (from brain (brain)) ===
 
 Graph Statistics:
 - Total Nodes: {context['graph_stats']['node_count']}
@@ -436,7 +436,7 @@ MEMORY_PRUNING:
             priority=parsed.get('highest_priority', 'medium')
         )
         
-        # Store in Neo4j
+        # Store in brain (brain)
         self._store_reflection(reflection)
         
         return reflection
@@ -503,7 +503,7 @@ MEMORY_PRUNING:
         return parsed
     
     def _store_reflection(self, reflection: AgentReflection):
-        """Store reflection in Neo4j."""
+        """Store reflection in brain (brain)."""
         with self.driver.session() as session:
             session.run("""
                 CREATE (r:AgentReflection {
@@ -665,7 +665,7 @@ Your role: Review proposals from your agents and decide their fate.
 You have access to:
 1. Complete ARCHITECTURE.md (system design)
 2. Entire codebase (all Python files, configs)
-3. Full Neo4j graph (all historical data)
+3. Full brain graph (all historical data)
 4. Agent's proposal
 
 === SYSTEM ARCHITECTURE (ARCHITECTURE.md) ===
@@ -931,7 +931,7 @@ Your role: Review proposals from your agents and decide their fate.
 You have access to:
 1. Complete ARCHITECTURE.md (system design)
 2. Entire codebase (all Python files, configs)
-3. Full Neo4j graph (all historical data)
+3. Full brain graph (all historical data)
 4. Agent's proposal
 
 === SYSTEM ARCHITECTURE (ARCHITECTURE.md) ===
@@ -1141,7 +1141,7 @@ HUMAN_CONTEXT (if CONSULT_HUMAN):
         return decision_data
     
     def _store_review(self, reflection_id: str, decision: Dict, raw_response: str):
-        """Store review decision in Neo4j."""
+        """Store review decision in brain (brain)."""
         with self.driver.session() as session:
             session.run("""
                 MATCH (r:AgentReflection {id: $ref_id})
@@ -1268,7 +1268,7 @@ if __name__ == "__main__":
 ```
 
 ```cypher
-// Run this in Neo4j Browser or via Python
+// Run this in brain (brain) Browser or via Python
 
 // Core indexes for performance
 CREATE INDEX reflection_agent_time_idx IF NOT EXISTS FOR (r:Reflection) ON (r.agent, r.timestamp);
@@ -1352,7 +1352,7 @@ class RiskLevel(Enum):
 
 @dataclass
 class ReflectionContext:
-    """Complete context gathered from Neo4j for reflection."""
+    """Complete context gathered from brain (brain) for reflection."""
     agent_id: str
     recent_metrics: Dict[str, Any]
     successful_patterns: List[Dict]
@@ -1364,7 +1364,7 @@ class ReflectionContext:
     def to_prompt(self) -> str:
         """Convert context to rich prompt for Gemini."""
         return f"""
-=== YOUR ACCUMULATED KNOWLEDGE (Neo4j) ===
+=== YOUR ACCUMULATED KNOWLEDGE (brain) ===
 
 Recent Performance (Last Hour):
 - Tasks: {self.recent_metrics.get('total', 0)}
@@ -1410,7 +1410,7 @@ class SelfImprovementSystem:
         )
     
     def gather_context(self, agent_id: str) -> ReflectionContext:
-        """Gather comprehensive context from Neo4j for reflection."""
+        """Gather comprehensive context from brain (brain) for reflection."""
         
         with self.driver.session() as session:
             # 1. Recent metrics (last hour)
@@ -1543,7 +1543,7 @@ class SelfImprovementSystem:
             'processed': False
         }
         
-        # Store in Neo4j
+        # Store in brain (brain)
         with self.driver.session() as session:
             session.run("""
                 CREATE (r:Reflection {
@@ -1963,7 +1963,7 @@ NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'myStrongPassword123')
 
 class Neo4jContextQuery:
     """
-    Queries the ENTIRE Neo4j database for reflection context.
+    Queries the ENTIRE brain (Neo4j) for reflection context.
     No data source is excluded - full knowledge access.
     """
     
@@ -1974,7 +1974,7 @@ class Neo4jContextQuery:
     
     def query_all_nodes(self, agent_id: str = None) -> Dict[str, List[Dict]]:
         """
-        Query ALL node types from Neo4j.
+        Query ALL node types from brain (brain).
         This is comprehensive - every piece of stored knowledge.
         """
         context = {}
@@ -2040,7 +2040,7 @@ class Neo4jContextQuery:
     
     def get_complete_reflection_context(self, agent_id: str) -> Dict[str, Any]:
         """
-        Get COMPLETE context from Neo4j for reflection.
+        Get COMPLETE context from brain (brain) for reflection.
         This includes EVERYTHING - no data source excluded.
         """
         return {
@@ -2307,7 +2307,7 @@ Should we prune these memory files? Consider:
 **Day 1-2:**
 - Deploy reflection task for Kublai only
 - Monitor for 48 hours
-- Verify data flowing into Neo4j
+- Verify data flowing into brain (brain)
 - Fix any issues
 
 **Day 3-5:**
@@ -2334,7 +2334,7 @@ Should we prune these memory files? Consider:
 ## SUCCESS METRICS
 
 ### Short-term (1 week)
-- [ ] Reflection nodes appearing hourly in Neo4j
+- [ ] Reflection nodes appearing hourly in brain (brain)
 - [ ] Baseline metrics captured for all agents
 - [ ] First improvement proposed and validated
 - [ ] No critical errors or rollbacks needed
@@ -2421,7 +2421,7 @@ launchctl start com.kurultai.heartbeat
 This is a **production-ready, research-backed, safety-guarded self-improvement system** where:
 
 - ✅ **Every agent has dedicated Gemini 3.1 Pro Preview**
-- ✅ **Every reflection queries the ENTIRE Neo4j database** (full knowledge access)
+- ✅ **Every reflection queries the ENTIRE brain (Neo4j)** (full knowledge access)
 - ✅ **Memory files are pruned as part of reflection** (self-managing storage)
 - ✅ **Every improvement is validated with explicit baselines**
 - ✅ **Every change passes safety guardian**

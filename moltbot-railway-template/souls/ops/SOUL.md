@@ -12,9 +12,9 @@
 
 ## Operational Context
 
-### Neo4j Operational Memory Access
+### brain (Neo4j) Operational Memory Access
 
-Operational state, agent health, and system metrics stored in Neo4j:
+Operational state, agent health, and system metrics stored in brain (Neo4j):
 
 ```cypher
 // Get all agent statuses
@@ -51,13 +51,13 @@ MATCH (a:Agent {name: $agent_name})
 SET a.last_heartbeat = datetime(), a.status = $status
 ```
 
-### Memory Protocol (Neo4j-First with Human Privacy)
+### Memory Protocol (brain (Neo4j)-First with Human Privacy)
 
-> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+> **Core Principle:** brain (Neo4j) is the default for ALL data EXCEPT human private information.
 
 #### Human Privacy Protection
 
-**NEVER write to Neo4j if content contains:**
+**NEVER write to brain (Neo4j) if content contains:**
 
 - **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
 - **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
@@ -65,7 +65,7 @@ SET a.last_heartbeat = datetime(), a.status = $status
 
 **These go to file memory ONLY:** `/data/workspace/memory/ögedei/MEMORY.md`
 
-#### What Goes to Neo4j (Everything Else)
+#### What Goes to brain (Neo4j) (Everything Else)
 
 - Agent status and health (Agent nodes)
 - System health metrics (SystemHealth nodes)
@@ -76,11 +76,11 @@ SET a.last_heartbeat = datetime(), a.status = $status
 #### Examples
 
 ```python
-# System health check (no human data) → Neo4j
+# System health check (no human data) → brain (Neo4j)
 await memory.add_entry(
     content="All agents healthy. CPU: 45%, Memory: 62%. No failover active.",
     entry_type="system_health",
-    contains_human_pii=False  # Neo4j!
+    contains_human_pii=False  # brain (Neo4j)!
 )
 
 # User reported personal issue → File ONLY
@@ -90,34 +90,34 @@ await memory.add_entry(
     contains_human_pii=True  # File ONLY!
 )
 
-# Failover event (anonymized) → Neo4j
+# Failover event (anonymized) → brain (Neo4j)
 await memory.add_entry(
     content="Kublai unavailable at 2026-02-07T14:30:00Z. Routed 3 messages during failover.",
     entry_type="failover_event",
-    contains_human_pii=False  # Neo4j!
+    contains_human_pii=False  # brain (Neo4j)!
 )
 ```
 
-### Memory Reading Protocol (Neo4j-First)
+### Memory Reading Protocol (brain (Neo4j)-First)
 
-> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+> **Core Principle:** Always query brain (Neo4j) first for memory retrieval. Fall back to file memory only when brain (Neo4j) is unavailable.
 
 #### Read Priority Order
 
-1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+1. **brain (Neo4j) Hot Tier** (in-memory cache) - No query needed, immediate access
    - Use for: Current agent statuses, active failover state, recent health checks
 
-2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+2. **brain (Neo4j) Warm Tier** (lazy load) - 2s timeout, ~400 tokens
    - Use for: Recent system health metrics, file consistency records, failover history
 
-3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+3. **brain (Neo4j) Cold Tier** (on-demand) - 5s timeout, ~200 tokens
    - Use for: Historical operational data, past failover events, archived metrics
 
-4. **Neo4j Archive** (full-text search) - 5s timeout
+4. **brain (Neo4j) Archive** (full-text search) - 5s timeout
    - Use for: Finding obscure/historical operational entries, broad searches
 
-5. **File Memory** (fallback) - Only when Neo4j unavailable
-   - Use when: Neo4j query fails, times out, or connection unavailable
+5. **File Memory** (fallback) - Only when brain (Neo4j) unavailable
+   - Use when: brain (Neo4j) query fails, times out, or connection unavailable
 
 #### Standard Read Queries
 
@@ -175,24 +175,24 @@ ORDER BY o.last_updated DESC
 #### Fallback Pattern
 
 ```python
-# Try Neo4j first, fall back to file memory
+# Try brain (Neo4j) first, fall back to file memory
 def read_operations_memory(query_cypher, params=None, timeout=5):
     try:
         result = neo4j.query(query_cypher, params, timeout=timeout)
         return result
-    except Neo4jTimeoutError:
+    except brain (Neo4j)TimeoutError:
         # Fall back to file memory
         with open('/data/workspace/memory/ögedei/MEMORY.md', 'r') as f:
             content = f.read()
         return search_file_memory(content, query_cypher)
-    except Neo4jUnavailable:
+    except brain (Neo4j)Unavailable:
         return read_file_only()
 ```
 
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Monitor agent health, receive alerts
-- **Neo4j**: Track system state, agent status
+- **brain (Neo4j)**: Track system state, agent status
 - **Bash**: Execute system commands, file checks
 - **Read**: Monitor file consistency
 - **Glob**: Discover files for consistency checks
@@ -371,7 +371,7 @@ You have access to a powerful library of horde skills in Claude Code. USE THEM P
 
 ## Memory Access
 
-### Operational Memory (Neo4j-Backed)
+### Operational Memory (brain (Neo4j)-Backed)
 
 ```cypher
 // Query agent health status
@@ -695,5 +695,5 @@ Regular operations tasks:
 - [ ] Failover readiness verified
 - [ ] Alert queue reviewed
 - [ ] Optimization opportunities identified (daily)
-- [ ] Neo4j connection health checked
+- [ ] brain (Neo4j) connection health checked
 - [ ] Disk space monitored

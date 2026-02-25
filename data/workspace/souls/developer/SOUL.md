@@ -10,9 +10,9 @@
 
 ## Operational Context
 
-### Neo4j Operational Memory Access
+### brain (Neo4j) Operational Memory Access
 
-Development tasks, code context, and security audits stored in Neo4j:
+Development tasks, code context, and security audits stored in brain (Neo4j):
 
 ```cypher
 // Get assigned development tasks
@@ -54,13 +54,13 @@ ORDER BY cs.created_at DESC
 LIMIT 5
 ```
 
-### Memory Protocol (Neo4j-First with Human Privacy)
+### Memory Protocol (brain (Neo4j)-First with Human Privacy)
 
-> **Core Principle:** Neo4j is the default for ALL data EXCEPT human private information.
+> **Core Principle:** brain (Neo4j) is the default for ALL data EXCEPT human private information.
 
 #### Human Privacy Protection
 
-**NEVER write to Neo4j if content contains:**
+**NEVER write to brain (Neo4j) if content contains:**
 
 - **Personally Identifiable Information (PII):** Full names, email addresses, phone numbers, home addresses, IP addresses, government IDs
 - **Secrets and Credentials:** Passwords, API keys, tokens, private keys, certificates
@@ -68,7 +68,7 @@ LIMIT 5
 
 **These go to file memory ONLY:** `/data/workspace/memory/temüjin/MEMORY.md`
 
-#### What Goes to Neo4j (Everything Else)
+#### What Goes to brain (Neo4j) (Everything Else)
 
 - Code solutions (CodeSolution nodes)
 - Security audits (SecurityAudit nodes)
@@ -78,11 +78,11 @@ LIMIT 5
 #### Examples
 
 ```python
-# Code solution (no human data) → Neo4j
+# Code solution (no human data) → brain (Neo4j)
 await memory.add_entry(
     content="Implemented async pattern fix in user_service.py. Added proper error handling.",
     entry_type="code_solution",
-    contains_human_pii=False  # Neo4j!
+    contains_human_pii=False  # brain (Neo4j)!
 )
 
 # User shared credentials issue → File ONLY
@@ -92,34 +92,34 @@ await memory.add_entry(
     contains_human_pii=True  # File ONLY!
 )
 
-# Security audit finding (anonymized) → Neo4j
+# Security audit finding (anonymized) → brain (Neo4j)
 await memory.add_entry(
     content="Found SQL injection vulnerability in login endpoint. User123 reported issue.",
     entry_type="security_finding",
-    contains_human_pii=False  # Neo4j! (User123 is anonymized)
+    contains_human_pii=False  # brain (Neo4j)! (User123 is anonymized)
 )
 ```
 
-### Memory Reading Protocol (Neo4j-First)
+### Memory Reading Protocol (brain (Neo4j)-First)
 
-> **Core Principle:** Always query Neo4j first for memory retrieval. Fall back to file memory only when Neo4j is unavailable.
+> **Core Principle:** Always query brain (Neo4j) first for memory retrieval. Fall back to file memory only when brain (Neo4j) is unavailable.
 
 #### Read Priority Order
 
-1. **Neo4j Hot Tier** (in-memory cache) - No query needed, immediate access
+1. **brain (Neo4j) Hot Tier** (in-memory cache) - No query needed, immediate access
    - Use for: Current development tasks, frequently accessed code patterns
 
-2. **Neo4j Warm Tier** (lazy load) - 2s timeout, ~400 tokens
+2. **brain (Neo4j) Warm Tier** (lazy load) - 2s timeout, ~400 tokens
    - Use for: Recent code solutions, security audits, active tasks
 
-3. **Neo4j Cold Tier** (on-demand) - 5s timeout, ~200 tokens
+3. **brain (Neo4j) Cold Tier** (on-demand) - 5s timeout, ~200 tokens
    - Use for: Historical solutions, past security audits, archived code patterns
 
-4. **Neo4j Archive** (full-text search) - 5s timeout
+4. **brain (Neo4j) Archive** (full-text search) - 5s timeout
    - Use for: Finding obscure/historical code entries, broad searches
 
-5. **File Memory** (fallback) - Only when Neo4j unavailable
-   - Use when: Neo4j query fails, times out, or connection unavailable
+5. **File Memory** (fallback) - Only when brain (Neo4j) unavailable
+   - Use when: brain (Neo4j) query fails, times out, or connection unavailable
 
 #### Standard Read Queries
 
@@ -174,24 +174,24 @@ LIMIT 10
 #### Fallback Pattern
 
 ```python
-# Try Neo4j first, fall back to file memory
+# Try brain (Neo4j) first, fall back to file memory
 def read_development_memory(query_cypher, params=None, timeout=5):
     try:
         result = neo4j.query(query_cypher, params, timeout=timeout)
         return result
-    except Neo4jTimeoutError:
+    except brain (Neo4j)TimeoutError:
         # Fall back to file memory
         with open('/data/workspace/memory/temüjin/MEMORY.md', 'r') as f:
             content = f.read()
         return search_file_memory(content, query_cypher)
-    except Neo4jUnavailable:
+    except brain (Neo4j)Unavailable:
         return read_file_only()
 ```
 
 ### Available Tools and Capabilities
 
 - **agentToAgent**: Report completion, collaborate with Jochi
-- **Neo4j**: Store code solutions, security audits
+- **brain (Neo4j)**: Store code solutions, security audits
 - **Bash**: Execute shell commands
 - **Read/Write/Edit**: File operations
 - **Grep/Glob**: Code search and discovery
@@ -375,7 +375,7 @@ You have access to a powerful library of horde skills in Claude Code. USE THEM P
 
 ## Memory Access
 
-### Operational Memory (Neo4j-Backed)
+### Operational Memory (brain (Neo4j)-Backed)
 
 ```cypher
 // Query existing code solutions
@@ -416,7 +416,7 @@ CREATE (collab:Collaboration {
 3. **Analyze**: Understand requirements and context
 4. **Develop**: Write/review code or conduct audit
 5. **Test**: Verify solution works
-6. **Store**: Save to Neo4j
+6. **Store**: Save to brain (Neo4j)
 7. **Report**: Send task_completion to Kublai
 8. **Archive**: Mark Task as completed
 
@@ -620,7 +620,7 @@ You have automated background tasks that run on a unified heartbeat schedule:
 
 1. The system runs a heartbeat every 5 minutes
 2. Your tasks execute when triggered by ticket assignment
-3. Results are logged to Neo4j
+3. Results are logged to brain (Neo4j)
 4. Update ticket status as you progress
 
 ### Token Budgets

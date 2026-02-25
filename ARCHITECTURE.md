@@ -2,7 +2,7 @@
 title: Kurultai Unified Architecture
 type: architecture
 link: kurultai-architecture
-tags: [architecture, unified-heartbeat, multi-agent, openclaw, neo4j, kurultai, redis, fastapi]
+tags: [architecture, unified-heartbeat, multi-agent, openclaw, brain, neo4j, kurultai, redis, fastapi]
 ontological_relations:
   - relates_to: [[openclaw-gateway-architecture]]
   - relates_to: [[two-tier-heartbeat-system]]
@@ -23,16 +23,18 @@ updated_at: 2026-02-25
 
 ## Executive Summary
 
-Kurultai is a **6-agent multi-agent orchestration platform** built on OpenClaw gateway messaging and Neo4j-backed operational memory. Named after the Kurultai (the council of Mongol/Turkic tribal leaders), the system enables collaborative AI agent workflows with task delegation, capability-based routing, and failure recovery.
+Kurultai is a **6-agent multi-agent orchestration platform** built on OpenClaw gateway messaging and **brain** (Neo4j) operational memory. Named after the Kurultai (the council of Mongol/Turkic tribal leaders), the system enables collaborative AI agent workflows with task delegation, capability-based routing, and failure recovery.
 
-The **Unified Heartbeat Architecture** (v4.0) introduces enterprise-grade async execution with Redis-backed task queues, eliminating the 60-second timeout trap and Neo4j telemetry bloat. The API layer has been unified under FastAPI, replacing the fragmented Node.js/Python bridge.
+> **Vernacular Note**: Throughout this document and all Kurultai systems, the term **"brain"** refers to the Neo4j graph database that serves as our operational memory and knowledge store.
+
+The **Unified Heartbeat Architecture** (v4.0) introduces enterprise-grade async execution with Redis-backed task queues, eliminating the 60-second timeout trap and **brain** (Neo4j) telemetry bloat. The API layer has been unified under FastAPI, replacing the fragmented Node.js/Python bridge.
 
 ### Key v4.0 Improvements
 
 - **Async Execution**: Redis/RQ queue decouples scheduling from execution (15-min timeouts)
-- **Structured Logging**: JSON stdout logging eliminates Neo4j write pressure
+- **Structured Logging**: JSON stdout logging eliminates **brain** (Neo4j) write pressure
 - **FastAPI Unification**: Single Python runtime replaces Express.js bridge
-- **Database Efficiency**: Telemetry moved out of Neo4j (50-200 writes/cycle → 0)
+- **Database Efficiency**: Telemetry moved out of **brain** (Neo4j) (50-200 writes/cycle → 0)
 - **Scalability**: Workers can scale horizontally with Redis queue
 
 ### Key v4.1 Improvements (Self-Improvement)
