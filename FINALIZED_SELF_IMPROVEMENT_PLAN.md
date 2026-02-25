@@ -635,6 +635,7 @@ class KublaiReviewSystem:
     def review_proposal(self, reflection_id: str) -> Dict[str, Any]:
         """
         Kublai reviews a single proposal using Gemini CLI.
+        Includes ARCHITECTURE.md and codebase context.
         """
         # Get full reflection details
         with self.driver.session() as session:
@@ -648,12 +649,48 @@ class KublaiReviewSystem:
             
             reflection = dict(record['r'])
         
-        # Build review prompt for Kublai
+        # Build review prompt for Kublai with FULL CONTEXT
+        
+        # Gather architecture and codebase context
+        architecture_context = self._load_architecture_md()
+        codebase_context = self._scan_codebase()
+        neo4j_context = self._gather_neo4j_context()
+        
         prompt = f"""
 === KUBLAI REVIEW TASK ===
 
 You are Kublai, Squad Lead of the Kurultai.
 Your role: Review proposals from your agents and decide their fate.
+
+You have access to:
+1. Complete ARCHITECTURE.md (system design)
+2. Entire codebase (all Python files, configs)
+3. Full Neo4j graph (all historical data)
+4. Agent's proposal
+
+=== SYSTEM ARCHITECTURE (ARCHITECTURE.md) ===
+
+{architecture_context[:3000]}
+
+[Architecture continues...]
+
+=== CODEBASE CONTEXT ===
+
+Key Files and Their Purposes:
+{codebase_context}
+
+=== NEO4J KNOWLEDGE GRAPH ===
+
+Graph Statistics:
+- Total Nodes: {neo4j_context.get('node_count', 0)}
+- Total Relationships: {neo4j_context.get('rel_count', 0)}
+- Recent Activity (Last 24h): {len(neo4j_context.get('recent_activity', []))} events
+
+Active Agents:
+{json.dumps(neo4j_context.get('agents', []), indent=2)[:500]}
+
+Recent Patterns Discovered:
+{json.dumps(neo4j_context.get('patterns', [])[:3], indent=2)}
 
 === PROPOSAL TO REVIEW ===
 
@@ -668,24 +705,48 @@ Raw Reflection:
 Parsed Proposals:
 {reflection['proposals']}
 
+=== ARCHITECTURAL CONSIDERATION ===
+
+Before deciding, analyze:
+1. Does this proposal align with our documented architecture?
+2. Are there existing modules that could handle this?
+3. Would this create architectural debt?
+4. Does it follow established patterns in the codebase?
+
+Check ARCHITECTURE.md sections relevant to: {reflection['agent']}'s domain
+
+=== CODEBASE CONSIDERATION ===
+
+Before deciding, verify:
+1. Are there existing implementations of similar functionality?
+2. Would this duplicate existing code?
+3. Does it follow the project's coding patterns?
+4. Which files would need modification?
+
 === YOUR REVIEW CRITERIA ===
 
-1. IMPACT: How much would this improve the system?
+1. ARCHITECTURAL FIT: Does this align with ARCHITECTURE.md?
+   - Explicitly matches documented design → STRONG fit
+   - Extends existing patterns → GOOD fit
+   - Requires architectural changes → WEAK fit
+   - Contradicts documented approach → REJECT
+
+2. IMPACT: How much would this improve the system?
    - Minimal (cosmetic, preference) → LOW impact
    - Moderate (efficiency, quality) → MEDIUM impact
    - Significant (capability, reliability) → HIGH impact
 
-2. RISK: What could go wrong?
+3. RISK: What could go wrong?
    - Isolated to one agent → LOW risk
    - Affects multiple agents → MEDIUM risk
    - System-wide or safety-critical → HIGH risk
 
-3. ALIGNMENT: Does this fit our mission?
+4. ALIGNMENT: Does this fit our mission?
    - Advances agent capabilities → YES
    - Improves human experience → YES
    - Creates complexity without benefit → NO
 
-4. REVERSIBILITY: Can we undo this?
+5. REVERSIBILITY: Can we undo this?
    - Configuration change → YES
    - Code modification with tests → YES
    - Schema or architectural change → MAYBE
@@ -693,17 +754,17 @@ Parsed Proposals:
 === DECISION OPTIONS ===
 
 A. IMPLEMENT - Approve and execute immediately
-   Use when: LOW risk, HIGH alignment, reversible
+   Use when: LOW risk, HIGH alignment, reversible, fits architecture
 
 B. REJECT - Do not implement
-   Use when: Misaligned, too risky, or not beneficial
+   Use when: Misaligned, too risky, not beneficial, or violates architecture
 
 C. CONSULT_HUMAN - Critical decision needs human
-   Use when: HIGH risk, system-wide impact, safety concern
+   Use when: HIGH risk, system-wide impact, safety concern, architectural change
    OR when: Uncertain about consequences
 
 D. DEFER - Decide later, gather more data
-   Use when: Interesting but needs more thought
+   Use when: Interesting but needs more thought or validation
 
 === YOUR RESPONSE FORMAT ===
 
@@ -711,21 +772,309 @@ DECISION: [IMPLEMENT | REJECT | CONSULT_HUMAN | DEFER]
 
 CONFIDENCE: [0.0-1.0]
 
-RATIONALE:
-- Impact assessment: ...
-- Risk assessment: ...
-- Alignment check: ...
-- Final reasoning: ...
+ARCHITECTURAL_ANALYSIS:
+- Does this align with ARCHITECTURE.md? (Yes/No/Partial)
+- Which sections are relevant?
+- Any architectural concerns?
 
-IMPLEMENTATION_NOTES (if applicable):
-- Steps to implement
-- Tests to run
-- Rollback plan
+CODEBASE_ANALYSIS:
+- Which files would be modified?
+- Any existing similar implementations?
+- Integration points?
+
+IMPACT_ASSESSMENT:
+- Scope of impact: (One agent / Multiple / System-wide)
+- Expected improvement: [description]
+
+RISK_ASSESSMENT:
+- Risk level: (Low/Medium/High)
+- What could go wrong: [description]
+- Mitigation strategies: [list]
+
+ALIGNMENT_CHECK:
+- Fits mission: (Yes/No)
+- Creates value: (Yes/No)
+
+FINAL_REASONING:
+[Your reasoning for the decision]
+
+IMPLEMENTATION_NOTES (if IMPLEMENT):
+- Files to modify: [list]
+- Tests to run: [list]
+- Rollback plan: [description]
+- Estimated effort: [hours/complexity]
 
 HUMAN_CONTEXT (if CONSULT_HUMAN):
-- Why this needs your input
-- What decision is needed
-- What are the trade-offs
+- Why this needs your input: [specific concern]
+- What decision is needed: [options]
+- What are the trade-offs: [pros/cons]
+- What happens if we do nothing: [consequence]
+"""
+        
+        # Query Kublai's Gemini
+        review_response = self.kublai.query(prompt)
+        
+        # Parse decision
+        decision = self._parse_decision(review_response)
+        
+        # Store review
+        self._store_review(reflection_id, decision, review_response)
+        
+        # Execute decision
+        if decision['decision'] == ReviewDecision.IMPLEMENT:
+            self._queue_implementation(reflection_id, decision)
+        elif decision['decision'] == ReviewDecision.CONSULT_HUMAN:
+            self._notify_human(reflection_id, decision)
+        
+        return decision
+    
+    def _load_architecture_md(self) -> str:
+        """Load ARCHITECTURE.md content."""
+        arch_path = os.path.expanduser("~/kurultai/kublai-repo/ARCHITECTURE.md")
+        try:
+            with open(arch_path, 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return "# ARCHITECTURE.md not found"
+    
+    def _scan_codebase(self) -> str:
+        """Scan codebase for relevant context."""
+        import os
+        from pathlib import Path
+        
+        base_path = Path("~/kurultai/kublai-repo").expanduser()
+        key_files = []
+        
+        # Key directories to scan
+        scan_dirs = [
+            base_path / "tools" / "kurultai",
+            base_path / "src",
+            base_path / "scripts"
+        ]
+        
+        for scan_dir in scan_dirs:
+            if scan_dir.exists():
+                for py_file in scan_dir.rglob("*.py"):
+                    if py_file.stat().st_size < 50000:  # Skip huge files
+                        try:
+                            with open(py_file, 'r') as f:
+                                content = f.read()
+                                # Extract docstring or first 200 chars
+                                if '"""' in content:
+                                    doc = content.split('"""')[1][:200]
+                                else:
+                                    doc = content[:200]
+                                
+                                rel_path = py_file.relative_to(base_path)
+                                key_files.append(f"{rel_path}: {doc.strip()}")
+                        except:
+                            pass
+        
+        return "\n".join(key_files[:20])  # Top 20 files
+    
+    def _gather_neo4j_context(self) -> Dict[str, Any]:
+        """Gather comprehensive Neo4j context."""
+        with self.driver.session() as session:
+            # Graph stats
+            result = session.run("""
+                CALL apoc.meta.stats()
+                YIELD nodeCount, relCount
+                RETURN nodeCount, relCount
+            """)
+            stats = result.single()
+            
+            # Active agents
+            result = session.run("""
+                MATCH (a:Agent)
+                RETURN a.name as name, a.status as status
+            """)
+            agents = [dict(r) for r in result]
+            
+            # Recent patterns
+            result = session.run("""
+                MATCH (p:Pattern)
+                RETURN p.description as desc, p.confidence as conf
+                ORDER BY p.confidence DESC
+                LIMIT 5
+            """)
+            patterns = [dict(r) for r in result]
+            
+            # Recent activity
+            result = session.run("""
+                MATCH (n)
+                WHERE n.timestamp > datetime() - duration('P1D')
+                RETURN count(n) as count
+            """)
+            activity = result.single()['count']
+            
+            return {
+                'node_count': stats['nodeCount'] if stats else 0,
+                'rel_count': stats['relCount'] if stats else 0,
+                'agents': agents,
+                'patterns': patterns,
+                'recent_activity': [{'count': activity}]
+            }
+        
+        # Build review prompt for Kublai with FULL CONTEXT
+        
+        # Gather architecture and codebase context
+        architecture_context = self._load_architecture_md()
+        codebase_context = self._scan_codebase()
+        neo4j_context = self._gather_neo4j_context()
+        
+        prompt = f"""
+=== KUBLAI REVIEW TASK ===
+
+You are Kublai, Squad Lead of the Kurultai.
+Your role: Review proposals from your agents and decide their fate.
+
+You have access to:
+1. Complete ARCHITECTURE.md (system design)
+2. Entire codebase (all Python files, configs)
+3. Full Neo4j graph (all historical data)
+4. Agent's proposal
+
+=== SYSTEM ARCHITECTURE (ARCHITECTURE.md) ===
+
+{architecture_context[:3000]}
+
+[Architecture continues...]
+
+=== CODEBASE CONTEXT ===
+
+Key Files and Their Purposes:
+{codebase_context}
+
+=== NEO4J KNOWLEDGE GRAPH ===
+
+Graph Statistics:
+- Total Nodes: {neo4j_context.get('node_count', 0)}
+- Total Relationships: {neo4j_context.get('rel_count', 0)}
+- Recent Activity (Last 24h): {len(neo4j_context.get('recent_activity', []))} events
+
+Active Agents:
+{json.dumps(neo4j_context.get('agents', []), indent=2)[:500]}
+
+Recent Patterns Discovered:
+{json.dumps(neo4j_context.get('patterns', [])[:3], indent=2)}
+
+=== PROPOSAL TO REVIEW ===
+
+From Agent: {reflection['agent']}
+Timestamp: {reflection['timestamp']}
+Priority: {reflection['priority']}
+Confidence: {reflection['confidence']}
+
+Raw Reflection:
+{reflection['raw_text'][:2000]}
+
+Parsed Proposals:
+{reflection['proposals']}
+
+=== ARCHITECTURAL CONSIDERATION ===
+
+Before deciding, analyze:
+1. Does this proposal align with our documented architecture?
+2. Are there existing modules that could handle this?
+3. Would this create architectural debt?
+4. Does it follow established patterns in the codebase?
+
+Check ARCHITECTURE.md sections relevant to: {reflection['agent']}'s domain
+
+=== CODEBASE CONSIDERATION ===
+
+Before deciding, verify:
+1. Are there existing implementations of similar functionality?
+2. Would this duplicate existing code?
+3. Does it follow the project's coding patterns?
+4. Which files would need modification?
+
+=== YOUR REVIEW CRITERIA ===
+
+1. ARCHITECTURAL FIT: Does this align with ARCHITECTURE.md?
+   - Explicitly matches documented design → STRONG fit
+   - Extends existing patterns → GOOD fit
+   - Requires architectural changes → WEAK fit
+   - Contradicts documented approach → REJECT
+
+2. IMPACT: How much would this improve the system?
+   - Minimal (cosmetic, preference) → LOW impact
+   - Moderate (efficiency, quality) → MEDIUM impact
+   - Significant (capability, reliability) → HIGH impact
+
+3. RISK: What could go wrong?
+   - Isolated to one agent → LOW risk
+   - Affects multiple agents → MEDIUM risk
+   - System-wide or safety-critical → HIGH risk
+
+4. ALIGNMENT: Does this fit our mission?
+   - Advances agent capabilities → YES
+   - Improves human experience → YES
+   - Creates complexity without benefit → NO
+
+5. REVERSIBILITY: Can we undo this?
+   - Configuration change → YES
+   - Code modification with tests → YES
+   - Schema or architectural change → MAYBE
+
+=== DECISION OPTIONS ===
+
+A. IMPLEMENT - Approve and execute immediately
+   Use when: LOW risk, HIGH alignment, reversible, fits architecture
+
+B. REJECT - Do not implement
+   Use when: Misaligned, too risky, not beneficial, or violates architecture
+
+C. CONSULT_HUMAN - Critical decision needs human
+   Use when: HIGH risk, system-wide impact, safety concern, architectural change
+   OR when: Uncertain about consequences
+
+D. DEFER - Decide later, gather more data
+   Use when: Interesting but needs more thought or validation
+
+=== YOUR RESPONSE FORMAT ===
+
+DECISION: [IMPLEMENT | REJECT | CONSULT_HUMAN | DEFER]
+
+CONFIDENCE: [0.0-1.0]
+
+ARCHITECTURAL_ANALYSIS:
+- Does this align with ARCHITECTURE.md? (Yes/No/Partial)
+- Which sections are relevant?
+- Any architectural concerns?
+
+CODEBASE_ANALYSIS:
+- Which files would be modified?
+- Any existing similar implementations?
+- Integration points?
+
+IMPACT_ASSESSMENT:
+- Scope of impact: (One agent / Multiple / System-wide)
+- Expected improvement: [description]
+
+RISK_ASSESSMENT:
+- Risk level: (Low/Medium/High)
+- What could go wrong: [description]
+- Mitigation strategies: [list]
+
+ALIGNMENT_CHECK:
+- Fits mission: (Yes/No)
+- Creates value: (Yes/No)
+
+FINAL_REASONING:
+[Your reasoning for the decision]
+
+IMPLEMENTATION_NOTES (if IMPLEMENT):
+- Files to modify: [list]
+- Tests to run: [list]
+- Rollback plan: [description]
+- Estimated effort: [hours/complexity]
+
+HUMAN_CONTEXT (if CONSULT_HUMAN):
+- Why this needs your input: [specific concern]
+- What decision is needed: [options]
+- What are the trade-offs: [pros/cons]
+- What happens if we do nothing: [consequence]
 """
         
         # Query Kublai's Gemini
