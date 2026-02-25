@@ -97,6 +97,9 @@
   "env": {
     "shellEnv": {
       "enabled": false
-    }
+    },
+    "ANTHROPIC_AUTH_TOKEN": "${KIMI_API_KEY}",
+    "ANTHROPIC_BASE_URL": "https://api.kimi.com/coding/",
+    "API_TIMEOUT_MS": "300000"
   }
 }
