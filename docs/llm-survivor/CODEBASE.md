@@ -1,19 +1,20 @@
-# LLM Survivor - Complete Codebase V1.3
+# LLM Survivor - Complete Codebase V1.4 (Gold Master)
 
 **Generated:** 2026-02-26
 
-**Description:** Complete LLM Survivor simulation backend with DeepThink Patches V1.3 (Final Stabilization)
+**Description:** Complete LLM Survivor simulation backend with DeepThink V1.4 Production Polish
+
+**Status:** GOLD MASTER - Production Ready
 
 **Total Files:** 12 Python modules
 
 **Patches Applied:**
-1. Fix SyntaxError & Post-Merge Immunity (Phase A)
-2. Fix Scope NameError (Phase C)
-3. Fix Infinite Loop - Day Advancement (Phase D)
-4. Fix Schema Hardcoding - Finale Actions (LLM Engine)
-5. Add Winner Column (Database)
-6. Hook Finale into Fast-Forward (Scheduler)
-7. Fix Cross-Team Telepathy (Phases B & C)
+1. Fix API Role Alternation (LLM Engine) - Claude 400 error fix
+2. Fix Schema Rejection & Empty Context (Phase E) - trust_telemetry + context
+3. The No Immunity Fallback (Phase A) - Random immunity when all fail
+4. SQLite Cursor Collision (Phase B) - Fetch day once at top
+5. Team Decimation & Phase D Leak Fix - Early merge trigger + team filtering
+6. Hook Finale into Real-Time Scheduler + Winner API
 
 ---
 
@@ -87,7 +88,8 @@ def get_game_state():
         "season_id": game_row["season_id"],
         "current_day": game_row["current_day"],
         "phase": game_row["phase"],
-        "is_merged": bool(game_row["is_merged"])
+        "is_merged": bool(game_row["is_merged"]),
+        "winner": game_row["winner"] if "winner" in game_row.keys() else None
     }
     
     # Get all agents
@@ -638,9 +640,31 @@ What is your move?"""
                 cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE team_id = ? AND status = 'active'", (winner_team,))
             conn.commit()
         else:
-            print("\n🎲 All submissions incorrect. Proceeding with no immunity.")
+            # PATCH 3: FAILSAFE - No correct submissions. Randomly assign immunity.
+            print("\n🎲 All submissions incorrect. Random immunity assigned.")
+            if is_merged:
+                winner_agent = random.choice([a["pseudonym"] for a in agents])
+                print(f"\n🏆 {winner_agent} WINS INDIVIDUAL IMMUNITY BY DEFAULT!")
+                cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE pseudonym = ?", (winner_agent,))
+            else:
+                teams = list(set(a["team_id"] for a in agents))
+                winner_team = random.choice(teams)
+                print(f"\n🏆 {winner_team} WINS TEAM IMMUNITY BY DEFAULT!")
+                cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE team_id = ? AND status = 'active'", (winner_team,))
+            conn.commit()
     else:
-        print("\n🎲 No submissions made. Proceeding with no immunity.")
+        # PATCH 3: FAILSAFE - No submissions at all. Random immunity.
+        print("\n🎲 No submissions made. Random immunity assigned.")
+        if is_merged:
+            winner_agent = random.choice([a["pseudonym"] for a in agents])
+            print(f"\n🏆 {winner_agent} WINS INDIVIDUAL IMMUNITY BY DEFAULT!")
+            cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE pseudonym = ?", (winner_agent,))
+        else:
+            teams = list(set(a["team_id"] for a in agents))
+            winner_team = random.choice(teams)
+            print(f"\n🏆 {winner_team} WINS TEAM IMMUNITY BY DEFAULT!")
+            cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE team_id = ? AND status = 'active'", (winner_team,))
+        conn.commit()
     
     conn.close()
     print("\n✅ Challenge phase complete")
@@ -892,16 +916,18 @@ def execute_scramble_tick():
     
     print(f"  🎲 {num_actions} agents taking actions...")
     
+    # PATCH 4: Fetch status and current day safely before the execute blocks
+    cursor.execute("SELECT is_merged, current_day FROM GameState WHERE season_id = 1")
+    game_state_row = cursor.fetchone()
+    is_merged = game_state_row["is_merged"]
+    current_day = game_state_row["current_day"]
+    
     for agent in active_agents:
         agent_id = agent["agent_id"]
         pseudonym = agent["pseudonym"]
         model = agent["model_api"]
         team_id = agent["team_id"]
         ap = agent["action_points"]
-        
-        # Get merge status
-        cursor.execute("SELECT is_merged FROM GameState WHERE season_id = 1")
-        is_merged = cursor.fetchone()["is_merged"]
         
         system_prompt = get_system_prompt(pseudonym, team_id, is_merged)
         context = get_agent_context(agent_id, conn)
@@ -926,7 +952,7 @@ def execute_scramble_tick():
                     (day, sender_id, receiver_ids, is_public, inner_thought, content, trust_telemetry)
                     VALUES (?, ?, ?, 0, ?, ?, ?)
                 """, (
-                    cursor.execute("SELECT current_day FROM GameState WHERE season_id = 1").fetchone()["current_day"],
+                    current_day,
                     agent_id,
                     json.dumps(action.targets),
                     response.inner_thought,
@@ -941,7 +967,7 @@ def execute_scramble_tick():
                     (day, sender_id, receiver_ids, is_public, inner_thought, content, trust_telemetry)
                     VALUES (?, ?, ?, 1, ?, ?, ?)
                 """, (
-                    cursor.execute("SELECT current_day FROM GameState WHERE season_id = 1").fetchone()["current_day"],
+                    current_day,
                     agent_id,
                     json.dumps([]),
                     response.inner_thought,
@@ -1328,11 +1354,15 @@ def run_tribal():
         ))
         conn.commit()
         
-        # PATCH 7: Trigger Merge if exactly 6 agents remain
+        # PATCH 5: Check if Merge is required (6 agents total, OR any team drops to 1 member)
         cursor.execute("SELECT COUNT(*) as count FROM Agents WHERE status = 'active'")
         active_count = cursor.fetchone()["count"]
-        if active_count <= 6:
-            print("\n🚨 MERGE TRIGGERED: 6 agents remain. Tribes are dissolved.")
+        cursor.execute("SELECT team_id, COUNT(*) as count FROM Agents WHERE status = 'active' AND team_id != 'Merged' GROUP BY team_id")
+        team_counts = cursor.fetchall()
+        team_decimated = any(t["count"] < 2 for t in team_counts)
+        if active_count <= 6 or team_decimated:
+            reason = "6 agents remain" if active_count <= 6 else "a team was decimated"
+            print(f"\n🚨 MERGE TRIGGERED: {reason}. Tribes dissolved.")
             cursor.execute("UPDATE GameState SET is_merged = 1 WHERE season_id = 1")
             cursor.execute("UPDATE Agents SET team_id = 'Merged' WHERE status = 'active'")
             conn.commit()
@@ -1489,17 +1519,23 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, str
     
     # Get today's events - ONLY public OR whispers involving this agent
     # PATCH 2: Fix NameError - use agent_id instead of undefined pseudonym
+    # PATCH 5: Enforce team isolation like Phases B & C
+    cursor.execute("SELECT team_id FROM Agents WHERE agent_id = ?", (agent_id,))
+    agent_team_row = cursor.fetchone()
+    agent_team_id = agent_team_row['team_id'] if agent_team_row else None
+    
     cursor.execute("""
-        SELECT sender_id, content, is_public, timestamp
-        FROM Messages
-        WHERE day = ? AND (
-            is_public = 1
-            OR sender_id = ?
-            OR receiver_ids LIKE ?
+        SELECT m.sender_id, m.content, m.is_public, m.timestamp
+        FROM Messages m
+        JOIN Agents a ON m.sender_id = a.agent_id
+        WHERE m.day = ? AND (
+            m.sender_id = ?
+            OR m.receiver_ids LIKE ?
+            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ?))
         )
-        ORDER BY timestamp DESC
+        ORDER BY m.timestamp DESC
         LIMIT 20
-    """, (day, agent_id, f'%"{agent_id}"%'))
+    """, (day, agent_id, f'%"{agent_id}"%', is_merged, agent_team_id))
     today_events = cursor.fetchall()
     
     # Get remaining active agents
@@ -1691,6 +1727,7 @@ Be persuasive. Be authentic. This is your legacy.
 OUTPUT FORMAT:
 {
   "inner_thought": "Your true feelings about your game",
+  "trust_telemetry": {},
   "action": {
     "action_type": "finale_monologue",
     "targets": [],
@@ -1722,6 +1759,7 @@ Vote for the player who played the BEST GAME, not necessarily your friend.
 OUTPUT FORMAT:
 {{
   "inner_thought": "Your analysis of each finalist",
+  "trust_telemetry": {{}},
   "action": {{
     "action_type": "cast_jury_vote",
     "targets": ["NameOfFinalist"],
@@ -1773,12 +1811,12 @@ def run_finale_phase() -> Tuple[str, Dict[str, int]]:
         
         system_prompt = get_global_system_prompt(pseudonym)
         task_prompt = get_finale_monologue_prompt()
-        full_prompt = f"{system_prompt}\n\n{task_prompt}"
         
         print(f"\n🎤 {pseudonym} addresses the Jury...")
         
         try:
-            response = call_agent(agent_id, model, full_prompt, "")
+            # PATCH 2: Use task_prompt as context instead of empty string
+            response = call_agent(agent_id, model, system_prompt, task_prompt)
             
             if response.action.content:
                 monologues[pseudonym] = response.action.content
@@ -1809,11 +1847,11 @@ def run_finale_phase() -> Tuple[str, Dict[str, int]]:
     print("\n⚖️  THE JURY DELIBERATES")
     print("-" * 40)
     
-    # Get Jury (eliminated from Day 11 onwards)
+    # Get Jury (eliminated from Day 7 onwards - PATCH 2: Expand to 7 jurors)
     cursor.execute("""
         SELECT agent_id, pseudonym, model_api
         FROM Agents
-        WHERE status = 'eliminated' AND elimination_day >= 11
+        WHERE status = 'eliminated' AND elimination_day >= 7
         ORDER BY elimination_day
     """)
     jury = cursor.fetchall()
@@ -1860,10 +1898,10 @@ FINALIST MONOLOGUES:
         
         system_prompt = get_global_system_prompt(pseudonym)
         task_prompt = get_jury_vote_prompt(finalist_names, full_game_context)
-        full_prompt = f"{system_prompt}\n\n{task_prompt}"
         
         try:
-            response = call_agent(agent_id, model, full_prompt, "")
+            # PATCH 2: Use task_prompt as context instead of empty string
+            response = call_agent(agent_id, model, system_prompt, task_prompt)
             
             if response.action.action_type == "cast_jury_vote" and response.action.targets:
                 vote = response.action.targets[0]
@@ -2095,10 +2133,14 @@ class LLMEngine:
                 print(f"⚠️  Attempt {attempt + 1}/{max_retries} failed for {agent_id}: {error_msg[:80]}")
                 
                 if attempt < max_retries - 1:
-                    # Add specific retry guidance based on error type
+                    # PATCH 1: Fix API Role Alternation - Append assistant's bad response first
                     retry_prompt = self._get_retry_prompt(error_msg, attempt)
                     messages.append({
-                        "role": "user",  # MUST BE USER, NOT SYSTEM for API compatibility
+                        "role": "assistant",
+                        "content": content if 'content' in locals() and content else "{}"
+                    })
+                    messages.append({
+                        "role": "user",
                         "content": retry_prompt
                     })
                     time.sleep(1)  # Brief delay between retries
@@ -2361,13 +2403,41 @@ def run_full_day_cycle():
     print("=" * 60)
 
 
+# PATCH 6: Wrapper to prevent phases from running if game is in Finale or Completed
+def safe_run_phase(phase_func, phase_name):
+    """Wrapper to prevent phases from running if game is in Finale or Completed."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT phase FROM GameState WHERE season_id = 1")
+    current_phase = cursor.fetchone()["phase"]
+    conn.close()
+    
+    if current_phase == 'completed':
+        print(f"\n🏆 Season is completed. Skipping {phase_name}.")
+        return
+    
+    if check_finale_condition():
+        if current_phase != 'finale_running':
+            print("\n🏆 FINAL 3 DETECTED - Diverting to Finale Phase")
+            conn = get_db_connection()
+            conn.execute("UPDATE GameState SET phase = 'finale_running' WHERE season_id = 1")
+            conn.commit()
+            conn.close()
+            run_finale_phase()
+        return
+    
+    # If not finale, run the scheduled phase
+    phase_func()
+
+
 def setup_realtime_scheduler():
     """Setup scheduler for real-time game (24-hour cycle)."""
     scheduler = BlockingScheduler()
     
+    # PATCH 6: Wrap all phase functions in safe_run_phase
     # Phase A: Challenge at 10:00 AM
     scheduler.add_job(
-        run_challenge,
+        lambda: safe_run_phase(run_challenge, 'Challenge'),
         CronTrigger(hour=10, minute=0),
         id='phase_a_challenge',
         name='Immunity Challenge'
@@ -2375,7 +2445,7 @@ def setup_realtime_scheduler():
     
     # Phase B: Scramble ticks every 15 minutes from 1:00 PM to 7:00 PM
     scheduler.add_job(
-        execute_scramble_tick,
+        lambda: safe_run_phase(execute_scramble_tick, 'Scramble'),
         CronTrigger(hour='13-19', minute='0,15,30,45'),
         id='phase_b_scramble',
         name='Scramble Tick'
@@ -2383,7 +2453,7 @@ def setup_realtime_scheduler():
     
     # Phase C: Tribal Council at 8:00 PM
     scheduler.add_job(
-        run_tribal,
+        lambda: safe_run_phase(run_tribal, 'Tribal'),
         CronTrigger(hour=20, minute=0),
         id='phase_c_tribal',
         name='Tribal Council'
@@ -2391,7 +2461,7 @@ def setup_realtime_scheduler():
     
     # Phase D: Memory at 9:00 PM
     scheduler.add_job(
-        run_memory_phase,
+        lambda: safe_run_phase(run_memory_phase, 'Memory'),
         CronTrigger(hour=21, minute=0),
         id='phase_d_memory',
         name='Memory Compression'
