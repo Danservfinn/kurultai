@@ -1,19 +1,19 @@
-# LLM Survivor - Complete Codebase V1.2
+# LLM Survivor - Complete Codebase V1.3
 
 **Generated:** 2026-02-26
 
-**Description:** Complete LLM Survivor simulation backend with DeepThink Patches V1.2 applied
+**Description:** Complete LLM Survivor simulation backend with DeepThink Patches V1.3 (Final Stabilization)
 
 **Total Files:** 12 Python modules
 
 **Patches Applied:**
-1. Fix Omniscience Leak (Phases B & C) - Filter messages for privacy
-2. Fix Phase D NameError - Use agent_id instead of undefined pseudonym
-3. Fix Cross-Team Contamination (Phase B) - Only same team pre-merge
-4. Remove Sequential Bias (Phase A) - All agents attempt, most correct wins
-5. Fix Memory Bloat (Phase D) - Overwrite memory (not append)
-6. Add Strict Target Validation (Phase C) - Penalize hallucinations
-7. Implement Finale Phase (Phase E) - Final 3 + Jury vote
+1. Fix SyntaxError & Post-Merge Immunity (Phase A)
+2. Fix Scope NameError (Phase C)
+3. Fix Infinite Loop - Day Advancement (Phase D)
+4. Fix Schema Hardcoding - Finale Actions (LLM Engine)
+5. Add Winner Column (Database)
+6. Hook Finale into Fast-Forward (Scheduler)
+7. Fix Cross-Team Telepathy (Phases B & C)
 
 ---
 
@@ -253,7 +253,8 @@ def init_database():
             season_id INTEGER PRIMARY KEY,
             current_day INTEGER DEFAULT 1,
             phase TEXT DEFAULT 'challenge',
-            is_merged BOOLEAN DEFAULT 0
+            is_merged BOOLEAN DEFAULT 0,
+            winner TEXT DEFAULT NULL
         )
     """)
     
@@ -611,69 +612,35 @@ What is your move?"""
             print(f"  ❌ {pseudonym} failed: {str(e)[:50]}")
             continue
     
-    # PATCH 4: Award immunity based on most correct answers (not first)
+    # PATCH 1: Check merge status and award immunity correctly
+    cursor.execute("SELECT is_merged FROM GameState WHERE season_id = 1")
+    is_merged = cursor.fetchone()["is_merged"]
+    
+    # Determine winner based on submissions
     if submissions:
-        # Count correct answers per team
-        team_correct = {}
-        for sub in submissions:
-            if sub["correct"]:
-                team = sub["team"]
-                team_correct[team] = team_correct.get(team, 0) + 1
-        
-        if team_correct:
-            # Find team(s) with most correct answers
-            max_correct = max(team_correct.values())
-            winning_teams = [t for t, c in team_correct.items() if c == max_correct]
-            
-            # If tie, pick randomly
-            winner_team = random.choice(winning_teams)
-            
-            print(f"\n🏆 {winner_team} WINS IMMUNITY!")
-            print(f"   Correct answers: {team_correct.get(winner_team, 0)}")
-            cursor.execute("""
-                UPDATE Agents 
-                SET has_immunity = 1 
-                WHERE team_id = ? AND status = 'active'
-            """, (winner_team,))
+        correct_subs = [s for s in submissions if s["correct"]]
+        if correct_subs:
+            if is_merged:
+                # INDIVIDUAL IMMUNITY
+                winner_agent = random.choice([s["agent"] for s in correct_subs])
+                print(f"\n🏆 {winner_agent} WINS INDIVIDUAL IMMUNITY!")
+                cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE pseudonym = ?", (winner_agent,))
+            else:
+                # TEAM IMMUNITY
+                team_correct = {}
+                for sub in correct_subs:
+                    team = sub["team"]
+                    team_correct[team] = team_correct.get(team, 0) + 1
+                max_correct = max(team_correct.values())
+                winning_teams = [t for t, c in team_correct.items() if c == max_correct]
+                winner_team = random.choice(winning_teams)
+                print(f"\n🏆 {winner_team} WINS IMMUNITY!")
+                cursor.execute("UPDATE Agents SET has_immunity = 1 WHERE team_id = ? AND status = 'active'", (winner_team,))
             conn.commit()
         else:
-            # No correct answers - random team wins
-            teams = list(set(a["team_id"] for a in agents))
-            winner_team = random.choice(teams)
-            print(f"\n🎲 No correct submissions. {winner_team} wins immunity.")
-            cursor.execute("""
-                UPDATE Agents 
-                SET has_immunity = 1 
-                WHERE team_id = ? AND status = 'active'
-            """, (winner_team,))
-            conn.commit()
+            print("\n🎲 All submissions incorrect. Proceeding with no immunity.")
     else:
-        # No submissions at all - random team wins
-        teams = list(set(a["team_id"] for a in agents))
-        winner_team = random.choice(teams)
-        print(f"\n🎲 No submissions. {winner_team} wins immunity.")
-        cursor.execute("""
-            UPDATE Agents 
-            SET has_immunity = 1 
-            WHERE team_id = ? AND status = 'active'
-        """, (winner_team,))
-        conn.commit()
-                    
-        except Exception as e:
-            print(f"  ❌ {pseudonym} failed: {str(e)[:50]}")
-            continue
-    
-    # If no correct submission, random team wins
-    if not winner:
-        teams = list(set(a["team_id"] for a in agents))
-        winner_team = random.choice(teams)
-        print(f"\n🎲 No correct submissions. {winner_team} wins immunity.")
-        cursor.execute("""
-            UPDATE Agents 
-            SET has_immunity = 1 
-            WHERE team_id = ? AND status = 'active'
-        """, (winner_team,))
-        conn.commit()
+        print("\n🎲 No submissions made. Proceeding with no immunity.")
     
     conn.close()
     print("\n✅ Challenge phase complete")
@@ -814,18 +781,19 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> str:
         """, (agent_id, team_id))
     valid_targets = [row['pseudonym'] for row in cursor.fetchall()]
     
-    # PATCH 1: Fix Omniscience Leak - Filter messages for privacy
+    # PATCH 7: Fix Cross-Team Telepathy - Filter public messages by team pre-merge
     cursor.execute("""
-        SELECT sender_id, content, is_public, timestamp
-        FROM Messages 
-        WHERE day = ? AND (
-            is_public = 1 
-            OR sender_id = ? 
-            OR receiver_ids LIKE ?
+        SELECT m.sender_id, m.content, m.is_public, m.timestamp
+        FROM Messages m
+        JOIN Agents a ON m.sender_id = a.agent_id
+        WHERE m.day = ? AND (
+            m.sender_id = ? 
+            OR m.receiver_ids LIKE ?
+            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ?))
         )
-        ORDER BY timestamp DESC
+        ORDER BY m.timestamp DESC
         LIMIT 15
-    """, (current_day, agent_id, f'%"{agent_id}"%'))
+    """, (current_day, agent_id, f'%"{agent_id}"%', is_merged, team_id))
     recent_messages = cursor.fetchall()
     
     # Get trust telemetry history from previous messages (own data only)
@@ -1142,18 +1110,24 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, Lis
     # Get immune agents list
     immune_agents = [a['pseudonym'] for a in agents if a['has_immunity']]
     
-    # PATCH 1: Fix Omniscience Leak - Filter messages for privacy
+    # PATCH 7: Fix Cross-Team Telepathy - Need agent's team_id for filtering
+    cursor.execute("SELECT team_id FROM Agents WHERE agent_id = ?", (agent_id,))
+    agent_team_row = cursor.fetchone()
+    agent_team_id = agent_team_row["team_id"] if agent_team_row else None
+    
+    # PATCH 1 & 7: Fix Omniscience Leak and Cross-Team Telepathy
     cursor.execute("""
-        SELECT sender_id, content, is_public, timestamp
-        FROM Messages
-        WHERE day = ? AND (
-            is_public = 1
-            OR sender_id = ?
-            OR receiver_ids LIKE ?
+        SELECT m.sender_id, m.content, m.is_public, m.timestamp
+        FROM Messages m
+        JOIN Agents a ON m.sender_id = a.agent_id
+        WHERE m.day = ? AND (
+            m.sender_id = ?
+            OR m.receiver_ids LIKE ?
+            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ?))
         )
-        ORDER BY timestamp DESC
+        ORDER BY m.timestamp DESC
         LIMIT 15
-    """, (day, agent_id, f'%"{agent_id}"%'))
+    """, (day, agent_id, f'%"{agent_id}"%', is_merged, agent_team_id))
     discussion = cursor.fetchall()
     
     # Build voting options (everyone except self and immune)
@@ -1222,10 +1196,6 @@ def cast_votes():
     
     votes: Dict[str, str] = {}
     
-    # PATCH 6: Generate eligible targets list for validation
-    eligible_targets = [a['pseudonym'] for a in agents 
-                       if a['agent_id'] != agent_id and not a['has_immunity']]
-    
     print(f"\n🗳️  Casting votes ({len(agents)} eligible)...")
     
     for agent in agents:
@@ -1233,6 +1203,10 @@ def cast_votes():
         pseudonym = agent["pseudonym"]
         model = agent["model_api"]
         is_immunity = agent["has_immunity"]
+        
+        # PATCH 2: Generate targets inside the loop where agent_id is defined
+        eligible_targets = [a['pseudonym'] for a in agents 
+                           if a['agent_id'] != agent_id and not a['has_immunity']]
         
         context, immune_agents = get_agent_context(agent_id, conn)
         system_prompt = get_system_prompt(pseudonym, is_immunity, immune_agents)
@@ -1658,8 +1632,16 @@ Threat Analysis: {json.dumps(response.trust_telemetry)}"""
             print(f"  ❌ {pseudonym} failed: {str(e)[:40]}")
             continue
     
+    # PATCH 3: Advance the game to the next day and reset phase
+    cursor.execute("""
+        UPDATE GameState 
+        SET current_day = current_day + 1, phase = 'challenge'
+        WHERE season_id = 1
+    """)
+    conn.commit()
+    
     conn.close()
-    print("\n✅ Memory compression complete")
+    print(f"\n✅ Memory compression complete. Advanced to Day {day + 1}.")
 
 
 if __name__ == "__main__":
@@ -1991,15 +1973,15 @@ if not OPENROUTER_API_KEY:
 class ActionPayload(BaseModel):
     """Action specification for agent responses."""
     action_type: str = Field(
-        description="Type of action: whisper, public_chat, idle, submit_solution, vote, confessional"
+        description="Type of action: whisper, public_chat, idle, submit_solution, vote, confessional, finale_monologue, cast_jury_vote"
     )
     targets: Optional[list] = Field(
         default=None,
-        description="Target agents for the action (e.g., whisper recipients)"
+        description="Target agents for the action (e.g., whisper recipients, vote target)"
     )
     content: Optional[str] = Field(
         default=None,
-        description="Content of the action (message, solution, vote reasoning)"
+        description="Content of the action (message, solution, vote reasoning, monologue)"
     )
 
 
@@ -2096,8 +2078,11 @@ class LLMEngine:
                     # Validate with Pydantic
                     validated = AgentResponse(**parsed)
                     
-                    # Additional validation: Check action_type is valid
-                    valid_actions = ['whisper', 'public_chat', 'idle', 'submit_solution', 'vote', 'confessional']
+                    # PATCH 4: Include Finale actions in validation
+                    valid_actions = [
+                        'whisper', 'public_chat', 'idle', 'submit_solution', 'vote', 'confessional',
+                        'finale_monologue', 'cast_jury_vote'
+                    ]
                     if validated.action.action_type not in valid_actions:
                         raise ValueError(f"Invalid action_type: {validated.action.action_type}")
                     
@@ -2420,10 +2405,16 @@ def run_fast_forward(days: int = 14):
     Fast-forward mode: Run multiple days quickly for testing.
     Each phase executes with 2-second delays instead of hours.
     """
-    print(f"\n🚀 FAST-FORWARD MODE: Simulating {days} days")
+    print(f"\n🚀 FAST-FORWARD MODE: Simulating up to {days} days")
     print("=" * 60)
     
     for day in range(1, days + 1):
+        # PATCH 6: Check for Finale before running day
+        if check_finale_condition():
+            print("\n🏆 FINAL 3 DETECTED - Halting loop to run Finale Phase")
+            run_finale_phase()
+            break
+        
         print(f"\n{'='*60}")
         print(f"📅 DAY {day}")
         print("=" * 60)
