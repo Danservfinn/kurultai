@@ -1,6 +1,26 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+// Zero-dependency 8-bit blip generator
+const playBlip = () => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(400 + Math.random() * 100, ctx.currentTime);
+    gain.gain.setValueAtTime(0.015, ctx.currentTime);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.03);
+  } catch (e) {
+    /* Ignore audio policy blocks */
+  }
+};
 
 interface DialogBoxProps {
   text: string;
@@ -9,6 +29,16 @@ interface DialogBoxProps {
 export function DialogBox({ text }: DialogBoxProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const audioEnabled = useRef(false);
+
+  // Unlock audio context on first click anywhere
+  useEffect(() => {
+    const enableAudio = () => {
+      audioEnabled.current = true;
+    };
+    window.addEventListener('click', enableAudio, { once: true });
+    return () => window.removeEventListener('click', enableAudio);
+  }, []);
 
   useEffect(() => {
     // Reset when text changes
@@ -20,6 +50,12 @@ export function DialogBox({ text }: DialogBoxProps) {
     const intervalId = setInterval(() => {
       if (currentIndex < text.length) {
         setDisplayedText(text.slice(0, currentIndex + 1));
+        
+        // Play blip every 3 characters to sound like GBC text
+        if (audioEnabled.current && currentIndex % 3 === 0 && text[currentIndex] !== ' ') {
+          playBlip();
+        }
+        
         currentIndex++;
       } else {
         setIsComplete(true);

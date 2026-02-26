@@ -8,38 +8,42 @@ interface PhaseBScrambleProps {
 }
 
 export function PhaseBScramble({ data }: PhaseBScrambleProps) {
-  const activeAgents = data.agents.filter(a => a.status === 'active');
-  
   // Get latest whispers (non-public messages)
   const whispers = data.messages
     .filter(m => !m.is_public && m.sender_id !== 'SYSTEM')
     .sort((a, b) => b.id - a.id)
     .slice(0, 15);
   
-  // Create a grid layout for agents
-  const gridPositions = [
-    [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0],
-    [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1],
-  ];
+  // Sort ALL agents alphabetically so they maintain permanent grid spots
+  const allAgents = [...data.agents].sort((a, b) => a.pseudonym.localeCompare(b.pseudonym));
 
   return (
     <div className="h-full relative bg-gbc-bg">
-      {/* Grid Container */}
-      <div className="grid grid-cols-8 grid-rows-2 gap-4 p-4 h-full">
-        {activeAgents.map((agent, index) => {
-          const pos = gridPositions[index] || [index % 8, Math.floor(index / 8)];
+      {/* 4x4 Grid */}
+      <div className="grid grid-cols-4 grid-rows-4 gap-4 p-4 h-full relative z-10">
+        {allAgents.map((agent, index) => {
+          const col = (index % 4) + 1;
+          const row = Math.floor(index / 4) + 1;
+          
+          if (agent.status !== 'active') {
+            // Render empty placeholder for eliminated agents
+            return <div key={agent.agent_id} style={{ gridColumn: col, gridRow: row }} />;
+          }
           
           return (
             <div 
               key={agent.agent_id}
               className="flex flex-col items-center justify-center"
-              style={{ gridColumn: pos[0] + 1, gridRow: pos[1] + 1 }}
+              style={{ gridColumn: col, gridRow: row }}
             >
               {/* HP Bar (Action Points) */}
-              <div className="w-12 h-2 bg-gbc-black mb-1 border-2 border-gbc-black">
+              <div className="w-12 h-2 bg-gbc-black mb-1 border-[1px] border-gbc-black">
                 <div 
-                  className="h-full bg-pkmn-red transition-all duration-300"
-                  style={{ width: `${(agent.action_points / 5) * 100}%` }}
+                  className="h-full transition-all duration-300"
+                  style={{ 
+                    width: `${(agent.action_points / 5) * 100}%`,
+                    backgroundColor: agent.action_points > 2 ? 'var(--color-gbc-primary)' : 'var(--color-pkmn-red)'
+                  }}
                 />
               </div>
               <AgentSprite agent={agent} scale={0.8} />
@@ -49,29 +53,23 @@ export function PhaseBScramble({ data }: PhaseBScrambleProps) {
       </div>
       
       {/* Spy Lines Overlay */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
         {whispers.map((whisper, index) => {
-          // Find sender and receiver positions (simplified)
-          const senderIndex = activeAgents.findIndex(a => a.pseudonym === whisper.sender_id);
-          const receiverIndex = activeAgents.findIndex(a => 
+          const senderIndex = allAgents.findIndex(a => a.pseudonym === whisper.sender_id);
+          const receiverIndex = allAgents.findIndex(a => 
             whisper.receiver_ids.includes(a.pseudonym)
           );
           
           if (senderIndex === -1 || receiverIndex === -1) return null;
           
-          // Calculate positions (approximate for grid)
-          const senderPos = gridPositions[senderIndex] || [0, 0];
-          const receiverPos = gridPositions[receiverIndex] || [0, 0];
+          // Calculate center of grid cells (4x4)
+          const x1 = ((senderIndex % 4) * 25) + 12.5;
+          const y1 = (Math.floor(senderIndex / 4) * 25) + 12.5;
+          const x2 = ((receiverIndex % 4) * 25) + 12.5;
+          const y2 = (Math.floor(receiverIndex / 4) * 25) + 12.5;
           
-          const x1 = (senderPos[0] / 8) * 100 + 6.25;
-          const y1 = (senderPos[1] / 2) * 100 + 25;
-          const x2 = (receiverPos[0] / 8) * 100 + 6.25;
-          const y2 = (receiverPos[1] / 2) * 100 + 25;
-          
-          // Get trust score for the receiver
           const receiverName = whisper.receiver_ids[0];
-          const trustScore = whisper.trust_telemetry[receiverName] || 5;
-          const isTrusted = trustScore > 5;
+          const isTrusted = (whisper.trust_telemetry[receiverName] || 5) > 5;
           
           return (
             <line
@@ -80,10 +78,10 @@ export function PhaseBScramble({ data }: PhaseBScrambleProps) {
               y1={`${y1}%`}
               x2={`${x2}%`}
               y2={`${y2}%`}
-              stroke={isTrusted ? '#346856' : '#f85858'}
-              strokeWidth="4"
-              strokeDasharray={isTrusted ? undefined : '8,8'}
-              opacity="0.7"
+              stroke={isTrusted ? 'var(--color-gbc-dark)' : 'var(--color-pkmn-red)'}
+              strokeWidth="3"
+              strokeDasharray={isTrusted ? undefined : '5,5'}
+              opacity="0.6"
             />
           );
         })}

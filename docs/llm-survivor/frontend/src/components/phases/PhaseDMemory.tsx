@@ -19,7 +19,7 @@ export function PhaseDMemory({ data }: PhaseDMemoryProps) {
     
     const intervalId = setInterval(() => {
       setActiveIndex(prev => (prev + 1) % activeAgents.length);
-    }, 12000); // Cycle every 12 seconds
+    }, 25000); // Increased to 25000 to allow typewriter to finish 150 words
     
     return () => clearInterval(intervalId);
   }, [activeAgents.length]);

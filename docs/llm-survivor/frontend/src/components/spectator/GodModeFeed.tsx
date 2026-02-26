@@ -5,11 +5,14 @@ import { Brain, MessageCircle } from 'lucide-react';
 
 interface GodModeFeedProps {
   messages: Message[];
+  currentPhase: string;
 }
 
-export function GodModeFeed({ messages }: GodModeFeedProps) {
-  // Sort by newest first
-  const sortedMessages = [...messages].sort((a, b) => b.id - a.id);
+export function GodModeFeed({ messages, currentPhase }: GodModeFeedProps) {
+  // Sort by newest first and filter out spoilers during tribal
+  const sortedMessages = [...messages]
+    .sort((a, b) => b.id - a.id)
+    .filter(msg => !(currentPhase === 'tribal' && msg.sender_id === 'SYSTEM' && msg.content.includes('voted out')));
   
   // Get the most recent trust score for display
   const getTrustScore = (msg: Message): number | null => {

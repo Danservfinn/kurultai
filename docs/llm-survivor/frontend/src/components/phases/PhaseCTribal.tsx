@@ -18,18 +18,19 @@ export function PhaseCTribal({ data }: PhaseCTribalProps) {
   const immuneAgents = activeAgents.filter(a => a.has_immunity);
   
   const votes = data.votes || [];
+  const votesLength = votes.length;
   
   useEffect(() => {
-    if (votes.length === 0) return;
+    if (votesLength === 0) return;
     
     // Start revealing votes
-    if (revealedVoteIndex < votes.length - 1) {
+    if (revealedVoteIndex < votesLength - 1) {
       const timer = setTimeout(() => {
         setRevealedVoteIndex(prev => prev + 1);
       }, 4000);
       
       return () => clearTimeout(timer);
-    } else if (revealedVoteIndex === votes.length - 1 && !eliminatedAgent) {
+    } else if (revealedVoteIndex === votesLength - 1 && !eliminatedAgent) {
       // All votes revealed - determine eliminated agent
       const voteCounts: Record<string, number> = {};
       votes.forEach(vote => {
@@ -43,7 +44,8 @@ export function PhaseCTribal({ data }: PhaseCTribalProps) {
       
       setEliminatedAgent(eliminated);
     }
-  }, [revealedVoteIndex, votes, eliminatedAgent]);
+    // Track votesLength (primitive integer), NOT votes (reference array)
+  }, [revealedVoteIndex, votesLength, eliminatedAgent]);
   
   const currentVote = votes[revealedVoteIndex];
   const dialogText = currentVote 

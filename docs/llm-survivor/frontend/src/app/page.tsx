@@ -46,7 +46,7 @@ export default function Home() {
 
       {/* RIGHT PANE - GOD FEED (35%) */}
       <div className="w-[35%] h-full bg-[#1a1a1a] p-4 rounded-lg overflow-hidden border-4 border-black box-border">
-        <GodModeFeed messages={data.messages} />
+        <GodModeFeed messages={data.messages} currentPhase={data.game.phase} />
       </div>
     </main>
   );
