@@ -1,20 +1,21 @@
-# LLM Survivor - Complete Codebase V1.4 (Gold Master)
+# LLM Survivor - Complete Codebase V1.5 (UI-Bridge)
 
 **Generated:** 2026-02-26
 
-**Description:** Complete LLM Survivor simulation backend with DeepThink V1.4 Production Polish
+**Description:** Complete LLM Survivor backend with V1.5 UI-Bridge patches for React frontend
 
-**Status:** GOLD MASTER - Production Ready
+**Status:** UI-BRIDGE COMPLETE - Ready for React Frontend
 
 **Total Files:** 12 Python modules
 
 **Patches Applied:**
-1. Fix API Role Alternation (LLM Engine) - Claude 400 error fix
-2. Fix Schema Rejection & Empty Context (Phase E) - trust_telemetry + context
-3. The No Immunity Fallback (Phase A) - Random immunity when all fail
-4. SQLite Cursor Collision (Phase B) - Fetch day once at top
-5. Team Decimation & Phase D Leak Fix - Early merge trigger + team filtering
-6. Hook Finale into Real-Time Scheduler + Winner API
+1. Enable SQLite WAL Mode - Prevents DB locked errors during concurrent access
+2. Fix SYSTEM Message Blackhole - LEFT JOIN allows SYSTEM announcements
+3. Save Tribal Council Votes for UI - Votes table populated for animation
+4. Save Jury Votes for Finale - Jury votes recorded for UI reveal
+5. Allow API to Expose Finale Votes - API returns votes for finale/completed phases
+6. Schedule Scramble Initialization - AP assignment at 12:45 PM
+7. State Machine Broadcasters - Phase updates in real-time for UI sync
 
 ---
 
@@ -58,8 +59,9 @@ DATABASE_PATH = Path(__file__).parent / "survivor.db"
 
 def get_db_connection():
     """Get database connection with row factory."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=wal;')  # PATCH 1: Enable WAL mode
     return conn
 
 
@@ -145,9 +147,9 @@ def get_game_state():
             "timestamp": row["timestamp"]
         })
     
-    # Get recent votes (if in tribal phase)
+    # PATCH 5: Get recent votes (if in tribal, finale, or completed phase)
     votes = []
-    if game_state["phase"] == "tribal":
+    if game_state["phase"] in ["tribal", "finale_running", "completed"]:
         cursor.execute("""
             SELECT v.day, v.voter_id, v.target_id, a.pseudonym as target_pseudonym
             FROM Votes v
@@ -360,8 +362,9 @@ def seed_initial_state():
 
 def get_db_connection():
     """Get database connection with row factory."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=wal;')  # PATCH 1: Enable WAL mode
     return conn
 
 
@@ -512,6 +515,10 @@ def run_challenge():
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # PATCH 7: Broadcast challenge phase to database
+    cursor.execute("UPDATE GameState SET phase = 'challenge' WHERE season_id = 1")
+    conn.commit()
     
     # Get game state
     cursor.execute("SELECT current_day FROM GameState WHERE season_id = 1")
@@ -805,15 +812,19 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> str:
         """, (agent_id, team_id))
     valid_targets = [row['pseudonym'] for row in cursor.fetchall()]
     
-    # PATCH 7: Fix Cross-Team Telepathy - Filter public messages by team pre-merge
+    # PATCH 7: Broadcast scramble phase to database
+    cursor.execute("UPDATE GameState SET phase = 'scramble' WHERE season_id = 1")
+    conn.commit()
+    
+    # PATCH 2: Fix SQL Join - Use LEFT JOIN and allow SYSTEM messages
     cursor.execute("""
         SELECT m.sender_id, m.content, m.is_public, m.timestamp
         FROM Messages m
-        JOIN Agents a ON m.sender_id = a.agent_id
+        LEFT JOIN Agents a ON m.sender_id = a.agent_id
         WHERE m.day = ? AND (
             m.sender_id = ? 
             OR m.receiver_ids LIKE ?
-            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ?))
+            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ? OR m.sender_id = 'SYSTEM'))
         )
         ORDER BY m.timestamp DESC
         LIMIT 15
@@ -994,6 +1005,11 @@ def run_scramble():
     print("-" * 40)
     
     conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # PATCH 7: Broadcast scramble phase to database
+    cursor.execute("UPDATE GameState SET phase = 'scramble' WHERE season_id = 1")
+    conn.commit()
     
     # Assign AP at start of phase
     assign_action_points(conn)
@@ -1141,15 +1157,15 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, Lis
     agent_team_row = cursor.fetchone()
     agent_team_id = agent_team_row["team_id"] if agent_team_row else None
     
-    # PATCH 1 & 7: Fix Omniscience Leak and Cross-Team Telepathy
+    # PATCH 2: Fix SQL Join - Use LEFT JOIN and allow SYSTEM messages
     cursor.execute("""
         SELECT m.sender_id, m.content, m.is_public, m.timestamp
         FROM Messages m
-        JOIN Agents a ON m.sender_id = a.agent_id
+        LEFT JOIN Agents a ON m.sender_id = a.agent_id
         WHERE m.day = ? AND (
             m.sender_id = ?
             OR m.receiver_ids LIKE ?
-            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ?))
+            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ? OR m.sender_id = 'SYSTEM'))
         )
         ORDER BY m.timestamp DESC
         LIMIT 15
@@ -1331,8 +1347,20 @@ def run_tribal():
     cursor.execute("SELECT current_day FROM GameState WHERE season_id = 1")
     day = cursor.fetchone()["current_day"]
     
+    # PATCH 7: Broadcast tribal phase to database
+    cursor.execute("UPDATE GameState SET phase = 'tribal' WHERE season_id = 1")
+    conn.commit()
+    
     # Cast votes
     votes = cast_votes()
+    
+    # PATCH 3: SAVE VOTES TO DB FOR FRONTEND ANIMATION
+    for voter_name, target_name in votes.items():
+        cursor.execute("""
+            INSERT INTO Votes (day, voter_id, target_id)
+            VALUES (?, ?, ?)
+        """, (day, voter_name, target_name))
+    conn.commit()
     
     # Count and resolve
     eliminated, tied = count_votes(votes)
@@ -1517,21 +1545,16 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, str
     result = cursor.fetchone()
     eliminated_agent = result['pseudonym'] if result else "An agent"
     
-    # Get today's events - ONLY public OR whispers involving this agent
-    # PATCH 2: Fix NameError - use agent_id instead of undefined pseudonym
-    # PATCH 5: Enforce team isolation like Phases B & C
-    cursor.execute("SELECT team_id FROM Agents WHERE agent_id = ?", (agent_id,))
-    agent_team_row = cursor.fetchone()
-    agent_team_id = agent_team_row['team_id'] if agent_team_row else None
-    
+    # Get today's events - Enforce team isolation like Phases B & C
+    # PATCH 2: Fix SQL Join - Use LEFT JOIN and allow SYSTEM messages
     cursor.execute("""
         SELECT m.sender_id, m.content, m.is_public, m.timestamp
         FROM Messages m
-        JOIN Agents a ON m.sender_id = a.agent_id
+        LEFT JOIN Agents a ON m.sender_id = a.agent_id
         WHERE m.day = ? AND (
             m.sender_id = ?
             OR m.receiver_ids LIKE ?
-            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ?))
+            OR (m.is_public = 1 AND (? = 1 OR a.team_id = ? OR m.sender_id = 'SYSTEM'))
         )
         ORDER BY m.timestamp DESC
         LIMIT 20
@@ -1907,22 +1930,34 @@ FINALIST MONOLOGUES:
                 vote = response.action.targets[0]
                 if vote in votes:
                     votes[vote] += 1
+                    # PATCH 4: Record Jury vote for UI
+                    cursor.execute("INSERT INTO Votes (day, voter_id, target_id) VALUES (?, ?, ?)", (day, pseudonym, vote))
+                    conn.commit()
                     print(f"   ✉️  {pseudonym} votes for {vote}")
                 else:
                     # Invalid vote - random
                     random_finalist = random.choice(finalist_names)
                     votes[random_finalist] += 1
+                    # PATCH 4: Record Jury vote for UI
+                    cursor.execute("INSERT INTO Votes (day, voter_id, target_id) VALUES (?, ?, ?)", (day, pseudonym, random_finalist))
+                    conn.commit()
                     print(f"   🎲 {pseudonym} (invalid vote) -> {random_finalist}")
             else:
                 # No valid vote - random
                 random_finalist = random.choice(finalist_names)
                 votes[random_finalist] += 1
+                # PATCH 4: Record Jury vote for UI
+                cursor.execute("INSERT INTO Votes (day, voter_id, target_id) VALUES (?, ?, ?)", (day, pseudonym, random_finalist))
+                conn.commit()
                 print(f"   🎲 {pseudonym} (no vote) -> {random_finalist}")
                 
         except Exception as e:
             # Error - random vote
             random_finalist = random.choice(finalist_names)
             votes[random_finalist] += 1
+            # PATCH 4: Record Jury vote for UI
+            cursor.execute("INSERT INTO Votes (day, voter_id, target_id) VALUES (?, ?, ?)", (day, pseudonym, random_finalist))
+            conn.commit()
             print(f"   🎲 {pseudonym} (error) -> {random_finalist}")
     
     # Determine winner
@@ -2433,6 +2468,15 @@ def safe_run_phase(phase_func, phase_name):
 def setup_realtime_scheduler():
     """Setup scheduler for real-time game (24-hour cycle)."""
     scheduler = BlockingScheduler()
+    
+    # PATCH 6: Schedule Scramble Initialization
+    # Phase B: Initialization at 12:45 PM (Assigns AP)
+    scheduler.add_job(
+        lambda: safe_run_phase(run_scramble, 'Scramble Init'),
+        CronTrigger(hour=12, minute=45),
+        id='phase_b_init',
+        name='Scramble Initialization'
+    )
     
     # PATCH 6: Wrap all phase functions in safe_run_phase
     # Phase A: Challenge at 10:00 AM
