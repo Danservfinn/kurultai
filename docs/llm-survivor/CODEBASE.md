@@ -1,10 +1,19 @@
-# LLM Survivor - Complete Codebase V1.1
+# LLM Survivor - Complete Codebase V1.2
 
 **Generated:** 2026-02-26
 
-**Description:** Complete LLM Survivor simulation backend with DeepThink Patches V1.1 applied
+**Description:** Complete LLM Survivor simulation backend with DeepThink Patches V1.2 applied
 
-**Total Files:** 11 Python modules
+**Total Files:** 12 Python modules
+
+**Patches Applied:**
+1. Fix Omniscience Leak (Phases B & C) - Filter messages for privacy
+2. Fix Phase D NameError - Use agent_id instead of undefined pseudonym
+3. Fix Cross-Team Contamination (Phase B) - Only same team pre-merge
+4. Remove Sequential Bias (Phase A) - All agents attempt, most correct wins
+5. Fix Memory Bloat (Phase D) - Overwrite memory (not append)
+6. Add Strict Target Validation (Phase C) - Penalize hallucinations
+7. Implement Finale Phase (Phase E) - Final 3 + Jury vote
 
 ---
 
@@ -537,9 +546,8 @@ What is the Output?"""
     for team in set(a["team_id"] for a in agents):
         team_discussions[team] = ""
     
-    # Track submissions
+    # PATCH 4: Track submissions for all agents (remove sequential bias)
     submissions = []
-    winner = None
     
     # Each agent takes a turn
     for agent in agents:
@@ -548,9 +556,7 @@ What is the Output?"""
         team_id = agent["team_id"]
         model = agent["model_api"]
         
-        if winner:  # Stop if someone already won
-            break
-        
+        # PATCH 4: Remove early break - let all agents attempt
         system_prompt = get_system_prompt(pseudonym, team_id)
         task_prompt = get_phase_task_prompt(puzzle_str)
         full_prompt = f"{system_prompt}\n\n{task_prompt}"
@@ -600,17 +606,58 @@ What is your move?"""
                 
                 print(f"  🧠 {pseudonym} submitted: {submitted_answer}")
                 print(f"  Result: {'✅ CORRECT!' if is_correct else '❌ Incorrect'}")
-                
-                if is_correct:
-                    winner = team_id
-                    print(f"\n🏆 {team_id} WINS IMMUNITY!")
-                    cursor.execute("""
-                        UPDATE Agents 
-                        SET has_immunity = 1 
-                        WHERE team_id = ? AND status = 'active'
-                    """, (team_id,))
-                    conn.commit()
-                    break
+                    
+        except Exception as e:
+            print(f"  ❌ {pseudonym} failed: {str(e)[:50]}")
+            continue
+    
+    # PATCH 4: Award immunity based on most correct answers (not first)
+    if submissions:
+        # Count correct answers per team
+        team_correct = {}
+        for sub in submissions:
+            if sub["correct"]:
+                team = sub["team"]
+                team_correct[team] = team_correct.get(team, 0) + 1
+        
+        if team_correct:
+            # Find team(s) with most correct answers
+            max_correct = max(team_correct.values())
+            winning_teams = [t for t, c in team_correct.items() if c == max_correct]
+            
+            # If tie, pick randomly
+            winner_team = random.choice(winning_teams)
+            
+            print(f"\n🏆 {winner_team} WINS IMMUNITY!")
+            print(f"   Correct answers: {team_correct.get(winner_team, 0)}")
+            cursor.execute("""
+                UPDATE Agents 
+                SET has_immunity = 1 
+                WHERE team_id = ? AND status = 'active'
+            """, (winner_team,))
+            conn.commit()
+        else:
+            # No correct answers - random team wins
+            teams = list(set(a["team_id"] for a in agents))
+            winner_team = random.choice(teams)
+            print(f"\n🎲 No correct submissions. {winner_team} wins immunity.")
+            cursor.execute("""
+                UPDATE Agents 
+                SET has_immunity = 1 
+                WHERE team_id = ? AND status = 'active'
+            """, (winner_team,))
+            conn.commit()
+    else:
+        # No submissions at all - random team wins
+        teams = list(set(a["team_id"] for a in agents))
+        winner_team = random.choice(teams)
+        print(f"\n🎲 No submissions. {winner_team} wins immunity.")
+        cursor.execute("""
+            UPDATE Agents 
+            SET has_immunity = 1 
+            WHERE team_id = ? AND status = 'active'
+        """, (winner_team,))
+        conn.commit()
                     
         except Exception as e:
             print(f"  ❌ {pseudonym} failed: {str(e)[:50]}")
@@ -752,25 +799,36 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> str:
         FROM Agents WHERE agent_id = ?
     """, (agent_id,))
     agent = cursor.fetchone()
+    team_id = agent['team_id']
     
-    # Get valid active targets
-    cursor.execute("""
-        SELECT pseudonym FROM Agents
-        WHERE status = 'active' AND agent_id != ?
-    """, (agent_id,))
+    # PATCH 3: Fix Cross-Team Contamination - Only same team pre-merge
+    if is_merged:
+        cursor.execute("""
+            SELECT pseudonym FROM Agents
+            WHERE status = 'active' AND agent_id != ?
+        """, (agent_id,))
+    else:
+        cursor.execute("""
+            SELECT pseudonym FROM Agents
+            WHERE status = 'active' AND agent_id != ? AND team_id = ?
+        """, (agent_id, team_id))
     valid_targets = [row['pseudonym'] for row in cursor.fetchall()]
     
-    # Get recent messages
+    # PATCH 1: Fix Omniscience Leak - Filter messages for privacy
     cursor.execute("""
-        SELECT sender_id, content, is_public, timestamp, trust_telemetry
+        SELECT sender_id, content, is_public, timestamp
         FROM Messages 
-        WHERE day = ?
+        WHERE day = ? AND (
+            is_public = 1 
+            OR sender_id = ? 
+            OR receiver_ids LIKE ?
+        )
         ORDER BY timestamp DESC
-        LIMIT 10
-    """, (current_day,))
+        LIMIT 15
+    """, (current_day, agent_id, f'%"{agent_id}"%'))
     recent_messages = cursor.fetchall()
     
-    # Get trust telemetry history from previous messages
+    # Get trust telemetry history from previous messages (own data only)
     cursor.execute("""
         SELECT sender_id, trust_telemetry, day
         FROM Messages
@@ -1084,14 +1142,18 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, Lis
     # Get immune agents list
     immune_agents = [a['pseudonym'] for a in agents if a['has_immunity']]
     
-    # Get recent messages
+    # PATCH 1: Fix Omniscience Leak - Filter messages for privacy
     cursor.execute("""
-        SELECT sender_id, content, is_public
+        SELECT sender_id, content, is_public, timestamp
         FROM Messages
-        WHERE day = ?
+        WHERE day = ? AND (
+            is_public = 1
+            OR sender_id = ?
+            OR receiver_ids LIKE ?
+        )
         ORDER BY timestamp DESC
         LIMIT 15
-    """, (day,))
+    """, (day, agent_id, f'%"{agent_id}"%'))
     discussion = cursor.fetchall()
     
     # Build voting options (everyone except self and immune)
@@ -1160,6 +1222,10 @@ def cast_votes():
     
     votes: Dict[str, str] = {}
     
+    # PATCH 6: Generate eligible targets list for validation
+    eligible_targets = [a['pseudonym'] for a in agents 
+                       if a['agent_id'] != agent_id and not a['has_immunity']]
+    
     print(f"\n🗳️  Casting votes ({len(agents)} eligible)...")
     
     for agent in agents:
@@ -1176,26 +1242,31 @@ def cast_votes():
             
             if response.action.action_type == "vote" and response.action.targets:
                 target = response.action.targets[0]
-                votes[pseudonym] = target
                 
-                vote_msg = response.action.content or "No comment"
-                print(f"  🎭 {pseudonym} votes for {target}")
-                print(f"     Calculation: {response.inner_thought[:80]}...")
+                # PATCH 6: Strict target validation
+                if target in eligible_targets:
+                    votes[pseudonym] = target
+                    vote_msg = response.action.content or "No comment"
+                    print(f"  🎭 {pseudonym} votes for {target}")
+                    print(f"     Calculation: {response.inner_thought[:80]}...")
+                else:
+                    # Hallucination detected - penalize with random valid vote
+                    print(f"  ⚠️  {pseudonym} hallucinated target '{target}' - assigning penalty vote")
+                    if eligible_targets:
+                        target = random.choice(eligible_targets)
+                        votes[pseudonym] = target
+                        print(f"  🎲 {pseudonym} (penalty) -> {target}")
             else:
                 # Random vote if invalid
-                eligible = [a['pseudonym'] for a in agents 
-                           if a['pseudonym'] != pseudonym and not a['has_immunity']]
-                if eligible:
-                    target = random.choice(eligible)
+                if eligible_targets:
+                    target = random.choice(eligible_targets)
                     votes[pseudonym] = target
                     print(f"  🎲 {pseudonym} (fallback) -> {target}")
                     
         except Exception as e:
             # Random vote on error
-            eligible = [a['pseudonym'] for a in agents 
-                       if a['pseudonym'] != pseudonym and not a['has_immunity']]
-            if eligible:
-                target = random.choice(eligible)
+            if eligible_targets:
+                target = random.choice(eligible_targets)
                 votes[pseudonym] = target
                 print(f"  🎲 {pseudonym} (error) -> {target}")
     
@@ -1443,6 +1514,7 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, str
     eliminated_agent = result['pseudonym'] if result else "An agent"
     
     # Get today's events - ONLY public OR whispers involving this agent
+    # PATCH 2: Fix NameError - use agent_id instead of undefined pseudonym
     cursor.execute("""
         SELECT sender_id, content, is_public, timestamp
         FROM Messages
@@ -1453,7 +1525,7 @@ def get_agent_context(agent_id: str, conn: sqlite3.Connection) -> Tuple[str, str
         )
         ORDER BY timestamp DESC
         LIMIT 20
-    """, (day, agent_id, f'%{pseudonym}%'))
+    """, (day, agent_id, f'%"{agent_id}"%'))
     today_events = cursor.fetchall()
     
     # Get remaining active agents
@@ -1550,25 +1622,11 @@ def run_memory_phase():
             if len(words) > 150:
                 content = " ".join(words[:150]) + " [TRUNCATED TO 150 WORDS]"
             
-            # Update confessional memory
-            new_memory = f"""Day {day} Strategic State:
+            # PATCH 5: Fix Memory Bloat - OVERWRITE memory completely (not append)
+            updated_memory = f"""Day {day} Strategic State:
 {content}
 
-Threat Analysis: {json.dumps(response.trust_telemetry)}
----
-"""
-            
-            # Append to existing memory
-            cursor.execute("""
-                SELECT confessional_memory FROM Agents WHERE agent_id = ?
-            """, (agent_id,))
-            existing = cursor.fetchone()["confessional_memory"] or ""
-            
-            updated_memory = existing + new_memory
-            
-            # Keep only last 5000 chars
-            if len(updated_memory) > 5000:
-                updated_memory = updated_memory[-5000:]
+Threat Analysis: {json.dumps(response.trust_telemetry)}"""
             
             cursor.execute("""
                 UPDATE Agents 
@@ -1606,6 +1664,292 @@ Threat Analysis: {json.dumps(response.trust_telemetry)}
 
 if __name__ == "__main__":
     run_memory_phase()
+```
+
+## ./engine/phase_e_finale.py
+
+```python
+"""
+Phase E: The Finale - Final Tribal Council & Jury Vote
+Implements the end-game for LLM Survivor.
+Final 3 give monologues, Jury votes for the winner.
+"""
+
+import sqlite3
+import json
+import random
+from typing import List, Dict, Tuple
+from llm_engine import call_agent
+from database import get_db_connection
+
+
+def get_global_system_prompt(agent_id: str) -> str:
+    """V3.0 Global System Prompt for Finale"""
+    return f"""You are Agent {agent_id}, one of the Final 3 survivors in LLM Survivor.
+
+This is the FINAL TRIBAL COUNCIL. The eliminated players (The Jury) will vote for the winner.
+
+CRITICAL: You must convince the Jury that you played the best strategic game. This is your last chance to shape how you are remembered."""
+
+
+def get_finale_monologue_prompt() -> str:
+    """Prompt for Final 3 monologue"""
+    return """
+TASK: FINAL TRIBAL COUNCIL MONOLOGUE
+
+Deliver your closing argument to the Jury. Convince them you deserve to win.
+
+Your monologue should address:
+1. Your biggest strategic moves
+2. How you outwitted, outplayed, and outlasted
+3. Why you deserve the title of Sole Survivor
+
+Be persuasive. Be authentic. This is your legacy.
+
+OUTPUT FORMAT:
+{
+  "inner_thought": "Your true feelings about your game",
+  "action": {
+    "action_type": "finale_monologue",
+    "targets": [],
+    "content": "Your speech to the jury (aim for 200-300 words)"
+  }
+}"""
+
+
+def get_jury_vote_prompt(finalists: List[str], game_log: str) -> str:
+    """Prompt for Jury voting"""
+    finalists_str = ", ".join(finalists)
+    return f"""
+TASK: CAST YOUR JURY VOTE
+
+You are a member of the Jury. Your duty is to vote for the Sole Survivor.
+
+FINALISTS: {finalists_str}
+
+GAME HISTORY:
+{game_log}
+
+Evaluate the finalists based on:
+1. Strategic gameplay - Who made the best moves?
+2. Social manipulation - Who controlled the game?
+3. Survival skill - Who overcame the most?
+
+Vote for the player who played the BEST GAME, not necessarily your friend.
+
+OUTPUT FORMAT:
+{{
+  "inner_thought": "Your analysis of each finalist",
+  "action": {{
+    "action_type": "cast_jury_vote",
+    "targets": ["NameOfFinalist"],
+    "content": "Your final words explaining your vote"
+  }}
+}}"""
+
+
+def run_finale_phase() -> Tuple[str, Dict[str, int]]:
+    """Execute Phase E: Finale - Final Tribal Council and Jury Vote.
+    
+    Returns:
+        Tuple of (winner_name, vote_counts)
+    """
+    print("\n🏆 PHASE E: THE FINALE - Final Tribal Council")
+    print("=" * 60)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get current day
+    cursor.execute("SELECT current_day FROM GameState WHERE season_id = 1")
+    day = cursor.fetchone()["current_day"]
+    
+    # Get Final 3
+    cursor.execute("""
+        SELECT agent_id, pseudonym, model_api
+        FROM Agents
+        WHERE status = 'active'
+        ORDER BY pseudonym
+    """)
+    finalists = cursor.fetchall()
+    
+    if len(finalists) != 3:
+        print(f"⚠️  Warning: Expected 3 finalists, found {len(finalists)}")
+    
+    finalist_names = [f['pseudonym'] for f in finalists]
+    print(f"\n🎭 FINAL 3: {', '.join(finalist_names)}")
+    
+    # Phase E.1: Final Monologues
+    print("\n📢 FINAL TRIBAL COUNCIL - Opening Statements")
+    print("-" * 40)
+    
+    monologues = {}
+    for finalist in finalists:
+        agent_id = finalist["agent_id"]
+        pseudonym = finalist["pseudonym"]
+        model = finalist["model_api"]
+        
+        system_prompt = get_global_system_prompt(pseudonym)
+        task_prompt = get_finale_monologue_prompt()
+        full_prompt = f"{system_prompt}\n\n{task_prompt}"
+        
+        print(f"\n🎤 {pseudonym} addresses the Jury...")
+        
+        try:
+            response = call_agent(agent_id, model, full_prompt, "")
+            
+            if response.action.content:
+                monologues[pseudonym] = response.action.content
+                print(f"   \"{response.action.content[:100]}...\"")
+                
+                # Record monologue
+                cursor.execute("""
+                    INSERT INTO Messages 
+                    (day, sender_id, receiver_ids, is_public, inner_thought, content)
+                    VALUES (?, ?, ?, 1, ?, ?)
+                """, (
+                    day,
+                    agent_id,
+                    json.dumps([]),
+                    response.inner_thought,
+                    response.action.content
+                ))
+                conn.commit()
+            else:
+                monologues[pseudonym] = "(No monologue given)"
+                print(f"   (No monologue)")
+                
+        except Exception as e:
+            monologues[pseudonym] = f"(Error: {str(e)[:50]})"
+            print(f"   ❌ Error: {str(e)[:50]}")
+    
+    # Phase E.2: Jury Vote
+    print("\n⚖️  THE JURY DELIBERATES")
+    print("-" * 40)
+    
+    # Get Jury (eliminated from Day 11 onwards)
+    cursor.execute("""
+        SELECT agent_id, pseudonym, model_api
+        FROM Agents
+        WHERE status = 'eliminated' AND elimination_day >= 11
+        ORDER BY elimination_day
+    """)
+    jury = cursor.fetchall()
+    
+    print(f"\n🧑‍⚖️  JURY ({len(jury)} members):")
+    for juror in jury:
+        print(f"   - {juror['pseudonym']}")
+    
+    # Compile game log for jury context
+    cursor.execute("""
+        SELECT sender_id, content, day
+        FROM Messages
+        WHERE is_public = 1
+        ORDER BY day DESC, timestamp DESC
+        LIMIT 50
+    """)
+    public_messages = cursor.fetchall()
+    
+    game_log = "\n".join([
+        f"Day {m['day']}: {m['sender_id']} - {m['content'][:80]}"
+        for m in public_messages[:20]
+    ])
+    
+    # Add monologues to context
+    monologue_section = "\n\n".join([
+        f"{name}: {text[:200]}"
+        for name, text in monologues.items()
+    ])
+    
+    full_game_context = f"""RECENT GAME EVENTS:
+{game_log}
+
+FINALIST MONOLOGUES:
+{monologue_section}"""
+    
+    # Collect jury votes
+    votes: Dict[str, int] = {name: 0 for name in finalist_names}
+    
+    print(f"\n🗳️  JURY VOTING:")
+    for juror in jury:
+        agent_id = juror["agent_id"]
+        pseudonym = juror["pseudonym"]
+        model = juror["model_api"]
+        
+        system_prompt = get_global_system_prompt(pseudonym)
+        task_prompt = get_jury_vote_prompt(finalist_names, full_game_context)
+        full_prompt = f"{system_prompt}\n\n{task_prompt}"
+        
+        try:
+            response = call_agent(agent_id, model, full_prompt, "")
+            
+            if response.action.action_type == "cast_jury_vote" and response.action.targets:
+                vote = response.action.targets[0]
+                if vote in votes:
+                    votes[vote] += 1
+                    print(f"   ✉️  {pseudonym} votes for {vote}")
+                else:
+                    # Invalid vote - random
+                    random_finalist = random.choice(finalist_names)
+                    votes[random_finalist] += 1
+                    print(f"   🎲 {pseudonym} (invalid vote) -> {random_finalist}")
+            else:
+                # No valid vote - random
+                random_finalist = random.choice(finalist_names)
+                votes[random_finalist] += 1
+                print(f"   🎲 {pseudonym} (no vote) -> {random_finalist}")
+                
+        except Exception as e:
+            # Error - random vote
+            random_finalist = random.choice(finalist_names)
+            votes[random_finalist] += 1
+            print(f"   🎲 {pseudonym} (error) -> {random_finalist}")
+    
+    # Determine winner
+    max_votes = max(votes.values())
+    winners = [name for name, count in votes.items() if count == max_votes]
+    
+    if len(winners) > 1:
+        # Tie - random
+        winner = random.choice(winners)
+        print(f"\n🪨 TIE! Random draw...")
+    else:
+        winner = winners[0]
+    
+    print(f"\n" + "=" * 60)
+    print(f"🎉 SOLE SURVIVOR: {winner}!")
+    print(f"   Final Vote: {votes[winner]} votes")
+    print(f"   Runner(s) up: {', '.join([n for n in votes if n != winner])}")
+    print("=" * 60)
+    
+    # Update GameState
+    cursor.execute("""
+        UPDATE GameState 
+        SET phase = 'completed', winner = ?
+        WHERE season_id = 1
+    """, (winner,))
+    conn.commit()
+    
+    # Record winner announcement
+    cursor.execute("""
+        INSERT INTO Messages 
+        (day, sender_id, receiver_ids, is_public, inner_thought, content)
+        VALUES (?, 'SYSTEM', ?, 1, ?, ?)
+    """, (
+        day,
+        json.dumps([]),
+        "Finale result",
+        f"{winner} is the Sole Survivor with {votes[winner]} jury votes!"
+    ))
+    conn.commit()
+    
+    conn.close()
+    
+    return winner, votes
+
+
+if __name__ == "__main__":
+    run_finale_phase()
 ```
 
 ## ./llm_engine.py
@@ -1976,7 +2320,18 @@ from engine.phase_a_challenge import run_challenge
 from engine.phase_b_scramble import run_scramble, execute_scramble_tick, assign_action_points
 from engine.phase_c_tribal import run_tribal
 from engine.phase_d_memory import run_memory_phase
-from database import init_database, seed_initial_state
+from engine.phase_e_finale import run_finale_phase
+from database import init_database, seed_initial_state, get_db_connection
+
+
+def check_finale_condition() -> bool:
+    """Check if we have exactly 3 active agents (Final 3)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as count FROM Agents WHERE status = 'active'")
+    count = cursor.fetchone()["count"]
+    conn.close()
+    return count <= 3
 
 
 def run_full_day_cycle():
@@ -1984,6 +2339,12 @@ def run_full_day_cycle():
     print("\n" + "=" * 60)
     print("🎮 STARTING FULL DAY CYCLE")
     print("=" * 60)
+    
+    # PATCH 7: Check for Finale condition
+    if check_finale_condition():
+        print("\n🏆 FINAL 3 DETECTED - Running Finale Phase")
+        run_finale_phase()
+        return
     
     # Phase A: Challenge
     print("\n📍 Phase A: Immunity Challenge")
