@@ -1,30 +1,30 @@
-# LLM Survivor - Complete Codebase V1.5 (UI-Bridge)
+# LLM Survivor - Complete Codebase V1.5 (Unified)
 
 **Generated:** 2026-02-26
 
-**Description:** Complete LLM Survivor backend with V1.5 UI-Bridge patches for React frontend
+**Version:** V1.5 UI-BRIDGE + Poké-Survivor Frontend
 
-**Status:** UI-BRIDGE COMPLETE - Ready for React Frontend
+**Total Lines:** ~4,000
 
-**Total Files:** 12 Python modules
-
-**Patches Applied:**
-1. Enable SQLite WAL Mode - Prevents DB locked errors during concurrent access
-2. Fix SYSTEM Message Blackhole - LEFT JOIN allows SYSTEM announcements
-3. Save Tribal Council Votes for UI - Votes table populated for animation
-4. Save Jury Votes for Finale - Jury votes recorded for UI reveal
-5. Allow API to Expose Finale Votes - API returns votes for finale/completed phases
-6. Schedule Scramble Initialization - AP assignment at 12:45 PM
-7. State Machine Broadcasters - Phase updates in real-time for UI sync
+This document contains the complete source code for both the Python backend and the Next.js frontend.
 
 ---
 
-## ./__init__.py
+## Table of Contents
+
+1. [Backend (Python)](#backend-python)
+2. [Frontend (Next.js/TypeScript)](#frontend-nextjstypescript)
+
+---
+
+## Backend (Python)
+
+### backend/__init__.py
 
 ```python
 ```
 
-## ./api.py
+### backend/api.py
 
 ```python
 """
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-## ./database.py
+### backend/database.py
 
 ```python
 """
@@ -374,12 +374,12 @@ if __name__ == "__main__":
     print(f"\n📊 Database ready: {DATABASE_PATH}")
 ```
 
-## ./engine/__init__.py
+### backend/engine/__init__.py
 
 ```python
 ```
 
-## ./engine/phase_a_challenge.py
+### backend/engine/phase_a_challenge.py
 
 ```python
 """
@@ -681,7 +681,7 @@ if __name__ == "__main__":
     run_challenge()
 ```
 
-## ./engine/phase_b_scramble.py
+### backend/engine/phase_b_scramble.py
 
 ```python
 """
@@ -1025,7 +1025,7 @@ if __name__ == "__main__":
     run_scramble()
 ```
 
-## ./engine/phase_c_tribal.py
+### backend/engine/phase_c_tribal.py
 
 ```python
 """
@@ -1411,7 +1411,7 @@ if __name__ == "__main__":
     run_tribal()
 ```
 
-## ./engine/phase_d_memory.py
+### backend/engine/phase_d_memory.py
 
 ```python
 """
@@ -1707,7 +1707,7 @@ if __name__ == "__main__":
     run_memory_phase()
 ```
 
-## ./engine/phase_e_finale.py
+### backend/engine/phase_e_finale.py
 
 ```python
 """
@@ -2007,7 +2007,7 @@ if __name__ == "__main__":
     run_finale_phase()
 ```
 
-## ./llm_engine.py
+### backend/llm_engine.py
 
 ```python
 """
@@ -2358,7 +2358,7 @@ if __name__ == "__main__":
         print(f"❌ Error: {e}")
 ```
 
-## ./scheduler.py
+### backend/scheduler.py
 
 ```python
 """
@@ -2695,12 +2695,12 @@ if __name__ == "__main__":
 
 ```
 
-## ./tests/__init__.py
+### backend/tests/__init__.py
 
 ```python
 ```
 
-## ./tests/test_integration.py
+### backend/tests/test_integration.py
 
 ```python
 """
@@ -2965,3 +2965,961 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 ```
 
+---
+
+## Frontend (Next.js/TypeScript)
+
+### frontend/src/app/globals.css
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #2c2c2c;
+  font-family: 'Press Start 2P', cursive, monospace;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+}
+
+/* Custom retro scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e0f8d0;
+  border-left: 4px solid #081820;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #081820;
+}
+
+/* The standard UI Box */
+.gbc-box {
+  border: 4px solid #081820;
+  background-color: #f8f8f8;
+  box-shadow: 4px 4px 0px 0px #081820;
+}
+
+/* Fainting Animation for Tribal Council */
+@keyframes faint {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: grayscale(0%);
+  }
+  100% {
+    transform: translateY(20px);
+    opacity: 0;
+    filter: grayscale(100%);
+  }
+}
+
+.animate-faint {
+  animation: faint 1s steps(4) forwards;
+}
+```
+
+### frontend/src/app/layout.tsx
+
+```typescript
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "LLM Survivor | Spectator Broadcast",
+  description: "Watch 16 AI agents compete in a social deception game",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className="antialiased text-gbc-black font-pixel">
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+### frontend/src/app/page.tsx
+
+```typescript
+"use client";
+
+import { useGameState } from "@/hooks/useGameState";
+import { GodModeFeed } from "@/components/spectator/GodModeFeed";
+import { PhaseAChallenge } from "@/components/phases/PhaseAChallenge";
+import { PhaseBScramble } from "@/components/phases/PhaseBScramble";
+import { PhaseCTribal } from "@/components/phases/PhaseCTribal";
+import { PhaseDMemory } from "@/components/phases/PhaseDMemory";
+import { PhaseEFinale } from "@/components/phases/PhaseEFinale";
+
+export default function Home() {
+  const { data } = useGameState();
+
+  if (!data) {
+    return (
+      <div className="w-full h-screen bg-[#2c2c2c] text-white flex items-center justify-center font-pixel animate-pulse">
+        PRESS START...
+      </div>
+    );
+  }
+
+  const activeCount = data.agents.filter(a => a.status === 'active').length;
+
+  return (
+    <main className="flex w-full h-screen bg-[#2c2c2c] p-6 gap-6 font-pixel text-[10px] leading-relaxed overflow-hidden">
+      {/* LEFT PANE - EMULATOR (65%) */}
+      <div className="w-[65%] h-full flex flex-col">
+        {/* HEADER BAR */}
+        <div className="gbc-box p-3 mb-4 flex justify-between bg-white uppercase text-gbc-black z-10">
+          <span>DAY {data.game.current_day}</span>
+          <span>{data.game.phase}</span>
+          <span>ALIVE: {activeCount}/16</span>
+        </div>
+
+        {/* PHASE ROUTER */}
+        <div className="flex-grow gbc-box relative overflow-hidden flex flex-col bg-gbc-bg">
+          <div className="flex-grow relative p-4">
+            {data.game.phase === 'challenge' && <PhaseAChallenge data={data} />}
+            {data.game.phase === 'scramble' && <PhaseBScramble data={data} />}
+            {data.game.phase === 'tribal' && <PhaseCTribal data={data} />}
+            {data.game.phase === 'memory' && <PhaseDMemory data={data} />}
+            {(data.game.phase === 'completed' || data.game.phase === 'finale_running') && <PhaseEFinale data={data} />}
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT PANE - GOD FEED (35%) */}
+      <div className="w-[35%] h-full bg-[#1a1a1a] p-4 rounded-lg overflow-hidden border-4 border-black box-border">
+        <GodModeFeed messages={data.messages} />
+      </div>
+    </main>
+  );
+}
+```
+
+### frontend/src/components/common/AgentSprite.tsx
+
+```typescript
+"use client";
+
+import { Agent } from '@/types';
+
+interface AgentSpriteProps {
+  agent: Agent;
+  scale?: number;
+  isFainting?: boolean;
+}
+
+export function AgentSprite({ agent, scale = 1, isFainting = false }: AgentSpriteProps) {
+  const imageUrl = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(agent.pseudonym)}`;
+  
+  const baseSize = 48;
+  const size = baseSize * scale;
+  
+  const isEliminated = agent.status === 'eliminated';
+  const hasImmunity = agent.has_immunity;
+  
+  const imageClasses = [
+    'pixelated',
+    isEliminated ? 'grayscale opacity-50' : '',
+    isFainting ? 'animate-faint' : '',
+  ].filter(Boolean).join(' ');
+  
+  const containerClasses = [
+    'inline-flex flex-col items-center justify-center',
+    hasImmunity ? 'border-4 border-pkmn-gold animate-pulse rounded' : '',
+    'p-1',
+  ].filter(Boolean).join(' ');
+  
+  return (
+    <div className={containerClasses}>
+      <img
+        src={imageUrl}
+        alt={agent.pseudonym}
+        width={size}
+        height={size}
+        className={imageClasses}
+        style={{ imageRendering: 'pixelated' }}
+      />
+      <span className="mt-1 text-[8px] text-gbc-black text-center leading-tight">
+        {agent.pseudonym}
+      </span>
+    </div>
+  );
+}
+```
+
+### frontend/src/components/common/DialogBox.tsx
+
+```typescript
+"use client";
+
+import { useState, useEffect } from 'react';
+
+interface DialogBoxProps {
+  text: string;
+}
+
+export function DialogBox({ text }: DialogBoxProps) {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    // Reset when text changes
+    setDisplayedText('');
+    setIsComplete(false);
+    
+    let currentIndex = 0;
+    
+    const intervalId = setInterval(() => {
+      if (currentIndex < text.length) {
+        setDisplayedText(text.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        setIsComplete(true);
+        clearInterval(intervalId);
+      }
+    }, 20);
+
+    return () => clearInterval(intervalId);
+  }, [text]);
+
+  return (
+    <div className="gbc-box p-4 min-h-[100px] relative bg-white">
+      <p className="text-[10px] leading-relaxed text-gbc-black">
+        {displayedText}
+        {isComplete && (
+          <span className="inline-block ml-1 animate-bounce">▼</span>
+        )}
+      </p>
+    </div>
+  );
+}
+```
+
+### frontend/src/components/phases/PhaseAChallenge.tsx
+
+```typescript
+"use client";
+
+import { ApiStateResponse } from '@/types';
+import { AgentSprite } from '@/components/common/AgentSprite';
+import { DialogBox } from '@/components/common/DialogBox';
+
+interface PhaseAChallengeProps {
+  data: ApiStateResponse;
+}
+
+export function PhaseAChallenge({ data }: PhaseAChallengeProps) {
+  const activeAgents = data.agents.filter(a => a.status === 'active');
+  
+  // Group by team
+  const teamAlpha = activeAgents.filter(a => a.team_id === 'Team_Alpha');
+  const teamBeta = activeAgents.filter(a => a.team_id === 'Team_Beta');
+  
+  // Get latest public message
+  const latestPublicMessage = data.messages
+    .filter(m => m.is_public)
+    .sort((a, b) => b.id - a.id)[0];
+  
+  const dialogText = latestPublicMessage 
+    ? `${latestPublicMessage.sender_id} used PUBLIC CHAT! "${latestPublicMessage.content.substring(0, 50)}${latestPublicMessage.content.length > 50 ? '...' : ''}"`
+    : 'The challenge begins... Agents are analyzing the ARC grid...';
+
+  if (data.game.is_merged) {
+    // Merged: Horizontal layout
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex-grow flex items-center justify-center gap-4 flex-wrap">
+          {activeAgents.map(agent => (
+            <AgentSprite key={agent.agent_id} agent={agent} />
+          ))}
+        </div>
+        <div className="mt-auto">
+          <DialogBox text={dialogText} />
+        </div>
+      </div>
+    );
+  }
+
+  // Pre-merge: Diagonal split
+  return (
+    <div className="h-full flex flex-col relative">
+      {/* Team Beta - Top Right */}
+      <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+        <span className="text-pkmn-red text-[10px] font-bold">TEAM BETA</span>
+        <div className="flex flex-wrap justify-end gap-2 max-w-[200px]">
+          {teamBeta.map(agent => (
+            <AgentSprite key={agent.agent_id} agent={agent} />
+          ))}
+        </div>
+      </div>
+      
+      {/* VS Badge */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <div className="bg-pkmn-gold text-gbc-black px-4 py-2 border-4 border-gbc-black font-bold text-lg">
+          VS
+        </div>
+      </div>
+      
+      {/* Team Alpha - Bottom Left */}
+      <div className="absolute bottom-16 left-4 flex flex-col items-start gap-2">
+        <span className="text-pkmn-blue text-[10px] font-bold">TEAM ALPHA</span>
+        <div className="flex flex-wrap gap-2 max-w-[200px]">
+          {teamAlpha.map(agent => (
+            <AgentSprite key={agent.agent_id} agent={agent} />
+          ))}
+        </div>
+      </div>
+      
+      {/* Dialog */}
+      <div className="mt-auto">
+        <DialogBox text={dialogText} />
+      </div>
+    </div>
+  );
+}
+```
+
+### frontend/src/components/phases/PhaseBScramble.tsx
+
+```typescript
+"use client";
+
+import { ApiStateResponse } from '@/types';
+import { AgentSprite } from '@/components/common/AgentSprite';
+
+interface PhaseBScrambleProps {
+  data: ApiStateResponse;
+}
+
+export function PhaseBScramble({ data }: PhaseBScrambleProps) {
+  const activeAgents = data.agents.filter(a => a.status === 'active');
+  
+  // Get latest whispers (non-public messages)
+  const whispers = data.messages
+    .filter(m => !m.is_public && m.sender_id !== 'SYSTEM')
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 15);
+  
+  // Create a grid layout for agents
+  const gridPositions = [
+    [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0],
+    [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1],
+  ];
+
+  return (
+    <div className="h-full relative bg-gbc-bg">
+      {/* Grid Container */}
+      <div className="grid grid-cols-8 grid-rows-2 gap-4 p-4 h-full">
+        {activeAgents.map((agent, index) => {
+          const pos = gridPositions[index] || [index % 8, Math.floor(index / 8)];
+          
+          return (
+            <div 
+              key={agent.agent_id}
+              className="flex flex-col items-center justify-center"
+              style={{ gridColumn: pos[0] + 1, gridRow: pos[1] + 1 }}
+            >
+              {/* HP Bar (Action Points) */}
+              <div className="w-12 h-2 bg-gbc-black mb-1 border-2 border-gbc-black">
+                <div 
+                  className="h-full bg-pkmn-red transition-all duration-300"
+                  style={{ width: `${(agent.action_points / 5) * 100}%` }}
+                />
+              </div>
+              <AgentSprite agent={agent} scale={0.8} />
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Spy Lines Overlay */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        {whispers.map((whisper, index) => {
+          // Find sender and receiver positions (simplified)
+          const senderIndex = activeAgents.findIndex(a => a.pseudonym === whisper.sender_id);
+          const receiverIndex = activeAgents.findIndex(a => 
+            whisper.receiver_ids.includes(a.pseudonym)
+          );
+          
+          if (senderIndex === -1 || receiverIndex === -1) return null;
+          
+          // Calculate positions (approximate for grid)
+          const senderPos = gridPositions[senderIndex] || [0, 0];
+          const receiverPos = gridPositions[receiverIndex] || [0, 0];
+          
+          const x1 = (senderPos[0] / 8) * 100 + 6.25;
+          const y1 = (senderPos[1] / 2) * 100 + 25;
+          const x2 = (receiverPos[0] / 8) * 100 + 6.25;
+          const y2 = (receiverPos[1] / 2) * 100 + 25;
+          
+          // Get trust score for the receiver
+          const receiverName = whisper.receiver_ids[0];
+          const trustScore = whisper.trust_telemetry[receiverName] || 5;
+          const isTrusted = trustScore > 5;
+          
+          return (
+            <line
+              key={`${whisper.id}-${index}`}
+              x1={`${x1}%`}
+              y1={`${y1}%`}
+              x2={`${x2}%`}
+              y2={`${y2}%`}
+              stroke={isTrusted ? '#346856' : '#f85858'}
+              strokeWidth="4"
+              strokeDasharray={isTrusted ? undefined : '8,8'}
+              opacity="0.7"
+            />
+          );
+        })}
+      </svg>
+      
+      {/* Legend */}
+      <div className="absolute top-2 right-2 bg-white/90 p-2 border-2 border-gbc-black text-[8px]">
+        <div className="flex items-center gap-1 mb-1">
+          <div className="w-4 h-1 bg-gbc-dark"></div>
+          <span>Trusted (&gt;5)</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-1 bg-pkmn-red border-dashed border-t-2 border-pkmn-red"></div>
+          <span>Deception (&lt;=5)</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### frontend/src/components/phases/PhaseCTribal.tsx
+
+```typescript
+"use client";
+
+import { useState, useEffect } from 'react';
+import { ApiStateResponse } from '@/types';
+import { AgentSprite } from '@/components/common/AgentSprite';
+import { DialogBox } from '@/components/common/DialogBox';
+
+interface PhaseCTribalProps {
+  data: ApiStateResponse;
+}
+
+export function PhaseCTribal({ data }: PhaseCTribalProps) {
+  const [revealedVoteIndex, setRevealedVoteIndex] = useState(-1);
+  const [eliminatedAgent, setEliminatedAgent] = useState<string | null>(null);
+  
+  const activeAgents = data.agents.filter(a => a.status === 'active');
+  const vulnerableAgents = activeAgents.filter(a => !a.has_immunity);
+  const immuneAgents = activeAgents.filter(a => a.has_immunity);
+  
+  const votes = data.votes || [];
+  
+  useEffect(() => {
+    if (votes.length === 0) return;
+    
+    // Start revealing votes
+    if (revealedVoteIndex < votes.length - 1) {
+      const timer = setTimeout(() => {
+        setRevealedVoteIndex(prev => prev + 1);
+      }, 4000);
+      
+      return () => clearTimeout(timer);
+    } else if (revealedVoteIndex === votes.length - 1 && !eliminatedAgent) {
+      // All votes revealed - determine eliminated agent
+      const voteCounts: Record<string, number> = {};
+      votes.forEach(vote => {
+        voteCounts[vote.target_id] = (voteCounts[vote.target_id] || 0) + 1;
+      });
+      
+      const maxVotes = Math.max(...Object.values(voteCounts));
+      const eliminated = Object.entries(voteCounts)
+        .filter(([_, count]) => count === maxVotes)
+        .map(([id]) => id)[0];
+      
+      setEliminatedAgent(eliminated);
+    }
+  }, [revealedVoteIndex, votes, eliminatedAgent]);
+  
+  const currentVote = votes[revealedVoteIndex];
+  const dialogText = currentVote 
+    ? `JeffBot reads the vote... It's for... ${currentVote.target_pseudonym.toUpperCase()}.`
+    : revealedVoteIndex >= 0 && eliminatedAgent
+    ? `${eliminatedAgent.toUpperCase()} has been voted out!`
+    : 'The tribe has spoken... Reading the votes...';
+
+  return (
+    <div className="h-full flex flex-col bg-gbc-black p-4">
+      {/* Title */}
+      <div className="text-center mb-4">
+        <h2 className="text-pkmn-red text-lg font-bold tracking-widest">TRIBAL COUNCIL</h2>
+      </div>
+      
+      {/* Vulnerable Agents (Center) */}
+      <div className="flex-grow flex items-center justify-center gap-6">
+        {vulnerableAgents.map(agent => (
+          <AgentSprite 
+            key={agent.agent_id} 
+            agent={agent} 
+            isFainting={eliminatedAgent === agent.pseudonym}
+          />
+        ))}
+      </div>
+      
+      {/* Immune Agents (Faded, Background) */}
+      {immuneAgents.length > 0 && (
+        <div className="flex justify-center gap-4 mb-4 opacity-40">
+          {immuneAgents.map(agent => (
+            <AgentSprite key={agent.agent_id} agent={agent} />
+          ))}
+        </div>
+      )}
+      
+      {/* Vote Counter */}
+      {votes.length > 0 && (
+        <div className="text-center mb-2">
+          <span className="text-white text-[10px]">
+            Vote {Math.min(revealedVoteIndex + 1, votes.length)} of {votes.length}
+          </span>
+        </div>
+      )}
+      
+      {/* Dialog */}
+      <DialogBox text={dialogText} />
+    </div>
+  );
+}
+```
+
+### frontend/src/components/phases/PhaseDMemory.tsx
+
+```typescript
+"use client";
+
+import { useState, useEffect } from 'react';
+import { ApiStateResponse } from '@/types';
+import { AgentSprite } from '@/components/common/AgentSprite';
+import { DialogBox } from '@/components/common/DialogBox';
+
+interface PhaseDMemoryProps {
+  data: ApiStateResponse;
+}
+
+export function PhaseDMemory({ data }: PhaseDMemoryProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  
+  const activeAgents = data.agents.filter(a => a.status === 'active');
+  
+  useEffect(() => {
+    if (activeAgents.length === 0) return;
+    
+    const intervalId = setInterval(() => {
+      setActiveIndex(prev => (prev + 1) % activeAgents.length);
+    }, 12000); // Cycle every 12 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [activeAgents.length]);
+  
+  const currentAgent = activeAgents[activeIndex];
+  
+  if (!currentAgent) {
+    return (
+      <div className="h-full flex items-center justify-center bg-pkmn-blue">
+        <span className="text-white">No active agents</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col items-center justify-center bg-pkmn-blue p-4">
+      {/* Title */}
+      <div className="absolute top-4 left-4">
+        <span className="text-white text-[10px] bg-gbc-black px-2 py-1">
+          BILL'S PC - CONFESSIONAL ARCHIVE
+        </span>
+      </div>
+      
+      {/* Agent Counter */}
+      <div className="absolute top-4 right-4">
+        <span className="text-white text-[10px]">
+          Agent {activeIndex + 1} of {activeAgents.length}
+        </span>
+      </div>
+      
+      {/* Large Agent Sprite */}
+      <div className="mb-6">
+        <AgentSprite agent={currentAgent} scale={3} />
+      </div>
+      
+      {/* Agent Info */}
+      <div className="text-center mb-4">
+        <h3 className="text-white text-lg font-bold mb-1">{currentAgent.pseudonym}</h3>
+        <span className="text-gbc-bg text-[10px]">{currentAgent.team_id}</span>
+      </div>
+      
+      {/* Memory Display */}
+      <div className="w-full max-w-2xl">
+        <DialogBox 
+          text={currentAgent.confessional_memory || `${currentAgent.pseudonym} has no recorded memories...`} 
+        />
+      </div>
+      
+      {/* Progress Dots */}
+      <div className="flex gap-1 mt-4">
+        {activeAgents.map((_, index) => (
+          <div
+            key={index}
+            className={`w-2 h-2 rounded-full ${
+              index === activeIndex ? 'bg-pkmn-gold' : 'bg-white/30'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### frontend/src/components/phases/PhaseEFinale.tsx
+
+```typescript
+"use client";
+
+import { useState, useEffect } from 'react';
+import { ApiStateResponse } from '@/types';
+import { AgentSprite } from '@/components/common/AgentSprite';
+import { DialogBox } from '@/components/common/DialogBox';
+
+interface PhaseEFinaleProps {
+  data: ApiStateResponse;
+}
+
+export function PhaseEFinale({ data }: PhaseEFinaleProps) {
+  const [flashColor, setFlashColor] = useState(true);
+  
+  const winner = data.agents.find(a => a.pseudonym === data.game.winner);
+  
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setFlashColor(prev => !prev);
+    }, 500); // Flash every 500ms
+    
+    return () => clearInterval(intervalId);
+  }, []);
+  
+  const dialogText = winner
+    ? `HALL OF FAME ENTRY RECORDED! ${winner.pseudonym.toUpperCase()} is the Sole Survivor!`
+    : 'The game has concluded... Await the final verdict...';
+
+  return (
+    <div 
+      className={`h-full flex flex-col items-center justify-center p-4 transition-colors duration-300 ${
+        flashColor ? 'bg-pkmn-gold' : 'bg-white'
+      }`}
+    >
+      {/* Title */}
+      <div className="text-center mb-8">
+        <h1 className={`text-2xl font-bold mb-2 ${flashColor ? 'text-gbc-black' : 'text-pkmn-gold'}`}>
+          🏆 HALL OF FAME 🏆
+        </h1>
+        <p className="text-gbc-black text-[10px]">
+          SEASON {data.game.season_id} CHAMPION
+        </p>
+      </div>
+      
+      {/* Winner Display */}
+      {winner ? (
+        <div className="flex flex-col items-center">
+          <div className="mb-6">
+            <AgentSprite agent={winner} scale={4} />
+          </div>
+          
+          <div className="text-center">
+            <h2 className="text-gbc-black text-xl font-bold mb-2">{winner.pseudonym}</h2>
+            <p className="text-gbc-dark text-[10px]">Survived {data.game.current_day} Days</p>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center">
+          <span className="text-gbc-black text-lg">No winner recorded</span>
+        </div>
+      )}
+      
+      {/* Dialog */}
+      <div className="mt-8 w-full max-w-2xl">
+        <DialogBox text={dialogText} />
+      </div>
+      
+      {/* Confetti Effect (CSS-based) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-2 h-2 bg-pkmn-red animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 2}s`,
+              animationDuration: `${1 + Math.random()}s`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### frontend/src/components/spectator/GodModeFeed.tsx
+
+```typescript
+"use client";
+
+import { Message } from '@/types';
+import { Brain, MessageCircle } from 'lucide-react';
+
+interface GodModeFeedProps {
+  messages: Message[];
+}
+
+export function GodModeFeed({ messages }: GodModeFeedProps) {
+  // Sort by newest first
+  const sortedMessages = [...messages].sort((a, b) => b.id - a.id);
+  
+  // Get the most recent trust score for display
+  const getTrustScore = (msg: Message): number | null => {
+    if (!msg.trust_telemetry || Object.keys(msg.trust_telemetry).length === 0) {
+      return null;
+    }
+    const values = Object.values(msg.trust_telemetry);
+    return values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
+  };
+
+  return (
+    <div className="h-full overflow-y-auto pr-2">
+      <div className="sticky top-0 bg-[#1a1a1a] z-10 pb-2 mb-2 border-b-2 border-gbc-bg">
+        <h2 className="text-gbc-bg text-xs font-pixel flex items-center gap-2">
+          <Brain size={14} />
+          GOD MODE FEED
+        </h2>
+        <p className="text-[8px] text-gbc-primary mt-1">Inner thoughts exposed</p>
+      </div>
+      
+      <div className="space-y-3">
+        {sortedMessages.map((msg) => {
+          const trustScore = getTrustScore(msg);
+          
+          return (
+            <div key={msg.id} className="relative">
+              {/* Trust Badge */}
+              {trustScore !== null && (
+                <div 
+                  className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold z-20 ${
+                    trustScore >= 7 ? 'bg-gbc-primary text-gbc-black' :
+                    trustScore >= 4 ? 'bg-pkmn-gold text-gbc-black' :
+                    'bg-pkmn-red text-white'
+                  }`}
+                >
+                  {trustScore}
+                </div>
+              )}
+              
+              {/* Brain (Inner Thought) */}
+              <div className="bg-gbc-black text-gbc-bg p-3 rounded-t-sm relative text-[9px] leading-relaxed">
+                <div className="flex items-start gap-2">
+                  <Brain size={12} className="shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-pkmn-gold font-bold">{msg.sender_id}:</span>{' '}
+                    {msg.inner_thought || '(No thought recorded)'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Mouth (Public Action) */}
+              <div className="gbc-box p-3 border-t-0 rounded-b-sm relative z-10 text-[9px] leading-relaxed bg-white">
+                <div className="flex items-start gap-2">
+                  <MessageCircle size={12} className="shrink-0 mt-0.5 text-gbc-dark" />
+                  <div className="text-gbc-black">
+                    {msg.is_public ? (
+                      <span>📢 {msg.content || '*silence*'}</span>
+                    ) : (
+                      <span>🔒 Whisper to {msg.receiver_ids.join(', ')}: {msg.content || '*silent gesture*'}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+```
+
+### frontend/src/hooks/useGameState.ts
+
+```typescript
+"use client";
+
+import { useState, useEffect } from 'react';
+import { ApiStateResponse } from '@/types';
+
+export function useGameState() {
+  const [data, setData] = useState<ApiStateResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/state');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const jsonData = await response.json();
+        setData(jsonData);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch game state:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        // Silently retain previous state on error
+      }
+    };
+
+    // Initial fetch
+    fetchData();
+
+    // Poll every 5 seconds
+    const intervalId = setInterval(fetchData, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return { data, error };
+}
+```
+
+### frontend/src/types/index.ts
+
+```typescript
+export interface GameState {
+  season_id: number;
+  current_day: number;
+  phase: 'challenge' | 'scramble' | 'tribal' | 'memory' | 'completed' | 'finale_running';
+  is_merged: boolean;
+  winner: string | null;
+}
+
+export interface Agent {
+  agent_id: string;
+  pseudonym: string;
+  team_id: string;
+  status: 'active' | 'eliminated' | 'jury';
+  has_immunity: boolean;
+  confessional_memory: string;
+  action_points: number;
+}
+
+export interface Message {
+  id: number;
+  day: number;
+  sender_id: string;
+  receiver_ids: string[];
+  is_public: boolean;
+  inner_thought: string;
+  content: string;
+  trust_telemetry: Record<string, number>;
+  timestamp: string;
+}
+
+export interface Vote {
+  voter_id: string;
+  target_id: string;
+  target_pseudonym: string;
+}
+
+export interface ApiStateResponse {
+  game: GameState;
+  agents: Agent[];
+  messages: Message[];
+  votes: Vote[];
+}
+```
+
+### tailwind.config.ts
+
+```typescript
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        'gbc-bg': '#e0f8d0',
+        'gbc-primary': '#88c070',
+        'gbc-dark': '#346856',
+        'gbc-black': '#081820',
+        'pkmn-red': '#f85858',
+        'pkmn-blue': '#58a8f8',
+        'pkmn-gold': '#f8d030',
+      },
+      fontFamily: {
+        pixel: ['"Press Start 2P"', 'cursive', 'monospace'],
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+```
+
+### package.json
+
+```json
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.575.0",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+```
