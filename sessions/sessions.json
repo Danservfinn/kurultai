@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772385024079,
+    "updatedAt": 1772385826675,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,8 +125,8 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "signal",
-      "surface": "signal",
+      "provider": "webchat",
+      "surface": "webchat",
       "chatType": "direct",
       "label": "Danny id:+19194133445",
       "from": "signal:+19194133445",
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772382706923,
+      "generatedAt": 1772385413287,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -151,8 +151,8 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 66554,
-        "projectContextChars": 53734,
+        "chars": 88392,
+        "projectContextChars": 75572,
         "nonProjectContextChars": 12820
       },
       "injectedWorkspaceFiles": [
@@ -160,16 +160,16 @@
           "name": "AGENTS.md",
           "path": "/Users/kublai/.openclaw/agents/main/AGENTS.md",
           "missing": false,
-          "rawChars": 9086,
-          "injectedChars": 9086,
+          "rawChars": 26274,
+          "injectedChars": 26274,
           "truncated": false
         },
         {
           "name": "SOUL.md",
           "path": "/Users/kublai/.openclaw/agents/main/SOUL.md",
           "missing": false,
-          "rawChars": 31453,
-          "injectedChars": 31453,
+          "rawChars": 36103,
+          "injectedChars": 36103,
           "truncated": false
         },
         {
@@ -380,10 +380,10 @@
     "totalTokensFresh": true,
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
-    "totalTokens": 425461,
+    "totalTokens": 448510,
     "compactionCount": 7,
-    "inputTokens": 5055253,
-    "outputTokens": 5226,
+    "inputTokens": 896070,
+    "outputTokens": 638,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal"
