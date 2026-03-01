@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772377225451,
+    "updatedAt": 1772381482595,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772376735241,
+      "generatedAt": 1772380867608,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -380,10 +380,10 @@
     "totalTokensFresh": true,
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
-    "totalTokens": 387292,
+    "totalTokens": 395171,
     "compactionCount": 7,
-    "inputTokens": 2312763,
-    "outputTokens": 3132,
+    "inputTokens": 5104777,
+    "outputTokens": 5295,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal"
@@ -790,9 +790,9 @@
     "modelProvider": "bailian",
     "model": "qwen3.5-plus",
     "contextTokens": 1000000,
-    "inputTokens": 174061,
-    "outputTokens": 1642,
-    "totalTokens": 27496,
+    "inputTokens": 47806,
+    "outputTokens": 628,
+    "totalTokens": 24112,
     "totalTokensFresh": true,
     "cacheRead": 0,
     "cacheWrite": 0
@@ -1924,9 +1924,9 @@
     "modelProvider": "bailian",
     "model": "qwen3.5-plus",
     "contextTokens": 1000000,
-    "inputTokens": 174061,
-    "outputTokens": 1642,
-    "totalTokens": 27496,
+    "inputTokens": 47806,
+    "outputTokens": 628,
+    "totalTokens": 24112,
     "totalTokensFresh": true,
     "cacheRead": 0,
     "cacheWrite": 0
