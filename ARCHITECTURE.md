@@ -399,6 +399,14 @@ Single helpful assistant, not an organized collective.
 
 ## Change Log
 
+### 2026-03-01 - All Agents Momentum Question Protocol
+- **Change**: Extended "What do I want to do next?" to all 6 agents
+- **Reason**: Parallel autonomy — all agents self-drive, not just Kublai
+- **Scope**: AGENTS.md, scripts/hourly_reflection.sh, shared-context/AGENT-PROTOCOLS.md
+- **Files Modified**: `AGENTS.md`, `scripts/hourly_reflection.sh`, `shared-context/AGENT-PROTOCOLS.md` (created)
+- **Protocol**: Each agent asks within domain, reports to Kublai, executes autonomously
+- **Benefit**: No bottleneck at Kublai, parallel autonomous execution, full visibility
+
 ### 2026-03-01 - Autonomous Action Protocol Established
 - **Change**: Added Prime Directive - "Never ask human to do what Kublai can do"
 - **Reason**: Identified pattern of asking human for tasks Kublai could do via browser

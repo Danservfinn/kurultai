@@ -192,7 +192,9 @@ cat >> "$WORKSPACE/memory/$DATE.md" << EOF
 
 ### The Momentum Question
 - [ ] At end of task, did I ask "What do I want to do next?"
+- [ ] Did I evaluate within my domain?
 - [ ] Did I act on the answer without waiting for human direction?
+- [ ] Did I report my next action to Kublai?
 - [ ] Is there continuous forward motion toward goals?
 
 ### Action Required
