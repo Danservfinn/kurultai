@@ -2,6 +2,8 @@
 # Hourly Agent Reflection System with Self-Awareness Protocol
 
 HOUR=$(date +%H)
+# Force base-10 interpretation (strip leading zero for octal safety)
+HOUR=$((10#$HOUR))
 AGENT_NUM=$((HOUR % 6))
 
 case $AGENT_NUM in
