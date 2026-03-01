@@ -165,3 +165,158 @@ RETURN a.name,
        count(CASE WHEN t.status = 'failed' THEN 1 END) as failed,
        avg(duration.between(t.created_at, t.completed_at).minutes) as avg_completion_time
 ```
+
+---
+
+## 🧠 Weighted Memory Patterns (Cognee-Inspired)
+
+**Principle:** Frequently-accessed connections strengthen over time. Stale connections weaken and are pruned.
+
+### 10. Increment Edge Weight on Access
+```cypher
+// When a relationship is accessed, strengthen it
+MATCH (a:Agent)-[r:ASSIGNED_TO]->(t:Task)
+SET r.weight = COALESCE(r.weight, 1) + 1,
+    r.last_accessed = datetime()
+RETURN r.weight
+```
+
+### 11. Decay Stale Edges (Weekly)
+```cypher
+// Weaken edges not accessed in 14 days
+MATCH ()-[r]-()
+WHERE r.last_accessed < datetime() - duration('P14D')
+SET r.weight = r.weight * 0.5
+RETURN count(r) as weakened_edges
+```
+
+### 12. Query by Weight (Prioritize Strong Connections)
+```cypher
+// Get tasks for agent, prioritizing frequently-assigned types
+MATCH (a:Agent {name: $agent_name})<-[r:ASSIGNED_TO]-(t:Task)
+WHERE t.status = 'pending'
+RETURN t, r.weight as priority
+ORDER BY r.weight DESC, t.priority ASC
+```
+
+### 13. Auto-Prune Orphaned Nodes (Monthly)
+```cypher
+// Delete nodes with no connections older than 30 days
+MATCH (n)
+WHERE NOT ()--(n)
+  AND n.created_at < datetime() - duration('P30D')
+DETACH DELETE n
+RETURN count(n) as pruned_nodes
+```
+
+### 14. Get Strongest Agent Relationships
+```cypher
+// Find which agents work together most often
+MATCH (a1:Agent)-[r:FED_INTO]-(a2:Agent)
+RETURN a1.name, a2.name, r.weight as collaboration_strength
+ORDER BY r.weight DESC
+LIMIT 10
+```
+
+### 15. Memory Access Analytics
+```cypher
+// Track which memory entries are accessed most
+MATCH (a:Agent)-[r:LOGGED]->(m:Memory)
+WHERE r.last_accessed > datetime() - duration('P7D')
+RETURN m.content, r.weight as access_count
+ORDER BY r.weight DESC
+LIMIT 20
+```
+
+---
+
+## 📊 Weight Schema
+
+| Relationship Type | Initial Weight | Decay Rate | Prune Threshold |
+|------------------|----------------|------------|-----------------|
+| **ASSIGNED_TO** | 1 | 0.5x per 14 days | <0.1 |
+| **LOGGED** | 1 | 0.5x per 14 days | <0.1 |
+| **DEPENDS_ON** | 1 | 0.5x per 30 days | <0.1 |
+| **FED_INTO** | 1 | 0.5x per 14 days | <0.1 |
+| **TRIGGERED** | 1 | 0.5x per 30 days | <0.1 |
+
+---
+
+## 🔧 Implementation Notes
+
+### Weight Increment (On Every Access)
+```typescript
+// src/lib/neo4j/weighted-access.ts
+
+export async function incrementEdgeWeight(
+  fromNode: string,
+  relationship: string,
+  toNode: string
+): Promise<number> {
+  const result = await neo4j.query(`
+    MATCH (a)-[r:${relationship}]->(b)
+    WHERE a.id = $fromId AND b.id = $toId
+    SET r.weight = COALESCE(r.weight, 1) + 1,
+        r.last_accessed = datetime()
+    RETURN r.weight
+  `, { fromId: fromNode, toId: toNode })
+  
+  return result.records[0].get('r.weight')
+}
+```
+
+### Weekly Decay (Cron Job)
+```typescript
+// src/lib/neo4j/decay-stale-edges.ts
+
+export async function decayStaleEdges(): Promise<number> {
+  const result = await neo4j.query(`
+    MATCH ()-[r]-()
+    WHERE r.last_accessed < datetime() - duration('P14D')
+    SET r.weight = r.weight * 0.5
+    RETURN count(r) as weakened_edges
+  `)
+  
+  return result.records[0].get('weakened_edges')
+}
+```
+
+### Monthly Pruning (Cron Job)
+```typescript
+// src/lib/neo4j/prune-orphaned-nodes.ts
+
+export async function pruneOrphanedNodes(): Promise<number> {
+  const result = await neo4j.query(`
+    MATCH (n)
+    WHERE NOT ()--(n)
+      AND n.created_at < datetime() - duration('P30D')
+    DETACH DELETE n
+    RETURN count(n) as pruned_nodes
+  `)
+  
+  return result.records[0].get('pruned_nodes')
+}
+```
+
+---
+
+## 📈 Benefits of Weighted Memory
+
+| Benefit | Impact |
+|---------|--------|
+| **Prioritized queries** | Frequently-accessed relationships returned first |
+| **Auto-optimization** | System learns what matters through usage |
+| **Stale data cleanup** | Old, unused connections automatically pruned |
+| **Better routing** | Agent assignments based on historical success |
+| **Faster search** | High-weight edges prioritized in traversal |
+
+---
+
+## 🚀 Next Steps
+
+1. **Add weight properties** to existing Neo4j relationships
+2. **Increment on access** (every query updates weights)
+3. **Weekly decay cron** (auto-weaken stale edges)
+4. **Monthly pruning cron** (remove orphaned nodes)
+5. **Update queries** to use weight-based ordering
+

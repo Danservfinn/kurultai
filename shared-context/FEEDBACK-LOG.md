@@ -56,3 +56,47 @@
 ### **Next Audit:** 2026-06-01 (end of Q2)
 
 **Owner:** Kublai (schedule via cron reminder)
+
+---
+
+## Cognee Lessons (2026-03-01)
+
+**Inspired by:** Cognee (graph + vector memory for AI agents)
+
+**Principle:** Memory should capture relationships, persist over time, and learn from usage.
+
+### **Adopted Features:**
+
+1. **Weighted Memory** — Frequently-accessed connections strengthen over time
+2. **Entity Extraction** — Auto-extract entities from memory files, create Neo4j nodes
+3. **Memory Decay** — Stale edges weaken (0.5x per 14 days)
+4. **Auto-Pruning** — Orphaned nodes deleted after 30 days
+5. **Unified Search** — Single API across Neo4j, memory files, shared context
+
+### **Implementation:**
+
+| Feature | File | Status |
+|---------|------|--------|
+| Weighted memory patterns | `docs/NEO4J_PATTERNS.md` | ✅ Added |
+| Entity extractor | `src/lib/memory/entity-extractor.ts` | ✅ Created |
+| Unified search API | `src/lib/memory/search.ts` | ✅ Created |
+| Weekly pruning script | `scripts/prune-memory.sh` | ✅ Created |
+| Weekly cron | System crontab | ⏳ Pending setup |
+
+### **Benefits:**
+
+- **Prioritized queries** — Frequently-accessed relationships returned first
+- **Auto-optimization** — System learns what matters through usage
+- **Stale data cleanup** — Old, unused connections automatically pruned
+- **Better routing** — Agent assignments based on historical success
+- **Faster search** — High-weight edges prioritized in traversal
+
+### **Next Steps:**
+
+1. Add weight properties to existing Neo4j relationships
+2. Increment weight on every access (update all Neo4j queries)
+3. Set up weekly decay cron
+4. Set up monthly pruning cron
+5. Update queries to use weight-based ordering
+
+---
