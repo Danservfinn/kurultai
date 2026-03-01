@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "profiles": {
+    "google:manual": {
+      "type": "token",
+      "provider": "google",
+      "token": "AIzaSyClwYbfgoWc10G1OrbG-oSB4aD4wZYDOys"
+    },
+    "moonshot:manual": {
+      "type": "token",
+      "provider": "moonshot",
+      "token": "sk-kimi-fxG3zdw2kXEpZnnftdT1gcymIrApBWAShe2giWyIaoOVHTa4UHjgCetotz7mgHkP"
+    },
+    "google-gemini-cli:d@kurult.ai": {
+      "type": "oauth",
+      "provider": "google-gemini-cli",
+      "access": "ya29.a0ATkoCc5ow7o2dUStoa9bKEG3Fni0q5Y4cESSCg5R0OYUMAEt3vFVETRVxTYdeZmQt0QatgtcUCoSu4-k8-3bxrR6JmWF92j8YPkagBNRRdjG7WdhMTbeZEx7JWss-uDFn6hjGpp6QJe-avtgeAYsjtRgnpkRPwmkDGrWMnelIvVduIsaYGUGVWw92BEXWvRiqzyfjLJIdpIyNQaCgYKAWgSARASFQHGX2MipSk7f6jDeAN6x2muoxNsEQ0213",
+      "refresh": "1//01F_0aksOUf-yCgYIARAAGAESNwF-L9IrVv2TfMUCOmhaZZy905guLYp5Qms_Mts0moOZvy0hV3uJhcXEu5gqlUvw6rIPR1FI2nU",
+      "expires": 1771980138682,
+      "email": "d@kurult.ai",
+      "projectId": "lunar-rhino-wj8c5"
+    },
+    "google:d@kurult.ai": {
+      "type": "oauth",
+      "provider": "google",
+      "access": "ya29.a0ATkoCc5ow7o2dUStoa9bKEG3Fni0q5Y4cESSCg5R0OYUMAEt3vFVETRVxTYdeZmQt0QatgtcUCoSu4-k8-3bxrR6JmWF92j8YPkagBNRRdjG7WdhMTbeZEx7JWss-uDFn6hjGpp6QJe-avtgeAYsjtRgnpkRPwmkDGrWMnelIvVduIsaYGUGVWw92BEXWvRiqzyfjLJIdpIyNQaCgYKAWgSARASFQHGX2MipSk7f6jDeAN6x2muoxNsEQ0213",
+      "refresh": "1//01F_0aksOUf-yCgYIARAAGAESNwF-L9IrVv2TfMUCOmhaZZy905guLYp5Qms_Mts0moOZvy0hV3uJhcXEu5gqlUvw6rIPR1FI2nU",
+      "expires": 1771980138682,
+      "email": "d@kurult.ai",
+      "projectId": "lunar-rhino-wj8c5"
+    }
+  },
+  "lastGood": {
+    "google": "google:manual",
+    "moonshot": "moonshot:manual",
+    "google-gemini-cli": "google-gemini-cli:d@kurult.ai"
+  },
+  "usageStats": {
+    "google:manual": {
+      "lastUsed": 1772036589710,
+      "errorCount": 0,
+      "lastFailureAt": 1772036589705
+    },
+    "moonshot:manual": {
+      "lastUsed": 1771899806496,
+      "errorCount": 0,
+      "lastFailureAt": 1771899806492
+    },
+    "google-gemini-cli:d@kurult.ai": {
+      "lastUsed": 1771960576607,
+      "errorCount": 0
+    },
+    "google:d@kurult.ai": {
+      "lastUsed": 1771976814305,
+      "errorCount": 0
+    }
+  }
+}

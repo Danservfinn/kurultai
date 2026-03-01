@@ -1,0 +1,3 @@
+0 2 * * * /Users/kublai/kurultai/kublai-repo/scripts/rotate_logs.sh
+0 * * * * /Users/kublai/.openclaw/agents/ogedei/generate_hourly_report.sh > /Users/kublai/.openclaw/agents/ogedei/hourly_reports/last_run.log 2>&1
+0 * * * * /Users/kublai/.openclaw/agents/main/scripts/hourly_reflection.sh >> /Users/kublai/.openclaw/agents/main/logs/hourly_reflection.log 2>&1

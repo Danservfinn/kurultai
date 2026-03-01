@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "profiles": {
+    "google:default": {
+      "type": "apiKey",
+      "provider": "google",
+      "apiKey": "AIzaSyClwYbfgoWc10G1OrbG-oSB4aD4wZYDOys"
+    },
+    "google-gemini-cli:d@kurult.ai": {
+      "type": "oauth",
+      "provider": "google-gemini-cli",
+      "access": "ya29.a0ATkoCc7Da0EajFFeVgBhPZQHeLnmX43Vq01WMayaoaFr28awNBxeJnZhkszCZrjg6Or7sBeFcvBu1QpUb_vRlXdIjTonDh7o85hslSIRfi4YW4jURrqlOPQQblnDzzzX2opLMIuDhcDokWMxgUg5Ymr7gnl7OZsdheWJz8rlybEglhMdJ6YyTO1HFlXwjo-gxL2THbzQEaJVUwaCgYKAd0SARASFQHGX2MiGpWxLO7_gBbtcacH3b1Frw0213",
+      "refresh": "1//01F_0aksOUf-yCgYIARAAGAESNwF-L9IrVv2TfMUCOmhaZZy905guLYp5Qms_Mts0moOZvy0hV3uJhcXEu5gqlUvw6rIPR1FI2nU",
+      "expires": 1771963525076,
+      "email": "d@kurult.ai",
+      "projectId": "lunar-rhino-wj8c5"
+    }
+  },
+  "lastGood": {
+    "google": "google:default",
+    "google-gemini-cli": "google-gemini-cli:d@kurult.ai"
+  }
+}

@@ -1,0 +1,1 @@
+0 * * * * /Users/kublai/.openclaw/agents/main/scripts/hourly_reflection.sh >> /Users/kublai/.openclaw/agents/main/logs/hourly_reflection.log 2>&1

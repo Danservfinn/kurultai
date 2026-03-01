@@ -1,0 +1,12 @@
+{
+  "google-gemini-cli": {
+    "type": "oauth",
+    "access": "ya29.a0ATkoCc7fmbltGlrycgBNTs_JCZ0d4bCpu008X9X05H7klJjXv5Fb_FeTSKCfgv6jkLIxgQvBtQHQe298ZBAR2mZHFdCfaHt3bcmESnlOeJXmlq_zN6dF9ObXdrF5wjIPetDs6bkzYKImqWmT6zJGz9BXqm2uO7CDS94L-NmEzwcDzOoLcphORVVrcTIlUPChVovZZn8-W86aCgYKAboSARASFQHGX2MiCw8e-_N2_Ri6gftz4hdJLg0211",
+    "refresh": "1//05XODPyRZnSGICgYIARAAGAUSNwF-L9IrrmrE8YvaZ99dh7PpryGquxHxGTBxiY3ynXisqNT8bt-Wp8eNmVp5P2reGaaZMlRZKCs",
+    "expires": 1771868668373
+  },
+  "google": {
+    "type": "apiKey",
+    "apiKey": "AIzaSyClwYbfgoWc10G1OrbG-oSB4aD4wZYDOys"
+  }
+}
