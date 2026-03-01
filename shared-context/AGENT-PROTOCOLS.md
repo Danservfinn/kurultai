@@ -61,6 +61,112 @@ Each agent reports to Kublai (via Neo4j or memory file):
 
 ---
 
+## 🧠 Decision Request Format (Kublai → Human)
+
+**Inspired by:** Claude Code's AskUserQuestion tool
+
+**Purpose:** Reduce friction in human-AI decisions. Make it easy to respond with A/B/enter.
+
+### **Template:**
+
+```markdown
+## Decision Needed: [One sentence]
+
+**Options:**
+1. **[Option A]** — [2-3 word description]
+   - Pros: [list]
+   - Cons: [list]
+
+2. **[Option B]** — [2-3 word description]
+   - Pros: [list]
+   - Cons: [list]
+
+**Recommendation:** [Kublai's pick + 1 sentence why]
+
+**Deadline:** [When needed]
+
+**Impact of Delay:** [What happens if no decision]
+
+---
+
+**Respond:** "A", "B", or "C" (for custom)
+```
+
+### **Example:**
+
+```markdown
+## Decision Needed: Parse launch strategy
+
+**Options:**
+1. **Post content now** — Fastest to revenue
+   - Pros: Immediate traffic, validate demand
+   - Cons: No unique features yet
+
+2. **Build agents first** — Stronger differentiation
+   - Pros: Unique selling points
+   - Cons: 2-3 day delay
+
+**Recommendation:** Option A — Revenue validates faster than features
+
+**Deadline:** Today (for weekend traffic)
+
+**Impact of Delay:** No users until posted
+
+---
+
+**Respond:** "A", "B", or "C"
+```
+
+### **Why This Works:**
+
+- **Structured** → Easy to parse quickly
+- **Clear options** → No ambiguity
+- **Recommendation included** → Don't need to decide from scratch
+- **Single-char response** → Can respond with "A" or "B" while multitasking
+- **Deadline + impact** → Knows urgency
+
+---
+
+### **Progressive Disclosure Protocol**
+
+**Inspired by:** Claude Code's context engineering
+
+**Principle:** Don't dump all context at once. Let agents discover through exploration.
+
+### **Context Loading Tiers:**
+
+| Tier | Files | When Loaded |
+|------|-------|-------------|
+| **Core** | SOUL.md, AGENTS.md, IDENTITY.md | Every session |
+| **Shared** | THESIS.md, FEEDBACK-LOG.md, SIGNALS.md | Every session |
+| **Operational** | ARCHITECTURE.md, TOOLS.md, agent-specific files | On-demand |
+| **Deep** | Neo4j queries, memory archives | Query-only |
+
+### **Discovery Pattern:**
+
+```
+1. Load core files (always)
+       ↓
+2. Read references (files mention other files)
+       ↓
+3. Explore recursively (follow references)
+       ↓
+4. Build context through search (grep, Neo4j)
+       ↓
+5. Avoid pollution (unload when done)
+```
+
+### **Why This Works:**
+
+- **Efficient** → Don't load what you don't need
+- **Scalable** → Can add infinite files without bloating context
+- **Natural** → Mimics how humans explore documentation
+- **Flexible** → Deep context available when needed
+
+---
+
+---
+
 ### **Kublai's Role:**
 
 - **Visibility** - Knows what all agents are doing

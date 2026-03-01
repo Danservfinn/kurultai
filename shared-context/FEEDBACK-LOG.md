@@ -38,3 +38,21 @@
 - Use native OpenClaw cron (cron tool) instead of system crontab when possible
 - Verify configuration schemas in docs before making changes
 - Docs are the source of truth - not memory, not assumptions
+
+## Tool Audit Protocol (Quarterly)
+
+**Inspired by:** Claude Code's "revisit tool assumptions" lesson
+
+**Principle:** As models improve, tools that once helped might now constrain them.
+
+### **Quarterly Questions:**
+
+1. Which protocols feel constraining with 1M context?
+2. Are we over-coordinating (can agents handle more autonomy)?
+3. Which files could be discovered vs. always-loaded?
+4. Is Kublai's routing necessary, or can agents self-coordinate?
+5. What assumptions are we carrying from smaller models?
+
+### **Next Audit:** 2026-06-01 (end of Q2)
+
+**Owner:** Kublai (schedule via cron reminder)
