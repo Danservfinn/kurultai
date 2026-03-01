@@ -341,12 +341,12 @@ src/
 
 **Full Documentation**: `shared-context/PARSE-PLATFORM-ARCHITECTURE.md`
 
-### 3. Hourly Reflection System (with Self-Awareness)
+### 3. Gateway Heartbeat System (with Integrated Reflection)
 
-**Purpose**: Continuous improvement through agent self-reflection + architecture accuracy checks  
-**Status**: ✅ Active  
-**Mechanism**: OpenClaw cron job  
-**Schedule**: One agent reflects each hour (rotating)
+**Purpose**: Agent check-in + deep reflection every 6 hours  
+**Status**: ✅ Active (all 6 agents)  
+**Mechanism**: OpenClaw Gateway (configured in openclaw.json)  
+**Schedule**: Every 30 minutes (all agents), Deep reflection every 6 hours
 
 **Rotation:**
 - Hour 0,6,12,18: Kublai
