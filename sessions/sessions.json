@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772352349307,
+    "updatedAt": 1772352517881,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772352070754,
+      "generatedAt": 1772352308876,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -380,10 +380,10 @@
     "totalTokensFresh": true,
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
-    "totalTokens": 324244,
+    "totalTokens": 336604,
     "compactionCount": 7,
-    "inputTokens": 324244,
-    "outputTokens": 679,
+    "inputTokens": 2645132,
+    "outputTokens": 11962,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal"
