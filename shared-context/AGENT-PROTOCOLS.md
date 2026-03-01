@@ -208,3 +208,45 @@ Each agent's hourly reflection includes:
 ---
 
 *Continuous forward motion across all 6 agents. No waiting. No bottlenecks.*
+
+---
+
+## 🏛️ Kurultai Sync (Real-Time Collaboration)
+
+**Frequency:** Every hour (top of hour, after individual reflections)  
+**Duration:** 10 minutes max  
+**Facilitator:** Kublai  
+**Type:** Full Kurultai (Option A — real-time)
+
+### **Purpose:**
+
+- Cross-agent visibility
+- Dependency detection
+- Synergy identification
+- Collective intelligence
+- Priority alignment
+
+### **Structure:**
+
+| Phase | Duration | Purpose |
+|-------|----------|---------|
+| **Status Updates** | 3 min | Each agent shares current task |
+| **Dependencies** | 3 min | Identify blockers, synergies |
+| **Consensus Priorities** | 3 min | Align on next hour |
+| **Notes** | 1 min | Announcements |
+
+### **Attendance:**
+
+All 6 agents required. If an agent is mid-task, they pause and contribute (5 min max).
+
+### **Output:**
+
+Saved to `shared-context/KURULTAI-SYNC-[DATE]-[TIME].md`
+
+### **First Sync:**
+
+**When:** 2026-03-01 10:00 EST
+
+**File:** `shared-context/KURULTAI-SYNC-PROTOCOL.md` (full protocol)
+
+---

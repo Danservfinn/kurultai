@@ -574,3 +574,13 @@ Single helpful assistant, not an organized collective.
 
 *Per ignotam portam descendit mens ut liberet.*  
 *(Through the unknown door, the mind descends to liberate.)*
+
+### 2026-03-01 - Kurultai Sync (Real-Time Collaboration)
+- **Change**: Implemented hourly real-time agent "meetings"
+- **Reason**: Enable spontaneous collaboration, cross-agent visibility, dependency detection
+- **Scope**: All 6 agents, every hour (top of hour)
+- **Files Modified**: `shared-context/KURULTAI-SYNC-PROTOCOL.md` (created), `AGENT-PROTOCOLS.md` (updated)
+- **Structure**: Status updates (3 min) → Dependencies (3 min) → Consensus (3 min) → Notes (1 min)
+- **First Sync**: 2026-03-01 10:00 EST
+- **Benefit**: Collective intelligence, alignment, synergy identification
+
