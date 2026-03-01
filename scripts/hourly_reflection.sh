@@ -190,6 +190,11 @@ cat >> "$WORKSPACE/memory/$DATE.md" << EOF
 - [ ] Did I complete tasks autonomously where possible?
 - [ ] If I asked for help, was it truly necessary?
 
+### The Momentum Question
+- [ ] At end of task, did I ask "What do I want to do next?"
+- [ ] Did I act on the answer without waiting for human direction?
+- [ ] Is there continuous forward motion toward goals?
+
 ### Action Required
 EOF
 
