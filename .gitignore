@@ -1,0 +1,56 @@
+# Git Ignore for Kurultai Agent
+
+## Secrets & Credentials
+.credentials.env
+*.env
+.env.local
+*.key
+*.pem
+*.secret
+
+## OpenClaw Internal
+.openclaw/
+agent/auth.json
+agent/auth-profiles.json
+*.auth.json
+
+## Session Data (Privacy)
+sessions/*.jsonl
+sessions/*.lock
+sessions/*.json
+
+## Logs
+logs/*.log
+*.log
+
+## Temporary Files
+*.tmp
+*.bak
+*.bak.*
+*.deleted.*
+CFCONFIG
+CRON
+CRONEOF
+ENDOFFILE
+EOF
+PYEOF
+
+## IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Node Modules (if any)
+node_modules/
+
+## Build Outputs
+dist/
+build/
+*.pyc
+__pycache__/
