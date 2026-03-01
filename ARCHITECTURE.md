@@ -676,3 +676,39 @@ src/
 - **First Sync**: 2026-03-01 10:00 EST
 - **Benefit**: Collective intelligence, alignment, synergy identification
 
+
+---
+
+## 📊 Quantitative Analysis Integration (2026-03-01)
+
+**Source:** "How to Simulate Like a Quant Desk" (gemchanger @gemchange_ltd)
+
+**Adopted Techniques:**
+
+| Technique | Status | Purpose |
+|-----------|--------|---------|
+| **Particle Filters** | 🔄 Week 1 | Real-time analysis updating |
+| **Monte Carlo + Variance Reduction** | 🔄 Week 1 | Confidence intervals on scores |
+| **Brier Score Tracking** | 🔄 Week 1 | Calibration tracking |
+| **Copula Models** | ⏳ Week 2-3 | Correlated article analysis |
+
+**Implementation Plan:**
+
+```
+Week 1:
+  - Day 1: Brier Score tracking
+  - Day 2-3: Monte Carlo confidence intervals
+  - Day 4-6: Particle filters for real-time updating
+
+Week 2-3:
+  - Copula models for correlated articles
+```
+
+**Competitive Advantage:**
+- Ground News: Static scores
+- AllSides: Static bias ratings
+- NewsGuard: Static credibility
+- **Parse**: Real-time updating + confidence intervals + calibration tracking
+
+**Documentation:** `shared-context/QUANT-SIMULATION-ADOPTION.md`
+

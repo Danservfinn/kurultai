@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772403877448,
+    "updatedAt": 1772404437127,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772402383877,
+      "generatedAt": 1772403850418,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -151,9 +151,9 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 88562,
+        "chars": 88916,
         "projectContextChars": 76096,
-        "nonProjectContextChars": 12466
+        "nonProjectContextChars": 12820
       },
       "injectedWorkspaceFiles": [
         {
@@ -252,7 +252,7 @@
       },
       "tools": {
         "listChars": 1738,
-        "schemaChars": 15207,
+        "schemaChars": 15195,
         "entries": [
           {
             "name": "read",
@@ -310,8 +310,8 @@
           },
           {
             "name": "message",
-            "summaryChars": 96,
-            "schemaChars": 4201,
+            "summaryChars": 102,
+            "schemaChars": 4189,
             "propertiesCount": 85
           },
           {
@@ -380,10 +380,10 @@
     "totalTokensFresh": true,
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
-    "totalTokens": 642699,
+    "totalTokens": 642537,
     "compactionCount": 7,
-    "inputTokens": 1284593,
-    "outputTokens": 1315,
+    "inputTokens": 1289430,
+    "outputTokens": 3557,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal"
