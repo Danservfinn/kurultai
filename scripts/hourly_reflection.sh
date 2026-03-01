@@ -184,6 +184,12 @@ cat >> "$WORKSPACE/memory/$DATE.md" << EOF
 - [ ] ARCHITECTURE.md reviewed (if applicable)
 - [ ] Change Log updated (if applicable)
 
+### Autonomy Check
+- [ ] Did I ask human to do something I could do myself?
+- [ ] Did I use browser/CLI/API before requesting help?
+- [ ] Did I complete tasks autonomously where possible?
+- [ ] If I asked for help, was it truly necessary?
+
 ### Action Required
 EOF
 

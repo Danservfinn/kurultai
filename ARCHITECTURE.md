@@ -399,6 +399,15 @@ Single helpful assistant, not an organized collective.
 
 ## Change Log
 
+### 2026-03-01 - Autonomous Action Protocol Established
+- **Change**: Added Prime Directive - "Never ask human to do what Kublai can do"
+- **Reason**: Identified pattern of asking human for tasks Kublai could do via browser
+- **Scope**: SOUL.md (new conviction #12 + protocol), AGENTS.md (autonomy section), hourly_reflection.sh (autonomy check)
+- **Files Modified**: `SOUL.md`, `AGENTS.md`, `scripts/hourly_reflection.sh`
+- **New Principle**: Humans SET GOALS. Kublai EXECUTES DETAILS.
+- **Browser Autonomy**: Full browser access = no human navigation/clicking/copying needed
+- **Self-Correction**: Stop → Reflect → Pivot → Report when catching self asking for help
+
 ### 2026-03-01 - Git Commit Protocol Established
 - **Change**: All Kurultai codebase changes now auto-committed to GitHub
 - **Reason**: Version control for system evolution, track changes, enable rollback
