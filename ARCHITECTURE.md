@@ -295,21 +295,51 @@ Single helpful assistant, not an organized collective.
 - Hosting: Railway (sunny-perception service)
 - Domain: llmsurvivor.kurult.ai
 
-### 2. Parse
+### 2. Parse Platform
 
-**Purpose**: AI-powered media analysis platform  
+**Purpose**: AI-powered media analysis platform with agent services  
 **Status**: ✅ Live  
 **URL**: https://www.parsethe.media  
+**Stack**: TypeScript, Next.js 14+, Node.js
+
 **Features**:
 - Article credibility scoring
 - Bias detection
 - Fact-checking
-- 8-agent AI analysis
+- 12 analysis agents (bernays, deception, persuasion, etc.)
+- **NEW**: Prompt injection detector (sandbox testing)
+- **NEW**: Ad detector (undisclosed advertising)
+- **NEW**: x402 payment integration (agent-to-agent)
 
 **Infrastructure**:
 - Platform: Railway (sunny-perception service)
 - Domain: www.parsethe.media
-- OAuth: Google Sign-In (NEXTAUTH_URL fixed)
+- OAuth: Google Sign-In (configured)
+- Stripe: Live (Pro $19, Team $49, Max $99)
+- API: `/api/v1/agents/[agent]`
+
+**Application Layer** (`src/`):
+```
+src/
+├── agents/
+│   ├── sandbox/prompt-injection-detector.ts
+│   └── ad-detector/
+│       ├── pattern-analyzer.ts
+│       └── affiliate-detector.ts
+├── app/api/v1/agents/
+│   ├── [agent]/route.ts
+│   ├── prompt-injection-detect/
+│   └── ad-detector/
+├── lib/
+│   ├── memory/search.ts
+│   ├── memory/entity-extractor.ts
+│   └── x402/
+│       ├── payment.ts
+│       └── validation.ts
+└── middleware/x402-payment.ts
+```
+
+**Full Documentation**: `shared-context/PARSE-PLATFORM-ARCHITECTURE.md`
 
 ### 3. Hourly Reflection System (with Self-Awareness)
 
@@ -398,6 +428,68 @@ Single helpful assistant, not an organized collective.
 ---
 
 ## Change Log
+
+### 2026-03-01 - Parse Platform Architecture Documented
+- **Change**: Full `src/` application architecture documented
+- **Reason**: Architecture verification found 200+ lines of undocumented code
+- **Scope**: TypeScript/Next.js app with agent services, x402 payments, memory search
+- **Files Created**: `shared-context/PARSE-PLATFORM-ARCHITECTURE.md`
+- **Components Documented**:
+  - Ad Detector (`src/agents/ad-detector/`)
+  - Prompt Injection Detector (`src/agents/sandbox/`)
+  - x402 Payment Library (`src/lib/x402/`)
+  - Memory Search (`src/lib/memory/search.ts`)
+  - Entity Extractor (`src/lib/memory/entity-extractor.ts`)
+  - API Layer (`src/app/api/v1/agents/`)
+  - Payment Middleware (`src/middleware/x402-payment.ts`)
+- **Files Created by Subagents**: 8+ TypeScript files in 32 minutes
+
+### 2026-03-01 - x402 Payment Integration Implemented
+- **Change**: Agent-to-agent payment protocol implemented
+- **Reason**: Enable autonomous agent commerce (no human billing)
+- **Scope**: Payment creation, validation, middleware
+- **Files Created**: `src/lib/x402/payment.ts`, `src/lib/x402/validation.ts`, `src/middleware/x402-payment.ts`
+- **Configuration**: `payTo: parse@kurult.ai`, `amount: 19` ($0.19/credit)
+- **Benefit**: AI agents can pay for Parse services autonomously
+
+### 2026-03-01 - Ad Detector Agent Implemented
+- **Change**: Undisclosed advertising detection agent built
+- **Reason**: Detect affiliate links, product placements, sponsored content
+- **Scope**: Pattern analysis, affiliate detection, sandbox testing
+- **Files Created**: `src/agents/ad-detector/pattern-analyzer.ts`, `src/agents/ad-detector/affiliate-detector.ts`
+- **Detection**: 8 ad indicators (affiliate links, brand mentions, CTAs, etc.)
+- **Benefit**: First media analysis tool with ad detection
+
+### 2026-03-01 - Cognee-Inspired Memory Improvements
+- **Change**: Weighted memory, entity extraction, unified search
+- **Reason**: Memory that learns, optimizes, and stays relevant
+- **Scope**: Neo4j patterns, entity extractor, search API, pruning
+- **Files Created**: `docs/NEO4J_PATTERNS.md` (weighted), `src/lib/memory/entity-extractor.ts`, `src/lib/memory/search.ts`, `scripts/prune-memory.sh`
+- **Features**:
+  - Edge weights (increment on access, decay weekly)
+  - Auto-entity extraction from memory files
+  - Unified search (Neo4j + files + context)
+  - Weekly pruning cron
+
+### 2026-03-01 - Cron Health Monitor Implemented
+- **Change**: Auto-fix failed cron jobs every 15 minutes
+- **Reason**: Ensure critical jobs (reflections, verification, daily summary) stay healthy
+- **Scope**: Health monitoring script with auto-restart
+- **Files Created**: `scripts/cron-health-monitor.sh`
+- **Monitored Jobs**:
+  - Hourly Reflection
+  - Architecture Verification
+  - Daily Goal Progress
+- **Benefit**: Self-healing cron system
+
+### 2026-03-01 - Kurultai Architecture Gap Documented
+- **Change**: Documented 6-agent architecture gap
+- **Reason**: Only Kublai runs as OpenClaw session; others simulated
+- **Scope**: Analysis, workaround, upgrade path
+- **Files Created**: `shared-context/KURULTAI-ARCHITECTURE-GAP.md`
+- **Finding**: Heartbeats require Dashboard (web UI), not CLI
+- **Decision**: Continue with subagents until 10+ paying users
+- **Upgrade Path**: 0 users (subagents) → 10 users (persistent) → 100 users (6-agent config)
 
 ### 2026-03-01 - All Agents Momentum Question Protocol
 - **Change**: Extended "What do I want to do next?" to all 6 agents
