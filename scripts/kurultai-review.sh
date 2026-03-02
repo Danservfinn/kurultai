@@ -386,10 +386,68 @@ echo "  ✅ Actions logged for execution"
 echo ""
 
 # ============================================================================
-# STEP 6: Archive
+# STEP 6: Auto-Update ARCHITECTURE.md (Kublai)
 # ============================================================================
 
-echo "Step 6: Archiving sync file..."
+echo "Step 6: Auto-updating ARCHITECTURE.md..."
+
+# Kublai automatically updates ARCHITECTURE.md with findings
+python3 << PYEOF
+import os
+from datetime import datetime
+
+# Read the analysis
+analysis_file = '$ANALYSIS_FILE'
+if os.path.exists(analysis_file):
+    with open(analysis_file, 'r') as f:
+        analysis = f.read()
+else:
+    analysis = "No analysis available"
+
+# Read ARCHITECTURE.md
+arch_file = '/Users/kublai/.openclaw/agents/main/ARCHITECTURE.md'
+with open(arch_file, 'r') as f:
+    arch_content = f.read()
+
+# Check if today's date is already in Change Log
+today = datetime.now().strftime('%Y-%m-%d')
+if f'### {today}' not in arch_content:
+    # Add new Change Log entry
+    new_entry = f"""
+### {today} - Automated Kurultai Review
+
+- **Change**: Automated hourly Kurultai review with 6-hour rolling window
+- **Reason**: Continuous improvement through automated analysis
+- **Scope**: Cloud LLM analysis, meta-review, auto-execution
+- **Analysis Summary**: {analysis[:500]}...
+- **Files**: `scripts/kurultai-review.sh`, `scripts/kurultai-review-prompt.txt`
+
+"""
+    # Find Change Log section and insert
+    if '## Change Log' in arch_content:
+        import re
+        match = re.search(r'## Change Log\n\n(### 2026)', arch_content)
+        if match:
+            insert_pos = match.start(1)
+            arch_content = arch_content[:insert_pos] + new_entry + "\n" + arch_content[insert_pos:]
+        else:
+            arch_content = arch_content.replace('## Change Log\n', '## Change Log\n' + new_entry)
+    
+    with open(arch_file, 'w') as f:
+        f.write(arch_content)
+    
+    print(f"✅ ARCHITECTURE.md updated with today's review")
+else:
+    print(f"ℹ️ ARCHITECTURE.md already updated for today")
+PYEOF
+
+echo ""
+
+# ============================================================================
+# STEP 7: Archive
+# ============================================================================
+
+echo "Step 7: Archiving sync file..."
 
 # Wait 10 minutes for Kublai to review
 sleep 600
@@ -408,5 +466,6 @@ echo "Files created:"
 echo "  - Analysis: $ANALYSIS_FILE"
 echo "  - Meta-Review: $META_REVIEW_FILE"
 echo "  - Sync File: $SYNC_FILE (archived)"
+echo "  - ARCHITECTURE.md: ✅ Auto-updated"
 echo ""
 echo "Next review: $(date -v+1H '+%H:00') EST"

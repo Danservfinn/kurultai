@@ -73,9 +73,11 @@ echo "" >> "$SYNC_FILE"
 # Kublai asks: "What do I want to do next?"
 echo "**Kublai Self-Reflection:**" >> "$SYNC_FILE"
 echo "" >> "$SYNC_FILE"
-echo "Question: What do I want to do next?" >> "$SYNC_FILE"
+echo "**Question:** What do I want to do next?" >> "$SYNC_FILE"
 echo "" >> "$SYNC_FILE"
 echo "**Answer:** [Kublai fills this in based on sync results]" >> "$SYNC_FILE"
+echo "" >> "$SYNC_FILE"
+echo "**Kublai's Next Action:** [Specific action Kublai will execute]" >> "$SYNC_FILE"
 echo "" >> "$SYNC_FILE"
 
 # Kublai assigns tasks to each agent
