@@ -1,10 +1,11 @@
 #!/bin/bash
-# Hourly Agent Reflection System with Self-Awareness Protocol
+# 5-Minute Agent Reflection (rotating every 5 min) System with Self-Awareness Protocol
 
-HOUR=$(date +%H)
-# Force base-10 interpretation (strip leading zero for octal safety)
-HOUR=$((10#$HOUR))
-AGENT_NUM=$((HOUR % 6))
+MINUTE=$(date +%M)
+# Force base-10 interpretation
+MINUTE=$((10#$MINUTE))
+# Rotate agents every 5 minutes (12 cycles per hour, 6 agents = every 30 min per agent)
+AGENT_NUM=$(( (MINUTE / 5) % 6 ))
 
 case $AGENT_NUM in
   0) AGENT="kublai" ;;
