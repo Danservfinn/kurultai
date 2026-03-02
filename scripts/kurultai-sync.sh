@@ -32,10 +32,9 @@ echo "" >> "$SYNC_FILE"
 echo "**Quorum:** 6/6 (100%)" >> "$SYNC_FILE"
 echo "" >> "$SYNC_FILE"
 
-# Log to Neo4j
-python3 << 'PYEOF'
+# Log to Neo4j (optional - requires neo4j Python driver)
+python3 << PYEOF 2>/dev/null
 from neo4j import GraphDatabase
-from datetime import datetime
 import os
 
 driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "neo4j"))
