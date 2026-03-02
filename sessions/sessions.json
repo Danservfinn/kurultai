@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772471819971,
+    "updatedAt": 1772472173870,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,7 +125,7 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "heartbeat",
+      "provider": "webchat",
       "surface": "webchat",
       "chatType": "direct",
       "label": "+19194133445",
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772471641236,
+      "generatedAt": 1772472003802,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
     "compactionCount": 7,
-    "inputTokens": 2219072,
-    "outputTokens": 2181,
+    "inputTokens": 1478264,
+    "outputTokens": 1038,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 739860
+    "totalTokens": 737627
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
