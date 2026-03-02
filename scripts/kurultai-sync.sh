@@ -24,11 +24,12 @@ echo "" >> "$SYNC_FILE"
 
 for agent in kublai mongke chagatai temujin jochi ogedei; do
     AGENT_FILE="/Users/kublai/.openclaw/agents/$agent/memory/${DATE}.md"
+    AGENT_NAME=$(echo "$agent" | sed 's/\b\(.\)/\u\1/')
     if [ -f "$AGENT_FILE" ]; then
         LAST_TASK=$(grep -A2 "Focus for Next Hour" "$AGENT_FILE" 2>/dev/null | tail -1 | sed 's/^- //')
-        echo "- [x] ${agent^} - $LAST_TASK" >> "$SYNC_FILE"
+        echo "- [x] $AGENT_NAME - $LAST_TASK" >> "$SYNC_FILE"
     else
-        echo "- [ ] ${agent^} - No update" >> "$SYNC_FILE"
+        echo "- [ ] $AGENT_NAME - No update" >> "$SYNC_FILE"
     fi
 done
 
