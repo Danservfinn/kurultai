@@ -4,7 +4,7 @@
       "default": "local",
       "fallback": "cloud",
       "localEndpoint": "http://localhost:1234/v1/chat/completions",
-      "localModel": "qwen3-14b-claude-4.5-opus-high-reasoning-distill",
+      "localModel": "qwen3.5-9b-mlx",
       "cloudModel": "qwen3.5-plus",
       "timeout": 60000,
       "maxRetries": 3

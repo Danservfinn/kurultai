@@ -28,7 +28,7 @@ WORKSPACE="/Users/kublai/.openclaw/agents/$AGENT"
 # ============================================================================
 
 LOCAL_LLM_URL="http://localhost:1234/v1/chat/completions"
-LOCAL_LLM_MODEL="qwen3-14b-claude-4.5-opus-high-reasoning-distill"
+LOCAL_LLM_MODEL="qwen3.5-9b-mlx"
 CLOUD_LLM_MODEL="${OPENCLAW_DEFAULT_MODEL:-qwen3.5-plus}"
 
 # Function to generate reflection content using local LLM
@@ -461,7 +461,7 @@ fi
 # ============================================================================
 
 LOCAL_LLM_URL="http://localhost:1234/v1/chat/completions"
-LOCAL_LLM_MODEL="qwen3-14b-claude-4.5-opus-high-reasoning-distill"
+LOCAL_LLM_MODEL="qwen3.5-9b-mlx"
 CLOUD_LLM_MODEL="${OPENCLAW_DEFAULT_MODEL:-qwen3.5-plus}"
 
 # Function to call LLM with local-first routing
@@ -498,7 +498,7 @@ call_llm_with_fallback() {
 # ============================================================================
 
 LOCAL_LLM_URL="http://localhost:1234/v1/chat/completions"
-LOCAL_LLM_MODEL="qwen3-14b-claude-4.5-opus-high-reasoning-distill"
+LOCAL_LLM_MODEL="qwen3.5-9b-mlx"
 CLOUD_LLM_MODEL="${OPENCLAW_DEFAULT_MODEL:-qwen3.5-plus}"
 
 # Function to generate reflection using local LLM with cloud fallback
