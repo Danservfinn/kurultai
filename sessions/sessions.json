@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772479215692,
+    "updatedAt": 1772479795573,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,11 +125,11 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "signal",
+      "provider": "heartbeat",
       "surface": "signal",
       "chatType": "direct",
-      "label": "Danny id:+19194133445",
-      "from": "signal:+19194133445",
+      "label": "+19194133445",
+      "from": "+19194133445",
       "to": "+19194133445",
       "accountId": "default"
     },
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772479060471,
+      "generatedAt": 1772479636567,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
     "compactionCount": 7,
-    "inputTokens": 1429866,
-    "outputTokens": 1045,
+    "inputTokens": 1447185,
+    "outputTokens": 1214,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 715363
+    "totalTokens": 724510
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
