@@ -170,10 +170,8 @@ ANALYZE AND REPORT:
 Be specific, evidence-based, and actionable. Cite specific chatlog messages, commits, or log entries.
 """
 
-# Call cloud LLM API (using OpenAI-compatible endpoint)
-# Note: Adjust API endpoint and key based on your setup
-api_key = os.environ.get('CLOUD_LLM_API_KEY', '')
-api_url = os.environ.get('CLOUD_LLM_API_URL', 'https://api.example.com/v1/chat/completions')
+# Call cloud LLM API (using OpenClaw config credentials)
+# API credentials already loaded above from openclaw.json
 
 try:
     response = requests.post(
