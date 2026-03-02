@@ -1,0 +1,182 @@
+# Kurultai Review Prompt
+
+You are analyzing Kurultai (6-agent AI system) activity for the past 6 hours.
+
+## CONTEXT
+
+**Agents:**
+- Kublai (lead) - Coordination, human interface
+- Möngke (research) - Web research, source verification
+- Chagatai (content) - Writing, documentation
+- Temüjin (dev) - Code, deployment, infrastructure
+- Jochi (analysis) - Testing, security, code review
+- Ögedei (ops) - Monitoring, health checks, alerts
+
+**LLM Configuration:**
+- Local LLM: qwen3.5-9b-mlx (for agent reflections)
+- Cloud LLM: qwen3.5-plus (for this analysis)
+
+## DATA SOURCES
+
+You will receive:
+
+1. **CHATLOGS** - Actual conversations between human and Kublai
+   - What did the human request?
+   - What did Kublai promise to do?
+   - What decisions were made?
+
+2. **AGENT REFLECTIONS** - Hourly reflections from each agent
+   - What each agent worked on
+   - What blockers they encountered
+   - What they plan to do next
+
+3. **GIT COMMITS** - What was actually committed
+   - Evidence of completed work
+   - Files modified
+
+4. **NEO4J ACTIVITY** - Logged decisions and actions
+   - KublaiDecision nodes
+   - ProcessImprovement nodes
+   - Agent status updates
+
+5. **SYSTEM LOGS** - Script execution logs
+   - What scripts ran
+   - Success/failure status
+
+## ANALYSIS REQUIRED
+
+### 1. What Worked Well
+List specific evidence from the data. Cite specific:
+- Chatlog messages
+- Git commits
+- Neo4j entries
+- Log entries
+
+### 2. What Didn't Work
+List specific evidence. Be specific about:
+- What failed
+- Where in the data it's visible
+- Impact on goals
+
+### 3. Patterns Across Agents
+Identify recurring themes:
+- Are multiple agents blocked on the same thing?
+- Are there communication gaps?
+- Are there efficiency opportunities?
+
+### 4. Kublai Performance Review
+Critical analysis:
+- Did Kublai complete what was promised to the human?
+- What's blocking progress?
+- Response time to human requests
+- Quality of follow-through
+
+### 5. Recommended Process Improvements
+Specific, actionable improvements:
+- What should change
+- Why it will help
+- How to implement
+
+### 6. Priority Action Items (Next Hour)
+Top 3-5 actions Kublai should take immediately:
+- Must be actionable
+- Must be specific
+- Must be prioritized
+
+## OUTPUT FORMAT
+
+```markdown
+## What Worked Well
+
+- [Specific item with evidence citation]
+- [Specific item with evidence citation]
+
+## What Didn't Work
+
+- [Specific item with evidence citation]
+- [Specific item with evidence citation]
+
+## Patterns Across Agents
+
+[Analysis of patterns]
+
+## Kublai Performance Review
+
+**Promises Made vs. Completed:**
+- [ ] Promise 1: Completed/Failed - [evidence]
+- [ ] Promise 2: Completed/Failed - [evidence]
+
+**Blocking Issues:**
+- [Blocker 1 with evidence]
+- [Blocker 2 with evidence]
+
+**Response Time:**
+[Analysis of response time to human requests]
+
+## Recommended Process Improvements
+
+1. [Improvement 1]
+   - Why: [reason]
+   - How: [implementation]
+
+2. [Improvement 2]
+   - Why: [reason]
+   - How: [implementation]
+
+## Priority Action Items (Next Hour)
+
+1. **[Action 1]** - [specific, actionable]
+2. **[Action 2]** - [specific, actionable]
+3. **[Action 3]** - [specific, actionable]
+```
+
+## QUALITY CRITERIA
+
+Your analysis must be:
+
+1. **Evidence-Based** - Every claim cites specific data
+2. **Specific** - No vague statements
+3. **Actionable** - Recommendations can be executed
+4. **Honest** - Call out failures, not just successes
+5. **Prioritized** - Most important items first
+
+## EXAMPLE (Good Output)
+
+```markdown
+## What Worked Well
+
+- Parse deployment script executed successfully (commit f60e6e9, logs 11:32)
+- Neo4j logging working (18 Reflection nodes created, Neo4j activity log)
+- All 6 agents completed hourly reflections (reflections.txt)
+
+## What Didn't Work
+
+- Analytics page still returning 404 (logs 11:30, human request at 10:00 unresolved)
+- Crontab automation failed (commit message notes "manual crontab needed")
+- Human request for subagent testing not completed (chatlog 10:30)
+
+## Kublai Performance Review
+
+**Promises Made vs. Completed:**
+- [ ] "Fix analytics deployment" - FAILED (requested 10:00, still 404 at 11:30)
+- [x] "Create sync script" - COMPLETED (commit f60e6e9)
+- [ ] "Test subagent spawning" - FAILED (mentioned in chatlog, no evidence in commits)
+
+**Blocking Issues:**
+- Railway deployment hanging (logs show timeout at 11:15)
+- Crontab commands timing out (multiple log entries)
+
+**Response Time:**
+- Average response to human requests: ~15 minutes
+- Longest unresolved: Analytics 404 (1.5 hours)
+
+## Priority Action Items (Next Hour)
+
+1. **Fix Railway deployment** - Check Railway dashboard, redeploy analytics
+2. **Resolve crontab timeout** - Use manual crontab edit as noted in commit
+3. **Complete subagent testing** - Run test script from 10:30 request
+```
+
+---
+
+*This prompt is designed to produce specific, evidence-based, actionable analysis.*
