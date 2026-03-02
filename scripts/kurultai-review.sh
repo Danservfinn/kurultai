@@ -196,7 +196,7 @@ try:
         print(analysis)
     else:
         print(f"❌ API Error: {response.status_code}")
-        print(response.text)
+        print(f"Response: {response.text}")
         
 except Exception as e:
     print(f"❌ Analysis failed: {e}")
@@ -226,7 +226,21 @@ echo "Step 3: Meta-review of LLM prompt..."
 
 python3 << PYEOF > "$META_REVIEW_FILE" 2>&1
 import os
+import json
 import requests
+
+# Read OpenClaw config to get API credentials
+with open('/Users/kublai/.openclaw/openclaw.json', 'r') as f:
+    openclaw_config = json.load(f)
+
+# Extract API credentials from bailian provider
+bailian = openclaw_config.get('models', {}).get('providers', {}).get('bailian', {})
+api_key = bailian.get('apiKey', '')
+base_url = bailian.get('baseUrl', 'https://coding-intl.dashscope.aliyuncs.com/v1')
+api_url = f"{base_url}/chat/completions"
+
+print(f"Using API: {api_url}")
+print(f"API Key: {api_key[:10]}...")
 
 # Read the analysis
 analysis = open('$ANALYSIS_FILE').read()
@@ -263,8 +277,7 @@ REVIEW THE PROMPT:
 Be specific and constructive.
 """
 
-api_key = os.environ.get('CLOUD_LLM_API_KEY', '')
-api_url = os.environ.get('CLOUD_LLM_API_URL', 'https://api.example.com/v1/chat/completions')
+# API credentials already set above from OpenClaw config
 
 try:
     response = requests.post(
@@ -287,6 +300,7 @@ try:
         print(meta_review)
     else:
         print(f"❌ Meta-review API Error: {response.status_code}")
+        print(f"Response: {response.text}")
         
 except Exception as e:
     print(f"❌ Meta-review failed: {e}")
