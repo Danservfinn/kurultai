@@ -199,6 +199,50 @@ cat >> "$WORKSPACE/memory/$DATE.md" << EOF
 - [ ] Did I report my next action to Kublai?
 - [ ] Is there continuous forward motion toward goals?
 
+---
+
+## 🤖 Local LLM Routing Reflection
+
+**Review LLM routing decisions for this hour:**
+
+### Task Routing Analysis
+- Local LLM Tasks: ___ 
+- Cloud LLM Tasks: ___
+- Local Success Rate: ___% (target: >95%)
+- Cloud Escalations: ___ (target: <5%)
+
+### Routing Decision Review
+**Verify routing followed decision tree:**
+
+| Rule | Decision | Correct? |
+|------|----------|----------|
+| volume = 'continuous'? | LOCAL ✅/❌ | ✅/❌ |
+| agent = 'ogedei'/'jochi'? | LOCAL ✅/❌ | ✅/❌ |
+| volume = 'batch' + simple? | LOCAL ✅/❌ | ✅/❌ |
+| userFacing = false? | LOCAL ✅/❌ | ✅/❌ |
+| complexity = 'critical'? | CLOUD ✅/❌ | ✅/❌ |
+| userFacing + complex? | CLOUD ✅/❌ | ✅/❌ |
+| DEFAULT? | LOCAL ✅/❌ | ✅/❌ |
+
+### Optimization Opportunities
+- [ ] Tasks that should have been routed differently?
+- [ ] Patterns in cloud escalations?
+- [ ] Can more tasks be routed to local?
+- [ ] Local LLM failures to investigate?
+
+### Metrics
+- Local Success Rate: ___% (target: >95%)
+- Cloud Escalation Rate: ___% (target: <5%)
+- Avg Local Latency: ___s (target: <5s)
+- Cost Savings This Hour: \$___ 
+
+### Action Items
+- [ ] Adjust routing rules if needed
+- [ ] Investigate local LLM failures
+- [ ] Document routing lessons learned
+
+---
+
 ### Action Required
 EOF
 
