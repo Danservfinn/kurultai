@@ -134,8 +134,8 @@ try:
         
         sync_id = result.single()["s"].element_id
         
-        # Create KublaiDecision node linked to sync
-        session.run("""
+        # Create KublaiDecision node linked to sync (with task assignment tracking)
+        result = session.run("""
             MATCH (s:KurultaiSync)
             WHERE s.date = \$date AND s.time = \$time
             CREATE (d:KublaiDecision {
@@ -146,10 +146,15 @@ try:
                 synergies_identified: [],
                 immediate_actions: [],
                 deferred_actions: [],
-                process_improvements: []
+                process_improvements: [],
+                kublai_next_action: '',
+                auto_executed: false
             })
             CREATE (s)-[:HAS_DECISION]->(d)
+            RETURN d
         """, date=sync_date, time=sync_time)
+        
+        decision_id = result.single()["d"].element_id
         
         # Create ProcessImprovement node for tracking improvements
         session.run("""
@@ -164,8 +169,27 @@ try:
             })
             CREATE (s)-[:HAS_IMPROVEMENT]->(pi)
         """, date=sync_date, time=sync_time)
+        
+        # Create Task nodes for each agent (Kublai assigns tasks)
+        agents = ['kublai', 'mongke', 'chagatai', 'temujin', 'jochi', 'ogedei']
+        for agent in agents:
+            session.run("""
+                MATCH (d:KublaiDecision)
+                WHERE d.timestamp IS NOT NULL
+                WITH d ORDER BY d.timestamp DESC LIMIT 1
+                CREATE (t:Task {
+                    timestamp: datetime(),
+                    agent: \$agent,
+                    description: '[Task to be assigned by Kublai]',
+                    status: 'pending',
+                    assigned_at: datetime(),
+                    completed: false
+                })
+                CREATE (d)-[:ASSIGNS_TASK]->(t)
+            """, agent=agent)
 
     print(f"✅ Logged Kurultai Sync to Neo4j (ID: {sync_id})")
+    print(f"✅ Created Task nodes for all 6 agents")
     driver.close()
 except Exception as e:
     print(f"⚠️ Neo4j logging skipped: {e}")
