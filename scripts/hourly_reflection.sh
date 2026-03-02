@@ -416,7 +416,7 @@ echo "---" >> "$WORKSPACE/memory/$DATE.md"
 echo "[$(date)] Done for $AGENT"
 
 # Log to Neo4j
-log_reflection_to_neo4j "$AGENT" "$DATE" "$TIME" "local"
+/Users/kublai/.openclaw/agents/main/scripts/log-to-neo4j.sh "$AGENT" "$DATE" "$TIME" "local"
 
 # Git Commit for Self-Awareness
 echo "[$(date)] Checking for git changes to commit..."
