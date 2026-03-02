@@ -429,6 +429,55 @@ src/
 
 ## Change Log
 
+
+### 2026-03-02 - Kurultai Review System Implemented
+- **Change**: Automated hourly review with 6-hour rolling window analysis
+- **Reason**: Continuous improvement through automated analysis of agent activity
+- **Scope**: Cloud LLM (qwen3.5-plus) meta-review, auto-execution of actions
+- **Files Created**: `scripts/kurultai-review.sh`, `scripts/kurultai-review-prompt.txt`
+- **Features**:
+  - Collects 6-hour rolling window of chatlogs
+  - Cloud LLM analyzes activity with evidence-based analysis
+  - Meta-review evaluates prompt quality
+  - Auto-executes priority actions
+  - Archives sync files after completion
+
+### 2026-03-02 - Kurultai Sync Protocol Live
+- **Change**: Real-time hourly agent meetings implemented
+- **Reason**: Cross-agent visibility and alignment
+- **Scope**: 10-minute structured sync (status, dependencies, consensus)
+- **Files Created**: `scripts/kurultai-sync.sh`, `shared-context/KURULTAI-SYNC-PROTOCOL.md`
+- **Live Syncs**: Multiple syncs completed (11:30, 11:32, 11:52 EST)
+- **Features**:
+  - All 6 agents report status
+  - Kublai distills learnings
+  - Logs to Neo4j (KurultaiSync nodes)
+  - Process improvement tracking
+
+### 2026-03-02 - Local LLM Integration Architecture
+- **Change**: LM Studio integration with automatic fallback
+- **Reason**: Cost reduction, privacy, faster response times
+- **Scope**: Task-based routing with metrics tracking
+- **Files Created**: `shared-context/LOCAL-LLM-INTEGRATION-ARCHITECTURE.md`
+- **Models**:
+  - Local: qwen3.5-9b-mlx (LM Studio)
+  - Cloud: qwen3.5-plus (fallback)
+- **Features**:
+  - Automatic local → cloud fallback
+  - Task-based routing (heartbeats use local)
+  - Metrics tracking (success rate, latency)
+
+### 2026-03-02 - Parse Conversion Tracking
+- **Change**: Full conversion analytics implementation
+- **Reason**: Track user journey from visit to subscription
+- **Scope**: Event tracking, funnel analysis, revenue attribution
+- **Files Created**: `docs/PARSE_CONVERSION_TRACKING_IMPLEMENTATION.md`
+- **Features**:
+  - Event tracking (page views, signups, conversions)
+  - Funnel analysis (visit → signup → trial → paid)
+  - Revenue attribution by source
+
+
 ### 2026-03-01 - Parse Platform Architecture Documented
 - **Change**: Full `src/` application architecture documented
 - **Reason**: Architecture verification found 200+ lines of undocumented code
