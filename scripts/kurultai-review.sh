@@ -47,7 +47,7 @@ for agent in kublai mongke chagatai temujin jochi ogedei; do
     AGENT_FILE="/Users/kublai/.openclaw/agents/$agent/memory/${DATE}.md"
     if [ -f "$AGENT_FILE" ]; then
         echo "=== ${agent^} Reflections ===" >> "$DATA_DIR/reflections.txt"
-        grep -A100 "## ${HOUR_AGO#*:}" "$AGENT_FILE" 2>/dev/null | head -50 >> "$DATA_DIR/reflections.txt"
+        tail -100 "$AGENT_FILE" >> "$DATA_DIR/reflections.txt"
         echo "" >> "$DATA_DIR/reflections.txt"
     fi
 done
@@ -107,7 +107,21 @@ echo "Step 2: Analyzing with cloud LLM (qwen3.5-plus)..."
 
 python3 << PYEOF > "$ANALYSIS_FILE" 2>&1
 import os
+import json
 import requests
+
+# Read OpenClaw config to get API credentials
+with open('/Users/kublai/.openclaw/openclaw.json', 'r') as f:
+    openclaw_config = json.load(f)
+
+# Extract API credentials from bailian provider
+bailian = openclaw_config.get('models', {}).get('providers', {}).get('bailian', {})
+api_key = bailian.get('apiKey', '')
+base_url = bailian.get('baseUrl', 'https://coding-intl.dashscope.aliyuncs.com/v1')
+api_url = f"{base_url}/chat/completions"
+
+print(f"Using API: {api_url}")
+print(f"API Key: {api_key[:10]}...")
 
 # Read collected data
 chatlogs = open('$DATA_DIR/chatlogs.txt').read()[:50000]  # Limit to avoid token limits
