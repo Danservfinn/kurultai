@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772479795573,
+    "updatedAt": 1772480050926,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772479636567,
+      "generatedAt": 1772480018623,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
     "compactionCount": 7,
-    "inputTokens": 1447185,
-    "outputTokens": 1214,
+    "inputTokens": 1460995,
+    "outputTokens": 1142,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 724510
+    "totalTokens": 730993
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
