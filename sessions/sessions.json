@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772480423721,
+    "updatedAt": 1772481037066,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,11 +125,11 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "webchat",
-      "surface": "webchat",
+      "provider": "signal",
+      "surface": "signal",
       "chatType": "direct",
-      "label": "+19194133445",
-      "from": "+19194133445",
+      "label": "Danny id:+19194133445",
+      "from": "signal:+19194133445",
       "to": "+19194133445",
       "accountId": "default"
     },
