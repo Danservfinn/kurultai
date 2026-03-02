@@ -96,6 +96,61 @@ PYEOF
 echo "  - Collecting system logs..."
 grep "${DATE} ${TIME#*:}" /tmp/kurultai-*.log 2>/dev/null > "$DATA_DIR/logs.txt" || echo "No logs found" > "$DATA_DIR/logs.txt"
 
+# 1.6 Collect structured heartbeats from Neo4j
+echo "  - Collecting structured heartbeats from Neo4j..."
+python3 << PYEOF > "$DATA_DIR/heartbeats.txt" 2>&1
+from neo4j import GraphDatabase
+from datetime import datetime
+
+driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "neo4j"))
+
+with driver.session() as session:
+    # Get heartbeats from past 6 hours
+    result = session.run("""
+        MATCH (h:Heartbeat)
+        WHERE h.timestamp > datetime() - duration('PT6H')
+        RETURN h.agent, h.timestamp, h.completed_tasks, h.current_task, 
+               h.blockers, h.next_action, h.self_directed, h.assigned_by
+        ORDER BY h.timestamp DESC
+    """)
+    
+    print("=== Structured Heartbeats (Past 6 Hours) ===\n")
+    for record in result:
+        print(f"Agent: {record['h.agent']}")
+        print(f"Time: {record['h.timestamp']}")
+        print(f"Completed: {record['h.completed_tasks']}")
+        print(f"Current: {record['h.current_task']}")
+        print(f"Blockers: {record['h.blockers']}")
+        print(f"Next: {record['h.next_action']}")
+        print(f"Self-Directed: {record['h.self_directed']}")
+        print(f"Assigned By: {record['h.assigned_by']}")
+        print("")
+    
+    # Calculate autonomy metrics
+    result = session.run("""
+        MATCH (h:Heartbeat)
+        WHERE h.timestamp > datetime() - duration('PT6H')
+        RETURN 
+            h.agent,
+            count(h) as heartbeat_count,
+            avg(size(h.completed_tasks)) as avg_completed,
+            avg(size(h.blockers)) as avg_blockers,
+            sum(CASE WHEN h.self_directed THEN 1 ELSE 0 END) * 100.0 / count(h) as autonomy_score
+        ORDER BY h.agent
+    """)
+    
+    print("\n=== Autonomy Metrics (Past 6 Hours) ===\n")
+    for record in result:
+        print(f"Agent: {record['h.agent']}")
+        print(f"  Heartbeats: {record['heartbeat_count']}")
+        print(f"  Avg Tasks Completed: {record['avg_completed']:.1f}")
+        print(f"  Avg Blockers: {record['avg_blockers']:.1f}")
+        print(f"  Autonomy Score: {record['autonomy_score']:.0f}%")
+        print("")
+
+driver.close()
+PYEOF
+
 echo "  ✅ Data collection complete"
 echo ""
 

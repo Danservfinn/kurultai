@@ -586,3 +586,96 @@ except Exception as e:
     print(f"⚠️ Neo4j logging skipped: {e}")
 PYEOF
 }
+
+# ============================================================================
+# STRUCTURED HEARTBEAT LOGGING (For Kurultai Analysis)
+# ============================================================================
+# Log structured heartbeat data to Neo4j for Kurultai review
+# Agents are purely self-directed - no assigned tasks
+# ============================================================================
+
+log_structured_heartbeat() {
+    local agent="$1"
+    local date="$2"
+    local time="$3"
+    local reflection_file="$WORKSPACE/memory/$DATE.md"
+    
+    python3 << PYEOF
+import os
+import re
+from datetime import datetime
+
+try:
+    import sys
+    sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+    from heartbeat_logger import HeartbeatLogger
+    
+    logger = HeartbeatLogger()
+    
+    # Read the reflection file to extract structured data
+    reflection_file = "$reflection_file"
+    completed_tasks = []
+    current_task = ''
+    blockers = []
+    next_action = ''
+    progress = 0.0
+    
+    if os.path.exists(reflection_file):
+        with open(reflection_file, 'r') as f:
+            content = f.read()
+            
+            # Extract completed tasks
+            completed_match = re.search(r'### Completed\s*\n(.*?)(?=###|\Z)', content, re.DOTALL)
+            if completed_match:
+                completed_tasks = [line.strip().lstrip('- ').lstrip('* ') 
+                                   for line in completed_match.group(1).strip().split('\n') 
+                                   if line.strip() and not line.startswith('#')]
+            
+            # Extract current task (from "Focus for Next Hour")
+            focus_match = re.search(r'### Focus for Next Hour\s*\n(.*?)(?=###|\Z)', content, re.DOTALL)
+            if focus_match:
+                focus_lines = [line.strip().lstrip('- ').lstrip('* ') 
+                               for line in focus_match.group(1).strip().split('\n') 
+                               if line.strip() and not line.startswith('#')]
+                if focus_lines:
+                    current_task = focus_lines[0]
+                    progress = 0.0  # New task, just starting
+            
+            # Extract blockers
+            blocker_match = re.search(r'(?:Blockers|Blocked)[:\s]*(.*?)(?=###|\Z)', content, re.DOTALL | re.IGNORECASE)
+            if blocker_match:
+                blockers = [line.strip().lstrip('- ').lstrip('* ') 
+                           for line in blocker_match.group(1).strip().split('\n') 
+                           if line.strip() and not line.startswith('#')]
+            
+            # Extract next action
+            next_match = re.search(r'(?:Next|Next Action|What.*s next)[:\s]*(.*?)(?=###|\Z)', content, re.DOTALL | re.IGNORECASE)
+            if next_match:
+                next_lines = [line.strip().lstrip('- ').lstrip('* ') 
+                             for line in next_match.group(1).strip().split('\n') 
+                             if line.strip() and not line.startswith('#')]
+                if next_lines:
+                    next_action = next_lines[0]
+    
+    # Log structured heartbeat (purely self-directed)
+    logger.log_heartbeat(
+        agent='$agent',
+        completed_tasks=completed_tasks,
+        current_task=current_task,
+        progress=progress,
+        blockers=blockers,
+        next_action=next_action,
+        self_directed=True,  # Heartbeats are purely self-directed
+        assigned_by=None
+    )
+    
+    print(f"✅ Logged structured heartbeat for $agent")
+    logger.close()
+    
+except Exception as e:
+    print(f"⚠️ Structured heartbeat logging skipped: {e}")
+PYEOF
+}
+
+# Call structured heartbeat logging after reflection
+log_structured_heartbeat "$AGENT" "$DATE" "$TIME"
