@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772477693390,
+    "updatedAt": 1772477984299,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -138,7 +138,7 @@
     "contextTokens": 1000000,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772477660735,
+      "generatedAt": 1772477781836,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -151,9 +151,9 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 91249,
+        "chars": 90895,
         "projectContextChars": 78429,
-        "nonProjectContextChars": 12820
+        "nonProjectContextChars": 12466
       },
       "injectedWorkspaceFiles": [
         {
@@ -260,7 +260,7 @@
       },
       "tools": {
         "listChars": 1738,
-        "schemaChars": 15195,
+        "schemaChars": 15207,
         "entries": [
           {
             "name": "read",
@@ -318,8 +318,8 @@
           },
           {
             "name": "message",
-            "summaryChars": 102,
-            "schemaChars": 4189,
+            "summaryChars": 96,
+            "schemaChars": 4201,
             "propertiesCount": 85
           },
           {
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772345133928,
     "memoryFlushCompactionCount": 6,
     "compactionCount": 7,
-    "inputTokens": 1398296,
-    "outputTokens": 1181,
+    "inputTokens": 1400449,
+    "outputTokens": 832,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 699583
+    "totalTokens": 700608
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
