@@ -3,7 +3,7 @@
 # Run via cron: */5 * * * * /Users/kublai/.openclaw/agents/main/scripts/heartbeat-watchdog.sh
 
 LOG_FILE="/Users/kublai/.openclaw/agents/main/logs/watchdog.log"
-DAEMON_NAME="heartbeat_master.py"
+DAEMON_NAME="node.*openclaw.*gateway"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -11,25 +11,26 @@ log() {
 
 log "=== Watchdog Check ==="
 
-# Check for heartbeat daemon process
+# Check for gateway process (heartbeat is built into gateway)
 PIDS=$(pgrep -f "$DAEMON_NAME")
 
 if [ -z "$PIDS" ]; then
-    log "❌ Heartbeat daemon NOT RUNNING - restarting..."
+    log "❌ Gateway NOT RUNNING - restarting..."
     
-    # Restart the daemon
-    cd /Users/kublai/.openclaw/agents/main
-    nohup python3 -m openclaw daemon > /dev/null 2>&1 &
+    # Restart the gateway via launchctl
+    launchctl kickstart -k gui/$(id -u)/ai.openclaw.gateway 2>/dev/null || \
+    launchctl kickstart -k gui/$(id -u)/com.openclaw.gateway 2>/dev/null || \
+    log "⚠️ launchctl kickstart failed, trying direct start..."
     
     # Wait and verify
     sleep 5
     NEW_PIDS=$(pgrep -f "$DAEMON_NAME")
     if [ -n "$NEW_PIDS" ]; then
-        log "✅ Heartbeat daemon restarted (PIDs: $NEW_PIDS)"
+        log "✅ Gateway restarted (PIDs: $NEW_PIDS)"
     else
-        log "❌ Failed to restart heartbeat daemon"
+        log "❌ Failed to restart gateway"
         # Alert Kublai
-        echo "Heartbeat daemon failed to restart" >&2
+        echo "Gateway failed to restart" >&2
     fi
 else
     log "✅ Heartbeat daemon running (PIDs: $PIDS)"
