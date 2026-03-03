@@ -422,6 +422,22 @@ if [ -f "$WORKSPACE/hooks/post-task.sh" ]; then
 else
     echo "⚠️  post-task.sh not found (skipping logging)"
 fi
+
+# ============================================================================
+# AGENT HARNESS HEALTH CHECK
+# ============================================================================
+echo "Running Agent Harness health check..."
+if [ -f "$WORKSPACE/hooks/health-check.sh" ]; then
+    if "$WORKSPACE/hooks/health-check.sh"; then
+        echo "✅ Agent Harness: HEALTHY"
+    else
+        echo "❌ Agent Harness: ISSUES DETECTED"
+        echo "   See health check output for details"
+    fi
+else
+    echo "⚠️  health-check.sh not found (skipping health check)"
+fi
+echo ""
 echo "[$(date)] Done for $AGENT"
 
 # Log to Neo4j
