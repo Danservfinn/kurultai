@@ -345,8 +345,20 @@ src/
 
 **Purpose**: Agent check-in + deep reflection every 6 hours  
 **Status**: ✅ Active (all 6 agents)  
-**Mechanism**: OpenClaw Gateway (configured in openclaw.json)  
-**Schedule**: Every 30 minutes (all agents), Deep reflection every 6 hours
+**Mechanism**: OpenClaw Gateway (configured in openclaw.json) + Python daemon (moltbot/tools/kurultai/)  
+**Schedule**: 
+- 5-minute cycles via Python daemon
+- Deep reflection every 6 hours via OpenClaw cron
+
+**Components**:
+- **Python Heartbeat Daemon** (`heartbeat_master.py`): Runs every 5 minutes, executes agent tasks
+- **Agent Tasks** (`agent_tasks.py`): Registered tasks per agent (health checks, memory curation, context review)
+- **Kublai Context Review**: LLM-powered analysis of recent chat every 12 minutes
+  - Analyzes last 60 minutes of session chat
+  - Uses cloud LLM (qwen3.5-plus via DashScope) for analysis
+  - Identifies open tasks, blockers, opportunities
+  - Routes code generation needs to temujin (task files in `temujin/tasks/`)
+  - **Escalates to Kublai** via Signal message when tasks/blockers found
 
 **Rotation:**
 - Hour 0,6,12,18: Kublai
