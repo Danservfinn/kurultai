@@ -63,7 +63,7 @@ if not spawns:
     log("Queue is empty")
     exit(0)
 
-# Process ready spawns
+# Process ready spawns (continuous tasks are in separate registry)
 ready = [s for s in spawns if s.get('status') == 'ready']
 log(f"Found {len(ready)} ready spawn(s)")
 
@@ -73,16 +73,10 @@ for s in ready:
     model = s.get('model', 'qwen3.5-plus')
     label = s.get('label', 'unknown')
     mode = s.get('mode', 'run')
-    continuous = s.get('continuous', False)
     retry_count = s.get('retry_count', 0)
     
-    # Check if continuous task already running
-    if continuous and s.get('session_key'):
-        log(f"SKIP: {label} (continuous task already running)")
-        continue
-    
     log(f"SPAWN: {agent} ({model}, {mode}) - {label}")
-    print(f"SPAWN_CMD|{agent}|{model}|{label}|{task}|{mode}|{continuous}")
+    print(f"SPAWN_CMD|{agent}|{model}|{label}|{task}|{mode}")
     
     # Mark as running
     s['status'] = 'running'

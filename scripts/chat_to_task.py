@@ -64,42 +64,66 @@ def queue_spawn(classification, message, priority="normal", mode="run", continuo
     except Exception as e:
         print(f"Neo4j error: {e}")
     
-    # Write to JSON queue (fallback + cron processing)
-    os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
-    existing = []
-    if os.path.exists(SPAWN_QUEUE):
+    # For continuous tasks, register in separate registry (not main queue)
+    if continuous:
         try:
-            with open(SPAWN_QUEUE, 'r') as f:
-                existing = json.load(f).get('spawns', [])
-        except:
-            pass
+            from continuous_registry import register as register_continuous
+            register_continuous(
+                label=label,
+                agent=classification["agent"],
+                task=message.strip()[:200]
+            )
+        except Exception as e:
+            print(f"Continuous registry error: {e}")
     
-    spawn_request = {
-        "agent": classification["agent"],
-        "model": classification["model"],
-        "task": message.strip()[:200],
-        "priority": priority,
-        "label": label,
-        "source": "chat_direct",
-        "created": datetime.now().isoformat(),
-        "status": "ready",
-        "mode": mode,
-        "continuous": continuous,
-        "retry_count": retry_count,
-        "max_retries": 3,
-        "session_key": None,
-        "completed_at": None,
-        "error": None
-    }
-    existing.append(spawn_request)
-    
-    with open(SPAWN_QUEUE, 'w') as f:
-        json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
-    
-    return {
-        **spawn_request,
-        "queued": True
-    }
+    # Write to JSON queue (only for non-continuous, or initial spawn)
+    if not continuous:
+        os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
+        existing = []
+        if os.path.exists(SPAWN_QUEUE):
+            try:
+                with open(SPAWN_QUEUE, 'r') as f:
+                    existing = json.load(f).get('spawns', [])
+            except:
+                pass
+        
+        spawn_request = {
+            "agent": classification["agent"],
+            "model": classification["model"],
+            "task": message.strip()[:200],
+            "priority": priority,
+            "label": label,
+            "source": "chat_direct",
+            "created": datetime.now().isoformat(),
+            "status": "ready",
+            "mode": mode,
+            "continuous": False,  # Don't set for queue
+            "retry_count": retry_count,
+            "max_retries": 3,
+            "session_key": None,
+            "completed_at": None,
+            "error": None
+        }
+        existing.append(spawn_request)
+        
+        with open(SPAWN_QUEUE, 'w') as f:
+            json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
+        
+        return {
+            **spawn_request,
+            "queued": True
+        }
+    else:
+        # Continuous task - return minimal info
+        return {
+            "agent": classification["agent"],
+            "model": classification["model"],
+            "label": label,
+            "task": message.strip()[:200],
+            "continuous": True,
+            "queued": False,  # Not in main queue
+            "registered": True  # In continuous registry
+        }
 
 def handle_chat_task(message, priority="normal", mode="run", continuous=False):
     """
