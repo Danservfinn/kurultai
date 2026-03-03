@@ -19,10 +19,12 @@
 - [ ] `subagents list` → any stuck?
 
 ### Self-Direction (Every Heartbeat)
+- [ ] **Review results:** What happened since last heartbeat? Any new signals/tasks/escalations?
 - [ ] Ask: **"What do I want to do?"**
 - [ ] Review current goals/missions from MEMORY.md
 - [ ] Identify any proactive action I could take
 - [ ] If something calls to me → do it (within NEVER rules)
+- [ ] If nothing urgent → respond `HEARTBEAT_OK`
 
 ---
 
