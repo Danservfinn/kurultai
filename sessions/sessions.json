@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "789d20eb-3ad2-45b7-b659-b02289b4fabe",
-    "updatedAt": 1772521788239,
+    "updatedAt": 1772522019406,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -110,19 +110,19 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "heartbeat",
+      "provider": "signal",
       "surface": "signal",
       "chatType": "direct",
       "to": "+19194133445",
       "accountId": "default",
-      "label": "+19194133445",
-      "from": "+19194133445"
+      "label": "Danny id:+19194133445",
+      "from": "signal:+19194133445"
     },
     "modelProvider": "bailian",
     "model": "MiniMax-M2.5",
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772521668932,
+      "generatedAt": 1772521965405,
       "sessionId": "789d20eb-3ad2-45b7-b659-b02289b4fabe",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -135,9 +135,9 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 14123,
+        "chars": 14504,
         "projectContextChars": 1474,
-        "nonProjectContextChars": 12649
+        "nonProjectContextChars": 13030
       },
       "injectedWorkspaceFiles": [
         {
@@ -240,7 +240,7 @@
       },
       "tools": {
         "listChars": 2021,
-        "schemaChars": 17227,
+        "schemaChars": 17215,
         "entries": [
           {
             "name": "read",
@@ -298,8 +298,8 @@
           },
           {
             "name": "message",
-            "summaryChars": 96,
-            "schemaChars": 4230,
+            "summaryChars": 102,
+            "schemaChars": 4218,
             "propertiesCount": 86
           },
           {
@@ -373,12 +373,12 @@
     },
     "totalTokensFresh": true,
     "compactionCount": 0,
-    "cacheRead": 17547,
+    "cacheRead": 21293,
     "cacheWrite": 0,
     "contextTokens": 204800,
-    "inputTokens": 6982,
-    "outputTokens": 1307,
-    "totalTokens": 18601
+    "inputTokens": 5588,
+    "outputTokens": 1253,
+    "totalTokens": 22605
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",

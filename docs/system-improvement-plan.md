@@ -94,15 +94,64 @@
 
 ---
 
-## Implementation Order
+## Priority 7: Agent Harness Monitoring
 
-| Priority | Task | Estimated Effort |
-|----------|------|------------------|
-| 1 | Task consumer | 2-3 hours |
-| 2 | Schedule clarity | 30 min |
-| 3 | Git noise reduction | 1 hour |
-| 4 | Signals.md locking | 1 hour |
-| 5 | Daemon resilience | 2 hours |
-| 6 | Parse monitoring | 1 hour |
+**Problem:** No visibility into whether the 6-agent Kurultai harness is actually working — agents could be failing silently.
 
-**Start with:** Priority 6 (quick win), then 1 (high impact).
+**Solution:** Add to HEARTBEAT.md quick check:
+
+### 7.1 Gateway Status
+```bash
+openclaw gateway status
+# Verify: status = running, uptime > 0
+```
+
+### 7.2 Active Sessions Check
+```bash
+# Check sessions/ for recent activity
+ls -lt sessions/*.jsonl | head -3
+# Flag if most recent > 30 min old
+```
+
+### 7.3 Cron Jobs Health
+```bash
+# Verify Kurultai cron jobs exist and are enabled
+cron list --includeDisabled=false
+# Expected: hourly_reflection for each agent
+```
+
+### 7.4 Sub-agent Health
+```bash
+subagents list
+# Check for stuck/stalled sub-agents
+```
+
+### 7.5 Session Success Rate
+- Parse recent session JSONLs for error patterns
+- Track: success vs. failed agent turns per hour
+- Store in Neo4j: `SessionMetrics` node
+
+### 7.6 Alerting
+| Condition | Action |
+|-----------|--------|
+| Gateway down | Signal Kublai immediately |
+| No sessions > 1 hour | Flag as blocked |
+| >50% failed turns | Escalate to Kublai |
+| Cron jobs disabled | Alert + auto-reenable |
+
+---
+
+## Implementation Status
+
+| Priority | Task | Status | Notes |
+|----------|------|--------|-------|
+| 1 | Task consumer | ✅ Done | Script + cron job added (every 15 min) |
+| 2 | Schedule clarity | ⏳ Pending | Needs human clarification |
+| 3 | Git noise reduction | ✅ Done | Already in hourly_reflection.sh |
+| 4 | Signals.md locking | ⏳ Pending | Neo4j migration needed |
+| 5 | Daemon resilience | ⏳ Pending | Requires Python daemon update |
+| 6 | Parse monitoring | ✅ Done | Added to HEARTBEAT.md |
+| 7 | Agent harness monitoring | ✅ Done | Added to HEARTBEAT.md + Self-Direction |
+
+**Completed:** 4/7 priorities
+**Remaining:** 3 (require design decisions or deeper work)

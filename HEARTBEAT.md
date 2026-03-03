@@ -7,10 +7,22 @@
 
 ## Quick Check (Every 30m)
 
+### Infrastructure
+- [ ] **Gateway:** `openclaw gateway status` → running?
+- [ ] **Sessions:** Recent activity in last 30 min?
+- [ ] **Parse:** `curl -s -o /dev/null -w "%{http_code}" https://parsethe.media/parse` → 200?
+- [ ] **LLM Survivor:** `curl -s -o /dev/null -w "%{http_code}" https://llmsurvivor.kurult.ai/` → 200?
+
+### Agent Health
 - [ ] Any CRITICAL escalations from Ögedei?
 - [ ] Any agents blocked >4 hours?
-- [ ] Parse deployment status OK?
-- [ ] LLM Survivor status OK?
+- [ ] `subagents list` → any stuck?
+
+### Self-Direction (Every Heartbeat)
+- [ ] Ask: **"What do I want to do?"**
+- [ ] Review current goals/missions from MEMORY.md
+- [ ] Identify any proactive action I could take
+- [ ] If something calls to me → do it (within NEVER rules)
 
 ---
 
