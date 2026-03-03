@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
-    "sessionId": "f4a32ed7-4347-41af-a891-789a9d2eb293",
-    "updatedAt": 1772520289161,
+    "sessionId": "789d20eb-3ad2-45b7-b659-b02289b4fabe",
+    "updatedAt": 1772520559856,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -106,24 +106,22 @@
     "lastChannel": "signal",
     "lastTo": "+19194133445",
     "lastAccountId": "default",
-    "sessionFile": "/Users/kublai/.openclaw/agents/main/sessions/f4a32ed7-4347-41af-a891-789a9d2eb293.jsonl",
+    "sessionFile": "/Users/kublai/.openclaw/agents/main/sessions/789d20eb-3ad2-45b7-b659-b02289b4fabe.jsonl",
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
       "provider": "signal",
-      "surface": "signal",
+      "surface": "webchat",
       "chatType": "direct",
       "to": "+19194133445",
-      "accountId": "default",
-      "label": "Danny id:+19194133445",
-      "from": "signal:+19194133445"
+      "accountId": "default"
     },
     "modelProvider": "bailian",
     "model": "MiniMax-M2.5",
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772519871712,
-      "sessionId": "f4a32ed7-4347-41af-a891-789a9d2eb293",
+      "generatedAt": 1772520524856,
+      "sessionId": "789d20eb-3ad2-45b7-b659-b02289b4fabe",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
       "model": "MiniMax-M2.5",
@@ -367,12 +365,12 @@
     },
     "totalTokensFresh": true,
     "compactionCount": 0,
-    "cacheRead": 47294,
+    "cacheRead": 284,
     "cacheWrite": 0,
     "contextTokens": 204800,
-    "inputTokens": 11930,
-    "outputTokens": 2241,
-    "totalTokens": 47867
+    "inputTokens": 12975,
+    "outputTokens": 417,
+    "totalTokens": 13259
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
