@@ -2,7 +2,7 @@
 # Spawn Consumer - Reads spawn requests and executes them via OpenClaw
 # Run every 2 minutes via cron
 
-SPAWN_QUEUE="/Users/kublai/.openclaw/agents/main/logs/spawn-queue.jsonl"
+SPAWN_QUEUE="/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
 LOG_FILE="/Users/kublai/.openclaw/agents/main/logs/spawn-consumer.log"
 
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -18,52 +18,52 @@ if [ ! -f "$SPAWN_QUEUE" ]; then
     exit 0
 fi
 
-# Process each line in the queue
-while IFS= read -r line; do
-    if [ -z "$line" ]; then
-        continue
-    fi
-    
-    # Parse JSON fields
-    agent=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('agent',''))" 2>/dev/null)
-    task=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('task',''))" 2>/dev/null)
-    model=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model','qwen3.5-plus'))" 2>/dev/null)
-    label=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('label',''))" 2>/dev/null)
-    
-    if [ -z "$agent" ] || [ -z "$task" ]; then
-        log "Invalid spawn request: $line"
-        continue
-    fi
-    
-    log "Spawning $agent (model: $model) for: $task"
-    
-    # Create a temporary script that calls sessions_spawn
-    # This will be picked up by the OpenClaw session
-    SPawn_file="/Users/kublai/.openclaw/agents/main/spawn-requests/${label}.md"
-    mkdir -p "$(dirname "$SPawn_file")"
-    
-    cat > "$SPawn_file" << EOF
----
-agent: $agent
-model: $model
-label: $label
-created: $(date)
-status: pending
----
+# Read JSON and process spawns
+python3 << 'PYTHON_SCRIPT'
+import json
+import os
+from datetime import datetime
 
-# Spawn Request
+SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
+LOG_FILE = "/Users/kublai/.openclaw/agents/main/logs/spawn-consumer.log"
 
-**Agent:** $agent  
-**Model:** $model  
-**Task:** $task
+def log(msg):
+    ts = datetime.now().strftime("%H:%M:%S")
+    print(f"[{ts}] {msg}")
 
-EOF
-    
-    log "Spawn request written to: $SPawn_file"
-    
-done < "$SPAWN_QUEUE"
+try:
+    with open(SPAWN_QUEUE, 'r') as f:
+        data = json.load(f)
+except:
+    log("Error reading queue")
+    exit(0)
 
-# Clear the queue after processing
-> "$SPAWN_QUEUE"
+spawns = data.get('spawns', [])
+if not spawns:
+    log("Queue is empty")
+    exit(0)
+
+log(f"Found {len(spawns)} spawn(s) to process")
+
+# Output spawn commands for each ready spawn
+for s in spawns:
+    if s.get('status') == 'ready':
+        agent = s.get('agent', 'unknown')
+        task = s.get('task', '')
+        model = s.get('model', 'qwen3.5-plus')
+        label = s.get('label', 'unknown')
+        
+        log(f"SPAWN: {agent} ({model}) - {label}")
+        print(f"SPAWN_CMD|{agent}|{model}|{label}|{task}")
+        
+        # Mark as processing
+        s['status'] = 'processing'
+
+# Save updated queue
+with open(SPAWN_QUEUE, 'w') as f:
+    json.dump({'spawns': spawns, 'updated': datetime.now().timestamp()}, f, indent=2)
+
+log(f"Processed {sum(1 for s in spawns if s.get('status') == 'processing')} spawns")
+PYTHON_SCRIPT
 
 log "=== Cycle Complete ==="
