@@ -43,8 +43,28 @@ def classify(message):
 
 def queue_spawn(classification, message, priority="normal", mode="run", continuous=False, retry_count=0):
     """Write to spawn queue and return spawn params"""
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    from neo4j_task_tracker import get_tracker
+    
     label = f"{classification['agent']}-{int(time.time())}"
     
+    # Write to Neo4j
+    try:
+        tracker = get_tracker()
+        tracker.create_task(
+            label=label,
+            agent=classification["agent"],
+            task_desc=message.strip()[:200],
+            priority=priority,
+            mode=mode,
+            continuous=continuous,
+            source="chat_direct"
+        )
+    except Exception as e:
+        print(f"Neo4j error: {e}")
+    
+    # Write to JSON queue (fallback + cron processing)
     os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
     existing = []
     if os.path.exists(SPAWN_QUEUE):
@@ -63,11 +83,11 @@ def queue_spawn(classification, message, priority="normal", mode="run", continuo
         "source": "chat_direct",
         "created": datetime.now().isoformat(),
         "status": "ready",
-        "mode": mode,  # "run" or "session"
+        "mode": mode,
         "continuous": continuous,
         "retry_count": retry_count,
         "max_retries": 3,
-        "session_key": None,  # Will be set when spawned
+        "session_key": None,
         "completed_at": None,
         "error": None
     }

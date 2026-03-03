@@ -31,6 +31,19 @@ def log_completion(label, status, error=None, session_key=None):
 
 def update_queue(label, status, error=None):
     """Update spawn queue with completion status"""
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    from neo4j_task_tracker import get_tracker
+    
+    # Update Neo4j
+    try:
+        tracker = get_tracker()
+        tracker.update_status(label, status, error)
+        print(f"Neo4j: {label} → {status}")
+    except Exception as e:
+        print(f"Neo4j error: {e}")
+    
+    # Update JSON queue (fallback)
     if not os.path.exists(SPAWN_QUEUE):
         return False
     
@@ -56,7 +69,7 @@ def update_queue(label, status, error=None):
                 s['error'] = error
             
             updated = True
-            print(f"Updated {label} → {status}")
+            print(f"JSON: {label} → {status}")
             break
     
     if updated:

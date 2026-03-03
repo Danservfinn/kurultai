@@ -96,6 +96,39 @@ Generate an hourly reflection with these sections:
 
 ---
 
+## 📊 Task Metrics (Neo4j)
+
+**Last Hour:**
+
+```bash
+$(python3 /Users/kublai/.openclaw/agents/main/scripts/reflection_data.py --agent $AGENT --hours 1 2>/dev/null | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    t=d.get('tasks',{})
+    print(f\"\"\"- Tasks: {t.get('total',0)} total, {t.get('completed',0)} completed, {t.get('failed',0)} failed
+- Success Rate: {t.get('success_rate','N/A')}
+- Retries: {t.get('retries',0)}
+- Avg Duration: {t.get('avg_duration_seconds','N/A')}s
+- Continuous: {d.get('continuous_tasks',0)} running\"\"\")
+except:
+    print('- Neo4j metrics unavailable')
+" 2>/dev/null)
+```
+
+### Recent Tasks
+$(python3 /Users/kublai/.openclaw/agents/main/scripts/reflection_data.py --agent $AGENT --hours 1 2>/dev/null | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    for t in d.get('recent_tasks',[])[:3]:
+        print(f\"- [{t.get('status','?')}] {t.get('label','')}: {t.get('task','')[:40]}\")
+except:
+    pass
+" 2>/dev/null)
+
+---
+
 ## 🤖 Proactive Spawning Check
 
 **Per PROACTIVE-SPAWN-PROTOCOL.md:**
