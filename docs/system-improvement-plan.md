@@ -148,10 +148,10 @@ subagents list
 | 1 | Task consumer | ✅ Done | Script + cron job added (every 15 min) |
 | 2 | Schedule clarity | ⏳ Pending | Needs human clarification |
 | 3 | Git noise reduction | ✅ Done | Already in hourly_reflection.sh |
-| 4 | Signals.md locking | ⏳ Pending | Neo4j migration needed |
-| 5 | Daemon resilience | ⏳ Pending | Requires Python daemon update |
+| 4 | Signals.md locking | ✅ Done | Created signals-lock.sh with flock |
+| 5 | Daemon resilience | ✅ Done | Created watchdog + cron (every 5 min) |
 | 6 | Parse monitoring | ✅ Done | Added to HEARTBEAT.md |
 | 7 | Agent harness monitoring | ✅ Done | Added to HEARTBEAT.md + Self-Direction |
 
-**Completed:** 4/7 priorities
-**Remaining:** 3 (require design decisions or deeper work)
+**Completed:** 6/7 priorities
+**Remaining:** Priority 2 (needs human clarification on schedule intent)
