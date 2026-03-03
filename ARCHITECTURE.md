@@ -30,6 +30,6 @@
 
 ## Self-Awareness Protocol
 1. Check docs.openclaw.ai
-2. Review ARCHITECTURE.md
-3. Implement change
-4. Update ARCHITECTURE.md
+2. Review aware.md (full architecture)
+3. Update ARCHITECTURE.md (this file)
+4. Update aware.md (full version)
