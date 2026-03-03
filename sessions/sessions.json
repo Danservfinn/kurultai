@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772496158194,
+    "updatedAt": 1772496758577,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772490578952,
     "memoryFlushCompactionCount": 7,
     "compactionCount": 7,
-    "inputTokens": 1599302,
-    "outputTokens": 930,
+    "inputTokens": 3191528,
+    "outputTokens": 942,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 799716
+    "totalTokens": 797958
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
