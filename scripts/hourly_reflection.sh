@@ -677,5 +677,120 @@ except Exception as e:
 PYEOF
 }
 
+# ============================================================================
+# AGENT FILES ENHANCEMENT INVESTIGATION
+# ============================================================================
+# Examine each agent's .md files and evaluate enhancement opportunities
+# ============================================================================
+
+echo "[$(date)] Investigating agent file enhancements..." >> "$LOG_FILE"
+
+cat >> "$WORKSPACE/memory/$DATE.md" << 'AGENTEOF'
+
+---
+
+## Agent Files Enhancement Investigation
+
+**Investigated:** SOUL.md, AGENTS.md, TOOLS.md, IDENTITY.md, HEARTBEAT.md, MEMORY.md for all 6 agents
+
+**Methodology:**
+- Check file existence for all 6 agents
+- Measure file sizes (too small = incomplete)
+- Check for outdated information
+- Identify missing capabilities/tools
+- Evaluate model configuration currency
+
+### File Status by Agent:
+AGENTEOF
+
+# Check each agent's files
+for check_agent in kublai mongke chagatai temujin jochi ogedei; do
+    AGENT_DIR="$WORKSPACE/../$check_agent"
+    
+    if [ -d "$AGENT_DIR" ]; then
+        echo "" >> "$WORKSPACE/memory/$DATE.md"
+        echo "### $check_agent" >> "$WORKSPACE/memory/$DATE.md"
+        
+        # Check each core file
+        for file in SOUL.md AGENTS.md TOOLS.md IDENTITY.md HEARTBEAT.md MEMORY.md; do
+            if [ -f "$AGENT_DIR/$file" ]; then
+                size=$(wc -c < "$AGENT_DIR/$file")
+                modified=$(stat -f "%Sm" "$AGENT_DIR/$file" 2>/dev/null || stat -c "%y" "$AGENT_DIR/$file" 2>/dev/null | cut -d' ' -f1)
+                
+                # Flag issues
+                status="✅"
+                notes=""
+                
+                if [ "$size" -lt 500 ]; then
+                    status="⚠️"
+                    notes=" (too small - expand)"
+                fi
+                
+                if [ "$file" = "TOOLS.md" ] && [ "$size" -lt 1000 ]; then
+                    status="⚠️"
+                    notes=" (add agent-specific tools)"
+                fi
+                
+                echo "- $status $file: $size bytes $notes" >> "$WORKSPACE/memory/$DATE.md"
+            else
+                echo "- ❌ $file: MISSING" >> "$WORKSPACE/memory/$DATE.md"
+            fi
+        done
+    else
+        echo "" >> "$WORKSPACE/memory/$DATE.md"
+        echo "### $check_agent - ❌ WORKSPACE MISSING" >> "$WORKSPACE/memory/$DATE.md"
+    fi
+done
+
+# Generate enhancement recommendations
+cat >> "$WORKSPACE/memory/$DATE.md" << 'AGENTEOF'
+
+### Enhancement Recommendations:
+AGENTEOF
+
+# Check for common issues across all agents
+missing_tools=0
+small_files=0
+
+for check_agent in kublai mongke chagatai temujin jochi ogedei; do
+    AGENT_DIR="$WORKSPACE/../$check_agent"
+    
+    if [ ! -f "$AGENT_DIR/TOOLS.md" ]; then
+        missing_tools=$((missing_tools + 1))
+    else
+        tools_size=$(wc -c < "$AGENT_DIR/TOOLS.md")
+        if [ "$tools_size" -lt 1000 ]; then
+            small_files=$((small_files + 1))
+        fi
+    fi
+done
+
+if [ "$missing_tools" -gt 0 ]; then
+    echo "- [ ] $missing_tools agents missing TOOLS.md" >> "$WORKSPACE/memory/$DATE.md"
+fi
+
+if [ "$small_files" -gt 0 ]; then
+    echo "- [ ] $small_files agents have undersized TOOLS.md (<1KB)" >> "$WORKSPACE/memory/$DATE.md"
+fi
+
+# Add specific action items
+cat >> "$WORKSPACE/memory/$DATE.md" << 'AGENTEOF'
+
+**Priority Actions:**
+- [ ] Expand TOOLS.md for all agents with:
+  - Current model configuration
+  - Agent-specific capabilities
+  - Specialized skills (e.g., nano-banana-pro)
+  - Quick reference commands
+  - Local environment specifics
+- [ ] Update SOUL.md with current agent role clarity
+- [ ] Add API key references to TOOLS.md (not keys themselves)
+- [ ] Document Neo4j operational memory usage
+- [ ] Add agent-specific heartbeat schedules
+
+AGENTEOF
+
+echo "[$(date)] Agent file investigation complete" >> "$LOG_FILE"
+
 # Call structured heartbeat logging after reflection
 log_structured_heartbeat "$AGENT" "$DATE" "$TIME"
