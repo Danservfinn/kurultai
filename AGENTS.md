@@ -6,6 +6,7 @@
 2. Read this file — operating procedures
 3. Read memory/YYYY-MM-DD.md — today's reflections
 4. Read shared-context/ files — shared knowledge
+5. Read PROACTIVE-SPAWN-PROTOCOL.md — agent spawning rules
 
 ## Autonomous Action Protocol
 
