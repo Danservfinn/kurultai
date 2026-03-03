@@ -33,16 +33,19 @@ def get_agent_reflection(agent, hours=1):
     continuous = tracker.get_continuous_tasks()
     agent_continuous = [t for t in continuous if t.get('agent') == agent]
     
+    total = max(task_data.get('total_tasks', 0), 1)
+    completed = task_data.get('completed', 0)
+    
     return {
         "agent": agent,
         "period_hours": hours,
         "tasks": {
             "total": task_data.get('total_tasks', 0),
-            "completed": task_data.get('completed', 0),
+            "completed": completed,
             "failed": task_data.get('failed', 0),
             "retries": task_data.get('total_retries', 0),
             "avg_duration_seconds": task_data.get('avg_duration'),
-            "success_rate": f"{100 * task_data.get('completed', 0) / max(task_data.get('total_tasks', 1), 1):.1f}%"
+            "success_rate": f"{100 * completed / total:.1f}%" if total > 0 else "0%"
         },
         "completion_rate_overall": completion,
         "continuous_tasks": len(agent_continuous),

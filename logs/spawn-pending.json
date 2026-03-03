@@ -31,7 +31,25 @@
       "completed_at": null,
       "error": null,
       "last_spawned": "2026-03-03T13:00:13.199254"
+    },
+    {
+      "agent": "jochi",
+      "model": "MiniMax-M2.5",
+      "task": "Test Neo4j tracking",
+      "priority": "normal",
+      "label": "jochi-1772560963",
+      "source": "chat_direct",
+      "created": "2026-03-03T13:02:44.053234",
+      "status": "running",
+      "mode": "run",
+      "continuous": false,
+      "retry_count": 0,
+      "max_retries": 3,
+      "session_key": null,
+      "completed_at": null,
+      "error": null,
+      "last_spawned": "2026-03-03T13:04:15.624985"
     }
   ],
-  "updated": 1772560934.65483
+  "updated": 1772561055.624993
 }
