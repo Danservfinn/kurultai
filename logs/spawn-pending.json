@@ -1,0 +1,25 @@
+{
+  "spawns": [
+    {
+      "agent": "temujin",
+      "task": "Direct spawn test",
+      "model": "qwen3.5-plus",
+      "label": "temujin-1772556066",
+      "priority": "normal",
+      "source": "heartbeat_pickup",
+      "status": "spawned",
+      "spawned_at": "2026-03-03T11:41:13.044169"
+    },
+    {
+      "agent": "temujin",
+      "task": "Test spawning integration",
+      "model": "qwen3.5-plus",
+      "label": "temujin-1772556066",
+      "priority": "normal",
+      "source": "heartbeat_pickup",
+      "status": "spawned",
+      "spawned_at": "2026-03-03T11:41:13.044236"
+    }
+  ],
+  "updated": "2026-03-03T11:41:13.044305"
+}
