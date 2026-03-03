@@ -233,6 +233,30 @@
           "api": "openai-completions"
         }
       ]
+    },
+    "local": {
+      "baseUrl": "http://localhost:1234/v1",
+      "apiKey": "not-needed",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "local-model",
+          "name": "Local LLM (LM Studio)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 128000,
+          "maxTokens": 8192,
+          "api": "openai-completions"
+        }
+      ]
     }
   }
 }
