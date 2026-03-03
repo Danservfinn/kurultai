@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "f4a32ed7-4347-41af-a891-789a9d2eb293",
-    "updatedAt": 1772519745479,
+    "updatedAt": 1772519977153,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -120,7 +120,7 @@
     "model": "MiniMax-M2.5",
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772519589576,
+      "generatedAt": 1772519871712,
       "sessionId": "f4a32ed7-4347-41af-a891-789a9d2eb293",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -365,12 +365,12 @@
     },
     "totalTokensFresh": true,
     "compactionCount": 0,
-    "cacheRead": 40958,
+    "cacheRead": 47294,
     "cacheWrite": 0,
     "contextTokens": 204800,
-    "inputTokens": 6588,
-    "outputTokens": 2910,
-    "totalTokens": 42217
+    "inputTokens": 11930,
+    "outputTokens": 2241,
+    "totalTokens": 47867
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
