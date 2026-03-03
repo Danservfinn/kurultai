@@ -8,8 +8,9 @@
       "label": "mongke-1772559988",
       "source": "chat_direct",
       "created": "2026-03-03T12:46:28.280115",
-      "status": "processing"
+      "status": "spawned",
+      "spawned_at": "2026-03-03T12:49:58.272591"
     }
   ],
-  "updated": 1772560079.48814
+  "updated": "2026-03-03T12:49:58.272682"
 }
