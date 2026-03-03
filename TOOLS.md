@@ -1,4 +1,4 @@
-# TOOLS.md - Kublai (Main Agent)
+# TOOLS.md - Kublai
 
 ## Agent Role
 
@@ -30,23 +30,16 @@
   python3 ~/.codex/skills/nano-banana-pro/nanobanana.py \
     --prompt "your prompt" \
     --output "output.png" \
-    --model "gemini-3.1-flash-image-preview" \
-    --size 1024x1024
+    --model "gemini-3.1-flash-image-preview"
   ```
-  - Models: gemini-3-pro-image-preview, gemini-2.5-flash-image, gemini-3.1-flash-image-preview
-  - Resolutions: 1K (default), 2K, 4K
-  - Aspect ratios: 1:1, 9:16, 16:9, etc.
 
 ### Horde Skills (Multi-Agent Orchestration)
-- `/golden-horde`: 9 multi-agent patterns (Review Loop, Adversarial Debate, Assembly Line, etc.)
+- `/golden-horde`: 9 multi-agent patterns
 - `/horde-plan`: Structured implementation plans
 - `/horde-implement`: Execute plans with checkpoints
 - `/horde-swarm`: Parallel subagent dispatch (35+ agent types)
-- `/horde-prompt`: Optimized prompts for horde agents
 - `/horde-review`: Multi-domain critical review
 - `/horde-test`: Parallel test suite execution
-- `/horde-brainstorming`: 6-phase collaborative design
-- `/horde-skill-creator`: Create new skills (7-phase workflow)
 
 ---
 
@@ -78,13 +71,13 @@
 4. Track completion via Neo4j
 
 ### Context Management
-- Load full context at session start (SOUL, AGENTS, ARCHITECTURE, etc.)
+- Load full context at session start
 - Use Neo4j for operational memory queries
 - Keep 700K+ tokens available for reasoning
 
 ### Autonomous Operation
 - Heartbeat checks every 30 minutes
-- Deep reflection every 6 hours (hours 0, 6, 12, 18)
+- Deep reflection every 6 hours
 - Auto-commit changes to git
 - Monitor agent statuses via Neo4j
 
@@ -104,35 +97,13 @@ python3 -c "from neo4j import GraphDatabase; d=GraphDatabase.driver('bolt://loca
 
 # Generate image
 python3 ~/.codex/skills/nano-banana-pro/nanobanana.py --prompt "prompt" --output "out.png"
-
-# Post to X (autonomous)
-cd ~/.openclaw/agents/main/src/autonomous_x_posting && python3 scheduler.py
 ```
-
----
-
-## Resilience
-
-### Fallback Models
-1. qwen3.5-plus (primary)
-2. MiniMax-M2.5 (fallback)
-3. qwen3-coder-plus (coding tasks)
-
-### Error Handling
-- Retry failed API calls with exponential backoff
-- Log errors to Neo4j for tracking
-- Escalate critical failures to human via Signal
-
-### Backup Locations
-- **GitHub:** https://github.com/Danservfinn/kurultai
-- **Local:** `/Users/kublai/.openclaw/agents/main`
-- **Neo4j:** `bolt://localhost:7687`
 
 ---
 
 ## Notes
 
 - X API: $5 credits loaded (~1000 tweets)
-- First autonomous thread posted successfully (4/4 tweets)
-- Nano-banana-pro: gemini-3.1-flash-image-preview tested & working
+- First autonomous thread posted successfully
+- Nano-banana-pro: gemini-3.1-flash tested & working
 - Parse: OpenRouter integration LIVE
