@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772495521070,
+    "updatedAt": 1772495876023,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,11 +125,11 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "signal",
+      "provider": "heartbeat",
       "surface": "signal",
       "chatType": "direct",
-      "label": "Danny id:+19194133445",
-      "from": "signal:+19194133445",
+      "label": "+19194133445",
+      "from": "+19194133445",
       "to": "+19194133445",
       "accountId": "default"
     },
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772490578952,
     "memoryFlushCompactionCount": 7,
     "compactionCount": 7,
-    "inputTokens": 2389660,
-    "outputTokens": 884,
+    "inputTokens": 3977770,
+    "outputTokens": 4340,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 797194
+    "totalTokens": 795284
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
