@@ -77,68 +77,84 @@ if not spawns:
         log("Queue is empty")
     exit(0)
 
-# Check subagent status and update completed tasks
+# Check subagent status via OpenClaw subagents tool
 def check_subagent_status(session_key):
     """Check if a subagent is still running"""
     if not session_key:
         return 'unknown'
     
     try:
-        # Use sessions_list or subagents list to check status
         result = subprocess.run(
-            ['python3', '-c', f'''
+            ['python3', '-c', '''
 import sys
 sys.path.insert(0, "/opt/homebrew/lib/node_modules/openclaw")
-# Would need actual OpenClaw API access - for now just check file
-from pathlib import Path
-session_file = Path("{session_key.replace(":", "_")}.jsonl")
-if session_file.exists():
-    print("exists")
-else:
-    print("not_found")
+try:
+    from openclaw.tools import subagents
+    result = subagents(action="list", recentMinutes=60)
+    import json
+    recent = result.get("recent", [])
+    for r in recent:
+        if r.get("sessionKey") == "''' + session_key + '''":
+            print(r.get("status", "unknown"))
+            break
+    else:
+        print("not_found")
+except Exception as e:
+    print("error:" + str(e))
 '''],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=10
         )
-        return 'completed' if 'not_found' in result.stdout else 'running'
-    except:
+        
+        status = result.stdout.strip()
+        if status == 'not_found' or status == 'done':
+            return 'completed'
+        elif status in ['failed', 'error']:
+            return 'failed'
+        elif status == 'running':
+            return 'running'
+        else:
+            return 'unknown'
+    except Exception as e:
+        log(f"Error checking session: {e}")
         return 'unknown'
 
-# Clean up stale "running" tasks (older than 1 hour without session_key update)
+# Check status of running tasks and update completed ones
 from datetime import datetime, timedelta
 cutoff = datetime.now() - timedelta(minutes=30)
 
 for s in spawns:
     if s.get('status') == 'running':
-        # Check if task has a session_key (actually running)
-        if not s.get('session_key'):
-            # No session key - likely completed or failed
+        session_key = s.get('session_key')
+        label = s.get('label', 'unknown')
+        
+        # Check actual subagent status if we have session_key
+        if session_key:
+            actual_status = check_subagent_status(session_key)
+            
+            if actual_status == 'completed':
+                s['status'] = 'completed'
+                s['completed_at'] = datetime.now().isoformat()
+                log(f"COMPLETE: {label} (subagent done)")
+                activity_detected = True
+            elif actual_status == 'failed':
+                s['status'] = 'failed'
+                s['completed_at'] = datetime.now().isoformat()
+                log(f"FAILED: {label} (subagent failed)")
+                activity_detected = True
+            # else: still running, keep as-is
+        
+        # Fallback: timeout-based cleanup for tasks without session tracking
+        elif not s.get('continuous'):
             last_spawned = s.get('last_spawned')
             if last_spawned:
                 try:
                     spawn_time = datetime.fromisoformat(last_spawned)
                     if spawn_time < cutoff:
-                        # Mark as completed (stale running task)
                         s['status'] = 'completed'
                         s['completed_at'] = datetime.now().isoformat()
-                        log(f"CLEANUP: {s.get('label')} marked completed (stale running)")
-                        activity_detected = True
-                except:
-                    pass
-        # Check continuous tasks - keep them running
-        elif s.get('continuous'):
-            pass  # Keep continuous tasks running
-        else:
-            # Non-continuous task that's been running >30 min - mark completed
-            last_spawned = s.get('last_spawned')
-            if last_spawned:
-                try:
-                    spawn_time = datetime.fromisoformat(last_spawned)
-                    if spawn_time < cutoff:
-                        s['status'] = 'completed'
-                        s['completed_at'] = datetime.now().isoformat()
-                        log(f"CLEANUP: {s.get('label')} marked completed (timeout)")
+                        log(f"CLEANUP: {label} marked completed (timeout)")
                         activity_detected = True
                 except:
                     pass
