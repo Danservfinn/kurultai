@@ -1,4 +1,15 @@
 {
-  "spawns": [],
-  "updated": "2026-03-03T12:44:03.289469"
+  "spawns": [
+    {
+      "agent": "mongke",
+      "model": "qwen3.5-plus",
+      "task": "Research competitor pricing for media analysis tools",
+      "priority": "normal",
+      "label": "mongke-1772559988",
+      "source": "chat_direct",
+      "created": "2026-03-03T12:46:28.280115",
+      "status": "ready"
+    }
+  ],
+  "updated": 1772559988.280195
 }

@@ -75,13 +75,9 @@ def route_and_spawn(message, priority="normal"):
     with open(SPAWN_QUEUE, 'w') as f:
         json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
     
-    # Call spawn handler to process immediately
-    result = subprocess.run(
-        ["python3", "/Users/kublai/.openclaw/agents/main/scripts/handle-spawns.py"],
-        capture_output=True,
-        text=True,
-        timeout=30
-    )
+    # Mark as ready for spawn (status updated in queue)
+    with open(SPAWN_QUEUE, 'w') as f:
+        json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
     
     return {
         "agent": classification["agent"],
@@ -91,7 +87,7 @@ def route_and_spawn(message, priority="normal"):
         "priority": priority,
         "confidence": round(classification["confidence"], 2),
         "queued": True,
-        "spawn_output": result.stdout.strip() if result.stdout else None
+        "ready_to_spawn": True
     }
 
 if __name__ == "__main__":
