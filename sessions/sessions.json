@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772506428061,
+    "updatedAt": 1772508213115,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,7 +125,7 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "webchat",
+      "provider": "heartbeat",
       "surface": "webchat",
       "chatType": "direct",
       "label": "+19194133445",
