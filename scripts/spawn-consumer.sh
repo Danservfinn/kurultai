@@ -15,7 +15,10 @@ log() {
 # Set REPORT_ONLY_ON_ACTIVITY=true to suppress empty cycle reports
 export REPORT_ONLY_ON_ACTIVITY="${REPORT_ONLY_ON_ACTIVITY:-true}"
 
-log "=== Spawn Consumer Cycle ==="
+# Only log header if not in silent mode or if there's activity
+if [ "$REPORT_ONLY_ON_ACTIVITY" != "true" ]; then
+    log "=== Spawn Consumer Cycle ==="
+fi
 
 if [ ! -f "$SPAWN_QUEUE" ]; then
     if [ "$REPORT_ONLY_ON_ACTIVITY" != "true" ]; then
@@ -133,9 +136,9 @@ save_queue({'spawns': spawns, 'updated': datetime.now().timestamp()})
 
 # Only report if there was meaningful activity
 if activity_detected:
+    log(f"=== Spawn Consumer Cycle ===")
     log(f"PROCESSED: {len(ready)} spawns, {retries_count} retries, {len(spawns)} remaining")
+    log(f"=== Cycle Complete ===")
 elif not report_only:
     log(f"Cycle complete: {len(ready)} spawns, {retries_count} retries, {len(spawns)} remaining")
 PYTHON_SCRIPT
-
-log "=== Cycle Complete ==="
