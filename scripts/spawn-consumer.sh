@@ -108,12 +108,8 @@ for s in failed:
         spawns.remove(s)
         log(f"FAILED: {label} (max retries exceeded)")
 
-# Cleanup completed spawns older than 1 hour
-cutoff = datetime.now().timestamp() - 3600
-spawns = [s for s in spawns if 
-          s.get('status') not in ['completed', 'failed'] or
-          s.get('completed_at') is None or
-          datetime.fromisoformat(s.get('completed_at', '2000-01-01')).timestamp() > cutoff]
+# Immediate cleanup of completed/failed tasks (keep only running/ready)
+spawns = [s for s in spawns if s.get('status') in ['ready', 'running']]
 
 # Save updated queue
 save_queue({'spawns': spawns, 'updated': datetime.now().timestamp()})
