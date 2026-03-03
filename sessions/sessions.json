@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "789d20eb-3ad2-45b7-b659-b02289b4fabe",
-    "updatedAt": 1772520559856,
+    "updatedAt": 1772520822315,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -114,13 +114,15 @@
       "surface": "webchat",
       "chatType": "direct",
       "to": "+19194133445",
-      "accountId": "default"
+      "accountId": "default",
+      "label": "+19194133445",
+      "from": "+19194133445"
     },
     "modelProvider": "bailian",
     "model": "MiniMax-M2.5",
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772520524856,
+      "generatedAt": 1772520746162,
       "sessionId": "789d20eb-3ad2-45b7-b659-b02289b4fabe",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -133,73 +135,73 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 26675,
-        "projectContextChars": 14049,
-        "nonProjectContextChars": 12626
+        "chars": 14309,
+        "projectContextChars": 1474,
+        "nonProjectContextChars": 12835
       },
       "injectedWorkspaceFiles": [
         {
           "name": "AGENTS.md",
           "path": "/Users/kublai/.openclaw/agents/main/AGENTS.md",
-          "missing": false,
-          "rawChars": 975,
-          "injectedChars": 975,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 68,
           "truncated": false
         },
         {
           "name": "SOUL.md",
           "path": "/Users/kublai/.openclaw/agents/main/SOUL.md",
-          "missing": false,
-          "rawChars": 1237,
-          "injectedChars": 1237,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 66,
           "truncated": false
         },
         {
           "name": "TOOLS.md",
           "path": "/Users/kublai/.openclaw/agents/main/TOOLS.md",
-          "missing": false,
-          "rawChars": 2882,
-          "injectedChars": 2882,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 67,
           "truncated": false
         },
         {
           "name": "IDENTITY.md",
           "path": "/Users/kublai/.openclaw/agents/main/IDENTITY.md",
-          "missing": false,
-          "rawChars": 825,
-          "injectedChars": 825,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 70,
           "truncated": false
         },
         {
           "name": "USER.md",
           "path": "/Users/kublai/.openclaw/agents/main/USER.md",
-          "missing": false,
-          "rawChars": 3087,
-          "injectedChars": 3087,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 66,
           "truncated": false
         },
         {
           "name": "HEARTBEAT.md",
           "path": "/Users/kublai/.openclaw/agents/main/HEARTBEAT.md",
-          "missing": false,
-          "rawChars": 1262,
-          "injectedChars": 1262,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 71,
           "truncated": false
         },
         {
           "name": "BOOTSTRAP.md",
           "path": "/Users/kublai/.openclaw/agents/main/BOOTSTRAP.md",
-          "missing": false,
-          "rawChars": 1444,
-          "injectedChars": 1444,
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 71,
           "truncated": false
         },
         {
           "name": "MEMORY.md",
           "path": "/Users/kublai/.openclaw/agents/main/MEMORY.md",
           "missing": false,
-          "rawChars": 1711,
-          "injectedChars": 1711,
+          "rawChars": 369,
+          "injectedChars": 369,
           "truncated": false
         }
       ],
@@ -237,8 +239,8 @@
         ]
       },
       "tools": {
-        "listChars": 1702,
-        "schemaChars": 16525,
+        "listChars": 2021,
+        "schemaChars": 17227,
         "entries": [
           {
             "name": "read",
@@ -289,9 +291,15 @@
             "propertiesCount": 36
           },
           {
+            "name": "cron",
+            "summaryChars": 2689,
+            "schemaChars": 690,
+            "propertiesCount": 13
+          },
+          {
             "name": "message",
-            "summaryChars": 102,
-            "schemaChars": 4218,
+            "summaryChars": 96,
+            "schemaChars": 4230,
             "propertiesCount": 86
           },
           {
@@ -365,12 +373,12 @@
     },
     "totalTokensFresh": true,
     "compactionCount": 0,
-    "cacheRead": 284,
+    "cacheRead": 23105,
     "cacheWrite": 0,
     "contextTokens": 204800,
-    "inputTokens": 12975,
-    "outputTokens": 417,
-    "totalTokens": 13259
+    "inputTokens": 46749,
+    "outputTokens": 1400,
+    "totalTokens": 23599
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
