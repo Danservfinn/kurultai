@@ -414,6 +414,14 @@ fi
 echo "" >> "$WORKSPACE/memory/$DATE.md"
 echo "---" >> "$WORKSPACE/memory/$DATE.md"
 
+
+# Post-task logging
+if [ -f "$WORKSPACE/hooks/post-task.sh" ]; then
+    echo "Logging task completion..."
+    "$WORKSPACE/hooks/post-task.sh" "Hourly Reflection" "Complete"
+else
+    echo "⚠️  post-task.sh not found (skipping logging)"
+fi
 echo "[$(date)] Done for $AGENT"
 
 # Log to Neo4j
