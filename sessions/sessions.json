@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "f4a32ed7-4347-41af-a891-789a9d2eb293",
-    "updatedAt": 1772519977153,
+    "updatedAt": 1772520289161,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -111,10 +111,12 @@
     "chatType": "direct",
     "origin": {
       "provider": "signal",
-      "surface": "webchat",
+      "surface": "signal",
       "chatType": "direct",
       "to": "+19194133445",
-      "accountId": "default"
+      "accountId": "default",
+      "label": "Danny id:+19194133445",
+      "from": "signal:+19194133445"
     },
     "modelProvider": "bailian",
     "model": "MiniMax-M2.5",
