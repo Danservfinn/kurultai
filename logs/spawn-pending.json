@@ -1,20 +1,6 @@
 {
   "spawns": [
     {
-      "agent": "mongke",
-      "model": "qwen3.5-plus",
-      "task": "Research competitor pricing for media analysis tools",
-      "priority": "normal",
-      "label": "mongke-1772559988",
-      "source": "chat_direct",
-      "created": "2026-03-03T12:46:28.280115",
-      "status": "completed",
-      "spawned_at": "2026-03-03T12:49:58.272591",
-      "session_key": "agent:main:subagent:823d2c61-eba7-4916-84f9-c22eedd3d0c7",
-      "run_id": "a2ca325d-7579-455f-90db-22f4f34a4849",
-      "completed_at": "2026-03-03T13:00:00.568102"
-    },
-    {
       "agent": "ogedei",
       "model": "qwen3.5-plus",
       "task": "Monitor Parse uptime every minute",
@@ -51,5 +37,5 @@
       "last_spawned": "2026-03-03T13:04:15.624985"
     }
   ],
-  "updated": 1772561656.610333
+  "updated": 1772561750.873353
 }

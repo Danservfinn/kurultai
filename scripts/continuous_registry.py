@@ -120,7 +120,8 @@ def list_tasks():
         print(f"  - {t.get('label')} ({t.get('agent')})")
         print(f"    Started: {t.get('started', 'N/A')[:19]}")
         print(f"    Heartbeats: {t.get('heartbeats', 0)}")
-        print(f"    Session: {t.get('session_key', 'N/A')[:20]}...")
+        session = t.get('session_key') or 'N/A'
+        print(f"    Session: {session[:20] if session != 'N/A' else session}...")
     
     if stopped:
         print(f"\nStopped: {len(stopped)}")
