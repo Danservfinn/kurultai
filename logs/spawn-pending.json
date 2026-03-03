@@ -13,7 +13,25 @@
       "session_key": "agent:main:subagent:823d2c61-eba7-4916-84f9-c22eedd3d0c7",
       "run_id": "a2ca325d-7579-455f-90db-22f4f34a4849",
       "completed_at": "2026-03-03T13:00:00.568102"
+    },
+    {
+      "agent": "ogedei",
+      "model": "qwen3.5-plus",
+      "task": "Monitor Parse uptime every minute",
+      "priority": "high",
+      "label": "ogedei-1772560807",
+      "source": "chat_direct",
+      "created": "2026-03-03T13:00:07.915890",
+      "status": "running",
+      "mode": "session",
+      "continuous": true,
+      "retry_count": 0,
+      "max_retries": 3,
+      "session_key": null,
+      "completed_at": null,
+      "error": null,
+      "last_spawned": "2026-03-03T13:00:13.199254"
     }
   ],
-  "updated": 1772560800.568226
+  "updated": 1772560813.19926
 }
