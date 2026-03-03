@@ -61,6 +61,7 @@ def add_to_dead_letter(spawn):
     log(f"  → Dead letter: {spawn.get('label')} (retries exhausted)")
 
 import os
+import subprocess
 report_only = os.getenv('REPORT_ONLY_ON_ACTIVITY', 'true') == 'true'
 
 try:
@@ -76,7 +77,73 @@ if not spawns:
         log("Queue is empty")
     exit(0)
 
-# Process ready spawns (continuous tasks are in separate registry)
+# Check subagent status and update completed tasks
+def check_subagent_status(session_key):
+    """Check if a subagent is still running"""
+    if not session_key:
+        return 'unknown'
+    
+    try:
+        # Use sessions_list or subagents list to check status
+        result = subprocess.run(
+            ['python3', '-c', f'''
+import sys
+sys.path.insert(0, "/opt/homebrew/lib/node_modules/openclaw")
+# Would need actual OpenClaw API access - for now just check file
+from pathlib import Path
+session_file = Path("{session_key.replace(":", "_")}.jsonl")
+if session_file.exists():
+    print("exists")
+else:
+    print("not_found")
+'''],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return 'completed' if 'not_found' in result.stdout else 'running'
+    except:
+        return 'unknown'
+
+# Clean up stale "running" tasks (older than 1 hour without session_key update)
+from datetime import datetime, timedelta
+cutoff = datetime.now() - timedelta(minutes=30)
+
+for s in spawns:
+    if s.get('status') == 'running':
+        # Check if task has a session_key (actually running)
+        if not s.get('session_key'):
+            # No session key - likely completed or failed
+            last_spawned = s.get('last_spawned')
+            if last_spawned:
+                try:
+                    spawn_time = datetime.fromisoformat(last_spawned)
+                    if spawn_time < cutoff:
+                        # Mark as completed (stale running task)
+                        s['status'] = 'completed'
+                        s['completed_at'] = datetime.now().isoformat()
+                        log(f"CLEANUP: {s.get('label')} marked completed (stale running)")
+                        activity_detected = True
+                except:
+                    pass
+        # Check continuous tasks - keep them running
+        elif s.get('continuous'):
+            pass  # Keep continuous tasks running
+        else:
+            # Non-continuous task that's been running >30 min - mark completed
+            last_spawned = s.get('last_spawned')
+            if last_spawned:
+                try:
+                    spawn_time = datetime.fromisoformat(last_spawned)
+                    if spawn_time < cutoff:
+                        s['status'] = 'completed'
+                        s['completed_at'] = datetime.now().isoformat()
+                        log(f"CLEANUP: {s.get('label')} marked completed (timeout)")
+                        activity_detected = True
+                except:
+                    pass
+
+# Process ready spawns
 ready = [s for s in spawns if s.get('status') == 'ready']
 activity_detected = False
 
@@ -130,6 +197,40 @@ for s in failed:
 
 # Immediate cleanup of completed/failed tasks (keep only running/ready)
 spawns = [s for s in spawns if s.get('status') in ['ready', 'running']]
+
+# Move continuous tasks to separate registry
+continuous_tasks = [s for s in spawns if s.get('continuous') and s.get('status') == 'running']
+if continuous_tasks:
+    try:
+        registry_file = "/Users/kublai/.openclaw/agents/main/logs/continuous-tasks.json"
+        registry_data = {'tasks': []}
+        if os.path.exists(registry_file):
+            with open(registry_file, 'r') as f:
+                registry_data = json.load(f)
+        
+        for ct in continuous_tasks:
+            # Check if already in registry
+            existing = [t for t in registry_data['tasks'] if t.get('label') == ct.get('label')]
+            if not existing:
+                registry_data['tasks'].append({
+                    'label': ct.get('label'),
+                    'agent': ct.get('agent'),
+                    'task': ct.get('task'),
+                    'session_key': ct.get('session_key'),
+                    'status': 'running',
+                    'started': ct.get('last_spawned'),
+                    'continuous': True
+                })
+                log(f"MOVED: {ct.get('label')} to continuous registry")
+                activity_detected = True
+        
+        with open(registry_file, 'w') as f:
+            json.dump(registry_data, f, indent=2)
+        
+        # Remove continuous tasks from main queue
+        spawns = [s for s in spawns if not (s.get('continuous') and s.get('status') == 'running')]
+    except Exception as e:
+        log(f"Error moving to continuous registry: {e}")
 
 # Save updated queue
 save_queue({'spawns': spawns, 'updated': datetime.now().timestamp()})

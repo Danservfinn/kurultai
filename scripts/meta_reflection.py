@@ -66,7 +66,7 @@ def get_agent_metrics(agent, hours=1):
         "completion_rate": completion
     }
 
-def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2):
+def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2, include_heartbeat_review=False):
     """Generate meta-reflection prompt for an agent"""
     metrics = get_agent_metrics(agent, hours)
     role = AGENT_ROLES.get(agent, "Unknown")
@@ -79,6 +79,15 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2)
             chat_review = generate_chat_review(chat_hours)
         except Exception as e:
             chat_review = f"*Chat log review unavailable: {e}*\n"
+    
+    # Optionally include heartbeat task review
+    heartbeat_review = ""
+    if include_heartbeat_review:
+        try:
+            from heartbeat_task_analyzer import generate_review
+            heartbeat_review = generate_review(agent)
+        except Exception as e:
+            heartbeat_review = f"*Heartbeat task review unavailable: {e}*\n"
     
     template = f"""# Agent Meta-Reflection: Task & Spawning System Evaluation
 
@@ -100,6 +109,18 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2)
 ## 📝 Chat Log Review (Last {chat_hours} Hours)
 
 {chat_review}
+
+---
+"""
+    
+    # Add heartbeat task review if available
+    if heartbeat_review:
+        template += f"""
+---
+
+## ⚙️ Heartbeat Task Review
+
+{heartbeat_review}
 
 ---
 """
@@ -278,6 +299,7 @@ def main():
     parser.add_argument('--hours', type=int, default=1, help='Hours to look back')
     parser.add_argument('--chat-review', action='store_true', help='Include chat log review (last 2 hours)')
     parser.add_argument('--chat-hours', type=int, default=2, help='Hours for chat log review')
+    parser.add_argument('--heartbeat-review', action='store_true', help='Include heartbeat task review')
     parser.add_argument('--submit', action='store_true', help='Submit feedback to Kublai (vs just printing)')
     parser.add_argument('--list-pending', action='store_true', help='List pending feedback for Kublai')
     
@@ -301,7 +323,8 @@ def main():
             agent, 
             args.hours, 
             include_chat_review=args.chat_review,
-            chat_hours=args.chat_hours
+            chat_hours=args.chat_hours,
+            include_heartbeat_review=args.heartbeat_review
         )
         
         if args.submit:

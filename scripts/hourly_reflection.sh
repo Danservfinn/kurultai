@@ -30,12 +30,13 @@ run_agent_reflection() {
         --agent "$AGENT" \
         --hours "$HOURS" 2>/dev/null || echo '{"tasks":{"total":0}}')
     
-    # Generate meta-reflection with chat review
+    # Generate meta-reflection with chat review and heartbeat task review
     local reflection=$(python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py \
         --agent "$AGENT" \
         --hours "$HOURS" \
         --chat-review \
-        --chat-hours "$CHAT_HOURS" 2>/dev/null || echo "# Reflection unavailable")
+        --chat-hours "$CHAT_HOURS" \
+        --heartbeat-review 2>/dev/null || echo "# Reflection unavailable")
     
     # Write reflection to memory
     cat >> "$MEMORY_DIR/$DATE.md" << EOF
