@@ -30,7 +30,7 @@ def parse_request_file(filepath):
     in_frontmatter = False
     
     for line in lines:
-        if line.startswith('---'):
+        if line.strip() == '---':
             in_frontmatter = not in_frontmatter
             continue
         
@@ -38,8 +38,18 @@ def parse_request_file(filepath):
             key, value = line.split(':', 1)
             request[key.strip()] = value.strip()
         
-        if line.startswith('# Task:'):
-            request['task'] = line.replace('# Task:', '').strip()
+        # Task can be in frontmatter or body
+        if line.startswith('# Task:') or line.startswith('**Task:**'):
+            request['task'] = line.replace('# Task:', '').replace('**Task:**', '').strip()
+        elif line.startswith('# Spawn Request'):
+            # Look for Task in bold format in next lines
+            pass
+    
+    # Also check for **Task:** format
+    import re
+    task_match = re.search(r'\*\*Task:\*\*\s*(.+)', content)
+    if task_match and 'task' not in request:
+        request['task'] = task_match.group(1).strip()
     
     return request
 
@@ -94,7 +104,30 @@ def process_pending():
             log(f"Error processing {request_file}: {e}")
     
     log(f"=== Cycle Complete: {len(spawn_requests)} requests ===")
+    
+    # Cleanup old processed files (older than 1 hour)
+    cleanup_old_files()
+    
     return spawn_requests
+
+
+def cleanup_old_files():
+    """Remove processed files older than 1 hour"""
+    import time
+    
+    now = time.time()
+    one_hour = 3600
+    
+    for ext in ['.processed.md', '.executing.md', '.done.md']:
+        pattern = f"{SPAWN_DIR}/*{ext}"
+        for filepath in glob.glob(pattern):
+            try:
+                mtime = os.path.getmtime(filepath)
+                if now - mtime > one_hour:
+                    os.remove(filepath)
+                    log(f"Cleaned up old file: {os.path.basename(filepath)}")
+            except Exception as e:
+                log(f"Error cleaning {filepath}: {e}")
 
 if __name__ == "__main__":
     requests = process_pending()
