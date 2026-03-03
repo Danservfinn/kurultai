@@ -704,8 +704,14 @@ cat >> "$WORKSPACE/memory/$DATE.md" << 'AGENTEOF'
 AGENTEOF
 
 # Check each agent's files
+# Note: Kublai's workspace is "main" not "kublai"
 for check_agent in kublai mongke chagatai temujin jochi ogedei; do
-    AGENT_DIR="$WORKSPACE/../$check_agent"
+    # Handle Kublai's special case (workspace is "main")
+    if [ "$check_agent" = "kublai" ]; then
+        AGENT_DIR="$WORKSPACE"
+    else
+        AGENT_DIR="$WORKSPACE/../$check_agent"
+    fi
     
     if [ -d "$AGENT_DIR" ]; then
         echo "" >> "$WORKSPACE/memory/$DATE.md"
