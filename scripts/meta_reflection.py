@@ -66,10 +66,19 @@ def get_agent_metrics(agent, hours=1):
         "completion_rate": completion
     }
 
-def generate_reflection(agent, hours=1):
+def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2):
     """Generate meta-reflection prompt for an agent"""
     metrics = get_agent_metrics(agent, hours)
     role = AGENT_ROLES.get(agent, "Unknown")
+    
+    # Optionally include chat log review
+    chat_review = ""
+    if include_chat_review:
+        try:
+            from chat_log_analyzer import generate_chat_review
+            chat_review = generate_chat_review(chat_hours)
+        except Exception as e:
+            chat_review = f"*Chat log review unavailable: {e}*\n"
     
     template = f"""# Agent Meta-Reflection: Task & Spawning System Evaluation
 
@@ -80,6 +89,22 @@ def generate_reflection(agent, hours=1):
 
 ---
 
+## Your Metrics This Period
+"""
+    
+    # Add chat review if available
+    if chat_review:
+        template += f"""
+---
+
+## 📝 Chat Log Review (Last {chat_hours} Hours)
+
+{chat_review}
+
+---
+"""
+    
+    template += f"""
 ## Your Metrics This Period
 
 - **Tasks completed:** {metrics['completed']} of {metrics['total_tasks']}
@@ -251,6 +276,8 @@ def main():
     parser.add_argument('--agent', help='Specific agent')
     parser.add_argument('--all-agents', action='store_true', help='Generate for all 6 agents')
     parser.add_argument('--hours', type=int, default=1, help='Hours to look back')
+    parser.add_argument('--chat-review', action='store_true', help='Include chat log review (last 2 hours)')
+    parser.add_argument('--chat-hours', type=int, default=2, help='Hours for chat log review')
     parser.add_argument('--submit', action='store_true', help='Submit feedback to Kublai (vs just printing)')
     parser.add_argument('--list-pending', action='store_true', help='List pending feedback for Kublai')
     
@@ -270,7 +297,12 @@ def main():
         sys.exit(1)
     
     for agent in agents:
-        reflection = generate_reflection(agent, args.hours)
+        reflection = generate_reflection(
+            agent, 
+            args.hours, 
+            include_chat_review=args.chat_review,
+            chat_hours=args.chat_hours
+        )
         
         if args.submit:
             # In real usage, agent would fill out the reflection and submit

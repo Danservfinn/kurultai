@@ -118,12 +118,21 @@ except:
 
 ---
 
-## 🤔 Meta-Reflection: System Evaluation
+## 🤔 Meta-Reflection: System Evaluation (with Chat Log Review)
 
 **As $AGENT, critically evaluate the task/spawning system:**
 
+**Review period:**
+- Task metrics: Last 1 hour
+- Chat logs: Last 2 hours
+
 ```bash
-$(python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py --agent $AGENT --hours 1 2>/dev/null | tail -n +10 | head -50)
+$(python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py \
+  --agent $AGENT \
+  --hours 1 \
+  --chat-review \
+  --chat-hours 2 \
+  2>/dev/null | tail -n +10 | head -80)
 ```
 
 ### Your Feedback to Kublai
@@ -132,14 +141,30 @@ $(python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py --agent
 
 1. **Bottlenecks observed:** [What's slow or broken?]
 2. **Improvement ideas:** [What would make it better?]
-3. **Agent coordination:** [Any collaboration opportunities?]
-4. **Priority:** [ ] CRITICAL  [ ] HIGH  [ ] MEDIUM  [ ] LOW
+3. **Chat log insights:** [What did you observe in recent chats?]
+4. **Architecture alignment:** [Is the system behaving as designed?]
+5. **Priority:** [ ] CRITICAL  [ ] HIGH  [ ] MEDIUM  [ ] LOW
 
 **Submit via:**
 ```bash
 python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py \
   --agent $AGENT \
+  --hours 1 \
+  --chat-review \
+  --chat-hours 2 \
   --submit
+```
+
+**Kublai will review and assign tasks:**
+```bash
+# Kublai reviews pending feedback
+python3 /Users/kublai/.openclaw/agents/main/scripts/kublai_review_feedback.py --list
+
+# Kublai approves and assigns task
+python3 /Users/kublai/.openclaw/agents/main/scripts/kublai_review_feedback.py \
+  --approve <feedback_id> \
+  --assign <agent> \
+  --task "Implement improvement"
 ```
 
 ---
