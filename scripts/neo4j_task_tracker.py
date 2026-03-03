@@ -116,15 +116,28 @@ class TaskTracker:
             result = session.run("""
                 MATCH (t:Task)
                 WHERE t.created > datetime() - duration({hours: $hours})
-                WITH t.agent AS agent, t
-                RETURN 
+                WITH 
+                    t.agent AS agent,
+                    t.status AS status,
+                    t
+                WITH
                     agent,
-                    count(t) AS total,
-                    sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS completed,
-                    sum(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END) AS failed,
-                    sum(CASE WHEN t.status = 'running' THEN 1 ELSE 0 END) AS running,
-                    sum(CASE WHEN t.status = 'ready' THEN 1 ELSE 0 END) AS ready
-                GROUP BY agent
+                    status,
+                    count(t) AS count
+                WITH
+                    agent,
+                    sum(CASE WHEN status = 'completed' THEN count ELSE 0 END) AS completed,
+                    sum(CASE WHEN status = 'failed' THEN count ELSE 0 END) AS failed,
+                    sum(CASE WHEN status = 'running' THEN count ELSE 0 END) AS running,
+                    sum(CASE WHEN status = 'ready' THEN count ELSE 0 END) AS ready,
+                    sum(count) AS total
+                RETURN
+                    agent,
+                    total,
+                    completed,
+                    failed,
+                    running,
+                    ready
                 ORDER BY total DESC
             """, hours=hours)
             return [dict(r) for r in result]
