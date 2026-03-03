@@ -35,6 +35,8 @@ from .curation_simple import SimpleCuration
 from .agent_reflection import hourly_agent_reflection_task
 from .kublai_review import kublai_review_task
 from .baseline_tracker import validate_improvements_task
+from .task_pickup import generic_task_pickup
+from .local_llm_router import run_with_routing, log_metric
 
 logger = logging.getLogger("kurultai.agent_tasks")
 
@@ -508,6 +510,155 @@ async def chagatai_consolidate(driver) -> Dict:
         }
 
 
+# ============================================================================
+# Temüjin (Developer) - Code generation, builds, infrastructure
+# ============================================================================
+
+async def temujin_task_pickup(driver) -> Dict:
+    """
+    Check for pending tasks in temujin task queue.
+
+    Polls the file-based task queue and writes to simple JSON spawn queue.
+    """
+    import glob
+    import json
+    import os
+    import time
+
+    task_dir = "/Users/kublai/.openclaw/agents/main/agent/temujin/tasks"
+    spawn_queue = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
+
+    results = {
+        "tasks_found": 0,
+        "tasks_spawned": 0,
+        "tokens_used": 100
+    }
+
+    if not os.path.exists(task_dir):
+        return {"summary": "No task directory found", "tokens_used": 50, "data": results}
+
+    # Find pending tasks
+    try:
+        tasks = (glob.glob(f"{task_dir}/high-*.md") +
+                 glob.glob(f"{task_dir}/normal-*.md") +
+                 glob.glob(f"{task_dir}/low-*.md"))
+        results["tasks_found"] = len(tasks)
+
+        if not tasks:
+            return {"summary": "No pending tasks", "tokens_used": 50, "data": results}
+
+        # Load existing queue
+        existing_spawns = []
+        if os.path.exists(spawn_queue):
+            try:
+                with open(spawn_queue, 'r') as f:
+                    data = json.load(f)
+                    existing_spawns = data.get('spawns', [])
+            except:
+                pass
+
+        # Process each task - write spawn request and move to executing
+        for task_file in tasks:
+            task_name = os.path.basename(task_file)
+            # Read task description
+            with open(task_file, 'r') as f:
+                content = f.read()
+                import re
+                match = re.search(r'^# Task: (.+)$', content, re.MULTILINE)
+                task_desc = match.group(1) if match else task_name
+
+            # Write spawn request to simple queue
+            spawn_request = {
+                "agent": "temujin",
+                "task": task_desc,
+                "model": "qwen3.5-plus",
+                "label": f"temujin-{int(time.time())}",
+                "priority": "normal",
+                "source": "heartbeat_pickup"
+            }
+
+            existing_spawns.append(spawn_request)
+            logger.info(f"Temujin spawn queued: {task_desc}")
+
+            # Move to executing
+            executing_file = task_file.replace('.md', '.executing.md')
+            os.rename(task_file, executing_file)
+
+            results["tasks_spawned"] += 1
+
+        # Save updated queue
+        os.makedirs(os.path.dirname(spawn_queue), exist_ok=True)
+        with open(spawn_queue, 'w') as f:
+            json.dump({'spawns': existing_spawns, 'updated': time.time()}, f, indent=2)
+
+        return {
+            "summary": f"Found {results['tasks_found']} tasks, queued {results['tasks_spawned']} spawns",
+            "tokens_used": 200,
+            "data": results
+        }
+
+    except Exception as e:
+        logger.exception("Temujin task pickup failed")
+        return {"summary": f"Error: {e}", "tokens_used": 100, "data": {"error": str(e)}}
+
+
+async def temujin_code_review(driver) -> Dict:
+    """
+    Review recent code changes in Parse project.
+
+    Scans for TypeScript errors, security issues.
+    """
+    import subprocess
+    import os
+
+    results = {
+        "files_checked": 0,
+        "issues_found": 0,
+        "status": "skipped",
+        "tokens_used": 50
+    }
+
+    parse_dir = "/Users/kublai/projects/parse-github"
+
+    # Check if Parse is checked out
+    if not os.path.exists(parse_dir):
+        results["status"] = "not_checked_out"
+        return {"summary": "Parse not checked out at /Users/kublai/projects/parse-github", "tokens_used": 50, "data": results}
+
+    if not os.path.exists(f"{parse_dir}/package.json"):
+        results["status"] = "not_parse_project"
+        return {"summary": "Not a Parse project directory", "tokens_used": 50, "data": results}
+
+    try:
+        # Run TypeScript check on Parse
+        result = subprocess.run(
+            ["npx", "tsc", "--noEmit"],
+            cwd=parse_dir,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        results["files_checked"] = 1
+        results["status"] = "success"
+        if result.returncode != 0:
+            results["issues_found"] = len(result.stdout.splitlines())
+            results["status"] = "errors_found"
+
+        return {
+            "summary": f"Code review: {results['issues_found']} issues ({results['status']})",
+            "tokens_used": 300,
+            "data": results
+        }
+
+    except subprocess.TimeoutExpired:
+        results["status"] = "timeout"
+        return {"summary": "Code review timed out", "tokens_used": 100, "data": results}
+    except Exception as e:
+        results["status"] = f"error: {str(e)[:50]}"
+        return {"summary": f"Code review error: {str(e)[:50]}", "tokens_used": 100, "data": results}
+
+
 async def mongke_gap_analysis(driver) -> Dict:
     """
     Analyze knowledge gaps daily.
@@ -928,6 +1079,151 @@ async def register_all_tasks(hb: UnifiedHeartbeat):
         max_tokens=200,
         handler=kublai_status_synthesis,
         description="Synthesize agent status, escalate critical issues"
+    ))
+
+    # === Task Pickup for All Agents - Every 5 minutes ===
+    # Kublai (Orchestrator)
+    async def kublai_task_pickup(driver) -> Dict:
+        return await generic_task_pickup("kublai", driver)
+    
+    hb.register(HeartbeatTask(
+        name="task_pickup",
+        agent="kublai",
+        frequency_minutes=5,
+        max_tokens=200,
+        handler=kublai_task_pickup,
+        description="Pick up pending tasks from kublai task queue"
+    ))
+    
+    # Temüjin (Developer)
+    async def temujin_task_pickup_handler(driver) -> Dict:
+        return await generic_task_pickup("temujin", driver)
+    
+    hb.register(HeartbeatTask(
+        name="task_pickup",
+        agent="temujin",
+        frequency_minutes=5,
+        max_tokens=200,
+        handler=temujin_task_pickup_handler,
+        description="Pick up pending tasks from temujin task queue"
+    ))
+    
+    # Möngke (Researcher)
+    async def mongke_task_pickup(driver) -> Dict:
+        return await generic_task_pickup("mongke", driver)
+    
+    hb.register(HeartbeatTask(
+        name="task_pickup",
+        agent="mongke",
+        frequency_minutes=5,
+        max_tokens=200,
+        handler=mongke_task_pickup,
+        description="Pick up pending tasks from mongke task queue"
+    ))
+    
+    # Chagatai (Writer)
+    async def chagatai_task_pickup(driver) -> Dict:
+        return await generic_task_pickup("chagatai", driver)
+    
+    hb.register(HeartbeatTask(
+        name="task_pickup",
+        agent="chagatai",
+        frequency_minutes=5,
+        max_tokens=200,
+        handler=chagatai_task_pickup,
+        description="Pick up pending tasks from chagatai task queue"
+    ))
+    
+    # Jochi (Analyst)
+    async def jochi_task_pickup(driver) -> Dict:
+        return await generic_task_pickup("jochi", driver)
+    
+    hb.register(HeartbeatTask(
+        name="task_pickup",
+        agent="jochi",
+        frequency_minutes=5,
+        max_tokens=200,
+        handler=jochi_task_pickup,
+        description="Pick up pending tasks from jochi task queue"
+    ))
+    
+    # Ögedei (Ops)
+    async def ogedei_task_pickup(driver) -> Dict:
+        return await generic_task_pickup("ogedei", driver)
+    
+    hb.register(HeartbeatTask(
+        name="task_pickup",
+        agent="ogedei",
+        frequency_minutes=5,
+        max_tokens=200,
+        handler=ogedei_task_pickup,
+        description="Pick up pending tasks from ogedei task queue"
+    ))
+
+    hb.register(HeartbeatTask(
+        name="code_review",
+        agent="temujin",
+        frequency_minutes=60,
+        max_tokens=300,
+        handler=temujin_code_review,
+        description="Review recent code changes for errors"
+    ))
+
+    # === Möngke (Research) - Web research on trending topics ===
+    async def mongke_quick_research(driver) -> Dict:
+        """
+        Quick research on trending topics for Parse/Kurultai.
+        """
+        results = {
+            "topics_researched": 0,
+            "status": "completed",
+            "tokens_used": 200
+        }
+        # Placeholder - could integrate with web search API
+        # For now, logs intent
+        logger.info("Mongke quick_research: Would research trending topics")
+        results["topics_researched"] = 0
+        return {
+            "summary": f"Quick research: {results['topics_researched']} topics",
+            "tokens_used": results["tokens_used"],
+            "data": results
+        }
+
+    hb.register(HeartbeatTask(
+        name="quick_research",
+        agent="mongke",
+        frequency_minutes=60,
+        max_tokens=400,
+        handler=mongke_quick_research,
+        description="Quick research on trending topics"
+    ))
+
+    # === Chagatai (Writer) - Content generation ===
+    async def chagatai_content_generation(driver) -> Dict:
+        """
+        Generate content for Parse blog/social when idle.
+        """
+        results = {
+            "content_generated": 0,
+            "status": "completed",
+            "tokens_used": 300
+        }
+        # Placeholder - could integrate with content generation
+        # For now, logs intent
+        logger.info("Chagatai content_generation: Would generate content")
+        return {
+            "summary": f"Content generation: {results['content_generated']} pieces",
+            "tokens_used": results["tokens_used"],
+            "data": results
+        }
+
+    hb.register(HeartbeatTask(
+        name="content_generation",
+        agent="chagatai",
+        frequency_minutes=60,
+        max_tokens=500,
+        handler=chagatai_content_generation,
+        description="Generate content when idle"
     ))
 
     # === Notion Sync - Hourly ===

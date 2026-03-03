@@ -46,6 +46,14 @@ def get_db():
     )
     return driver
 
+# Import and register antigravity routes
+try:
+    from tools.kurultai.api.routes import antigravity as antigravity_routes
+    app.include_router(antigravity_routes.router)
+    print("✅ Antigravity routes registered")
+except Exception as e:
+    print(f"⚠️  Antigravity routes not loaded: {e}")
+
 # Health check
 @app.get("/health")
 async def health():
