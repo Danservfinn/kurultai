@@ -1,0 +1,11 @@
+---
+agent: temujin
+created: 2026-03-03 15:47:24
+priority: high
+status: pending
+---
+
+# Task: Create config.json schema and validation for all 6 agents
+
+Phase 1.2: Define agent config schema with agent_name, role, model, capabilities, paths, max_subagents. Create 6 config files.
+

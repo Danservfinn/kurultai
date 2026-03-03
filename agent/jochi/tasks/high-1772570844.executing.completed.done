@@ -1,0 +1,11 @@
+---
+agent: jochi
+created: 2026-03-03 15:47:24
+priority: high
+status: pending
+---
+
+# Task: Update Neo4j schema with AgentState nodes and relationships
+
+Phase 1.3: Add AgentState node schema with status, current_task, workspace_path, last_heartbeat, tasks_completed. Add EXECUTING, SPAWNED, OWNS relationships.
+

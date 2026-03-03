@@ -1,0 +1,11 @@
+---
+agent: kublai
+created: 2026-03-03 15:47:24
+priority: high
+status: pending
+---
+
+# Task: Create workspace directory structure for all 6 Kurultai agents (temujin, mongke, chagatai, jochi, ogedei, kublai)
+
+Phase 1.1: Create /Users/kublai/.openclaw/agents/{agent}/tasks,workspace,memory directories with config.json for each
+
