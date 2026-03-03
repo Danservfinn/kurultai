@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772514365079,
+    "updatedAt": 1772514626365,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -386,7 +386,7 @@
       }
     },
     "totalTokensFresh": true,
-    "memoryFlushAt": 1772506087564,
+    "memoryFlushAt": 1772514626365,
     "memoryFlushCompactionCount": 7,
     "compactionCount": 7,
     "inputTokens": 1702328,
