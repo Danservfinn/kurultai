@@ -115,24 +115,103 @@ def spawn_subagent(agent_name, task, subagent_task):
     print(f"✓ Subagent spawned: {spawn_request['label']}")
     return spawn_request['label']
 
+def execute_task_with_llm(agent_name, task_text, config):
+    """Execute task using LLM (local or cloud)"""
+    from local_llm_router import run_with_routing
+    
+    # Build prompt with agent context
+    prompt = f"""You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.
+
+**Capabilities:** {', '.join(config.get('capabilities', []))}
+
+**Task:** {task_text}
+
+Execute this task using your capabilities. Provide:
+1. Analysis of what needs to be done
+2. Step-by-step execution plan
+3. Results or deliverables
+4. Any follow-up actions needed
+
+Be thorough and professional."""
+    
+    # Run with local LLM routing
+    result = run_with_routing(
+        agent=agent_name,
+        task_name="task_execution",
+        prompt=prompt,
+        force_cloud=False
+    )
+    
+    return result
+
 def process_task(agent_name, task):
-    """Process a single task"""
+    """Process a single task with actual execution"""
     print(f"\n📋 Processing task: {task['task'][:60]}...")
     
     # Mark as executing
     executing_file = mark_task_executing(task['file'])
     print(f"  Status: executing → {executing_file}")
     
-    # For now, just mark as completed
-    # In full implementation, agent would actually execute the task
-    # and potentially spawn subagents
+    # Load agent config
+    config = load_agent_config(agent_name)
     
-    mark_task_completed(task['file'], 'completed')
-    print(f"  ✓ Task completed")
+    # Determine if task needs subagent delegation
+    needs_delegation = len(task['task'].split()) > 50 or any(
+        kw in task['task'].lower() for kw in ['multi-step', 'complex', 'pipeline', 'system']
+    )
     
-    return True
+    if needs_delegation:
+        print(f"  🔄 Task is complex - spawning subagent...")
+        
+        # Spawn subagent for parallel work
+        subagent_label = spawn_subagent(
+            agent_name=agent_name,
+            task=task['file'],
+            subagent_task=task['task']
+        )
+        
+        print(f"  ✓ Subagent spawned: {subagent_label}")
+        print(f"  ⏳ Waiting for subagent completion...")
+        
+        # In full implementation, would wait for subagent
+        # For now, mark as in_progress
+        mark_task_completed(task['file'], 'in_progress')
+        print(f"  ⏳ Task in progress (waiting for subagent)")
+        
+        return True
+    
+    # Execute task directly with LLM
+    print(f"  🤖 Executing with LLM...")
+    result = execute_task_with_llm(agent_name, task['task'], config)
+    
+    if result.get('success'):
+        # Save result to workspace
+        workspace_path = config.get('workspace_path', f"{AGENTS_DIR}/{agent_name}/workspace")
+        result_file = f"{workspace_path}/task-{int(datetime.now().timestamp())}.md"
+        
+        os.makedirs(workspace_path, exist_ok=True)
+        with open(result_file, 'w') as f:
+            f.write(f"# Task Result\n\n")
+            f.write(f"**Task:** {task['task']}\n\n")
+            f.write(f"**Model:** {result.get('model', 'unknown')}\n\n")
+            f.write(f"**Latency:** {result.get('latency_ms', 0)}ms\n\n")
+            f.write(f"---\n\n")
+            f.write(f"{result.get('content', 'No content')}\n")
+        
+        print(f"  ✓ Result saved: {result_file}")
+        mark_task_completed(task['file'], 'completed')
+        print(f"  ✓ Task completed")
+        
+        # Update Neo4j
+        update_agent_state(agent_name, 'idle', None, increment_completed=True)
+        
+        return True
+    else:
+        print(f"  ✗ Task execution failed: {result.get('error', 'Unknown error')}")
+        mark_task_completed(task['file'], 'failed')
+        return False
 
-def update_agent_state(agent_name, status='busy', task_label=None):
+def update_agent_state(agent_name, status='busy', task_label=None, increment_completed=False):
     """Update agent state in Neo4j"""
     try:
         from neo4j import GraphDatabase
@@ -144,7 +223,15 @@ def update_agent_state(agent_name, status='busy', task_label=None):
         driver = GraphDatabase.driver(uri, auth=(user, password))
         
         with driver.session() as session:
-            if task_label:
+            if increment_completed:
+                session.run("""
+                    MATCH (a:AgentState {name: $name})
+                    SET a.status = $status,
+                        a.current_task = $task,
+                        a.last_heartbeat = datetime(),
+                        a.tasks_completed = coalesce(a.tasks_completed, 0) + 1
+                """, name=agent_name, status=status, task=task_label)
+            elif task_label:
                 session.run("""
                     MATCH (a:AgentState {name: $name})
                     SET a.status = $status,

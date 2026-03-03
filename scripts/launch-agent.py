@@ -92,42 +92,81 @@ def register_agent_state(agent_name, config):
         return False
 
 def launch_agent(agent_name, config, mode="session"):
-    """Launch agent as persistent session"""
+    """Launch agent as persistent session via sessions_spawn"""
     print(f"🚀 Launching {agent_name} ({config.get('model', 'qwen3.5-plus')})...")
     
-    # Prepare initial context
-    initial_task = f"""You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.
+    try:
+        # Import OpenClaw sessions_spawn
+        sys.path.insert(0, '/opt/homebrew/lib/node_modules/openclaw')
+        from openclaw.tools import sessions_spawn
+        
+        # Prepare initial context
+        initial_task = f"""You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.
 
 **Capabilities:** {', '.join(config.get('capabilities', []))}
 
 **Workspace:** {config.get('workspace_path')}
 **Memory:** {config.get('memory_path')}
+**Task Queue:** {config.get('task_queue_path')}
 
 You are now running as a persistent agent. You will:
 1. Monitor your task queue at {config.get('task_queue_path')}
-2. Process tasks autonomously
+2. Process tasks autonomously using agent-task-handler.py
 3. Spawn subagents when needed for parallel work
-4. Report completion status
+4. Update your state in Neo4j (AgentState node)
+5. Report completion status
 
 Begin by acknowledging your role and checking for pending tasks."""
-    
-    # Launch via sessions_spawn
-    # Note: This would normally be called via OpenClaw tool
-    # For now, we'll output the spawn command
-    print(f"✓ Agent launch command prepared")
-    print(f"  Agent: {agent_name}")
-    print(f"  Model: {config.get('model')}")
-    print(f"  Mode: {mode}")
-    print(f"  Initial context: {len(initial_task)} chars")
-    
-    return {
-        "agent": agent_name,
-        "model": config.get('model'),
-        "mode": mode,
-        "status": "launched",
-        "workspace": config.get('workspace_path'),
-        "launched_at": datetime.now().isoformat()
-    }
+        
+        # Actually call sessions_spawn
+        result = sessions_spawn(
+            task=initial_task,
+            runtime="acp",
+            mode=mode,
+            label=f"{agent_name}-persistent",
+            timeoutSeconds=0  # No timeout for persistent agents
+        )
+        
+        print(f"✓ Agent launched successfully")
+        print(f"  Session: {result.get('childSessionKey', 'unknown')}")
+        print(f"  Run ID: {result.get('runId', 'unknown')}")
+        
+        # Update Neo4j state
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "myStrongPassword123"))
+        
+        with driver.session() as session:
+            session.run("""
+                MATCH (a:AgentState {name: $name})
+                SET a.status = 'running',
+                    a.session_key = $session_key,
+                    a.run_id = $run_id,
+                    a.last_heartbeat = datetime(),
+                    a.started = datetime()
+            """, name=agent_name, 
+                session_key=result.get('childSessionKey'),
+                run_id=result.get('runId'))
+        
+        driver.close()
+        
+        return {
+            "agent": agent_name,
+            "model": config.get('model'),
+            "mode": mode,
+            "status": "launched",
+            "session_key": result.get('childSessionKey'),
+            "run_id": result.get('runId'),
+            "workspace": config.get('workspace_path'),
+            "launched_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"✗ Launch failed: {e}")
+        return {
+            "agent": agent_name,
+            "status": "failed",
+            "error": str(e)
+        }
 
 def main():
     parser = argparse.ArgumentParser(description='Launch persistent Kurultai agents')
