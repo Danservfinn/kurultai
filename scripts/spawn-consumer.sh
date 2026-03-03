@@ -11,10 +11,16 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
+# Silent mode: Only report when something meaningful happens
+# Set REPORT_ONLY_ON_ACTIVITY=true to suppress empty cycle reports
+REPORT_ONLY_ON_ACTIVITY=true
+
 log "=== Spawn Consumer Cycle ==="
 
 if [ ! -f "$SPAWN_QUEUE" ]; then
-    log "No spawn queue found"
+    if [ "$REPORT_ONLY_ON_ACTIVITY" != "true" ]; then
+        log "No spawn queue found"
+    fi
     exit 0
 fi
 
@@ -60,12 +66,17 @@ except Exception as e:
 
 spawns = data.get('spawns', [])
 if not spawns:
-    log("Queue is empty")
+    if "$REPORT_ONLY_ON_ACTIVITY" != "true":
+        log("Queue is empty")
     exit(0)
 
 # Process ready spawns (continuous tasks are in separate registry)
 ready = [s for s in spawns if s.get('status') == 'ready']
-log(f"Found {len(ready)} ready spawn(s)")
+activity_detected = False
+
+if ready:
+    log(f"Found {len(ready)} ready spawn(s)")
+    activity_detected = True
 
 for s in ready:
     agent = s.get('agent', 'unknown')
@@ -75,15 +86,21 @@ for s in ready:
     mode = s.get('mode', 'run')
     retry_count = s.get('retry_count', 0)
     
+    # Check if this is a novel execution (first time or different from last)
+    is_novel = True  # Default to novel for now
+    
     log(f"SPAWN: {agent} ({model}, {mode}) - {label}")
-    print(f"SPAWN_CMD|{agent}|{model}|{label}|{task}|{mode}")
+    print(f"SPAWN_CMD|{agent}|{model}|{label}|{task}|{mode}|{is_novel}")
     
     # Mark as running
     s['status'] = 'running'
     s['last_spawned'] = datetime.now().isoformat()
+    activity_detected = True
 
 # Handle failed spawns (retry logic)
 failed = [s for s in spawns if s.get('status') == 'failed']
+retries_count = 0
+
 for s in failed:
     retry_count = s.get('retry_count', 0)
     max_retries = s.get('max_retries', 3)
@@ -96,11 +113,14 @@ for s in failed:
         s['last_retry'] = datetime.now().isoformat()
         s['error'] = f"Retry {retry_count + 1}/{max_retries}"
         log(f"RETRY: {label} (attempt {retry_count + 1}/{max_retries})")
+        activity_detected = True
+        retries_count += 1
     else:
         # Dead letter
         add_to_dead_letter(s)
         spawns.remove(s)
         log(f"FAILED: {label} (max retries exceeded)")
+        activity_detected = True
 
 # Immediate cleanup of completed/failed tasks (keep only running/ready)
 spawns = [s for s in spawns if s.get('status') in ['ready', 'running']]
@@ -108,7 +128,16 @@ spawns = [s for s in spawns if s.get('status') in ['ready', 'running']]
 # Save updated queue
 save_queue({'spawns': spawns, 'updated': datetime.now().timestamp()})
 
-log(f"Processed {len(ready)} spawns, {len(failed)} retries, {len(spawns)} remaining in queue")
+# Only report if there was meaningful activity
+if activity_detected:
+    log(f"PROCESSED: {len(ready)} spawns, {retries_count} retries, {len(spawns)} remaining")
+elif "$REPORT_ONLY_ON_ACTIVITY" != "true":
+    log(f"Cycle complete: {len(ready)} spawns, {len(failed)} retries, {len(spawns)} remaining")
 PYTHON_SCRIPT
+
+if [ "$REPORT_ONLY_ON_ACTIVITY" = "true" ] && [ "$activity_detected" != "True" ]; then
+    # Silent cycle - no output
+    exit 0
+fi
 
 log "=== Cycle Complete ==="
