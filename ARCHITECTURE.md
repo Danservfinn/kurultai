@@ -786,3 +786,18 @@ Week 2-3:
 
 **Documentation:** `shared-context/QUANT-SIMULATION-ADOPTION.md`
 
+---
+
+## 2026-03-03 - Proactive Agent Spawning Protocol
+
+- **Change**: Implemented proactive spawning system for all Kurultai agents
+- **Reason**: Enable parallel execution without bottleneck at Kublai
+- **Files Created**: `shared-context/PROACTIVE-SPAWN-PROTOCOL.md`
+- **Files Modified**: `AGENTS.md`, `scripts/hourly_reflection.sh`
+- **Features**:
+  - All agents can spawn sub-agents via `sessions_spawn(runtime="subagent")`
+  - Agent routing matrix (Möngke=research, Chagatai=writing, Temüjin=code, Jochi=analysis, Ögedei=ops)
+  - Concurrency limits: 5 per agent, 20 system-wide
+  - Reflection now includes proactive spawning check
+  - Each agent reports sub-agents spawned each hour
+

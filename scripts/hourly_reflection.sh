@@ -88,11 +88,29 @@ Generate an hourly reflection with these sections:
 - [ ] If I asked for help, was it truly necessary?
 
 ### The Momentum Question
-- [ ] At end of task, did I ask \"What do I want to do next?\"
+- [ ] At end of task, did I ask "What do I want to do next?"
 - [ ] Did I evaluate within my domain?
 - [ ] Did I act on the answer without waiting for human direction?
 - [ ] Did I report my next action to Kublai?
 - [ ] Is there continuous forward motion toward goals?
+
+---
+
+## 🤖 Proactive Spawning Check
+
+**Per PROACTIVE-SPAWN-PROTOCOL.md:**
+
+### Spawning This Hour
+- [ ] Did I identify work that could benefit from a specialist agent?
+- [ ] Did I spawn sub-agents for parallel workstreams?
+- [ ] Did I use sessions_spawn with runtime="subagent"?
+
+### Concurrency Status
+- Personal sub-agents: [count] (max 5)
+- System-wide: [count] (max 20, monitored by Ögedei)
+
+### Next Actions Needing Spawns
+- [List any work coming up that warrants spawning]
 
 ---
 
@@ -360,12 +378,30 @@ cat >> "$WORKSPACE/memory/$DATE.md" << EOF
 
 ---
 
+## 🤖 Proactive Spawning Check
+
+**Per PROACTIVE-SPAWN-PROTOCOL.md:**
+
+### Spawning This Hour
+- [ ] Did I identify work that could benefit from a specialist agent?
+- [ ] Did I spawn sub-agents for parallel workstreams?
+- [ ] Did I use sessions_spawn with runtime="subagent"?
+
+### Concurrency Status
+- Personal sub-agents: ___ (max 5)
+- System-wide: ___ (max 20, monitored by Ögedei)
+
+### Next Actions Needing Spawns
+- [List any work coming up that warrants spawning]
+
+---
+
 ## 🤖 Local LLM Routing Reflection
 
 **Review LLM routing decisions for this hour:**
 
 ### Task Routing Analysis
-- Local LLM Tasks: ___ 
+- Local LLM Tasks: ___
 - Cloud LLM Tasks: ___
 - Local Success Rate: ___% (target: >95%)
 - Cloud Escalations: ___ (target: <5%)
