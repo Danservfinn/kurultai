@@ -183,9 +183,11 @@ echo ""
 
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
     echo "✅ AGENT HARNESS: HEALTHY"
+    HEALTH_STATUS="HEALTHY"
     exit 0
 elif [ $ERRORS -eq 0 ]; then
     echo "⚠️  AGENT HARNESS: HEALTHY (with warnings)"
+    HEALTH_STATUS="HEALTHY_WARNINGS"
     exit 0
 else
     echo "❌ AGENT HARNESS: UNHEALTHY"
@@ -195,7 +197,14 @@ else
     echo "  - Hooks not integrated"
     echo "  - Missing spec templates"
     echo "  - Missing documentation"
+    HEALTH_STATUS="UNHEALTHY"
     exit 1
+fi
+EOF
+
+# Log to Neo4j
+if [ -f "$WORKSPACE/hooks/health-check-neo4j.sh" ]; then
+    bash "$WORKSPACE/hooks/health-check-neo4j.sh"
 fi
 EOF
 

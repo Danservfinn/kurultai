@@ -1,4 +1,13 @@
 #!/bin/bash
+
+# Run Agent Harness health check
+echo "=== AGENT HARNESS HEALTH CHECK ==="
+if [ -f "/Users/kublai/.openclaw/agents/main/hooks/health-check.sh" ]; then
+    /Users/kublai/.openclaw/agents/main/hooks/health-check.sh
+else
+    echo "⚠️  health-check.sh not found"
+fi
+echo ""
 # Kurultai Sync - Hourly All-Agents Meeting
 # Duration: 10 minutes max
 # Purpose: Cross-agent visibility, alignment, and continuous improvement
