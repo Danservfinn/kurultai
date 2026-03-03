@@ -24,43 +24,60 @@ def get_agent_reflection(agent, hours=1):
     task_data = tracker.get_reflection_data(agent, hours)
     
     # Get recent tasks
-    recent_tasks = tracker.get_tasks_by_agent(agent, limit=5)
+    try:
+        recent_tasks = tracker.get_tasks_by_agent(agent, limit=5)
+    except:
+        recent_tasks = []
     
     # Get completion rate
-    completion = tracker.get_completion_rate(hours * 24)
+    try:
+        completion = tracker.get_completion_rate(hours * 24)
+    except:
+        completion = {}
     
     # Get continuous tasks
-    continuous = tracker.get_continuous_tasks()
-    agent_continuous = [t for t in continuous if t.get('agent') == agent]
+    try:
+        continuous = tracker.get_continuous_tasks()
+        agent_continuous = [t for t in continuous if t.get('agent') == agent]
+    except:
+        agent_continuous = []
     
-    total = max(task_data.get('total_tasks', 0), 1)
-    completed = task_data.get('completed', 0)
+    total = task_data.get('total_tasks', 0) or 0
+    completed = task_data.get('completed', 0) or 0
+    failed = task_data.get('failed', 0) or 0
+    retries = task_data.get('total_retries', 0) or 0
+    
+    # Safe success rate calculation
+    if total > 0:
+        success_rate = f"{100 * completed / total:.1f}%"
+    else:
+        success_rate = "N/A (no tasks)"
     
     return {
         "agent": agent,
         "period_hours": hours,
         "tasks": {
-            "total": task_data.get('total_tasks', 0),
+            "total": total,
             "completed": completed,
-            "failed": task_data.get('failed', 0),
-            "retries": task_data.get('total_retries', 0),
+            "failed": failed,
+            "retries": retries,
             "avg_duration_seconds": task_data.get('avg_duration'),
-            "success_rate": f"{100 * completed / total:.1f}%" if total > 0 else "0%"
+            "success_rate": success_rate
         },
         "completion_rate_overall": completion,
         "continuous_tasks": len(agent_continuous),
         "recent_tasks": [
             {
-                "label": t.get('label'),
-                "status": t.get('status'),
-                "task": t.get('task', '')[:50],
-                "duration": t.get('completed') and t.get('created') and "completed" or "running"
+                "label": t.get('label', 'unknown'),
+                "status": t.get('status', 'unknown'),
+                "task": t.get('task', '')[:50] if t.get('task') else 'No description',
+                "duration": "completed" if t.get('completed') else "running"
             }
-            for t in recent_tasks
+            for t in (recent_tasks or [])[:5]
         ]
     }
 
-def get_kurultai_summary(hours=1):
+def get_kurultai_summary(hours=1, include_trends=False):
     """Get summary for all 6 agents"""
     tracker = get_tracker()
     
@@ -68,12 +85,18 @@ def get_kurultai_summary(hours=1):
     hourly = tracker.get_hourly_summary(hours)
     
     # Get overall completion rate
-    completion = tracker.get_completion_rate(hours * 24)
+    try:
+        completion = tracker.get_completion_rate(hours * 24)
+    except:
+        completion = {}
     
     # Get continuous tasks
-    continuous = tracker.get_continuous_tasks()
+    try:
+        continuous = tracker.get_continuous_tasks()
+    except:
+        continuous = []
     
-    return {
+    result = {
         "period_hours": hours,
         "agents": hourly,
         "completion_rate": completion,
@@ -82,22 +105,37 @@ def get_kurultai_summary(hours=1):
         "total_completed": sum(a.get('completed', 0) for a in hourly),
         "total_failed": sum(a.get('failed', 0) for a in hourly)
     }
+    
+    # Add historical trends if requested
+    if include_trends:
+        try:
+            result["trends"] = {
+                "daily": tracker.get_historical_trends(7),
+                "workload": tracker.get_agent_workload(7),
+                "peak_hours": tracker.get_peak_hours(7),
+                "bottlenecks": tracker.get_bottlenecks(24)
+            }
+        except Exception as e:
+            result["trends_error"] = str(e)
+    
+    return result
 
 def main():
     parser = argparse.ArgumentParser(description='Get reflection data')
     parser.add_argument('--agent', help='Specific agent (optional)')
     parser.add_argument('--hours', type=int, default=1, help='Hours to look back')
     parser.add_argument('--kurultai', action='store_true', help='Get all 6 agents summary')
+    parser.add_argument('--trends', action='store_true', help='Include historical trends (7 days)')
     
     args = parser.parse_args()
     
     try:
         if args.kurultai:
-            data = get_kurultai_summary(args.hours)
+            data = get_kurultai_summary(args.hours, include_trends=args.trends)
         elif args.agent:
             data = get_agent_reflection(args.agent, args.hours)
         else:
-            data = get_kurultai_summary(args.hours)
+            data = get_kurultai_summary(args.hours, include_trends=args.trends)
         
         print(json.dumps(data, indent=2, default=str))
     except Exception as e:

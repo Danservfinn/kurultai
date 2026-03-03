@@ -182,6 +182,78 @@ class TaskTracker:
             
             record = result.single()
             return dict(record) if record else {}
+    
+    def get_historical_trends(self, days=7):
+        """Get daily task trends for last N days"""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created > datetime() - duration({days: $days})
+                WITH 
+                    date(t.created) AS day,
+                    t.status AS status,
+                    t
+                RETURN 
+                    day,
+                    sum(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+                    sum(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+                    sum(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running,
+                    count(t) AS total
+                GROUP BY day
+                ORDER BY day DESC
+                """, days=days)
+            return [dict(r) for r in result]
+    
+    def get_agent_workload(self, days=7):
+        """Get workload distribution by agent"""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created > datetime() - duration({days: $days})
+                WITH t.agent AS agent, t
+                RETURN 
+                    agent,
+                    count(t) AS total_tasks,
+                    sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+                    round(100.0 * sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) / count(t), 1) AS success_rate
+                GROUP BY agent
+                ORDER BY total_tasks DESC
+                """, days=days)
+            return [dict(r) for r in result]
+    
+    def get_peak_hours(self, days=7):
+        """Get busiest hours of day"""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created > datetime() - duration({days: $days})
+                WITH 
+                    t.created.hour AS hour,
+                    count(t) AS count
+                RETURN 
+                    hour,
+                    count
+                ORDER BY count DESC
+                LIMIT 5
+                """, days=days)
+            return [dict(r) for r in result]
+    
+    def get_bottlenecks(self, hours=24):
+        """Find tasks with most retries (potential bottlenecks)"""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created > datetime() - duration({hours: $hours})
+                  AND t.retry_count > 0
+                RETURN 
+                    t.agent AS agent,
+                    t.label AS label,
+                    t.retry_count AS retries,
+                    t.status AS status
+                ORDER BY retries DESC
+                LIMIT 10
+                """, hours=hours)
+            return [dict(r) for r in result]
 
 
 # Singleton instance
