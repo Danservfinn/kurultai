@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772518499868,
+    "updatedAt": 1772518784522,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -125,7 +125,7 @@
     "abortedLastRun": false,
     "chatType": "direct",
     "origin": {
-      "provider": "webchat",
+      "provider": "signal",
       "surface": "webchat",
       "chatType": "direct",
       "label": "Danny id:+19194133445",
@@ -134,15 +134,15 @@
       "accountId": "default"
     },
     "modelProvider": "bailian",
-    "model": "qwen3.5-plus",
-    "contextTokens": 1000000,
+    "model": "MiniMax-M2.5",
+    "contextTokens": 204800,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772517051657,
+      "generatedAt": 1772518700692,
       "sessionId": "envtest",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
-      "model": "qwen3.5-plus",
+      "model": "MiniMax-M2.5",
       "workspaceDir": "/Users/kublai/.openclaw/agents/main",
       "bootstrapMaxChars": 50000,
       "bootstrapTotalMaxChars": 150000,
@@ -151,8 +151,8 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 90508,
-        "projectContextChars": 78429,
+        "chars": 26128,
+        "projectContextChars": 14049,
         "nonProjectContextChars": 12079
       },
       "injectedWorkspaceFiles": [
@@ -160,32 +160,32 @@
           "name": "AGENTS.md",
           "path": "/Users/kublai/.openclaw/agents/main/AGENTS.md",
           "missing": false,
-          "rawChars": 26274,
-          "injectedChars": 26274,
+          "rawChars": 975,
+          "injectedChars": 975,
           "truncated": false
         },
         {
           "name": "SOUL.md",
           "path": "/Users/kublai/.openclaw/agents/main/SOUL.md",
           "missing": false,
-          "rawChars": 36103,
-          "injectedChars": 36103,
+          "rawChars": 1237,
+          "injectedChars": 1237,
           "truncated": false
         },
         {
           "name": "TOOLS.md",
           "path": "/Users/kublai/.openclaw/agents/main/TOOLS.md",
           "missing": false,
-          "rawChars": 2417,
-          "injectedChars": 2417,
+          "rawChars": 2882,
+          "injectedChars": 2882,
           "truncated": false
         },
         {
           "name": "IDENTITY.md",
           "path": "/Users/kublai/.openclaw/agents/main/IDENTITY.md",
           "missing": false,
-          "rawChars": 5505,
-          "injectedChars": 5505,
+          "rawChars": 825,
+          "injectedChars": 825,
           "truncated": false
         },
         {
@@ -380,15 +380,15 @@
       }
     },
     "totalTokensFresh": true,
-    "memoryFlushAt": 1772517051628,
-    "memoryFlushCompactionCount": 7,
-    "compactionCount": 7,
-    "inputTokens": 5240128,
-    "outputTokens": 6532,
-    "cacheRead": 0,
+    "memoryFlushAt": 1772518700666,
+    "memoryFlushCompactionCount": 8,
+    "compactionCount": 8,
+    "inputTokens": 35530,
+    "outputTokens": 462,
+    "cacheRead": 35646,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 875303
+    "totalTokens": 35778
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
