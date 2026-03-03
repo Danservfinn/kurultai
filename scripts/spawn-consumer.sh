@@ -13,7 +13,7 @@ log() {
 
 # Silent mode: Only report when something meaningful happens
 # Set REPORT_ONLY_ON_ACTIVITY=true to suppress empty cycle reports
-REPORT_ONLY_ON_ACTIVITY=true
+export REPORT_ONLY_ON_ACTIVITY="${REPORT_ONLY_ON_ACTIVITY:-true}"
 
 log "=== Spawn Consumer Cycle ==="
 
@@ -57,6 +57,9 @@ def add_to_dead_letter(spawn):
         json.dump({'failed': dead, 'updated': datetime.now().timestamp()}, f, indent=2)
     log(f"  → Dead letter: {spawn.get('label')} (retries exhausted)")
 
+import os
+report_only = os.getenv('REPORT_ONLY_ON_ACTIVITY', 'true') == 'true'
+
 try:
     with open(SPAWN_QUEUE, 'r') as f:
         data = json.load(f)
@@ -66,7 +69,7 @@ except Exception as e:
 
 spawns = data.get('spawns', [])
 if not spawns:
-    if "$REPORT_ONLY_ON_ACTIVITY" != "true":
+    if not report_only:
         log("Queue is empty")
     exit(0)
 
@@ -131,13 +134,8 @@ save_queue({'spawns': spawns, 'updated': datetime.now().timestamp()})
 # Only report if there was meaningful activity
 if activity_detected:
     log(f"PROCESSED: {len(ready)} spawns, {retries_count} retries, {len(spawns)} remaining")
-elif "$REPORT_ONLY_ON_ACTIVITY" != "true":
-    log(f"Cycle complete: {len(ready)} spawns, {len(failed)} retries, {len(spawns)} remaining")
+elif not report_only:
+    log(f"Cycle complete: {len(ready)} spawns, {retries_count} retries, {len(spawns)} remaining")
 PYTHON_SCRIPT
-
-if [ "$REPORT_ONLY_ON_ACTIVITY" = "true" ] && [ "$activity_detected" != "True" ]; then
-    # Silent cycle - no output
-    exit 0
-fi
 
 log "=== Cycle Complete ==="
