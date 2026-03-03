@@ -116,6 +116,34 @@ except:
 " 2>/dev/null)
 ```
 
+---
+
+## 🤔 Meta-Reflection: System Evaluation
+
+**As $AGENT, critically evaluate the task/spawning system:**
+
+```bash
+$(python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py --agent $AGENT --hours 1 2>/dev/null | tail -n +10 | head -50)
+```
+
+### Your Feedback to Kublai
+
+**Submit system improvement ideas:**
+
+1. **Bottlenecks observed:** [What's slow or broken?]
+2. **Improvement ideas:** [What would make it better?]
+3. **Agent coordination:** [Any collaboration opportunities?]
+4. **Priority:** [ ] CRITICAL  [ ] HIGH  [ ] MEDIUM  [ ] LOW
+
+**Submit via:**
+```bash
+python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py \
+  --agent $AGENT \
+  --submit
+```
+
+---
+
 ### Recent Tasks
 $(python3 /Users/kublai/.openclaw/agents/main/scripts/reflection_data.py --agent $AGENT --hours 1 2>/dev/null | python3 -c "
 import sys,json
