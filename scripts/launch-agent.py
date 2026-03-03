@@ -92,13 +92,36 @@ def register_agent_state(agent_name, config):
         return False
 
 def launch_agent(agent_name, config, mode="session"):
-    """Launch agent as persistent session via sessions_spawn"""
-    print(f"🚀 Launching {agent_name} ({config.get('model', 'qwen3.5-plus')})...")
+    """Mark agent as running in Neo4j (actual launch via heartbeat)"""
+    print(f"🚀 Activating {agent_name} ({config.get('model', 'qwen3.5-plus')})...")
     
     try:
-        # Import OpenClaw sessions_spawn
-        sys.path.insert(0, '/opt/homebrew/lib/node_modules/openclaw')
-        from openclaw.tools import sessions_spawn
+        # Update Neo4j state to running
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "myStrongPassword123"))
+        
+        with driver.session() as session:
+            session.run("""
+                MATCH (a:AgentState {name: $name})
+                SET a.status = 'running',
+                    a.last_heartbeat = datetime(),
+                    a.activated = datetime()
+            """, name=agent_name)
+        
+        driver.close()
+        
+        print(f"✓ Agent activated in Neo4j")
+        print(f"  Status: running")
+        print(f"  Workspace: {config.get('workspace_path')}")
+        
+        return {
+            "agent": agent_name,
+            "model": config.get('model'),
+            "mode": mode,
+            "status": "running",
+            "workspace": config.get('workspace_path'),
+            "launched_at": datetime.now().isoformat()
+        }
         
         # Prepare initial context
         initial_task = f"""You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.
