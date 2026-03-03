@@ -41,7 +41,7 @@ def classify(message):
         "confidence": scores[best] / max(sum(scores.values()), 1)
     }
 
-def queue_spawn(classification, message, priority="normal"):
+def queue_spawn(classification, message, priority="normal", mode="run", continuous=False, retry_count=0):
     """Write to spawn queue and return spawn params"""
     label = f"{classification['agent']}-{int(time.time())}"
     
@@ -62,7 +62,14 @@ def queue_spawn(classification, message, priority="normal"):
         "label": label,
         "source": "chat_direct",
         "created": datetime.now().isoformat(),
-        "status": "ready"
+        "status": "ready",
+        "mode": mode,  # "run" or "session"
+        "continuous": continuous,
+        "retry_count": retry_count,
+        "max_retries": 3,
+        "session_key": None,  # Will be set when spawned
+        "completed_at": None,
+        "error": None
     }
     existing.append(spawn_request)
     
@@ -74,7 +81,7 @@ def queue_spawn(classification, message, priority="normal"):
         "queued": True
     }
 
-def handle_chat_task(message, priority="normal"):
+def handle_chat_task(message, priority="normal", mode="run", continuous=False):
     """
     Full chat-to-task flow:
     1. Classify message
@@ -82,9 +89,13 @@ def handle_chat_task(message, priority="normal"):
     3. Return params for sessions_spawn
     
     Kublai calls this, then calls sessions_spawn with returned params.
+    
+    Args:
+        mode: "run" (one-shot) or "session" (continuous/never-ending)
+        continuous: If True, task never completes (for monitors/watchers)
     """
     classification = classify(message)
-    spawn_params = queue_spawn(classification, message, priority)
+    spawn_params = queue_spawn(classification, message, priority, mode, continuous)
     
     return {
         "classified": True,
@@ -96,12 +107,15 @@ def handle_chat_task(message, priority="normal"):
         "confidence": round(classification["confidence"], 2),
         "queued": True,
         "ready_to_spawn": True,
+        "mode": mode,
+        "continuous": continuous,
         "sessions_spawn_params": {
             "task": message.strip(),
             "runtime": "subagent",
             "label": spawn_params["label"],
             "model": classification["model"],
-            "timeoutSeconds": 300
+            "timeoutSeconds": 300 if not continuous else 0,  # 0 = no timeout for continuous
+            "mode": mode
         }
     }
 

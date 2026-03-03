@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "15657235-d5f7-4fbf-ab3b-39ec9eb1f5a3",
-    "updatedAt": 1772560420863,
+    "updatedAt": 1772560709117,
     "systemSent": true,
     "skillsSnapshot": {
       "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>coding-agent</name>\n    <description>Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:&quot;acp&quot;), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>eightctl</name>\n    <description>Control Eight Sleep pods (status, temperature, alarms, schedules).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>gemini</name>\n    <description>Gemini CLI for one-shot Q&amp;A, summaries, and generation.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>healthcheck</name>\n    <description>Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>nano-banana-pro</name>\n    <description>Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
@@ -110,7 +110,7 @@
       "provider": "signal",
       "from": "signal:+19194133445",
       "to": "+19194133445",
-      "surface": "signal",
+      "surface": "webchat",
       "chatType": "direct",
       "accountId": "default"
     },
@@ -118,7 +118,7 @@
     "model": "qwen3.5-plus",
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1772560295418,
+      "generatedAt": 1772560553744,
       "sessionId": "15657235-d5f7-4fbf-ab3b-39ec9eb1f5a3",
       "sessionKey": "agent:main:main",
       "provider": "bailian",
@@ -366,9 +366,9 @@
     "cacheRead": 0,
     "cacheWrite": 0,
     "contextTokens": 1000000,
-    "inputTokens": 897344,
-    "outputTokens": 1726,
-    "totalTokens": 150581,
+    "inputTokens": 154492,
+    "outputTokens": 1782,
+    "totalTokens": 154492,
     "lastChannel": "signal",
     "lastAccountId": "default",
     "channel": "signal",
@@ -2946,8 +2946,8 @@
     "cacheWrite": 0
   },
   "agent:main:cron:2c03c41d-21c4-4bf9-accf-a5821d9ef279": {
-    "sessionId": "2bf1d121-0bfd-4605-af7c-9d769b1f3b09",
-    "updatedAt": 1772560443555,
+    "sessionId": "ded1b7c4-50f2-4f58-9ea9-2dfb838fa9b1",
+    "updatedAt": 1772560663424,
     "systemSent": true,
     "label": "Cron: heartbeat-watchdog",
     "skillsSnapshot": {
@@ -18984,8 +18984,8 @@
     "cacheWrite": 0
   },
   "agent:main:cron:f74a5572-0adf-46c0-9336-cca9f01e807d": {
-    "sessionId": "9abb6eaa-4862-4da5-ac89-ef42a832f4ff",
-    "updatedAt": 1772560448759,
+    "sessionId": "4b642ac5-25ce-44cf-b77f-844f0a3fbbf4",
+    "updatedAt": 1772560688772,
     "systemSent": true,
     "label": "Cron: spawn-consumer",
     "skillsSnapshot": {
@@ -19084,12 +19084,14 @@
     "modelProvider": "bailian",
     "model": "qwen3.5-plus",
     "contextTokens": 1000000,
-    "inputTokens": 94632,
-    "outputTokens": 1236,
-    "totalTokens": 14969,
+    "inputTokens": 37481,
+    "outputTokens": 604,
+    "totalTokens": 12920,
     "totalTokensFresh": true,
     "cacheRead": 0,
-    "cacheWrite": 0
+    "cacheWrite": 0,
+    "sessionFile": "/Users/kublai/.openclaw/agents/main/sessions/75cf5f19-389f-42f5-b9d6-9517a593b259.jsonl",
+    "abortedLastRun": false
   },
   "agent:main:cron:f74a5572-0adf-46c0-9336-cca9f01e807d:run:b2a3afd7-8924-4e7e-829b-3656d10a1efc": {
     "sessionId": "b2a3afd7-8924-4e7e-829b-3656d10a1efc",
@@ -31085,5 +31087,447 @@
     "totalTokensFresh": true,
     "cacheRead": 0,
     "cacheWrite": 0
+  },
+  "agent:main:cron:f74a5572-0adf-46c0-9336-cca9f01e807d:run:75cf5f19-389f-42f5-b9d6-9517a593b259": {
+    "sessionId": "75cf5f19-389f-42f5-b9d6-9517a593b259",
+    "updatedAt": 1772560568757,
+    "systemSent": true,
+    "label": "Cron: spawn-consumer",
+    "skillsSnapshot": {
+      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>coding-agent</name>\n    <description>Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:&quot;acp&quot;), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>eightctl</name>\n    <description>Control Eight Sleep pods (status, temperature, alarms, schedules).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>gemini</name>\n    <description>Gemini CLI for one-shot Q&amp;A, summaries, and generation.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>healthcheck</name>\n    <description>Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>nano-banana-pro</name>\n    <description>Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
+      "skills": [
+        {
+          "name": "coding-agent",
+          "requiredEnv": []
+        },
+        {
+          "name": "eightctl",
+          "requiredEnv": []
+        },
+        {
+          "name": "gemini",
+          "requiredEnv": []
+        },
+        {
+          "name": "healthcheck"
+        },
+        {
+          "name": "nano-banana-pro",
+          "primaryEnv": "GEMINI_API_KEY",
+          "requiredEnv": [
+            "GEMINI_API_KEY"
+          ]
+        },
+        {
+          "name": "skill-creator"
+        },
+        {
+          "name": "weather",
+          "requiredEnv": []
+        }
+      ],
+      "resolvedSkills": [
+        {
+          "name": "coding-agent",
+          "description": "Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:\"acp\"), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "eightctl",
+          "description": "Control Eight Sleep pods (status, temperature, alarms, schedules).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "gemini",
+          "description": "Gemini CLI for one-shot Q&A, summaries, and generation.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "healthcheck",
+          "description": "Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "nano-banana-pro",
+          "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "skill-creator",
+          "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "weather",
+          "description": "Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/weather",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        }
+      ],
+      "version": 0
+    },
+    "modelProvider": "bailian",
+    "model": "qwen3.5-plus",
+    "contextTokens": 1000000,
+    "inputTokens": 172626,
+    "outputTokens": 2564,
+    "totalTokens": 19918,
+    "totalTokensFresh": true,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "agent:main:subagent:823d2c61-eba7-4916-84f9-c22eedd3d0c7": {
+    "sessionId": "a6488df8-1ecf-452a-bb69-fbad9dc28dd1",
+    "updatedAt": 1772560649301,
+    "spawnDepth": 1,
+    "deliveryContext": {
+      "channel": "signal"
+    },
+    "lastChannel": "signal",
+    "label": "mongke-1772559988",
+    "spawnedBy": "agent:main:cron:f74a5572-0adf-46c0-9336-cca9f01e807d",
+    "channel": "signal",
+    "skillsSnapshot": {
+      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>coding-agent</name>\n    <description>Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:&quot;acp&quot;), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>eightctl</name>\n    <description>Control Eight Sleep pods (status, temperature, alarms, schedules).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>gemini</name>\n    <description>Gemini CLI for one-shot Q&amp;A, summaries, and generation.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>healthcheck</name>\n    <description>Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>nano-banana-pro</name>\n    <description>Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
+      "skills": [
+        {
+          "name": "coding-agent",
+          "requiredEnv": []
+        },
+        {
+          "name": "eightctl",
+          "requiredEnv": []
+        },
+        {
+          "name": "gemini",
+          "requiredEnv": []
+        },
+        {
+          "name": "healthcheck"
+        },
+        {
+          "name": "nano-banana-pro",
+          "primaryEnv": "GEMINI_API_KEY",
+          "requiredEnv": [
+            "GEMINI_API_KEY"
+          ]
+        },
+        {
+          "name": "skill-creator"
+        },
+        {
+          "name": "weather",
+          "requiredEnv": []
+        }
+      ],
+      "resolvedSkills": [
+        {
+          "name": "coding-agent",
+          "description": "Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:\"acp\"), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "eightctl",
+          "description": "Control Eight Sleep pods (status, temperature, alarms, schedules).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "gemini",
+          "description": "Gemini CLI for one-shot Q&A, summaries, and generation.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "healthcheck",
+          "description": "Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "nano-banana-pro",
+          "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "skill-creator",
+          "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "weather",
+          "description": "Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/weather",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        }
+      ],
+      "version": 0
+    },
+    "sessionFile": "/Users/kublai/.openclaw/agents/main/sessions/a6488df8-1ecf-452a-bb69-fbad9dc28dd1.jsonl",
+    "contextTokens": 1000000,
+    "modelProvider": "bailian",
+    "model": "qwen3.5-plus",
+    "abortedLastRun": false,
+    "inputTokens": 62992,
+    "outputTokens": 1737,
+    "totalTokens": 20474,
+    "totalTokensFresh": true,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "agent:main:cron:2c03c41d-21c4-4bf9-accf-a5821d9ef279:run:ded1b7c4-50f2-4f58-9ea9-2dfb838fa9b1": {
+    "sessionId": "ded1b7c4-50f2-4f58-9ea9-2dfb838fa9b1",
+    "updatedAt": 1772560663424,
+    "systemSent": true,
+    "label": "Cron: heartbeat-watchdog",
+    "skillsSnapshot": {
+      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>coding-agent</name>\n    <description>Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:&quot;acp&quot;), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>eightctl</name>\n    <description>Control Eight Sleep pods (status, temperature, alarms, schedules).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>gemini</name>\n    <description>Gemini CLI for one-shot Q&amp;A, summaries, and generation.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>healthcheck</name>\n    <description>Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>nano-banana-pro</name>\n    <description>Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
+      "skills": [
+        {
+          "name": "coding-agent",
+          "requiredEnv": []
+        },
+        {
+          "name": "eightctl",
+          "requiredEnv": []
+        },
+        {
+          "name": "gemini",
+          "requiredEnv": []
+        },
+        {
+          "name": "healthcheck"
+        },
+        {
+          "name": "nano-banana-pro",
+          "primaryEnv": "GEMINI_API_KEY",
+          "requiredEnv": [
+            "GEMINI_API_KEY"
+          ]
+        },
+        {
+          "name": "skill-creator"
+        },
+        {
+          "name": "weather",
+          "requiredEnv": []
+        }
+      ],
+      "resolvedSkills": [
+        {
+          "name": "coding-agent",
+          "description": "Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:\"acp\"), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "eightctl",
+          "description": "Control Eight Sleep pods (status, temperature, alarms, schedules).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "gemini",
+          "description": "Gemini CLI for one-shot Q&A, summaries, and generation.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "healthcheck",
+          "description": "Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "nano-banana-pro",
+          "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "skill-creator",
+          "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "weather",
+          "description": "Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/weather",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        }
+      ],
+      "version": 0
+    },
+    "modelProvider": "bailian",
+    "model": "qwen3.5-plus",
+    "contextTokens": 1000000,
+    "inputTokens": 106387,
+    "outputTokens": 1826,
+    "totalTokens": 28280,
+    "totalTokensFresh": true,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "agent:main:cron:f74a5572-0adf-46c0-9336-cca9f01e807d:run:4b642ac5-25ce-44cf-b77f-844f0a3fbbf4": {
+    "sessionId": "4b642ac5-25ce-44cf-b77f-844f0a3fbbf4",
+    "updatedAt": 1772560688772,
+    "systemSent": true,
+    "label": "Cron: spawn-consumer",
+    "skillsSnapshot": {
+      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>coding-agent</name>\n    <description>Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:&quot;acp&quot;), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>eightctl</name>\n    <description>Control Eight Sleep pods (status, temperature, alarms, schedules).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>gemini</name>\n    <description>Gemini CLI for one-shot Q&amp;A, summaries, and generation.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>healthcheck</name>\n    <description>Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>nano-banana-pro</name>\n    <description>Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.</description>\n    <location>/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
+      "skills": [
+        {
+          "name": "coding-agent",
+          "requiredEnv": []
+        },
+        {
+          "name": "eightctl",
+          "requiredEnv": []
+        },
+        {
+          "name": "gemini",
+          "requiredEnv": []
+        },
+        {
+          "name": "healthcheck"
+        },
+        {
+          "name": "nano-banana-pro",
+          "primaryEnv": "GEMINI_API_KEY",
+          "requiredEnv": [
+            "GEMINI_API_KEY"
+          ]
+        },
+        {
+          "name": "skill-creator"
+        },
+        {
+          "name": "weather",
+          "requiredEnv": []
+        }
+      ],
+      "resolvedSkills": [
+        {
+          "name": "coding-agent",
+          "description": "Delegate coding tasks to Codex, Claude Code, or Pi agents via background process. Use when: (1) building/creating new features or apps, (2) reviewing PRs (spawn in temp dir), (3) refactoring large codebases, (4) iterative coding that needs file exploration. NOT for: simple one-liner fixes (just edit), reading code (use read tool), thread-bound ACP harness requests in chat (for example spawn/run Codex or Claude Code in a Discord thread; use sessions_spawn with runtime:\"acp\"), or any work in ~/clawd workspace (never spawn agents here). Requires a bash tool that supports pty:true.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/coding-agent",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "eightctl",
+          "description": "Control Eight Sleep pods (status, temperature, alarms, schedules).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/eightctl",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "gemini",
+          "description": "Gemini CLI for one-shot Q&A, summaries, and generation.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/gemini",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "healthcheck",
+          "description": "Host security hardening and risk-tolerance configuration for OpenClaw deployments. Use when a user asks for security audits, firewall/SSH/update hardening, risk posture, exposure review, OpenClaw cron scheduling for periodic checks, or version status checks on a machine running OpenClaw (laptop, workstation, Pi, VPS).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/healthcheck",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "nano-banana-pro",
+          "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/nano-banana-pro",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "skill-creator",
+          "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/skill-creator",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "weather",
+          "description": "Get current weather and forecasts via wttr.in or Open-Meteo. Use when: user asks about weather, temperature, or forecasts for any location. NOT for: historical weather data, severe weather alerts, or detailed meteorological analysis. No API key needed.",
+          "filePath": "/opt/homebrew/lib/node_modules/openclaw/skills/weather/SKILL.md",
+          "baseDir": "/opt/homebrew/lib/node_modules/openclaw/skills/weather",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        }
+      ],
+      "version": 0
+    },
+    "modelProvider": "bailian",
+    "model": "qwen3.5-plus",
+    "contextTokens": 1000000,
+    "inputTokens": 37481,
+    "outputTokens": 604,
+    "totalTokens": 12920,
+    "totalTokensFresh": true,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "sessionFile": "/Users/kublai/.openclaw/agents/main/sessions/75cf5f19-389f-42f5-b9d6-9517a593b259.jsonl",
+    "abortedLastRun": false
   }
 }

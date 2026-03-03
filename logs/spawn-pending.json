@@ -8,9 +8,12 @@
       "label": "mongke-1772559988",
       "source": "chat_direct",
       "created": "2026-03-03T12:46:28.280115",
-      "status": "spawned",
-      "spawned_at": "2026-03-03T12:49:58.272591"
+      "status": "completed",
+      "spawned_at": "2026-03-03T12:49:58.272591",
+      "session_key": "agent:main:subagent:823d2c61-eba7-4916-84f9-c22eedd3d0c7",
+      "run_id": "a2ca325d-7579-455f-90db-22f4f34a4849",
+      "completed_at": "2026-03-03T13:00:00.568102"
     }
   ],
-  "updated": 1772560452.584337
+  "updated": 1772560800.568226
 }
