@@ -1,7 +1,7 @@
 {
   "agent:main:main": {
     "sessionId": "envtest",
-    "updatedAt": 1772498517967,
+    "updatedAt": 1772499001381,
     "thinkingLevel": "low",
     "verboseLevel": "on",
     "systemSent": true,
@@ -128,8 +128,8 @@
       "provider": "webchat",
       "surface": "webchat",
       "chatType": "direct",
-      "label": "+19194133445",
-      "from": "+19194133445",
+      "label": "Danny id:+19194133445",
+      "from": "signal:+19194133445",
       "to": "+19194133445",
       "accountId": "default"
     },
@@ -389,12 +389,12 @@
     "memoryFlushAt": 1772490578952,
     "memoryFlushCompactionCount": 7,
     "compactionCount": 7,
-    "inputTokens": 1608386,
-    "outputTokens": 1550,
+    "inputTokens": 1613988,
+    "outputTokens": 4280,
     "cacheRead": 0,
     "cacheWrite": 0,
     "channel": "signal",
-    "totalTokens": 804498
+    "totalTokens": 807606
   },
   "agent:main:signal:group:broemhvnclgsz8treukbz6v3bedhdb0exajd+srp6oa=": {
     "chatType": "group",
