@@ -1,7 +1,7 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.0  
-**Last Updated**: 2026-03-01  
+**Version**: 1.1  
+**Last Updated**: 2026-03-03  
 **Status**: Active Production System  
 **Agent**: Kublai (Squad Lead / Router)  
 **Platform**: OpenClaw Gateway  
@@ -441,6 +441,17 @@ src/
 
 ## Change Log
 
+### 2026-03-03 - LLM-Powered Heartbeat Context Review
+- **Change**: Added LLM-powered context review to heartbeat daemon
+- **Reason**: Agent should autonomously review chat context for open tasks/blockers
+- **Scope**: New heartbeat task `kublai/context_review` runs every 12 minutes
+- **Files Modified**: `moltbot/tools/kurultai/agent_tasks.py`
+- **Features**:
+  - Collects chat context from last 60 minutes (session jsonl files)
+  - Uses cloud LLM (qwen3.5-plus via DashScope) for analysis
+  - Identifies open tasks, blockers, code generation needs
+  - Routes code tasks to temujin via task files (`temujin/tasks/llm-review-*.md`)
+  - **Escalates to Kublai** via Signal when tasks/blockers found
 
 ### 2026-03-02 - Kurultai Review System Implemented
 - **Change**: Automated hourly review with 6-hour rolling window analysis
@@ -706,6 +717,8 @@ src/
 | Hourly Reflections | Cron job | ✅ Active |
 | Neo4j | Connection | ✅ Operational |
 | Signal | Gateway | ✅ Connected |
+| Heartbeat Daemon | 5-min cycles | ✅ Running |
+| Context Review | 12-min LLM analysis | ✅ Active |
 
 ---
 
