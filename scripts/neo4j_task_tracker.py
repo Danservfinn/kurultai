@@ -193,13 +193,22 @@ class TaskTracker:
                     date(t.created) AS day,
                     t.status AS status,
                     t
-                RETURN 
+                WITH
                     day,
-                    sum(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
-                    sum(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
-                    sum(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running,
-                    count(t) AS total
-                GROUP BY day
+                    status,
+                    count(t) AS count
+                WITH
+                    day,
+                    sum(CASE WHEN status = 'completed' THEN count ELSE 0 END) AS completed,
+                    sum(CASE WHEN status = 'failed' THEN count ELSE 0 END) AS failed,
+                    sum(CASE WHEN status = 'running' THEN count ELSE 0 END) AS running,
+                    sum(count) AS total
+                RETURN
+                    day,
+                    completed,
+                    failed,
+                    running,
+                    total
                 ORDER BY day DESC
                 """, days=days)
             return [dict(r) for r in result]
@@ -210,13 +219,19 @@ class TaskTracker:
             result = session.run("""
                 MATCH (t:Task)
                 WHERE t.created > datetime() - duration({days: $days})
-                WITH t.agent AS agent, t
-                RETURN 
+                WITH 
+                    t.agent AS agent,
+                    t.status AS status,
+                    t
+                WITH 
                     agent,
                     count(t) AS total_tasks,
-                    sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS completed,
-                    round(100.0 * sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) / count(t), 1) AS success_rate
-                GROUP BY agent
+                    sum(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
+                RETURN 
+                    agent,
+                    total_tasks,
+                    completed,
+                    round(100.0 * completed / total_tasks, 1) AS success_rate
                 ORDER BY total_tasks DESC
                 """, days=days)
             return [dict(r) for r in result]
