@@ -38,6 +38,20 @@ def main():
         "Claude Code skills OpenClaw",
         "OpenClaw ClawHub community skills",
         "OpenClaw plugins extensions",
+        "Apple Neural Engine training maderix",
+        "ANE Apple Silicon ML training",
+    ]
+    
+    # Projects to monitor (track updates/stars)
+    projects_to_watch = [
+        {
+            "name": "ANE - Apple Neural Engine Training",
+            "url": "https://github.com/maderix/ANE",
+            "category": "research",
+            "description": "Training neural networks on Apple Neural Engine via private APIs",
+            "priority": "low",
+            "notes": "Research project, ~5-9% utilization, small models only (<200M params)",
+        },
     ]
     
     all_results = []
@@ -112,6 +126,17 @@ def main():
             "category": "tutorial",
             "description": "Business automation use cases with OpenClaw",
             "found_at": datetime.now().isoformat(),
+        },
+        # Watchlist projects
+        {
+            "title": "ANE - Apple Neural Engine Training (WATCHLIST)",
+            "url": "https://github.com/maderix/ANE",
+            "source": "github.com",
+            "category": "research",
+            "description": "Training neural networks on Apple Neural Engine via private APIs. Research project, ~5-9% utilization. Monitor for production readiness.",
+            "found_at": datetime.now().isoformat(),
+            "watchlist": True,
+            "priority": "low",
         },
     ]
     
