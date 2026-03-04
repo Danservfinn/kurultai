@@ -1,7 +1,7 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.1  
-**Last Updated**: 2026-03-03  
+**Version**: 1.2  
+**Last Updated**: 2026-03-04  
 **Status**: Active Production System  
 **Agent**: Kublai (Squad Lead / Router)  
 **Platform**: OpenClaw Gateway  
@@ -708,6 +708,42 @@ src/
 | `browser` | Browser automation | Dashboard access, testing |
 | `message` | Messaging | Signal, Telegram, etc. |
 
+### Coding Agent (Claude Code)
+
+**Primary coding tool for all Kurultai agents** (since 2026-03-04)
+
+| Component | Configuration |
+|-----------|---------------|
+| **Location** | `/opt/homebrew/bin/claude` (v2.1.66) |
+| **Auth** | OAuth (claude.ai Max subscription) |
+| **Config** | `~/.claude/settings.json` |
+| **Skills** | 76 installed (via claude-code-setup) |
+| **Plugins** | 13 installed (hookify, superpowers, playwright, etc.) |
+| **MCP Servers** | chrome-devtools, railway |
+
+**Usage Pattern:**
+```bash
+# Quick one-shot task
+bash pty:true command:"cd ~/project && claude -p 'Your task here'"
+
+# Background task with monitoring
+bash pty:true background:true workdir:~/project command:"claude -p 'Build feature X'"
+# Returns sessionId for process tool monitoring
+```
+
+**When to Use:**
+- ✅ Building new features or apps
+- ✅ Reviewing PRs
+- ✅ Refactoring large codebases
+- ✅ Iterative coding needing file exploration
+- ✅ Writing tests (TDD)
+- ✅ Debugging complex issues
+
+**NOT For:**
+- ❌ Simple one-liner fixes (use edit tool)
+- ❌ Reading code (use read tool)
+- ❌ Work in ~/clawd workspace
+
 ### Active Monitoring
 
 | System | Check | Status |
@@ -800,4 +836,77 @@ Week 2-3:
   - Concurrency limits: 5 per agent, 20 system-wide
   - Reflection now includes proactive spawning check
   - Each agent reports sub-agents spawned each hour
+
+---
+
+## 2026-03-04 - Claude Code Integration (Complete System Migration)
+
+**COMPLETE SYSTEM MIGRATION TO CLAUDE CODE**
+
+- **Change**: All Kurultai agents now use Claude Code (not Gemini CLI) for coding tasks and hourly reflections
+- **Reason**: Superior coding capabilities, 76 specialized skills, 13 plugins, better tool integration
+- **Scope**: System-wide migration affecting all 6 agents + reflection system
+
+**Components Updated:**
+
+1. **TOOLS.md (All 6 Agents)**
+   - Kublai, Temujin, Mongke, Chagatai, Jochi, Ogedei
+   - Replaced Gemini CLI references with Claude Code patterns
+   - Added Claude Code configuration (location, auth, skills, plugins)
+   - Documented usage patterns (pty:true, workdir, background mode)
+
+2. **kurultai-reflection Skill**
+   - **File**: `/Users/kublai/kurultai-reflection-skill/kurultai-reflection/SKILL.md`
+   - **Step 2**: Changed from `gemini -y -m gemini-3.1-pro-preview` to `bash pty:true claude -p`
+   - Updated memory file reference: GEMINI.md → MEMORY.md/ARCHITECTURE.md
+   - Repackaged and reinstalled skill
+
+3. **Hourly Reflection Cron Job**
+   - **Cron ID**: `7dfa0005-ea8a-4457-aa78-16ea26a8a3a5`
+   - Updated payload with Claude Code instructions
+   - All 5 agent reflections now use Claude Code
+
+4. **Heartbeat-Watchdog Skill**
+   - **File**: `skills/heartbeat-watchdog/SKILL.md` (created)
+   - Uses local LLM (lmstudio/qwen3.5-9b-mlx) for gateway health analysis
+   - Intelligent restart decisions with confidence scoring
+   - Cron updated to use local model
+
+**Claude Code Configuration:**
+- **Version**: 2.1.66
+- **Auth**: OAuth (claude.ai Max subscription)
+- **Skills**: 76 installed (senior-frontend, senior-backend, horde-review, etc.)
+- **Plugins**: 13 installed (hookify, superpowers, playwright, supabase, vercel, etc.)
+- **Setup**: Installed via Danservfinn/claude-code-setup-v2
+
+**Files Modified:**
+- `TOOLS.md` (Kublai + all 5 agents)
+- `kurultai-reflection-skill/kurultai-reflection/SKILL.md`
+- `~/.openclaw/cron/jobs.json` (hourly reflection + heartbeat-watchdog)
+- `skills/heartbeat-watchdog/SKILL.md` (created)
+- `~/.openclaw/openclaw.json` (added lmstudio model to allowed models)
+
+**Benefits:**
+- Unified coding tool across all agents
+- 76 specialized skills for various domains
+- 13 plugins for enhanced capabilities
+- Better tool integration (Playwright, Supabase, Vercel, etc.)
+- Local LLM option for heartbeat monitoring (cost reduction, privacy)
+
+---
+
+## 2026-03-04 - LLM-Powered Heartbeat Watchdog
+
+- **Change**: Heartbeat-watchdog now uses local LLM for intelligent gateway health analysis
+- **Reason**: Move beyond simple process monitoring to intelligent diagnostics
+- **Skill Created**: `skills/heartbeat-watchdog/SKILL.md`
+- **Model**: lmstudio/qwen3.5-9b-mlx (local, via LM Studio)
+- **Features**:
+  - Gathers metrics (PID, CPU, MEM, endpoint health, logs)
+  - Analyzes with local LLM
+  - Makes intelligent restart decisions (NONE/WARN/RESTART/ALERT)
+  - Confidence scoring (0-100%)
+  - Contextual diagnostic reports
+- **Cron Updated**: Model changed to `lmstudio/qwen3.5-9b-mlx`
+- **Config**: Added to `~/.openclaw/openclaw.json` allowed models
 
