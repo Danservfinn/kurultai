@@ -31,13 +31,20 @@ def load_module(name, path):
     spec.loader.exec_module(module)
     return module
 
-# Load modules
-task_router = load_module('task_router', f'{SCRIPTS_DIR}/task-router.py')
+# Load modules - use Kublai's intelligent routing
+kublai_router = load_module('kublai_router', f'{SCRIPTS_DIR}/kublai-route.py')
 agent_handler = load_module('agent_handler', f'{SCRIPTS_DIR}/agent-task-handler.py')
 
 def classify_task(task_text):
-    """Classify task using unified router"""
-    return task_router.classify_task(task_text)
+    """Classify task using Kublai's intelligent routing"""
+    routing = kublai_router.kublai_route_task(task_text)
+    return {
+        "destination": routing["destination"],
+        "best_agent": routing["best_agent"],
+        "best_score": routing["best_score"],
+        "complexity": routing["complexity"],
+        "reasoning": routing["reasoning"]
+    }
 
 def execute_with_agent(agent_name, task_text, priority="normal"):
     """Execute task directly with agent (no queue wait)"""

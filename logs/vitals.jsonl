@@ -1,0 +1,1 @@
+{"timestamp": "2026-03-03T23:37:23.563318", "gateway_status": "running", "rate_limit_active": true, "mem_percent": 82.5, "disk_percent": 56.031205490103176, "stuck_tasks": 0, "dead_letters": 0, "agent_queues": {"main": 0, "mongke": 0, "chagatai": 0, "temujin": 80, "jochi": 0, "ogedei": 0}}

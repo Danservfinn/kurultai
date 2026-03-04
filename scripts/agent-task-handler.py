@@ -116,37 +116,54 @@ def spawn_subagent(agent_name, task, subagent_task):
     return spawn_request['label']
 
 def execute_task_with_llm(agent_name, task_text, config):
-    """Execute task using LLM (local or cloud) - SIMPLIFIED"""
+    """Execute task by spawning a subagent using the agent's configured model"""
     import sys
-    sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+    import json
+    import time
+    import os
     
     try:
-        from local_llm_router import run_with_routing
+        model = config.get('model', 'qwen3.5-plus')
         
-        # Build prompt with agent context
-        prompt = f"""You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.
-
-**Capabilities:** {', '.join(config.get('capabilities', []))}
-
-**Task:** {task_text}
-
-Execute this task. Provide results."""
+        spawn_request = {
+            "agent": agent_name,
+            "model": model,
+            "task": f"You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.\nCapabilities: {', '.join(config.get('capabilities', []))}\n\nTask: {task_text}",
+            "priority": "normal",
+            "label": f"{agent_name}-exec-{int(time.time())}",
+            "source": "agent_execution",
+            "destination": "subagent",
+            "status": "ready"
+        }
         
-        # Run with local LLM routing
-        result = run_with_routing(
-            agent=agent_name,
-            task_name="task_execution",
-            prompt=prompt,
-            force_cloud=False
-        )
+        # Add to spawn queue
+        os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
         
-        return result
-    except Exception as e:
-        # Fallback: just mark as completed with placeholder
+        existing = []
+        if os.path.exists(SPAWN_QUEUE):
+            try:
+                with open(SPAWN_QUEUE, 'r') as f:
+                    data = json.load(f)
+                    existing = data.get('spawns', [])
+            except:
+                pass
+        
+        existing.append(spawn_request)
+        
+        with open(SPAWN_QUEUE, 'w') as f:
+            json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
+            
         return {
             "success": True,
-            "content": f"Task executed by {agent_name}: {task_text[:100]}",
-            "model": "fallback",
+            "content": f"Task delegated to OpenClaw spawn queue under label {spawn_request['label']} using model {model}.",
+            "model": model,
+            "latency_ms": 0
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "model": "failed",
             "latency_ms": 0
         }
 

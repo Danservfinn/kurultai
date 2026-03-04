@@ -27,11 +27,12 @@ if [ ! -f "$SPAWN_QUEUE" ]; then
     exit 0
 fi
 
-# Read JSON and process spawns
-python3 << 'PYTHON_SCRIPT'
+# Write python script to a file
+cat > /tmp/spawn_consumer_python.py << 'PYTHON_SCRIPT'
 import json
 import os
 from datetime import datetime
+import subprocess
 
 SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
 LOG_FILE = "/Users/kublai/.openclaw/agents/main/logs/spawn-consumer.log"
@@ -60,8 +61,6 @@ def add_to_dead_letter(spawn):
         json.dump({'failed': dead, 'updated': datetime.now().timestamp()}, f, indent=2)
     log(f"  → Dead letter: {spawn.get('label')} (retries exhausted)")
 
-import os
-import subprocess
 report_only = os.getenv('REPORT_ONLY_ON_ACTIVITY', 'true') == 'true'
 
 try:
@@ -121,7 +120,7 @@ except Exception as e:
         return 'unknown'
 
 # Check status of running tasks and update completed ones
-from datetime import datetime, timedelta
+from datetime import timedelta
 cutoff = datetime.now() - timedelta(minutes=30)
 
 for s in spawns:
@@ -173,54 +172,73 @@ for s in ready:
     priority = s.get('priority', 'normal')
     source = s.get('source', 'unknown')
     
-    # Use smart router to classify and route
-    try:
-        # Import smart router classification
-        import sys
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from task_router import classify_task, route_to_agent, route_to_subagent
+    # Bypass smart router for execution tasks that are already designated
+    if source == "agent_execution":
+        agent = s.get('agent', 'subagent')
+        model = s.get('model', 'qwen3.5-plus')
+        mode = s.get('mode', 'run')
+        log(f"🚀 Launching OpenClaw execution for {label} ({agent} using {model})")
         
-        classification = classify_task(task_text)
-        destination = classification['destination']
-        
-        log(f"ROUTING: {label} → {destination} ({classification['complexity']})")
-        
-        if destination == 'subagent':
-            # Direct subagent spawn (simple tasks)
+        # Execute directly via subprocess
+        try:
+            cmd = ["openclaw", "execute", task_text, f"--agent={agent}", f"--model={model}", f"--label={label}"]
+            with open(LOG_FILE, "a") as logfile:
+                subprocess.Popen(cmd, stdout=logfile, stderr=subprocess.STDOUT)
+        except Exception as e:
+            log(f"Failed to launch openclaw: {e}")
+            
+        s['status'] = 'running'
+        s['last_spawned'] = datetime.now().isoformat()
+        activity_detected = True
+    else:
+        # Use smart router to classify and route
+        try:
+            # Import smart router classification
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from task_router import classify_task, route_to_agent, route_to_subagent
+            
+            classification = classify_task(task_text)
+            destination = classification['destination']
+            
+            log(f"ROUTING: {label} → {destination} ({classification['complexity']})")
+            
+            if destination == 'subagent':
+                # Direct subagent spawn (simple tasks)
+                agent = s.get('agent', 'subagent')
+                model = s.get('model', 'qwen3.5-plus')
+                mode = s.get('mode', 'run')
+                
+                log(f"SPAWN: subagent - {label}")
+                print(f"SPAWN_CMD|{agent}|{model}|{label}|{task_text}|{mode}")
+                s['status'] = 'running'
+                s['last_spawned'] = datetime.now().isoformat()
+                activity_detected = True
+            else:
+                # Route to full agent queue
+                route_result = route_to_agent(destination, task_text, priority)
+                if route_result.get('success'):
+                    log(f"✓ Routed to {destination}: {route_result.get('task_file')}")
+                    s['status'] = 'routed'
+                    s['routed_to'] = destination
+                    s['routed_at'] = datetime.now().isoformat()
+                    activity_detected = True
+                else:
+                    log(f"✗ Routing failed: {route_result.get('error')}")
+                    s['status'] = 'failed'
+                    s['error'] = route_result.get('error')
+            
+        except Exception as e:
+            log(f"✗ Routing error: {e}")
+            # Fallback to direct subagent spawn
             agent = s.get('agent', 'subagent')
             model = s.get('model', 'qwen3.5-plus')
             mode = s.get('mode', 'run')
-            
-            log(f"SPAWN: subagent - {label}")
+            log(f"FALLBACK: {label} → subagent")
             print(f"SPAWN_CMD|{agent}|{model}|{label}|{task_text}|{mode}")
             s['status'] = 'running'
             s['last_spawned'] = datetime.now().isoformat()
             activity_detected = True
-        else:
-            # Route to full agent queue
-            route_result = route_to_agent(destination, task_text, priority)
-            if route_result.get('success'):
-                log(f"✓ Routed to {destination}: {route_result.get('task_file')}")
-                s['status'] = 'routed'
-                s['routed_to'] = destination
-                s['routed_at'] = datetime.now().isoformat()
-                activity_detected = True
-            else:
-                log(f"✗ Routing failed: {route_result.get('error')}")
-                s['status'] = 'failed'
-                s['error'] = route_result.get('error')
-        
-    except Exception as e:
-        log(f"✗ Routing error: {e}")
-        # Fallback to direct subagent spawn
-        agent = s.get('agent', 'subagent')
-        model = s.get('model', 'qwen3.5-plus')
-        mode = s.get('mode', 'run')
-        log(f"FALLBACK: {label} → subagent")
-        print(f"SPAWN_CMD|{agent}|{model}|{label}|{task_text}|{mode}")
-        s['status'] = 'running'
-        s['last_spawned'] = datetime.now().isoformat()
-        activity_detected = True
 
 # Handle failed spawns (retry logic)
 failed = [s for s in spawns if s.get('status') == 'failed']
@@ -295,3 +313,4 @@ if activity_detected:
 elif not report_only:
     log(f"Cycle complete: {len(ready)} spawns, {retries_count} retries, {len(spawns)} remaining")
 PYTHON_SCRIPT
+python3 /tmp/spawn_consumer_python.py

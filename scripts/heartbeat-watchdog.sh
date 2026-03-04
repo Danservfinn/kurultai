@@ -3,7 +3,7 @@
 # Run via cron: */5 * * * * /Users/kublai/.openclaw/agents/main/scripts/heartbeat-watchdog.sh
 
 LOG_FILE="/Users/kublai/.openclaw/agents/main/logs/watchdog.log"
-DAEMON_NAME="node.*openclaw.*gateway"
+DAEMON_NAME="openclaw-gateway"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"

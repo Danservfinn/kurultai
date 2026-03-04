@@ -57,18 +57,16 @@ EOF
     echo "[$(date)] [$AGENT] Reflection complete → $MEMORY_DIR/$DATE.md"
 }
 
-# Run all 6 agents concurrently in background
-echo "[$(date)] Launching ${#AGENTS[@]} agents concurrently..."
+# Run all 6 agents sequentially in a cascade
+echo "[$(date)] Launching ${#AGENTS[@]} agents sequentially (cascade)..."
 
 for agent in "${AGENTS[@]}"; do
-    run_agent_reflection "$agent" &
+    run_agent_reflection "$agent"
+    # Small pause between agents to prevent API rate limits
+    sleep 5
 done
 
-# Wait for all agents to complete
-echo "[$(date)] Waiting for all agents to complete..."
-wait
-
-echo "[$(date)] All 6 agents completed their reflections"
+echo "[$(date)] All 6 agents completed their reflections sequentially"
 echo "================================================================"
 
 # Generate Kublai summary
