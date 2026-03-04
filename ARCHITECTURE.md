@@ -374,6 +374,83 @@ src/
 - ✅ Architecture accuracy verification
 - ✅ File change detection (last hour)
 - ✅ Configuration change detection
+
+### 4. Heartbeat-Driven Task Execution
+
+**Purpose**: Execute agent tasks within 5 minutes of creation (replaces task-consumer + spawn-consumer pipeline)  
+**Status**: ✅ Active (implemented 2026-03-04)  
+**Schedule**: Every 5 minutes (heartbeat-watchdog cron)
+
+**Components**:
+- **heartbeat-task-executor.py** (`scripts/heartbeat-task-executor.py`):
+  - Scans `agent/*/tasks/` for pending `*.md` files
+  - Priority order: `high-*` > `normal-*` > `low-*` (FIFO within each)
+  - Marks tasks as `.executing` during execution (file lock)
+  - Executes via `openclaw agent --agent <id> --message <task>`
+  - Timeout: 4 minutes per task
+  - Marks as `.completed.done` on finish/failure
+
+**Flow**:
+```
+Heartbeat fires (every 5 min)
+        ↓
+heartbeat-task-executor.py scans task directories
+        ↓
+IF pending tasks exist:
+  - Select highest priority
+  - Mark as .executing
+  - Execute via OpenClaw spawn
+  - Write results to task file
+  - Mark as .completed.done
+        ↓
+Report in heartbeat: tasks_completed: N
+```
+
+**Advantages over previous system**:
+| Old (task-consumer + spawn-consumer) | New (heartbeat-driven) |
+|-------------------------------------|------------------------|
+| Two separate cron jobs (race conditions) | Single trigger point |
+| Tasks sat unexecuted for hours | Tasks execute within 5 min |
+| Complex queue management | Simple file-based locking |
+| Orphaned tasks common | Deterministic execution |
+
+**Files**:
+- `scripts/heartbeat-task-executor.py` - Main execution script
+- `agent/{agent}/tasks/*.md` - Task files
+- `AGENTS.md` - Heartbeat Task Execution Protocol
+
+**Legacy Scripts** (deprecated but kept for compatibility):
+- `scripts/task-consumer.sh` - No longer primary execution path
+- `scripts/spawn-consumer.sh` - Still used for non-heartbeat spawns
+
+### 5. Accountability System (Kurultai Reflection Enhancements)
+
+**Purpose**: Ensure agents follow commitments and issues get resolved  
+**Status**: ✅ Active (implemented 2026-03-04)  
+**Location**: `~/.codex/skills/kurultai-reflection/SKILL.md`
+
+**Components**:
+
+1. **Persistent Issue Tracking** (Step 2.5):
+   - Script: `scripts/persistent-issues.py`
+   - Tracks issues across hourly reflections
+   - Auto-escalates at 3 consecutive reports
+   - Creates CRITICAL tasks for responsible agent
+
+2. **Rule Compliance Check** (Step 3.5):
+   - Verifies each agent followed their WHEN/THEN rules
+   - Logs violations to agent memory files
+   - Includes violations in reflection report
+
+3. **Idle Agent Task Assignment** (Step 4.5):
+   - Auto-assigns tasks to agents idle >4 hours
+   - Sources: MEMORY.md blocked items → cron errors → goal backlog
+   - Creates task files in agent directories
+
+**Files**:
+- `scripts/persistent-issues.py` - Issue tracking and escalation
+- `logs/persistent-issues.json` - Persistent issue database
+- `~/.codex/skills/kurultai-reflection/SKILL.md` - Enhanced with Steps 2.5, 3.5, 4.5
 - ✅ Protocol compliance checklist
 - ✅ Action required assessment
 
@@ -440,6 +517,47 @@ src/
 ---
 
 ## Change Log
+
+### 2026-03-04 - Heartbeat-Driven Task Execution + Accountability System
+
+**Change**: Implemented heartbeat-driven task execution and full accountability system
+
+**Reason**: Tasks were sitting unexecuted for hours; no enforcement of agent commitments
+
+**Scope**: Two major system additions:
+
+1. **Heartbeat Task Execution** (replaces task-consumer + spawn-consumer pipeline):
+   - New script: `scripts/heartbeat-task-executor.py` (5.5KB)
+   - Executes tasks on every heartbeat (5 min cycle)
+   - Priority ordering: high > normal > low
+   - File-based locking (.executing → .completed.done)
+   - Timeout: 4 minutes per task
+   - Result: Tasks execute within 5 min (was: hours)
+
+2. **Accountability System** (kurultai-reflection enhancements):
+   - New script: `scripts/persistent-issues.py` (6.5KB)
+   - Step 2.5: Persistent issue tracking (escalates at 3 reports)
+   - Step 3.5: Rule compliance verification
+   - Step 4.5: Auto task assignment for idle agents (>4 hours)
+   - Result: Issues resolved faster, agents follow commitments
+
+**Files Modified**:
+- `ARCHITECTURE.md` - Added Sections 4 & 5 (new operational systems)
+- `AGENTS.md` - Added Heartbeat Task Execution Protocol
+- `~/.codex/skills/kurultai-reflection/SKILL.md` - Steps 2.5, 3.5, 4.5
+
+**Files Created**:
+- `scripts/heartbeat-task-executor.py`
+- `scripts/persistent-issues.py`
+- `logs/persistent-issues.json`
+
+**Legacy** (deprecated but kept for compatibility):
+- `scripts/task-consumer.sh` - No longer primary execution path
+- `scripts/spawn-consumer.sh` - Still used for non-heartbeat spawns
+
+**Testing**: First full cycle at 2026-03-04 12:00 PM reflection
+
+---
 
 ### 2026-03-03 - LLM-Powered Heartbeat Context Review
 - **Change**: Added LLM-powered context review to heartbeat daemon
