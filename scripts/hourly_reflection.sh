@@ -95,6 +95,12 @@ echo "================================================================"
 echo "[$(date)] Running Kublai Actions (kurultai trigger)..."
 python3 /Users/kublai/.openclaw/agents/main/scripts/kublai-actions.py --trigger kurultai 2>/dev/null || true
 
+# ============================================================
+# KUBLAI INITIATIVE: "What do I want to do next?"
+# ============================================================
+echo "[$(date)] Running Kublai Initiative (self-directed action)..."
+python3 /Users/kublai/.openclaw/agents/main/scripts/kublai-initiative.py 2>/dev/null || true
+
 # List pending feedback for Kublai
 echo ""
 echo "Pending Feedback for Kublai:"
