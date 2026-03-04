@@ -189,7 +189,7 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2,
     if include_heartbeat_review:
         try:
             from heartbeat_task_analyzer import generate_review
-            heartbeat_review = generate_review(agent)
+            heartbeat_review = generate_review(agent, hours=hours)
         except Exception as e:
             heartbeat_review = f"*Heartbeat task review unavailable: {e}*\n"
 
@@ -207,9 +207,8 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2,
 
 ---
 
-## Your Metrics This Period
 """
-    
+
     # Add chat review if available
     if chat_review:
         template += f"""
@@ -256,6 +255,21 @@ Reflect on your own tasks:
 - Did you have the right tools/context to succeed?
 
 **Your assessment:**
+```
+[Agent responds here]
+```
+
+---
+
+### 1b. Infrastructure Awareness (from Heartbeat Data)
+
+Review the Infrastructure Pulse above and consider:
+- Are infrastructure trends affecting your task performance?
+- If anomalies were detected, do they explain any failures you experienced?
+- If YOUR agent is flagged as stalled or degraded, explain why and propose a fix.
+- Were your tasks dispatched and completed on schedule by the tick cycle?
+
+**Your infrastructure assessment:**
 ```
 [Agent responds here]
 ```
