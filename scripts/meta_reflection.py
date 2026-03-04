@@ -28,6 +28,102 @@ AGENT_ROLES = {
     "ogedei": "Ops (monitoring, health checks, failover)"
 }
 
+AGENT_MODELS = {
+    "kublai": "bailian/qwen3.5-plus",
+    "mongke": "bailian/MiniMax-M2.5",
+    "chagatai": "bailian/kimi-k2.5",
+    "temujin": "bailian/MiniMax-M2.5",
+    "jochi": "bailian/qwen3.5-plus",
+    "ogedei": "bailian/qwen3.5-plus"
+}
+
+
+def get_system_context():
+    """Generate compact system context from OpenClaw config for agent awareness."""
+    import subprocess
+
+    ctx = {}
+
+    # Gateway health
+    try:
+        result = subprocess.run(
+            ["openclaw", "gateway", "health"],
+            capture_output=True, text=True, timeout=10
+        )
+        ctx["gateway_health"] = result.stdout.strip() if result.returncode == 0 else "UNREACHABLE"
+    except Exception:
+        ctx["gateway_health"] = "UNKNOWN"
+
+    # Cron job status
+    try:
+        result = subprocess.run(
+            ["openclaw", "cron", "list"],
+            capture_output=True, text=True, timeout=10
+        )
+        lines = [l for l in result.stdout.strip().split("\n") if l and not l.startswith("ID")]
+        cron_summary = []
+        for line in lines:
+            parts = line.split()
+            if len(parts) >= 7:
+                name = " ".join(parts[1:-5])
+                status = parts[-3] if len(parts) > 3 else "?"
+                cron_summary.append(f"  - {name}: {status}")
+        ctx["cron_jobs"] = "\n".join(cron_summary) if cron_summary else "No cron jobs"
+    except Exception:
+        ctx["cron_jobs"] = "Unavailable"
+
+    # Agent session usage
+    try:
+        result = subprocess.run(
+            ["openclaw", "gateway", "call", "status", "--json"],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            agent_status = []
+            for a in data.get("sessions", {}).get("byAgent", []):
+                agent_id = a.get("agentId", "?")
+                count = a.get("count", 0)
+                recent = a.get("recent", [{}])[0] if a.get("recent") else {}
+                pct = recent.get("percentUsed", 0)
+                model = recent.get("model", "?")
+                agent_status.append(f"  - {agent_id}: {count} sessions, {pct}% ctx used, model={model}")
+            ctx["agent_sessions"] = "\n".join(agent_status)
+        else:
+            ctx["agent_sessions"] = "Unavailable"
+    except Exception:
+        ctx["agent_sessions"] = "Unavailable"
+
+    return ctx
+
+
+def format_system_context(ctx):
+    """Format system context as a compact markdown block for agent reflection."""
+    return f"""## System Context (OpenClaw)
+
+**Gateway:** {ctx.get('gateway_health', 'UNKNOWN')}
+
+**Agents:**
+| ID | Role | Model |
+|----|------|-------|
+| kublai | Squad Lead | bailian/qwen3.5-plus |
+| mongke | Researcher | bailian/MiniMax-M2.5 |
+| chagatai | Writer/Ops | bailian/kimi-k2.5 |
+| temujin | Developer | bailian/MiniMax-M2.5 |
+| jochi | Analyst | bailian/qwen3.5-plus |
+| ogedei | Ops | bailian/qwen3.5-plus |
+
+**Session Usage:**
+{ctx.get('agent_sessions', 'Unavailable')}
+
+**Cron Jobs:**
+{ctx.get('cron_jobs', 'Unavailable')}
+
+**Signal:** Bot +15165643945, Group: Kublai Klub
+**Config:** ~/.openclaw/openclaw.json
+**Workspaces:** ~/.openclaw/agents/{{id}}/
+"""
+
 def get_agent_metrics(agent, hours=1):
     """Get metrics for an agent"""
     tracker = get_tracker()
@@ -70,7 +166,15 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2,
     """Generate meta-reflection prompt for an agent"""
     metrics = get_agent_metrics(agent, hours)
     role = AGENT_ROLES.get(agent, "Unknown")
-    
+    model = AGENT_MODELS.get(agent, "Unknown")
+
+    # Gather live system context
+    try:
+        sys_ctx = get_system_context()
+        system_context_block = format_system_context(sys_ctx)
+    except Exception as e:
+        system_context_block = f"*System context unavailable: {e}*\n"
+
     # Optionally include chat log review
     chat_review = ""
     if include_chat_review:
@@ -79,7 +183,7 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2,
             chat_review = generate_chat_review(chat_hours)
         except Exception as e:
             chat_review = f"*Chat log review unavailable: {e}*\n"
-    
+
     # Optionally include heartbeat task review
     heartbeat_review = ""
     if include_heartbeat_review:
@@ -88,13 +192,18 @@ def generate_reflection(agent, hours=1, include_chat_review=False, chat_hours=2,
             heartbeat_review = generate_review(agent)
         except Exception as e:
             heartbeat_review = f"*Heartbeat task review unavailable: {e}*\n"
-    
+
     template = f"""# Agent Meta-Reflection: Task & Spawning System Evaluation
 
-**Agent:** {agent.capitalize()}  
-**Role:** {role}  
-**Reflection Period:** Last {hours} hour(s)  
+**Agent:** {agent.capitalize()}
+**Role:** {role}
+**Model:** {model}
+**Reflection Period:** Last {hours} hour(s)
 **Timestamp:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+---
+
+{system_context_block}
 
 ---
 
