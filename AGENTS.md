@@ -36,3 +36,34 @@ Then ACT — no waiting, no asking.
 - **Primary:** qwen3.5-plus (1M context)
 - **Fallback:** MiniMax-M2.5
 - **Heartbeat:** Every 30 minutes
+
+## Heartbeat Task Execution Protocol
+
+**On every heartbeat (every 5 minutes via heartbeat-watchdog cron):**
+
+1. **Check for pending tasks** in `agent/{agent}/tasks/`
+   - Pending = `*.md` files NOT containing `.executing`, `.completed`, or `.done`
+   
+2. **IF tasks exist:**
+   - Select highest priority: `high-*` > `normal-*` > `low-*` (FIFO within each)
+   - Mark task as `.executing` (file lock)
+   - Execute task using available tools
+   - Write results to task file
+   - Mark as `.completed.done.md`
+   - Report in heartbeat: `tasks_completed: 1`
+
+3. **IF no tasks:**
+   - Report: `tasks_completed: 0, status: idle`
+   - Apply idle rules (check MEMORY.md blocked items, cron errors, goals)
+
+**Script:** `scripts/heartbeat-task-executor.py`
+- Runs automatically during heartbeat-watchdog cycle
+- Timeout: 4 minutes per task
+- Max: 1 task per agent per cycle
+
+**Example heartbeat response:**
+```
+status: running
+tasks_completed: 1
+task_result: temujin:high-1772640000.md → completed (TypeScript fixed)
+```
