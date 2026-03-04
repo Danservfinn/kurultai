@@ -39,7 +39,18 @@ Then ACT — no waiting, no asking.
 
 ## Heartbeat Task Execution Protocol
 
-**On every heartbeat (every 5 minutes via heartbeat-watchdog cron):**
+**Task Execution Triggers (whichever fires first):**
+
+1. **Immediate Execution** (within 10 seconds via task-watcher daemon):
+   - `task-watcher.py` runs continuously in background
+   - Polls every 10 seconds for new task files
+   - Executes immediately on detection
+   - State tracked in `logs/task-watcher-state.json`
+
+2. **Heartbeat Execution** (every 5 minutes via heartbeat-watchdog):
+   - Falls back if task-watcher misses a task
+   - Executes any remaining pending tasks
+   - Reports in heartbeat response
 
 1. **Check for pending tasks** in `agent/{agent}/tasks/`
    - Pending = `*.md` files NOT containing `.executing`, `.completed`, or `.done`

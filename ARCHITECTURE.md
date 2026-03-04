@@ -375,9 +375,46 @@ src/
 - ✅ File change detection (last hour)
 - ✅ Configuration change detection
 
-### 4. Heartbeat-Driven Task Execution
+### 4. Immediate Task Execution (task-watcher daemon)
 
-**Purpose**: Execute agent tasks within 5 minutes of creation (replaces task-consumer + spawn-consumer pipeline)  
+**Purpose**: Execute tasks within 10 seconds of creation (not waiting for heartbeat)  
+**Status**: ✅ Active (implemented 2026-03-04 11:30 AM)  
+**Schedule**: Continuous (polls every 10 seconds)
+
+**Components**:
+- **task-watcher.py** (`scripts/task-watcher.py`):
+  - Runs as launchd daemon (`com.kurultai.task-watcher`)
+  - Polls `agent/*/tasks/` every 10 seconds
+  - Detects new `*.md` files (not in state file)
+  - Executes immediately via `openclaw agent`
+  - Tracks executed tasks in `logs/task-watcher-state.json`
+  - Timeout: 4 minutes per task
+
+**Flow**:
+```
+Task file created (any source)
+        ↓
+task-watcher detects within 10s
+        ↓
+IF task not in state file (genuinely new):
+  - Mark as .executing
+  - Execute immediately
+  - Mark as .completed.done
+  - Record in state file
+        ↓
+Next heartbeat: Report execution
+```
+
+**Fallback**: heartbeat-task-executor.py still runs every 5 minutes to catch:
+- Any tasks task-watcher missed
+- Tasks created while daemon was restarting
+- Cleanup of stale .executing files
+
+---
+
+### 5. Heartbeat-Driven Task Execution (Fallback)
+
+**Purpose**: Fallback task execution if task-watcher misses tasks  
 **Status**: ✅ Active (implemented 2026-03-04)  
 **Schedule**: Every 5 minutes (heartbeat-watchdog cron)
 
@@ -423,7 +460,7 @@ Report in heartbeat: tasks_completed: N
 - `scripts/task-consumer.sh` - No longer primary execution path
 - `scripts/spawn-consumer.sh` - Still used for non-heartbeat spawns
 
-### 5. Accountability System (Kurultai Reflection Enhancements)
+### 6. Accountability System (Kurultai Reflection Enhancements)
 
 **Purpose**: Ensure agents follow commitments and issues get resolved  
 **Status**: ✅ Active (implemented 2026-03-04)  
@@ -518,23 +555,30 @@ Report in heartbeat: tasks_completed: N
 
 ## Change Log
 
-### 2026-03-04 - Heartbeat-Driven Task Execution + Accountability System
+### 2026-03-04 - Immediate Task Execution + Accountability System
 
-**Change**: Implemented heartbeat-driven task execution and full accountability system
+**Change**: Implemented immediate task execution (10s latency) and full accountability system
 
-**Reason**: Tasks were sitting unexecuted for hours; no enforcement of agent commitments
+**Reason**: Tasks were sitting unexecuted for hours; heartbeat cycle added up to 5 min delay
 
-**Scope**: Two major system additions:
+**Scope**: Three major system additions:
 
-1. **Heartbeat Task Execution** (replaces task-consumer + spawn-consumer pipeline):
+1. **Immediate Task Execution** (task-watcher daemon):
+   - New script: `scripts/task-watcher.py` (7.7KB)
+   - Launchd daemon: `com.kurultai.task-watcher`
+   - Polls every 10 seconds for new tasks
+   - Executes immediately on detection
+   - State tracking in `logs/task-watcher-state.json`
+   - Result: Tasks execute within 10s (was: up to 5 min)
+
+2. **Heartbeat Task Execution** (fallback):
    - New script: `scripts/heartbeat-task-executor.py` (5.5KB)
-   - Executes tasks on every heartbeat (5 min cycle)
+   - Runs every 5 minutes with heartbeat-watchdog
+   - Catches any tasks task-watcher missed
    - Priority ordering: high > normal > low
    - File-based locking (.executing → .completed.done)
-   - Timeout: 4 minutes per task
-   - Result: Tasks execute within 5 min (was: hours)
 
-2. **Accountability System** (kurultai-reflection enhancements):
+3. **Accountability System** (kurultai-reflection enhancements):
    - New script: `scripts/persistent-issues.py` (6.5KB)
    - Step 2.5: Persistent issue tracking (escalates at 3 reports)
    - Step 3.5: Rule compliance verification
@@ -542,14 +586,17 @@ Report in heartbeat: tasks_completed: N
    - Result: Issues resolved faster, agents follow commitments
 
 **Files Modified**:
-- `ARCHITECTURE.md` - Added Sections 4 & 5 (new operational systems)
-- `AGENTS.md` - Added Heartbeat Task Execution Protocol
+- `ARCHITECTURE.md` - Added Sections 4, 5, 6 (new operational systems)
+- `AGENTS.md` - Added Immediate + Heartbeat Task Execution Protocol
 - `~/.codex/skills/kurultai-reflection/SKILL.md` - Steps 2.5, 3.5, 4.5
 
 **Files Created**:
-- `scripts/heartbeat-task-executor.py`
-- `scripts/persistent-issues.py`
-- `logs/persistent-issues.json`
+- `scripts/task-watcher.py` (7.7KB) - Immediate task execution daemon
+- `scripts/heartbeat-task-executor.py` (5.5KB) - Heartbeat fallback execution
+- `scripts/persistent-issues.py` (6.5KB) - Issue tracking and escalation
+- `logs/persistent-issues.json` - Persistent issue database
+- `logs/task-watcher-state.json` - Executed task state (auto-created)
+- `~/Library/LaunchAgents/com.kurultai.task-watcher.plist` - Daemon config
 
 **Legacy** (deprecated but kept for compatibility):
 - `scripts/task-consumer.sh` - No longer primary execution path
