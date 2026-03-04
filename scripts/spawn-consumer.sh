@@ -185,11 +185,18 @@ for s in ready:
         
         # Execute directly via subprocess
         try:
-            cmd = ["/opt/homebrew/bin/openclaw", "execute", task_text, f"--agent={agent}", f"--model={model}", f"--label={label}"]
+            cmd = ["/opt/homebrew/bin/openclaw", "agent", "--agent", agent, "--message", task_text, "--thinking", "high"]
+            env = os.environ.copy()
+            env["PATH"] = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            env["NODE_PATH"] = "/opt/homebrew/lib/node_modules"
+            env["OPENCLAW_STATE_DIR"] = "/Users/kublai/.openclaw"
             with open(LOG_FILE, "a") as logfile:
-                subprocess.Popen(cmd, stdout=logfile, stderr=subprocess.STDOUT)
+                subprocess.Popen(cmd, stdout=logfile, stderr=subprocess.STDOUT, cwd="/Users/kublai/.openclaw/agents/main", env=env)
+            log(f"  → PID launched for {label}")
         except Exception as e:
             log(f"Failed to launch openclaw: {e}")
+            s['status'] = 'failed'
+            s['error'] = str(e)
             
         s['status'] = 'running'
         s['last_spawned'] = datetime.now().isoformat()

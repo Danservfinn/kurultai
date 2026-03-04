@@ -1,10 +1,10 @@
-TICK 2026-03-04 01:39:29
-GATEWAY: up pid=30974,31017,45375,92651,92950 http=200 latency=14ms uptime=3d12h
-PROCESS: cpu=0.0% mem=0.0% rss=0MB threads=2
-ERRORS:  last5m=446 last1h=4946 fatal=0
+TICK 2026-03-04 11:12:26
+GATEWAY: up pid=14245,14333,14372,14445,14727 http=200 latency=2ms uptime=7h3m
+PROCESS: cpu=0.0% mem=0.0% rss=1MB threads=2
+ERRORS:  last5m=108 last1h=318 fatal=0
 SERVICES: neo4j=up redis=up
-TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
-TRENDS:  uptime_1h=100.0% avg_cpu=0.0% errors_1h=2682 restarts_1h=0
+TASKS:   pending=1 dispatched=1 spawn=0 queues=[temujin=1]
+TRENDS:  uptime_1h=100.0% avg_cpu=0.0% errors_1h=1296 restarts_1h=0
 DECISION: degraded
 ACTION:   warn
-REASON:   446 errors in 5m
+REASON:   108 errors in 5m

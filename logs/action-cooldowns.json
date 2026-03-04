@@ -1,4 +1,6 @@
 {
-  "error_spike:high": 1772607014.882751,
-  "cron_fix:heartbeat-watchdog": 1772607015.191419
+  "error_spike:high": 1772640046.9862661,
+  "cron_fix:heartbeat-watchdog": 1772607015.191419,
+  "cron_fix:tock-gather": 1772623104.230965,
+  "agent_stalled:jochi": 1772623104.231194
 }
