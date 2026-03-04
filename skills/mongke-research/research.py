@@ -23,6 +23,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scrapling.fetchers import StealthyFetcher, Fetcher
 
+# Optional SearXNG integration
+try:
+    from .searxng_search import SearXNGSearch
+    SEARXNG_AVAILABLE = True
+except ImportError:
+    SEARXNG_AVAILABLE = False
+    SearXNGSearch = None
+
 
 class MongkeResearchSkill:
     """Research skill for Mongke agent."""
@@ -35,6 +43,35 @@ class MongkeResearchSkill:
         # Initialize Scrapling
         StealthyFetcher.adaptive = True
         
+        # Initialize SearXNG if available
+        self.searxng = SearXNGSearch() if SEARXNG_AVAILABLE else None
+        
+    def search_web(self, query: str, num_results: int = 10) -> list:
+        """
+        Search the web using SearXNG and return URLs.
+        
+        Args:
+            query: Search query
+            num_results: Number of results to return
+        
+        Returns:
+            List of URLs from search results
+        """
+        if not self.searxng:
+            print("  ⚠ SearXNG not available, provide URLs manually")
+            return []
+        
+        print(f"  🔍 Searching web: {query}")
+        results = self.searxng.search(query, limit=num_results)
+        
+        if results:
+            urls = [r['url'] for r in results if r.get('url')]
+            print(f"    ✓ Found {len(urls)} sources")
+            return urls
+        else:
+            print("    ✗ No search results")
+            return []
+    
     def scrape_url(self, url, stealthy=True, depth=1):
         """Scrape a single URL using Scrapling."""
         print(f"  📄 Scraping: {url}")
@@ -196,13 +233,23 @@ Respond in JSON format:
             dict with analysis results
         """
         print(f"\n🔍 Mongke Research: {query}")
-        print(f"   Sources: {len(sources or [])} URLs")
+        
+        # Auto-find sources via SearXNG if none provided
+        if not sources:
+            if self.searxng:
+                print("   Finding sources via SearXNG...")
+                sources = self.search_web(query, num_results=10)
+            else:
+                print("  ✗ No sources provided and SearXNG unavailable")
+                return {"error": "No sources"}
+        
+        print(f"   Sources: {len(sources)} URLs")
         print(f"   Depth: {depth}")
         print()
         
         if not sources:
-            print("  ✗ No sources provided")
-            return {"error": "No sources"}
+            print("  ✗ No sources found")
+            return {"error": "No sources found"}
         
         all_analysis = {
             "query": query,

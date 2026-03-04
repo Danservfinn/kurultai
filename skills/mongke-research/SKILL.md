@@ -25,6 +25,23 @@ Already installed (uses existing Scrapling + Ollama setup).
 - scrapling>=0.4.1 ✅
 - ollama (qwen3.5:9b model) ✅
 - neo4j Python driver ✅
+- searxng (optional, for auto source discovery) ⚠️
+
+### Optional: SearXNG for Auto Source Discovery
+
+SearXNG enables automatic web search to find research sources.
+
+**Option A: Self-host with Docker**
+```bash
+mkdir -p ~/searxng && cd ~/searxng
+curl -sL https://raw.githubusercontent.com/searxng/searxng/master/docker/docker-compose.yml -o docker-compose.yml
+docker compose up -d
+```
+
+See `SEARXNG-SETUP.md` for detailed setup instructions.
+
+**Option B: Manual URLs**
+If SearXNG isn't available, provide URLs manually to the research method.
 
 ---
 
