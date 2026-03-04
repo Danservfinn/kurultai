@@ -95,6 +95,15 @@ def execute_task(task_file, timeout):
         return False, f"Failed to read task: {e}"
     
     # Execute via OpenClaw spawn
+    # This launches a subagent session using the agent's configured model from openclaw.json
+    # All Kurultai agents use CLOUD LLMs (bailian/*), NOT local LLMs:
+    #   - Kublai: bailian/qwen3.5-plus
+    #   - Möngke: bailian/MiniMax-M2.5
+    #   - Chagatai: bailian/kimi-k2.5
+    #   - Temüjin: bailian/MiniMax-M2.5
+    #   - Jochi: bailian/qwen3.5-plus
+    #   - Ögedei: bailian/qwen3.5-plus
+    # The --agent flag automatically uses the agent's default model configuration.
     cmd = [
         "openclaw",
         "agent",

@@ -386,9 +386,20 @@ src/
   - Runs as launchd daemon (`com.kurultai.task-watcher`)
   - Polls `agent/*/tasks/` every 10 seconds
   - Detects new `*.md` files (not in state file)
-  - Executes immediately via `openclaw agent`
+  - Executes immediately via `openclaw agent --agent <id>`
+  - **Model**: Uses agent's configured model from `openclaw.json` (ALL CLOUD LLMS)
   - Tracks executed tasks in `logs/task-watcher-state.json`
   - Timeout: 4 minutes per task
+
+**Agent Model Configuration** (all cloud LLMs via Alibaba Cloud/DashScope):
+| Agent | Model | Type |
+|-------|-------|------|
+| Kublai | bailian/qwen3.5-plus | ☁️ Cloud |
+| Möngke | bailian/MiniMax-M2.5 | ☁️ Cloud |
+| Chagatai | bailian/kimi-k2.5 | ☁️ Cloud |
+| Temüjin | bailian/MiniMax-M2.5 | ☁️ Cloud |
+| Jochi | bailian/qwen3.5-plus | ☁️ Cloud |
+| Ögedei | bailian/qwen3.5-plus | ☁️ Cloud |
 
 **Flow**:
 ```
