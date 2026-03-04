@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """
-Smart Task Router
+Unified Task Router
 
-Routes tasks to appropriate destination based on complexity and type:
-- Simple tasks → subagent (one-shot)
-- Code tasks → Temujin (full agent)
-- Research tasks → Mongke (full agent)
-- Writing tasks → Chagatai (full agent)
-- Testing tasks → Jochi (full agent)
-- Ops tasks → Ogedei (full agent)
+Classifies and routes tasks to appropriate agents.
+Replaces: chat_to_task.py + smart-task-router.py
 
 Usage:
-    python3 smart-task-router.py --task "Build a login feature"
-    python3 smart-task-router.py --classify "Research competitor pricing"
+    python3 task-router.py --task "Build a login feature"
+    python3 task-router.py --classify "Research competitors"
 """
 
 import argparse
@@ -31,9 +26,9 @@ AGENT_QUEUES = {
     "kublai": "/Users/kublai/.openclaw/agents/kublai/tasks"
 }
 
-# Keyword-based routing
+# Single source of truth for routing
 ROUTING_KEYWORDS = {
-    "temujin": ["code", "build", "implement", "fix", "bug", "feature", "deploy", "api", "database", "typescript", "python", "script", "infrastructure"],
+    "temujin": ["code", "build", "implement", "fix", "bug", "feature", "deploy", "api", "database", "typescript", "python", "script", "infrastructure", "login", "oauth"],
     "mongke": ["research", "analyze", "investigate", "discover", "competitor", "market", "trend", "data", "intelligence", "survey"],
     "chagatai": ["write", "document", "blog", "post", "content", "article", "creative", "copy", "marketing", "social", "twitter", "thread"],
     "jochi": ["test", "security", "audit", "review", "verify", "validate", "pattern", "scan", "vulnerability", "check"],
@@ -101,12 +96,12 @@ def route_to_agent(agent, task, priority="normal"):
 agent: {agent}
 priority: {priority}
 created: {datetime.now().isoformat()}
-source: smart_router
+source: task_router
 ---
 
 # Task: {task}
 
-Routed by smart-task-router.py
+Routed by task-router.py
 """)
     
     print(f"✓ Task routed to {agent}: {task_file}")
@@ -137,7 +132,7 @@ def route_to_subagent(task, priority="normal"):
         "task": task,
         "priority": priority,
         "label": f"sub-{int(datetime.now().timestamp())}",
-        "source": "smart_router",
+        "source": "task_router",
         "destination": "subagent"
     }
     
@@ -154,17 +149,26 @@ def route_to_subagent(task, priority="normal"):
         "spawn_label": spawn_request['label']
     }
 
+def route_task(message, priority="normal"):
+    """Classify and route in one call"""
+    classification = classify_task(message)
+    destination = classification['destination']
+    
+    if destination == 'subagent':
+        return route_to_subagent(message, priority)
+    else:
+        return route_to_agent(destination, message, priority)
+
 def main():
-    parser = argparse.ArgumentParser(description='Smart task router')
+    parser = argparse.ArgumentParser(description='Unified task router')
     parser.add_argument('--task', help='Task text to route')
     parser.add_argument('--classify', help='Classify task without routing')
     parser.add_argument('--priority', default='normal', choices=['high', 'normal', 'low'])
-    parser.add_argument('--log', action='store_true', help='Log routing decision to Neo4j')
     
     args = parser.parse_args()
     
     if not args.task and not args.classify:
-        print("Usage: python3 smart-task-router.py --task <text> OR --classify <text>")
+        print("Usage: python3 task-router.py --task <text> OR --classify <text>")
         sys.exit(1)
     
     task_text = args.task or args.classify
@@ -178,7 +182,7 @@ def main():
         return
     
     # Route
-    print(f"=== Smart Task Router ===")
+    print(f"=== Task Router ===")
     print(f"Task: {task_text[:80]}...")
     print(f"Classification: {classification['complexity']} ({classification['best_agent']}, score={classification['best_score']})")
     print(f"Destination: {classification['destination']}")
@@ -188,36 +192,6 @@ def main():
         result = route_to_subagent(task_text, args.priority)
     else:
         result = route_to_agent(classification['destination'], task_text, args.priority)
-    
-    # Log to Neo4j if requested
-    if args.log:
-        try:
-            from neo4j import GraphDatabase
-            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "myStrongPassword123"))
-            
-            with driver.session() as session:
-                session.run("""
-                    CREATE (r:TaskRouting {
-                        task: $task,
-                        destination: $destination,
-                        complexity: $complexity,
-                        agent: $agent,
-                        score: $score,
-                        priority: $priority,
-                        routed_at: datetime()
-                    })
-                """,
-                task=task_text[:200],
-                destination=classification['destination'],
-                complexity=classification['complexity'],
-                agent=classification['best_agent'],
-                score=classification['best_score'],
-                priority=args.priority)
-            
-            driver.close()
-            print("✓ Routing decision logged to Neo4j")
-        except Exception as e:
-            print(f"⚠ Neo4j logging failed: {e}")
     
     print(f"\n✓ Routing complete")
 

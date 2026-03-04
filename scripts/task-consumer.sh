@@ -77,14 +77,23 @@ process_agent() {
         local executing_file="${task_file%.md}.executing.md"
         mv "$task_file" "$executing_file"
         
-        # For now, just log that we'd spawn - in real use, Kublai calls this script
-        # and then spawns via sessions_spawn in the same context
-        log "  Would spawn $agent (model: $model) for: $task_desc"
+        # Execute task with agent-task-handler.py
+        log "  Executing with $agent-task-handler.py..."
+        python3 /Users/kublai/.openclaw/agents/main/scripts/agent-task-handler.py \
+            --agent "$agent" \
+            --task-file "$executing_file" \
+            2>&1 | while read line; do log "    $line"; done
         
-        # Move to completed
-        mv "$executing_file" "${executing_file%.md}.completed.done"
-        
-        log "  Task marked complete"
+        # Check if execution was successful
+        if [ $? -eq 0 ]; then
+            # Move to completed
+            mv "$executing_file" "${executing_file%.md}.completed.done.md"
+            log "  ✓ Task completed"
+        else
+            # Move back to pending for retry
+            mv "$executing_file" "$task_file"
+            log "  ✗ Task failed - returned to queue"
+        fi
     done
 }
 

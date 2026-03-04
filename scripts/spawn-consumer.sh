@@ -178,7 +178,7 @@ for s in ready:
         # Import smart router classification
         import sys
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from smart_task_router import classify_task, route_to_agent, route_to_subagent
+        from task_router import classify_task, route_to_agent, route_to_subagent
         
         classification = classify_task(task_text)
         destination = classification['destination']
