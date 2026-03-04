@@ -2,6 +2,10 @@
 # Spawn Consumer - Reads spawn requests and executes them via OpenClaw
 # Run every 2 minutes via cron
 
+# Set up PATH for cron environment
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export NODE_PATH="/opt/homebrew/lib/node_modules"
+
 SPAWN_QUEUE="/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
 LOG_FILE="/Users/kublai/.openclaw/agents/main/logs/spawn-consumer.log"
 
@@ -181,7 +185,7 @@ for s in ready:
         
         # Execute directly via subprocess
         try:
-            cmd = ["openclaw", "execute", task_text, f"--agent={agent}", f"--model={model}", f"--label={label}"]
+            cmd = ["/opt/homebrew/bin/openclaw", "execute", task_text, f"--agent={agent}", f"--model={model}", f"--label={label}"]
             with open(LOG_FILE, "a") as logfile:
                 subprocess.Popen(cmd, stdout=logfile, stderr=subprocess.STDOUT)
         except Exception as e:
