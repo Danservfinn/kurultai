@@ -32,13 +32,11 @@ AGENT_ROLES = {
 def get_agent_state(agent_name):
     """Get agent state from Neo4j"""
     try:
-        from neo4j import GraphDatabase
-        
-        uri = "bolt://localhost:7687"
-        user = "neo4j"
-        password = "myStrongPassword123"
-        
-        driver = GraphDatabase.driver(uri, auth=(user, password))
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from neo4j_task_tracker import get_driver
+
+        driver = get_driver()
         
         with driver.session() as session:
             result = session.run("""

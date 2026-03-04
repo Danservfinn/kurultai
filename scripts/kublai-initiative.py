@@ -21,11 +21,15 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from json_state import locked_json_read, locked_json_update
 
 BASE = Path.home() / ".openclaw/agents"
 MAIN = BASE / "main"
@@ -37,14 +41,7 @@ AGENT_DIR = MAIN / "agent"
 
 AGENTS = ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
 
-AGENT_ROUTING = {
-    "infrastructure": "ogedei",
-    "code": "temujin",
-    "investigation": "jochi",
-    "documentation": "chagatai",
-    "research": "mongke",
-    "coordination": "kublai",
-}
+from task_router import route_by_category, route_by_text, CATEGORY_ROUTING
 
 # Minimum 45 minutes between initiatives to prevent thrashing
 INITIATIVE_COOLDOWN_SECS = 2700
@@ -61,20 +58,14 @@ def log(msg):
 
 def is_cooled_down():
     """Check if we're still in cooldown from last initiative."""
-    if not COOLDOWN_FILE.exists():
-        return False
-    try:
-        with open(COOLDOWN_FILE) as f:
-            data = json.load(f)
-        last = data.get("last_initiative", 0)
-        return (time.time() - last) < INITIATIVE_COOLDOWN_SECS
-    except Exception:
-        return False
+    data = locked_json_read(str(COOLDOWN_FILE), default={})
+    last = data.get("last_initiative", 0)
+    return (time.time() - last) < INITIATIVE_COOLDOWN_SECS
 
 
 def mark_fired():
-    with open(COOLDOWN_FILE, "w") as f:
-        json.dump({"last_initiative": time.time()}, f)
+    with locked_json_update(str(COOLDOWN_FILE)) as data:
+        data["last_initiative"] = time.time()
 
 
 def read_agent_reflections():
@@ -224,17 +215,10 @@ def heuristic_initiative(reflections, goals, system_state):
             if line.lower().startswith("- next:") or line.lower().startswith("next:"):
                 action = line.split(":", 1)[1].strip()
                 if action:
-                    # Route based on keywords
-                    agent = "kublai"
-                    action_lower = action.lower()
-                    if any(w in action_lower for w in ["fix", "build", "deploy", "code", "typescript"]):
-                        agent = "temujin"
-                    elif any(w in action_lower for w in ["monitor", "check", "restart"]):
-                        agent = "ogedei"
-                    elif any(w in action_lower for w in ["research", "discover", "api"]):
-                        agent = "mongke"
-                    elif any(w in action_lower for w in ["document", "write"]):
-                        agent = "chagatai"
+                    # Route using canonical router
+                    agent = route_by_text(action)
+                    if agent == "subagent":
+                        agent = "kublai"
 
                     return (
                         f"ACTION: {action}\n"
@@ -285,8 +269,8 @@ def parse_initiative(raw_text):
     # Validate agent name
     agent = fields["agent"].lower().strip()
     if agent not in AGENTS:
-        # Try to route by keyword
-        for keyword, routed_agent in AGENT_ROUTING.items():
+        # Try to route by keyword using canonical router
+        for keyword, routed_agent in CATEGORY_ROUTING.items():
             if keyword in fields["action"].lower():
                 agent = routed_agent
                 break
@@ -303,8 +287,15 @@ def parse_initiative(raw_text):
     return fields
 
 
-def create_task(agent, priority, title, body):
+MAX_TASK_DEPTH = 3
+
+
+def create_task(agent, priority, title, body, depth=0):
     """Create a task file in an agent's task queue."""
+    if depth >= MAX_TASK_DEPTH:
+        log(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} for '{title[:60]}' — preventing runaway chain")
+        return None
+
     task_dir = AGENT_DIR / agent / "tasks"
     task_dir.mkdir(parents=True, exist_ok=True)
 
@@ -318,6 +309,7 @@ priority: {priority}
 created: {datetime.now().isoformat()}
 source: kublai-initiative
 type: proactive
+depth: {depth}
 ---
 
 # Task: {title}
@@ -325,18 +317,16 @@ type: proactive
 {body}
 """
     filepath.write_text(content)
-    log(f"TASK CREATED: {priority} task for {agent}: {title}")
+    log(f"TASK CREATED: {priority} task for {agent}: {title} (depth={depth})")
     return str(filepath)
 
 
 def log_hypothesis(action, expected_outcome):
     """Log the initiative as a hypothesis in Neo4j for future validation."""
     try:
-        from neo4j import GraphDatabase
+        from neo4j_task_tracker import get_driver
 
-        driver = GraphDatabase.driver(
-            "bolt://localhost:7687", auth=("neo4j", "myStrongPassword123")
-        )
+        driver = get_driver()
         with driver.session() as session:
             session.run(
                 """

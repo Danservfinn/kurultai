@@ -10,6 +10,13 @@
 
 set -o pipefail
 
+# Source Neo4j credentials
+if [ -f "$HOME/.openclaw/credentials/neo4j.env" ]; then
+    set -a
+    source "$HOME/.openclaw/credentials/neo4j.env"
+    set +a
+fi
+
 BASE="/Users/kublai/.openclaw/agents/main"
 TOCK_DIR="$BASE/logs/tock"
 TOCK_LOG="$BASE/logs/tock.log"
@@ -32,7 +39,11 @@ NEO4J_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json
 try:
     from neo4j import GraphDatabase
-    driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "myStrongPassword123"))
+    import os as _os
+    driver = GraphDatabase.driver(
+        _os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123"))
+    )
     results = {}
     with driver.session() as session:
         # Per-agent tasks (30m)

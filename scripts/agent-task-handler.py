@@ -17,8 +17,12 @@ import sys
 import time
 from datetime import datetime
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from json_state import locked_json_update
+
 AGENTS_DIR = "/Users/kublai/.openclaw/agents"
 SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
+MAX_TASK_DEPTH = 3
 
 def load_agent_config(agent_name):
     """Load agent configuration"""
@@ -81,10 +85,21 @@ def mark_task_completed(task_file, status='completed'):
         os.rename(executing_file, completed_file)
         print(f"✓ Task completed: {completed_file}")
 
-def spawn_subagent(agent_name, task, subagent_task):
-    """Spawn a subagent for parallel work"""
+def _extract_depth(content):
+    """Extract depth field from task frontmatter."""
+    import re
+    match = re.search(r'^depth:\s*(\d+)', content, re.MULTILINE)
+    return int(match.group(1)) if match else 0
+
+
+def spawn_subagent(agent_name, task, subagent_task, depth=0):
+    """Spawn a subagent for parallel work. Rejects if depth >= MAX_TASK_DEPTH."""
+    if depth >= MAX_TASK_DEPTH:
+        print(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} — preventing runaway chain")
+        return None
+
     config = load_agent_config(agent_name)
-    
+
     spawn_request = {
         "agent": agent_name,
         "model": config.get('model', 'qwen3.5-plus'),
@@ -92,26 +107,18 @@ def spawn_subagent(agent_name, task, subagent_task):
         "priority": "normal",
         "label": f"{agent_name}-sub-{int(time.time())}",
         "source": "agent_delegation",
-        "parent_task": task
+        "parent_task": task,
+        "depth": depth + 1,
     }
     
-    # Add to spawn queue
+    # Add to spawn queue with file locking
     os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
-    
-    existing = []
-    if os.path.exists(SPAWN_QUEUE):
-        try:
-            with open(SPAWN_QUEUE, 'r') as f:
-                data = json.load(f)
-                existing = data.get('spawns', [])
-        except:
-            pass
-    
-    existing.append(spawn_request)
-    
-    with open(SPAWN_QUEUE, 'w') as f:
-        json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
-    
+    with locked_json_update(SPAWN_QUEUE, default={'spawns': [], 'updated': 0}) as data:
+        if 'spawns' not in data:
+            data['spawns'] = []
+        data['spawns'].append(spawn_request)
+        data['updated'] = time.time()
+
     print(f"✓ Subagent spawned: {spawn_request['label']}")
     return spawn_request['label']
 
@@ -136,22 +143,13 @@ def execute_task_with_llm(agent_name, task_text, config):
             "status": "ready"
         }
         
-        # Add to spawn queue
+        # Add to spawn queue with file locking
         os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
-        
-        existing = []
-        if os.path.exists(SPAWN_QUEUE):
-            try:
-                with open(SPAWN_QUEUE, 'r') as f:
-                    data = json.load(f)
-                    existing = data.get('spawns', [])
-            except:
-                pass
-        
-        existing.append(spawn_request)
-        
-        with open(SPAWN_QUEUE, 'w') as f:
-            json.dump({'spawns': existing, 'updated': time.time()}, f, indent=2)
+        with locked_json_update(SPAWN_QUEUE, default={'spawns': [], 'updated': 0}) as data:
+            if 'spawns' not in data:
+                data['spawns'] = []
+            data['spawns'].append(spawn_request)
+            data['updated'] = time.time()
             
         return {
             "success": True,
@@ -170,27 +168,31 @@ def execute_task_with_llm(agent_name, task_text, config):
 def process_task(agent_name, task):
     """Process a single task with actual execution"""
     print(f"\n📋 Processing task: {task['task'][:60]}...")
-    
+
+    # Extract depth from task content
+    depth = task.get('depth', 0)
+
     # Mark as executing
     executing_file = mark_task_executing(task['file'])
     print(f"  Status: executing → {executing_file}")
-    
+
     # Load agent config
     config = load_agent_config(agent_name)
-    
+
     # Determine if task needs subagent delegation
     needs_delegation = len(task['task'].split()) > 50 or any(
         kw in task['task'].lower() for kw in ['multi-step', 'complex', 'pipeline', 'system']
     )
-    
+
     if needs_delegation:
         print(f"  🔄 Task is complex - spawning subagent...")
-        
+
         # Spawn subagent for parallel work
         subagent_label = spawn_subagent(
             agent_name=agent_name,
             task=task['file'],
-            subagent_task=task['task']
+            subagent_task=task['task'],
+            depth=depth,
         )
         
         print(f"  ✓ Subagent spawned: {subagent_label}")
@@ -237,13 +239,9 @@ def process_task(agent_name, task):
 def update_agent_state(agent_name, status='busy', task_label=None, increment_completed=False):
     """Update agent state in Neo4j"""
     try:
-        from neo4j import GraphDatabase
-        
-        uri = "bolt://localhost:7687"
-        user = "neo4j"
-        password = "myStrongPassword123"
-        
-        driver = GraphDatabase.driver(uri, auth=(user, password))
+        from neo4j_task_tracker import get_driver
+
+        driver = get_driver()
         
         with driver.session() as session:
             if increment_completed:
@@ -278,20 +276,24 @@ def execute_single_task(agent_name, task_file):
     # Read task file
     with open(task_file, 'r') as f:
         content = f.read()
-    
+
     # Extract task description
     task_desc = content
     for line in content.split('\n'):
         if line.startswith('# Task:'):
             task_desc = line.replace('# Task:', '').strip()
             break
-    
+
+    # Extract depth from frontmatter
+    depth = _extract_depth(content)
+
     task = {
         'file': task_file,
         'task': task_desc,
-        'priority': 'normal'
+        'priority': 'normal',
+        'depth': depth,
     }
-    
+
     return process_task(agent_name, task)
 
 def main():

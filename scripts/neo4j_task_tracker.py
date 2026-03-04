@@ -16,16 +16,43 @@ Usage:
 
 import os
 import json
+import uuid
+import glob
 from datetime import datetime
 from neo4j import GraphDatabase
 
+# Credentials env file — single source of truth
+_NEO4J_ENV_FILE = os.path.expanduser("~/.openclaw/credentials/neo4j.env")
+
+
+def _load_neo4j_env():
+    """Load Neo4j credentials from env file into os.environ if not already set."""
+    if os.path.exists(_NEO4J_ENV_FILE):
+        with open(_NEO4J_ENV_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, _, value = line.partition('=')
+                    if key.strip() not in os.environ:
+                        os.environ[key.strip()] = value.strip()
+
+
+def get_driver():
+    """Get a Neo4j driver using centralized credentials.
+
+    This is the SOLE connection factory. All scripts should use this
+    instead of creating their own GraphDatabase.driver() calls.
+    """
+    _load_neo4j_env()
+    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    user = os.getenv("NEO4J_USER", "neo4j")
+    password = os.getenv("NEO4J_PASSWORD", "myStrongPassword123")
+    return GraphDatabase.driver(uri, auth=(user, password))
+
+
 class TaskTracker:
     def __init__(self):
-        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        user = os.getenv("NEO4J_USER", "neo4j")
-        password = os.getenv("NEO4J_PASSWORD", "myStrongPassword123")
-        
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self.driver = get_driver()
         
     def close(self):
         self.driver.close()
@@ -281,6 +308,348 @@ class TaskTracker:
                 ORDER BY retries DESC
                 LIMIT 10
                 """, hours=hours)
+            return [dict(r) for r in result]
+
+
+    # ==========================================================
+    # Phase B: Neo4j as single source of truth
+    # ==========================================================
+
+    def create_task_full(self, agent, title, body, priority="normal",
+                         source="system", depth=0, parent_id=None):
+        """Create task in Neo4j (primary) AND filesystem (backward compat).
+
+        Returns the task_id (uuid).
+        """
+        task_id = str(uuid.uuid4())[:12]
+        label = f"{agent}-{task_id}"
+
+        with self.driver.session() as session:
+            session.run("""
+                MERGE (a:Agent {name: $agent})
+                CREATE (t:Task {
+                    task_id: $task_id,
+                    label: $label,
+                    agent: $agent,
+                    title: $title,
+                    body: $body,
+                    priority: $priority,
+                    source: $source,
+                    depth: $depth,
+                    parent_id: $parent_id,
+                    status: 'PENDING',
+                    created: datetime(),
+                    retry_count: 0,
+                    max_retries: 3
+                })
+                CREATE (a)-[:EXECUTED]->(t)
+            """,
+            task_id=task_id, label=label, agent=agent, title=title,
+            body=body, priority=priority, source=source, depth=depth,
+            parent_id=parent_id)
+
+        # Backward-compatible filesystem write
+        base = os.path.expanduser("~/.openclaw/agents/main/agent")
+        task_dir = f"{base}/{agent}/tasks"
+        os.makedirs(task_dir, exist_ok=True)
+        epoch = int(datetime.now().timestamp())
+        filepath = f"{task_dir}/{priority}-{epoch}.md"
+
+        content = f"""---
+agent: {agent}
+priority: {priority}
+created: {datetime.now().isoformat()}
+source: {source}
+depth: {depth}
+task_id: {task_id}
+parent_id: {parent_id or ''}
+---
+
+# Task: {title}
+
+{body}
+"""
+        with open(filepath, 'w') as f:
+            f.write(content)
+
+        return task_id
+
+    def transition_task(self, task_id, new_status, actor="system"):
+        """Transition task to new state with validation.
+
+        Valid transitions:
+            PENDING -> ASSIGNED, CANCELLED
+            ASSIGNED -> EXECUTING, CANCELLED
+            EXECUTING -> COMPLETED, FAILED, TIMEOUT, CANCELLED
+            FAILED -> PENDING (retry)
+            TIMEOUT -> PENDING (retry)
+        """
+        VALID_TRANSITIONS = {
+            "PENDING": {"ASSIGNED", "CANCELLED"},
+            "ASSIGNED": {"EXECUTING", "CANCELLED"},
+            "EXECUTING": {"COMPLETED", "FAILED", "TIMEOUT", "CANCELLED"},
+            "FAILED": {"PENDING"},
+            "TIMEOUT": {"PENDING"},
+        }
+
+        with self.driver.session() as session:
+            # Get current status
+            result = session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                RETURN t.status AS status
+            """, task_id=task_id)
+            record = result.single()
+
+            if not record:
+                return {"success": False, "error": f"Task {task_id} not found"}
+
+            current = record["status"]
+            allowed = VALID_TRANSITIONS.get(current, set())
+
+            if new_status not in allowed:
+                return {
+                    "success": False,
+                    "error": f"Invalid transition: {current} -> {new_status} (allowed: {allowed})"
+                }
+
+            # Apply transition and log it
+            session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                SET t.status = $new_status,
+                    t.updated = datetime()
+                CREATE (t)-[:TRANSITIONED {
+                    from_status: $current,
+                    to_status: $new_status,
+                    action: $action,
+                    timestamp: datetime(),
+                    actor: $actor
+                }]->(t)
+            """, task_id=task_id, new_status=new_status, current=current,
+                action=f"{current}->{new_status}", actor=actor)
+
+            # Set completed timestamp for terminal states
+            if new_status in ("COMPLETED", "FAILED", "TIMEOUT", "CANCELLED"):
+                session.run("""
+                    MATCH (t:Task {task_id: $task_id})
+                    SET t.completed = datetime()
+                """, task_id=task_id)
+
+            return {"success": True, "from": current, "to": new_status}
+
+    def sync_check(self):
+        """Daily sync: compare Neo4j task states with filesystem.
+
+        Returns a dict of discrepancies.
+        """
+        base = os.path.expanduser("~/.openclaw/agents/main/agent")
+        agents = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+        discrepancies = []
+
+        # Get all recent tasks from Neo4j
+        neo4j_tasks = {}
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created > datetime() - duration('P1D')
+                RETURN t.task_id AS task_id, t.agent AS agent,
+                       t.status AS status, t.label AS label
+            """)
+            for r in result:
+                tid = r.get("task_id")
+                if tid:
+                    neo4j_tasks[tid] = {
+                        "agent": r["agent"],
+                        "status": r["status"],
+                        "label": r["label"],
+                    }
+
+        # Check filesystem for tasks with task_id in frontmatter
+        for agent in agents:
+            task_dir = f"{base}/{agent}/tasks"
+            if not os.path.isdir(task_dir):
+                continue
+            for fpath in glob.glob(f"{task_dir}/*.md"):
+                try:
+                    with open(fpath) as f:
+                        content = f.read(500)
+                    # Extract task_id from frontmatter
+                    import re
+                    match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
+                    if not match:
+                        continue
+                    file_task_id = match.group(1)
+
+                    # Determine file status from filename
+                    fname = os.path.basename(fpath)
+                    if '.done' in fname:
+                        file_status = "COMPLETED"
+                    elif '.executing' in fname:
+                        file_status = "EXECUTING"
+                    else:
+                        file_status = "PENDING"
+
+                    neo_entry = neo4j_tasks.get(file_task_id)
+                    if neo_entry and neo_entry["status"] != file_status:
+                        discrepancies.append({
+                            "task_id": file_task_id,
+                            "agent": agent,
+                            "file": fname,
+                            "file_status": file_status,
+                            "neo4j_status": neo_entry["status"],
+                        })
+                except Exception:
+                    continue
+
+        return {
+            "checked": datetime.now().isoformat(),
+            "neo4j_count": len(neo4j_tasks),
+            "discrepancies": discrepancies,
+        }
+
+
+    # ==========================================================
+    # Phase B4: Hypothesis validation
+    # ==========================================================
+
+    def validate_hypotheses(self):
+        """Check pending Hypothesis nodes and mark as validated or expired.
+
+        - Hypotheses older than 2h with matching completed tasks -> validated
+        - Hypotheses older than 24h with no match -> expired
+        """
+        results = {"validated": 0, "expired": 0, "pending": 0}
+
+        with self.driver.session() as session:
+            # Validate: pending hypotheses older than 2h with completed tasks
+            r = session.run("""
+                MATCH (h:Hypothesis {status: 'pending'})
+                WHERE h.created < datetime() - duration('PT2H')
+                OPTIONAL MATCH (t:Task)
+                    WHERE t.status = 'completed'
+                      AND t.created > h.created
+                      AND (toLower(t.title) CONTAINS toLower(substring(h.action, 0, 30))
+                           OR toLower(t.task) CONTAINS toLower(substring(h.action, 0, 30)))
+                WITH h, count(t) AS matching_tasks
+                WHERE matching_tasks > 0
+                SET h.status = 'validated',
+                    h.validated_at = datetime(),
+                    h.validated = true
+                RETURN count(h) AS cnt
+            """)
+            record = r.single()
+            results["validated"] = record["cnt"] if record else 0
+
+            # Expire: pending hypotheses older than 24h with no match
+            r = session.run("""
+                MATCH (h:Hypothesis {status: 'pending'})
+                WHERE h.created < datetime() - duration('P1D')
+                SET h.status = 'expired',
+                    h.expired_at = datetime()
+                RETURN count(h) AS cnt
+            """)
+            record = r.single()
+            results["expired"] = record["cnt"] if record else 0
+
+            # Count remaining pending
+            r = session.run("""
+                MATCH (h:Hypothesis {status: 'pending'})
+                RETURN count(h) AS cnt
+            """)
+            record = r.single()
+            results["pending"] = record["cnt"] if record else 0
+
+        return results
+
+    # ==========================================================
+    # Phase B5: WHEN/THEN Rules as Neo4j entities
+    # ==========================================================
+
+    def create_rule(self, agent, condition, action, source="system"):
+        """Create a (:Rule) node with 'proposed' status."""
+        rule_id = str(uuid.uuid4())[:12]
+        with self.driver.session() as session:
+            session.run("""
+                CREATE (r:Rule {
+                    rule_id: $rule_id,
+                    agent: $agent,
+                    condition: $condition,
+                    action: $action,
+                    status: 'proposed',
+                    source: $source,
+                    created: datetime(),
+                    last_invoked: null,
+                    invocations: 0
+                })
+            """, rule_id=rule_id, agent=agent, condition=condition,
+                action=action, source=source)
+        return rule_id
+
+    def invoke_rule(self, rule_id):
+        """Mark a rule as invoked. Transitions proposed->active on first use."""
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (r:Rule {rule_id: $rule_id})
+                SET r.invocations = r.invocations + 1,
+                    r.last_invoked = datetime(),
+                    r.status = CASE
+                        WHEN r.status = 'proposed' THEN 'active'
+                        ELSE r.status
+                    END
+            """, rule_id=rule_id)
+
+    def prune_rules(self):
+        """Lifecycle management for rules.
+
+        - active rules with no invocation for 7 days -> deprecated
+        - deprecated rules with no invocation for 30 days -> pruned (deleted)
+        """
+        results = {"deprecated": 0, "pruned": 0}
+        with self.driver.session() as session:
+            # Deprecate: active rules unused for 7 days
+            r = session.run("""
+                MATCH (r:Rule {status: 'active'})
+                WHERE r.last_invoked < datetime() - duration('P7D')
+                SET r.status = 'deprecated'
+                RETURN count(r) AS cnt
+            """)
+            record = r.single()
+            results["deprecated"] = record["cnt"] if record else 0
+
+            # Prune: deprecated rules unused for 30 days
+            r = session.run("""
+                MATCH (r:Rule {status: 'deprecated'})
+                WHERE r.last_invoked < datetime() - duration('P30D')
+                   OR (r.last_invoked IS NULL AND r.created < datetime() - duration('P30D'))
+                DELETE r
+                RETURN count(r) AS cnt
+            """)
+            record = r.single()
+            results["pruned"] = record["cnt"] if record else 0
+
+        return results
+
+    def get_active_rules(self, agent=None):
+        """Get active rules, optionally filtered by agent."""
+        with self.driver.session() as session:
+            if agent:
+                result = session.run("""
+                    MATCH (r:Rule)
+                    WHERE r.status IN ['proposed', 'active']
+                      AND r.agent = $agent
+                    RETURN r.rule_id AS rule_id, r.agent AS agent,
+                           r.condition AS condition, r.action AS action,
+                           r.status AS status, r.invocations AS invocations
+                    ORDER BY r.invocations DESC
+                """, agent=agent)
+            else:
+                result = session.run("""
+                    MATCH (r:Rule)
+                    WHERE r.status IN ['proposed', 'active']
+                    RETURN r.rule_id AS rule_id, r.agent AS agent,
+                           r.condition AS condition, r.action AS action,
+                           r.status AS status, r.invocations AS invocations
+                    ORDER BY r.invocations DESC
+                """)
             return [dict(r) for r in result]
 
 

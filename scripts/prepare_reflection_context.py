@@ -163,11 +163,11 @@ def read_tock_data():
 def get_failure_patterns(agent, days=7):
     """Query Neo4j for the agent's recurring failure patterns over N days."""
     try:
-        from neo4j import GraphDatabase
+        import sys as _sys
+        _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from neo4j_task_tracker import get_driver
 
-        driver = GraphDatabase.driver(
-            "bolt://localhost:7687", auth=("neo4j", "myStrongPassword123")
-        )
+        driver = get_driver()
         with driver.session() as session:
             result = session.run(
                 """
@@ -234,6 +234,18 @@ def load_protocol(agent):
     return None
 
 
+def get_routing_audit(hours=1):
+    """Get routing audit data for kublai's reflection."""
+    try:
+        from routing_audit import generate_audit, format_for_reflection
+        report = generate_audit(hours=hours)
+        if report.get("total_routed", 0) > 0:
+            return format_for_reflection(report)
+        return None
+    except Exception:
+        return None
+
+
 def generate_context(agent, hours=1):
     """Generate the compact reflection context for an agent.
 
@@ -263,6 +275,13 @@ def generate_context(agent, hours=1):
     lines.append("## System Metrics (from Tock)")
     lines.append(format_tock_agent_summary(tock_data, agent))
     lines.append("")
+
+    # Routing audit (kublai only — real routing/execution data)
+    if agent == "kublai":
+        audit_block = get_routing_audit(hours=hours)
+        if audit_block:
+            lines.append(audit_block)
+            lines.append("")
 
     # Active rules — THE key self-improvement signal
     lines.append("## YOUR BEHAVIORAL RULES (self-generated — you MUST follow these)")

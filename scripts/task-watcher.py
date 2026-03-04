@@ -25,30 +25,30 @@ from pathlib import Path
 from datetime import datetime
 from threading import Thread, Event
 
+sys.path.insert(0, str(Path(__file__).parent))
+from json_state import locked_json_read, locked_json_update
+
 # Configuration
 AGENTS_DIR = Path("/Users/kublai/.openclaw/agents/main/agent")
 STATE_FILE = Path("/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json")
 POLL_INTERVAL_DEFAULT = 15  # seconds
 TIMEOUT_DEFAULT = 240  # 4 minutes
+CLEANUP_INTERVAL = 3600  # Run cleanup every hour
+DONE_FILE_MAX_AGE = 48 * 3600  # 48 hours in seconds
 
 # Global state for daemon mode
 stop_event = Event()
 
 def load_state():
     """Load previously seen tasks from state file."""
-    if not STATE_FILE.exists():
-        return {}
-    try:
-        with open(STATE_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return {}
+    return locked_json_read(str(STATE_FILE), default={})
 
 def save_state(state):
     """Save current state to file."""
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f, indent=2)
+    with locked_json_update(str(STATE_FILE)) as data:
+        data.clear()
+        data.update(state)
 
 def list_pending_tasks(agent_dir):
     """List pending tasks for an agent, sorted by priority."""
@@ -77,74 +77,37 @@ def list_pending_tasks(agent_dir):
     return sorted(pending, key=priority_key)
 
 def execute_task(task_file, timeout):
-    """Execute a single task file. Returns (success, output)."""
-    # Mark as executing
-    executing_file = task_file.with_suffix(task_file.suffix + '.executing')
-    try:
-        task_file.rename(executing_file)
-    except Exception as e:
-        return False, f"Failed to mark task as executing: {e}"
-    
+    """Execute a single task file via agent-task-handler.py. Returns (success, output)."""
     # Determine agent from path
-    agent = executing_file.parent.parent.name
-    
-    # Read task content
-    try:
-        content = executing_file.read_text()[:2000]
-    except Exception as e:
-        return False, f"Failed to read task: {e}"
-    
-    # Execute via OpenClaw spawn
-    # This launches a subagent session using the agent's configured model from openclaw.json
-    # All Kurultai agents use CLOUD LLMs (bailian/*), NOT local LLMs:
-    #   - Kublai: bailian/qwen3.5-plus
-    #   - Möngke: bailian/MiniMax-M2.5
-    #   - Chagatai: bailian/kimi-k2.5
-    #   - Temüjin: bailian/MiniMax-M2.5
-    #   - Jochi: bailian/qwen3.5-plus
-    #   - Ögedei: bailian/qwen3.5-plus
-    # The --agent flag automatically uses the agent's default model configuration.
+    agent = task_file.parent.parent.name
+
+    # agent-task-handler.py handles the full lifecycle:
+    # marking as executing, calling the LLM, marking as completed/failed,
+    # and updating Neo4j state.
     cmd = [
-        "openclaw",
-        "agent",
+        "python3",
+        str(Path(__file__).parent / "agent-task-handler.py"),
         "--agent", agent,
-        "--message", f"Execute this task immediately: {content}",
-        "--thinking", "high"
+        "--task-file", str(task_file),
     ]
-    
+
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=str(executing_file.parent.parent.parent)
+            cwd=str(task_file.parent.parent.parent)
         )
-        
+
         if result.returncode == 0:
-            # Mark as completed
-            completed_file = executing_file.with_suffix(executing_file.suffix + '.completed.done')
-            executing_file.rename(completed_file)
             return True, result.stdout[:1000]
         else:
-            # Mark as completed with failure
-            completed_file = executing_file.with_suffix(executing_file.suffix + '.completed.done')
-            executing_file.rename(completed_file)
-            return False, result.stderr[:1000]
-            
+            return False, result.stderr[:1000] or result.stdout[:1000]
+
     except subprocess.TimeoutExpired:
-        # Revert to pending on timeout
-        try:
-            executing_file.rename(task_file)
-        except:
-            pass
         return False, f"Task timed out after {timeout}s"
     except Exception as e:
-        # Revert to pending on error
-        try:
-            executing_file.rename(task_file)
-        except:
-            pass
         return False, f"Execution error: {e}"
 
 def watch_cycle(poll_interval, max_tasks_per_cycle=1):
@@ -185,12 +148,39 @@ def watch_cycle(poll_interval, max_tasks_per_cycle=1):
     
     return tasks_executed
 
+def cleanup_done_files():
+    """Remove .done task files older than 48 hours."""
+    now = time.time()
+    removed = 0
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+        for f in tasks_dir.iterdir():
+            if '.done' not in f.name:
+                continue
+            try:
+                age = now - f.stat().st_mtime
+                if age > DONE_FILE_MAX_AGE:
+                    f.unlink()
+                    removed += 1
+            except OSError:
+                continue
+    if removed > 0:
+        print(f"[{datetime.now().isoformat()}] Cleaned up {removed} done task file(s)")
+    return removed
+
+
 def daemon_loop(poll_interval):
     """Main daemon loop."""
     print(f"[{datetime.now().isoformat()}] Task Watcher starting (poll interval: {poll_interval}s)")
     print(f"Watching: {AGENTS_DIR}")
     print(f"State file: {STATE_FILE}")
     
+    last_cleanup = 0
+
     while not stop_event.is_set():
         try:
             executed = watch_cycle(poll_interval)
@@ -198,6 +188,14 @@ def daemon_loop(poll_interval):
                 print(f"[{datetime.now().isoformat()}] Executed {executed} tasks")
         except Exception as e:
             print(f"[{datetime.now().isoformat()}] Error in watch cycle: {e}")
+
+        # Periodic cleanup of old .done files
+        if time.time() - last_cleanup > CLEANUP_INTERVAL:
+            try:
+                cleanup_done_files()
+            except Exception as e:
+                print(f"[{datetime.now().isoformat()}] Cleanup error: {e}")
+            last_cleanup = time.time()
         
         # Sleep in small increments to respond to stop_event quickly
         for _ in range(poll_interval):

@@ -90,6 +90,12 @@ echo "[$(date)] Concurrent Kurultai Reflection Complete"
 echo "================================================================"
 
 # ============================================================
+# ROUTING AUDIT: Analyze task routing and execution quality
+# ============================================================
+echo "[$(date)] Running Routing Audit..."
+python3 /Users/kublai/.openclaw/agents/main/scripts/routing_audit_action.py 2>/dev/null || true
+
+# ============================================================
 # KUBLAI ACTIONS: Process feedback into agent tasks
 # ============================================================
 echo "[$(date)] Running Kublai Actions (kurultai trigger)..."

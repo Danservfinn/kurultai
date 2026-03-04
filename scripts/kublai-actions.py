@@ -18,6 +18,9 @@ import sys
 import time
 from datetime import datetime
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from json_state import locked_json_read, locked_json_update
+
 BASE = "/Users/kublai/.openclaw/agents/main"
 AGENT_DIR = f"{BASE}/agent"
 TICKS_FILE = f"{BASE}/logs/ticks.jsonl"
@@ -27,7 +30,7 @@ COOLDOWN_FILE = f"{BASE}/logs/action-cooldowns.json"
 
 # Cooldown periods (seconds) to prevent duplicate task creation
 COOLDOWNS = {
-    "error_spike": 1800,       # 30 min
+    "error_spike": 7200,       # 2 hours
     "service_down": 600,       # 10 min
     "high_cpu": 1800,          # 30 min
     "high_memory": 1800,       # 30 min
@@ -37,14 +40,28 @@ COOLDOWNS = {
     "feedback_review": 7200,   # 2 hours
 }
 
-AGENT_ROUTING = {
-    "infrastructure": "ogedei",
-    "code_fix": "temujin",
-    "investigation": "jochi",
-    "documentation": "chagatai",
-    "research": "mongke",
-    "coordination": "kublai",
-}
+MAX_ACTIONS_PER_CYCLE = 3
+
+from task_router import route_by_category, route_by_text
+
+
+def has_pending_task(agent, title_prefix):
+    """Check if an agent already has an uncompleted task with this title prefix."""
+    task_dir = f"{AGENT_DIR}/{agent}/tasks"
+    if not os.path.exists(task_dir):
+        return False
+    for fname in os.listdir(task_dir):
+        if fname.endswith('.done') or fname.endswith('.done.md'):
+            continue
+        fpath = os.path.join(task_dir, fname)
+        try:
+            with open(fpath) as f:
+                content = f.read(500)
+            if f"# Task: {title_prefix}" in content:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def log(msg):
@@ -57,18 +74,13 @@ def log(msg):
 
 
 def load_cooldowns():
-    if os.path.exists(COOLDOWN_FILE):
-        try:
-            with open(COOLDOWN_FILE) as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
+    return locked_json_read(COOLDOWN_FILE, default={})
 
 
 def save_cooldowns(cooldowns):
-    with open(COOLDOWN_FILE, "w") as f:
-        json.dump(cooldowns, f, indent=2)
+    with locked_json_update(COOLDOWN_FILE) as data:
+        data.clear()
+        data.update(cooldowns)
 
 
 def is_cooled_down(action_key):
@@ -86,8 +98,19 @@ def mark_fired(action_key):
     save_cooldowns(cooldowns)
 
 
-def create_task(agent, priority, title, body, source="kublai-actions"):
-    """Create a task file in an agent's task queue."""
+MAX_TASK_DEPTH = 3
+
+
+def create_task(agent, priority, title, body, source="kublai-actions", depth=0):
+    """Create a task file in an agent's task queue.
+
+    Args:
+        depth: Current task chain depth. Rejects if >= MAX_TASK_DEPTH.
+    """
+    if depth >= MAX_TASK_DEPTH:
+        log(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} for '{title[:60]}' — preventing runaway chain")
+        return None
+
     task_dir = f"{AGENT_DIR}/{agent}/tasks"
     os.makedirs(task_dir, exist_ok=True)
 
@@ -100,6 +123,7 @@ agent: {agent}
 priority: {priority}
 created: {datetime.now().isoformat()}
 source: {source}
+depth: {depth}
 ---
 
 # Task: {title}
@@ -109,7 +133,7 @@ source: {source}
     with open(filepath, "w") as f:
         f.write(content)
 
-    log(f"ACTION: Created {priority} task for {agent}: {title}")
+    log(f"ACTION: Created {priority} task for {agent}: {title} (depth={depth})")
     return filepath
 
 
@@ -147,7 +171,7 @@ def tick_actions():
     tasks = tick.get("tasks", {})
 
     # Rule 1: Fatal errors — immediate high-priority investigation
-    if fatal_5m > 0 and not is_cooled_down("error_spike:fatal"):
+    if fatal_5m > 0 and not is_cooled_down("error_spike:fatal") and not has_pending_task("jochi", "Investigate FATAL"):
         create_task(
             "jochi", "high",
             "Investigate FATAL/CRASH errors in gateway log",
@@ -166,7 +190,7 @@ Total errors last 5m: {errors_5m}, last 1h: {errors_1h}.
         actions_created += 1
 
     # Rule 2: High error rate (non-fatal) — investigate
-    elif errors_5m > 50 and not is_cooled_down("error_spike:high"):
+    elif errors_5m > 50 and not is_cooled_down("error_spike:high") and not has_pending_task("jochi", "Investigate error spike"):
         create_task(
             "jochi", "normal",
             f"Investigate error spike: {errors_5m} errors in 5m",
@@ -185,7 +209,7 @@ No FATAL errors, but error rate is elevated.
 
     # Rule 3: Service down — create restart task
     for svc in ["neo4j", "redis"]:
-        if services.get(svc) == "down" and not is_cooled_down(f"service_down:{svc}"):
+        if services.get(svc) == "down" and not is_cooled_down(f"service_down:{svc}") and not has_pending_task("ogedei", f"Restart {svc}"):
             create_task(
                 "ogedei", "high",
                 f"Restart {svc} — service is DOWN",
@@ -207,7 +231,7 @@ Gateway status: {gateway.get('status', '?')}, HTTP: {gateway.get('http', '?')}
 
     # Rule 4: High CPU
     cpu = process.get("cpu_pct", 0)
-    if cpu > 80 and not is_cooled_down("high_cpu"):
+    if cpu > 80 and not is_cooled_down("high_cpu") and not has_pending_task("ogedei", "Investigate high CPU"):
         create_task(
             "ogedei", "normal",
             f"Investigate high CPU usage: {cpu}%",
@@ -226,7 +250,7 @@ Memory: {process.get('mem_pct', 0)}%, RSS: {process.get('rss_kb', 0)}KB
 
     # Rule 5: High memory
     rss_mb = process.get("rss_kb", 0) / 1024
-    if rss_mb > 900 and not is_cooled_down("high_memory"):
+    if rss_mb > 900 and not is_cooled_down("high_memory") and not has_pending_task("ogedei", "Investigate high memory"):
         create_task(
             "ogedei", "normal",
             f"Investigate high memory usage: {rss_mb:.0f}MB RSS",
@@ -241,6 +265,9 @@ OpenClaw gateway RSS is {rss_mb:.0f}MB (threshold: 900MB).
         )
         mark_fired("high_memory")
         actions_created += 1
+
+    if actions_created >= MAX_ACTIONS_PER_CYCLE:
+        log(f"TICK: hit MAX_ACTIONS_PER_CYCLE={MAX_ACTIONS_PER_CYCLE}, stopping early")
 
     if actions_created == 0:
         log(f"TICK: {decision} — no actions needed")
@@ -276,7 +303,7 @@ def tock_actions():
     for job in cron.get("jobs", []):
         consec = job.get("consecutive_errors", 0)
         name = job.get("name", "?")
-        if consec >= 3 and not is_cooled_down(f"cron_fix:{name}"):
+        if consec >= 3 and not is_cooled_down(f"cron_fix:{name}") and not has_pending_task("temujin", f"Fix cron job: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
             create_task(
                 "temujin", "high",
                 f"Fix cron job: {name} ({consec} consecutive errors)",
@@ -295,49 +322,35 @@ Last duration: {job.get('last_duration_ms', 0)}ms
             mark_fired(f"cron_fix:{name}")
             actions_created += 1
 
-    # Rule 2: Queue backlog — tasks piling up
+    # Rule 2: Queue backlog — log only (creating tasks worsens backlog)
     total_pending = queues.get("total_pending", 0)
     if total_pending > 10 and not is_cooled_down("queue_backlog"):
         by_agent = queues.get("by_agent", {})
         backlog_detail = ", ".join(
             f"{a}={c}" for a, c in by_agent.items() if c > 0
         )
-        create_task(
-            "kublai", "high",
-            f"Rebalance workload: {total_pending} tasks queued",
-            f"""## Context
-Task queue backlog: {total_pending} total pending.
-By agent: {backlog_detail}
-
-## Action Required
-1. Review pending tasks for each overloaded agent
-2. Determine if tasks can be redistributed to idle agents
-3. Check if task-consumer is running properly
-4. Consider temporarily increasing task-consumer frequency
-"""
-        )
+        log(f"TOCK: queue_backlog detected: {total_pending} pending ({backlog_detail}) — logging only, not creating task")
         mark_fired("queue_backlog")
-        actions_created += 1
 
-    # Rule 3: Agent stalled — has pending tasks but 0 completions in 30m
+    # Rule 3: Agent stalled — route to kublai for triage (not to the stalled agent)
     for name, data in agents.items():
         t = data.get("tasks", {})
         queue_depth = t.get("queue_depth", 0)
         completed = t.get("completed", 0)
         running = t.get("running", 0)
         if queue_depth > 0 and completed == 0 and running == 0:
-            if not is_cooled_down(f"agent_stalled:{name}"):
+            if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task("kublai", f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
                 create_task(
-                    name, "normal",
-                    f"Check in: you have {queue_depth} queued tasks with 0 completions",
+                    "kublai", "normal",
+                    f"Triage stalled agent: {name} has {queue_depth} queued tasks with 0 completions",
                     f"""## Context
-You ({name}) have {queue_depth} tasks in your file queue but 0 completions
+Agent {name} has {queue_depth} tasks in file queue but 0 completions
 in the last 30 minutes and nothing currently running.
 
 ## Action Required
-1. List your pending tasks: `ls ~/.openclaw/agents/main/agent/{name}/tasks/*.md`
-2. Pick the highest priority task and execute it
-3. If you're blocked on something, report the blocker
+1. Review {name}'s pending tasks
+2. Determine if tasks should be redistributed or if there's a blocker
+3. Take corrective action (reassign, cancel stale tasks, or investigate)
 """
                 )
                 mark_fired(f"agent_stalled:{name}")
@@ -345,7 +358,7 @@ in the last 30 minutes and nothing currently running.
 
     # Rule 4: LLM assessment says HIGH or CRITICAL
     severity = assessment.get("severity", "LOW")
-    if severity in ["HIGH", "CRITICAL"] and not is_cooled_down("tock_severity"):
+    if severity in ["HIGH", "CRITICAL"] and not is_cooled_down("tock_severity") and not has_pending_task("kublai", "Tock assessment:") and actions_created < MAX_ACTIONS_PER_CYCLE:
         action = assessment.get("recommended_action", "unknown")
         bottleneck = assessment.get("bottleneck", "unknown")
         create_task(
@@ -366,6 +379,9 @@ and take the recommended action or delegate to the appropriate agent.
         mark_fired("tock_severity")
         actions_created += 1
 
+    if actions_created >= MAX_ACTIONS_PER_CYCLE:
+        log(f"TOCK: hit MAX_ACTIONS_PER_CYCLE={MAX_ACTIONS_PER_CYCLE}, stopping early")
+
     if actions_created == 0:
         log(f"TOCK: severity={severity} — no actions needed")
     else:
@@ -382,11 +398,8 @@ def kurultai_actions():
     actions_created = 0
 
     try:
-        from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(
-            "bolt://localhost:7687",
-            auth=("neo4j", "myStrongPassword123")
-        )
+        from neo4j_task_tracker import get_driver
+        driver = get_driver()
 
         with driver.session() as session:
             # Get pending feedback sorted by priority
@@ -426,12 +439,12 @@ def kurultai_actions():
                     pass
 
                 # Only auto-create tasks for HIGH and CRITICAL
-                if priority in ["CRITICAL", "HIGH"]:
+                if priority in ["CRITICAL", "HIGH"] and actions_created < MAX_ACTIONS_PER_CYCLE:
                     # Determine target agent based on feedback content
                     target = _route_feedback(feedback_text)
                     task_priority = "high" if priority == "CRITICAL" else "normal"
 
-                    if not is_cooled_down(f"feedback_review:{fb_id}"):
+                    if not is_cooled_down(f"feedback_review:{fb_id}") and not has_pending_task(target, "Implement feedback from"):
                         create_task(
                             target, task_priority,
                             f"Implement feedback from {agent}: {feedback_text[:60]}",
@@ -483,19 +496,11 @@ def kurultai_actions():
 
 
 def _route_feedback(text):
-    """Route feedback to the appropriate agent based on content."""
-    text_lower = text.lower()
-    if any(w in text_lower for w in ["infrastructure", "deploy", "restart", "monitor", "cron"]):
-        return "ogedei"
-    if any(w in text_lower for w in ["code", "implement", "build", "fix", "script", "bug"]):
-        return "temujin"
-    if any(w in text_lower for w in ["test", "security", "audit", "analyze", "pattern"]):
-        return "jochi"
-    if any(w in text_lower for w in ["document", "write", "readme", "describe"]):
-        return "chagatai"
-    if any(w in text_lower for w in ["research", "discover", "api", "explore"]):
-        return "mongke"
-    return "kublai"
+    """Route feedback to the appropriate agent based on content.
+    Delegates to canonical task_router.
+    """
+    agent = route_by_text(text)
+    return agent if agent != "subagent" else "kublai"
 
 
 def main():

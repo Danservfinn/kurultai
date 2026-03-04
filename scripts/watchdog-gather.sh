@@ -15,6 +15,13 @@
 
 set -o pipefail
 
+# Source Neo4j credentials
+if [ -f "$HOME/.openclaw/credentials/neo4j.env" ]; then
+    set -a
+    source "$HOME/.openclaw/credentials/neo4j.env"
+    set +a
+fi
+
 BASE="$HOME/.openclaw/agents/main"
 LOGDIR="$BASE/logs"
 TICKS="$LOGDIR/ticks.jsonl"
@@ -80,7 +87,7 @@ fi
 NEO4J_STATUS=$(python3 -c "
 from neo4j import GraphDatabase
 try:
-    d=GraphDatabase.driver('bolt://localhost:7687',auth=('neo4j','myStrongPassword123'))
+    import os as _os; d=GraphDatabase.driver(_os.getenv('NEO4J_URI','bolt://localhost:7687'),auth=(_os.getenv('NEO4J_USER','neo4j'),_os.getenv('NEO4J_PASSWORD','myStrongPassword123')))
     d.verify_connectivity(); print('up'); d.close()
 except: print('down')
 " 2>/dev/null || echo "unknown")
@@ -120,13 +127,11 @@ for agent in "${AGENTS[@]}"; do
     fi
 done
 
-# Push forward: run task-consumer and spawn-consumer (non-blocking, backgrounded)
+# Push forward: run spawn-consumer (non-blocking, backgrounded)
+# NOTE: task-consumer.sh removed — task-watcher.py daemon is now sole dispatcher
 if [ "$TASKS_PENDING_TOTAL" -gt 0 ] || [ -f "$BASE/logs/spawn-pending.json" ]; then
-    # Run task consumer for pending file-based tasks
-    if [ "$TASKS_PENDING_TOTAL" -gt 0 ] && [ -x "$SCRIPTS/task-consumer.sh" ]; then
-        bash "$SCRIPTS/task-consumer.sh" >> "$LOGDIR/task-consumer.log" 2>&1 &
-        TASKS_DISPATCHED=$TASKS_PENDING_TOTAL
-    fi
+    # task-watcher.py (launchd daemon) handles file-based task dispatch
+    TASKS_DISPATCHED=0
 
     # Run spawn consumer for spawn queue
     if [ -f "$BASE/logs/spawn-pending.json" ]; then
