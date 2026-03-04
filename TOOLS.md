@@ -24,14 +24,33 @@
 - `process`: Manage background processes
 - `message`: Signal/Telegram messaging
 
+### Coding Agent (Claude Code)
+For all coding tasks, use the **coding-agent skill** with Claude Code:
+
+```bash
+# Quick one-shot task
+bash pty:true command:"cd ~/project && claude -p 'Your task here'"
+
+# Background task with monitoring
+bash pty:true background:true workdir:~/project command:"claude -p 'Build feature X'"
+# Returns sessionId for process tool monitoring
+```
+
+**When to use coding-agent:**
+- Building new features or apps
+- Reviewing PRs
+- Refactoring large codebases
+- Iterative coding needing file exploration
+
+**NOT for:**
+- Simple one-liner fixes (use edit tool)
+- Reading code (use read tool)
+- Work in ~/clawd workspace
+
 ### Specialized Skills
 - **nano-banana-pro**: Image generation/editing via Google Gemini
-  ```bash
-  python3 ~/.codex/skills/nano-banana-pro/nanobanana.py \
-    --prompt "your prompt" \
-    --output "output.png" \
-    --model "gemini-3.1-flash-image-preview"
-  ```
+- **kurultai-reflection**: Hourly agent reflection
+- **heartbeat-watchdog**: LLM-powered gateway monitoring
 
 ### Horde Skills (Multi-Agent Orchestration)
 - `/golden-horde`: 9 multi-agent patterns
@@ -56,6 +75,13 @@
 - **X/Twitter:** `~/.openclaw/agents/main/.x_api_credentials`
 - **Gemini (Nano Banana):** `GEMINI_API_KEY` env var
 
+### Claude Code
+- **Location:** `/opt/homebrew/bin/claude` (v2.1.66)
+- **Auth:** OAuth (claude.ai Max subscription)
+- **Config:** `~/.claude/settings.json`
+- **Plugins:** 13 installed (hookify, superpowers, playwright, etc.)
+- **Skills:** 76 installed via claude-code-setup
+
 ### Railway Projects
 - **Parse:** `parsethe.media` (OpenRouter integrated)
 - **LLM Survivor:** `llmsurvivor.kurult.ai`
@@ -69,6 +95,12 @@
 2. Route to appropriate specialist agent
 3. Set clear review expectations
 4. Track completion via Neo4j
+
+### Coding with Claude Code
+1. Use `pty:true` for interactive CLI
+2. Set `workdir` to project folder
+3. Use `background:true` for long tasks
+4. Monitor via `process` tool
 
 ### Context Management
 - Load full context at session start
@@ -95,6 +127,9 @@ openclaw cron list
 # Check Neo4j
 python3 -c "from neo4j import GraphDatabase; d=GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j','neo4j')); print(d.verify_connectivity())"
 
+# Claude Code one-shot
+claude -p "Your task here"
+
 # Generate image
 python3 ~/.codex/skills/nano-banana-pro/nanobanana.py --prompt "prompt" --output "out.png"
 ```
@@ -107,3 +142,4 @@ python3 ~/.codex/skills/nano-banana-pro/nanobanana.py --prompt "prompt" --output
 - First autonomous thread posted successfully
 - Nano-banana-pro: gemini-3.1-flash tested & working
 - Parse: OpenRouter integration LIVE
+- Claude Code: Installed & configured with 76 skills, 13 plugins
