@@ -1,10 +1,10 @@
-TICK 2026-03-04 11:27:27
-GATEWAY: up pid=14245,14333,14372,14445,14727 http=200 latency=1ms uptime=7h18m
+TICK 2026-03-04 11:32:27
+GATEWAY: up pid=14245,14333,14372,14445,14727 http=200 latency=1ms uptime=7h23m
 PROCESS: cpu=0.0% mem=0.0% rss=1MB threads=2
-ERRORS:  last5m=95 last1h=318 fatal=0
+ERRORS:  last5m=92 last1h=336 fatal=0
 SERVICES: neo4j=up redis=up
 TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
-TRENDS:  uptime_1h=100.0% avg_cpu=0.0% errors_1h=1278 restarts_1h=0
+TRENDS:  uptime_1h=100.0% avg_cpu=0.0% errors_1h=1265 restarts_1h=0
 DECISION: degraded
 ACTION:   warn
-REASON:   95 errors in 5m
+REASON:   92 errors in 5m

@@ -1,17 +1,6 @@
 {
   "spawns": [
     {
-      "agent": "jochi",
-      "model": "MiniMax-M2.5",
-      "task": "You are Jochi, Analyst.\nCapabilities: testing, security, pattern_recognition, analysis, validation\n\nTask: Investigate error spike: 108 errors in 5m",
-      "priority": "normal",
-      "label": "jochi-exec-1772640147",
-      "source": "agent_execution",
-      "destination": "subagent",
-      "status": "running",
-      "last_spawned": "2026-03-04T11:03:50.520307"
-    },
-    {
       "agent": "temujin",
       "model": "qwen3.5-plus",
       "task": "You are Temujin, Developer.\nCapabilities: code_generation, code_review, debugging, deployment, infrastructure\n\nTask: Fix TypeScript, deploy agent services",
@@ -21,7 +10,17 @@
       "destination": "subagent",
       "status": "running",
       "last_spawned": "2026-03-04T11:13:50.963790"
+    },
+    {
+      "agent": "jochi",
+      "model": "MiniMax-M2.5",
+      "task": "You are Jochi, Analyst.\nCapabilities: testing, security, pattern_recognition, analysis, validation\n\nTask: Investigate error spike: 92 errors in 5m",
+      "priority": "normal",
+      "label": "jochi-exec-1772642100",
+      "source": "agent_execution",
+      "destination": "subagent",
+      "status": "ready"
     }
   ],
-  "updated": 1772641800.35118
+  "updated": 1772642100.289848
 }

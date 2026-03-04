@@ -609,9 +609,13 @@ Report in heartbeat: tasks_completed: N
 - `logs/task-watcher-state.json` - Executed task state (auto-created)
 - `~/Library/LaunchAgents/com.kurultai.task-watcher.plist` - Daemon config
 
-**Legacy** (deprecated but kept for compatibility):
-- `scripts/task-consumer.sh` - No longer primary execution path
-- `scripts/spawn-consumer.sh` - Still used for non-heartbeat spawns
+**Legacy** (deprecated - cron jobs disabled 2026-03-04 11:33 AM):
+- `scripts/task-consumer.sh` - Replaced by task-watcher daemon (10s polling) + heartbeat-task-executor (5min)
+- `scripts/spawn-consumer.sh` - Replaced by direct `openclaw agent` calls in task execution scripts
+
+**Scripts kept for reference only** (no longer scheduled):
+- Both scripts remain in `scripts/` directory for reference
+- Can be re-enabled if needed, but task-watcher + heartbeat-task-executor are preferred
 
 **Testing**: First full cycle at 2026-03-04 12:00 PM reflection
 
