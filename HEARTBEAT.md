@@ -10,7 +10,7 @@
 ### Infrastructure
 - [ ] **Gateway:** `openclaw gateway status` → running?
 - [ ] **Sessions:** Recent activity in last 30 min?
-- [ ] **Parse:** `curl -s -o /dev/null -w "%{http_code}" https://parsethe.media/parse` → 200?
+- [ ] **Parse:** `curl -s -o /dev/null -w "%{http_code}" https://www.parsethe.media` → 200?
 - [ ] **LLM Survivor:** `curl -s -o /dev/null -w "%{http_code}" https://llmsurvivor.kurult.ai/` → 200?
 
 ### Agent Health
