@@ -10,6 +10,28 @@
 
 set -o pipefail
 
+# Single-instance lock — prevents concurrent tocks (e.g., after sleep/wake catch-up)
+LOCK_DIR="/tmp/tock-gather.lock"
+_cleanup_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
+trap _cleanup_lock EXIT
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    if [ -f "$LOCK_DIR/pid" ]; then
+        OLD_PID=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+        if [ -n "$OLD_PID" ] && ! kill -0 "$OLD_PID" 2>/dev/null; then
+            rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"
+            mkdir "$LOCK_DIR" 2>/dev/null || { echo "[$(date '+%Y-%m-%d %H:%M:%S')] TOCK | SKIP: lock contention" >> "/Users/kublai/.openclaw/agents/main/logs/tock.log"; exit 0; }
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] TOCK | SKIP: already running (pid=$OLD_PID)" >> "/Users/kublai/.openclaw/agents/main/logs/tock.log"
+            exit 0
+        fi
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TOCK | SKIP: already running" >> "/Users/kublai/.openclaw/agents/main/logs/tock.log"
+        exit 0
+    fi
+fi
+echo $$ > "$LOCK_DIR/pid"
+
 # Source Neo4j credentials
 if [ -f "$HOME/.openclaw/credentials/neo4j.env" ]; then
     set -a
@@ -36,13 +58,15 @@ mkdir -p "$OUTDIR"
 # 1. Neo4j: Per-agent task metrics + delegations + errors
 # ============================================================
 NEO4J_DATA=$(python3 2>/dev/null << 'PYEOF'
-import json
+import json, signal
+signal.alarm(30)  # kill after 30 seconds
 try:
     from neo4j import GraphDatabase
     import os as _os
     driver = GraphDatabase.driver(
         _os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-        auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123"))
+        auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123")),
+        connection_timeout=5, max_transaction_retry_time=5
     )
     results = {}
     with driver.session() as session:
@@ -284,7 +308,7 @@ PYEOF
 )
 
 # ============================================================
-# 8. LLM Assessment (direct API call to local model)
+# 8. LLM Assessment (direct API call to Ollama)
 # ============================================================
 LLM_ASSESSMENT=$(python3 << PYEOF
 import json, requests
@@ -304,20 +328,19 @@ SEVERITY: LOW|MEDIUM|HIGH|CRITICAL"""
 
 try:
     resp = requests.post(
-        "http://localhost:1234/v1/chat/completions",
+        "http://localhost:11434/api/chat",
         json={
-            "model": "qwen3.5-9b-mlx",
+            "model": "qwen3.5:9b",
             "messages": [
                 {"role": "system", "content": "You are a concise operations analyst. Respond only in the exact format requested. No thinking tags."},
                 {"role": "user", "content": prompt}
             ],
-            "max_tokens": 200,
-            "temperature": 0.3
+            "stream": False
         },
-        timeout=110
+        timeout=90
     )
     if resp.status_code == 200:
-        text = resp.json()["choices"][0]["message"]["content"].strip()
+        text = resp.json()["message"]["content"].strip()
         import re
         text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
         print(text)
@@ -338,7 +361,7 @@ import json
 raw = """$LLM_ASSESSMENT"""
 data = json.loads('''$ASSEMBLED''')
 
-assessment = {"model":"lmstudio/qwen3.5-9b-mlx","workload_balance":"","bottleneck":"","coordination_gap":"","recommended_action":"","severity":"LOW"}
+assessment = {"model":"ollama/qwen3.5:9b","workload_balance":"","bottleneck":"","coordination_gap":"","recommended_action":"","severity":"LOW"}
 
 if raw.strip() != "FALLBACK" and "WORKLOAD:" in raw:
     for line in raw.strip().split("\n"):
@@ -403,7 +426,7 @@ echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TO
 # ============================================================
 # KUBLAI ACTIONS: Create tasks based on tock findings
 # ============================================================
-python3 "$BASE/scripts/kublai-actions.py" --trigger tock 2>/dev/null &
+python3 "$BASE/scripts/kublai-actions.py" --trigger tock >> "$BASE/logs/kublai-actions.log" 2>&1 &
 
 # Output for LLM
 echo "TOCK COMPLETE. Severity: $SEVERITY. Bottleneck: $BOTTLENECK"
