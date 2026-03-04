@@ -1,4 +1,27 @@
 {
-  "spawns": [],
-  "updated": 1772591122.870453
+  "spawns": [
+    {
+      "agent": "temujin",
+      "model": "qwen3.5-plus",
+      "task": "You are Temujin, Developer.\nCapabilities: code_generation, code_review, debugging, deployment, infrastructure\n\nTask: Fix cron job: heartbeat-watchdog (7 consecutive errors)",
+      "priority": "normal",
+      "label": "temujin-exec-1772607300",
+      "source": "agent_execution",
+      "destination": "subagent",
+      "status": "running",
+      "last_spawned": "2026-03-04T01:55:26.143180"
+    },
+    {
+      "agent": "jochi",
+      "model": "MiniMax-M2.5",
+      "task": "You are Jochi, Analyst.\nCapabilities: testing, security, pattern_recognition, analysis, validation\n\nTask: Investigate error spike: 446 errors in 5m",
+      "priority": "normal",
+      "label": "jochi-exec-1772607467",
+      "source": "agent_execution",
+      "destination": "subagent",
+      "status": "running",
+      "last_spawned": "2026-03-04T01:58:00.436170"
+    }
+  ],
+  "updated": 1772607720.722327
 }

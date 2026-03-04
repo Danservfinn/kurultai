@@ -45,7 +45,12 @@ process_agent() {
     # Find pending tasks (high-*, normal-*, low-*.md, not .done, not .executing)
     shopt -s nullglob
     local tasks=()
-    tasks=("$task_dir"/high-*.md "$task_dir"/normal-*.md "$task_dir"/low-*.md)
+    for f in "$task_dir"/high-*.md "$task_dir"/normal-*.md "$task_dir"/low-*.md; do
+        # Skip files that are .done or .executing
+        if [[ "$f" != *.done.md ]] && [[ "$f" != *.executing.md ]]; then
+            tasks+=("$f")
+        fi
+    done
     
     if [ ${#tasks[@]} -eq 0 ]; then
         return

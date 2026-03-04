@@ -1,60 +1,73 @@
 #!/bin/bash
 # Concurrent Kurultai Reflection - All 6 Agents Reflect Simultaneously
 # Runs every hour with all agents reflecting in parallel
+#
+# Option B: Protocol-based reflections (~800 tokens/agent vs ~6400 legacy)
+# - Role-specific protocols with WHEN/THEN behavioral rules
+# - Commitment tracking across sessions
+# - Tock data replaces redundant CLI calls
 
 set -e
 
-echo "[$(date)] Starting Concurrent Kurultai Reflection (All 6 Agents)"
+echo "[$(date)] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]"
 echo "================================================================"
 
-# All 6 agents reflect concurrently
 AGENTS=("kublai" "mongke" "chagatai" "temujin" "jochi" "ogedei")
 HOURS=1
-CHAT_HOURS=2
+SCRIPTS="/Users/kublai/.openclaw/agents/main/scripts"
 
-# Function to run reflection for a single agent (runs in background)
+# Function to run reflection for a single agent
 run_agent_reflection() {
     local AGENT="$1"
     local WORKSPACE="/Users/kublai/.openclaw/agents/$AGENT"
     local MEMORY_DIR="$WORKSPACE/memory"
     local DATE=$(date +%Y-%m-%d)
     local TIME=$(date +%H:%M)
-    
-    echo "[$(date)] [$AGENT] Starting reflection..."
-    
+
+    echo "[$(date)] [$AGENT] Starting protocol reflection..."
+
     # Ensure memory directory exists
     mkdir -p "$MEMORY_DIR"
-    
-    # Get task metrics from Neo4j
-    local task_metrics=$(python3 /Users/kublai/.openclaw/agents/main/scripts/reflection_data.py \
-        --agent "$AGENT" \
-        --hours "$HOURS" 2>/dev/null || echo '{"tasks":{"total":0}}')
-    
-    # Generate meta-reflection with chat review and heartbeat task review
-    local reflection=$(python3 /Users/kublai/.openclaw/agents/main/scripts/meta_reflection.py \
+
+    # Generate protocol-based reflection (Option B: ~800 tokens)
+    local reflection=$(python3 "$SCRIPTS/meta_reflection.py" \
         --agent "$AGENT" \
         --hours "$HOURS" \
-        --chat-review \
-        --chat-hours "$CHAT_HOURS" \
+        --protocol \
         --heartbeat-review 2>/dev/null || echo "# Reflection unavailable")
-    
-    # Write reflection to memory
-    cat >> "$MEMORY_DIR/$DATE.md" << EOF
+
+    # Write reflection to memory with ACTIVE RULES section preserved
+    # Check if ACTIVE RULES section already exists in today's file
+    if [ -f "$MEMORY_DIR/$DATE.md" ] && grep -q "^## ACTIVE RULES" "$MEMORY_DIR/$DATE.md"; then
+        # Append session log only (rules already at top)
+        cat >> "$MEMORY_DIR/$DATE.md" << EOF
 
 ---
 
-## $TIME - Hourly Reflection (Concurrent Kurultai)
-
-**Agent:** $AGENT  
-**Period:** Last $HOURS hour(s)  
-**Chat Review:** Last $CHAT_HOURS hours
+## SESSION LOG - $TIME (Protocol Reflection)
 
 $reflection
 
 ---
 EOF
-    
-    echo "[$(date)] [$AGENT] Reflection complete → $MEMORY_DIR/$DATE.md"
+    else
+        # First reflection of the day — include header
+        cat >> "$MEMORY_DIR/$DATE.md" << EOF
+
+---
+
+## $TIME - Hourly Reflection (Protocol Mode)
+
+**Agent:** $AGENT
+**Period:** Last $HOURS hour(s)
+
+$reflection
+
+---
+EOF
+    fi
+
+    echo "[$(date)] [$AGENT] Protocol reflection complete -> $MEMORY_DIR/$DATE.md"
 }
 
 # Run all 6 agents sequentially in a cascade
@@ -75,6 +88,12 @@ python3 /Users/kublai/.openclaw/agents/main/scripts/kublai_review_feedback.py --
 
 echo "[$(date)] Concurrent Kurultai Reflection Complete"
 echo "================================================================"
+
+# ============================================================
+# KUBLAI ACTIONS: Process feedback into agent tasks
+# ============================================================
+echo "[$(date)] Running Kublai Actions (kurultai trigger)..."
+python3 /Users/kublai/.openclaw/agents/main/scripts/kublai-actions.py --trigger kurultai 2>/dev/null || true
 
 # List pending feedback for Kublai
 echo ""

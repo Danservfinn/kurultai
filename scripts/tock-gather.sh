@@ -28,7 +28,7 @@ mkdir -p "$OUTDIR"
 # ============================================================
 # 1. Neo4j: Per-agent task metrics + delegations + errors
 # ============================================================
-NEO4J_DATA=$(python3 << 'PYEOF' 2>/dev/null || echo '{"error":"neo4j_unavailable"}')
+NEO4J_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json
 try:
     from neo4j import GraphDatabase
@@ -78,6 +78,7 @@ except Exception as e:
     print(json.dumps({"error": str(e)}))
 PYEOF
 )
+NEO4J_DATA=${NEO4J_DATA:-'{"error":"neo4j_unavailable"}'}
 
 # ============================================================
 # 2. Session usage from gateway
@@ -87,7 +88,7 @@ SESSION_DATA=$(timeout 15 openclaw gateway call status --json 2>/dev/null || ech
 # ============================================================
 # 3. Cron job health
 # ============================================================
-CRON_DATA=$(python3 << 'PYEOF' 2>/dev/null || echo '{"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]}')
+CRON_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json
 try:
     with open("/Users/kublai/.openclaw/cron/jobs.json") as f:
@@ -114,11 +115,12 @@ except Exception as e:
     print(json.dumps({"error": str(e)}))
 PYEOF
 )
+CRON_DATA=${CRON_DATA:-'{"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]}'}
 
 # ============================================================
 # 4. Task queue depths (file-based)
 # ============================================================
-QUEUE_DATA=$(python3 << 'PYEOF' 2>/dev/null || echo '{}')
+QUEUE_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json, os, glob
 base = "/Users/kublai/.openclaw/agents/main/agent"
 queues = {}
@@ -136,6 +138,7 @@ for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
 print(json.dumps(queues))
 PYEOF
 )
+QUEUE_DATA=${QUEUE_DATA:-'{}'}
 
 # Spawn queue
 SPAWN_COUNT=$(python3 -c "
@@ -150,12 +153,13 @@ else: print(0)
 # ============================================================
 # 5. Last tick status
 # ============================================================
-TICK_STATUS=$(tail -1 "$BASE/logs/watchdog.log" 2>/dev/null | grep -o "status=[a-z]*" | cut -d= -f2 || echo "unknown")
+TICK_STATUS=$(tail -1 "$BASE/logs/watchdog.log" 2>/dev/null | grep -o "status=[a-z]*" | cut -d= -f2; true)
+TICK_STATUS=${TICK_STATUS:-unknown}
 
 # ============================================================
 # 6. Assemble full JSON
 # ============================================================
-ASSEMBLED=$(python3 << PYEOF 2>/dev/null)
+ASSEMBLED=$(python3 << PYEOF
 import json
 
 neo4j = json.loads('''$NEO4J_DATA''')
@@ -233,10 +237,16 @@ print(json.dumps(output, indent=2, default=str))
 PYEOF
 )
 
+if [ -z "$ASSEMBLED" ]; then
+    echo "[$TS] TOCK | ERROR: assembly failed" >> "$TOCK_LOG"
+    echo "TOCK FAILED: data assembly error"
+    exit 1
+fi
+
 # ============================================================
 # 7. Generate LLM summary (under 500 tokens)
 # ============================================================
-LLM_SUMMARY=$(python3 << PYEOF 2>/dev/null)
+LLM_SUMMARY=$(python3 << PYEOF
 import json
 data = json.loads('''$ASSEMBLED''')
 lines = ["TOCK SUMMARY $TS", ""]
@@ -265,7 +275,7 @@ PYEOF
 # ============================================================
 # 8. LLM Assessment (direct API call to local model)
 # ============================================================
-LLM_ASSESSMENT=$(timeout 120 python3 << PYEOF 2>/dev/null || echo "FALLBACK")
+LLM_ASSESSMENT=$(python3 << PYEOF
 import json, requests
 
 summary = """$LLM_SUMMARY"""
@@ -297,7 +307,6 @@ try:
     )
     if resp.status_code == 200:
         text = resp.json()["choices"][0]["message"]["content"].strip()
-        # Strip thinking tags if present
         import re
         text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
         print(text)
@@ -307,11 +316,12 @@ except:
     print("FALLBACK")
 PYEOF
 )
+LLM_ASSESSMENT=${LLM_ASSESSMENT:-FALLBACK}
 
 # ============================================================
 # 9. Parse LLM response or heuristic fallback
 # ============================================================
-LLM_JSON=$(python3 << PYEOF 2>/dev/null)
+LLM_JSON=$(python3 << PYEOF
 import json
 
 raw = """$LLM_ASSESSMENT"""
@@ -356,15 +366,13 @@ PYEOF
 # ============================================================
 # 10. Write outputs
 # ============================================================
-# Merge assessment into assembled data
 python3 << PYEOF
-import json
+import json, os
 data = json.loads('''$ASSEMBLED''')
 assessment = json.loads('''$LLM_JSON''')
 data["llm_assessment"] = assessment
 with open("$OUTFILE", "w") as f:
     json.dump(data, f, indent=2, default=str)
-import os
 latest = "$LATEST"
 if os.path.islink(latest) or os.path.exists(latest):
     os.remove(latest)
@@ -377,8 +385,14 @@ BOTTLENECK=$(python3 -c "import json; print(json.loads('''$LLM_JSON''').get('bot
 TASKS_DONE=$(python3 -c "import json; d=json.loads('''$ASSEMBLED'''); print(sum(a['tasks']['completed'] for a in d['agents'].values()))" 2>/dev/null || echo 0)
 TASKS_FAIL=$(python3 -c "import json; d=json.loads('''$ASSEMBLED'''); print(sum(a['tasks']['failed'] for a in d['agents'].values()))" 2>/dev/null || echo 0)
 Q_TOTAL=$(python3 -c "import json; print(json.loads('''$ASSEMBLED''').get('queues',{}).get('total_pending',0))" 2>/dev/null || echo 0)
+CRON_ERR=$(python3 -c "import json; print(json.loads('''$CRON_DATA''').get('erroring',0))" 2>/dev/null || echo 0)
 
-echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$(python3 -c "import json; print(json.loads('''$CRON_DATA''').get('erroring',0))" 2>/dev/null || echo 0) | severity=$SEVERITY | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | severity=$SEVERITY | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+
+# ============================================================
+# KUBLAI ACTIONS: Create tasks based on tock findings
+# ============================================================
+python3 "$BASE/scripts/kublai-actions.py" --trigger tock 2>/dev/null &
 
 # Output for LLM
 echo "TOCK COMPLETE. Severity: $SEVERITY. Bottleneck: $BOTTLENECK"

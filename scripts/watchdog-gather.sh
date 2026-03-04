@@ -251,23 +251,24 @@ printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"lat
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-cat > "$SUMMARY" << SUMEOF
-TICK $TS
-GATEWAY: $GW_STATUS pid=$PIDS http=$HTTP latency=${LATENCY_MS}ms uptime=$UPTIME_H
-PROCESS: cpu=${CPU:-0}% mem=${MEM:-0}% rss=${RSS_MB}MB threads=${THREADS:-0}
-ERRORS:  last5m=$ERRORS_5M last1h=$ERRORS_1H fatal=$FATAL_5M
-SERVICES: neo4j=$NEO4J_STATUS redis=$REDIS_STATUS
-TASKS:   pending=$TASKS_PENDING_TOTAL dispatched=$TASKS_DISPATCHED spawn=$SPAWN_COUNT queues=[$TASK_QUEUE_STATUS]
-TRENDS:  uptime_1h=${UPTIME_1H}% avg_cpu=${AVG_CPU_1H}% errors_1h=$ERRORS_TREND_1H restarts_1h=$RESTARTS_1H
-DECISION: $STATUS
-ACTION:   $ACTION
-REASON:   $REASON
-SUMEOF
+printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% errors_1h=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+    "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" \
+    "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
+    "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
+    "$NEO4J_STATUS" "$REDIS_STATUS" \
+    "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "$SPAWN_COUNT" "$TASK_QUEUE_STATUS" \
+    "$UPTIME_1H" "$AVG_CPU_1H" "$ERRORS_TREND_1H" "$RESTARTS_1H" \
+    "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
 
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
 echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
+
+# ============================================================
+# KUBLAI ACTIONS: Create tasks based on tick findings
+# ============================================================
+python3 "$SCRIPTS/kublai-actions.py" --trigger tick 2>/dev/null &
 
 # ============================================================
 # Output for the LLM
