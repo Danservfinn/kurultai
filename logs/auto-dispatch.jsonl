@@ -53,3 +53,26 @@
 {"ts": "2026-03-05T12:04:03.730102", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 10279}
 {"ts": "2026-03-05T12:04:03.731758", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 31777}
 {"ts": "2026-03-05T12:04:03.732210", "action": "cycle_complete", "stats": {"reverted": 4, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:09:03.829108", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 35710}
+{"ts": "2026-03-05T12:09:03.831654", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 34102}
+{"ts": "2026-03-05T12:09:03.831920", "action": "revert_stale", "agent": "mongke", "task": "direct-1772583732.md", "stuck_secs": 146811}
+{"ts": "2026-03-05T12:09:03.832038", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 17885}
+{"ts": "2026-03-05T12:09:03.834261", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 34103}
+{"ts": "2026-03-05T12:09:03.834515", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 10579}
+{"ts": "2026-03-05T12:09:03.836119", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 34104}
+{"ts": "2026-03-05T12:09:03.836543", "action": "cycle_complete", "stats": {"reverted": 4, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:09:20.418260", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 35727}
+{"ts": "2026-03-05T12:09:20.418719", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 17902}
+{"ts": "2026-03-05T12:09:20.419002", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 10595}
+{"ts": "2026-03-05T12:09:20.419390", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:09:48.235385", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 34370}
+{"ts": "2026-03-05T12:09:48.236921", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 34371}
+{"ts": "2026-03-05T12:09:48.238275", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 34372}
+{"ts": "2026-03-05T12:09:48.238613", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 3, "skipped_busy": 2, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:10:00.909939", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 35767}
+{"ts": "2026-03-05T12:10:00.914202", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 34470}
+{"ts": "2026-03-05T12:10:00.914796", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 17942}
+{"ts": "2026-03-05T12:10:00.918086", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 34471}
+{"ts": "2026-03-05T12:10:00.918645", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 10636}
+{"ts": "2026-03-05T12:10:00.922859", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 34472}
+{"ts": "2026-03-05T12:10:00.924060", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 3, "skipped_busy": 2, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
