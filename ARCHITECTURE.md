@@ -1,7 +1,7 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.2  
-**Last Updated**: 2026-03-04  
+**Version**: 1.4
+**Last Updated**: 2026-03-05  
 **Status**: Active Production System  
 **Agent**: Kublai (Squad Lead / Router)  
 **Platform**: OpenClaw Gateway  
@@ -375,101 +375,129 @@ src/
 - ✅ File change detection (last hour)
 - ✅ Configuration change detection
 
-### 4. Immediate Task Execution (task-watcher daemon)
+### 4. Task Execution Chain (task-watcher -> agent-task-handler -> claude-agent)
 
-**Purpose**: Execute tasks within 10 seconds of creation (not waiting for heartbeat)  
-**Status**: ✅ Active (implemented 2026-03-04 11:30 AM)  
-**Schedule**: Continuous (polls every 10 seconds)
+**Purpose**: Execute tasks within 15 seconds of creation via Claude Code, with concurrent per-agent parallelism and instant subagent spawning
+**Status**: Active (implemented 2026-03-04, fixed 2026-03-05, concurrent + spawn integration 2026-03-05)
+**Schedule**: Continuous (polls every 15 seconds)
 
-**Components**:
-- **task-watcher.py** (`scripts/task-watcher.py`):
-  - Runs as launchd daemon (`com.kurultai.task-watcher`)
-  - Polls `agent/*/tasks/` every 10 seconds
-  - Detects new `*.md` files (not in state file)
-  - Executes immediately via `openclaw agent --agent <id>`
-  - **Model**: Uses agent's configured model from `openclaw.json` (ALL CLOUD LLMS)
-  - Tracks executed tasks in `logs/task-watcher-state.json`
-  - Timeout: 4 minutes per task
+**Concurrency Model**:
+- `ThreadPoolExecutor(max_workers=6)` -- one execution slot per agent
+- All 6 agents can run Claude Code tasks **simultaneously**
+- Each agent processes one task at a time (queued tasks wait for current to finish)
+- Spawn queue processed every cycle -- subagent requests routed within 15s (was 2 min via cron)
 
-**Agent Model Configuration** (all cloud LLMs via Alibaba Cloud/DashScope):
-| Agent | Model | Type |
-|-------|-------|------|
-| Kublai | bailian/qwen3.5-plus | ☁️ Cloud |
-| Möngke | bailian/MiniMax-M2.5 | ☁️ Cloud |
-| Chagatai | bailian/kimi-k2.5 | ☁️ Cloud |
-| Temüjin | bailian/MiniMax-M2.5 | ☁️ Cloud |
-| Jochi | bailian/qwen3.5-plus | ☁️ Cloud |
-| Ögedei | bailian/qwen3.5-plus | ☁️ Cloud |
+**Three-Layer Execution Stack**:
+
+1. **task-watcher.py** (`scripts/task-watcher.py`) -- Detection + Spawn layer:
+   - Runs as launchd daemon (`com.kurultai.task-watcher`)
+   - Polls `~/.openclaw/agents/<agent>/tasks/` every 15 seconds
+   - **Spawn queue**: Reads `logs/spawn-pending.json` every cycle:
+     - `agent_execution` spawns: Launches Claude Code directly via Popen (non-blocking)
+     - `agent_delegation` spawns: Creates task file in agent queue (picked up next cycle)
+   - Detects new `*.md` files (not in state file)
+   - Submits to ThreadPoolExecutor: `agent-task-handler.py --agent <name> --task-file <path>`
+   - Tracks executed tasks in `logs/task-watcher-state.json`
+
+2. **agent-task-handler.py** (`scripts/agent-task-handler.py`) -- Coordination layer:
+   - Marks task as `.executing.md`
+   - Loads agent config (role, workspace path)
+   - Calls `claude-agent` wrapper with full task content
+   - Writes result to `<agent>/workspace/task-<epoch>.md`
+   - Marks task as `.completed.done.md` or `.failed.done.md`
+   - Updates Neo4j agent state
+   - Can spawn subagents via `spawn_subagent()` (writes to spawn-pending.json, depth-limited to 3)
+
+3. **claude-agent** (`~/.local/bin/claude-agent`) -- Execution layer:
+   - Wrapper around `claude` CLI (Claude Code)
+   - **Model**: Claude Opus (via OAuth login, no API key)
+   - **No budget cap** -- runs until task is complete
+   - Adds `--dangerously-skip-permissions` for non-interactive execution
+   - Strips CLAUDECODE env var (allows nested sessions)
 
 **Flow**:
 ```
-Task file created (any source)
-        ↓
-task-watcher detects within 10s
-        ↓
-IF task not in state file (genuinely new):
-  - Mark as .executing
-  - Execute immediately
-  - Mark as .completed.done
-  - Record in state file
-        ↓
-Next heartbeat: Report execution
+Task file created (any source)     Spawn request (agent_delegation)
+        |                                    |
+        |                          task-watcher reads spawn-pending.json
+        |                          creates task file in agent queue
+        |                                    |
+        +------------------------------------+
+        |
+task-watcher detects within 15s
+        |
+ThreadPoolExecutor (1 slot per agent, 6 max concurrent)
+        |
+agent-task-handler.py:
+  - Mark as .executing.md
+  - Build prompt with agent role + task content
+  - Execute via claude-agent (Claude Code Opus)
+  - Write result to workspace/task-<epoch>.md
+  - Mark as .completed.done.md
+  - (Optional) spawn_subagent() -> spawn-pending.json -> next cycle
+        |
+ogedei-watchdog verifies completion quality
 ```
 
-**Fallback**: heartbeat-task-executor.py still runs every 5 minutes to catch:
-- Any tasks task-watcher missed
-- Tasks created while daemon was restarting
-- Cleanup of stale .executing files
+**Subagent Spawning** (instant, depth-limited):
+```
+Agent A executing task
+  -> spawn_subagent(agent_b, subtask, depth=1)
+     -> writes to spawn-pending.json {status: "ready", source: "agent_delegation"}
+        -> task-watcher processes within 15s
+           -> creates task file in agent_b/tasks/
+              -> task-watcher dispatches to agent_b's execution slot
+                 -> agent_b can spawn further (up to depth=3)
+```
+
+**Agent Model Configuration**:
+| Agent | Gateway Model (agents_config.py) | Task Execution Model |
+|-------|----------------------------------|---------------------|
+| Kublai | bailian/qwen3.5-plus | Claude Opus |
+| Mongke | bailian/MiniMax-M2.5 | Claude Opus |
+| Chagatai | bailian/kimi-k2.5 | Claude Opus |
+| Temujin | bailian/MiniMax-M2.5 | Claude Opus |
+| Jochi | bailian/qwen3.5-plus | Claude Opus |
+| Ogedei | bailian/qwen3.5-plus | Claude Opus |
 
 ---
 
-### 5. Heartbeat-Driven Task Execution (Fallback)
+### 5. Quality Assurance (ogedei-watchdog daemon)
 
-**Purpose**: Fallback task execution if task-watcher misses tasks  
-**Status**: ✅ Active (implemented 2026-03-04)  
+**Purpose**: Real-time quality monitoring between 30-minute tock cycles
+**Status**: Active (implemented 2026-03-05)
+**Schedule**: Continuous (30-second cycles)
+
+**Components**:
+- **ogedei-watchdog.py** (`scripts/ogedei-watchdog.py`):
+  - Runs as launchd daemon (`com.kurultai.ogedei-watchdog`)
+  - Five checks per cycle:
+    1. `check_watcher_alive()` -- pgrep task-watcher + log freshness; auto-restarts via launchctl
+    2. `check_stalled_tasks()` -- `.executing.md` files > 15 min old
+    3. `verify_recent_completions()` -- new `.done.md` checked for real Claude Code execution
+    4. `periodic_queue_audit()` -- full audit every 30 min (detects fake completions)
+    5. `cleanup_malformed()` -- removes `.executing.completed.done` artifacts > 24h
+  - State: `logs/ogedei-watchdog-state.json` (read by tock-gather.sh)
+  - Log: `logs/ogedei-watchdog.log`
+
+### 5b. Stale Task Cleanup (auto_dispatch cron)
+
+**Purpose**: Clean up stale `.executing` files and clear dead dispatch state
+**Status**: Active (cleanup-only since 2026-03-05)
 **Schedule**: Every 5 minutes (heartbeat-watchdog cron)
 
 **Components**:
-- **heartbeat-task-executor.py** (`scripts/heartbeat-task-executor.py`):
-  - Scans `agent/*/tasks/` for pending `*.md` files
-  - Priority order: `high-*` > `normal-*` > `low-*` (FIFO within each)
-  - Marks tasks as `.executing` during execution (file lock)
-  - Executes via `openclaw agent --agent <id> --message <task>`
-  - Timeout: 4 minutes per task
-  - Marks as `.completed.done` on finish/failure
+- **auto_dispatch.py** (`scripts/auto_dispatch.py`):
+  - Reverts `.executing` tasks stuck > 15 minutes back to pending
+  - Clears dispatch state for dead PIDs
+  - **No longer dispatches tasks** -- all dispatch handled by task-watcher
 
-**Flow**:
-```
-Heartbeat fires (every 5 min)
-        ↓
-heartbeat-task-executor.py scans task directories
-        ↓
-IF pending tasks exist:
-  - Select highest priority
-  - Mark as .executing
-  - Execute via OpenClaw spawn
-  - Write results to task file
-  - Mark as .completed.done
-        ↓
-Report in heartbeat: tasks_completed: N
-```
+**Archived Scripts** (in `scripts/_archived/`):
+- `heartbeat-task-executor.py` -- Superseded by task-watcher daemon
+- `task-consumer.sh` -- Legacy, replaced by task-watcher
 
-**Advantages over previous system**:
-| Old (task-consumer + spawn-consumer) | New (heartbeat-driven) |
-|-------------------------------------|------------------------|
-| Two separate cron jobs (race conditions) | Single trigger point |
-| Tasks sat unexecuted for hours | Tasks execute within 5 min |
-| Complex queue management | Simple file-based locking |
-| Orphaned tasks common | Deterministic execution |
-
-**Files**:
-- `scripts/heartbeat-task-executor.py` - Main execution script
-- `agent/{agent}/tasks/*.md` - Task files
-- `AGENTS.md` - Heartbeat Task Execution Protocol
-
-**Legacy Scripts** (deprecated but kept for compatibility):
-- `scripts/task-consumer.sh` - No longer primary execution path
-- `scripts/spawn-consumer.sh` - Still used for non-heartbeat spawns
+**Fallback Scripts** (still active, low priority):
+- `spawn-consumer.sh` + `spawn_consumer_worker.py` -- Runs every 2 min via cron as fallback for spawn queue processing. Primary processing is now in task-watcher (15s cycles).
 
 ### 6. Accountability System (Kurultai Reflection Enhancements)
 
@@ -565,6 +593,77 @@ Report in heartbeat: tasks_completed: N
 ---
 
 ## Change Log
+
+### 2026-03-05 - Concurrent Execution + Instant Subagent Spawning (v1.4)
+
+**Change**: Made task execution concurrent (6 parallel agents) and integrated spawn queue into task-watcher for near-instant subagent spawning.
+
+**Scope**:
+
+1. **Concurrent task-watcher** (`scripts/task-watcher.py`):
+   - ThreadPoolExecutor with 6 workers (one per agent)
+   - All agents execute Claude Code tasks simultaneously
+   - Per-agent slot locking prevents double-dispatch
+
+2. **Instant subagent spawning** (integrated into task-watcher):
+   - task-watcher reads `spawn-pending.json` every 15s cycle
+   - `agent_execution` spawns: launches Claude Code directly (Popen)
+   - `agent_delegation` spawns: creates task file in agent queue
+   - Replaces 2-minute cron delay with ~15s turnaround
+   - Depth-limited to 3 (prevents runaway spawn chains)
+   - `spawn_consumer_worker.py` + `spawn-consumer.sh` now serve as fallback only
+
+3. **Spawn lifecycle**:
+   - ready -> routed (task file created) or running (Claude Code launched)
+   - running -> completed (30 min timeout)
+   - failed -> retry (up to 3x) -> dead letter
+
+**Files Edited**: `scripts/task-watcher.py`
+**Files Updated**: `ARCHITECTURE.md` (v1.3 -> v1.4)
+
+---
+
+### 2026-03-05 - Ogedei Watchdog + Execution Chain Fix (v1.3)
+
+**Change**: Created ogedei-watchdog daemon, fixed execution chain, disabled auto_dispatch racing
+
+**Scope**:
+
+1. **Ogedei Watchdog Daemon** (`scripts/ogedei-watchdog.py`):
+   - Persistent 30s poll daemon with 5 quality checks
+   - Auto-restarts task-watcher if down
+   - Detects stalled tasks, fake completions, malformed artifacts
+   - State file consumed by tock-gather.sh (replaces inline queue-audit)
+   - LaunchAgent: `com.kurultai.ogedei-watchdog`
+
+2. **Execution Chain Fix** (task-watcher -> agent-task-handler -> claude-agent):
+   - Fixed `mark_task_completed()` double-suffix bug (`.executing.executing.md`)
+   - Cleaned 49 malformed `.executing.completed.done` files
+   - Fixed jochi self-routing deadlock in `kublai-actions.py`
+   - Fixed dispatch-state not clearing when PID exits
+
+3. **auto_dispatch.py converted to cleanup-only**:
+   - Was racing task-watcher, dispatching via `openclaw agent` (glm-5, not Claude Code)
+   - Now only reverts stale `.executing` files and clears dead PID state
+   - All task dispatch handled exclusively by task-watcher
+
+4. **claude-agent budget removed**:
+   - Was capped at $1, causing task failures on substantial work
+   - Now runs uncapped (Claude Max subscription)
+
+5. **Stale path fixes**:
+   - Fixed `agents/main/agent` -> `agents` in 5 files
+   - Archived `heartbeat-task-executor.py` and `task-consumer.sh` to `scripts/_archived/`
+
+6. **tock-gather.sh rewired**:
+   - Queue audit reads from `ogedei-watchdog-state.json` when fresh (<35 min)
+   - Falls back to inline `queue-audit.py` when watchdog state is stale
+
+**Files Created**: `scripts/ogedei-watchdog.py`, `com.kurultai.ogedei-watchdog.plist`
+**Files Edited**: `kublai-actions.py`, `agent-task-handler.py`, `auto_dispatch.py`, `tock-gather.sh`, `health_dashboard.py`, `routing_audit.py`, `load-balancer-patch.py`, `task-queue-write.sh`, `heartbeat-watchdog.sh`, `claude-agent`
+**Files Archived**: `heartbeat-task-executor.py`, `task-consumer.sh`
+
+---
 
 ### 2026-03-05 - Task Execution Path Fix (Critical Bug)
 
