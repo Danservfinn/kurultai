@@ -257,7 +257,7 @@ elif [ -n "$CPU" ] && [ "$(echo "$CPU > 80" | bc -l 2>/dev/null)" = "1" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="high CPU ${CPU}%"; EXIT_CODE=1
 elif [ -n "$RSS" ] && [ "$RSS" -gt 1048576 ] 2>/dev/null; then
     STATUS="degraded"; ACTION="warn"; REASON="high RSS $(( RSS / 1024 ))MB"; EXIT_CODE=1
-elif [ "$ERRORS_5M" -gt 50 ]; then
+elif [ "$ERRORS_5M" -gt 100 ]; then
     STATUS="degraded"; ACTION="warn"; REASON="$ERRORS_5M errors in 5m"; EXIT_CODE=1
 elif [ "$LATENCY_MS" -gt 2000 ] && [ "$HTTP" = "200" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="latency ${LATENCY_MS}ms"; EXIT_CODE=1
