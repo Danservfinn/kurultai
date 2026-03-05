@@ -1,3 +1,8 @@
+---
+name: heartbeat-watchdog
+description: "5-minute system health check (tick) for the Kurultai. Runs watchdog-gather.sh to collect Neo4j, Redis, cron, and agent health metrics. Use when checking system health, diagnosing failures, or understanding the tick pipeline."
+---
+
 # Heartbeat Watchdog (Tick)
 
 **Model:** lmstudio/qwen3.5-9b-mlx (local)
@@ -34,29 +39,31 @@ ACTION:   none
 REASON:   all checks passed
 ```
 
-## Step 2: Decide
+## Step 2: LLM Triage (automatic)
 
-The script already made a decision (DECISION line). Review it:
+The script now includes a **local LLM triage** step (ollama/qwen3.5:9b) that:
+1. Reviews the tick summary + last 3 tick trends
+2. Decides if Kublai should take action (ACTION_NEEDED: yes/no)
+3. If yes, creates a task in Kublai's queue with severity, reason, and suggested action
 
-- If everything looks normal, **accept the script's decision**
-- Only override if you see something the script missed:
-  - Trends worsening but script says healthy
-  - Multiple services borderline but none triggered threshold
-  - Tasks stuck (pending > 0 for multiple cycles)
-
-Your decision: `healthy`, `degraded`, or `down`
-
-## Step 3: Log
-
-Append ONE line to `~/.openclaw/agents/main/logs/watchdog.log`:
-
+The triage result is logged to watchdog.log as:
 ```
-[YYYY-MM-DD HH:MM:SS] WATCHDOG_LLM | status=<decision> | accepted_bash=yes|no | note=<10 words max>
+[YYYY-MM-DD HH:MM:SS] TICK_LLM | action_needed=yes|no | severity=LOW|MEDIUM|HIGH|CRITICAL | reason=...
 ```
+
+Rule-based actions (kublai-actions.py) still run as a safety net alongside the LLM triage.
+
+## Step 3: Kublai Review (when triggered)
+
+When the LLM triage creates a task, Kublai reviews the tick data and can:
+- Investigate further (check logs, run diagnostics)
+- Delegate to another agent (temujin for code, ogedei for infra, jochi for debugging)
+- Dismiss if the LLM overreacted (log reasoning)
+- Escalate if the situation is worse than described
 
 ## Rules
 
 - ONE bash command. Do not run individual commands.
-- ONE log line. Do not be verbose.
-- If script fails: `status=unknown | accepted_bash=error | note=script failed`
-- Keep total execution under 60 seconds of LLM time.
+- If script fails: check `watchdog.log` for the error
+- LLM triage has a 60s timeout — falls through to rule-based actions on failure
+- Keep total tick cycle under 90 seconds

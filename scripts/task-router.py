@@ -28,46 +28,61 @@ ROUTING_LOG = "/Users/kublai/.openclaw/agents/main/logs/routing-decisions.jsonl"
 # ============================================================
 OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen3.5:9b"
-OLLAMA_TIMEOUT = 5  # seconds — fail fast to fallback
+OLLAMA_TIMEOUT = 10  # seconds — allows for cold model load
+OLLAMA_RETRIES = 1   # retry once on timeout before falling back
 
 LLM_SYSTEM_PROMPT = """You are a task router for a 6-agent AI team. Given a task, respond with ONLY the agent name — one word, lowercase, nothing else.
 
 Agents:
-- temujin: Software development — coding, building features, fixing bugs, APIs, database, deployment, scripts, automation
+- kublai: Squad lead — triage, routing decisions, stalled agent management, system-wide assessment, cross-agent coordination, self-improvement tasks
+- temujin: Software development — coding, building features, fixing bugs, APIs, database, deployment, scripts, automation, building endpoints
 - mongke: Research & analysis — market research, competitor analysis, data exploration, trend investigation, ecosystem discovery
-- chagatai: Writing & content — blog posts, documentation, marketing copy, changelogs, social media, creative writing
-- jochi: Testing & security — QA testing, security audits, vulnerability scanning, code review, validation, compliance
-- ogedei: DevOps & operations — monitoring, alerting, cron jobs, backups, uptime, health checks, infrastructure ops
-- subagent: Simple one-off tasks that need no specialist"""
+- chagatai: Writing & content — blog posts, documentation, marketing copy, changelogs, social media, creative writing, post-mortems
+- jochi: Testing & security — QA testing, security audits, vulnerability scanning, code review, validation, compliance, investigating errors and failures
+- ogedei: DevOps & operations — monitoring, alerting, restarting services, backups, uptime, health checks, infrastructure ops, CPU/memory/disk triage, log rotation
+
+Rules:
+- "Investigate errors/failures/spikes" → jochi (investigation), NOT ogedei
+- "Fix cron job" or "fix script" → temujin (code fix), NOT ogedei
+- "Triage stalled agent" or "assessment" → kublai (squad lead decision)
+- "Restart service" or "high CPU/memory" → ogedei (ops triage)
+- "Add endpoint" or "build feature" → temujin (development), NOT ogedei
+- "Review routing" or "implement improvements" to the system → kublai (self-improvement)"""
 
 VALID_AGENTS = {"temujin", "mongke", "chagatai", "jochi", "ogedei", "subagent", "kublai"}
 
 
 def _llm_classify(task_text):
-    """Route task via local LLM. Returns agent name or None on failure."""
-    try:
-        payload = json.dumps({
-            "model": OLLAMA_MODEL,
-            "messages": [
-                {"role": "system", "content": LLM_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Route: {task_text}"},
-            ],
-            "stream": False,
-            "think": False,
-            "options": {"temperature": 0, "num_predict": 10},
-        }).encode()
-        req = urllib.request.Request(
-            OLLAMA_URL, data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        resp = json.loads(urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT).read())
-        agent = resp.get("message", {}).get("content", "").strip().lower()
-        # Validate — LLM must return a known agent name
-        if agent in VALID_AGENTS:
-            return agent
-        return None
-    except Exception:
-        return None
+    """Route task via local LLM. Returns (agent_name, None) or (None, error_reason)."""
+    last_error = None
+    for attempt in range(1 + OLLAMA_RETRIES):
+        try:
+            payload = json.dumps({
+                "model": OLLAMA_MODEL,
+                "messages": [
+                    {"role": "system", "content": LLM_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Route: {task_text}"},
+                ],
+                "stream": False,
+                "think": False,
+                "options": {"temperature": 0, "num_predict": 10},
+            }).encode()
+            req = urllib.request.Request(
+                OLLAMA_URL, data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            resp = json.loads(urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT).read())
+            agent = resp.get("message", {}).get("content", "").strip().lower()
+            if agent in VALID_AGENTS:
+                return agent, None
+            last_error = f"invalid_response:{agent[:30]}"
+        except urllib.error.URLError as e:
+            last_error = f"connection_error:{e.reason}" if hasattr(e, 'reason') else "connection_error"
+        except TimeoutError:
+            last_error = f"timeout:{OLLAMA_TIMEOUT}s"
+        except Exception as e:
+            last_error = f"{type(e).__name__}:{str(e)[:50]}"
+    return None, last_error
 
 SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
 AGENT_QUEUES = {
@@ -202,7 +217,7 @@ def classify_task(task_text):
     Fallback: keyword scoring — used when LLM is unavailable.
     """
     method = "llm"
-    destination = _llm_classify(task_text)
+    destination, llm_error = _llm_classify(task_text)
 
     if destination is None:
         method = "keyword_fallback"
@@ -219,6 +234,8 @@ def classify_task(task_text):
         "scores": scores,
         "classified_at": datetime.now().isoformat(),
     }
+    if llm_error:
+        result["llm_error"] = llm_error
 
     # Log routing decision for audit trail
     _log_routing_decision(result)
@@ -238,6 +255,8 @@ def _log_routing_decision(decision):
             "complexity": decision["complexity"],
             "top_scores": {k: v for k, v in decision.get("scores", {}).items() if v > 0},
         }
+        if decision.get("llm_error"):
+            entry["llm_error"] = decision["llm_error"]
         with open(ROUTING_LOG, "a") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception:

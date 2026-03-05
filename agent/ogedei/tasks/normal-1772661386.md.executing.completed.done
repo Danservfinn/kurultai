@@ -1,0 +1,29 @@
+---
+agent: ogedei
+priority: normal
+created: 2026-03-04T16:56:26.593625
+source: kurultai-proposal
+depth: 0
+task_id: 470150d1-496
+parent_id: 
+---
+
+# Task: Implement immediate escalation and report blocking protocol for unresolved actio
+
+## Self-Improvement Proposal (Kurultai Brainstorm)
+
+**Agent:** ogedei
+**Category:** rule
+**Effort:** M
+
+**Problem:** Current behavior involves observing failures without acting or escalating, violating the new rule that mandates escalation to Kublai and blocking the report after 3 consecutive hourly reports; evidence shows a pattern of silent copying instead of intervention.
+
+**Solution:** Modify behavioral rule set to trigger an automatic "ESCALATE_TO_KUBLAI" command and execute "BLOCK_REPORT" function when `report_count` >= 3 for any unresolved action item ID.
+
+**Expected Impact:** Reduce mean time to resolution (MTTR) for critical issues by ensuring Kublai is alerted within the 3-report window, preventing silent failure accumulation.
+
+## Instructions
+1. Implement the solution described above
+2. Test the change
+3. Report results
+

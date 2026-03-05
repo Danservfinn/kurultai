@@ -15,6 +15,30 @@
 
 set -o pipefail
 
+# Single-instance lock — prevents concurrent ticks (e.g., after sleep/wake catch-up)
+LOCK_DIR="/tmp/watchdog-gather.lock"
+_cleanup_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
+trap _cleanup_lock EXIT
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    # Check for stale lock (PID file inside lock dir)
+    if [ -f "$LOCK_DIR/pid" ]; then
+        OLD_PID=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+        if [ -n "$OLD_PID" ] && ! kill -0 "$OLD_PID" 2>/dev/null; then
+            # Stale lock — previous process died without cleanup
+            rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"
+            mkdir "$LOCK_DIR" 2>/dev/null || { echo "[$(date '+%Y-%m-%d %H:%M:%S')] TICK | SKIP: lock contention" >> "$HOME/.openclaw/agents/main/logs/watchdog.log"; exit 0; }
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] TICK | SKIP: already running (pid=$OLD_PID)" >> "$HOME/.openclaw/agents/main/logs/watchdog.log"
+            exit 0
+        fi
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TICK | SKIP: already running" >> "$HOME/.openclaw/agents/main/logs/watchdog.log"
+        exit 0
+    fi
+fi
+echo $$ > "$LOCK_DIR/pid"
+
 # Source Neo4j credentials
 if [ -f "$HOME/.openclaw/credentials/neo4j.env" ]; then
     set -a
@@ -73,8 +97,14 @@ LATENCY_MS=$(echo "$LATENCY_S" | awk '{printf "%.0f", $1 * 1000}')
 # SECTION 3: Error Counts
 # ============================================================
 if [ -f "$OPENCLAW_LOG" ]; then
-    ERRORS_5M=$(tail -500 "$OPENCLAW_LOG" 2>/dev/null | grep -c "ERROR\|FATAL\|CRASH" 2>/dev/null; true)
-    ERRORS_1H=$(tail -5000 "$OPENCLAW_LOG" 2>/dev/null | grep -c "ERROR\|FATAL\|CRASH" 2>/dev/null; true)
+    # Filter out known noise: gateway "other services detected" warnings are logged at ERROR level
+    # but are not actionable errors (just detecting com.kurultai.task-watcher plist)
+    # Noise patterns:
+    # - Gateway detecting task-watcher plist as "another gateway" (6 lines per occurrence)
+    # - Signal daemon clean exits (code=0, normal restart cycle)
+    NOISE_FILTER="gateway-like services\|Cleanup hint\|Recommendation: run\|isolate ports\|com.kurultai.task-watcher\|signal daemon exited.*code=0"
+    ERRORS_5M=$(tail -500 "$OPENCLAW_LOG" 2>/dev/null | grep "ERROR\|FATAL\|CRASH" | grep -cv "$NOISE_FILTER" 2>/dev/null; true)
+    ERRORS_1H=$(tail -5000 "$OPENCLAW_LOG" 2>/dev/null | grep "ERROR\|FATAL\|CRASH" | grep -cv "$NOISE_FILTER" 2>/dev/null; true)
     FATAL_5M=$(tail -500 "$OPENCLAW_LOG" 2>/dev/null | grep -c "FATAL\|CRASH" 2>/dev/null; true)
     ERRORS_5M=${ERRORS_5M:-0}; ERRORS_1H=${ERRORS_1H:-0}; FATAL_5M=${FATAL_5M:-0}
 else
@@ -85,12 +115,14 @@ fi
 # SECTION 4: Dependent Services
 # ============================================================
 NEO4J_STATUS=$(python3 -c "
+import signal, sys
+signal.alarm(8)  # kill after 8 seconds
 from neo4j import GraphDatabase
 try:
-    import os as _os; d=GraphDatabase.driver(_os.getenv('NEO4J_URI','bolt://localhost:7687'),auth=(_os.getenv('NEO4J_USER','neo4j'),_os.getenv('NEO4J_PASSWORD','myStrongPassword123')))
+    import os as _os; d=GraphDatabase.driver(_os.getenv('NEO4J_URI','bolt://localhost:7687'),auth=(_os.getenv('NEO4J_USER','neo4j'),_os.getenv('NEO4J_PASSWORD','myStrongPassword123')),connection_timeout=3,max_transaction_retry_time=3)
     d.verify_connectivity(); print('up'); d.close()
 except: print('down')
-" 2>/dev/null || echo "unknown")
+" 2>/dev/null || echo "down")
 
 REDIS_STATUS=$(redis-cli ping 2>/dev/null | grep -q "PONG" && echo "up" || echo "down")
 
@@ -221,13 +253,21 @@ elif [ -n "$CPU" ] && [ "$(echo "$CPU > 80" | bc -l 2>/dev/null)" = "1" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="high CPU ${CPU}%"; EXIT_CODE=1
 elif [ -n "$RSS" ] && [ "$RSS" -gt 1048576 ] 2>/dev/null; then
     STATUS="degraded"; ACTION="warn"; REASON="high RSS $(( RSS / 1024 ))MB"; EXIT_CODE=1
-elif [ "$ERRORS_5M" -gt 5 ]; then
+elif [ "$ERRORS_5M" -gt 50 ]; then
     STATUS="degraded"; ACTION="warn"; REASON="$ERRORS_5M errors in 5m"; EXIT_CODE=1
 elif [ "$LATENCY_MS" -gt 2000 ] && [ "$HTTP" = "200" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="latency ${LATENCY_MS}ms"; EXIT_CODE=1
 elif [ "$NEO4J_STATUS" = "down" ] || [ "$REDIS_STATUS" = "down" ]; then
     STATUS="degraded"; ACTION="warn"
     REASON="services down: $([ "$NEO4J_STATUS" = "down" ] && echo neo4j)$([ "$REDIS_STATUS" = "down" ] && echo ${NEO4J_STATUS:+,}redis)"
+    EXIT_CODE=1
+fi
+
+# Disk space check
+AVAIL_KB=$(df -k "$LOGDIR" 2>/dev/null | awk 'NR==2{print $4}')
+if [ "${AVAIL_KB:-0}" -lt 524288 ] 2>/dev/null; then  # < 512MB
+    STATUS="degraded"; ACTION="warn"
+    REASON="low disk: $((AVAIL_KB / 1024))MB available"
     EXIT_CODE=1
 fi
 
@@ -271,13 +311,135 @@ printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s\nPROCESS: cpu
 echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
 
 # ============================================================
-# KUBLAI ACTIONS: Create tasks based on tick findings
+# SECTION 8: LLM Triage (local ollama — decide if Kublai should act)
 # ============================================================
-python3 "$SCRIPTS/kublai-actions.py" --trigger tick 2>/dev/null &
+LLM_TRIAGE=$(python3 << 'PYEOF'
+import json, re, sys
+sys.path.insert(0, "$SCRIPTS")
+from ollama_lock import OllamaLock, Priority, LockBusy
+
+summary = open(sys.argv[1]).read() if len(sys.argv) > 1 else ""
+
+# Read last 3 ticks for trend context
+trends = []
+try:
+    with open(sys.argv[2]) as f:
+        for line in f.readlines()[-3:]:
+            line = line.strip()
+            if line:
+                trends.append(json.loads(line))
+except Exception:
+    pass
+
+trend_ctx = ""
+if len(trends) >= 2:
+    decisions = [t.get("decision", "?") for t in trends]
+    errs = [t.get("errors", {}).get("last_5m", 0) for t in trends]
+    trend_ctx = f"\nLAST {len(trends)} TICKS: decisions={decisions} errors_5m={errs}"
+
+prompt = f"""You are a watchdog for a 6-agent AI system (Kurultai). Review this 5-minute health tick and decide if Kublai (the lead agent) needs to review and take action.
+
+{summary}{trend_ctx}
+
+Respond in EXACTLY this format (no extra text):
+ACTION_NEEDED: yes|no
+SEVERITY: LOW|MEDIUM|HIGH|CRITICAL
+REASON: <one sentence explaining your decision>
+SUGGESTED_ACTION: <what Kublai should do, or "none">"""
+
+try:
+    import requests
+    with OllamaLock(Priority.NORMAL, label="tick-triage"):
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": "qwen3.5:9b",
+                "messages": [
+                    {"role": "system", "content": "You are a concise operations watchdog. Only flag things that genuinely need human/lead-agent attention. Healthy systems with no anomalies should get ACTION_NEEDED: no."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False,
+                "think": False,
+                "options": {"num_predict": 150}
+            },
+            timeout=180
+        )
+        if resp.status_code == 200:
+            text = resp.json().get("message", {}).get("content", "").strip()
+            text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+            if text:
+                print(text)
+            else:
+                print("FALLBACK")
+        else:
+            print("FALLBACK")
+except LockBusy:
+    print("FALLBACK")
+except Exception as e:
+    print("FALLBACK")
+PYEOF
+"$SUMMARY" "$TICKS" 2>/dev/null)
+LLM_TRIAGE=${LLM_TRIAGE:-FALLBACK}
+
+# ============================================================
+# SECTION 9: Parse LLM triage and dispatch Kublai immediately
+# ============================================================
+LLM_ACTION_NEEDED="no"
+LLM_SEVERITY="LOW"
+LLM_REASON=""
+LLM_SUGGESTED=""
+
+if echo "$LLM_TRIAGE" | grep -q "ACTION_NEEDED:"; then
+    LLM_ACTION_NEEDED=$(echo "$LLM_TRIAGE" | grep "^ACTION_NEEDED:" | head -1 | cut -d: -f2 | tr -d ' ' | tr '[:upper:]' '[:lower:]')
+    LLM_SEVERITY=$(echo "$LLM_TRIAGE" | grep "^SEVERITY:" | head -1 | cut -d: -f2 | tr -d ' ' | tr '[:lower:]' '[:upper:]')
+    LLM_REASON=$(echo "$LLM_TRIAGE" | grep "^REASON:" | head -1 | sed 's/^REASON: *//')
+    LLM_SUGGESTED=$(echo "$LLM_TRIAGE" | grep "^SUGGESTED_ACTION:" | head -1 | sed 's/^SUGGESTED_ACTION: *//')
+fi
+
+# Log LLM triage result
+echo "[$TS] TICK_LLM | action_needed=$LLM_ACTION_NEEDED | severity=$LLM_SEVERITY | reason=$LLM_REASON" >> "$WATCHDOG_LOG"
+
+# Dispatch Kublai immediately if LLM says action needed (backgrounded)
+if [ "$LLM_ACTION_NEEDED" = "yes" ]; then
+    TICK_SUMMARY=$(cat "$SUMMARY")
+    KUBLAI_MSG="## Tick Watchdog Alert (LLM Triage)
+
+**Severity:** $LLM_SEVERITY
+**Reason:** $LLM_REASON
+**Suggested Action:** $LLM_SUGGESTED
+
+## Current Tick Summary
+\`\`\`
+$TICK_SUMMARY
+\`\`\`
+
+## You Decide
+Review the tick data above and take whatever action you deem appropriate.
+You may:
+- Investigate further (check logs, run diagnostics)
+- Delegate to another agent (temujin for code fixes, ogedei for infra, jochi for debugging)
+- Dismiss if the LLM overreacted (log your reasoning to ~/.openclaw/agents/main/logs/watchdog.log)
+- Escalate if the situation is worse than described"
+
+    echo "[$TS] TICK_LLM | dispatching kublai immediately" >> "$WATCHDOG_LOG"
+    /opt/homebrew/bin/openclaw agent --agent kublai \
+        --message "$KUBLAI_MSG" \
+        --thinking high \
+        >> "$LOGDIR/tick-kublai-dispatch.log" 2>&1 &
+    echo "TICK_LLM: Dispatched kublai (pid=$!) — severity=$LLM_SEVERITY reason=$LLM_REASON"
+fi
+
+# ============================================================
+# KUBLAI ACTIONS: Rule-based actions (safety net, runs alongside LLM triage)
+# ============================================================
+python3 "$SCRIPTS/kublai-actions.py" --trigger tick >> "$LOGDIR/kublai-actions.log" 2>&1 &
 
 # ============================================================
 # Output for the LLM
 # ============================================================
 cat "$SUMMARY"
+if [ "$LLM_ACTION_NEEDED" = "yes" ]; then
+    echo "LLM_TRIAGE: action_needed=yes severity=$LLM_SEVERITY reason=$LLM_REASON"
+fi
 
 exit $EXIT_CODE

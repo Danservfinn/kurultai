@@ -305,6 +305,65 @@
           "api": "openai-completions"
         }
       ]
+    },
+    "zai-coding": {
+      "baseUrl": "https://api.z.ai/api/anthropic",
+      "apiKey": "b64f885d20d141bba9f7622266781c94.6lmEUgJUVnEtNq54",
+      "api": "anthropic-messages",
+      "models": [
+        {
+          "id": "glm-5",
+          "name": "GLM-5 (Z.AI Coding)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 202752,
+          "maxTokens": 16384,
+          "api": "anthropic-messages"
+        },
+        {
+          "id": "glm-4.7",
+          "name": "GLM-4.7 (Z.AI Coding)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 202752,
+          "maxTokens": 16384,
+          "api": "anthropic-messages"
+        },
+        {
+          "id": "glm-4.5-air",
+          "name": "GLM-4.5-Air (Z.AI Coding)",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "api": "anthropic-messages"
+        }
+      ]
     }
   }
 }

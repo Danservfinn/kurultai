@@ -18,8 +18,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# Add parent directory to path
+# Add parent directory and scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path.home() / ".openclaw" / "agents" / "main" / "scripts"))
 
 from scrapling.fetchers import StealthyFetcher, Fetcher
 
@@ -35,7 +36,7 @@ except ImportError:
 class MongkeResearchSkill:
     """Research skill for Mongke agent."""
     
-    def __init__(self, ollama_model="qwen3.5:9b", ollama_timeout=90):
+    def __init__(self, ollama_model="qwen3.5:9b", ollama_timeout=180):
         self.ollama_model = ollama_model
         self.ollama_timeout = ollama_timeout
         self.ollama_url = "http://localhost:11434/api/chat"
@@ -44,7 +45,13 @@ class MongkeResearchSkill:
         StealthyFetcher.adaptive = True
         
         # Initialize SearXNG if available
-        self.searxng = SearXNGSearch() if SEARXNG_AVAILABLE else None
+        try:
+            from skills.mongke_research.searxng_search import SearXNGSearch
+            self.searxng = SearXNGSearch(base_url="http://localhost:8888")
+            SEARXNG_AVAILABLE = True
+        except ImportError:
+            self.searxng = None
+            SEARXNG_AVAILABLE = False
         
     def search_web(self, query: str, num_results: int = 10) -> list:
         """
@@ -86,9 +93,13 @@ class MongkeResearchSkill:
             content = {
                 "url": url,
                 "title": page.css("title::text").get() or "Untitled",
-                "text": page.css("body").get() or "",
+                "text": page.css("main p::text, article p::text, .content p::text, p::text").get() or "",
                 "links": page.css("a::attr(href)").getall()[:20],
             }
+            
+            # If no paragraph text, try getting body text
+            if not content["text"]:
+                content["text"] = page.css("body").get() or ""
             
             print(f"    ✓ Title: {content['title'][:60]}...")
             return content
@@ -97,10 +108,16 @@ class MongkeResearchSkill:
             print(f"    ✗ Error: {str(e)[:80]}")
             return {"url": url, "error": str(e)}
     
+    def _get_lock(self, label="research"):
+        """Get an OllamaLock with LOW priority + tick-aware yielding."""
+        from ollama_lock import OllamaLock, Priority
+        return OllamaLock(Priority.LOW, label=label, yield_for_ticks=True)
+
     def analyze_with_ollama(self, content, query):
-        """Analyze scraped content with Ollama LLM."""
+        """Analyze scraped content with Ollama LLM (GPU-lock protected)."""
         import requests
-        
+        from ollama_lock import LockBusy
+
         prompt = f"""You are a research analyst. Analyze this content for the query: "{query}"
 
 CONTENT:
@@ -122,30 +139,35 @@ Respond in JSON format:
 }}"""
 
         try:
-            resp = requests.post(
-                self.ollama_url,
-                json={
-                    "model": self.ollama_model,
-                    "messages": [
-                        {"role": "system", "content": "You are a concise research analyst. Respond in valid JSON only."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "stream": False
-                },
-                timeout=self.ollama_timeout
-            )
-            
-            if resp.status_code == 200:
-                text = resp.json()["message"]["content"].strip()
-                # Clean up any markdown code blocks
-                if text.startswith("```"):
-                    text = text.split("```")[1]
-                    if text.startswith("json"):
-                        text = text[4:]
-                return json.loads(text)
-            else:
-                return {"error": f"HTTP {resp.status_code}"}
-                
+            with self._get_lock("research-analyze"):
+                resp = requests.post(
+                    self.ollama_url,
+                    json={
+                        "model": self.ollama_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a concise research analyst. Respond in valid JSON only."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "stream": False,
+                        "think": False
+                    },
+                    timeout=self.ollama_timeout
+                )
+
+                if resp.status_code == 200:
+                    text = resp.json()["message"]["content"].strip()
+                    # Clean up any markdown code blocks
+                    if text.startswith("```"):
+                        text = text.split("```")[1]
+                        if text.startswith("json"):
+                            text = text[4:]
+                    return json.loads(text)
+                else:
+                    return {"error": f"HTTP {resp.status_code}"}
+
+        except LockBusy:
+            print("    ⏳ GPU busy (tick/tock running), skipping this URL")
+            return {"error": "GPU busy, skipped"}
         except Exception as e:
             return {"error": str(e)}
     
@@ -289,22 +311,25 @@ KEY FINDINGS:
 SUMMARY:"""
         
         import requests
+        from ollama_lock import LockBusy
         try:
-            resp = requests.post(
-                self.ollama_url,
-                json={
-                    "model": self.ollama_model,
-                    "messages": [
-                        {"role": "system", "content": "You are a concise research summarizer."},
-                        {"role": "user", "content": summary_prompt}
-                    ],
-                    "stream": False
-                },
-                timeout=60
-            )
-            if resp.status_code == 200:
-                all_analysis["summary"] = resp.json()["message"]["content"].strip()
-        except:
+            with self._get_lock("research-summary"):
+                resp = requests.post(
+                    self.ollama_url,
+                    json={
+                        "model": self.ollama_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a concise research summarizer."},
+                            {"role": "user", "content": summary_prompt}
+                        ],
+                        "stream": False,
+                        "think": False
+                    },
+                    timeout=180
+                )
+                if resp.status_code == 200:
+                    all_analysis["summary"] = resp.json()["message"]["content"].strip()
+        except (LockBusy, Exception):
             all_analysis["summary"] = f"Research on {query} found {len(all_analysis['entities'])} entities and {len(all_analysis['concepts'])} concepts."
         
         # Output results
@@ -350,7 +375,7 @@ def main():
     parser.add_argument("--output", default="neo4j", help="Output format: neo4l,json,markdown (comma-separated)")
     parser.add_argument("--tags", help="Comma-separated tags")
     parser.add_argument("--ollama-model", default="qwen3.5:9b", help="Ollama model")
-    parser.add_argument("--ollama-timeout", type=int, default=90, help="Ollama timeout (seconds)")
+    parser.add_argument("--ollama-timeout", type=int, default=180, help="Ollama timeout (seconds)")
     
     args = parser.parse_args()
     

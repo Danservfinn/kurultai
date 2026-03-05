@@ -287,38 +287,24 @@ def parse_initiative(raw_text):
     return fields
 
 
-MAX_TASK_DEPTH = 3
-
-
 def create_task(agent, priority, title, body, depth=0):
-    """Create a task file in an agent's task queue."""
-    if depth >= MAX_TASK_DEPTH:
-        log(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} for '{title[:60]}' — preventing runaway chain")
-        return None
+    """Create a task via canonical task_intake pipeline.
 
-    task_dir = AGENT_DIR / agent / "tasks"
-    task_dir.mkdir(parents=True, exist_ok=True)
-
-    epoch = int(time.time())
-    filename = f"{priority}-{epoch}.md"
-    filepath = task_dir / filename
-
-    content = f"""---
-agent: {agent}
-priority: {priority}
-created: {datetime.now().isoformat()}
-source: kublai-initiative
-type: proactive
-depth: {depth}
----
-
-# Task: {title}
-
-{body}
-"""
-    filepath.write_text(content)
-    log(f"TASK CREATED: {priority} task for {agent}: {title} (depth={depth})")
-    return str(filepath)
+    Delegates to task_intake.create_task() for Neo4j + filesystem creation,
+    duplicate checking, and depth limiting.
+    """
+    from task_intake import create_task as _intake_create
+    result = _intake_create(
+        title=title,
+        body=body,
+        priority=priority,
+        source="kublai-initiative",
+        depth=depth,
+        agent=agent,
+    )
+    if result:
+        log(f"TASK CREATED: {priority} task for {agent}: {title} (depth={depth})")
+    return result
 
 
 def log_hypothesis(action, expected_outcome):

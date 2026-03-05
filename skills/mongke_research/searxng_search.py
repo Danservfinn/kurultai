@@ -29,7 +29,7 @@ class SearXNGSearch:
     # Alternative: Jina AI Reader API (free tier available)
     JINA_SEARCH_URL = "https://s.jina.ai/{query}"
     
-    def __init__(self, base_url: str = "http://localhost:8080", use_public: bool = False):
+    def __init__(self, base_url: str = "http://localhost:8888", use_public: bool = False):
         """
         Initialize SearXNG search client.
         

@@ -28,6 +28,10 @@ TOCK_LATEST = f"{BASE}/logs/tock/latest.json"
 ACTIONS_LOG = f"{BASE}/logs/kublai-actions.log"
 COOLDOWN_FILE = f"{BASE}/logs/action-cooldowns.json"
 
+# Staleness thresholds — skip actions if data is too old
+MAX_TICK_AGE_SECS = 600   # 10 minutes (2 missed ticks)
+MAX_TOCK_AGE_SECS = 3600  # 60 minutes (2 missed tocks)
+
 # Cooldown periods (seconds) to prevent duplicate task creation
 COOLDOWNS = {
     "error_spike": 7200,       # 2 hours
@@ -64,13 +68,24 @@ def has_pending_task(agent, title_prefix):
     return False
 
 
+def _file_age_secs(path):
+    """Return age of file in seconds, or infinity if missing."""
+    try:
+        return time.time() - os.path.getmtime(path)
+    except OSError:
+        return float('inf')
+
+
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
     print(line)
-    os.makedirs(os.path.dirname(ACTIONS_LOG), exist_ok=True)
-    with open(ACTIONS_LOG, "a") as f:
-        f.write(line + "\n")
+    try:
+        os.makedirs(os.path.dirname(ACTIONS_LOG), exist_ok=True)
+        with open(ACTIONS_LOG, "a") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass  # Disk full — stdout still works for cron capture
 
 
 def load_cooldowns():
@@ -98,43 +113,25 @@ def mark_fired(action_key):
     save_cooldowns(cooldowns)
 
 
-MAX_TASK_DEPTH = 3
-
-
 def create_task(agent, priority, title, body, source="kublai-actions", depth=0):
-    """Create a task file in an agent's task queue.
+    """Create a task via canonical task_intake pipeline.
 
-    Args:
-        depth: Current task chain depth. Rejects if >= MAX_TASK_DEPTH.
+    Delegates to task_intake.create_task() for Neo4j + filesystem creation,
+    duplicate checking, and depth limiting.
     """
-    if depth >= MAX_TASK_DEPTH:
-        log(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} for '{title[:60]}' — preventing runaway chain")
-        return None
-
-    task_dir = f"{AGENT_DIR}/{agent}/tasks"
-    os.makedirs(task_dir, exist_ok=True)
-
-    epoch = int(time.time())
-    filename = f"{priority}-{epoch}.md"
-    filepath = f"{task_dir}/{filename}"
-
-    content = f"""---
-agent: {agent}
-priority: {priority}
-created: {datetime.now().isoformat()}
-source: {source}
-depth: {depth}
----
-
-# Task: {title}
-
-{body}
-"""
-    with open(filepath, "w") as f:
-        f.write(content)
-
-    log(f"ACTION: Created {priority} task for {agent}: {title} (depth={depth})")
-    return filepath
+    from task_intake import create_task as _intake_create
+    result = _intake_create(
+        title=title,
+        body=body,
+        priority=priority,
+        source=source,
+        depth=depth,
+        agent=agent,
+        skip_duplicate_check=True,  # callers already check has_pending_task
+    )
+    if result:
+        log(f"ACTION: Created {priority} task for {agent}: {title} (depth={depth})")
+    return result
 
 
 # ============================================================
@@ -159,6 +156,14 @@ def tick_actions():
     except json.JSONDecodeError:
         log("TICK: Failed to parse latest tick")
         return 0
+
+    # Staleness check — warn if tick data is too old
+    tick_age = _file_age_secs(TICKS_FILE)
+    if tick_age > MAX_TICK_AGE_SECS:
+        log(f"TICK: WARNING — ticks.jsonl is {tick_age:.0f}s old (tick may be failing)")
+    tick_epoch = tick.get("epoch", 0)
+    if tick_epoch and (time.time() - tick_epoch) > MAX_TICK_AGE_SECS:
+        log(f"TICK: WARNING — last tick record is {time.time()-tick_epoch:.0f}s old")
 
     actions_created = 0
     decision = tick.get("decision", "healthy")
@@ -293,11 +298,21 @@ def tock_actions():
         log(f"TOCK: Failed to parse latest.json: {e}")
         return 0
 
+    # Staleness check — skip entirely if tock data is too old
+    tock_age = _file_age_secs(TOCK_LATEST)
+    if tock_age > MAX_TOCK_AGE_SECS:
+        log(f"TOCK: WARNING — latest.json is {tock_age:.0f}s old, skipping stale data")
+        return 0
+
     actions_created = 0
     agents = tock.get("agents", {})
     cron = tock.get("cron", {})
     queues = tock.get("queues", {})
     assessment = tock.get("llm_assessment", {})
+
+    # Log when running on heuristic fallback (LLM unavailable)
+    if assessment.get("model") == "heuristic-fallback":
+        log("TOCK: WARNING — LLM assessment unavailable, using heuristic fallback")
 
     # Rule 1: Cron jobs erroring repeatedly
     for job in cron.get("jobs", []):
@@ -511,13 +526,17 @@ def main():
                         help="Print what would be done without creating tasks")
     args = parser.parse_args()
 
-    if args.trigger == "tick":
-        count = tick_actions()
-    elif args.trigger == "tock":
-        count = tock_actions()
-    elif args.trigger == "kurultai":
-        count = kurultai_actions()
-    else:
+    try:
+        if args.trigger == "tick":
+            count = tick_actions()
+        elif args.trigger == "tock":
+            count = tock_actions()
+        elif args.trigger == "kurultai":
+            count = kurultai_actions()
+        else:
+            count = 0
+    except Exception as e:
+        log(f"FATAL: Unhandled exception in {args.trigger}_actions: {e}")
         count = 0
 
     print(f"ACTIONS: {count} task(s) created")

@@ -1,0 +1,59 @@
+{"ts": "2026-03-04T13:52:32.538403", "task": "Build a REST API for auth", "dest": "temujin", "method": "keyword_fallback", "complexity": "simple", "top_scores": {"temujin": 5}}
+{"ts": "2026-03-04T13:52:37.542601", "task": "Research competitor pricing", "dest": "mongke", "method": "keyword_fallback", "complexity": "simple", "top_scores": {"mongke": 5}}
+{"ts": "2026-03-04T13:52:40.306379", "task": "Write a changelog entry", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"chagatai": 5}}
+{"ts": "2026-03-04T13:52:41.861849", "task": "Test the payment flow", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"jochi": 4}}
+{"ts": "2026-03-04T13:52:43.430157", "task": "Monitor server health", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"ogedei": 5}}
+{"ts": "2026-03-04T14:49:57.001214", "task": "Scan the openclaw scripts directory for any Python files that import subprocess and list potential c", "dest": "temujin", "method": "keyword_fallback", "complexity": "complex", "top_scores": {"temujin": 2, "jochi": 1}}
+{"ts": "2026-03-04T14:50:21.527916", "task": "Scan the openclaw scripts directory for any Python files that import subprocess and list potential c", "dest": "temujin", "method": "keyword_fallback", "complexity": "complex", "top_scores": {"temujin": 2, "jochi": 1}}
+{"ts": "2026-03-04T14:50:30.253910", "task": "Scan the openclaw scripts directory for any Python files that import subprocess and list potential c", "dest": "temujin", "method": "keyword_fallback", "complexity": "complex", "top_scores": {"temujin": 2, "jochi": 1}}
+{"ts": "2026-03-04T16:05:32.565839", "task": "Scan scripts for command injection vulnerabilities", "dest": "jochi", "method": "llm", "complexity": "complex", "top_scores": {"temujin": 1, "jochi": 1}}
+{"ts": "2026-03-04T16:05:34.229870", "task": "Write a blog post about our new feature", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "chagatai": 6}}
+{"ts": "2026-03-04T16:05:34.257062", "task": "Monitor cron health", "dest": "ogedei", "method": "keyword_fallback", "complexity": "simple", "top_scores": {"ogedei": 6}}
+{"ts": "2026-03-04T16:05:58.865511", "task": "Audit the hourly reflection pipeline for any scripts that silently swallow errors", "dest": "jochi", "method": "llm", "complexity": "complex", "top_scores": {"temujin": 1, "jochi": 4}}
+{"ts": "2026-03-04T16:09:17.568980", "task": "Investigate FATAL/CRASH errors in gateway log", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:09:19.138679", "task": "Investigate error spike: 73 errors in 5m", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:09:20.701953", "task": "Restart neo4j \u2014 service is DOWN", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"ogedei": 4}}
+{"ts": "2026-03-04T16:09:22.267087", "task": "Restart redis \u2014 service is DOWN", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"ogedei": 4}}
+{"ts": "2026-03-04T16:09:23.825737", "task": "Investigate high CPU usage: 92%", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:09:25.387145", "task": "Investigate high memory usage: 1200MB RSS", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:09:26.954352", "task": "Fix cron job: hourly_reflection (5 consecutive errors)", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "ogedei": 1}}
+{"ts": "2026-03-04T16:09:28.441513", "task": "Triage stalled agent: mongke has 4 queued tasks with 0 completions", "dest": "subagent", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-04T16:09:30.009197", "task": "Tock assessment: CRITICAL \u2014 temujin backlog", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-04T16:09:31.574010", "task": "Implement feedback from jochi: Add rate limiting to API endpoints", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 5}}
+{"ts": "2026-03-04T16:09:33.143216", "task": "Implement feedback from ogedei: Set up alerting for disk space", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "ogedei": 1}}
+{"ts": "2026-03-04T16:09:34.782457", "task": "Implement feedback from chagatai: Rewrite onboarding docs", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "chagatai": 1}}
+{"ts": "2026-03-04T16:09:36.337750", "task": "Review routing audit findings and implement improvements", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "mongke": 1, "jochi": 5}}
+{"ts": "2026-03-04T16:09:37.900887", "task": "Investigate recurring timeout pattern in mongke tasks", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4, "jochi": 1}}
+{"ts": "2026-03-04T16:09:39.462518", "task": "Add health check endpoint for task-watcher daemon", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"jochi": 1, "ogedei": 2}}
+{"ts": "2026-03-04T16:09:40.944381", "task": "Research alternative embedding models for semantic search", "dest": "mongke", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "mongke": 4}}
+{"ts": "2026-03-04T16:09:42.580073", "task": "Write post-mortem for yesterday's neo4j outage", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"chagatai": 5}}
+{"ts": "2026-03-04T16:09:44.149349", "task": "Set up log rotation for routing-decisions.jsonl", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-04T16:10:17.071777", "task": "Investigate FATAL/CRASH errors in gateway log", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:10:19.689552", "task": "Investigate error spike: 73 errors in 5m", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:10:22.297697", "task": "Restart neo4j \u2014 service is DOWN", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"ogedei": 4}}
+{"ts": "2026-03-04T16:10:24.940784", "task": "Restart redis \u2014 service is DOWN", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"ogedei": 4}}
+{"ts": "2026-03-04T16:10:27.554780", "task": "Investigate high CPU usage: 92%", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:10:30.172082", "task": "Investigate high memory usage: 1200MB RSS", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-04T16:10:32.781694", "task": "Fix cron job: hourly_reflection (5 consecutive errors)", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "ogedei": 1}}
+{"ts": "2026-03-04T16:10:35.399380", "task": "Triage stalled agent: mongke has 4 queued tasks with 0 completions", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-04T16:10:38.006102", "task": "Tock assessment: CRITICAL \u2014 temujin backlog", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-04T16:10:40.618901", "task": "Implement feedback from jochi: Add rate limiting to API endpoints", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 5}}
+{"ts": "2026-03-04T16:10:43.230749", "task": "Implement feedback from ogedei: Set up alerting for disk space", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "ogedei": 1}}
+{"ts": "2026-03-04T16:10:45.916217", "task": "Implement feedback from chagatai: Rewrite onboarding docs", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "chagatai": 1}}
+{"ts": "2026-03-04T16:10:48.529878", "task": "Review routing audit findings and implement improvements", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "mongke": 1, "jochi": 5}}
+{"ts": "2026-03-04T16:10:51.132148", "task": "Investigate recurring timeout pattern in mongke tasks", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 4, "jochi": 1}}
+{"ts": "2026-03-04T16:10:53.744154", "task": "Add health check endpoint for task-watcher daemon", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"jochi": 1, "ogedei": 2}}
+{"ts": "2026-03-04T16:10:56.276143", "task": "Research alternative embedding models for semantic search", "dest": "mongke", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "mongke": 4}}
+{"ts": "2026-03-04T16:10:58.958595", "task": "Write post-mortem for yesterday's neo4j outage", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"chagatai": 5}}
+{"ts": "2026-03-04T16:11:01.576763", "task": "Set up log rotation for routing-decisions.jsonl", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-04T16:11:17.613156", "task": "Build a login feature with OAuth", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 7}}
+{"ts": "2026-03-04T16:11:20.146555", "task": "Research competitors in the AI agent space", "dest": "mongke", "method": "llm", "complexity": "simple", "top_scores": {"mongke": 5}}
+{"ts": "2026-03-04T16:11:22.822333", "task": "Write a blog post about our launch", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"chagatai": 6}}
+{"ts": "2026-03-04T16:11:25.425316", "task": "Audit the codebase for security vulnerabilities", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "jochi": 5}}
+{"ts": "2026-03-04T16:11:27.848712", "task": "Monitor cron job health and uptime", "dest": "ogedei", "method": "llm", "complexity": "simple", "top_scores": {"ogedei": 7}}
+{"ts": "2026-03-04T16:11:30.342722", "task": "Create marketing copy for landing page", "dest": "chagatai", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 3, "mongke": 1, "chagatai": 2}}
+{"ts": "2026-03-04T16:11:32.772161", "task": "Validate the deployment pipeline", "dest": "jochi", "method": "llm", "complexity": "complex", "top_scores": {"temujin": 1, "jochi": 1}}
+{"ts": "2026-03-04T16:11:35.189969", "task": "Fix cron job for backup rotation", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 4, "ogedei": 2}}
+{"ts": "2026-03-04T16:11:37.612835", "task": "Research security vulnerabilities in OAuth", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 1, "mongke": 4, "jochi": 1}}
+{"ts": "2026-03-04T16:11:40.034674", "task": "Scan scripts for command injection risks", "dest": "jochi", "method": "llm", "complexity": "complex", "top_scores": {"temujin": 1, "jochi": 1}}
+{"ts": "2026-03-04T17:26:37.695171", "task": "Fix TypeScript, deploy agent services", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 7}}

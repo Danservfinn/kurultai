@@ -20,12 +20,11 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from agents_config import AGENTS
 
 ROUTING_LOG = "/Users/kublai/.openclaw/agents/main/logs/routing-decisions.jsonl"
 WATCHER_STATE = "/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json"
 AGENT_DIR = "/Users/kublai/.openclaw/agents/main/agent"
-
-AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
 
 def read_routing_decisions(hours=1):

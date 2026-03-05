@@ -1,0 +1,13 @@
+---
+agent: jochi
+priority: normal
+created: 2026-03-04T16:05:59.026962
+source: routing-test
+depth: 0
+task_id: b911a6e3-1c2
+parent_id: 
+---
+
+# Task: Audit the hourly reflection pipeline for any scripts that silently swallow errors
+
+Check all Python scripts called by hourly_reflection.sh. For each, verify that exceptions are logged rather than silently caught with bare 'except: pass'. List any silent error swallowing with file:line references.

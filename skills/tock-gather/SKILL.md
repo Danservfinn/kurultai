@@ -1,3 +1,8 @@
+---
+name: tock-gather
+description: "30-minute agent telemetry collection (tock) for the Kurultai. Gathers task completion rates, queue depths, success rates, and system metrics across all 6 agents. Use when checking agent performance, understanding tock data, or diagnosing agent workload issues."
+---
+
 # Tock Gather (30-Minute Agent Metrics)
 
 **Model:** lmstudio/qwen3.5-9b-mlx (local)

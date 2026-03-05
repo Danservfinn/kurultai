@@ -1,8 +1,13 @@
+---
+name: scrapling-research
+description: "Web scraping and data extraction using Scrapling framework. Adaptive scraping that survives redesigns, Cloudflare bypass, concurrent crawling, MCP server integration. Use when agents need to scrape websites, monitor competitors, gather news, or extract structured data from web pages."
+---
+
 # Scrapling Research Skill
 
-**Created:** 2026-03-04  
-**Version:** 1.0.0  
-**Status:** ✅ Active
+**Created:** 2026-03-04
+**Version:** 1.0.0
+**Status:** Active
 
 ---
 

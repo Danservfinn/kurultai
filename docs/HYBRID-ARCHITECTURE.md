@@ -1,8 +1,8 @@
 # Hybrid Architecture - Kurultai Agent System
 
-**Version:** 2.0  
-**Last Updated:** 2026-03-03  
-**Status:** Active Implementation
+**Version:** 3.0
+**Last Updated:** 2026-03-04
+**Status:** Active Implementation (post-KURULTAI-FORGE consolidation)
 
 ---
 
@@ -49,14 +49,164 @@ This provides the best of both worlds:
 
 ---
 
+## Task Workflow (post-KURULTAI-FORGE)
+
+Complete lifecycle from task creation to completion:
+
+```
+                         ┌──────────────────────┐
+                         │   TASK SOURCES        │
+                         │                       │
+                         │  kublai-actions.py    │
+                         │  kublai-initiative.py │
+                         │  CLI / API / cron     │
+                         └──────────┬────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │       task_intake.py           │
+                    │   (Single Entry Point)         │
+                    │                               │
+                    │  1. Depth check (max 3)       │
+                    │  2. Auto-route via router     │
+                    │  3. Duplicate check (fs)      │
+                    │  4. Create in Neo4j           │
+                    │  5. Write filesystem (.md)    │
+                    └──────────┬────────────────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+     ┌─────────────┐  ┌─────────────┐  ┌──────────────┐
+     │ task-router  │  │  Neo4j      │  │  Filesystem  │
+     │   .py        │  │ (primary)   │  │  (compat)    │
+     │              │  │             │  │              │
+     │ Keywords +   │  │ Task node   │  │ {agent}/     │
+     │ Disambig.    │  │ PENDING     │  │  tasks/      │
+     │ → agent name │  │ state       │  │  high-*.md   │
+     └─────────────┘  └──────┬──────┘  └──────┬───────┘
+                              │                │
+                              └────────┬───────┘
+                                       │
+                                       ▼
+                    ┌──────────────────────────────────┐
+                    │     task-watcher.py (launchd)     │
+                    │     SOLE DISPATCHER               │
+                    │                                  │
+                    │  Poll every 15s for new .md      │
+                    │  Execute via agent-task-handler   │
+                    │  Cleanup .done files (hourly)    │
+                    └──────────────┬───────────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────────┐
+                    │    agent-task-handler.py          │
+                    │                                  │
+                    │  1. Mark .executing              │
+                    │  2. Extract depth from frontmatter│
+                    │  3. Call LLM (openclaw agent)    │
+                    │  4. Mark .done / .failed         │
+                    │  5. Neo4j transition_task()      │
+                    │  6. Can spawn subtasks (depth+1) │
+                    └──────────────┬───────────────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+                    ▼              ▼              ▼
+              ┌──────────┐  ┌──────────┐  ┌──────────┐
+              │COMPLETED │  │ FAILED   │  │ TIMEOUT  │
+              │          │  │          │  │          │
+              │ .done    │  │ retry →  │  │ retry →  │
+              │ file     │  │ PENDING  │  │ PENDING  │
+              │ (48h TTL)│  │ (max 3x) │  │          │
+              └──────────┘  └──────────┘  └──────────┘
+```
+
+### Subagent Spawn Pipeline (separate path)
+
+```
+  kublai-actions.py / agent-task-handler.py
+              │
+              │  spawn request
+              ▼
+  ┌──────────────────────────────┐
+  │  spawn-pending.json          │  ← locked via json_state.py
+  │  (status: ready)             │
+  └──────────────┬───────────────┘
+                 │
+                 │  cron */2
+                 ▼
+  ┌──────────────────────────────┐
+  │  spawn-consumer.sh           │
+  │  → spawn_consumer_worker.py  │
+  │                              │
+  │  1. Validate agent allowlist │
+  │  2. Sanitize input text      │
+  │  3. Route: subagent or agent │
+  │  4. Launch openclaw agent    │
+  │  5. Track status             │
+  │  6. Retry on failure (3x)   │
+  │  7. Dead-letter on exhaust   │
+  └──────────────────────────────┘
+```
+
+### State Machine (Neo4j)
+
+```
+  PENDING ──→ ASSIGNED ──→ EXECUTING ──→ COMPLETED
+                                │
+                                ├──→ FAILED ──→ (retry) ──→ PENDING
+                                │
+                                ├──→ TIMEOUT ──→ (retry) ──→ PENDING
+                                │
+                                └──→ CANCELLED
+
+  Each transition logged as:
+    (Task)-[:TRANSITIONED {from, to, actor, timestamp}]->(Task)
+```
+
+### Monitoring
+
+```
+  ┌──────────────────────────────────┐
+  │      health_dashboard.py         │
+  │                                  │
+  │  Queue depths (per agent)        │
+  │  Spawn queue depth               │
+  │  Dispatch status (task-watcher)  │
+  │  Neo4j: task stats, completion   │
+  │         rate, bottlenecks,       │
+  │         workload, hypotheses,    │
+  │         active rules             │
+  └──────────────────────────────────┘
+```
+
+### Safety Guards
+
+```
+  ┌─────────────────────────────────────────────────┐
+  │  Depth limit: MAX_TASK_DEPTH = 3                │
+  │  Dedup: has_pending_task() filesystem check     │
+  │  Rate limit: MAX_ACTIONS_PER_CYCLE = 3          │
+  │  Cooldown: error_spike at 7200s (2h)            │
+  │  Agent allowlist: VALID_AGENTS set              │
+  │  Input sanitization: sanitize_text()            │
+  │  File locking: json_state.py (fcntl.flock)      │
+  │  Credentials: ~/.openclaw/credentials/neo4j.env │
+  └─────────────────────────────────────────────────┘
+```
+
+---
+
 ## Agent Workspaces
 
 Each agent has a dedicated workspace:
 
 ```
-/Users/kublai/.openclaw/agents/{agent}/
+/Users/kublai/.openclaw/agents/main/agent/{agent}/
 ├── config.json         # Agent configuration
-├── tasks/              # Pending task queue
+├── tasks/              # Pending task queue (high-*.md, normal-*.md, low-*.md)
+│   └── *.done          # Completed tasks (auto-cleaned after 48h by task-watcher.py)
 ├── workspace/          # Persistent files
 └── memory/             # Agent-specific memory
     └── context.md      # Current context
@@ -112,43 +262,103 @@ Each agent has a dedicated workspace:
 
 ---
 
-## Task Routing
+## Canonical Model Mapping
 
-### Smart Router Decision Tree
+**Authoritative source:** `~/.openclaw/openclaw.json` → `agents.list[].model`
 
-```
-Task → Classify complexity
-       ├─ Simple (<5 min, no context) → Subagent
-       ├─ Code task → Temujin (full agent)
-       ├─ Research task → Mongke (full agent)
-       ├─ Writing task → Chagatai (full agent)
-       ├─ Testing task → Jochi (full agent)
-       └─ Ops task → Ogedei (full agent)
-```
+| Agent | Model | Role |
+|-------|-------|------|
+| Kublai | bailian/qwen3.5-plus | Orchestrator |
+| Mongke | bailian/MiniMax-M2.5 | Researcher |
+| Chagatai | bailian/kimi-k2.5 | Writer |
+| Temujin | bailian/MiniMax-M2.5 | Developer |
+| Jochi | bailian/qwen3.5-plus | Tester/Security |
+| Ogedei | bailian/qwen3.5-plus | Ops/Monitor |
 
-### Routing Keywords
-
-| Agent | Keywords |
-|-------|----------|
-| Temujin | code, build, implement, fix, bug, feature, deploy, api |
-| Mongke | research, analyze, investigate, discover, competitor, market |
-| Chagatai | write, document, blog, post, content, article, creative |
-| Jochi | test, security, audit, review, verify, validate, pattern |
-| Ogedei | monitor, health, alert, failover, ops, uptime, status |
+> **Important:** `openclaw.json` is the single source of truth for model assignments.
+> The now-archived `task-consumer.sh` had incorrect mappings. Always read from
+> `openclaw.json` programmatically; do not hardcode model names in scripts.
 
 ---
 
-## Scripts
+## Task Routing
+
+### Canonical Router: `task-router.py` (aka `task_router.py`)
+
+All routing goes through the canonical router. Import via:
+```python
+from task_router import classify_task, route_by_text, route_by_category
+```
+
+### Decision Tree
+
+```
+Task → classify_task(text)
+       ├─ Score keywords per agent
+       ├─ Apply disambiguation rules
+       ├─ Assess complexity (simple/moderate/complex)
+       │
+       ├─ Simple + no context → Subagent
+       ├─ Code/infra task → Temujin
+       ├─ Research/analysis → Mongke
+       ├─ Writing/content → Chagatai
+       ├─ Test/security/audit → Jochi
+       └─ Ops/monitoring → Ogedei
+```
+
+### Routing Keywords (canonical, from task-router.py)
+
+| Agent | Primary Keywords |
+|-------|----------|
+| Temujin | code, build, implement, fix, bug, feature, deploy, api, database, typescript, python, infrastructure, automation, integration, sandbox, llm |
+| Mongke | research, analyze, investigate, discover, find, study, competitor, market, trend, data, intelligence, survey, explore, ecosystem |
+| Chagatai | write, document, blog, post, content, article, creative, copy, marketing, social, twitter, readme, changelog |
+| Jochi | test, verify, validate, check, security, audit, vulnerability, scan, prompt injection, safety, review, pattern, analysis |
+| Ogedei | monitor, health, alert, uptime, status, dashboard, failover, ops, cron, restart, backup, watch, track |
+
+### Disambiguation Rules
+
+- "research" + "security" → Jochi (not Mongke)
+- "research" + "prompt injection" → Jochi
+- "build" + "infrastructure" → Temujin
+- "monitor" + "infrastructure" → Ogedei
+
+---
+
+## Scripts (post-KURULTAI-FORGE)
+
+### Core Pipeline
 
 | Script | Purpose |
 |--------|---------|
-| `launch-agent.py` | Launch persistent agents |
-| `agent-task-handler.py` | Process agent task queues |
-| `smart-task-router.py` | Route tasks to appropriate destination |
-| `agent-health-monitor.py` | Monitor agent health, auto-restart |
+| `task-watcher.py` | **Sole task dispatcher** (launchd daemon, 15s poll). Detects new tasks, calls agent-task-handler.py, cleans up old .done files |
+| `agent-task-handler.py` | Full task lifecycle: mark executing, call LLM, mark completed/failed, update Neo4j |
+| `task-router.py` | **Canonical router** — single source of truth for task routing keywords and disambiguation |
+| `task_intake.py` | **Single entry point** for all task creation (depth check, route, dedup, Neo4j+filesystem) |
+| `spawn-consumer.sh` | Process subagent spawn queue (*/2 cron, calls spawn_consumer_worker.py) |
+| `spawn_consumer_worker.py` | Spawn queue processing with input sanitization and agent allowlist |
+
+### Support
+
+| Script | Purpose |
+|--------|---------|
+| `neo4j_task_tracker.py` | Neo4j connection factory, task state machine, hypothesis validation, rule lifecycle |
+| `json_state.py` | Shared file-locking module (fcntl.flock) for all JSON state files |
+| `health_dashboard.py` | Consolidated system health monitoring (replaces agent-manager.py --status) |
+| `kublai-actions.py` | Rule-based actions (tick/tock cycles, with depth limits and dedup guards) |
+| `kublai-initiative.py` | Proactive initiative engine |
 | `agent-dashboard.py` | Real-time agent status dashboard |
-| `subagent_completion_tracker.py` | Track subagent completion |
-| `spawn-consumer.sh` | Process spawn queue |
+
+### Archived (no longer active)
+
+| Script | Replaced By |
+|--------|------------|
+| `task-consumer.sh` | task-watcher.py (launchd) |
+| `task-queue-monitor.py` | task-watcher.py (launchd) |
+| `classify-task.py` | task-router.py |
+| `chat-execute.py` | agent-task-handler.py |
+| `direct-execute.py` | agent-task-handler.py |
+| `complete-task.py` | neo4j_task_tracker.transition_task() |
 
 ---
 

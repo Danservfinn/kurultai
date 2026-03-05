@@ -1,0 +1,11 @@
+---
+agent: chagatai
+priority: normal
+created: 2026-03-04T13:46:23.754162
+source: llm-router-test
+depth: 0
+---
+
+# Task: Write a changelog entry for the KURULTAI-FORGE consolidation
+
+Summarize the 16-task consolidation: unified routing, single dispatcher, file locking, credential centralization, LLM-based routing, health dashboard, task state machine.

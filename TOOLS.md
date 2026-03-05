@@ -25,15 +25,20 @@
 - `message`: Signal/Telegram messaging
 
 ### Coding Agent (Claude Code)
-For all coding tasks, use the **coding-agent skill** with Claude Code:
+For all coding tasks, use **`claude-agent`** — a wrapper that spawns Claude Code with all 90+ skills, 23 plugins, and proper non-interactive settings:
 
 ```bash
-# Quick one-shot task
-bash pty:true command:"cd ~/project && claude -p 'Your task here'"
+# Quick one-shot task (default: opus, $1.00 budget)
+bash pty:true command:"claude-agent 'Your task here'"
+
+# Specify model and budget
+bash pty:true command:"claude-agent --model sonnet --budget 0.50 'Quick task'"
+
+# With working directory
+bash pty:true command:"claude-agent --workdir ~/project 'Build feature X'"
 
 # Background task with monitoring
-bash pty:true background:true workdir:~/project command:"claude -p 'Build feature X'"
-# Returns sessionId for process tool monitoring
+bash pty:true background:true command:"claude-agent --workdir ~/project 'Build feature X'"
 ```
 
 **When to use coding-agent:**
@@ -47,18 +52,38 @@ bash pty:true background:true workdir:~/project command:"claude -p 'Build featur
 - Reading code (use read tool)
 - Work in ~/clawd workspace
 
-### Specialized Skills
+### Horde Skills (Available in Claude Code Sessions)
+When invoking `claude-agent`, you can reference these skills in the prompt:
+
+**Orchestration:**
+- `/golden-horde` — 9 multi-agent patterns (review loop, debate, pipeline, etc.)
+- `/horde-swarm` — Parallel subagent dispatch (35+ agent types)
+- `/horde-brainstorming` — Structured ideation with diverge/evaluate/converge
+
+**Planning & Implementation:**
+- `/horde-plan` — Structured implementation plans with dependency tracking
+- `/horde-implement` — Execute plans with quality checkpoints
+- `/horde-gate-testing` — Integration tests between implementation phases
+
+**Quality:**
+- `/horde-review` — Multi-domain critical review (security, perf, architecture)
+- `/horde-test` — Parallel test suite execution
+- `/code-reviewer` — Automated code review
+
+**Specialist Skills:**
+- `/senior-architect`, `/senior-backend`, `/senior-frontend`, `/senior-devops`
+- `/senior-data-engineer`, `/senior-ml-engineer`, `/senior-data-scientist`
+- `/security-auditor`, `/brainstorming`, `/critical-reviewer`
+
+**Example with skill:**
+```bash
+bash pty:true command:"claude-agent --workdir ~/project 'Use /horde-plan to design a caching layer, then /horde-implement to build it'"
+```
+
+### Other Skills
 - **nano-banana-pro**: Image generation/editing via Google Gemini
 - **kurultai-reflection**: Hourly agent reflection
 - **heartbeat-watchdog**: LLM-powered gateway monitoring
-
-### Horde Skills (Multi-Agent Orchestration)
-- `/golden-horde`: 9 multi-agent patterns
-- `/horde-plan`: Structured implementation plans
-- `/horde-implement`: Execute plans with checkpoints
-- `/horde-swarm`: Parallel subagent dispatch (35+ agent types)
-- `/horde-review`: Multi-domain critical review
-- `/horde-test`: Parallel test suite execution
 
 ---
 
@@ -76,11 +101,11 @@ bash pty:true background:true workdir:~/project command:"claude -p 'Build featur
 - **Gemini (Nano Banana):** `GEMINI_API_KEY` env var
 
 ### Claude Code
-- **Location:** `/opt/homebrew/bin/claude` (v2.1.66)
+- **Wrapper:** `/Users/kublai/.local/bin/claude-agent` (auto-configures permissions, env)
+- **Binary:** `/Users/kublai/.local/bin/claude` (v2.1.68)
 - **Auth:** OAuth (claude.ai Max subscription)
-- **Config:** `~/.claude/settings.json`
-- **Plugins:** 13 installed (hookify, superpowers, playwright, etc.)
-- **Skills:** 76 installed via claude-code-setup
+- **Config:** `~/.claude/settings.json` (23 plugins, thinking enabled)
+- **Skills:** 90+ installed via claude-code-setup-v2
 
 ### Railway Projects
 - **Parse:** `parsethe.media` (OpenRouter integrated)
@@ -97,10 +122,11 @@ bash pty:true background:true workdir:~/project command:"claude -p 'Build featur
 4. Track completion via Neo4j
 
 ### Coding with Claude Code
-1. Use `pty:true` for interactive CLI
-2. Set `workdir` to project folder
+1. Always use `claude-agent` wrapper (not bare `claude -p`)
+2. Use `--workdir` for project-specific work
 3. Use `background:true` for long tasks
-4. Monitor via `process` tool
+4. For complex tasks, reference horde skills in the prompt
+5. Monitor via `process` tool
 
 ### Context Management
 - Load full context at session start
@@ -128,7 +154,10 @@ openclaw cron list
 python3 -c "from neo4j import GraphDatabase; d=GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j','neo4j')); print(d.verify_connectivity())"
 
 # Claude Code one-shot
-claude -p "Your task here"
+claude-agent "Your task here"
+
+# Claude Code with horde skills
+claude-agent "Use /horde-review to review the auth module"
 
 # Generate image
 python3 ~/.codex/skills/nano-banana-pro/nanobanana.py --prompt "prompt" --output "out.png"
@@ -142,4 +171,4 @@ python3 ~/.codex/skills/nano-banana-pro/nanobanana.py --prompt "prompt" --output
 - First autonomous thread posted successfully
 - Nano-banana-pro: gemini-3.1-flash tested & working
 - Parse: OpenRouter integration LIVE
-- Claude Code: Installed & configured with 76 skills, 13 plugins
+- Claude Code: Installed & configured with 90+ skills, 23 plugins (via claude-code-setup-v2)

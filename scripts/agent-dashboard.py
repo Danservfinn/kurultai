@@ -18,16 +18,8 @@ from datetime import datetime, timedelta
 AGENTS_DIR = "/Users/kublai/.openclaw/agents"
 METRICS_FILE = "/Users/kublai/.openclaw/agents/main/logs/heartbeat_metrics.jsonl"
 
-AGENTS = ['kublai', 'temujin', 'mongke', 'chagatai', 'jochi', 'ogedei']
-
-AGENT_ROLES = {
-    "kublai": "Squad Lead / Router",
-    "temujin": "Developer",
-    "mongke": "Researcher",
-    "chagatai": "Writer",
-    "jochi": "Analyst",
-    "ogedei": "Operations"
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from agents_config import AGENTS, AGENT_ROLES
 
 def get_agent_state(agent_name):
     """Get agent state from Neo4j"""

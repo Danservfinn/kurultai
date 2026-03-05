@@ -1,0 +1,65 @@
+{
+  "query": "Hermeticism esoteric tradition Hermes Trismegistus Corpus Hermeticum",
+  "sources": [
+    "https://en.wikipedia.org/wiki/Hermeticism",
+    "https://www.britannica.com/topic/Hermetism"
+  ],
+  "timestamp": "2026-03-04T20:21:14.947619",
+  "entities": [
+    {
+      "name": "Hermes Trismegistus",
+      "type": "person",
+      "description": "Legendary figure associated with Hermeticism, often depicted as the syncretic combination of Hermes and Thoth."
+    },
+    {
+      "name": "Corpus Hermeticum",
+      "type": "symbol",
+      "description": "A collection of ancient Greek philosophical texts that form the foundational scriptures of Hermeticism."
+    }
+  ],
+  "concepts": [
+    {
+      "name": "Hermeticism",
+      "description": "An esoteric tradition focused on spiritual enlightenment and direct knowledge (gnosis) through divine revelation."
+    },
+    {
+      "name": "Esoteric Tradition",
+      "description": "A branch of mysticism or philosophy intended for a select few, emphasizing hidden meanings."
+    },
+    {
+      "name": "Gnosis",
+      "description": "The direct, personal experience of divine knowledge central to Hermetic thought."
+    },
+    {
+      "name": "Hermes Trismegistus",
+      "description": "The godly sage or 'Thrice-Greatest Hermes', symbolizing the unity of wisdom and power."
+    },
+    {
+      "name": "Esoteric tradition",
+      "description": "A spiritual or philosophical path focused on inner knowledge and hidden wisdom rather than public dogma."
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Hermes Trismegistus",
+      "to": "Corpus Hermeticum",
+      "type": "attributed author"
+    },
+    {
+      "from": "Corpus Hermeticum",
+      "to": "Hermeticism",
+      "type": "foundational texts"
+    },
+    {
+      "from": "Corpus Hermeticum",
+      "to": "Hermes Trismegistus",
+      "type": "attribution"
+    },
+    {
+      "from": "Hermetism",
+      "to": "Esoteric tradition",
+      "type": "subclass_of"
+    }
+  ],
+  "summary": "Hermeticism is an esoteric tradition centered on achieving spiritual enlightenment and divine *gnosis* through direct revelation. This philosophy is attributed to the legendary sage Hermes Trismegistus, a syncretic figure combining Egyptian and Greek wisdom. The foundational texts of this movement are compiled in the *Corpus Hermeticum*, which outlines an inner path distinct from public dogma. Ultimately, these writings emphasize hidden meanings and the unity of wisdom, positioning Hermeticism as a specialized branch of mysticism intended for spiritual initiates."
+}

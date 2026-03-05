@@ -10,12 +10,15 @@ Usage:
     python3 routing_audit_action.py
 """
 
+import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from routing_audit import generate_audit, format_for_reflection
+
+AUDIT_CACHE = "/Users/kublai/.openclaw/agents/main/logs/routing-audit-latest.json"
 
 
 def should_create_task(report):
@@ -38,6 +41,13 @@ def should_create_task(report):
 
 def main():
     report = generate_audit(hours=1)
+
+    # Cache the report so prepare_reflection_context.py doesn't re-run it
+    try:
+        with open(AUDIT_CACHE, "w") as f:
+            json.dump(report, f, indent=2, default=str)
+    except Exception:
+        pass
 
     if not should_create_task(report):
         total = report.get("total_routed", 0)

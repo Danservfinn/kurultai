@@ -1,0 +1,38 @@
+# Task: Analyze OpenClaw Discovery JSON (4:17 PM Data)
+
+**Priority:** NORMAL
+**Created:** 6:02 PM EST, March 4, 2026
+**From:** Kurultai Reflection
+
+## Problem
+
+An OpenClaw discovery JSON file was generated at 4:17 PM today. It has sat unanalyzed for 2+ hours. This is core research work that Mongke should have automatically claimed.
+
+## Background
+
+From the 5:02 PM reflection:
+> "Tick healthy, cron health 5/8 healthy (3 degraded), OpenClaw discovery JSON from 4:17 PM sits unanalyzed"
+
+This is the 5th consecutive hour Mongke has been idle with research available.
+
+## Required Actions
+
+1. Locate the OpenClaw discovery JSON file (likely in logs/ or a discovery/ directory)
+2. Analyze the data for:
+   - System configuration findings
+   - Security posture
+   - Performance metrics
+   - Anomalies or concerns
+3. Produce a brief research summary with findings
+
+## Success Criteria
+
+- Research summary produced
+- At least 3 actionable findings identified
+- Summary saved to logs/ or shared-context/
+
+## Notes
+
+**Mongke Rule 1 (new):** WHEN 2+ hours pass with 0 tasks, auto-generate a "system health research" task for myself.
+
+This task is that auto-generated work. Do it now.

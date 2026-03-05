@@ -1,0 +1,39 @@
+# Task: Resolve Scrapling Cron Jobs (Scripts Missing)
+
+**Priority:** NORMAL
+**Created:** 6:02 PM EST, March 4, 2026
+**From:** Kurultai Reflection
+
+## Problem
+
+Two Scrapling cron jobs are configured but have NEVER executed because their scripts do not exist:
+
+1. **Scrapling: Competitor Monitoring** (b060eabe-7d54-44bd-8b13-61049b0c3adc)
+   - Schedule: Every 6 hours
+   - Status: idle, never ran
+   
+2. **Scrapling: OpenClaw Discovery** (3e18b42c-7c3a-4801-8c1c-42b575484f7f)
+   - Schedule: Every 12 hours
+   - Status: idle, never ran
+
+## Required Actions
+
+Choose ONE approach:
+
+### Option A: Create the scripts
+- Create `scripts/scrapling-competitor.sh` for competitor monitoring
+- Create `scripts/scrapling-discovery.sh` for OpenClaw discovery
+- Implement basic scrapling logic or stub that reports status
+
+### Option B: Remove the cron entries
+- If these crons are not needed, remove them from OpenClaw cron configuration
+- Clean up any related configuration
+
+## Success Criteria
+
+- Both crons show either "ok" status (if scripts created) OR are removed from cron list
+- No more "idle, never ran" entries in cron status
+
+## Notes
+
+These crons have been in "unknown/never ran" status for multiple daily reflections. This is a 24+ hour old issue.

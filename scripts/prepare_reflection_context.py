@@ -17,31 +17,17 @@ import argparse
 import json
 import os
 import re
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from agents_config import AGENTS, AGENT_ROLES, AGENT_MODELS
 
 BASE = Path.home() / ".openclaw/agents"
 TOCK_LATEST = BASE / "main/logs/tock/latest.json"
 PROTOCOLS_DIR = BASE / "main/scripts/reflection_protocols"
 MAX_ACTIVE_RULES = 7
-
-AGENT_ROLES = {
-    "kublai": "Squad Lead / Router",
-    "temujin": "Developer (code, builds, infrastructure)",
-    "mongke": "Researcher (web research, API discovery)",
-    "chagatai": "Writer (documentation, creative content)",
-    "jochi": "Analyst (testing, security, pattern recognition)",
-    "ogedei": "Ops (monitoring, health checks, failover)",
-}
-
-AGENT_MODELS = {
-    "kublai": "bailian/qwen3.5-plus",
-    "mongke": "bailian/MiniMax-M2.5",
-    "chagatai": "bailian/kimi-k2.5",
-    "temujin": "bailian/MiniMax-M2.5",
-    "jochi": "bailian/qwen3.5-plus",
-    "ogedei": "bailian/qwen3.5-plus",
-}
 
 
 def find_latest_memory_file(agent):
@@ -234,10 +220,28 @@ def load_protocol(agent):
     return None
 
 
+AUDIT_CACHE = BASE / "main/logs/routing-audit-latest.json"
+
+
 def get_routing_audit(hours=1):
-    """Get routing audit data for kublai's reflection."""
+    """Get routing audit data for kublai's reflection.
+
+    Reads from cache written by routing_audit_action.py (runs earlier in the
+    hourly pipeline). Falls back to generating fresh if cache is missing.
+    """
     try:
-        from routing_audit import generate_audit, format_for_reflection
+        from routing_audit import format_for_reflection
+
+        # Prefer cached result (written by routing_audit_action.py)
+        if AUDIT_CACHE.exists():
+            import json as _json
+            with open(AUDIT_CACHE) as f:
+                report = _json.load(f)
+            if report.get("total_routed", 0) > 0:
+                return format_for_reflection(report)
+
+        # Fallback: generate fresh (e.g. if called outside hourly pipeline)
+        from routing_audit import generate_audit
         report = generate_audit(hours=hours)
         if report.get("total_routed", 0) > 0:
             return format_for_reflection(report)

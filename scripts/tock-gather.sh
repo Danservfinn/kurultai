@@ -311,7 +311,9 @@ PYEOF
 # 8. LLM Assessment (direct API call to Ollama)
 # ============================================================
 LLM_ASSESSMENT=$(python3 << PYEOF
-import json, requests
+import json, re, sys, requests
+sys.path.insert(0, "$BASE/scripts")
+from ollama_lock import OllamaLock, Priority, LockBusy
 
 summary = """$LLM_SUMMARY"""
 
@@ -327,25 +329,32 @@ ACTION: <one recommended action or "none needed">
 SEVERITY: LOW|MEDIUM|HIGH|CRITICAL"""
 
 try:
-    resp = requests.post(
-        "http://localhost:11434/api/chat",
-        json={
-            "model": "qwen3.5:9b",
-            "messages": [
-                {"role": "system", "content": "You are a concise operations analyst. Respond only in the exact format requested. No thinking tags."},
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False
-        },
-        timeout=90
-    )
-    if resp.status_code == 200:
-        text = resp.json()["message"]["content"].strip()
-        import re
-        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-        print(text)
-    else:
-        print("FALLBACK")
+    with OllamaLock(Priority.NORMAL, label="tock-assessment"):
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": "qwen3.5:9b",
+                "messages": [
+                    {"role": "system", "content": "You are a concise operations analyst. Respond only in the exact format requested."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False,
+                "think": False,
+                "options": {"num_predict": 150}
+            },
+            timeout=180
+        )
+        if resp.status_code == 200:
+            text = resp.json().get("message", {}).get("content", "").strip()
+            text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+            if text:
+                print(text)
+            else:
+                print("FALLBACK")
+        else:
+            print("FALLBACK")
+except LockBusy:
+    print("FALLBACK")
 except:
     print("FALLBACK")
 PYEOF

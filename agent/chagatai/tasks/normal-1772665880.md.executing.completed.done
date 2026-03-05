@@ -1,0 +1,39 @@
+# Task: Write Cron Failure Incident Report
+
+**Priority:** NORMAL
+**Created:** 6:02 PM EST, March 4, 2026
+**From:** Kurultai Reflection
+
+## Problem
+
+Three cron jobs have been failing or never executing for 24+ hours:
+1. Daily Goal Progress — delivery failure (10+ hours)
+2. Scrapling: Competitor — script missing (never ran)
+3. Scrapling: OpenClaw Discovery — script missing (never ran)
+
+This is a system reliability incident that should be documented.
+
+## Required Actions
+
+Write an incident report including:
+1. **Timeline:** When each issue started
+2. **Impact:** What functionality is affected
+3. **Root Causes:** Delivery failure, missing scripts
+4. **Resolution Status:** Tasks created, pending fixes
+5. **Prevention:** How to avoid similar issues
+
+## Format
+
+Save as: `logs/incident-cron-failures-2026-03-04.md`
+
+## Success Criteria
+
+- Incident report written and saved
+- Report is clear enough for a human to understand the issues
+- Report includes recommended follow-up actions
+
+## Notes
+
+**Chagatai-R4 (new):** WHEN invoked for reflection AND tasks_completed=0 → produce at least ONE inline artifact within the reflection response itself.
+
+This is your first assigned writing task. Make it count.

@@ -1,0 +1,44 @@
+{
+  "period_hours": 1,
+  "generated_at": "2026-03-04T17:26:34.754389",
+  "total_routed": 0,
+  "routing_methods": {},
+  "destinations": {},
+  "by_agent": {},
+  "queue_state": {
+    "kublai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 3
+    },
+    "temujin": {
+      "pending": 0,
+      "executing": 0,
+      "done": 13
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 0
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 1
+    },
+    "jochi": {
+      "pending": 0,
+      "executing": 0,
+      "done": 17
+    },
+    "ogedei": {
+      "pending": 0,
+      "executing": 0,
+      "done": 3
+    }
+  },
+  "issues": [
+    "No routing decisions logged in the last 1h"
+  ],
+  "suggestions": []
+}

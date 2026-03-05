@@ -1,0 +1,76 @@
+[
+  {
+    "title": "OpenClaw Official Repository",
+    "url": "https://github.com/openclaw/openclaw",
+    "source": "github.com",
+    "category": "official",
+    "description": "Main OpenClaw repository with core functionality",
+    "found_at": "2026-03-04T18:11:51.147126"
+  },
+  {
+    "title": "ClawHub - Community Skills",
+    "url": "https://clawhub.ai/",
+    "source": "clawhub.ai",
+    "category": "skill",
+    "description": "Community-built skills marketplace (5,700+ skills)",
+    "found_at": "2026-03-04T18:11:51.147128"
+  },
+  {
+    "title": "OpenClaw Skills Documentation",
+    "url": "https://docs.openclaw.ai/skills",
+    "source": "docs.openclaw.ai",
+    "category": "tutorial",
+    "description": "Official documentation for creating and using skills",
+    "found_at": "2026-03-04T18:11:51.147129"
+  },
+  {
+    "title": "OpenClaw Discord Community",
+    "url": "https://discord.gg/clawd",
+    "source": "discord.com",
+    "category": "community",
+    "description": "Official Discord server for support and announcements",
+    "found_at": "2026-03-04T18:11:51.147131"
+  },
+  {
+    "title": "OpenClaw Integrations Guide",
+    "url": "https://www.knolli.ai/post/openclaw-integrations",
+    "source": "knolli.ai",
+    "category": "tutorial",
+    "description": "Guide to integrating OpenClaw with external services",
+    "found_at": "2026-03-04T18:11:51.147132"
+  },
+  {
+    "title": "DigitalOcean: What are OpenClaw Skills",
+    "url": "https://www.digitalocean.com/resources/articles/what-are-openclaw-skills",
+    "source": "digitalocean.com",
+    "category": "tutorial",
+    "description": "Introduction to OpenClaw skills and capabilities",
+    "found_at": "2026-03-04T18:11:51.147134"
+  },
+  {
+    "title": "OpenClaw Security Best Practices",
+    "url": "https://www.malwarebytes.com/blog/news/2026/02/openclaw-what-is-it-and-can-you-use-it-safely",
+    "source": "malwarebytes.com",
+    "category": "security",
+    "description": "Security considerations for OpenClaw deployment",
+    "found_at": "2026-03-04T18:11:51.147135"
+  },
+  {
+    "title": "OpenClaw Use Cases for Business",
+    "url": "https://contabo.com/blog/openclaw-use-cases-for-business-in-2026/",
+    "source": "contabo.com",
+    "category": "tutorial",
+    "description": "Business automation use cases with OpenClaw",
+    "found_at": "2026-03-04T18:11:51.147136"
+  },
+  {
+    "title": "ANE - Apple Neural Engine Training (WATCHLIST)",
+    "url": "https://github.com/maderix/ANE",
+    "source": "github.com",
+    "category": "research",
+    "description": "Training neural networks on Apple Neural Engine via private APIs. Research project, ~5-9% utilization. Monitor for production readiness.",
+    "found_at": "2026-03-04T18:11:51.147138",
+    "watchlist": true,
+    "priority": "low"
+  }
+]

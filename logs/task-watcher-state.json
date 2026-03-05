@@ -2,5 +2,73 @@
   "temujin/test-immediate-1772641582.md": {
     "executed": "2026-03-04T11:27:51.421635",
     "success": true
+  },
+  "jochi/normal-1772646751.md": {
+    "executed": "2026-03-04T12:56:18.630928",
+    "success": true
+  },
+  "jochi/normal-1772649672.md": {
+    "executed": "2026-03-04T13:44:34.553310",
+    "success": true
+  },
+  "chagatai/normal-1772649983.md": {
+    "executed": "2026-03-04T13:47:21.892280",
+    "success": true
+  },
+  "kublai/normal-1772650456.md": {
+    "executed": "2026-03-04T13:54:23.107981",
+    "success": false
+  },
+  "kublai/normal-1772650469.md": {
+    "executed": "2026-03-04T13:54:37.739239",
+    "success": false
+  },
+  "temujin/normal-1772653797.md": {
+    "executed": "2026-03-04T14:51:18.349685",
+    "success": true
+  },
+  "jochi/normal-1772654230.md": {
+    "executed": "2026-03-04T14:58:32.525547",
+    "success": true
+  },
+  "jochi/normal-1772658359.md": {
+    "executed": "2026-03-04T16:07:56.652805",
+    "success": true
+  },
+  "ogedei/high-1772659924.md": {
+    "executed": "2026-03-04T16:33:15.712640",
+    "success": true
+  },
+  "ogedei/normal-1772661386.md": {
+    "executed": "2026-03-04T16:59:59.753505",
+    "success": true
+  },
+  "temujin/normal-1772663197.md": {
+    "executed": "2026-03-04T17:27:02.489725",
+    "success": true
+  },
+  "temujin/normal-1772665856.md": {
+    "executed": "2026-03-04T18:12:07.008618",
+    "success": true
+  },
+  "mongke/normal-1772665880.md": {
+    "executed": "2026-03-04T18:13:13.611993",
+    "success": true
+  },
+  "ogedei/high-1772665856.md": {
+    "executed": "2026-03-04T18:15:19.884940",
+    "success": true
+  },
+  "jochi/normal-1772665914.md": {
+    "executed": "2026-03-04T18:18:38.372672",
+    "success": true
+  },
+  "chagatai/normal-1772665880.md": {
+    "executed": "2026-03-04T18:19:28.150874",
+    "success": true
+  },
+  "mongke/esoteric-research-1772666325.md": {
+    "executed": "2026-03-04T18:22:10.121450",
+    "success": true
   }
 }

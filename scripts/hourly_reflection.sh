@@ -82,33 +82,37 @@ done
 echo "[$(date)] All 6 agents completed their reflections sequentially"
 echo "================================================================"
 
-# Generate Kublai summary
-echo "[$(date)] Generating Kublai review summary..."
-python3 /Users/kublai/.openclaw/agents/main/scripts/kublai_review_feedback.py --summary 2>/dev/null || true
-
 echo "[$(date)] Concurrent Kurultai Reflection Complete"
 echo "================================================================"
 
 # ============================================================
-# ROUTING AUDIT: Analyze task routing and execution quality
+# SELF-IMPROVEMENT BRAINSTORMING: Each agent proposes improvements
+# (Uses Claude Code + /horde-brainstorming, configured per claude-code-setup-v2)
+# ============================================================
+echo "[$(date)] Running Self-Improvement Brainstorming (all agents)..."
+python3 "$SCRIPTS/kurultai_brainstorm.py" --all >> "$SCRIPTS/../logs/kurultai-brainstorm.log" 2>&1 || true
+
+# ============================================================
+# ROUTING AUDIT: Analyze routing decisions + cache for kublai reflection
 # ============================================================
 echo "[$(date)] Running Routing Audit..."
-python3 /Users/kublai/.openclaw/agents/main/scripts/routing_audit_action.py 2>/dev/null || true
+python3 "$SCRIPTS/routing_audit_action.py" 2>/dev/null || true
 
 # ============================================================
 # KUBLAI ACTIONS: Process feedback into agent tasks
+# (Also handles pending AgentFeedback review — no separate --summary needed)
 # ============================================================
 echo "[$(date)] Running Kublai Actions (kurultai trigger)..."
-python3 /Users/kublai/.openclaw/agents/main/scripts/kublai-actions.py --trigger kurultai 2>/dev/null || true
+python3 "$SCRIPTS/kublai-actions.py" --trigger kurultai 2>/dev/null || true
+
+# ============================================================
+# PROPOSAL EXPIRY: Clean up stale proposals (Kublai reviews them himself)
+# ============================================================
+echo "[$(date)] Expiring stale proposals..."
+python3 "$SCRIPTS/kurultai_review.py" --expire >> "$SCRIPTS/../logs/kurultai-review.log" 2>&1 || true
 
 # ============================================================
 # KUBLAI INITIATIVE: "What do I want to do next?"
 # ============================================================
 echo "[$(date)] Running Kublai Initiative (self-directed action)..."
-python3 /Users/kublai/.openclaw/agents/main/scripts/kublai-initiative.py 2>/dev/null || true
-
-# List pending feedback for Kublai
-echo ""
-echo "Pending Feedback for Kublai:"
-python3 /Users/kublai/.openclaw/agents/main/scripts/kublai_review_feedback.py --list 2>/dev/null || echo "(none)"
-echo ""
+python3 "$SCRIPTS/kublai-initiative.py" 2>/dev/null || true
