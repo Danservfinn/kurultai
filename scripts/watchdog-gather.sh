@@ -52,7 +52,7 @@ TICKS="$LOGDIR/ticks.jsonl"
 SUMMARY="$LOGDIR/tick-summary.txt"
 WATCHDOG_LOG="$LOGDIR/watchdog.log"
 OPENCLAW_LOG="$HOME/.openclaw/logs/openclaw.log"
-AGENT_BASE="$BASE/agent"
+AGENT_BASE="$HOME/.openclaw/agents"
 SCRIPTS="$BASE/scripts"
 
 TS=$(date '+%Y-%m-%d %H:%M:%S')
@@ -101,8 +101,12 @@ if [ -f "$OPENCLAW_LOG" ]; then
     # but are not actionable errors (just detecting com.kurultai.task-watcher plist)
     # Noise patterns:
     # - Gateway detecting task-watcher plist as "another gateway" (6 lines per occurrence)
-    # - Signal daemon clean exits (code=0, normal restart cycle)
-    NOISE_FILTER="gateway-like services\|Cleanup hint\|Recommendation: run\|isolate ports\|com.kurultai.task-watcher\|signal daemon exited.*code=0"
+    # - Signal daemon clean exits (code=0 or code=143/SIGTERM, normal restart cycle)
+    # - systemd checks on macOS (Service unit not found, Service not installed)
+    # - Agent messaging by name instead of UUID (message failed: Unknown target)
+    # - Optional file checks (ENOENT for skills, config files)
+    # - Missing GNU coreutils on macOS (command not found: timeout)
+    NOISE_FILTER="gateway-like services\|Cleanup hint\|Recommendation: run\|isolate ports\|com.kurultai.task-watcher\|signal daemon exited\|Service unit not found\|Service not installed\|File logs:\|message failed: Unknown target\|ENOENT.*skills\|command not found: timeout"
     ERRORS_5M=$(tail -500 "$OPENCLAW_LOG" 2>/dev/null | grep "ERROR\|FATAL\|CRASH" | grep -cv "$NOISE_FILTER" 2>/dev/null; true)
     ERRORS_1H=$(tail -5000 "$OPENCLAW_LOG" 2>/dev/null | grep "ERROR\|FATAL\|CRASH" | grep -cv "$NOISE_FILTER" 2>/dev/null; true)
     FATAL_5M=$(tail -500 "$OPENCLAW_LOG" 2>/dev/null | grep -c "FATAL\|CRASH" 2>/dev/null; true)

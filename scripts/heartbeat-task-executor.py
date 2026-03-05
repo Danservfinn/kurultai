@@ -17,7 +17,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Configuration
-AGENTS_DIR = Path("/Users/kublai/.openclaw/agents/main/agent")
+AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
 TIMEOUT_DEFAULT = 240  # 4 minutes (heartbeat runs every 5 min)
 
 def list_pending_tasks(agent_dir):

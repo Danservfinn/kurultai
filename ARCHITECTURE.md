@@ -566,6 +566,31 @@ Report in heartbeat: tasks_completed: N
 
 ## Change Log
 
+### 2026-03-05 - Task Execution Path Fix (Critical Bug)
+
+**Change**: Fixed path misconfiguration in task execution scripts
+
+**Reason**: Task execution scripts were looking at wrong agent directory paths
+
+**Root Cause**: Three scripts had `AGENTS_DIR`/`AGENT_BASE` pointing to `/Users/kublai/.openclaw/agents/main/agent/{agent}/tasks/` instead of `/Users/kublai/.openclaw/agents/{agent}/tasks/`
+
+**Impact**: Tasks were not being executed - pending tasks sat for hours undetected
+
+**Files Fixed**:
+- `scripts/watchdog-gather.sh` - Changed `AGENT_BASE="$BASE/agent"` → `AGENT_BASE="$HOME/.openclaw/agents"`
+- `scripts/heartbeat-task-executor.py` - Changed path to `/Users/kublai/.openclaw/agents`
+- `scripts/task-watcher.py` - Changed path to `/Users/kublai/.openclaw/agents`
+
+**Result**: 
+- All 7 pending tasks executed successfully after fix
+- tasks_pending correctly shows 0 (was showing stale data)
+- System health monitoring now accurate
+
+**Restarted Services**:
+- task-watcher.py daemon restarted via launchctl
+
+**Verification**: Watchdog log at 05:30 shows `tasks_pending=0` with correct path
+
 ### 2026-03-04 - Immediate Task Execution + Accountability System
 
 **Change**: Implemented immediate task execution (10s latency) and full accountability system

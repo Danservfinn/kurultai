@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
 
 # Configuration
-AGENTS_DIR = Path("/Users/kublai/.openclaw/agents/main/agent")
+AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
 STATE_FILE = Path("/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json")
 POLL_INTERVAL_DEFAULT = 15  # seconds
 TIMEOUT_DEFAULT = 240  # 4 minutes
