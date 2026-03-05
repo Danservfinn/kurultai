@@ -210,6 +210,37 @@ def _keyword_classify(task_text):
     return destination, scores, complexity
 
 
+def _prevent_self_routing(task_text, destination):
+    """Prevent routing triage/assessment tasks to the agent they're about.
+
+    Detects patterns like "Triage stalled agent: X" or "assessment: ... X backlog"
+    and redirects to a different agent. Primary redirect: jochi (analyst).
+    If jochi is the stalled agent, redirect to kublai (squad lead).
+    This prevents deadlocks where a stalled agent receives its own triage task.
+    """
+    task_lower = task_text.lower()
+
+    def _safe_redirect(stalled_agent):
+        """Pick a redirect target that isn't the stalled agent."""
+        if stalled_agent != "jochi":
+            return "jochi"
+        return "kublai"
+
+    # Pattern 1: "triage stalled agent: <agent_name>"
+    if "triage stalled agent:" in task_lower or "triage stalled agent " in task_lower:
+        for agent in VALID_AGENTS - {"subagent"}:
+            if agent in task_lower and destination == agent:
+                return _safe_redirect(agent)
+
+    # Pattern 2: "assessment: ... <agent_name> backlog" or similar
+    if "assessment" in task_lower:
+        for agent in VALID_AGENTS - {"subagent"}:
+            if agent in task_lower and destination == agent:
+                return _safe_redirect(agent)
+
+    return destination
+
+
 def classify_task(task_text):
     """Classify task and determine routing destination.
 
@@ -225,6 +256,9 @@ def classify_task(task_text):
     else:
         # LLM succeeded — still compute scores for metadata
         _, scores, complexity = _keyword_classify(task_text)
+
+    # Guard: prevent routing triage tasks to the agent they're about
+    destination = _prevent_self_routing(task_text, destination)
 
     result = {
         "task": task_text[:100],

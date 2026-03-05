@@ -347,16 +347,17 @@ Last duration: {job.get('last_duration_ms', 0)}ms
         log(f"TOCK: queue_backlog detected: {total_pending} pending ({backlog_detail}) — logging only, not creating task")
         mark_fired("queue_backlog")
 
-    # Rule 3: Agent stalled — route to kublai for triage (not to the stalled agent)
+    # Rule 3: Agent stalled — route to jochi (analyst) for investigation
+    # NEVER route to the stalled agent itself (causes deadlock — see circular triage bug 2026-03-05)
     for name, data in agents.items():
         t = data.get("tasks", {})
         queue_depth = t.get("queue_depth", 0)
         completed = t.get("completed", 0)
         running = t.get("running", 0)
         if queue_depth > 0 and completed == 0 and running == 0:
-            if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task("kublai", f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
+            if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task("jochi", f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
                 create_task(
-                    "kublai", "normal",
+                    "jochi", "normal",
                     f"Triage stalled agent: {name} has {queue_depth} queued tasks with 0 completions",
                     f"""## Context
 Agent {name} has {queue_depth} tasks in file queue but 0 completions
@@ -366,6 +367,7 @@ in the last 30 minutes and nothing currently running.
 1. Review {name}'s pending tasks
 2. Determine if tasks should be redistributed or if there's a blocker
 3. Take corrective action (reassign, cancel stale tasks, or investigate)
+4. Report findings to kublai for coordination
 """
                 )
                 mark_fired(f"agent_stalled:{name}")
