@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_read, locked_json_update
 
 BASE = "/Users/kublai/.openclaw/agents/main"
-AGENT_DIR = f"{BASE}/agent"
+AGENT_DIR = "/Users/kublai/.openclaw/agents"
 TICKS_FILE = f"{BASE}/logs/ticks.jsonl"
 TOCK_LATEST = f"{BASE}/logs/tock/latest.json"
 ACTIONS_LOG = f"{BASE}/logs/kublai-actions.log"
@@ -42,6 +42,7 @@ COOLDOWNS = {
     "queue_backlog": 1800,     # 30 min
     "agent_stalled": 3600,     # 1 hour
     "feedback_review": 7200,   # 2 hours
+    "queue_audit": 1800,       # 30 min
 }
 
 MAX_ACTIONS_PER_CYCLE = 3
@@ -346,6 +347,31 @@ Last duration: {job.get('last_duration_ms', 0)}ms
         )
         log(f"TOCK: queue_backlog detected: {total_pending} pending ({backlog_detail}) — logging only, not creating task")
         mark_fired("queue_backlog")
+
+    # Rule 2b: Queue audit — fake completions detected
+    queue_audit = tock.get("queue_audit", {})
+    audit_requeued = queue_audit.get("requeued", 0)
+    audit_fake = queue_audit.get("fake_found", 0)
+    if audit_requeued > 0:
+        log(f"TOCK: queue_audit auto-fixed {audit_requeued} fake completion(s)")
+    if audit_fake > 3 and not is_cooled_down("queue_audit") and not has_pending_task("ogedei", "Investigate task queue") and actions_created < MAX_ACTIONS_PER_CYCLE:
+        create_task(
+            "ogedei", "high",
+            f"Investigate task queue: {audit_fake} fake completions detected",
+            f"""## Context
+The queue audit detected {audit_fake} tasks marked as "done" that were never
+actually executed by Claude Code. {audit_requeued} were automatically re-queued.
+
+## Action Required
+1. Check task-watcher logs for execution errors
+2. Verify Claude Code (claude-agent) is functioning
+3. Review workspace result files for agents with fake completions
+4. Ensure the execution chain is working: task-watcher -> agent-task-handler -> claude-agent
+5. Report findings to Kublai
+"""
+        )
+        mark_fired("queue_audit")
+        actions_created += 1
 
     # Rule 3: Agent stalled — route to jochi (analyst) for investigation
     # NEVER route to the stalled agent itself (causes deadlock — see circular triage bug 2026-03-05)

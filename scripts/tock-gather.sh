@@ -157,7 +157,7 @@ CRON_DATA=${CRON_DATA:-'{"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]}'}
 # ============================================================
 QUEUE_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json, os, glob
-base = "/Users/kublai/.openclaw/agents/main/agent"
+base = "/Users/kublai/.openclaw/agents"
 queues = {}
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     task_dir = f"{base}/{agent}/tasks"
@@ -186,6 +186,11 @@ else: print(0)
 " 2>/dev/null || echo "0")
 
 # ============================================================
+# 4b. Queue audit (detect fake completions, auto-requeue)
+# ============================================================
+QUEUE_AUDIT=$(python3 "$BASE/scripts/queue-audit.py" --json 2>/dev/null || echo '{"audited":0,"fake_found":0,"requeued":0,"skipped":0}')
+
+# ============================================================
 # 5. Last tick status
 # ============================================================
 TICK_STATUS=$(tail -1 "$BASE/logs/watchdog.log" 2>/dev/null | grep -o "status=[a-z]*" | cut -d= -f2; true)
@@ -201,6 +206,10 @@ neo4j = json.loads('''$NEO4J_DATA''')
 session_raw = '''$SESSION_DATA'''
 cron = json.loads('''$CRON_DATA''')
 queues = json.loads('''$QUEUE_DATA''')
+try:
+    queue_audit = json.loads('''$QUEUE_AUDIT''')
+except:
+    queue_audit = {"audited":0,"fake_found":0,"requeued":0,"skipped":0}
 
 # Parse session data
 try:
@@ -265,7 +274,8 @@ output = {
     "system": {
         "neo4j_reachable": "error" not in neo4j,
         "tick_status": "$TICK_STATUS"
-    }
+    },
+    "queue_audit": queue_audit
 }
 
 print(json.dumps(output, indent=2, default=str))

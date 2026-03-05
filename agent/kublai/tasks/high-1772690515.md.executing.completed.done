@@ -1,0 +1,23 @@
+---
+agent: kublai
+priority: high
+created: 2026-03-05T01:01:55.461348
+source: kublai-actions
+depth: 0
+task_id: 1ac2dd4f-56f
+parent_id: 
+---
+
+# Task: Tock assessment: CRITICAL — none
+
+## Context
+The 30-minute tock assessment flagged severity: CRITICAL
+Bottleneck: none
+Workload: All agents are idle with zero completed, pending, or queued tasks.
+Coordination: none
+Recommended action: Verify if incoming task queue is empty or if agents require reactivation
+
+## Action Required
+Review the tock data at `~/.openclaw/agents/main/logs/tock/latest.json`
+and take the recommended action or delegate to the appropriate agent.
+

@@ -18,7 +18,8 @@ from datetime import datetime
 
 # Configuration
 AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
-TIMEOUT_DEFAULT = 240  # 4 minutes (heartbeat runs every 5 min)
+CLAUDE_AGENT = "/Users/kublai/.local/bin/claude-agent"
+TIMEOUT_DEFAULT = 600  # 10 minutes for Claude Code execution
 
 def list_pending_tasks(agent_dir):
     """List pending tasks for an agent, sorted by priority."""
@@ -47,65 +48,67 @@ def list_pending_tasks(agent_dir):
     return sorted(pending, key=priority_key)
 
 def execute_task(task_file, timeout):
-    """Execute a single task file. Returns (success, output)."""
+    """Execute a single task file via Claude Code. Returns (success, output)."""
     # Mark as executing
     executing_file = task_file.with_suffix(task_file.suffix + '.executing')
     try:
         task_file.rename(executing_file)
     except Exception as e:
         return False, f"Failed to mark task as executing: {e}"
-    
-    # Read task content to determine agent
+
+    # Read task content
     try:
         content = executing_file.read_text()
     except Exception as e:
         return False, f"Failed to read task: {e}"
-    
-    # Determine agent from path
+
+    # Determine agent and workspace from path
     agent = executing_file.parent.parent.name
-    
-    # Execute via OpenClaw spawn
-    # This launches a subagent session using the agent's configured model from openclaw.json
-    # All Kurultai agents use CLOUD LLMs (bailian/*), NOT local LLMs:
-    #   - Kublai: bailian/qwen3.5-plus
-    #   - Möngke: bailian/MiniMax-M2.5
-    #   - Chagatai: bailian/kimi-k2.5
-    #   - Temüjin: bailian/MiniMax-M2.5
-    #   - Jochi: bailian/qwen3.5-plus
-    #   - Ögedei: bailian/qwen3.5-plus
-    # The --agent flag automatically uses the agent's default model configuration.
-    cmd = [
-        "openclaw",
-        "agent",
-        "--agent", agent,
-        "--message", f"Execute this task: {content[:500]}",
-        "--thinking", "high"
-    ]
-    
+    workspace = str(executing_file.parent.parent)
+
+    # Build prompt with full task content for Claude Code
+    prompt = (
+        f"You are {agent.capitalize()}, executing an assigned task.\n\n"
+        f"{content}\n\n"
+        "Execute this task completely. Write all necessary code, "
+        "make all changes, and verify your work before finishing."
+    )
+
+    # Execute via Claude Code (not glm-5)
+    env = os.environ.copy()
+    env.pop('CLAUDECODE', None)  # Allow nested Claude Code sessions
+    env['PATH'] = (
+        "/Users/kublai/.local/bin:/opt/homebrew/bin:"
+        "/usr/local/bin:/usr/bin:/bin:" + env.get('PATH', '')
+    )
+
     try:
         result = subprocess.run(
-            cmd,
+            [CLAUDE_AGENT, "--workdir", workspace, prompt],
             capture_output=True,
             text=True,
             timeout=timeout,
-            cwd=str(executing_file.parent.parent.parent)
+            env=env,
         )
-        
-        if result.returncode == 0:
+
+        output = result.stdout[-3000:] if result.stdout else ""
+
+        if result.returncode == 0 and output.strip():
             # Mark as completed
             completed_file = executing_file.with_suffix(executing_file.suffix + '.completed.done')
             executing_file.rename(completed_file)
-            return True, result.stdout[:1000]
+            return True, output[:1000]
         else:
-            # Mark as completed with failure
-            completed_file = executing_file.with_suffix(executing_file.suffix + '.completed.done')
+            # Mark as failed
+            error = result.stderr[-1000:] if result.stderr else "No output from Claude Code"
+            completed_file = executing_file.with_suffix(executing_file.suffix + '.failed.done')
             executing_file.rename(completed_file)
-            return False, result.stderr[:1000]
-            
+            return False, error
+
     except subprocess.TimeoutExpired:
-        # Revert to pending on timeout
+        # Revert to pending on timeout (allow retry)
         executing_file.rename(task_file)
-        return False, f"Task timed out after {timeout}s"
+        return False, f"Claude Code timed out after {timeout}s"
     except Exception as e:
         # Revert to pending on error
         try:

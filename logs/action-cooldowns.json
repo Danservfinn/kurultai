@@ -1,7 +1,15 @@
 {
-  "error_spike:high": 1772654230.522812,
+  "error_spike:high": 1772691220.5474281,
   "cron_fix:heartbeat-watchdog": 1772607015.191419,
   "cron_fix:tock-gather": 1772623104.230965,
-  "agent_stalled:jochi": 1772623104.231194,
-  "service_down:neo4j": 1772659924.601877
+  "agent_stalled:jochi": 1772724683.641643,
+  "service_down:neo4j": 1772659924.601877,
+  "tock_severity": 1772722892.338062,
+  "agent_stalled:kublai": 1772723008.567847,
+  "queue_backlog": 1772730102.364266,
+  "queue_audit": 1772730102.709963,
+  "agent_stalled:mongke": 1772730102.723966,
+  "agent_stalled:chagatai": 1772730102.7657669,
+  "agent_stalled:temujin": 1772730258.868501,
+  "agent_stalled:ogedei": 1772730258.880543
 }

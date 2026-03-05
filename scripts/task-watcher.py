@@ -28,11 +28,15 @@ from threading import Thread, Event
 sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
 
+# Force unbuffered output for launchd (stdout goes to file)
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 # Configuration
 AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
 STATE_FILE = Path("/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json")
 POLL_INTERVAL_DEFAULT = 15  # seconds
-TIMEOUT_DEFAULT = 240  # 4 minutes
+TIMEOUT_DEFAULT = 600  # 10 minutes for Claude Code execution
 CLEANUP_INTERVAL = 3600  # Run cleanup every hour
 DONE_FILE_MAX_AGE = 48 * 3600  # 48 hours in seconds
 
@@ -122,20 +126,34 @@ def watch_cycle(poll_interval, max_tasks_per_cycle=1):
         agent = agent_dir.name
         pending = list_pending_tasks(agent_dir)
         
-        for task_file in pending[:max_tasks_per_cycle]:
+        # Filter out already-seen tasks, but detect re-queued ones
+        # A task is "new" if not in state, or if file was modified after
+        # state timestamp (re-queued by queue-audit.py)
+        new_tasks = []
+        for f in pending:
+            key = f"{agent}/{f.name}"
+            if key not in state:
+                new_tasks.append(f)
+            else:
+                # Check if file was modified after execution (re-queued)
+                try:
+                    exec_time = datetime.fromisoformat(state[key]['executed'])
+                    file_mtime = datetime.fromtimestamp(f.stat().st_mtime)
+                    if file_mtime > exec_time:
+                        new_tasks.append(f)
+                except (KeyError, ValueError, OSError):
+                    pass
+
+        for task_file in new_tasks[:max_tasks_per_cycle]:
             task_key = f"{agent}/{task_file.name}"
-            
-            # Check if this is a genuinely new task (not seen before)
-            if task_key in state:
-                continue
-            
+
             # New task detected - execute immediately
             print(f"[{datetime.now().isoformat()}] NEW TASK: {task_key}")
             success, output = execute_task(task_file, TIMEOUT_DEFAULT)
-            
+
             status = "✓" if success else "✗"
             print(f"  {status} {task_key}: {'Completed' if success else 'Failed'}")
-            
+
             # Update state
             state[task_key] = {
                 'executed': datetime.now().isoformat(),

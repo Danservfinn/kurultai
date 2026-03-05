@@ -1,0 +1,21 @@
+---
+agent: jochi
+priority: normal
+created: 2026-03-05T01:13:40.546324
+source: kublai-actions
+depth: 0
+task_id: 244f3fa1-e9d
+parent_id: 
+---
+
+# Task: Investigate error spike: 95 errors in 5m
+
+## Context
+The tick detected 95 errors in the last 5 minutes (1h total: 194).
+No FATAL errors, but error rate is elevated.
+
+## Action Required
+1. Check `~/.openclaw/logs/openclaw.log` for error patterns
+2. Determine if this is a transient spike or ongoing issue
+3. Report findings and recommend action
+

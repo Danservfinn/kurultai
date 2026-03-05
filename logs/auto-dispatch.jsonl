@@ -1,0 +1,55 @@
+{"ts": "2026-03-05T09:19:14.969871", "action": "revert_stale", "agent": "temujin", "task": "high-1772578840.md", "stuck_secs": 141514}
+{"ts": "2026-03-05T09:19:14.970566", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T09:43:52.480917", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 5, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:18:48.657772", "action": "revert_stale", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "stuck_secs": 7564}
+{"ts": "2026-03-05T11:18:48.661697", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:19:02.800159", "action": "dispatch", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "title": "Implement Auto-Dispatch Cron", "pid": 18524}
+{"ts": "2026-03-05T11:19:02.800907", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:24:02.895617", "action": "revert_stale", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "stuck_secs": 7878}
+{"ts": "2026-03-05T11:24:02.896303", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 1, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:29:03.000761", "action": "dispatch", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "title": "Implement Auto-Dispatch Cron", "pid": 20551}
+{"ts": "2026-03-05T11:29:03.001370", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:34:03.103858", "action": "revert_stale", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "stuck_secs": 8478}
+{"ts": "2026-03-05T11:34:03.111358", "action": "dispatch", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "title": "Implement Auto-Dispatch Cron", "pid": 21456}
+{"ts": "2026-03-05T11:34:03.112132", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:39:03.210430", "action": "revert_stale", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "stuck_secs": 8778}
+{"ts": "2026-03-05T11:39:03.213900", "action": "dispatch", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "title": "Implement Auto-Dispatch Cron", "pid": 22176}
+{"ts": "2026-03-05T11:39:03.214494", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:44:03.307184", "action": "revert_stale", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "stuck_secs": 9078}
+{"ts": "2026-03-05T11:44:03.309173", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 23429}
+{"ts": "2026-03-05T11:44:03.310795", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 23430}
+{"ts": "2026-03-05T11:44:03.312267", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 23431}
+{"ts": "2026-03-05T11:44:03.312555", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:49:03.405347", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 34510}
+{"ts": "2026-03-05T11:49:03.407562", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 24604}
+{"ts": "2026-03-05T11:49:03.407885", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 16685}
+{"ts": "2026-03-05T11:49:03.409344", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 24605}
+{"ts": "2026-03-05T11:49:03.409560", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 9378}
+{"ts": "2026-03-05T11:49:03.410851", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 24606}
+{"ts": "2026-03-05T11:49:03.411086", "action": "revert_stale", "agent": "jochi", "task": "normal-1772723008.md", "stuck_secs": 6334}
+{"ts": "2026-03-05T11:49:03.411297", "action": "cycle_complete", "stats": {"reverted": 4, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:54:03.505437", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 34810}
+{"ts": "2026-03-05T11:54:03.505859", "action": "revert_stale", "agent": "temujin", "task": "direct-1772583456.md", "stuck_secs": 146187}
+{"ts": "2026-03-05T11:54:03.508210", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 28352}
+{"ts": "2026-03-05T11:54:03.508526", "action": "revert_stale", "agent": "mongke", "task": "direct-1772583732.md", "stuck_secs": 145910}
+{"ts": "2026-03-05T11:54:03.508777", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 16985}
+{"ts": "2026-03-05T11:54:03.510524", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 28353}
+{"ts": "2026-03-05T11:54:03.510882", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 9679}
+{"ts": "2026-03-05T11:54:03.512512", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 28354}
+{"ts": "2026-03-05T11:54:03.512819", "action": "cycle_complete", "stats": {"reverted": 5, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T11:59:03.603896", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 35110}
+{"ts": "2026-03-05T11:59:03.604322", "action": "revert_stale", "agent": "temujin", "task": "direct-1772583715.md", "stuck_secs": 146227}
+{"ts": "2026-03-05T11:59:03.606852", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 30087}
+{"ts": "2026-03-05T11:59:03.607252", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 17285}
+{"ts": "2026-03-05T11:59:03.609111", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 30088}
+{"ts": "2026-03-05T11:59:03.609426", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 9979}
+{"ts": "2026-03-05T11:59:03.611213", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 30089}
+{"ts": "2026-03-05T11:59:03.611518", "action": "cycle_complete", "stats": {"reverted": 4, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:04:03.718499", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 35410}
+{"ts": "2026-03-05T12:04:03.718950", "action": "revert_stale", "agent": "temujin", "task": "direct-1772583358.md", "stuck_secs": 146885}
+{"ts": "2026-03-05T12:04:03.727357", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 31775}
+{"ts": "2026-03-05T12:04:03.727818", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 17585}
+{"ts": "2026-03-05T12:04:03.729750", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 31776}
+{"ts": "2026-03-05T12:04:03.730102", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 10279}
+{"ts": "2026-03-05T12:04:03.731758", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 31777}
+{"ts": "2026-03-05T12:04:03.732210", "action": "cycle_complete", "stats": {"reverted": 4, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}

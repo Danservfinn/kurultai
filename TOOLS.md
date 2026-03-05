@@ -6,51 +6,28 @@
 
 ## Model Configuration
 
-- **Default:** qwen3.5-plus (1M context)
-- **Fallback:** MiniMax-M2.5
+- **Default:** zai-coding/glm-5 (dispatches to Claude Code via ACP)
+- **Fallback:** zai-coding/glm-4.7, bailian/qwen3.5-plus
 - **Heartbeat:** Every 30 minutes
 
 ---
 
-## Core Capabilities
+## Tool Usage
 
-### OpenClaw Tools
-- `sessions_spawn`: Spawn subagents for parallel work
-- `web_search`: Research via Kimi/Perplexity
-- `web_fetch`: Fetch web content (markdown extraction)
-- `exec`: Shell commands (with pty support)
-- `read/write/edit`: File operations
-- `browser`: Browser automation (Chrome)
-- `process`: Manage background processes
-- `message`: Signal/Telegram messaging
+### Primary Tool: `message()` — Route tasks to specialist agents
+See AGENTS.md for full routing protocol. Specialist tasks go to agents, not ACP.
 
-### Coding Agent (Claude Code)
-For all coding tasks, use **`claude-agent`** — a wrapper that spawns Claude Code with all 90+ skills, 23 plugins, and proper non-interactive settings:
-
-```bash
-# Quick one-shot task (default: opus, $1.00 budget)
-bash pty:true command:"claude-agent 'Your task here'"
-
-# Specify model and budget
-bash pty:true command:"claude-agent --model sonnet --budget 0.50 'Quick task'"
-
-# With working directory
-bash pty:true command:"claude-agent --workdir ~/project 'Build feature X'"
-
-# Background task with monitoring
-bash pty:true background:true command:"claude-agent --workdir ~/project 'Build feature X'"
+### Secondary Tool: `sessions_spawn()` — Your own coordination work
+For Kublai-only tasks (triage, synthesis, reflection, planning):
 ```
+sessions_spawn({ task: "<description>", runtime: "acp", agentId: "claude", mode: "run" })
+```
+Use `mode: "session"` with `thread: true` for multi-turn work.
 
-**When to use coding-agent:**
-- Building new features or apps
-- Reviewing PRs
-- Refactoring large codebases
-- Iterative coding needing file exploration
-
-**NOT for:**
-- Simple one-liner fixes (use edit tool)
-- Reading code (use read tool)
-- Work in ~/clawd workspace
+### Status Tools (use directly):
+- `sessions_list` / `session_status` — quick session checks
+- `agents_list` — list available agents
+- `cron` — manage scheduled jobs
 
 ### Horde Skills (Available in Claude Code Sessions)
 When invoking `claude-agent`, you can reference these skills in the prompt:
@@ -75,9 +52,9 @@ When invoking `claude-agent`, you can reference these skills in the prompt:
 - `/senior-data-engineer`, `/senior-ml-engineer`, `/senior-data-scientist`
 - `/security-auditor`, `/brainstorming`, `/critical-reviewer`
 
-**Example with skill:**
-```bash
-bash pty:true command:"claude-agent --workdir ~/project 'Use /horde-plan to design a caching layer, then /horde-implement to build it'"
+**Example with skill (via ACP):**
+```
+sessions_spawn({ task: "Use /horde-plan to design a caching layer for the Parse project, then /horde-implement to build it", runtime: "acp", agentId: "claude", mode: "run" })
 ```
 
 ### Other Skills
@@ -121,12 +98,12 @@ bash pty:true command:"claude-agent --workdir ~/project 'Use /horde-plan to desi
 3. Set clear review expectations
 4. Track completion via Neo4j
 
-### Coding with Claude Code
-1. Always use `claude-agent` wrapper (not bare `claude -p`)
-2. Use `--workdir` for project-specific work
-3. Use `background:true` for long tasks
-4. For complex tasks, reference horde skills in the prompt
-5. Monitor via `process` tool
+### Coding with Claude Code (via ACP)
+1. Always dispatch via `sessions_spawn({ runtime: "acp", agentId: "claude" })`
+2. Include full context (URLs, file paths, requirements) in the `task` field
+3. Use `mode: "session"` with `thread: true` for multi-turn work
+4. For complex tasks, reference horde skills in the task description
+5. Monitor via `session_status` tool
 
 ### Context Management
 - Load full context at session start
@@ -141,26 +118,20 @@ bash pty:true command:"claude-agent --workdir ~/project 'Use /horde-plan to desi
 
 ---
 
-## Quick Commands
+## Quick Commands (via ACP)
 
-```bash
-# Check agent status
-openclaw status
+```
+# One-shot task via Claude Code ACP
+sessions_spawn({ task: "Your task here", runtime: "acp", agentId: "claude", mode: "run" })
 
-# List cron jobs
-openclaw cron list
+# Multi-turn session via Claude Code ACP
+sessions_spawn({ task: "Your task here", runtime: "acp", agentId: "claude", mode: "session", thread: true })
 
-# Check Neo4j
-python3 -c "from neo4j import GraphDatabase; d=GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j','neo4j')); print(d.verify_connectivity())"
+# Task with horde skills
+sessions_spawn({ task: "Use /horde-review to review the auth module", runtime: "acp", agentId: "claude", mode: "run" })
 
-# Claude Code one-shot
-claude-agent "Your task here"
-
-# Claude Code with horde skills
-claude-agent "Use /horde-review to review the auth module"
-
-# Generate image
-python3 ~/.codex/skills/nano-banana-pro/nanobanana.py --prompt "prompt" --output "out.png"
+# Image generation
+sessions_spawn({ task: "Generate image with prompt: 'prompt' and save to out.png using nano-banana-pro", runtime: "acp", agentId: "claude", mode: "run" })
 ```
 
 ---

@@ -1,0 +1,21 @@
+---
+agent: kublai
+priority: normal
+created: 2026-03-05T01:31:31.663470
+source: kublai-actions
+depth: 0
+task_id: fd0da643-17b
+parent_id: 
+---
+
+# Task: Triage stalled agent: jochi has 1 queued tasks with 0 completions
+
+## Context
+Agent jochi has 1 tasks in file queue but 0 completions
+in the last 30 minutes and nothing currently running.
+
+## Action Required
+1. Review jochi's pending tasks
+2. Determine if tasks should be redistributed or if there's a blocker
+3. Take corrective action (reassign, cancel stale tasks, or investigate)
+

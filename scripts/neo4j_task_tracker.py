@@ -349,7 +349,7 @@ class TaskTracker:
             parent_id=parent_id)
 
         # Backward-compatible filesystem write
-        base = os.path.expanduser("~/.openclaw/agents/main/agent")
+        base = os.path.expanduser("~/.openclaw/agents")
         task_dir = f"{base}/{agent}/tasks"
         os.makedirs(task_dir, exist_ok=True)
         epoch = int(datetime.now().timestamp())
@@ -441,7 +441,7 @@ parent_id: {parent_id or ''}
 
         Returns a dict of discrepancies.
         """
-        base = os.path.expanduser("~/.openclaw/agents/main/agent")
+        base = os.path.expanduser("~/.openclaw/agents")
         agents = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
         discrepancies = []
 

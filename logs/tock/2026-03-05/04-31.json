@@ -1,0 +1,187 @@
+{
+  "timestamp": "2026-03-05T04:31:18-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 6,
+    "healthy": 6,
+    "erroring": 0,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 197404,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 71462,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 22644,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 296873,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 34938,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 56613,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 0,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [],
+    "count_30m": 0
+  },
+  "errors": {
+    "clusters": []
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy"
+  },
+  "llm_assessment": {
+    "model": "ollama/qwen3.5:9b",
+    "workload_balance": "All agents are idle with no completed tasks, pending items, or context usage.",
+    "bottleneck": "none",
+    "coordination_gap": "none",
+    "recommended_action": "Assign tasks to active agents to utilize available capacity.",
+    "severity": "LOW"
+  }
+}

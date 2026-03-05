@@ -70,5 +70,113 @@
   "mongke/esoteric-research-1772666325.md": {
     "executed": "2026-03-04T18:22:10.121450",
     "success": true
+  },
+  "kublai/high-1772690515.md": {
+    "executed": "2026-03-05T01:02:08.208322",
+    "success": false
+  },
+  "jochi/normal-1772691220.md": {
+    "executed": "2026-03-05T01:17:41.706433",
+    "success": false
+  },
+  "kublai/normal-1772692291.md": {
+    "executed": "2026-03-05T01:31:43.160309",
+    "success": false
+  },
+  "kublai/normal-1772695913.md": {
+    "executed": "2026-03-05T02:32:04.964145",
+    "success": false
+  },
+  "kublai/normal-1772699786.md": {
+    "executed": "2026-03-05T03:36:34.507204",
+    "success": false
+  },
+  "jochi/auto-20260304-2302-router-audit.md": {
+    "executed": "2026-03-05T05:03:09.691825",
+    "success": true
+  },
+  "chagatai/auto-20260304-2208-incident-cron-failures.md": {
+    "executed": "2026-03-05T05:03:09.858488",
+    "success": true
+  },
+  "temujin/high-1772694499.parse-for-agents-vision-a.md": {
+    "executed": "2026-03-05T05:03:10.020358",
+    "success": true
+  },
+  "mongke/auto-20260304-2208-parse-competitor-pricing.md": {
+    "executed": "2026-03-05T05:03:10.182643",
+    "success": true
+  },
+  "ogedei/high-error-spike-investigation.md": {
+    "executed": "2026-03-05T05:03:10.954232",
+    "success": true
+  },
+  "temujin/heartbeat-review-20260303-015632.md": {
+    "executed": "2026-03-05T05:03:22.662653",
+    "success": true
+  },
+  "ogedei/auto-20260304-2208-scrapling-verification.md": {
+    "executed": "2026-03-05T05:03:22.819015",
+    "success": true
+  },
+  "jochi/high-1772713503-error-baseline.md": {
+    "executed": "2026-03-05T07:10:59.395288",
+    "success": true
+  },
+  "chagatai/normal-1772713502-changelog.md": {
+    "executed": "2026-03-05T07:10:59.498576",
+    "success": true
+  },
+  "temujin/high-1772713500-parse-for-agents-mvp.md": {
+    "executed": "2026-03-05T07:10:59.680723",
+    "success": true
+  },
+  "mongke/high-1772713501-competitor-pricing.md": {
+    "executed": "2026-03-05T07:10:59.860026",
+    "success": true
+  },
+  "ogedei/normal-1772713504-stale-tasks-backup.md": {
+    "executed": "2026-03-05T07:10:59.960753",
+    "success": true
+  },
+  "jochi/high-1772721002-queue-stall-analysis.md": {
+    "executed": "2026-03-05T09:12:56.212415",
+    "success": true
+  },
+  "chagatai/high-1772721004-architecture-doc.md": {
+    "executed": "2026-03-05T09:12:56.978786",
+    "success": true
+  },
+  "mongke/normal-1772721003-competitor-research.md": {
+    "executed": "2026-03-05T09:12:58.121528",
+    "success": true
+  },
+  "ogedei/low-1772721005-truncate-err.md": {
+    "executed": "2026-03-05T09:12:58.674942",
+    "success": true
+  },
+  "temujin/high-1772578840.md": {
+    "executed": "2026-03-05T09:19:24.501062",
+    "success": true
+  },
+  "temujin/high-test-claude-code-execution.md": {
+    "executed": "2026-03-05T10:55:33.690266",
+    "success": true
+  },
+  "temujin/high-1772721000-circular-triage-fix.md": {
+    "executed": "2026-03-05T11:10:35.484897",
+    "success": true
+  },
+  "temujin/high-1772721001-auto-dispatch-cron.md": {
+    "executed": "2026-03-05T11:20:47.357107",
+    "success": false
+  },
+  "temujin/high-1772722500-parse-for-agents-build.md": {
+    "executed": "2026-03-05T11:23:10.653254",
+    "success": true
+  },
+  "temujin/high-1772727470-injection-detection-spec.md": {
+    "executed": "2026-03-05T11:26:22.643075",
+    "success": true
   }
 }

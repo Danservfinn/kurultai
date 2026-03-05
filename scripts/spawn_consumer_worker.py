@@ -21,6 +21,7 @@ from json_state import locked_json_read, locked_json_update
 SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
 LOG_FILE = "/Users/kublai/.openclaw/agents/main/logs/spawn-consumer.log"
 DEAD_LETTER = "/Users/kublai/.openclaw/agents/main/logs/spawn-dead-letter.json"
+CLAUDE_AGENT = "/Users/kublai/.local/bin/claude-agent"
 
 # Agent name allowlist — reject anything not in this set
 VALID_AGENTS = {"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "subagent"}
@@ -179,21 +180,31 @@ def process_queue():
             continue
 
         if source == "agent_execution":
-            model = s.get('model', 'qwen3.5-plus')
-            log(f"Launching OpenClaw execution for {label} ({agent} using {model})")
+            workspace = f"/Users/kublai/.openclaw/agents/{agent}"
+            log(f"Launching Claude Code for {label} ({agent})")
+
+            prompt = (
+                f"You are {agent.capitalize()}, executing an assigned task.\n\n"
+                f"{task_text}\n\n"
+                "Execute completely. Write code, make changes, verify."
+            )
 
             try:
-                cmd = ["/opt/homebrew/bin/openclaw", "agent", "--agent", agent, "--message", task_text, "--thinking", "high"]
                 env = os.environ.copy()
-                env["PATH"] = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-                env["NODE_PATH"] = "/opt/homebrew/lib/node_modules"
-                env["OPENCLAW_STATE_DIR"] = "/Users/kublai/.openclaw"
+                env.pop('CLAUDECODE', None)
+                env["PATH"] = (
+                    "/Users/kublai/.local/bin:/opt/homebrew/bin:"
+                    "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+                )
                 with open(LOG_FILE, "a") as logfile:
-                    subprocess.Popen(cmd, stdout=logfile, stderr=subprocess.STDOUT,
-                                     cwd="/Users/kublai/.openclaw/agents/main", env=env)
-                log(f"  -> PID launched for {label}")
+                    subprocess.Popen(
+                        [CLAUDE_AGENT, "--workdir", workspace, prompt],
+                        stdout=logfile, stderr=subprocess.STDOUT,
+                        env=env,
+                    )
+                log(f"  -> Claude Code launched for {label}")
             except Exception as e:
-                log(f"Failed to launch openclaw: {e}")
+                log(f"Failed to launch Claude Code: {e}")
                 s['status'] = 'failed'
                 s['error'] = str(e)
                 continue

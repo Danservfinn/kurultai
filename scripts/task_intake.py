@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from task_router import classify_task, route_by_text
 
 MAX_TASK_DEPTH = 3
-AGENT_DIR = os.path.expanduser("~/.openclaw/agents/main/agent")
+AGENT_DIR = os.path.expanduser("~/.openclaw/agents")
 
 
 def has_pending_task(agent, title_prefix):

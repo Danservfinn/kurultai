@@ -13,6 +13,7 @@ import argparse
 import glob
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -22,6 +23,8 @@ from json_state import locked_json_update
 
 AGENTS_DIR = "/Users/kublai/.openclaw/agents"
 SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
+CLAUDE_AGENT = "/Users/kublai/.local/bin/claude-agent"
+CLAUDE_TIMEOUT = 600  # 10 minutes for Claude Code execution
 MAX_TASK_DEPTH = 3
 
 def load_agent_config(agent_name):
@@ -123,116 +126,112 @@ def spawn_subagent(agent_name, task, subagent_task, depth=0):
     return spawn_request['label']
 
 def execute_task_with_llm(agent_name, task_text, config):
-    """Execute task by spawning a subagent using the agent's configured model"""
-    import sys
-    import json
-    import time
-    import os
-    
+    """Execute task via Claude Code using the claude-agent wrapper.
+
+    This replaces the old spawn-queue approach which only had glm-5
+    acknowledge tasks without actually executing code.
+    """
+    workspace = config.get('workspace_path', f"{AGENTS_DIR}/{agent_name}")
+
+    prompt = (
+        f"You are {agent_name.capitalize()}, "
+        f"{config.get('agent_role', 'a development agent')}.\n\n"
+        f"{task_text}\n\n"
+        "Execute this task completely. Write all necessary code, "
+        "make all changes, and verify your work before finishing."
+    )
+
+    env = os.environ.copy()
+    env.pop('CLAUDECODE', None)  # Allow nested Claude Code sessions
+    env['PATH'] = (
+        "/Users/kublai/.local/bin:/opt/homebrew/bin:"
+        "/usr/local/bin:/usr/bin:/bin:" + env.get('PATH', '')
+    )
+
     try:
-        model = config.get('model', 'qwen3.5-plus')
-        
-        spawn_request = {
-            "agent": agent_name,
-            "model": model,
-            "task": f"You are {agent_name.capitalize()}, {config.get('agent_role', 'an AI agent')}.\nCapabilities: {', '.join(config.get('capabilities', []))}\n\nTask: {task_text}",
-            "priority": "normal",
-            "label": f"{agent_name}-exec-{int(time.time())}",
-            "source": "agent_execution",
-            "destination": "subagent",
-            "status": "ready"
-        }
-        
-        # Add to spawn queue with file locking
-        os.makedirs(os.path.dirname(SPAWN_QUEUE), exist_ok=True)
-        with locked_json_update(SPAWN_QUEUE, default={'spawns': [], 'updated': 0}) as data:
-            if 'spawns' not in data:
-                data['spawns'] = []
-            data['spawns'].append(spawn_request)
-            data['updated'] = time.time()
-            
+        result = subprocess.run(
+            [CLAUDE_AGENT, "--workdir", workspace, prompt],
+            capture_output=True,
+            text=True,
+            timeout=CLAUDE_TIMEOUT,
+            env=env,
+        )
+
+        output = result.stdout[-3000:] if result.stdout else ""
+        error = result.stderr[-1000:] if result.stderr else ""
+
+        success = result.returncode == 0
+        if success and not output.strip():
+            success = False
+            error = "Claude Code returned success but produced no output"
+
         return {
-            "success": True,
-            "content": f"Task delegated to OpenClaw spawn queue under label {spawn_request['label']} using model {model}.",
-            "model": model,
+            "success": success,
+            "content": output,
+            "error": error if not success else None,
+            "model": "claude-code",
+            "latency_ms": 0
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": f"Claude Code timed out after {CLAUDE_TIMEOUT}s",
+            "model": "claude-code",
             "latency_ms": 0
         }
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
-            "model": "failed",
+            "model": "claude-code",
             "latency_ms": 0
         }
 
 def process_task(agent_name, task):
-    """Process a single task with actual execution"""
-    print(f"\n📋 Processing task: {task['task'][:60]}...")
+    """Process a single task via Claude Code.
 
-    # Extract depth from task content
-    depth = task.get('depth', 0)
+    All tasks (simple and complex) go through Claude Code, which handles
+    complexity internally via its own subagent system and skills.
+    """
+    # Use full task content for Claude Code, not just the summary line
+    task_content = task.get('full_content', task['task'])
+    print(f"\n📋 Processing: {task['task'][:80]}...")
 
     # Mark as executing
     executing_file = mark_task_executing(task['file'])
-    print(f"  Status: executing → {executing_file}")
+    print(f"  Status: executing")
 
     # Load agent config
     config = load_agent_config(agent_name)
 
-    # Determine if task needs subagent delegation
-    needs_delegation = len(task['task'].split()) > 50 or any(
-        kw in task['task'].lower() for kw in ['multi-step', 'complex', 'pipeline', 'system']
-    )
+    # Execute via Claude Code
+    print(f"  🤖 Executing via Claude Code...")
+    result = execute_task_with_llm(agent_name, task_content, config)
 
-    if needs_delegation:
-        print(f"  🔄 Task is complex - spawning subagent...")
-
-        # Spawn subagent for parallel work
-        subagent_label = spawn_subagent(
-            agent_name=agent_name,
-            task=task['file'],
-            subagent_task=task['task'],
-            depth=depth,
-        )
-        
-        print(f"  ✓ Subagent spawned: {subagent_label}")
-        print(f"  ⏳ Waiting for subagent completion...")
-        
-        # In full implementation, would wait for subagent
-        # For now, mark as in_progress
-        mark_task_completed(task['file'], 'in_progress')
-        print(f"  ⏳ Task in progress (waiting for subagent)")
-        
-        return True
-    
-    # Execute task directly with LLM
-    print(f"  🤖 Executing with LLM...")
-    result = execute_task_with_llm(agent_name, task['task'], config)
-    
     if result.get('success'):
         # Save result to workspace
         workspace_path = config.get('workspace_path', f"{AGENTS_DIR}/{agent_name}/workspace")
         result_file = f"{workspace_path}/task-{int(datetime.now().timestamp())}.md"
-        
+
         os.makedirs(workspace_path, exist_ok=True)
         with open(result_file, 'w') as f:
             f.write(f"# Task Result\n\n")
             f.write(f"**Task:** {task['task']}\n\n")
-            f.write(f"**Model:** {result.get('model', 'unknown')}\n\n")
-            f.write(f"**Latency:** {result.get('latency_ms', 0)}ms\n\n")
+            f.write(f"**Model:** claude-code\n\n")
             f.write(f"---\n\n")
             f.write(f"{result.get('content', 'No content')}\n")
-        
+
         print(f"  ✓ Result saved: {result_file}")
         mark_task_completed(task['file'], 'completed')
-        print(f"  ✓ Task completed")
-        
+        print(f"  ✓ Task completed via Claude Code")
+
         # Update Neo4j
         update_agent_state(agent_name, 'idle', None, increment_completed=True)
-        
+
         return True
     else:
-        print(f"  ✗ Task execution failed: {result.get('error', 'Unknown error')}")
+        error_msg = result.get('error', 'Unknown error')
+        print(f"  ✗ Claude Code failed: {error_msg[:200]}")
         mark_task_completed(task['file'], 'failed')
         return False
 
@@ -272,24 +271,23 @@ def update_agent_state(agent_name, status='busy', task_label=None, increment_com
         print(f"⚠ Neo4j update failed: {e}")
 
 def execute_single_task(agent_name, task_file):
-    """Execute a single task file directly"""
-    # Read task file
+    """Execute a single task file via Claude Code."""
     with open(task_file, 'r') as f:
         content = f.read()
 
-    # Extract task description
+    # Extract short description for logging
     task_desc = content
     for line in content.split('\n'):
         if line.startswith('# Task:'):
             task_desc = line.replace('# Task:', '').strip()
             break
 
-    # Extract depth from frontmatter
     depth = _extract_depth(content)
 
     task = {
         'file': task_file,
         'task': task_desc,
+        'full_content': content,  # Pass full content to Claude Code
         'priority': 'normal',
         'depth': depth,
     }

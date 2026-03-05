@@ -1,0 +1,187 @@
+{
+  "timestamp": "2026-03-05T09:03:01-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 2
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 6,
+    "healthy": 5,
+    "erroring": 1,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 197404,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 114871,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 49056,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 446810,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "error",
+        "consecutive_errors": 1,
+        "last_duration_ms": 105548,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 53335,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 2,
+    "by_agent": {
+      "kublai": 2,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [],
+    "count_30m": 0
+  },
+  "errors": {
+    "clusters": []
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy"
+  },
+  "llm_assessment": {
+    "model": "ollama/qwen3.5:9b",
+    "workload_balance": "kublai is overloaded with 2 queued tasks while the other five agents are idle.",
+    "bottleneck": "queue depth on kublai",
+    "coordination_gap": "none",
+    "recommended_action": "redistribute pending tasks or scale out processing capacity",
+    "severity": "MEDIUM"
+  }
+}
