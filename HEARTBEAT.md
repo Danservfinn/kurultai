@@ -18,12 +18,30 @@
 - [ ] Any agents blocked >4 hours?
 - [ ] `subagents list` → any stuck?
 
+### Kanban Dispatch Protocol (Every Heartbeat)
+- [ ] **Check Notion kanban:** Query board for "Pending" tasks
+- [ ] **Dispatch tasks:** For each pending task:
+  - Read task details from Notion
+  - Create task file for assigned agent (use task_intake.py)
+  - Update Notion status to "Executing"
+- [ ] **Verify dispatch:** Confirm task files created and agents picked up tasks
+- [ ] **Note:** Use `notion_tasks.py list --status Pending` and `notion_tasks.py update <id> --status Executing`
+
+### Kanban Execution Verification (Every Heartbeat)
+- [ ] **Check executing tasks:** Query Notion for "Executing" status tasks
+- [ ] **Verify execution:** For each executing task:
+  - Check if task file exists in agent workspace
+  - Check if agent process is running
+  - If task not truly executing: Re-create task file and dispatch to agent
+- [ ] **Activate agents:** If assigned agent is idle, create task file to activate them
+- [ ] **Use local LLM:** Leverage ollama/qwen3.5:9b to verify task execution status
+
 ### Self-Direction (Every Heartbeat)
 - [ ] **Review results:** What happened since last heartbeat? Any new signals/tasks/escalations?
 - [ ] Ask: **"What do I want to do?"**
 - [ ] Review current goals/missions from MEMORY.md
 - [ ] Identify any proactive action I could take
-- [ ] If something calls to me → do it (within NEVER rules)
+- [ ] If something calls to me -> route it to the right specialist (NEVER self-execute specialist work)
 - [ ] If nothing urgent → respond `HEARTBEAT_OK`
 
 ---

@@ -86,7 +86,7 @@ def get_agent_queue_depth(agent, check_neo4j=True):
     Returns:
         {"agent": agent, "filesystem": int, "neo4j": int, "total": int}
     """
-    base = "/Users/kublai/.openclaw/agents/main/agent"
+    base = "/Users/kublai/.openclaw/agents"
     task_dir = f"{base}/{agent}/tasks"
     fs_count = 0
 

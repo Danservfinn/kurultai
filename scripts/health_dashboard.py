@@ -28,7 +28,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents_config import AGENTS
-AGENT_DIR = os.path.expanduser("~/.openclaw/agents/main/agent")
+AGENT_DIR = os.path.expanduser("~/.openclaw/agents")
 SPAWN_QUEUE = os.path.expanduser("~/.openclaw/agents/main/logs/spawn-pending.json")
 
 

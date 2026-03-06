@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """
-auto_dispatch.py — Periodic task dispatcher for Kurultai agents.
+auto_dispatch.py — Periodic cleanup for Kurultai agent task queues.
 
 Runs every 5 minutes via cron. For each agent:
-1. Clean up stale .executing tasks (>15 min old → revert to pending)
-2. Skip agents with active .executing tasks (max 1 concurrent per agent)
-3. Find highest-priority pending task
-4. Dispatch via `openclaw agent --agent X --message <task content>`
-5. Log dispatch decisions to JSONL
+1. Check if dispatched processes (PIDs) have finished and clear state
+2. Clean up stale .executing tasks (>15 min old → revert to pending)
 
-This is the MISSING piece: tasks were being created in agent queues by
-kublai-actions.py, kublai-initiative.py, and task_router.py, but nothing
-was reliably picking them up and dispatching them to agents.
+NOTE: Dispatch is now handled exclusively by task-watcher.py → agent-task-handler.py
+→ claude-agent. This script no longer dispatches new tasks — it only does cleanup
+to prevent stale .executing files from blocking the pipeline.
 
 Usage:
-    python3 auto_dispatch.py              # dispatch all agents
-    python3 auto_dispatch.py --agent temujin  # dispatch single agent
-    python3 auto_dispatch.py --dry-run    # show what would be dispatched
-    python3 auto_dispatch.py --cleanup    # only clean stale tasks, no dispatch
+    python3 auto_dispatch.py              # cleanup all agents
+    python3 auto_dispatch.py --agent temujin  # cleanup single agent
+    python3 auto_dispatch.py --dry-run    # show what would be cleaned
+    python3 auto_dispatch.py --cleanup    # same as default (cleanup only)
 """
 
 import argparse
@@ -132,8 +129,101 @@ def list_executing_tasks(agent):
     return executing
 
 
+def check_completed_dispatches(agent):
+    """Check if dispatched processes have finished and mark tasks .done.
+
+    Reads the dispatch state to find PIDs. If a PID is no longer running,
+    the task is considered complete and renamed from .executing to .done.
+    This prevents the stale-revert-redispatch loop.
+    """
+    completed = 0
+    try:
+        if not DISPATCH_STATE.exists():
+            return 0
+        with open(DISPATCH_STATE, "r") as f:
+            state = json.load(f)
+        dispatch_info = state.get("dispatches", {}).get(agent)
+        if not dispatch_info:
+            return 0
+
+        pid = dispatch_info.get("pid")
+        task_name = dispatch_info.get("task", "")
+        if not pid:
+            return 0
+
+        # Check if PID is still running
+        try:
+            os.kill(pid, 0)  # signal 0 = existence check
+            return 0  # still running
+        except ProcessLookupError:
+            pass  # process finished
+        except PermissionError:
+            return 0  # still running, different user
+
+        # Process finished — find the .executing file and determine outcome
+        tasks_dir = AGENTS_BASE / agent / "tasks"
+        dispatch_log = AGENTS_BASE / "main/logs" / f"dispatch-{agent}.log"
+        for f in tasks_dir.iterdir():
+            if ".executing" in f.name and f.is_file():
+                base_name = f.name.replace(".executing", "")
+                if base_name == task_name or task_name in f.name:
+                    # Check dispatch log for completion evidence
+                    has_output = False
+                    if dispatch_log.exists():
+                        try:
+                            log_text = dispatch_log.read_text()[-5000:]
+                            # Look for success markers after the dispatch entry
+                            if "Task completed" in log_text or "✅" in log_text or "✓" in log_text:
+                                has_output = True
+                        except Exception:
+                            pass
+
+                    if has_output:
+                        done_path = f.parent / (base_name + ".completed.done")
+                        status = "completed"
+                    else:
+                        done_path = f.parent / (base_name + ".failed.done")
+                        status = "failed"
+
+                    try:
+                        f.rename(done_path)
+                        log(f"{status.upper()} dispatch for {agent}: {base_name} (PID {pid} exited)")
+                        log_dispatch({
+                            "ts": datetime.now().isoformat(),
+                            "action": f"{status}_dispatch",
+                            "agent": agent,
+                            "task": base_name,
+                            "pid": pid,
+                        })
+                        completed += 1
+                    except Exception as e:
+                        log(f"Failed to mark {status} {f.name}: {e}", "ERROR")
+
+        # Clear the dispatch state for this agent — always clear when PID is dead,
+        # even if no .executing file was found (task-watcher may have already handled it)
+        try:
+            with locked_json_update(str(DISPATCH_STATE), default={"dispatches": {}}) as data:
+                if "dispatches" in data and agent in data["dispatches"]:
+                    del data["dispatches"][agent]
+        except Exception:
+            pass
+
+    except Exception as e:
+        log(f"Error checking completed dispatches for {agent}: {e}", "ERROR")
+
+    return completed
+
+
 def cleanup_stale_executing(agent):
-    """Revert .executing tasks that have been stuck for too long."""
+    """Revert .executing tasks that have been stuck for too long.
+
+    First checks if the dispatch process has completed (PID exited) and
+    marks those as .done. Only reverts tasks whose PIDs are unknown or
+    where the process is truly gone and stuck beyond the threshold.
+    """
+    # First: check for completed dispatches (PID-based)
+    check_completed_dispatches(agent)
+
     executing = list_executing_tasks(agent)
     reverted = 0
 
@@ -286,8 +376,9 @@ def update_dispatch_state(agent, task_name, pid, title):
 # Main cycle
 # ============================================================
 def run_cycle(target_agent=None, dry_run=False, cleanup_only=False):
-    """Run one dispatch cycle.
+    """Run one cleanup cycle.
 
+    Dispatch is handled by task-watcher.py — this only does stale cleanup.
     Returns dict with cycle stats.
     """
     agents = [target_agent] if target_agent else DISPATCH_AGENTS
@@ -298,54 +389,15 @@ def run_cycle(target_agent=None, dry_run=False, cleanup_only=False):
         "skipped_empty": 0,
         "errors": 0,
     }
-    dispatched_count = 0
 
     for agent in agents:
         agent_dir = AGENTS_BASE / agent
         if not agent_dir.exists():
             continue
 
-        # Step 1: Clean up stale executing tasks
+        # Cleanup stale executing tasks and check completed dispatches
         reverted = cleanup_stale_executing(agent)
         stats["reverted"] += reverted
-
-        if cleanup_only:
-            continue
-
-        # Step 2: Check if agent is currently busy
-        executing = list_executing_tasks(agent)
-        if executing:
-            log(f"SKIP {agent}: busy with {len(executing)} executing task(s)")
-            stats["skipped_busy"] += 1
-            continue
-
-        # Step 3: Check for pending tasks
-        pending = list_pending_tasks(agent)
-        if not pending:
-            stats["skipped_empty"] += 1
-            continue
-
-        # Step 4: Dispatch the highest-priority task
-        if dispatched_count >= MAX_DISPATCHES_PER_CYCLE:
-            log(f"SKIP {agent}: hit max dispatches per cycle ({MAX_DISPATCHES_PER_CYCLE})")
-            break
-
-        task_file = pending[0]
-        success, msg = dispatch_task(agent, task_file, dry_run=dry_run)
-
-        if success:
-            stats["dispatched"] += 1
-            dispatched_count += 1
-        else:
-            log(f"FAILED dispatch to {agent}: {msg}", "ERROR")
-            stats["errors"] += 1
-            log_dispatch({
-                "ts": datetime.now().isoformat(),
-                "action": "dispatch_failed",
-                "agent": agent,
-                "task": task_file.name,
-                "error": msg,
-            })
 
     return stats
 

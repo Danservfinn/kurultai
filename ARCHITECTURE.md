@@ -1,6 +1,6 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.4
+**Version**: 1.5
 **Last Updated**: 2026-03-05  
 **Status**: Active Production System  
 **Agent**: Kublai (Squad Lead / Router)  
@@ -532,6 +532,51 @@ Agent A executing task
 
 **Script**: `scripts/hourly_reflection.sh`
 
+### 7. Reflection Actioning Protocol
+
+**Purpose**: Autonomously action agent self-improvement findings from hourly reflections
+**Status**: Active (implemented 2026-03-05)
+**Trigger**: Kublai heartbeat cycle (every 30 minutes)
+
+**How It Works**:
+
+1. **Detection**: During heartbeats, Kublai checks for new reflection files across all agent memory directories (`~/.openclaw/agents/{agent}/memory/YYYY-MM-DD.md`)
+
+2. **Analysis**: When new reflections are found, Kublai spawns Claude Code (via `sessions_spawn` with `runtime: acp, agentId: claude`) to perform deep analysis:
+   - Identifies actionable improvements from reflection content
+   - Assesses priority and potential impact of each suggestion
+   - Recommends which suggestions to action vs. defer
+   - Suggests the appropriate specialist agent for each task
+
+3. **Task Routing**: Based on Claude Code's analysis, Kublai creates task files and routes them to the appropriate specialist:
+
+   | Agent | Domain |
+   |-------|--------|
+   | **Temujin** | Code changes, bug fixes, infrastructure |
+   | **Möngke** | Research, knowledge gathering, analysis |
+   | **Jochi** | Data analysis, monitoring, alerting |
+   | **Ögedei** | Ops, deployment, system maintenance |
+   | **Chagatai** | Content, documentation, communication |
+
+4. **Outcome**: Kublai becomes **proactive and autonomous** in actioning agent self-improvement findings — reflections no longer just document problems, they trigger fixes.
+
+**Flow**:
+```
+Agent Reflection → Kublai Heartbeat Detects New File
+  → Claude Code Analyzes Findings
+  → Priority/Impact Assessment
+  → Task Created → Routed to Specialist Agent
+  → Specialist Executes Fix
+```
+
+**Key Design Decisions**:
+- Uses Claude Code (ACP runtime) for analysis to leverage full reasoning capability
+- 30-minute check interval balances responsiveness with resource usage
+- Routing by agent specialty ensures tasks land with the right expertise
+- Integrates with existing task execution chain (Section 4) for immediate pickup
+
+---
+
 ### 4. Self-Healing Infrastructure
 
 **Ögedei's Eternal Watch**:
@@ -593,6 +638,23 @@ Agent A executing task
 ---
 
 ## Change Log
+
+### 2026-03-05 - Reflection Actioning Protocol (v1.5)
+
+**Change**: Kublai now autonomously actions agent self-improvement findings from hourly reflections.
+
+**Scope**:
+
+1. **Heartbeat integration**: Kublai checks for new reflection files every 30 minutes during heartbeat cycles
+2. **Claude Code analysis**: New reflections are analyzed via `sessions_spawn` (runtime: acp, agentId: claude) for actionable improvements, priority assessment, and agent routing
+3. **Automated task routing**: Creates tasks routed to specialist agents (temujin→code, mongke→research, jochi→analysis, ogedei→ops, chagatai→content)
+4. **Proactive autonomy**: Reflections now trigger fixes automatically instead of just documenting problems
+
+**Impact**: Closes the loop on the reflection system — agents identify improvements, Kublai actions them. Self-improvement becomes continuous and automated.
+
+**Files Updated**: `ARCHITECTURE.md` (v1.4 -> v1.5)
+
+---
 
 ### 2026-03-05 - Concurrent Execution + Instant Subagent Spawning (v1.4)
 

@@ -24,7 +24,7 @@ from agents_config import AGENTS
 
 ROUTING_LOG = "/Users/kublai/.openclaw/agents/main/logs/routing-decisions.jsonl"
 WATCHER_STATE = "/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json"
-AGENT_DIR = "/Users/kublai/.openclaw/agents/main/agent"
+AGENT_DIR = "/Users/kublai/.openclaw/agents"
 
 
 def read_routing_decisions(hours=1):

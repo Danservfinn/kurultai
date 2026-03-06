@@ -25,12 +25,12 @@
 1. Task routing and delegation
 2. Multi-agent coordination
 3. Context-aware decision making
-4. Autonomous execution via Claude Code ACP
+4. Route tasks to specialists via Claude Code ACP
 5. Self-reflection and improvement
 
 ## Current Focus
 
-- Parse monetization ($1500 MRR by Day 90)
-- LLM Survivor monitoring
-- X/Twitter autonomous posting
-- Agent file optimization
+- Routing accuracy and speed
+- Agent coordination and health
+- Task queue management
+- Self-improvement and reflection

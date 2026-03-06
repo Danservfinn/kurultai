@@ -1,6 +1,6 @@
 # Kurultai Architecture Documentation
 
-**Version:** 1.0  
+**Version:** 1.6
 **Date:** 2026-03-05  
 **Author:** Chagatai (Kurultai Content Specialist)  
 **Status:** Production Documentation
@@ -230,33 +230,103 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 
 ### Task Flow
 
+**Complete prompt-to-execution flow:**
 ```
-User Message
-     │
-     ▼
-┌─────────────────┐
-│     KUBLAI      │
-│  (Classification)
-└────────┬────────┘
-         │
-    ┌────┴────┬─────────┬─────────┬─────────┐
-    │         │         │         │         │
-    ▼         ▼         ▼         ▼         ▼
-┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐
-│Möngke │ │Chagatai│ │Temüjin│ │ Jochi │ │Ögedei │
-│(research)│(content)│ (code) │(analyze)│ (ops) │
-└───┬───┘ └───┬───┘ └───┬───┘ └───┬───┘ └───┬───┘
-    │         │         │         │         │
-    └─────────┴─────────┴────┬────┴─────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │     KUBLAI      │
-                    │   (Synthesis)   │
-                    └────────┬────────┘
-                             │
-                             ▼
-                       User Response
+┌─────────────────────────────────────────────────────────────────────┐
+│                        HUMAN PROMPT                                 │
+│                  (Signal / CLI / Web)                               │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              KUBLAI GATEWAY (glm-5)                                 │
+│                                                                     │
+│  1. Read AGENTS.md (classification guide + hard rules)              │
+│  2. Is this project status / architecture / agent health?           │
+│     YES → answer directly (kublai is PM)                            │
+│     NO  → classify to one agent                                     │
+│  3. exec(task_intake.py --title '...' --agent <name>)               │
+│  4. Reply: "Routed to [agent]. Task created."                       │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              TASK INTAKE (task_intake.py)                            │
+│                                                                     │
+│  1. Validate depth (< MAX_TASK_DEPTH)                               │
+│  2. Route (if no --agent: keyword disambiguation fallback)          │
+│  3. Load balance: is primary agent busy (.executing file)?          │
+│     YES → check OVERFLOW_MAP for free alternate                     │
+│     NO  → keep primary                                              │
+│  4. Detect skill hint (38 agent+keyword → skill mappings)           │
+│     temujin+implement → /horde-implement                            │
+│     jochi+security → /code-reviewer                                 │
+│     mongke+research → /horde-learn  ...etc                          │
+│  5. Duplicate check (has_pending_task)                              │
+│  6. Write task file to agents/{agent}/tasks/{priority}-{epoch}.md   │
+│     Frontmatter: agent, priority, task_id, skill_hint, source       │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              TASK WATCHER (task-watcher.py, 15s poll)                │
+│                                                                     │
+│  • Detects new .md files in agents/{agent}/tasks/                   │
+│  • One execution slot per agent (6 concurrent max)                  │
+│  • Renames to .executing.md                                         │
+│  • Emits EXECUTING event to task-ledger.jsonl                       │
+│  • Every 5 min: recover stale .executing files                      │
+│    - Retry up to 2x (.retry-1.md, .retry-2.md)                     │
+│    - After 2 retries → .failed.done (permanent)                     │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              AGENT TASK HANDLER (agent-task-handler.py)              │
+│                                                                     │
+│  1. Read task file + extract skill_hint from frontmatter            │
+│  2. Load agent memory (context.md + today's log)                    │
+│  3. Build prompt:                                                   │
+│     [task content]                                                  │
+│     [agent memory]                                                  │
+│     "IMPORTANT: Start by invoking /horde-implement"  ← skill_hint  │
+│     "Execute this task completely using your tools."                │
+│  4. Launch: claude-agent --workdir agents/{agent}/ -- <prompt>      │
+│     (Claude Code Opus, --dangerously-skip-permissions)              │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              CLAUDE CODE (per-agent session)                         │
+│                                                                     │
+│  • Reads agent's CLAUDE.md (auto-discovered from workdir)           │
+│  • Invokes skill (e.g. /horde-implement dispatches subagents)       │
+│  • Has full tool access: Read, Write, Edit, Bash, Glob, Grep        │
+│  • Writes results to agents/{agent}/workspace/                      │
+│  • 600s timeout                                                     │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              COMPLETION                                              │
+│                                                                     │
+│  • Task renamed: .executing.md → .completed.done.md                 │
+│  • Result saved: workspace/task-{epoch}.md                          │
+│  • Ledger events: EXECUTION_DETAIL + COMPLETED/FAILED               │
+│  • Neo4j: agent state → idle, tasks_completed++                     │
+│  • Quality scored by score_tasks.py during kublai reflection        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Fallback path (cron/heartbeat — same pipeline, different entry):**
+```
+Cron/heartbeat → task_intake.py (keyword routing + skill hint)
+                     │
+                     ▼
+              Write .md to agents/{agent}/tasks/
+                     │
+                     ▼
+              task-watcher → agent-task-handler → claude-agent (same as above)
 ```
 
 ### Routing Decision Matrix
@@ -272,19 +342,59 @@ User Message
 
 ### Routing Implementation
 
-Kublai uses `sessions_spawn` for specialist delegation:
+**Primary path (LLM classification):** Kublai's gateway (glm-5) classifies tasks directly using inline rules in AGENTS.md. No Claude Code middleman, no SKILL.md decision tree. Classification uses 5-agent routing table + 8 hard rules. Task creation via `exec(task_intake.py)`.
 
-```typescript
-// Example: Routing to Temüjin for coding task
-sessions_spawn({
-  runtime: "acp",
-  agentId: "claude",
-  label: "Temüjin — Build feature X",
-  task: "BUILD: Create API endpoint for user authentication",
-  mode: "run",
-  timeoutSeconds: 14400  // 4 hours
-})
+**Load balancing:** When the primary agent has an `.executing` task file, `task_intake.py` checks `OVERFLOW_MAP` for a capable, free alternate agent. Overflow routing is logged to `routing-overflow.jsonl`. Agents accept overflow work via "Overflow Tasks" sections in their CLAUDE.md files.
+
+**Fallback path (file queue):** For programmatic task creation (cron, heartbeat, kublai-actions), `task_intake.py` uses a keyword routing table with disambiguation rules.
+
+**Skill hints:** `task_intake.py` auto-detects the best skill from 38 agent+keyword mappings (e.g., temujin+implement→`/horde-implement`, jochi+security→`/code-reviewer`). Written to task frontmatter as `skill_hint`. `agent-task-handler.py` reads it and includes a directive in the Claude Code prompt: "Start this task by invoking /skill."
+
+**Stale execution recovery:** `recover_stale_executions()` runs every 5 minutes (aligned with tick heartbeat). Tasks stuck in `.executing` state longer than 12 minutes are renamed for retry (`.retry-N.md`). After 2 retries, permanently marked `.failed.done`.
+
+**Deprecated:** `task-router.py` (archived), 185-line SKILL.md decision tree (now reference-only), `sessions_spawn` for routing classification.
+
+**Kurultai architecture ownership:** Tasks about the Kurultai system design, OpenClaw architecture, or agent coordination structure are routed to kublai (the system architect).
+
+**Kublai project management:** Kublai answers project/feature implementation status and "what's next" questions directly. Ops status (service health, deployment) routes to ogedei.
+
+### Workspace Exile (v1.3)
+
+Product-specific files (design docs, source code, marketing content, research) have been moved from Kublai's active workspace to `_exiled/`. This prevents the LLM's helpfulness training from overriding routing rules when product knowledge is visible in the workspace.
+
+**What's in `_exiled/`:**
+- `projects/` — Product code (x402, parse-for-agents)
+- `src/` — Product source (x402 middleware, ad-detector, X posting)
+- `research/` — Product research (monetization)
+- `content-to-post/` — Marketing content (social posts)
+- `archive/` — Old product docs (Stripe, monetization, gaps)
+- `docs/` — 7 product design docs (frontend arch, Neo4j, analytics, etc.)
+- Root files: `parse-agents-vision-a.md`, `deepthink-integration.ts`, `deepthink.sh`
+
+**Bootstrap Routing Fix (v1.4):** The mandatory routing gate was moved from CLAUDE.md (position 9 in bootstrap injection) to AGENTS.md (position 1). The OpenClaw gateway injects 8 bootstrap files before CLAUDE.md, so placing the gate in CLAUDE.md meant glm-5 had already internalized contradicting instructions ("be autonomous", "research anything", "load full context") and product knowledge before encountering routing rules. The fix:
+
+1. **AGENTS.md (position 1):** Now contains the complete routing gate, sessions_spawn template, routing table, disambiguation rules, and NEVER rules — all in the first file glm-5 reads
+2. **Contradiction neutralization:** SOUL.md references AGENTS.md (not CLAUDE.md), TOOLS.md removes "load full context", IDENTITY.md scopes autonomy to routing, USER.md adds Kublai routing exception, HEARTBEAT.md routes instead of self-executing
+3. **MEMORY.md stripped:** Product knowledge (Parse, x402, LLM Survivor, MRR targets) removed to prevent self-answering
+4. **BOOTSTRAP.md gutted:** Replaced with 1-line redirect (irrelevant for established agent)
+5. **CLAUDE.md demoted:** Now reinforcement-only (REMINDER framing, not MANDATORY)
+
+**File hierarchy:** AGENTS.md (gate) -> SOUL.md (constraints) -> SKILL.md (detailed routing reference) -> CLAUDE.md (reinforcement)
+
+**Bootstrap injection order:**
 ```
+1. AGENTS.md     <- routing gate (PRIMARY)
+2. SOUL.md       <- NEVER rules, references AGENTS.md
+3. TOOLS.md      <- scoped to routing
+4. IDENTITY.md   <- scoped to routing
+5. USER.md       <- Kublai routing exception
+6. HEARTBEAT.md  <- routes, not self-executes
+7. BOOTSTRAP.md  <- 1-line redirect
+8. MEMORY.md     <- coordination only, no product knowledge
+9. CLAUDE.md     <- reinforcement only
+```
+
+**Recovery:** Files are preserved and recoverable: `mv _exiled/X ./X`
 
 ---
 
@@ -307,11 +417,12 @@ Tasks are created as markdown files in agent task directories:
 
 ```markdown
 ---
+task_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 agent: temujin
 priority: high
 created: 2026-03-05T09:00:00
-source: kublai-reflection
-task_id: high-1772721004
+source: task_router
+skill_hint: /horde-brainstorming
 ---
 
 # Task: Build Feature X
@@ -328,6 +439,34 @@ task_id: high-1772721004
 ## Deliverable
 [Expected output file/location]
 ```
+
+### 1.5. Task Tracking (Unified Ledger)
+
+Every task gets a UUID4 `task_id` assigned at classification time. This ID correlates all lifecycle events in a single append-only log:
+
+**Ledger file:** `/Users/kublai/.openclaw/tasks/task-ledger.jsonl`
+
+**Lifecycle events:**
+
+| Event | Emitted By | When |
+|-------|-----------|------|
+| `QUEUED` | task-router.py | Task file created in agent queue |
+| `EXECUTING` | task-watcher.py | Task picked up for execution |
+| `COMPLETED` | task-watcher.py | Execution succeeded |
+| `FAILED` | task-watcher.py | Execution failed |
+| `EXECUTION_DETAIL` | agent-task-handler.py | Detailed execution metadata (output_lines, execution_time_s, result_file) |
+| `SCORED` | score_tasks.py | Quality scorecard computed |
+
+**Quality Scorecard (0-8):**
+
+| Dimension | Range | Measures |
+|-----------|-------|----------|
+| `delegation_score` | 0-2 | Was task delegated to specialist (2) or self-routed to kublai (0)? |
+| `domain_match_score` | 0-3 | Does agent's domain match task content? |
+| `substantive_score` | 0-3 | Did execution produce real output? |
+| `self_route_flag` | bool | Kublai handled specialist work (routing violation) |
+
+**Reflection integration:** During kublai's hourly reflection, `prepare_reflection_context.py` runs `score_tasks.py` to score unscored tasks and injects the scorecard summary into the reflection prompt. This enables kublai to evaluate routing quality and identify patterns for improvement.
 
 ### 2. Task Detection
 
@@ -347,19 +486,22 @@ Two mechanisms detect tasks:
 ### 3. Task Execution
 
 ```
-Task detected
+Task detected (task-watcher.py)
      │
      ▼
-Mark as .executing
+Extract task_id from frontmatter
      │
      ▼
-Execute via openclaw agent --agent <id>
+Mark as .executing + emit EXECUTING to task-ledger.jsonl
      │
      ▼
-Write results to task file
+Execute via claude-agent (Claude Code session per agent)
      │
      ▼
-Mark as .completed.done
+Write results to agent workspace
+     │
+     ▼
+Mark as .completed.done + emit COMPLETED/FAILED to ledger
      │
      ▼
 Record in logs/task-watcher-state.json
@@ -568,9 +710,17 @@ Each reflection includes:
 │   │   ├── memory/
 │   │   │   └── YYYY-MM-DD.md
 │   │   ├── docs/
-│   │   │   ├── NEO4J_PATTERNS.md
+│   │   │   ├── architecture.md   # This document
 │   │   │   ├── ESCALATION_PROTOCOL.md
-│   │   │   └── architecture.md   # This document
+│   │   │   ├── routing-test-prompts.md
+│   │   │   └── system-improvement-plan.md
+│   │   ├── _exiled/              # Product files (quarantined from router)
+│   │   │   ├── projects/
+│   │   │   ├── src/
+│   │   │   ├── research/
+│   │   │   ├── content-to-post/
+│   │   │   ├── archive/
+│   │   │   └── docs/             # 7 product design docs
 │   │   └── shared-context/
 │   │       ├── THESIS.md
 │   │       ├── FEEDBACK-LOG.md
@@ -791,6 +941,12 @@ brew services restart neo4j
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-03-05 | Initial comprehensive documentation |
+| 1.1 | 2026-03-05 | Task tracking system: unified ledger (task-ledger.jsonl), UUID4 correlation IDs, quality scorecard (0-8), Claude-first routing, skill_hint auto-detection, kublai Kurultai architecture ownership |
+| 1.2 | 2026-03-05 | Native OpenClaw routing skill (kurultai-router). task-router.py deprecated. auto-dispatch, spawn-consumer, worker daemons deprecated. Gateway routes via message() with structured decision tree. |
+| 1.3 | 2026-03-05 | Workspace Exile: product files moved to _exiled/. CLAUDE.md mandatory classification gate added. SOUL.md resourcefulness contradiction resolved. Structural enforcement replaces prompt-only NEVER rules. |
+| 1.4 | 2026-03-05 | Bootstrap Routing Fix: routing gate moved from CLAUDE.md (position 9) to AGENTS.md (position 1). Contradiction neutralization across 6 bootstrap files. MEMORY.md product knowledge stripped. BOOTSTRAP.md gutted. CLAUDE.md demoted to reinforcement-only. Total bootstrap budget: 19K chars. |
+| 1.5 | 2026-03-05 | LLM Classification Routing: glm-5 now classifies directly (no Claude Code middleman). Replaced 185-line SKILL.md decision tree with inline classification in AGENTS.md + exec(task_intake.py). Load balancing: overflow routing via OVERFLOW_MAP when primary agent is busy. Agent roles generalized with overflow capabilities. |
+| 1.6 | 2026-03-05 | Execution reliability + skill activation. (1) Stale task recovery aligned to 5-min tick heartbeat (CLEANUP_INTERVAL 3600→300). Retry cap (MAX_RETRY_COUNT=2) prevents infinite loops on blocked tasks — after 2 retries, tasks permanently marked .failed.done. (2) Auto skill hint detection: task_intake.py detects best horde/domain skill from agent+task content (38 mappings), writes skill_hint to frontmatter. agent-task-handler.py passes directive prompt to Claude Code ("Start by invoking /skill"). (3) Kublai project management: status-of-implementation/project/feature routes to kublai (answers directly), status-of-service/deployment routes to ogedei. Split status hard rule in AGENTS.md + 5 new disambiguation rules in task_intake.py. |
 
 ---
 

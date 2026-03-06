@@ -23,6 +23,7 @@ from json_state import locked_json_update
 
 AGENTS_DIR = "/Users/kublai/.openclaw/agents"
 SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
+TASK_LEDGER = "/Users/kublai/.openclaw/tasks/task-ledger.jsonl"
 CLAUDE_AGENT = "/Users/kublai/.local/bin/claude-agent"
 CLAUDE_TIMEOUT = 600  # 10 minutes for Claude Code execution
 MAX_TASK_DEPTH = 3
@@ -80,9 +81,15 @@ def mark_task_executing(task_file):
     return executing_file
 
 def mark_task_completed(task_file, status='completed'):
-    """Mark task as completed"""
-    # Find executing file
-    executing_file = task_file.replace('.md', '.executing.md')
+    """Mark task as completed.
+
+    Handles both cases: task_file is the original .md or already .executing.md.
+    Avoids double-suffix bug (.executing.executing.md → .executing.completed.done.md).
+    """
+    if task_file.endswith('.executing.md'):
+        executing_file = task_file
+    else:
+        executing_file = task_file.replace('.md', '.executing.md')
     if os.path.exists(executing_file):
         completed_file = executing_file.replace('.executing.md', f'.{status}.done.md')
         os.rename(executing_file, completed_file)
@@ -93,6 +100,30 @@ def _extract_depth(content):
     import re
     match = re.search(r'^depth:\s*(\d+)', content, re.MULTILINE)
     return int(match.group(1)) if match else 0
+
+
+def _extract_task_id(content):
+    """Extract task_id from task frontmatter."""
+    import re
+    match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _extract_skill_hint(content):
+    """Extract skill_hint from task frontmatter."""
+    import re
+    match = re.search(r'^skill_hint:\s*(\S+)', content, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _append_ledger(entry):
+    """Append an event to the unified task-ledger.jsonl."""
+    try:
+        os.makedirs(os.path.dirname(TASK_LEDGER), exist_ok=True)
+        with open(TASK_LEDGER, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
 
 
 def spawn_subagent(agent_name, task, subagent_task, depth=0):
@@ -125,20 +156,55 @@ def spawn_subagent(agent_name, task, subagent_task, depth=0):
     print(f"✓ Subagent spawned: {spawn_request['label']}")
     return spawn_request['label']
 
-def execute_task_with_llm(agent_name, task_text, config):
+def _load_agent_memory(agent_name):
+    """Load recent memory context for the agent."""
+    memory_dir = f"{AGENTS_DIR}/{agent_name}/memory"
+    context = ""
+
+    # Load context.md if it exists
+    context_file = f"{memory_dir}/context.md"
+    if os.path.exists(context_file):
+        try:
+            with open(context_file, 'r') as f:
+                context += f.read()[:2000] + "\n\n"
+        except Exception:
+            pass
+
+    # Load today's memory file
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_file = f"{memory_dir}/{today}.md"
+    if os.path.exists(today_file):
+        try:
+            with open(today_file, 'r') as f:
+                lines = f.readlines()
+                context += "".join(lines[-50:])  # Last 50 lines
+        except Exception:
+            pass
+
+    return context.strip()
+
+
+def execute_task_with_llm(agent_name, task_text, config, skill_hint=None):
     """Execute task via Claude Code using the claude-agent wrapper.
 
-    This replaces the old spawn-queue approach which only had glm-5
-    acknowledge tasks without actually executing code.
+    Each agent runs as a sovereign Claude Code session with its own
+    CLAUDE.md (auto-discovered from workdir), identity, and tools.
     """
-    workspace = config.get('workspace_path', f"{AGENTS_DIR}/{agent_name}")
+    # Use agent ROOT directory as workdir so CLAUDE.md is auto-discovered
+    agent_root = f"{AGENTS_DIR}/{agent_name}"
+
+    # Build prompt with agent context
+    memory = _load_agent_memory(agent_name)
+    memory_section = f"\n\n## Recent Context\n{memory}" if memory else ""
+    skill_section = f"\n\nIMPORTANT: Start this task by invoking {skill_hint} — it is the correct skill for this work." if skill_hint else ""
 
     prompt = (
-        f"You are {agent_name.capitalize()}, "
-        f"{config.get('agent_role', 'a development agent')}.\n\n"
-        f"{task_text}\n\n"
-        "Execute this task completely. Write all necessary code, "
-        "make all changes, and verify your work before finishing."
+        f"{task_text}"
+        f"{memory_section}"
+        f"{skill_section}\n\n"
+        "Execute this task completely using your tools. "
+        "Read files, write code, run commands, verify your work. "
+        "For simple questions, a direct answer is fine."
     )
 
     env = os.environ.copy()
@@ -150,15 +216,15 @@ def execute_task_with_llm(agent_name, task_text, config):
 
     try:
         result = subprocess.run(
-            [CLAUDE_AGENT, "--workdir", workspace, prompt],
+            [CLAUDE_AGENT, "--workdir", agent_root, "--", prompt],
             capture_output=True,
             text=True,
             timeout=CLAUDE_TIMEOUT,
             env=env,
         )
 
-        output = result.stdout[-3000:] if result.stdout else ""
-        error = result.stderr[-1000:] if result.stderr else ""
+        output = result.stdout or ""
+        error = result.stderr[-2000:] if result.stderr else ""
 
         success = result.returncode == 0
         if success and not output.strip():
@@ -195,6 +261,7 @@ def process_task(agent_name, task):
     """
     # Use full task content for Claude Code, not just the summary line
     task_content = task.get('full_content', task['task'])
+    task_id = task.get('task_id')
     print(f"\n📋 Processing: {task['task'][:80]}...")
 
     # Mark as executing
@@ -205,8 +272,11 @@ def process_task(agent_name, task):
     config = load_agent_config(agent_name)
 
     # Execute via Claude Code
-    print(f"  🤖 Executing via Claude Code...")
-    result = execute_task_with_llm(agent_name, task_content, config)
+    skill_hint = task.get('skill_hint')
+    print(f"  🤖 Executing via Claude Code...{f' (skill: {skill_hint})' if skill_hint else ''}")
+    start_time = time.time()
+    result = execute_task_with_llm(agent_name, task_content, config, skill_hint=skill_hint)
+    elapsed_s = round(time.time() - start_time, 1)
 
     if result.get('success'):
         # Save result to workspace
@@ -223,7 +293,21 @@ def process_task(agent_name, task):
 
         print(f"  ✓ Result saved: {result_file}")
         mark_task_completed(task['file'], 'completed')
-        print(f"  ✓ Task completed via Claude Code")
+        print(f"  ✓ Task completed via Claude Code ({elapsed_s}s)")
+
+        # Emit execution metadata to ledger
+        if task_id:
+            output_content = result.get('content', '')
+            _append_ledger({
+                "task_id": task_id,
+                "event": "EXECUTION_DETAIL",
+                "ts": datetime.now().isoformat(),
+                "agent": agent_name,
+                "execution_time_s": elapsed_s,
+                "output_lines": len(output_content.splitlines()),
+                "result_file": result_file,
+                "success": True,
+            })
 
         # Update Neo4j
         update_agent_state(agent_name, 'idle', None, increment_completed=True)
@@ -233,6 +317,18 @@ def process_task(agent_name, task):
         error_msg = result.get('error', 'Unknown error')
         print(f"  ✗ Claude Code failed: {error_msg[:200]}")
         mark_task_completed(task['file'], 'failed')
+
+        if task_id:
+            _append_ledger({
+                "task_id": task_id,
+                "event": "EXECUTION_DETAIL",
+                "ts": datetime.now().isoformat(),
+                "agent": agent_name,
+                "execution_time_s": elapsed_s,
+                "error": error_msg[:500],
+                "success": False,
+            })
+
         return False
 
 def update_agent_state(agent_name, status='busy', task_label=None, increment_completed=False):
@@ -283,10 +379,14 @@ def execute_single_task(agent_name, task_file):
             break
 
     depth = _extract_depth(content)
+    task_id = _extract_task_id(content)
+    skill_hint = _extract_skill_hint(content)
 
     task = {
         'file': task_file,
         'task': task_desc,
+        'task_id': task_id,
+        'skill_hint': skill_hint,
         'full_content': content,  # Pass full content to Claude Code
         'priority': 'normal',
         'depth': depth,

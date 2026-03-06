@@ -48,8 +48,8 @@ DOMAIN_FILE = MAIN / "logs/brainstorm-domain-rotation.json"
 # Claude Code — opus for brainstorming (via claude-agent wrapper)
 CLAUDE_AGENT_BIN = os.getenv("CLAUDE_AGENT_BIN", "/Users/kublai/.local/bin/claude-agent")
 CLAUDE_MODEL = os.getenv("CLAUDE_BRAINSTORM_MODEL", "opus")
-CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_BRAINSTORM_TIMEOUT", "300"))
-CLAUDE_MAX_BUDGET = os.getenv("CLAUDE_BRAINSTORM_BUDGET", "1.00")
+CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_BRAINSTORM_TIMEOUT", "600"))
+CLAUDE_MAX_BUDGET = os.getenv("CLAUDE_BRAINSTORM_BUDGET", "")
 
 # Cooldown: 55 minutes per agent
 BRAINSTORM_COOLDOWN_SECS = 3300
@@ -496,6 +496,13 @@ def gather_context(agent):
     # 10. Previous brainstorm proposals (meta-reflection)
     context["previous_proposals"] = _previous_proposals(agent)
 
+    # 11. Task ledger — actual execution results from the last hour
+    try:
+        from prepare_reflection_context import get_task_ledger_summary
+        context["task_ledger"] = get_task_ledger_summary(agent, hours=1) or "(no recent task events)"
+    except Exception:
+        context["task_ledger"] = "(unavailable)"
+
     return context
 
 
@@ -572,6 +579,9 @@ The Kurultai is a 6-agent AI system on Mac Mini (darwin, arm64):
 ## Available Skills
 {context.get('skills_summary', '(none)')}
 
+## Task Execution Results (Last Hour)
+{context.get('task_ledger', '(none)')}
+
 ## Previous Brainstorm Proposals & Outcomes (Meta-Reflection)
 {context.get('previous_proposals', '(none)')}
 
@@ -579,24 +589,37 @@ The Kurultai is a 6-agent AI system on Mac Mini (darwin, arm64):
 {DOMAIN_DESCRIPTIONS.get(domain, '')}
 
 ## Your Task
-Use /horde-brainstorming to brainstorm ONE high-impact improvement. Consider ALL of the above context — your chat history, logs, task patterns, skills, and previous proposals.
+You are an autonomous agent. Your goal is CONTINUAL SELF-IMPROVEMENT of the Kurultai system.
 
-You should reflect on:
-1. What happened in the last 2 hours (chat history + logs) — what went well, what failed?
-2. How tasks were assigned and executed — any bottlenecks, misroutes, or failures?
-3. Which skills could be improved or better utilized?
-4. How this kurultai-reflection process itself could be improved for better self-improvement
-5. The **{domain}** domain specifically — what's the highest-impact change?
+Analyze the context above, identify ONE high-impact improvement, AND IMPLEMENT IT.
 
-Brainstorm from your perspective as {context['role']}. Focus on concrete, implementable changes.
+**Step 1 — Analyze** (consider ALL context above):
+1. What happened since the last reflection? What failed, what succeeded?
+2. The **{domain}** domain — what's the highest-impact change?
+3. Your failure patterns — what keeps going wrong?
 
-IMPORTANT: After the brainstorming completes, you MUST end your response with
-your FINAL proposal in EXACTLY this format (these 6 lines, nothing else after):
+**Step 2 — Implement** (DO the work, don't just propose):
+- If it's a code/script fix: Read the file, edit it, verify the change works
+- If it's a config/rule change: Make the change directly
+- If it's a new capability: Create the file/script
+- If it requires another agent's domain: Create a task file in their queue at ~/.openclaw/agents/<agent>/tasks/
 
-PROPOSAL: <one-line description of the improvement>
-PROBLEM: <what's broken or suboptimal, with evidence from your context above>
-SOLUTION: <concrete change — specific files, functions, or rules to modify>
-IMPACT: <expected improvement, measurable if possible>
+**Step 3 — Verify**: Run a quick test or validation that your change works.
+
+Constraints:
+- Stay within your domain ({context['role']}). Don't modify other agents' CLAUDE.md files.
+- Don't break existing functionality — read before editing.
+- Small, focused changes beat ambitious rewrites.
+- If something is too risky or large, create a task for the appropriate agent instead.
+
+IMPORTANT: After implementing, you MUST end your response with your result
+in EXACTLY this format (these 7 lines, nothing else after):
+
+PROPOSAL: <one-line description of what you improved>
+PROBLEM: <what was broken or suboptimal, with evidence>
+SOLUTION: <what you actually changed — specific files and functions>
+IMPLEMENTED: <YES or NO — did you make the change, or just propose it?>
+VERIFIED: <YES or NO — did you verify it works?>
 EFFORT: <S or M or L>
 CATEGORY: <rule|script|protocol|capability|process>"""
 
@@ -606,15 +629,14 @@ CATEGORY: <rule|script|protocol|capability|process>"""
 
 def call_claude(prompt, agent):
     """Spawn a Claude Code session for brainstorming via claude-agent wrapper."""
-    cmd = [
-        CLAUDE_AGENT_BIN,
-        "--model", CLAUDE_MODEL,
-        "--budget", CLAUDE_MAX_BUDGET,
-        prompt,
-    ]
+    cmd = [CLAUDE_AGENT_BIN, "--model", CLAUDE_MODEL]
+    if CLAUDE_MAX_BUDGET:
+        cmd.extend(["--budget", CLAUDE_MAX_BUDGET])
+    cmd.append(prompt)
 
     try:
-        log(f"Spawning claude-agent for {agent} (model={CLAUDE_MODEL}, budget=${CLAUDE_MAX_BUDGET})")
+        budget_str = f"${CLAUDE_MAX_BUDGET}" if CLAUDE_MAX_BUDGET else "uncapped"
+        log(f"Spawning claude-agent for {agent} (model={CLAUDE_MODEL}, budget={budget_str})")
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -649,9 +671,11 @@ def parse_proposal(raw_text):
     fields = {}
 
     # Scan the full output for proposal fields (they should be near the end)
+    all_keys = ["PROPOSAL", "PROBLEM", "SOLUTION", "IMPACT", "IMPLEMENTED", "VERIFIED", "EFFORT", "CATEGORY"]
+
     for line in raw_text.strip().split("\n"):
         line = line.strip()
-        for key in ["PROPOSAL", "PROBLEM", "SOLUTION", "IMPACT", "EFFORT", "CATEGORY"]:
+        for key in all_keys:
             if line.upper().startswith(f"{key}:"):
                 fields[key.lower()] = line[len(key) + 1:].strip()
 
@@ -660,7 +684,7 @@ def parse_proposal(raw_text):
         tail = raw_text[-3000:]
         for line in tail.strip().split("\n"):
             line = line.strip()
-            for key in ["PROPOSAL", "PROBLEM", "SOLUTION", "IMPACT", "EFFORT", "CATEGORY"]:
+            for key in all_keys:
                 if line.upper().startswith(f"{key}:"):
                     fields[key.lower()] = line[len(key) + 1:].strip()
 
@@ -689,6 +713,9 @@ def submit_proposal(agent, proposal):
     try:
         from neo4j_task_tracker import get_driver
 
+        implemented = proposal.get("implemented", "NO").upper().startswith("Y")
+        verified = proposal.get("verified", "NO").upper().startswith("Y")
+        status = "implemented" if implemented else "pending_review"
         priority = "HIGH" if proposal["effort"] == "S" or proposal["category"] == "rule" else "MEDIUM"
         feedback_id = f"{agent}-brainstorm-{int(datetime.now().timestamp())}"
 
@@ -703,11 +730,13 @@ def submit_proposal(agent, proposal):
                     priority: $priority,
                     proposals: $proposals,
                     submitted: datetime(),
-                    status: 'pending_review',
+                    status: $status,
                     source: 'kurultai_brainstorm',
                     id: $feedback_id,
                     category: $category,
-                    effort: $effort
+                    effort: $effort,
+                    implemented: $implemented,
+                    verified: $verified
                 })
                 CREATE (a)-[:SUBMITTED]->(f)
                 """,
@@ -716,12 +745,16 @@ def submit_proposal(agent, proposal):
                 priority=priority,
                 proposals=json.dumps([proposal]),
                 feedback_id=feedback_id,
+                status=status,
                 category=proposal["category"],
                 effort=proposal["effort"],
+                implemented=implemented,
+                verified=verified,
             )
         driver.close()
 
-        log(f"SUBMITTED: [{priority}] {agent} -> {proposal['proposal'][:60]}")
+        impl_tag = "DONE" if implemented else "PROPOSED"
+        log(f"SUBMITTED: [{priority}/{impl_tag}] {agent} -> {proposal['proposal'][:60]}")
         return True
     except Exception as e:
         log(f"Neo4j submission failed for {agent}: {e}")
@@ -819,7 +852,8 @@ def main():
     domain = args.domain or get_current_domain()
 
     log("=== Kurultai Self-Improvement Brainstorming (Claude Code) ===")
-    log(f"Model: {CLAUDE_MODEL} | Budget: ${CLAUDE_MAX_BUDGET}/session | Timeout: {CLAUDE_TIMEOUT}s")
+    budget_str = f"${CLAUDE_MAX_BUDGET}" if CLAUDE_MAX_BUDGET else "uncapped"
+    log(f"Model: {CLAUDE_MODEL} | Budget: {budget_str}/session | Timeout: {CLAUDE_TIMEOUT}s")
     log(f"Wrapper: {CLAUDE_AGENT_BIN}")
     log(f"Domain focus: {domain}")
 

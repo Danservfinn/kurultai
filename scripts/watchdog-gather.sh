@@ -163,15 +163,10 @@ for agent in "${AGENTS[@]}"; do
     fi
 done
 
-# Push forward: run spawn-consumer (non-blocking, backgrounded)
-# NOTE: task-consumer.sh removed — task-watcher.py daemon is now sole dispatcher
-if [ "$TASKS_PENDING_TOTAL" -gt 0 ] || [ -f "$BASE/logs/spawn-pending.json" ]; then
-    # task-watcher.py (launchd daemon) handles file-based task dispatch
-    TASKS_DISPATCHED=0
-
-    # Run spawn consumer for spawn queue
-    if [ -f "$BASE/logs/spawn-pending.json" ]; then
-        SPAWN_COUNT=$(python3 -c "
+# task-watcher.py (launchd daemon) is the sole dispatcher for all tasks and spawns
+TASKS_DISPATCHED=0
+if [ -f "$BASE/logs/spawn-pending.json" ]; then
+    SPAWN_COUNT=$(python3 -c "
 import json
 try:
     d=json.load(open('$BASE/logs/spawn-pending.json'))
@@ -179,14 +174,6 @@ try:
     print(len(ready))
 except: print(0)
 " 2>/dev/null || echo "0")
-
-        if [ "$SPAWN_COUNT" -gt 0 ] && [ -x "$SCRIPTS/spawn-consumer.sh" ]; then
-            bash "$SCRIPTS/spawn-consumer.sh" >> "$LOGDIR/spawn-consumer.log" 2>&1 &
-            TASKS_DISPATCHED=$((TASKS_DISPATCHED + SPAWN_COUNT))
-        fi
-    else
-        SPAWN_COUNT=0
-    fi
 else
     SPAWN_COUNT=0
 fi
@@ -309,6 +296,12 @@ printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s\nPROCESS: cpu
     "$UPTIME_1H" "$AVG_CPU_1H" "$ERRORS_TREND_1H" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
 
+# Append STALL_WARNINGs for tasks idle > 60 minutes
+STALL_OUTPUT=$(python3 "$SCRIPTS/stall_detector.py" 2>/dev/null)
+if [ -n "$STALL_OUTPUT" ]; then
+    echo "$STALL_OUTPUT" >> "$SUMMARY"
+fi
+
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
@@ -317,9 +310,10 @@ echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% 
 # ============================================================
 # SECTION 8: LLM Triage (local ollama — decide if Kublai should act)
 # ============================================================
+export _WD_SCRIPTS="$SCRIPTS"
 LLM_TRIAGE=$(python3 << 'PYEOF'
-import json, re, sys
-sys.path.insert(0, "$SCRIPTS")
+import json, os, re, sys
+sys.path.insert(0, os.environ.get("_WD_SCRIPTS", ""))
 from ollama_lock import OllamaLock, Priority, LockBusy
 
 summary = open(sys.argv[1]).read() if len(sys.argv) > 1 else ""
@@ -437,6 +431,27 @@ fi
 # KUBLAI ACTIONS: Rule-based actions (safety net, runs alongside LLM triage)
 # ============================================================
 python3 "$SCRIPTS/kublai-actions.py" --trigger tick >> "$LOGDIR/kublai-actions.log" 2>&1 &
+
+# ============================================================
+# SELF-WAKE: Rule T7 — wake idle agents with blocked items (backgrounded)
+# ============================================================
+python3 "$SCRIPTS/agent-self-wake.py" >> "$LOGDIR/self-wake.log" 2>&1 &
+
+# ============================================================
+# NOTION SYNC: Update kanban board with current task states (backgrounded)
+# ============================================================
+python3 "$SCRIPTS/notion-task-sync.py" --active >> "$LOGDIR/notion-sync.log" 2>&1 &
+
+# ============================================================
+# WRITE 4: Consolidated WATCHDOG_LLM line (replaces LLM manual logging)
+# ============================================================
+WATCHDOG_LLM_LOG="$LOGDIR/watchdog-llm.log"
+if [ "$STATUS" = "healthy" ]; then
+    WATCHDOG_NOTE="nominal"
+else
+    WATCHDOG_NOTE="$REASON"
+fi
+echo "[$TS] WATCHDOG_LLM | status=$STATUS | action_needed=$LLM_ACTION_NEEDED | severity=$LLM_SEVERITY | note=$WATCHDOG_NOTE" >> "$WATCHDOG_LLM_LOG"
 
 # ============================================================
 # Output for the LLM

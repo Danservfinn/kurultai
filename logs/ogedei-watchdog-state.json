@@ -1,0 +1,17 @@
+{
+  "last_audit": 1772771974.646006,
+  "cycles": 1265,
+  "last_cycle": "2026-03-06T00:04:41.896176",
+  "watcher_restarts": 10,
+  "stalled_warnings": 1667,
+  "fakes_detected": 4,
+  "malformed_cleaned": 0,
+  "audit_result": {
+    "audited": 51,
+    "fake_found": 2,
+    "requeued": 2,
+    "skipped": 1
+  },
+  "last_cycle_epoch": 1772773481.8962471,
+  "last_issues": []
+}

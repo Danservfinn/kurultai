@@ -41,7 +41,27 @@ AGENT_DIR = MAIN / "agent"
 
 AGENTS = ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
 
-from task_router import route_by_category, route_by_text, CATEGORY_ROUTING
+# Inline routing -- source of truth is kurultai-router SKILL.md
+CATEGORY_ROUTING = {
+    "infrastructure": "ogedei",
+    "code_fix": "temujin",
+    "code": "temujin",
+    "investigation": "jochi",
+    "documentation": "chagatai",
+    "research": "mongke",
+    "coordination": "kublai",
+    "monitoring": "ogedei",
+    "security": "jochi",
+    "writing": "chagatai",
+    "ops": "ogedei",
+}
+
+def route_by_category(category):
+    return CATEGORY_ROUTING.get(category.lower(), "kublai")
+
+def route_by_text(text):
+    from task_intake import route_by_text as _route
+    return _route(text)
 
 # Minimum 45 minutes between initiatives to prevent thrashing
 INITIATIVE_COOLDOWN_SECS = 2700

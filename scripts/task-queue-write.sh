@@ -4,7 +4,7 @@
 
 set -e
 
-AGENT_DIR="/Users/kublai/.openclaw/agents/main/agent"
+AGENT_DIR="/Users/kublai/.openclaw/agents"
 
 usage() {
     echo "Usage: task-queue-write.sh -a <agent> -t <task> [-d <description>]"

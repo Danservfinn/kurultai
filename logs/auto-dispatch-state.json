@@ -1,23 +1,4 @@
 {
-  "dispatches": {
-    "temujin": {
-      "task": "high-1772694499.parse-for-agents-vision-a.md",
-      "title": "TASK: Build Vision A of Parse for Agents",
-      "pid": 34470,
-      "dispatched_at": "2026-03-05T12:10:00.913778"
-    },
-    "mongke": {
-      "task": "high-1772713501-competitor-pricing.md",
-      "title": "TASK: Complete Parse Competitor Pricing Analysis",
-      "pid": 34471,
-      "dispatched_at": "2026-03-05T12:10:00.917686"
-    },
-    "chagatai": {
-      "task": "high-1772721004-architecture-doc.md",
-      "title": "Write Kurultai Architecture Documentation",
-      "pid": 34472,
-      "dispatched_at": "2026-03-05T12:10:00.922315"
-    }
-  },
-  "last_cycle": "2026-03-05T12:10:00.922322"
+  "dispatches": {},
+  "last_cycle": "2026-03-05T12:44:04.513843"
 }

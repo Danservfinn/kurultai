@@ -186,9 +186,32 @@ else: print(0)
 " 2>/dev/null || echo "0")
 
 # ============================================================
-# 4b. Queue audit (detect fake completions, auto-requeue)
+# 4b. Queue audit — read from ogedei-watchdog state (fallback: run inline)
 # ============================================================
-QUEUE_AUDIT=$(python3 "$BASE/scripts/queue-audit.py" --json 2>/dev/null || echo '{"audited":0,"fake_found":0,"requeued":0,"skipped":0}')
+WATCHDOG_STATE="$BASE/logs/ogedei-watchdog-state.json"
+QUEUE_AUDIT=$(python3 2>/dev/null << 'PYEOF'
+import json, os, time
+state_file = os.environ.get("_WD_STATE", "/Users/kublai/.openclaw/agents/main/logs/ogedei-watchdog-state.json")
+try:
+    with open(state_file) as f:
+        state = json.load(f)
+    last_audit = state.get("last_audit", 0)
+    if (time.time() - last_audit) < 2100:  # 35 min — watchdog is fresh
+        print(json.dumps(state.get("audit_result", {"audited":0,"fake_found":0,"requeued":0,"skipped":0})))
+    else:
+        raise ValueError("stale")
+except:
+    # Fallback: run queue-audit.py inline
+    import sys, importlib.util
+    spec = importlib.util.spec_from_file_location("queue_audit", "/Users/kublai/.openclaw/agents/main/scripts/queue-audit.py")
+    qa = importlib.util.module_from_spec(spec)
+    sys.argv = ["queue-audit.py", "--json"]
+    spec.loader.exec_module(qa)
+    totals, _ = qa.audit()
+    print(json.dumps(totals))
+PYEOF
+)
+QUEUE_AUDIT=${QUEUE_AUDIT:-'{"audited":0,"fake_found":0,"requeued":0,"skipped":0}'}
 
 # ============================================================
 # 5. Last tick status

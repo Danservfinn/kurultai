@@ -41,13 +41,36 @@ COOLDOWNS = {
     "cron_fix": 3600,          # 1 hour
     "queue_backlog": 1800,     # 30 min
     "agent_stalled": 3600,     # 1 hour
+    "task_stall": 3600,        # 1 hour (time-to-first-action)
     "feedback_review": 7200,   # 2 hours
     "queue_audit": 1800,       # 30 min
 }
 
 MAX_ACTIONS_PER_CYCLE = 3
 
-from task_router import route_by_category, route_by_text
+# Minimal routing for programmatic actions -- source of truth is kurultai-router SKILL.md
+CATEGORY_ROUTING = {
+    "infrastructure": "ogedei",
+    "code_fix": "temujin",
+    "code": "temujin",
+    "investigation": "jochi",
+    "documentation": "chagatai",
+    "research": "mongke",
+    "coordination": "kublai",
+    "monitoring": "ogedei",
+    "security": "jochi",
+    "writing": "chagatai",
+    "ops": "ogedei",
+}
+
+def route_by_category(category):
+    """Route by pre-classified category string. Returns agent name."""
+    return CATEGORY_ROUTING.get(category.lower(), "kublai")
+
+def route_by_text(text):
+    """Lightweight keyword routing for programmatic task creation."""
+    from task_intake import route_by_text as _route
+    return _route(text)
 
 
 def has_pending_task(agent, title_prefix):
@@ -272,6 +295,47 @@ OpenClaw gateway RSS is {rss_mb:.0f}MB (threshold: 900MB).
         mark_fired("high_memory")
         actions_created += 1
 
+    # Rule 6: Time-to-first-action stall detection
+    if actions_created < MAX_ACTIONS_PER_CYCLE:
+        try:
+            from stall_detector import detect_stalls
+            stall_warnings = detect_stalls()
+            for warning in stall_warnings:
+                # Parse agent name from "STALL_WARNING: <agent> idle ..."
+                parts = warning.split()
+                if len(parts) >= 2:
+                    stalled_agent = parts[1]
+                else:
+                    continue
+                cooldown_key = f"task_stall:{stalled_agent}"
+                # Route investigation away from the stalled agent
+                target = "kublai" if stalled_agent == "jochi" else "jochi"
+                if not is_cooled_down(cooldown_key) and not has_pending_task(target, f"Investigate stalled task:") and actions_created < MAX_ACTIONS_PER_CYCLE:
+                    create_task(
+                        target, "normal",
+                        f"Investigate stalled task: {stalled_agent} has idle task with no workspace output",
+                        f"""## Context
+{warning}
+
+An active task has been sitting for over 60 minutes with no workspace artifact produced.
+This likely indicates a stuck execution, a task that was never picked up, or a silent failure.
+
+## Action Required
+1. Check {stalled_agent}'s task directory for the stalled task file
+2. Check task-watcher logs for dispatch/execution errors: `~/.openclaw/agents/main/logs/task-watcher.log`
+3. Check if the agent's Claude Code process is running: `pgrep -f "claude.*{stalled_agent}"`
+4. Either re-queue the task, cancel it, or escalate
+5. Report findings
+""",
+                        source="stall-detector",
+                    )
+                    mark_fired(cooldown_key)
+                    actions_created += 1
+        except ImportError:
+            pass  # stall_detector not available
+        except Exception as e:
+            log(f"TICK: stall detection error: {e}")
+
     if actions_created >= MAX_ACTIONS_PER_CYCLE:
         log(f"TICK: hit MAX_ACTIONS_PER_CYCLE={MAX_ACTIONS_PER_CYCLE}, stopping early")
 
@@ -381,9 +445,11 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
         completed = t.get("completed", 0)
         running = t.get("running", 0)
         if queue_depth > 0 and completed == 0 and running == 0:
-            if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task("jochi", f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
+            # Guard: if jochi is stalled, route to kublai instead (prevent self-routing deadlock)
+            target = "kublai" if name == "jochi" else "jochi"
+            if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task(target, f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
                 create_task(
-                    "jochi", "normal",
+                    target, "normal",
                     f"Triage stalled agent: {name} has {queue_depth} queued tasks with 0 completions",
                     f"""## Context
 Agent {name} has {queue_depth} tasks in file queue but 0 completions
@@ -400,12 +466,14 @@ in the last 30 minutes and nothing currently running.
                 actions_created += 1
 
     # Rule 4: LLM assessment says HIGH or CRITICAL
+    # Route to jochi (analyst), NOT kublai — kublai is often idle when this fires,
+    # creating a circular deadlock (see circular triage bug 2026-03-05)
     severity = assessment.get("severity", "LOW")
-    if severity in ["HIGH", "CRITICAL"] and not is_cooled_down("tock_severity") and not has_pending_task("kublai", "Tock assessment:") and actions_created < MAX_ACTIONS_PER_CYCLE:
+    if severity in ["HIGH", "CRITICAL"] and not is_cooled_down("tock_severity") and not has_pending_task("jochi", "Tock assessment:") and actions_created < MAX_ACTIONS_PER_CYCLE:
         action = assessment.get("recommended_action", "unknown")
         bottleneck = assessment.get("bottleneck", "unknown")
         create_task(
-            "kublai", "high",
+            "jochi", "high",
             f"Tock assessment: {severity} — {bottleneck}",
             f"""## Context
 The 30-minute tock assessment flagged severity: {severity}

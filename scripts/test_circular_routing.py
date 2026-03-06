@@ -69,10 +69,34 @@ class TestPreventSelfRouting(unittest.TestCase):
         self.assertEqual(result, "kublai")
 
     def test_assessment_backlog_different_dest_unchanged(self):
-        """Assessment about X routed to Y should stay unchanged."""
+        """Assessment about X routed to non-kublai Y should stay unchanged."""
         task = "Tock assessment: CRITICAL — temujin backlog"
+        result = _prevent_self_routing(task, "jochi")
+        self.assertEqual(result, "jochi")
+        result = _prevent_self_routing(task, "ogedei")
+        self.assertEqual(result, "ogedei")
+
+    def test_tock_assessment_kublai_always_redirected(self):
+        """Any tock assessment routed to kublai must redirect to jochi (anti-deadlock)."""
+        for bottleneck in ["temujin backlog", "none", "all agents idle", "queue backlog"]:
+            task = f"Tock assessment: CRITICAL — {bottleneck}"
+            result = _prevent_self_routing(task, "kublai")
+            self.assertEqual(result, "jochi",
+                f"'Tock assessment: CRITICAL — {bottleneck}' stayed at kublai")
+
+    def test_tock_assessment_no_agent_name_not_routed_to_kublai(self):
+        """Tock assessment without agent name (e.g. bottleneck='none') must not route to kublai."""
+        task = "Tock assessment: CRITICAL — none"
         result = _prevent_self_routing(task, "kublai")
-        self.assertEqual(result, "kublai")
+        self.assertEqual(result, "jochi",
+            "'Tock assessment: CRITICAL — none' routed to kublai (circular deadlock)")
+
+    def test_tock_assessment_routed_to_jochi_stays(self):
+        """Tock assessment already routed to jochi should stay with jochi."""
+        task = "Tock assessment: HIGH — queue backlog"
+        result = _prevent_self_routing(task, "jochi")
+        self.assertEqual(result, "jochi",
+            "Tock assessment routed to jochi should not be redirected")
 
     def test_normal_tasks_unaffected(self):
         """Regular tasks mentioning an agent name should not be redirected."""
@@ -197,6 +221,15 @@ class TestEndToEndSelfRoutingPrevention(unittest.TestCase):
             result = classify_task("Tock assessment: CRITICAL — temujin backlog")
             self.assertNotEqual(result["destination"], "temujin",
                 "classify_task routed assessment-temujin to temujin despite guard")
+            self.assertEqual(result["destination"], "jochi")
+
+    def test_classify_tock_assessment_no_agent_not_kublai(self):
+        """classify_task for 'Tock assessment: CRITICAL — none' must not return kublai."""
+        with patch('task_router._llm_classify', return_value=("kublai", None)):
+            from task_router import classify_task
+            result = classify_task("Tock assessment: CRITICAL — none")
+            self.assertNotEqual(result["destination"], "kublai",
+                "classify_task routed tock assessment to kublai (circular deadlock)")
             self.assertEqual(result["destination"], "jochi")
 
     def test_classify_normal_task_unaffected(self):

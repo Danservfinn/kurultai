@@ -80,3 +80,34 @@
 {"ts": "2026-03-05T11:10:14.651591", "task": "Build a login feature with OAuth", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 7}}
 {"ts": "2026-03-05T11:10:14.652209", "task": "Triage stalled agent: jochi has 3 queued tasks", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
 {"ts": "2026-03-05T11:10:14.652839", "task": "Triage stalled agent: kublai has 3 queued tasks", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.530507", "task": "Triage stalled agent: temujin has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.532390", "task": "Triage stalled agent: mongke has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.533152", "task": "Triage stalled agent: chagatai has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.533759", "task": "Triage stalled agent: jochi has 5 queued", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.534328", "task": "Triage stalled agent: ogedei has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.534880", "task": "Triage stalled agent: kublai has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.535693", "task": "Tock assessment: CRITICAL \u2014 temujin backlog", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.536656", "task": "Build a login feature with OAuth", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 7}}
+{"ts": "2026-03-05T12:16:00.537414", "task": "Tock assessment: CRITICAL \u2014 none", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.538075", "task": "Triage stalled agent: jochi has 3 queued tasks", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:00.538668", "task": "Triage stalled agent: kublai has 3 queued tasks", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.406213", "task": "Triage stalled agent: temujin has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.406842", "task": "Triage stalled agent: mongke has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.407153", "task": "Triage stalled agent: chagatai has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.407529", "task": "Triage stalled agent: jochi has 5 queued", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.408029", "task": "Triage stalled agent: ogedei has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.408508", "task": "Triage stalled agent: kublai has 5 queued", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.409226", "task": "Tock assessment: CRITICAL \u2014 temujin backlog", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.409867", "task": "Build a login feature with OAuth", "dest": "temujin", "method": "llm", "complexity": "simple", "top_scores": {"temujin": 7}}
+{"ts": "2026-03-05T12:16:27.410480", "task": "Tock assessment: CRITICAL \u2014 none", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.411072", "task": "Triage stalled agent: jochi has 3 queued tasks", "dest": "kublai", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T12:16:27.411662", "task": "Triage stalled agent: kublai has 3 queued tasks", "dest": "jochi", "method": "llm", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T17:29:38.649143", "task": "Build a login endpoint with OAuth support", "dest": "temujin", "method": "claude", "complexity": "simple", "top_scores": {"temujin": 6}}
+{"ts": "2026-03-05T17:29:47.171583", "task": "Investigate the error spike in production logs", "dest": "jochi", "method": "claude", "complexity": "simple", "top_scores": {"mongke": 4}}
+{"ts": "2026-03-05T17:29:52.348561", "task": "Write a blog post about multi-agent AI systems", "dest": "chagatai", "method": "claude", "complexity": "complex", "top_scores": {"chagatai": 6}}
+{"ts": "2026-03-05T17:29:56.475286", "task": "Research competitor pricing for Back4App and Supabase", "dest": "mongke", "method": "claude", "complexity": "simple", "top_scores": {"mongke": 5}}
+{"ts": "2026-03-05T17:30:04.796621", "task": "Triage stalled agent: mongke has 3 queued tasks", "dest": "kublai", "method": "claude", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T17:30:10.679542", "task": "Tock assessment: CRITICAL \u2014 temujin backlog", "dest": "jochi", "method": "claude", "complexity": "simple", "top_scores": {}}
+{"ts": "2026-03-05T17:35:43.433826", "task": "Make Parse for Agents more agent-friendly on the frontend. There should be no need for human input w", "dest": "temujin", "method": "claude", "complexity": "complex", "top_scores": {"temujin": 1}}
+{"ts": "2026-03-05T17:38:03.019040", "task": "Make Parse for Agents more agent-friendly on the frontend. There should be no need for human input w", "dest": "temujin", "method": "claude", "complexity": "complex", "top_scores": {"temujin": 1}}
+{"ts": "2026-03-05T17:39:00.773709", "task": "Make Parse for Agents more agent-friendly on the frontend. There should be no need for human input w", "dest": "temujin", "method": "claude", "complexity": "complex", "top_scores": {"temujin": 1}}

@@ -1,10 +1,10 @@
-TICK 2026-03-05 11:57:56
-GATEWAY: up pid=10144,10145,12445,12447,14245 http=200 latency=1ms uptime=1h19m
-PROCESS: cpu=0.0% mem=0.1% rss=16MB threads=13
-ERRORS:  last5m=14 last1h=205 fatal=0
+TICK 2026-03-06 00:00:00
+GATEWAY: up pid=730,1537,3596,3632,14245 http=200 latency=1ms uptime=4m
+PROCESS: cpu=0.0% mem=0.1% rss=8MB threads=2
+ERRORS:  last5m=44 last1h=234 fatal=0
 SERVICES: neo4j=up redis=up
-TASKS:   pending=12 dispatched=0 spawn=0 queues=[temujin=4,mongke=1,chagatai=1,jochi=3,ogedei=3]
-TRENDS:  uptime_1h=100.0% avg_cpu=0.0% errors_1h=97 restarts_1h=0
+TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
+TRENDS:  uptime_1h=100.0% avg_cpu=3.3% errors_1h=391 restarts_1h=0
 DECISION: healthy
 ACTION:   none
 REASON:   all checks passed

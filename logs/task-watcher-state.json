@@ -178,5 +178,225 @@
   "temujin/high-1772727470-injection-detection-spec.md": {
     "executed": "2026-03-05T11:26:22.643075",
     "success": true
+  },
+  "jochi/normal-1772723008.md": {
+    "executed": "2026-03-05T12:03:36.005217",
+    "success": true
+  },
+  "mongke/direct-1772583732.md": {
+    "executed": "2026-03-05T12:09:20.328520",
+    "success": true
+  },
+  "ogedei/high-1772730102.md": {
+    "executed": "2026-03-05T12:11:59.610248",
+    "success": true
+  },
+  "jochi/normal-1772730102.md": {
+    "executed": "2026-03-05T12:14:13.257800",
+    "success": true
+  },
+  "kublai/high-1772722892.md": {
+    "executed": "2026-03-05T12:16:57.735975",
+    "success": true
+  },
+  "jochi/normal-1772730258.md": {
+    "executed": "2026-03-05T12:21:04.326032",
+    "success": true
+  },
+  "kublai/triage-chagatai-434b0852.md": {
+    "executed": "2026-03-05T12:26:26.633877",
+    "success": true
+  },
+  "temujin/direct-1772583358.md": {
+    "executed": "2026-03-05T12:32:29.450623",
+    "success": true
+  },
+  "mongke/high-1772713501-competitor-pricing.md.md": {
+    "executed": "2026-03-05T12:35:04.819319",
+    "success": true
+  },
+  "kublai/normal-1772731892.md": {
+    "executed": "2026-03-05T12:39:28.170535",
+    "success": false
+  },
+  "temujin/high-1772732101.md": {
+    "executed": "2026-03-05T12:54:08.860403",
+    "success": true
+  },
+  "jochi/normal-1772733347.md": {
+    "executed": "2026-03-05T12:57:03.688381",
+    "success": true
+  },
+  "jochi/high-1772737280.md": {
+    "executed": "2026-03-05T14:02:05.321832",
+    "success": true
+  },
+  "mongke/news-feed.md": {
+    "executed": "2026-03-05T16:13:25.080239",
+    "success": true
+  },
+  "jochi/competitor-intel.md": {
+    "executed": "2026-03-05T16:17:18.560761",
+    "success": true
+  },
+  "mongke/openclaw-discovery.md": {
+    "executed": "2026-03-05T16:18:38.569953",
+    "success": true
+  },
+  "temujin/high-1772750143.md": {
+    "executed": "2026-03-05T17:36:15.210683",
+    "success": false
+  },
+  "temujin/high-1772750283.md": {
+    "executed": "2026-03-05T17:38:24.602940",
+    "success": false
+  },
+  "temujin/high-1772750340.md": {
+    "executed": "2026-03-05T17:43:03.601303",
+    "success": true
+  },
+  "temujin/normal-1772762166.md": {
+    "executed": "2026-03-05T20:57:37.144179",
+    "success": true
+  },
+  "kublai/normal-1772762272.md": {
+    "executed": "2026-03-05T20:58:47.822283",
+    "success": true
+  },
+  "kublai/normal-1772762564.md": {
+    "executed": "2026-03-05T21:03:38.770512",
+    "success": true
+  },
+  "ogedei/normal-1772762888-log-separation.md": {
+    "executed": "2026-03-05T21:10:05.788964",
+    "success": true
+  },
+  "chagatai/normal-1772762888-parse-quickstart.md": {
+    "executed": "2026-03-05T21:10:34.852360",
+    "success": true
+  },
+  "mongke/normal-1772762888-agent-eval-pricing-matrix.md": {
+    "executed": "2026-03-05T21:11:59.116581",
+    "success": true
+  },
+  "temujin/normal-1772762888-heartbeat-self-wake.md": {
+    "executed": "2026-03-05T21:12:34.509695",
+    "success": true
+  },
+  "jochi/normal-1772762888-time-to-first-action.md": {
+    "executed": "2026-03-05T21:12:51.808684",
+    "success": true
+  },
+  "temujin/normal-1772763111.md": {
+    "executed": "2026-03-05T21:14:08.931895",
+    "success": true
+  },
+  "chagatai/normal-selfwake-1772764960.md": {
+    "executed": "2026-03-05T21:46:21.719073",
+    "success": true
+  },
+  "ogedei/normal-1772765671.md": {
+    "executed": "2026-03-05T21:57:44.060474",
+    "success": true
+  },
+  "temujin/normal-1772765862.md": {
+    "executed": "2026-03-05T22:00:10.071330",
+    "success": true
+  },
+  "chagatai/normal-1772671398.md": {
+    "executed": "2026-03-05T22:11:29.165163",
+    "success": true
+  },
+  "temujin/normal-1772766857.retry-1.md": {
+    "executed": "2026-03-05T22:35:33.998113",
+    "success": true
+  },
+  "ogedei/normal-selfwake-1772767753.md": {
+    "executed": "2026-03-05T22:36:19.211236",
+    "success": true
+  },
+  "mongke/normal-1772768006.md": {
+    "executed": "2026-03-05T22:43:32.806881",
+    "success": false
+  },
+  "chagatai/normal-selfwake-1772768656.md": {
+    "executed": "2026-03-05T22:47:07.296348",
+    "success": true
+  },
+  "mongke/normal-1772768006.retry-1.md": {
+    "executed": "2026-03-05T22:54:38.045312",
+    "success": true
+  },
+  "ogedei/normal-1772768782.md": {
+    "executed": "2026-03-05T22:56:32.763701",
+    "success": false
+  },
+  "temujin/normal-1772768782.md": {
+    "executed": "2026-03-05T22:56:32.763593",
+    "success": false
+  },
+  "ogedei/normal-1772768782.retry-1.retry-2.retry-2.retry-2.md": {
+    "executed": "2026-03-05T23:07:06.575948",
+    "success": true
+  },
+  "jochi/high-1772769854.md": {
+    "executed": "2026-03-05T23:08:10.463105",
+    "success": true
+  },
+  "temujin/normal-1772768782.retry-1.retry-2.retry-2.retry-2.md": {
+    "executed": "2026-03-05T23:09:48.830468",
+    "success": true
+  },
+  "temujin/normal-1772770574.md": {
+    "executed": "2026-03-05T23:18:08.345699",
+    "success": true
+  },
+  "mongke/high-1772769416.retry-1.md": {
+    "executed": "2026-03-05T23:20:37.553426",
+    "success": true
+  },
+  "temujin/normal-1772770838.md": {
+    "executed": "2026-03-05T23:23:03.049356",
+    "success": true
+  },
+  "ogedei/high-1772771480.md": {
+    "executed": "2026-03-05T23:37:21.103269",
+    "success": true
+  },
+  "mongke/normal-1772771543.md": {
+    "executed": "2026-03-05T23:38:10.558221",
+    "success": true
+  },
+  "jochi/normal-1772771543.md": {
+    "executed": "2026-03-05T23:39:42.682011",
+    "success": true
+  },
+  "mongke/high-1772671397.md": {
+    "executed": "2026-03-05T23:45:14.486529",
+    "success": true
+  },
+  "jochi/normal-1772671399.md": {
+    "executed": "2026-03-05T23:45:21.067661",
+    "success": true
+  },
+  "chagatai/normal-selfwake-1772772301.md": {
+    "executed": "2026-03-05T23:46:14.695489",
+    "success": true
+  },
+  "temujin/normal-1772772063.md": {
+    "executed": "2026-03-05T23:49:51.394182",
+    "success": true
+  },
+  "ogedei/low-notion-Test_two-way_sync___verify_pull_works-1772772601.md": {
+    "executed": "2026-03-05T23:50:45.121780",
+    "success": true
+  },
+  "jochi/high-1772772247.md": {
+    "executed": "2026-03-05T23:53:08.585331",
+    "success": true
+  },
+  "ogedei/low-1772773377.md": {
+    "executed": "2026-03-06T00:04:33.297091",
+    "success": true
   }
 }

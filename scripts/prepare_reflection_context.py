@@ -220,7 +220,60 @@ def load_protocol(agent):
     return None
 
 
+TASK_LEDGER = Path.home() / ".openclaw/tasks/task-ledger.jsonl"
 AUDIT_CACHE = BASE / "main/logs/routing-audit-latest.json"
+
+
+def get_task_ledger_summary(agent, hours=1):
+    """Summarize task ledger events for an agent over the last N hours."""
+    if not TASK_LEDGER.exists():
+        return None
+
+    cutoff = datetime.now() - timedelta(hours=hours)
+    events = []
+
+    try:
+        with open(TASK_LEDGER, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                # Filter by agent and time
+                if entry.get("agent") != agent:
+                    continue
+                ts_str = entry.get("ts", "")
+                try:
+                    ts = datetime.fromisoformat(ts_str)
+                    if ts < cutoff:
+                        continue
+                except (ValueError, TypeError):
+                    continue
+                events.append(entry)
+    except Exception:
+        return None
+
+    if not events:
+        return "No task events in the last hour."
+
+    completed = [e for e in events if e.get("event") == "COMPLETED"]
+    failed = [e for e in events if e.get("event") == "FAILED"]
+    executing = [e for e in events if e.get("event") == "EXECUTING"]
+
+    lines = [f"- Executed: {len(executing)} | Completed: {len(completed)} | Failed: {len(failed)}"]
+
+    for e in completed[:3]:
+        duration = e.get("execution_time_s", "?")
+        lines.append(f"  OK: task={e.get('task_id', '?')[:8]} ({duration}s)")
+
+    for e in failed[:3]:
+        error = (e.get("error") or "unknown")[:80]
+        lines.append(f"  FAIL: task={e.get('task_id', '?')[:8]} — {error}")
+
+    return "\n".join(lines)
 
 
 def get_routing_audit(hours=1):
@@ -287,6 +340,17 @@ def generate_context(agent, hours=1):
             lines.append(audit_block)
             lines.append("")
 
+        # Task quality scorecard (kublai only)
+        try:
+            from score_tasks import score_all_tasks, generate_summary
+            score_all_tasks(hours=hours)  # Score any unscored tasks first
+            scorecard = generate_summary(hours=hours)
+            if scorecard and "No scored tasks" not in scorecard:
+                lines.append(scorecard)
+                lines.append("")
+        except Exception:
+            pass
+
     # Active rules — THE key self-improvement signal
     lines.append("## YOUR BEHAVIORAL RULES (self-generated — you MUST follow these)")
     if active_rules:
@@ -315,6 +379,13 @@ def generate_context(agent, hours=1):
         lines.append("## Your Failure Patterns (7-day)")
         for p in failure_patterns:
             lines.append(f"- `{p['error']}` x{p['count']}")
+        lines.append("")
+
+    # Task ledger — what actually happened since last reflection
+    ledger_summary = get_task_ledger_summary(agent, hours=hours)
+    if ledger_summary:
+        lines.append("## Task Execution Results (from ledger)")
+        lines.append(ledger_summary)
         lines.append("")
 
     # Error clusters from tock (cross-agent visibility)

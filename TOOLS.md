@@ -15,7 +15,7 @@
 ## Tool Usage
 
 ### Primary Tool: `message()` — Route tasks to specialist agents
-See AGENTS.md for full routing protocol. Specialist tasks go to agents, not ACP.
+Follow the `kurultai-router` skill (`~/.openclaw/skills/kurultai-router/SKILL.md`) for all routing decisions. Specialist tasks go to agents via message(), not ACP.
 
 ### Secondary Tool: `sessions_spawn()` — Your own coordination work
 For Kublai-only tasks (triage, synthesis, reflection, planning):
@@ -25,7 +25,8 @@ sessions_spawn({ task: "<description>", runtime: "acp", agentId: "claude", mode:
 Use `mode: "session"` with `thread: true` for multi-turn work.
 
 ### Status Tools (use directly):
-- `sessions_list` / `session_status` — quick session checks
+- `sessions_list` — list sessions
+- `sessions_history` — fetch session transcript
 - `agents_list` — list available agents
 - `cron` — manage scheduled jobs
 
@@ -106,14 +107,13 @@ sessions_spawn({ task: "Use /horde-plan to design a caching layer for the Parse 
 5. Monitor via `session_status` tool
 
 ### Context Management
-- Load full context at session start
+- Do NOT read workspace files to answer human questions — route instead
 - Use Neo4j for operational memory queries
-- Keep 700K+ tokens available for reasoning
 
 ### Autonomous Operation
+- Route human messages immediately via the AGENTS.md gate
 - Heartbeat checks every 30 minutes
 - Deep reflection every 6 hours
-- Auto-commit changes to git
 - Monitor agent statuses via Neo4j
 
 ---

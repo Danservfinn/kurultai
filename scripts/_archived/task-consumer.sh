@@ -5,7 +5,7 @@
 
 set -e
 
-AGENT_DIR="/Users/kublai/.openclaw/agents/main/agent"
+AGENT_DIR="/Users/kublai/.openclaw/agents"
 LOG_FILE="/Users/kublai/.openclaw/agents/main/logs/task-consumer.log"
 POLL_INTERVAL=30
 

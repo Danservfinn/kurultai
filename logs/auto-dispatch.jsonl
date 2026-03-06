@@ -76,3 +76,240 @@
 {"ts": "2026-03-05T12:10:00.918645", "action": "revert_stale", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "stuck_secs": 10636}
 {"ts": "2026-03-05T12:10:00.922859", "action": "dispatch", "agent": "chagatai", "task": "high-1772721004-architecture-doc.md", "title": "Write Kurultai Architecture Documentation", "pid": 34472}
 {"ts": "2026-03-05T12:10:00.924060", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 3, "skipped_busy": 2, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:14:03.924301", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 36010}
+{"ts": "2026-03-05T12:14:03.926287", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 36903}
+{"ts": "2026-03-05T12:14:03.926595", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 18185}
+{"ts": "2026-03-05T12:14:03.928079", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 36904}
+{"ts": "2026-03-05T12:14:03.929764", "action": "dispatch", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 36905}
+{"ts": "2026-03-05T12:14:03.930177", "action": "cycle_complete", "stats": {"reverted": 2, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:15:00.495666", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 36067}
+{"ts": "2026-03-05T12:15:00.498679", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 37304}
+{"ts": "2026-03-05T12:15:00.499247", "action": "revert_stale", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "stuck_secs": 18242}
+{"ts": "2026-03-05T12:15:00.502527", "action": "dispatch", "agent": "mongke", "task": "high-1772713501-competitor-pricing.md", "title": "TASK: Complete Parse Competitor Pricing Analysis", "pid": 37305}
+{"ts": "2026-03-05T12:15:00.503075", "action": "revert_stale", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "stuck_secs": 50742}
+{"ts": "2026-03-05T12:15:00.506835", "action": "dispatch", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 37306}
+{"ts": "2026-03-05T12:15:00.507737", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:19:04.011027", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 36311}
+{"ts": "2026-03-05T12:19:04.012837", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 38800}
+{"ts": "2026-03-05T12:19:04.014494", "action": "dispatch", "agent": "mongke", "task": "direct-1772583732.md", "title": "Research how to create a sandbox for testing LLM prompts for prompt injections", "pid": 38801}
+{"ts": "2026-03-05T12:19:04.014728", "action": "revert_stale", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "stuck_secs": 50986}
+{"ts": "2026-03-05T12:19:04.016449", "action": "dispatch", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 38802}
+{"ts": "2026-03-05T12:19:04.016761", "action": "revert_stale", "agent": "jochi", "task": "normal-1772723008.completed.done.md", "stuck_secs": 935}
+{"ts": "2026-03-05T12:19:04.017027", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:20:01.127879", "action": "revert_stale", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "stuck_secs": 36368}
+{"ts": "2026-03-05T12:20:01.132396", "action": "dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "title": "TASK: Build Vision A of Parse for Agents", "pid": 39047}
+{"ts": "2026-03-05T12:20:01.133059", "action": "revert_stale", "agent": "mongke", "task": "direct-1772583732.md", "stuck_secs": 147468}
+{"ts": "2026-03-05T12:20:01.136747", "action": "dispatch", "agent": "mongke", "task": "direct-1772583732.md", "title": "Research how to create a sandbox for testing LLM prompts for prompt injections", "pid": 39048}
+{"ts": "2026-03-05T12:20:01.137406", "action": "revert_stale", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "stuck_secs": 51043}
+{"ts": "2026-03-05T12:20:01.141184", "action": "dispatch", "agent": "chagatai", "task": "auto-20260304-2208-incident-cron-failures.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 39049}
+{"ts": "2026-03-05T12:20:01.141941", "action": "revert_stale", "agent": "jochi", "task": "normal-1772730258.md", "stuck_secs": 942}
+{"ts": "2026-03-05T12:20:01.142557", "action": "cycle_complete", "stats": {"reverted": 4, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:24:04.110118", "action": "completed_dispatch", "agent": "temujin", "task": "high-1772694499.parse-for-agents-vision-a.md", "pid": 39047}
+{"ts": "2026-03-05T12:24:04.112403", "action": "dispatch", "agent": "temujin", "task": "high-1772713500-parse-for-agents-mvp.md", "title": "TASK: Begin Parse for Agents MVP Implementation", "pid": 40040}
+{"ts": "2026-03-05T12:24:04.114186", "action": "dispatch", "agent": "mongke", "task": "auto-20260304-2208-parse-competitor-pricing.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 40041}
+{"ts": "2026-03-05T12:24:04.115664", "action": "dispatch", "agent": "chagatai", "task": "normal-1772713502-changelog.md", "title": "TASK: Draft 24-Hour Changelog", "pid": 40042}
+{"ts": "2026-03-05T12:24:04.116064", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:24:08.281281", "action": "completed_dispatch", "agent": "chagatai", "task": "normal-1772713502-changelog.md", "pid": 40042}
+{"ts": "2026-03-05T12:24:08.282305", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 1, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:25:00.705741", "action": "completed_dispatch", "agent": "temujin", "task": "high-1772713500-parse-for-agents-mvp.md", "pid": 40040}
+{"ts": "2026-03-05T12:25:00.711460", "action": "dispatch", "agent": "temujin", "task": "high-1772721000-circular-triage-fix.md", "title": "Fix Circular Triage Routing", "pid": 40260}
+{"ts": "2026-03-05T12:25:00.712350", "action": "completed_dispatch", "agent": "mongke", "task": "auto-20260304-2208-parse-competitor-pricing.md", "pid": 40041}
+{"ts": "2026-03-05T12:25:00.717800", "action": "dispatch", "agent": "mongke", "task": "normal-1772721003-competitor-research.md", "title": "Parse SaaS Competitive Landscape Research", "pid": 40261}
+{"ts": "2026-03-05T12:25:00.723124", "action": "dispatch", "agent": "jochi", "task": "high-1772713503-error-baseline.md", "title": "TASK: Error Noise Baseline Analysis", "pid": 40262}
+{"ts": "2026-03-05T12:25:00.723845", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 1, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:29:04.192153", "action": "completed_dispatch", "agent": "temujin", "task": "high-1772721000-circular-triage-fix.md", "pid": 40260}
+{"ts": "2026-03-05T12:29:04.194877", "action": "dispatch", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "title": "Implement Auto-Dispatch Cron", "pid": 41551}
+{"ts": "2026-03-05T12:29:04.195205", "action": "revert_stale", "agent": "mongke", "task": "normal-1772721003-competitor-research.md", "stuck_secs": 11779}
+{"ts": "2026-03-05T12:29:04.197233", "action": "dispatch", "agent": "mongke", "task": "normal-1772721003-competitor-research.md", "title": "Parse SaaS Competitive Landscape Research", "pid": 41552}
+{"ts": "2026-03-05T12:29:04.199134", "action": "dispatch", "agent": "chagatai", "task": "normal-1772713502-changelog.md", "title": "TASK: Draft 24-Hour Changelog", "pid": 41553}
+{"ts": "2026-03-05T12:29:04.199459", "action": "revert_stale", "agent": "jochi", "task": "high-1772713503-error-baseline.md", "stuck_secs": 19086}
+{"ts": "2026-03-05T12:29:04.199708", "action": "cycle_complete", "stats": {"reverted": 2, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:30:00.295960", "action": "completed_dispatch", "agent": "temujin", "task": "high-1772721001-auto-dispatch-cron.md", "pid": 41551}
+{"ts": "2026-03-05T12:30:00.301331", "action": "dispatch", "agent": "temujin", "task": "high-1772722500-parse-for-agents-build.md", "title": "TASK: Build Parse for Agents (Claude Code)", "pid": 41923}
+{"ts": "2026-03-05T12:30:00.302050", "action": "completed_dispatch", "agent": "mongke", "task": "normal-1772721003-competitor-research.md", "pid": 41552}
+{"ts": "2026-03-05T12:30:00.303194", "action": "completed_dispatch", "agent": "chagatai", "task": "normal-1772713502-changelog.md", "pid": 41553}
+{"ts": "2026-03-05T12:30:00.307417", "action": "dispatch", "agent": "jochi", "task": "high-1772713503-error-baseline.md", "title": "TASK: Error Noise Baseline Analysis", "pid": 41924}
+{"ts": "2026-03-05T12:30:00.314179", "action": "dispatch", "agent": "ogedei", "task": "normal-1772713504-stale-tasks-backup.md", "title": "TASK: Close Stale Tasks + Backup Audit", "pid": 41925}
+{"ts": "2026-03-05T12:30:00.314720", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 2, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:34:04.309601", "action": "completed_dispatch", "agent": "temujin", "task": "high-1772722500-parse-for-agents-build.md", "pid": 41923}
+{"ts": "2026-03-05T12:34:04.312958", "action": "dispatch", "agent": "temujin", "task": "direct-1772583715.md", "title": "Research how to create a sandbox for testing LLM prompts for prompt injections. ", "pid": 44143}
+{"ts": "2026-03-05T12:34:04.313837", "action": "revert_stale", "agent": "jochi", "task": "high-1772713503-error-baseline.md", "stuck_secs": 19386}
+{"ts": "2026-03-05T12:34:04.315642", "action": "dispatch", "agent": "jochi", "task": "high-1772713503-error-baseline.md", "title": "TASK: Error Noise Baseline Analysis", "pid": 44144}
+{"ts": "2026-03-05T12:34:04.315995", "action": "completed_dispatch", "agent": "ogedei", "task": "normal-1772713504-stale-tasks-backup.md", "pid": 41925}
+{"ts": "2026-03-05T12:34:04.317988", "action": "dispatch", "agent": "ogedei", "task": "low-1772721005-truncate-err.md", "title": "Truncate Stale heartbeat-watchdog.err File", "pid": 44145}
+{"ts": "2026-03-05T12:34:04.318113", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 3, "skipped_busy": 1, "skipped_empty": 1, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:35:01.056817", "action": "completed_dispatch", "agent": "temujin", "task": "direct-1772583715.md", "pid": 44143}
+{"ts": "2026-03-05T12:35:01.063467", "action": "dispatch", "agent": "temujin", "task": "high-1772732101.md", "title": "Bring Parse for Agents to production readiness", "pid": 44317}
+{"ts": "2026-03-05T12:35:01.064847", "action": "failed_dispatch", "agent": "jochi", "task": "high-1772713503-error-baseline.md", "pid": 44144}
+{"ts": "2026-03-05T12:35:01.068730", "action": "dispatch", "agent": "jochi", "task": "high-1772721002-queue-stall-analysis.md", "title": "Investigate System-Wide Queue Stall", "pid": 44318}
+{"ts": "2026-03-05T12:35:01.069649", "action": "completed_dispatch", "agent": "ogedei", "task": "low-1772721005-truncate-err.md", "pid": 44145}
+{"ts": "2026-03-05T12:35:01.070340", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 2, "skipped_busy": 1, "skipped_empty": 2, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:39:04.411654", "action": "completed_dispatch", "agent": "temujin", "task": "high-1772732101.md", "pid": 44317}
+{"ts": "2026-03-05T12:39:04.414342", "action": "dispatch", "agent": "temujin", "task": "direct-1772583456.md", "title": "Research how to create a sandbox for testing LLM prompts for prompt injections. ", "pid": 46931}
+{"ts": "2026-03-05T12:39:04.416310", "action": "dispatch", "agent": "mongke", "task": "direct-1772583732.md.md", "title": "Research how to create a sandbox for testing LLM prompts for prompt injections", "pid": 46932}
+{"ts": "2026-03-05T12:39:04.416724", "action": "revert_stale", "agent": "jochi", "task": "high-1772721002-queue-stall-analysis.md", "stuck_secs": 12380}
+{"ts": "2026-03-05T12:39:04.418211", "action": "dispatch", "agent": "jochi", "task": "high-1772721002-queue-stall-analysis.md", "title": "Investigate System-Wide Queue Stall", "pid": 46933}
+{"ts": "2026-03-05T12:39:04.418484", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 3, "skipped_busy": 0, "skipped_empty": 2, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:40:00.657250", "action": "completed_dispatch", "agent": "temujin", "task": "direct-1772583456.md", "pid": 46931}
+{"ts": "2026-03-05T12:40:00.659167", "action": "completed_dispatch", "agent": "mongke", "task": "direct-1772583732.md.md", "pid": 46932}
+{"ts": "2026-03-05T12:40:00.660870", "action": "failed_dispatch", "agent": "jochi", "task": "high-1772721002-queue-stall-analysis.md", "pid": 46933}
+{"ts": "2026-03-05T12:40:00.667440", "action": "dispatch", "agent": "jochi", "task": "auto-20260304-2302-router-audit.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 47165}
+{"ts": "2026-03-05T12:40:00.668379", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:44:04.511448", "action": "revert_stale", "agent": "jochi", "task": "auto-20260304-2302-router-audit.md", "stuck_secs": 48816}
+{"ts": "2026-03-05T12:44:04.514013", "action": "dispatch", "agent": "jochi", "task": "auto-20260304-2302-router-audit.md", "title": "Auto-Assigned Task (idle >4 hours)", "pid": 48169}
+{"ts": "2026-03-05T12:44:04.514320", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 1, "skipped_busy": 0, "skipped_empty": 4, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:45:00.278782", "action": "failed_dispatch", "agent": "jochi", "task": "auto-20260304-2302-router-audit.md", "pid": 48169}
+{"ts": "2026-03-05T12:45:00.280090", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 5, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:49:04.610343", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:50:00.846258", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:54:04.702432", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:55:00.367915", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T12:59:04.800810", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:00:00.940480", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:04:04.979636", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:05:00.512270", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:09:05.076865", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:10:00.126066", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:14:05.172280", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:15:00.686262", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:19:05.273104", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:20:00.124734", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:24:05.353893", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:25:00.695487", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:29:05.452768", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:30:00.419645", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:34:05.554770", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:35:00.467390", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:39:05.659475", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:40:00.215991", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:44:05.753332", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:45:01.148892", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:49:05.853321", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:50:01.074966", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:54:05.950218", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:55:00.295773", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T13:59:06.053368", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:00:00.313215", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:04:06.227234", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:05:00.411983", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:09:06.325943", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:10:00.268144", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:14:06.415905", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:15:00.877933", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:19:06.508375", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:20:00.492391", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:24:06.598735", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:25:00.355182", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:29:06.698648", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:30:01.130987", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:34:06.804128", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:35:00.796432", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:39:06.901745", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:40:00.620202", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:44:07.000696", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:45:00.563003", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:49:07.096622", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:50:01.095480", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:54:07.187609", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:55:00.716049", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T14:59:07.280463", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:00:00.222926", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:04:07.393994", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:05:01.128617", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:09:07.500089", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:10:00.910793", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:14:07.591802", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:15:00.904825", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:19:07.688981", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:20:00.875751", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:24:07.786239", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:25:00.673445", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:29:07.879199", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:30:00.616736", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:34:07.980313", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:35:00.637069", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:39:08.079699", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:40:00.532947", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:44:08.177795", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:45:00.598855", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:49:08.277846", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:50:00.523370", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:54:08.372267", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:55:00.474329", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T15:59:08.469260", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:00:01.044205", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:04:08.588194", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:05:01.070320", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:09:08.684036", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:10:01.059395", "action": "revert_stale", "agent": "mongke", "task": "news-feed.md", "stuck_secs": 94476}
+{"ts": "2026-03-05T16:10:01.060285", "action": "revert_stale", "agent": "jochi", "task": "competitor-intel.md", "stuck_secs": 94476}
+{"ts": "2026-03-05T16:10:01.060616", "action": "cycle_complete", "stats": {"reverted": 2, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:14:08.787521", "action": "revert_stale", "agent": "mongke", "task": "openclaw-discovery.md", "stuck_secs": 94046}
+{"ts": "2026-03-05T16:14:08.787847", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:15:01.045172", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:19:08.879868", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:20:00.650757", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:24:08.973829", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:25:00.270984", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:29:09.068267", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:30:00.295833", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:34:09.169349", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:35:00.948175", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:39:09.267721", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:40:00.556238", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:44:09.358687", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:45:01.157520", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:49:09.455013", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:50:00.953223", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:54:09.548443", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:55:00.722859", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T16:59:09.643682", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:00:00.288244", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:04:09.760174", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:05:00.238803", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:09:09.852995", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:10:01.098602", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:14:09.950347", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:15:00.687369", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:19:10.054046", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:20:00.268797", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:24:10.148877", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:25:00.885061", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:29:10.247837", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:30:00.450121", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:34:10.359297", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:35:01.154736", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:39:10.457801", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:40:00.754277", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:44:10.554335", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:45:00.347977", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:49:10.649307", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:50:00.955157", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:54:10.747828", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:55:00.561575", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T17:59:10.842296", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:00:01.074629", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:04:10.949207", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:05:00.778753", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:09:11.047782", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:10:00.489561", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:14:12.479634", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.1}
+{"ts": "2026-03-05T18:15:01.410851", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:19:12.634354", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:20:01.032413", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:24:12.729380", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:25:00.539160", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:29:12.823465", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:30:00.202104", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:34:12.921806", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:35:00.839881", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:39:13.021763", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:40:00.496496", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:44:13.116012", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:45:01.083423", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:49:13.182978", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:50:00.642027", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:54:13.273191", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:55:00.169670", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T18:59:13.371423", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-05T19:00:00.784787", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}

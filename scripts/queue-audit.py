@@ -69,8 +69,21 @@ def find_result_file(agent, task_mtime):
     return best
 
 
-def is_fake(result_path):
+def is_fake(result_path, done_path=None):
     """Return True if the result file shows no real Claude Code execution."""
+    # Check if the done file itself contains a resolution or is intentionally closed
+    if done_path:
+        try:
+            done_content = open(done_path).read()
+            basename = os.path.basename(done_path)
+            # Agent-written closures with resolution content
+            if "## Resolution" in done_content or "**Status:** RESOLVED" in done_content:
+                return False
+            # Intentionally marked obsolete (superseded by newer tasks)
+            if ".obsolete.done" in basename:
+                return False
+        except OSError:
+            pass
     if result_path is None:
         return True
     try:
@@ -93,9 +106,15 @@ def is_fake(result_path):
 def original_name(done_filename):
     """Strip .done suffixes to get original pending filename."""
     name = done_filename
+    # Standard suffixes from agent-task-handler
     for suf in [".completed.done.md", ".in_progress.done.md", ".failed.done.md"]:
         if name.endswith(suf):
             return name[:-len(suf)] + ".md"
+    # Non-standard suffixes created by LLM agents during cleanup/reflection
+    m = re.match(r'^(.+)\.(stale-cleared|orphan-failed|stale)\.done\.md$', name)
+    if m:
+        return m.group(1) + ".md"
+    # .obsolete.done and .resolved.done are intentional closures — not re-queueable
     return None
 
 
@@ -111,6 +130,8 @@ def requeue(agent, done_path, dry_run=False):
         return True
     try:
         os.rename(done_path, dest)
+        # Touch file so mtime > state execution time (watcher detects re-queue)
+        os.utime(dest, None)
     except OSError:
         return False
     # Clear from watcher state
@@ -156,7 +177,7 @@ def audit():
                 continue
 
             result = find_result_file(agent, os.path.getmtime(path))
-            if not is_fake(result):
+            if not is_fake(result, done_path=path):
                 continue
 
             totals["fake_found"] += 1
