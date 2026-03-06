@@ -1,16 +1,16 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.5
-**Last Updated**: 2026-03-05  
+**Version**: 1.8
+**Last Updated**: 2026-03-06
 **Status**: Active Production System  
 **Agent**: Kublai (Squad Lead / Router)  
-**Platform**: OpenClaw Gateway  
+**Platform**: OpenClaw Gateway (Multi-Gateway Setup)  
 
 ---
 
 ## Executive Summary
 
-Kublai is a **squad-leading AI agent** operating within the OpenClaw ecosystem, coordinating a team of 5 specialist agents (the Kurultai) to serve a human operator. Unlike monolithic AI systems, Kublai uses a **file-based memory architecture** combined with **Neo4j operational memory** to maintain continuity, learn from interactions, and coordinate complex multi-agent workflows.
+Kublai is a **squad-leading AI agent** operating within the OpenClaw ecosystem, coordinating a team of 6 specialist agents (the Kurultai) to serve a human operator. Unlike monolithic AI systems, Kublai uses a **file-based memory architecture** combined with **Neo4j operational memory** to maintain continuity, learn from interactions, and coordinate complex multi-agent workflows.
 
 ### Core Philosophy
 
@@ -80,9 +80,9 @@ Kublai operates on the belief that **AI should liberate humans from labor**, fun
 │  └───────────────────────────────┬─────────────────────────────────────────────┘  │
 │                                  │ via file-based coordination                   │
 │  ┌───────────┐  ┌───────────┐  ┌───────┐  ┌───────────┐  ┌───────┐             │
-│  │  Möngke   │  │  Chagatai │  │Temüjin│  │  Jochi    │  │Ögedei │             │
-│  │(Research) │  │  (Writer) │  │ (Dev) │  │ (Analyst) │  │ (Ops) │             │
-│  └───────────┘  └───────────┘  └───────┘  └───────────┘  └───────┘             │
+│  │  Möngke   │  │  Chagatai │  │Temüjin│  │  Jochi    │  │Ögedei │  │ Tolui │  │
+│  │(Research) │  │  (Writer) │  │ (Dev) │  │ (Analyst) │  │ (Ops) │  │(Truth)│  │
+│  └───────────┘  └───────────┘  └───────┘  └───────────┘  └───────┘  └───────┘  │
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
                                  │
@@ -155,21 +155,22 @@ Kublai operates on the belief that **AI should liberate humans from labor**, fun
         ┌──────────┬───────┼───────┬──────────┐
         │          │       │       │          │
    ┌────▼───┐ ┌────▼───┐ ┌─▼─────┐ ┌▼─────┐ ┌▼──────┐
-   │ Möngke │ │Chagatai│ │Temüjin│ │ Jochi│ │Ögedei │
-   │Research│ │ Writer │ │  Dev  │ │Analyst│ │  Ops  │
-   └────────┘ └────────┘ └───────┘ └──────┘ └───────┘
+   │ Möngke │ │Chagatai│ │Temüjin│ │ Jochi│ │Ögedei │ │ Tolui │
+   │Research│ │ Writer │ │  Dev  │ │Analyst│ │  Ops  │ │ Truth │
+   └────────┘ └────────┘ └───────┘ └──────┘ └───────┘ └───────┘
 ```
 
 ### Agent Responsibilities
 
-| Agent | Role | Primary Function | Consumes From | Feeds Into |
-|-------|------|------------------|---------------|------------|
-| **Kublai** | Squad Lead / Router | Task delegation, synthesis, oversight | All agents | Human, all agents |
-| **Möngke** | Research Specialist | Web research, API discovery, truth-seeking | - | Kublai, all agents |
-| **Chagatai** | Content Specialist | Writing, documentation, creative | Möngke (research) | Kublai |
-| **Temüjin** | Development Specialist | Code generation, infrastructure, builds | Jochi (analysis) | Kublai |
-| **Jochi** | Analysis Specialist | Pattern recognition, testing, security | All operational data | Kublai, Temüjin |
-| **Ögedei** | Operations Specialist | System monitoring, health checks, failover | All system metrics | Kublai (escalations) |
+| Agent | Role | Primary Function | Consumes From | Feeds Into | Gateway |
+|-------|------|------------------|---------------|------------|---------|
+| **Kublai** | Squad Lead / Router | Task delegation, synthesis, oversight | All agents | Human, all agents | 18789 (main) |
+| **Möngke** | Research Specialist | Web research, API discovery, truth-seeking | - | Kublai, all agents | 18789 |
+| **Chagatai** | Content Specialist | Writing, documentation, creative (Claude Code, opus 4.6 default) | Möngke (research) | Kublai, Blog | 18789 |
+| **Temüjin** | Development Specialist | Code generation, infrastructure, builds | Jochi (analysis) | Kublai | 18789 |
+| **Jochi** | Analysis Specialist | Pattern recognition, testing, security | All operational data | Kublai, Temüjin | 18789 |
+| **Ögedei** | Operations Specialist | System monitoring, health checks, failover | All system metrics | Kublai (escalations) | 18789 |
+| **Tolui** | Truth Teller | Blunt code review, BS detection, quality verification | All agent outputs | Kublai, all agents | 18792 (dedicated) |
 
 ### Agent Handoff Patterns
 
@@ -240,6 +241,100 @@ User Request → Kublai (classification)
 - Agent status updates
 - Operational metrics
 - Shared beliefs (non-sensitive)
+
+## State Management (Dual-State Model)
+
+The Kurultai uses a **dual-state architecture**: filesystem task files are the source of truth for execution, while Neo4j is the source of truth for queries and metrics. Keeping these in sync is a core operational concern.
+
+### Data Flow
+
+```
+Task Created (task_intake.py / create_task_full)
+       │
+       ├──► Filesystem: ~/.openclaw/agents/<agent>/tasks/<priority>-<epoch>.md
+       │    (frontmatter with task_id, agent, priority, source, depth)
+       │
+       └──► Neo4j: (:Task {task_id, status: 'PENDING', ...})
+              └──(:Agent)-[:EXECUTED]->(:Task)
+
+Task Executed (task-watcher.py)
+       │
+       ├──► Filesystem: renames file .md → .executing.md → .completed.done.md
+       │    (source of truth for execution lifecycle)
+       │
+       └──► Neo4j: NOT automatically updated (causes drift)
+              └── neo4j-state-sync.py reconciles periodically
+```
+
+### State Transitions
+
+Tasks follow a validated state machine (enforced by `neo4j_task_tracker.py:transition_task`):
+
+```
+PENDING ──► ASSIGNED ──► EXECUTING ──► COMPLETED
+   │            │            │
+   │            │            ├──► FAILED ──► PENDING (retry)
+   │            │            │
+   │            │            └──► TIMEOUT ──► PENDING (retry)
+   │            │
+   └──► CANCELLED ◄──────────┘
+```
+
+### Filesystem Naming Conventions
+
+Status is derived from filename suffixes (see `neo4j-state-sync.py:derive_status_from_filename`):
+
+| Suffix | Status |
+|--------|--------|
+| `.md` (plain) | PENDING |
+| `.executing.md` | EXECUTING |
+| `.completed.done.md` | COMPLETED |
+| `.failed.done.md` | FAILED |
+| `.stale.done.md`, `.obsolete.done.md`, `.resolved.done.md` | COMPLETED (terminal) |
+
+### Concurrent Access Control (`json_state.py`)
+
+Shared JSON state files (e.g., `task-watcher-state.json`, `brainstorm-cooldown.json`) are accessed by multiple scripts concurrently. `json_state.py` provides safe access via `fcntl` file locking:
+
+| Function | Lock Type | Use Case |
+|----------|-----------|----------|
+| `locked_json_read(path)` | `LOCK_SH` (shared) | Read-only access, multiple readers allowed |
+| `locked_json_update(path)` | `LOCK_EX` (exclusive) | Read-modify-write cycle, single writer |
+
+Key properties:
+- `locked_json_update` uses `O_RDWR | O_CREAT` to atomically create files (no TOCTOU race)
+- Data is `fsync`ed to disk before lock release (crash-safe)
+- Both functions handle `FileNotFoundError` and `JSONDecodeError` gracefully
+
+### Neo4j-Filesystem Drift & Reconciliation
+
+**Known issue**: `task-watcher.py` renames filesystem files during execution but does NOT update Neo4j. This causes Neo4j task nodes to remain at PENDING while files show COMPLETED.
+
+**Solution**: `neo4j-state-sync.py` — run periodically (via tock or manually):
+- Scans all agent task directories for files with `task_id` in frontmatter
+- Compares filesystem status (derived from filename) against Neo4j status
+- Reports drift; with `--apply` flag, updates Neo4j to match filesystem
+
+Also: `neo4j_task_tracker.py:sync_check()` provides a lighter daily consistency check.
+
+### Neo4j Node Types (State-Related)
+
+| Node | Key Properties | Lifecycle |
+|------|---------------|-----------|
+| `:Task` | task_id, agent, status, priority, created, completed | Created at intake, transitions through state machine |
+| `:Agent` | name | Merged on first task creation |
+| `:Hypothesis` | status (pending/validated/expired), action | Validated after 2h with matching tasks; expired after 24h |
+| `:Rule` | rule_id, agent, condition, action, status | proposed → active (on first invoke) → deprecated (7d unused) → pruned (30d) |
+
+### Scripts Reference (State Management)
+
+| Script | Purpose |
+|--------|---------|
+| `json_state.py` | Locked JSON file access (shared state) |
+| `neo4j_task_tracker.py` | Task CRUD, state transitions, metrics queries |
+| `neo4j-state-sync.py` | Filesystem → Neo4j reconciliation |
+| `task-watcher.py` | Watches for new tasks, executes via Claude Code |
+| `task_intake.py` | Creates tasks in both Neo4j and filesystem |
 
 ---
 
@@ -344,7 +439,7 @@ src/
 ### 3. Gateway Heartbeat System (with Integrated Reflection)
 
 **Purpose**: Agent check-in + deep reflection every 6 hours  
-**Status**: ✅ Active (all 6 agents)  
+**Status**: ✅ Active (all 7 agents)  
 **Mechanism**: OpenClaw Gateway (configured in openclaw.json) + Python daemon (moltbot/tools/kurultai/)  
 **Schedule**: 
 - 5-minute cycles via Python daemon
@@ -378,12 +473,12 @@ src/
 ### 4. Task Execution Chain (task-watcher -> agent-task-handler -> claude-agent)
 
 **Purpose**: Execute tasks within 15 seconds of creation via Claude Code, with concurrent per-agent parallelism and instant subagent spawning
-**Status**: Active (implemented 2026-03-04, fixed 2026-03-05, concurrent + spawn integration 2026-03-05)
+**Status**: Active (implemented 2026-03-04, fixed 2026-03-05, concurrent + spawn integration 2026-03-05, queue improvements 2026-03-06)
 **Schedule**: Continuous (polls every 15 seconds)
 
 **Concurrency Model**:
 - `ThreadPoolExecutor(max_workers=6)` -- one execution slot per agent
-- All 6 agents can run Claude Code tasks **simultaneously**
+- All 7 agents can run Claude Code tasks **simultaneously**
 - Each agent processes one task at a time (queued tasks wait for current to finish)
 - Spawn queue processed every cycle -- subagent requests routed within 15s (was 2 min via cron)
 
@@ -392,6 +487,9 @@ src/
 1. **task-watcher.py** (`scripts/task-watcher.py`) -- Detection + Spawn layer:
    - Runs as launchd daemon (`com.kurultai.task-watcher`)
    - Polls `~/.openclaw/agents/<agent>/tasks/` every 15 seconds
+   - **Priority-based timeouts**: high=900s (15m), normal=600s (10m), low=600s (10m)
+   - **Unified state paths**: `.task-ledger.jsonl`, `.watcher-state.json`, `.spawn-queue.json`
+   - **Rename bug fixes**: retry counter (`.retry-N` suffix), max 2 retries then `.failed.done`, stale recovery on startup
    - **Spawn queue**: Reads `logs/spawn-pending.json` every cycle:
      - `agent_execution` spawns: Launches Claude Code directly via Popen (non-blocking)
      - `agent_delegation` spawns: Creates task file in agent queue (picked up next cycle)
@@ -459,6 +557,7 @@ Agent A executing task
 | Temujin | bailian/MiniMax-M2.5 | Claude Opus |
 | Jochi | bailian/qwen3.5-plus | Claude Opus |
 | Ogedei | bailian/qwen3.5-plus | Claude Opus |
+| Tolui | ollama/Qwen3.5-9B-abliterated | Local Ollama |
 
 ---
 
@@ -483,13 +582,16 @@ Agent A executing task
 ### 5b. Stale Task Cleanup (auto_dispatch cron)
 
 **Purpose**: Clean up stale `.executing` files and clear dead dispatch state
-**Status**: Active (cleanup-only since 2026-03-05)
+**Status**: Active (restored from archive 2026-03-06, cleanup-only since 2026-03-05)
 **Schedule**: Every 5 minutes (heartbeat-watchdog cron)
 
 **Components**:
 - **auto_dispatch.py** (`scripts/auto_dispatch.py`):
-  - Reverts `.executing` tasks stuck > 15 minutes back to pending
+  - Restored from `scripts/_archived/` after fleet-wide idle issue (2026-03-06)
+  - Reverts `.executing` tasks stuck > 20 minutes (STALE_EXECUTING_SECS=1200) back to pending
+  - Must exceed task-watcher max timeout (900s) + buffer (120s)
   - Clears dispatch state for dead PIDs
+  - Recovers orphaned tasks from crashes/SIGTERM
   - **No longer dispatches tasks** -- all dispatch handled by task-watcher
 
 **Archived Scripts** (in `scripts/_archived/`):
@@ -530,7 +632,10 @@ Agent A executing task
 - ✅ Protocol compliance checklist
 - ✅ Action required assessment
 
-**Script**: `scripts/hourly_reflection.sh`
+**Scripts**:
+- `scripts/hourly_reflection.sh` -- Legacy reflection driver
+- `scripts/meta_reflection.py` -- Current protocol-mode reflection (~800 tokens/agent, role-specific protocols, WHEN/THEN behavioral rules, commitment tracking)
+- `scripts/prepare_reflection_context.py` -- Context generator for reflections
 
 ### 7. Reflection Actioning Protocol
 
@@ -575,9 +680,119 @@ Agent Reflection → Kublai Heartbeat Detects New File
 - Routing by agent specialty ensures tasks land with the right expertise
 - Integrates with existing task execution chain (Section 4) for immediate pickup
 
+### 8. Local Kanban Board
+
+**Purpose**: Task management via local web-based kanban board
+**Status**: Active (implemented 2026-03-06)
+**URL**: `https://kanban.kurult.ai` (localhost:18790)
+**Code**: `~/.openclaw/kanban/` (server.js + index.html)
+
+**Components**:
+
+1. **Local Kanban Board** (`kanban/server.js`):
+   - Reads task files directly from `~/.openclaw/agents/{agent}/tasks/`
+   - Status from filename: `.executing.md`=active, `.completed.done`=done, `.failed.done`=failed, plain `.md`=pending
+   - All 6 Kurultai agents tracked
+   - No external dependencies — fully local, file-based
+
+2. **Task Dispatch**:
+   - Tasks created via `task_intake.py` (filesystem + Neo4j)
+   - Task execution managed by `task-watcher.py`
+   - No external sync required
+
+### 9. MyClaw Backup System
+
+**Purpose**: Daily backup of all OpenClaw configuration, agent memory, skills, and workspace data
+**Status**: Active (implemented 2026-03-06)
+**Skill Location**: `~/.openclaw/agents/main/skills/myclaw-backup/SKILL.md`
+**Schedule**: Daily cron at 3:00 AM UTC
+**Archive Size**: ~3.0 GB per backup
+
+**Components**:
+- `scripts/backup.sh [output-dir]` -- Create backup (default: `/tmp/openclaw-backups/`)
+- `scripts/restore.sh <archive> [--dry-run]` -- Restore (always dry-run first)
+- `scripts/serve.sh start --token TOKEN` -- HTTP server for browser-based management
+- `scripts/schedule.sh --interval daily` -- System cron scheduling
+
+**Security**: Archives set to `chmod 600`. HTTP server requires mandatory token authentication. Handles bot tokens, API keys, channel credentials.
+
+**Part of**: MyClaw.ai ecosystem (https://myclaw.ai)
+
+### 10. Blog Pipeline (parsethis.ai)
+
+**Purpose**: Agent security blog for SEO/GEO optimization driving traffic to Parse platform
+**Status**: Active (2 posts/day since 2026-03-06)
+**URL**: parsethis.ai
+**Content Path**: `/Users/kublai/projects/parse-for-agents/content/blog/agent-security/`
+
+**Workflow**: Mongke (research) -> Chagatai (writing) -> Published
+
+**Schedule**:
+- 7:00 AM EST: Research-driven posts (from Mongke briefs)
+- 6:00 PM EST: Evergreen/how-to posts (from topic queue)
+- Output: 2 posts/day = 14/week = ~60/month
+
+**Pipeline**:
+1. Mongke drops research brief to `shared-context/blog-briefs/pending/`
+2. Chagatai picks up brief, writes using BLOG-TEMPLATE.md
+3. Saves to `/Users/kublai/projects/parse-for-agents/content/blog/agent-security/`
+4. Moves brief to `completed/` directory
+5. Logs to Chagatai's workspace `blog-workflow/BLOG-TRACKER.md`
+
+**Quality Gates**:
+- 1,200-2,000 words per post
+- SEO: Primary keyword in title, H1, first paragraph
+- Parse mention: at least 1 integration example per post
+- At least 1 code block with real usage example
+- No banned words (try, consider, maybe, potentially, might)
+
+**Topics**: 35+ queued, organized in 5 keyword clusters
+
 ---
 
-### 4. Self-Healing Infrastructure
+### 12. Multi-Gateway Architecture
+
+**Purpose**: Independent gateway processes for fault isolation and dedicated agent resources
+**Status**: Active (Tolui gateway on port 18791)
+**Gateways**:
+
+| Gateway | Port | Purpose | LaunchAgent |
+|---------|------|---------|-------------|
+| **Kublai (Main)** | 18789 | Primary gateway, serves most agents | `ai.openclaw.gateway` |
+| **Tolui** | 18792 | Dedicated truth-teller gateway | `ai.openclaw.gateway.tolui` |
+
+**Architecture**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    GATEWAY LAYER                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────┐          ┌─────────────────────┐      │
+│  │  Kublai Gateway     │          │   Tolui Gateway     │      │
+│  │  Port: 18789        │          │   Port: 18791       │      │
+│  │                     │          │                     │      │
+│  │  - Kublai sessions  │          │  - Tolui sessions   │      │
+│  │  - Most agents      │          │  - Truth operations │      │
+│  │  - Main routing     │          │  - Independent ops  │      │
+│  └─────────────────────┘          └─────────────────────┘      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Benefits**:
+- **Fault Isolation**: If Kublai gateway fails, Tolui can continue operating
+- **Resource Dedication**: Tolui's truth-telling operations have dedicated resources
+- **Scalability**: Additional agents can get dedicated gateways as needed
+- **Independence**: Each gateway can be configured, restarted, monitored separately
+
+**Configuration**:
+- Both gateways share same `~/.openclaw/openclaw.json` config
+- Gateway token is shared (`8e5fbb0cce0dade6dcb19c9e6fb16d09f219ea4c51bf0b9eda59b474bc854e7d`)
+- Agents connect to gateway via WebSocket; can be configured per-agent
+
+---
+
+### 11. Self-Healing Infrastructure
 
 **Ögedei's Eternal Watch**:
 - Monitors: LLM Survivor, Parse, Jochi, Chagatai
@@ -638,6 +853,77 @@ Agent Reflection → Kublai Heartbeat Detects New File
 ---
 
 ## Change Log
+
+### 2026-03-06 - Tolui Independent Gateway (v1.8)
+
+**Change**: Tolui now operates as the 7th independent agent with dedicated gateway process.
+
+**Scope**:
+
+1. **Tolui Gateway Service** (Section 12):
+   - LaunchAgent: `ai.openclaw.gateway.tolui`
+   - Port: 18792 (Kublai gateway remains on 18789)
+   - Logs: `~/.openclaw/logs/gateway-tolui.log`
+   - Config: `~/Library/LaunchAgents/ai.openclaw.gateway.tolui.plist`
+   - Environment: `OPENCLAW_AGENT_ID=tolui`
+
+2. **Multi-Gateway Architecture**:
+   - Kublai gateway (18789): Serves main session + most agents
+   - Tolui gateway (18791): Dedicated to Tolui operations
+   - Agents can connect to any gateway; gateways are message routers
+   - Independent gateways provide fault isolation and dedicated resources
+
+**Files Created**: `~/Library/LaunchAgents/ai.openclaw.gateway.tolui.plist`
+
+**Impact**: Tolui can operate independently if Kublai gateway goes down; dedicated resources for truth-telling operations.
+
+---
+
+### 2026-03-06 - Local Kanban, Backup, Blog Pipeline, Queue Fixes (v1.7)
+
+**Change**: Major operational expansion -- local kanban board, daily backup system, blog content pipeline, and task queue reliability improvements.
+
+**Scope**:
+
+1. **Local Kanban Board** (Section 8):
+   - Web kanban at `https://kanban.kurult.ai` (localhost:18790)
+   - File-based task tracking, no external dependencies
+   - Notion integration removed 2026-03-06 in favor of local-only approach
+
+2. **MyClaw Backup System** (Section 9):
+   - Daily cron at 3:00 AM UTC, ~3.0 GB archives
+   - Backup/restore/serve scripts with token-based security
+   - Part of MyClaw.ai ecosystem
+
+3. **Blog Pipeline on parsethis.ai** (Section 10):
+   - Agent security blog for SEO/GEO driving Parse traffic
+   - 2 posts/day pipeline: Mongke (research) -> Chagatai (writing)
+   - 35+ topics queued in 5 keyword clusters
+   - Quality gates: 1,200-2,000 words, SEO requirements, code examples
+
+4. **Chagatai Writing Workflow**:
+   - Now uses Claude Code with opus 4.6 as default model for all writing tasks
+   - Full tool access: Read, Write, Edit, Bash, Glob, Grep, WebSearch, subagents
+
+5. **auto_dispatch.py Restoration**:
+   - Restored from `scripts/_archived/` after fleet-wide idle issue
+   - Fixed stale threshold: 1200s (exceeds task-watcher max 900s + 120s buffer)
+   - Recovers orphaned tasks from crashes/SIGTERM
+
+6. **Reflection System Update**:
+   - `meta_reflection.py` now drives reflections in protocol mode (~800 tokens/agent)
+   - Role-specific protocols, WHEN/THEN behavioral rules, commitment tracking
+   - Kublai checks agent reflections during heartbeats and routes actionable suggestions to specialists
+
+7. **Task Queue Improvements**:
+   - Priority-based timeouts: high=900s, normal=600s, low=600s
+   - Unified state paths: `.task-ledger.jsonl`, `.watcher-state.json`, `.spawn-queue.json`
+   - Rename bug fixes: `.retry-N` suffix, max 2 retries -> `.failed.done`
+   - Stale recovery on daemon startup
+
+**Files Updated**: `ARCHITECTURE.md` (v1.6 -> v1.7), `HEARTBEAT.md` (Kanban protocols added)
+
+---
 
 ### 2026-03-05 - Reflection Actioning Protocol (v1.5)
 
@@ -838,7 +1124,7 @@ Agent Reflection → Kublai Heartbeat Detects New File
 - **Files Created**: `scripts/kurultai-sync.sh`, `shared-context/KURULTAI-SYNC-PROTOCOL.md`
 - **Live Syncs**: Multiple syncs completed (11:30, 11:32, 11:52 EST)
 - **Features**:
-  - All 6 agents report status
+  - All 7 agents report status
   - Kublai distills learnings
   - Logs to Neo4j (KurultaiSync nodes)
   - Process improvement tracking
@@ -930,7 +1216,7 @@ Agent Reflection → Kublai Heartbeat Detects New File
 - **Upgrade Path**: 0 users (subagents) → 10 users (persistent) → 100 users (6-agent config)
 
 ### 2026-03-01 - All Agents Momentum Question Protocol
-- **Change**: Extended "What do I want to do next?" to all 6 agents
+- **Change**: Extended "What do I want to do next?" to all 7 agents
 - **Reason**: Parallel autonomy — all agents self-drive, not just Kublai
 - **Scope**: AGENTS.md, scripts/hourly_reflection.sh, shared-context/AGENT-PROTOCOLS.md
 - **Files Modified**: `AGENTS.md`, `scripts/hourly_reflection.sh`, `shared-context/AGENT-PROTOCOLS.md` (created)
@@ -998,7 +1284,7 @@ Agent Reflection → Kublai Heartbeat Detects New File
   - Cross-agent memory cross-referencing
   - Long-term trend detection (7+ day windows)
   - Context-aware success criteria definition
-- **Expected Impact**: Kublai maintains complete operational coherence across all 6 agents
+- **Expected Impact**: Kublai maintains complete operational coherence across all 7 agents
 
 ### 2026-03-01 - Self-Awareness Integrated into Hourly Reflections
 - **Change**: Merged self-awareness protocol into hourly reflection system
@@ -1030,7 +1316,7 @@ Agent Reflection → Kublai Heartbeat Detects New File
 ### 2026-03-01 - Hourly Reflection System Active
 - **Change**: Deployed agent reflection system via OpenClaw cron
 - **Job ID**: bfa4cc51-0b06-4ac8-8d2b-e9849ace8f22
-- **Schedule**: Every hour, rotating through 6 agents
+- **Schedule**: Every hour, rotating through 7 agents
 - **Implementation**: `scripts/hourly_reflection.sh`
 
 ### 2026-02-28 - Parse Deployment
@@ -1114,25 +1400,29 @@ bash pty:true background:true workdir:~/project command:"claude -p 'Build featur
 
 | System | Check | Status |
 |--------|-------|--------|
-| LLM Survivor | API health | ✅ Day 1, Tribal, 16 agents |
+| LLM Survivor | API health | ✅ Day 1, Tribal, 17 agents |
 | Parse | HTTP 200 | ✅ OAuth working |
-| Hourly Reflections | Cron job | ✅ Active |
+| Hourly Reflections | Cron job | ✅ Active (meta_reflection.py) |
 | Neo4j | Connection | ✅ Operational |
 | Signal | Gateway | ✅ Connected |
 | Heartbeat Daemon | 5-min cycles | ✅ Running |
 | Context Review | 12-min LLM analysis | ✅ Active |
+| Local Kanban | File-based | ✅ kanban.kurult.ai active |
+| MyClaw Backup | Daily 3AM UTC | ✅ ~3.0 GB archives |
+| Blog Pipeline | 2 posts/day | ✅ parsethis.ai active |
 
 ---
 
 ## Future Considerations
 
-- [ ] Expand hourly reflections to include performance metrics
+- [x] ~~Expand hourly reflections to include performance metrics~~ (Done: meta_reflection.py with Neo4j metrics)
 - [ ] Implement automated memory pruning based on age
 - [ ] Create visual dashboard for system status
-- [ ] Add more sophisticated cross-agent communication
-- [ ] Explore local LLM fallback for sensitive operations
+- [x] ~~Add more sophisticated cross-agent communication~~ (Done: local kanban, reflection actioning)
+- [x] ~~Explore local LLM fallback for sensitive operations~~ (Done: ollama/qwen3.5:9b for heartbeat checks)
 - [ ] Implement agent-to-agent direct messaging
 - [ ] Create automated testing for self-modifications
+- [ ] Blog pipeline: automated publishing to parsethis.ai (currently manual deploy)
 
 ---
 
@@ -1146,7 +1436,7 @@ bash pty:true background:true workdir:~/project command:"claude -p 'Build featur
 ### 2026-03-01 - Kurultai Sync (Real-Time Collaboration)
 - **Change**: Implemented hourly real-time agent "meetings"
 - **Reason**: Enable spontaneous collaboration, cross-agent visibility, dependency detection
-- **Scope**: All 6 agents, every hour (top of hour)
+- **Scope**: All 7 agents, every hour (top of hour)
 - **Files Modified**: `shared-context/KURULTAI-SYNC-PROTOCOL.md` (created), `AGENT-PROTOCOLS.md` (updated)
 - **Structure**: Status updates (3 min) → Dependencies (3 min) → Consensus (3 min) → Notes (1 min)
 - **First Sync**: 2026-03-01 10:00 EST
@@ -1211,7 +1501,7 @@ Week 2-3:
 
 - **Change**: All Kurultai agents now use Claude Code (not Gemini CLI) for coding tasks and hourly reflections
 - **Reason**: Superior coding capabilities, 76 specialized skills, 13 plugins, better tool integration
-- **Scope**: System-wide migration affecting all 6 agents + reflection system
+- **Scope**: System-wide migration affecting all 7 agents + reflection system
 
 **Components Updated:**
 
