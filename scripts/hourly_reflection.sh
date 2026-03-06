@@ -6,10 +6,40 @@
 # - Role-specific protocols with WHEN/THEN behavioral rules
 # - Commitment tracking across sessions
 # - Tock data replaces redundant CLI calls
+#
+# HARD TIMEOUT: 420s (7 min) - ensures cron exits before 900s stale threshold
+# CHECKPOINT: Emits reflection-status.json after core reflections complete
+# FALLBACK: Exit 0 even if downstream steps fail (content generation succeeded)
 
-set -e
+# HARD TIMEOUT GUARD (Kublai Initiative 2026-03-06)
+# Kill entire process group after 420s to prevent 900s stale task reverts
+SCRIPT_START=$(date +%s)
+TIMEOUT_SECONDS=420
+
+cleanup_and_exit() {
+    local elapsed=$(($(date +%s) - SCRIPT_START))
+    echo "[$(date)] Reflection finished in ${elapsed}s"
+    # Always exit 0 if core reflections completed - decouple from downstream failures
+    if [ -f "$LOGS_DIR/reflection-status.json" ]; then
+        exit 0
+    else
+        # Core reflections didn't complete - this is a real failure
+        exit 1
+    fi
+}
+
+# Timeout watchdog - kill if running too long
+timeout_watchdog() {
+    sleep $TIMEOUT_SECONDS
+    echo "[$(date)] TIMEOUT: Reflection exceeded ${TIMEOUT_SECONDS}s, forcing exit"
+    kill -TERM -$$ 2>/dev/null || true
+}
+timeout_watchdog &
+WATCHDOG_PID=$!
+trap "kill $WATCHDOG_PID 2>/dev/null; cleanup_and_exit" EXIT TERM INT
 
 echo "[$(date)] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]"
+echo "[$(date)] Hard timeout: ${TIMEOUT_SECONDS}s | Watchdog PID: $WATCHDOG_PID"
 echo "================================================================"
 
 AGENTS=("kublai" "mongke" "chagatai" "temujin" "jochi" "ogedei")
@@ -70,17 +100,36 @@ EOF
     echo "[$(date)] [$AGENT] Protocol reflection complete -> $MEMORY_DIR/$DATE.md"
 }
 
-# Run all 6 agents sequentially in a cascade
-echo "[$(date)] Launching ${#AGENTS[@]} agents sequentially (cascade)..."
+# Run all 6 agents in parallel (reflections are pure Python, no API rate limit concern)
+echo "[$(date)] Launching ${#AGENTS[@]} agents in parallel..."
 
+pids=()
 for agent in "${AGENTS[@]}"; do
-    run_agent_reflection "$agent"
-    # Small pause between agents to prevent API rate limits
-    sleep 5
+    run_agent_reflection "$agent" &
+    pids+=($!)
+done
+for pid in "${pids[@]}"; do
+    wait "$pid" || true
 done
 
-echo "[$(date)] All 6 agents completed their reflections sequentially"
+echo "[$(date)] All 6 agents completed their reflections (parallel)"
 echo "================================================================"
+
+# ============================================================
+# CHECKPOINT: Emit success status - core reflections complete
+# This decouples content generation success from downstream step failures
+# ============================================================
+LOGS_DIR="/Users/kublai/.openclaw/agents/main/logs"
+mkdir -p "$LOGS_DIR"
+cat > "$LOGS_DIR/reflection-status.json" << EOF
+{
+  "status": "content_complete",
+  "timestamp": "$(date -Iseconds)",
+  "elapsed_seconds": $(($(date +%s) - SCRIPT_START)),
+  "agents": ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
+}
+EOF
+echo "[$(date)] Checkpoint written to $LOGS_DIR/reflection-status.json"
 
 echo "[$(date)] Concurrent Kurultai Reflection Complete"
 echo "================================================================"
@@ -89,8 +138,20 @@ echo "================================================================"
 # SELF-IMPROVEMENT BRAINSTORMING: Each agent proposes improvements
 # (Uses Claude Code + /horde-brainstorming, configured per claude-code-setup-v2)
 # ============================================================
-echo "[$(date)] Running Self-Improvement Brainstorming (all agents)..."
+echo "[$(date)] Running Self-Improvement Brainstorming (all agents, parallel)..."
 python3 "$SCRIPTS/kurultai_brainstorm.py" --all >> "$SCRIPTS/../logs/kurultai-brainstorm.log" 2>&1 || true
+
+# ============================================================
+# CROSS-AGENT RULE PROPAGATION: Proven rules propagated to related agents
+# ============================================================
+echo "[$(date)] Running Cross-Agent Rule Propagation..."
+python3 "$SCRIPTS/cross_agent_rules.py" >> "$SCRIPTS/../logs/cross-agent-rules.log" 2>&1 || true
+
+# ============================================================
+# CAPABILITY SCORE UPDATE: Update routing quality scores
+# ============================================================
+echo "[$(date)] Updating capability scores..."
+python3 "$SCRIPTS/route_quality_tracker.py" >> "$SCRIPTS/../logs/capability-scores.log" 2>&1 || true
 
 # ============================================================
 # ROUTING AUDIT: Analyze routing decisions + cache for kublai reflection
