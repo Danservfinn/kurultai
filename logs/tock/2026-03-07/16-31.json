@@ -1,0 +1,388 @@
+{
+  "timestamp": "2026-03-07T16:31:44-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": true
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 10,
+        "model": "glm-5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 3,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 1,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 81,
+        "model": "glm-5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 2,
+        "pending": 0,
+        "running": 0,
+        "total": 2,
+        "queue_depth": 1
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 7,
+        "model": "kimi-k2.5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 1,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 73,
+        "model": "qwen3-coder-next"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 19,
+    "healthy": 16,
+    "erroring": 0,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 201161,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 191063,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 8018,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 198635,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 28312,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 64933,
+        "enabled": true
+      },
+      {
+        "name": "qmd-index-refresh",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 38583,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-competitor-monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 13295,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-openclaw-discovery",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 20835,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-news-gatherer",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 27658,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 25281,
+        "enabled": true
+      },
+      {
+        "name": "calendar-reminder-worker",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 12040,
+        "enabled": true
+      },
+      {
+        "name": "signal-calendar-listener",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai 3-hour review",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 56969,
+        "enabled": true
+      },
+      {
+        "name": "Failed Task Review - Hourly",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120218,
+        "enabled": true
+      },
+      {
+        "name": "stale-lock-cleanup",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 90233,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 1,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 1,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [
+      {
+        "from_agent": "anomaly-scanner",
+        "to_agent": "jochi",
+        "task_label": "jochi-c4911dd2-a08"
+      },
+      {
+        "from_agent": "gateway-router",
+        "to_agent": "jochi",
+        "task_label": "jochi-cee20e73-88c"
+      },
+      {
+        "from_agent": "gateway-router",
+        "to_agent": "ogedei",
+        "task_label": "ogedei-ffebf9a9-a78"
+      },
+      {
+        "from_agent": "kublai-initiative",
+        "to_agent": "temujin",
+        "task_label": "temujin-2a92f081-b99"
+      }
+    ],
+    "count_30m": 4
+  },
+  "errors": {
+    "clusters": [
+      {
+        "error": "INFO: Building file manifest for /Users/kublai/.openclaw/agents/ogedei \u2026\nINFO: Creating archive at /Users/kublai/.openclaw/backups/tasks/ffebf9a9-a78/workspace.tar.gz \u2026\nINFO: Snapshot created: 290 files, 423.9 KB\n",
+        "count": 1,
+        "agents": [
+          "ogedei"
+        ]
+      },
+      {
+        "error": "INFO: Building file manifest for /Users/kublai/.openclaw/agents/jochi \u2026\nINFO: Creating archive at /Users/kublai/.openclaw/backups/tasks/c4911dd2-a08/workspace.tar.gz \u2026\nINFO: Snapshot created: 292 files, 714.5 KB\n",
+        "count": 1,
+        "agents": [
+          "jochi"
+        ]
+      },
+      {
+        "error": "INFO: Building file manifest for /Users/kublai/.openclaw/agents/temujin \u2026\nINFO: Creating archive at /Users/kublai/.openclaw/backups/tasks/2a92f081-b99/workspace.tar.gz \u2026\nINFO: Snapshot created: 382 files, 3880.8 KB\n",
+        "count": 1,
+        "agents": [
+          "temujin"
+        ]
+      },
+      {
+        "error": "INFO: Building file manifest for /Users/kublai/.openclaw/agents/jochi \u2026\nINFO: Creating archive at /Users/kublai/.openclaw/backups/tasks/cee20e73-88c/workspace.tar.gz \u2026\nINFO: Snapshot created: 293 files, 715.2 KB\n",
+        "count": 1,
+        "agents": [
+          "jochi"
+        ]
+      }
+    ]
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 376,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 9,
+    "double_suffix_fixed": 0
+  },
+  "ledger_reconciliation": {
+    "neo4j_total_completed": 0,
+    "ledger_total_completed": 0,
+    "delta": 0,
+    "mismatches": [
+      {
+        "agent": "kublai",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 0,
+        "ledger_failed": 2
+      },
+      {
+        "agent": "temujin",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 1,
+        "ledger_failed": 11
+      },
+      {
+        "agent": "jochi",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 2,
+        "ledger_failed": 8
+      },
+      {
+        "agent": "ogedei",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 1,
+        "ledger_failed": 4
+      }
+    ],
+    "reconciled": false
+  },
+  "llm_assessment": {
+    "model": "ollama/hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+    "workload_balance": "Balanced across agents with no immediate capacity issues",
+    "bottleneck": "Kublai's file manifest generation loop",
+    "coordination_gap": "Ledger tracking failures across 4 agents (kublai, temujin, jochi, ogedei)",
+    "recommended_action": "Terminate stuck cron processes and investigate ledger sync failures",
+    "severity": "LOW"
+  }
+}

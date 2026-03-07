@@ -4,7 +4,10 @@
 
 set -e
 
-AGENT_DIR="/Users/kublai/.openclaw/agents"
+# Source shared path constants
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/kurultai_paths.sh"
+AGENT_DIR="$AGENTS_DIR"
 
 usage() {
     echo "Usage: task-queue-write.sh -a <agent> -t <task> [-d <description>]"

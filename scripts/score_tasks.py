@@ -5,10 +5,11 @@ Task Quality Scorecard
 Reads task-ledger.jsonl and computes quality scores for each completed task.
 Scores are appended back to the ledger as SCORED events.
 
-Scoring dimensions (0-8 total):
+Scoring dimensions (0-10 total):
   - delegation_score (0-2): Was the task delegated or self-routed?
   - domain_match_score (0-3): Did the destination agent match the task domain?
   - substantive_score (0-3): Did execution produce real output?
+  - pending_time_score (0-2): How fast did the task move from QUEUED to EXECUTING?
 
 Usage:
     python3 score_tasks.py                    # Score all unscored tasks
@@ -22,48 +23,29 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-TASK_LEDGER = "/Users/kublai/.openclaw/tasks/task-ledger.jsonl"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kurultai_ledger import append_ledger as _kp_append_ledger, read_ledger
 
 # Domain keywords for domain_match validation
-AGENT_DOMAINS = {
-    "temujin": ["code", "build", "implement", "fix", "api", "feature", "deploy",
-                "design", "architect", "plan", "brainstorm", "payment", "protocol",
-                "sdk", "script", "database", "infrastructure"],
-    "mongke": ["research", "investigate", "discover", "explore", "competitor",
-               "market", "trend", "find", "study"],
-    "chagatai": ["write", "document", "blog", "content", "article", "copy",
-                 "marketing", "readme", "changelog"],
-    "jochi": ["test", "verify", "audit", "security", "review", "analyze",
-              "vulnerability", "scan", "pattern"],
-    "ogedei": ["monitor", "health", "restart", "backup", "alert", "ops",
-               "uptime", "incident"],
-    "kublai": ["triage", "coordinate", "route", "assess", "status"],
-}
+# Single source of truth: task_intake.py:AGENT_KEYWORDS
+# Previously maintained a separate copy that drifted (missing keywords caused
+# correctly-routed tasks to score as "weak domain match" 1/3 instead of 2-3/3).
+from task_intake import AGENT_KEYWORDS
+AGENT_DOMAINS = AGENT_KEYWORDS
 
 
-def read_ledger(hours=None):
-    """Read all events from task-ledger.jsonl, optionally filtered by time."""
-    if not os.path.exists(TASK_LEDGER):
-        return []
+def normalize_score(scored_event):
+    """Normalize a SCORED event to the /10 scale.
 
-    cutoff = None
-    if hours:
-        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+    score_version 2 (current): 0-10, already correct.
+    score_version missing or 1: 0-8 (no pending_time), scale to /10.
+    """
+    version = scored_event.get("score_version")
+    total = scored_event.get("total_score", 0)
+    if version and version >= 2:
+        return total
+    return round(total * 10 / 8, 1)
 
-    events = []
-    with open(TASK_LEDGER, "r") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-                if cutoff and entry.get("ts", "") < cutoff:
-                    continue
-                events.append(entry)
-            except json.JSONDecodeError:
-                continue
-    return events
 
 
 def group_by_task_id(events):
@@ -153,6 +135,35 @@ def score_substantive(task_events):
     return 1
 
 
+def score_pending_time(task_events):
+    """Score 0-2: How fast did the task move from QUEUED to EXECUTING?
+
+    2 = QUEUED→EXECUTING < 60s
+    1 = 60-300s
+    0 = >300s or unmeasurable
+    """
+    queued = [e for e in task_events if e.get("event") == "QUEUED"]
+    executing = [e for e in task_events if e.get("event") == "EXECUTING"]
+
+    if not queued or not executing:
+        return 0  # unmeasurable
+
+    try:
+        queued_ts = datetime.fromisoformat(queued[0]["ts"])
+        executing_ts = datetime.fromisoformat(executing[0]["ts"])
+        delta_s = (executing_ts - queued_ts).total_seconds()
+    except (KeyError, ValueError, TypeError):
+        return 0
+
+    if delta_s < 0:
+        return 0  # clock skew or data issue
+    if delta_s < 60:
+        return 2
+    if delta_s < 300:
+        return 1
+    return 0
+
+
 def detect_self_route_flag(task_events):
     """Detect if kublai routed a design/implementation task to itself."""
     queued = [e for e in task_events if e.get("event") == "QUEUED"]
@@ -195,8 +206,9 @@ def score_all_tasks(hours=None):
         delegation = score_delegation(task_events)
         domain_match = score_domain_match(task_events)
         substantive = score_substantive(task_events)
+        pending_time = score_pending_time(task_events)
         self_route = detect_self_route_flag(task_events)
-        total = delegation + domain_match + substantive
+        total = delegation + domain_match + substantive + pending_time
 
         score_entry = {
             "task_id": task_id,
@@ -205,18 +217,16 @@ def score_all_tasks(hours=None):
             "delegation_score": delegation,
             "domain_match_score": domain_match,
             "substantive_score": substantive,
+            "pending_time_score": pending_time,
             "total_score": total,
             "self_route_flag": self_route,
             "agent": task_events[0].get("agent", "unknown"),
+            "score_version": 2,
         }
 
         # Append to ledger
-        try:
-            with open(TASK_LEDGER, "a") as f:
-                f.write(json.dumps(score_entry) + "\n")
-            new_scores += 1
-        except Exception:
-            pass
+        _kp_append_ledger(score_entry)
+        new_scores += 1
 
         results.append(score_entry)
 
@@ -232,36 +242,37 @@ def generate_summary(hours=None):
         return "No scored tasks found."
 
     total_tasks = len(scored)
-    avg_total = sum(s["total_score"] for s in scored) / total_tasks
+    avg_total = sum(normalize_score(s) for s in scored) / total_tasks
     avg_delegation = sum(s["delegation_score"] for s in scored) / total_tasks
     avg_domain = sum(s["domain_match_score"] for s in scored) / total_tasks
     avg_substance = sum(s["substantive_score"] for s in scored) / total_tasks
+    avg_pending = sum(s.get("pending_time_score", 0) for s in scored) / total_tasks
     self_routes = sum(1 for s in scored if s.get("self_route_flag"))
 
     # Per-agent breakdown
     agent_scores = defaultdict(list)
     for s in scored:
-        agent_scores[s.get("agent", "unknown")].append(s["total_score"])
+        agent_scores[s.get("agent", "unknown")].append(normalize_score(s))
 
     lines = [
         f"## Task Quality Scorecard ({total_tasks} tasks)",
-        f"- Average score: {avg_total:.1f}/8",
-        f"- Delegation: {avg_delegation:.1f}/2 | Domain match: {avg_domain:.1f}/3 | Substance: {avg_substance:.1f}/3",
+        f"- Average score: {avg_total:.1f}/10",
+        f"- Delegation: {avg_delegation:.1f}/2 | Domain match: {avg_domain:.1f}/3 | Substance: {avg_substance:.1f}/3 | Pending time: {avg_pending:.1f}/2",
         f"- Self-route violations: {self_routes}",
         "",
         "### Per-Agent Scores",
     ]
-    for agent, scores in sorted(agent_scores.items()):
-        avg = sum(scores) / len(scores)
-        lines.append(f"- {agent}: {avg:.1f}/8 ({len(scores)} tasks)")
+    for agent, scores_list in sorted(agent_scores.items()):
+        avg = sum(scores_list) / len(scores_list)
+        lines.append(f"- {agent}: {avg:.1f}/10 ({len(scores_list)} tasks)")
 
     # Flag low-scoring tasks
-    low_scores = [s for s in scored if s["total_score"] <= 3]
+    low_scores = [s for s in scored if normalize_score(s) <= 4]
     if low_scores:
         lines.append("")
-        lines.append("### Low-Score Tasks (<=3/8)")
+        lines.append("### Low-Score Tasks (<=4/10)")
         for s in low_scores[:5]:
-            lines.append(f"- task_id={s['task_id'][:8]}... agent={s['agent']} score={s['total_score']}")
+            lines.append(f"- task_id={s['task_id'][:8]}... agent={s['agent']} score={normalize_score(s)}")
 
     return "\n".join(lines)
 
@@ -281,7 +292,7 @@ def main():
     print(f"Scored {new_scores} new task(s)")
     for r in results:
         flag = " [SELF-ROUTE]" if r["self_route_flag"] else ""
-        print(f"  {r['task_id'][:8]}... {r['agent']}: {r['total_score']}/8{flag}")
+        print(f"  {r['task_id'][:8]}... {r['agent']}: {r['total_score']}/10{flag}")
 
 
 if __name__ == "__main__":

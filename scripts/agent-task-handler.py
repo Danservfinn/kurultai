@@ -15,24 +15,195 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_update
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER, CLAUDE_AGENT as _CLAUDE_AGENT
+from kurultai_ledger import append_ledger as _kp_append_ledger
 
-AGENTS_DIR = "/Users/kublai/.openclaw/agents"
-SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
-TASK_LEDGER = "/Users/kublai/.openclaw/tasks/task-ledger.jsonl"
-CLAUDE_AGENT = "/Users/kublai/.local/bin/claude-agent"
-CLAUDE_TIMEOUT = 600  # 10 minutes for Claude Code execution
+AGENTS_DIR = str(_AGENTS_DIR)
+SPAWN_QUEUE = str(_SPAWN_QUEUE)
+CLAUDE_AGENT = str(_CLAUDE_AGENT)
+CLAUDE_TIMEOUT = 7200  # 2 hours for Claude Code execution
+
+# Fallback model configuration for rate limit recovery
+# When the primary model (claude-opus-4-6) is rate limited, fallback to claude-sonnet-4-6
+# Sonnet has higher rate limits and is suitable for most tasks
+FALLBACK_MODEL = "claude-sonnet-4-6"  # Fallback when rate limited (higher limits than opus)
+MAX_RATE_LIMIT_RETRIES = 1  # Only retry once with fallback model
+TIMEOUT_BY_PRIORITY = {
+    'high': 7200,   # 2 hours for complex high-priority tasks
+    'normal': 7200, # 2 hours
+    'low': 7200,    # 2 hours
+}
+# Skills that need extra time (design exploration, brainstorming)
+SLOW_SKILLS = {
+    '/horde-brainstorming': 7200,
+    '/golden-horde': 7200,
+    '/horde-implement': 7200,
+    '/horde-review': 7200,
+    '/horde-debug': 7200,
+    '/horde-learn': 7200,
+    '/horde-swarm': 7200,
+    '/horde-test': 7200,
+    # Medium-complexity skills: get slow stall thresholds (7min silence / 8min elapsed)
+    # but don't override the priority-based execution timeout (value=0)
+    '/senior-frontend': 0,
+    '/senior-backend': 0,
+    '/senior-fullstack': 0,
+    '/senior-architect': 0,
+    '/systematic-debugging': 0,
+    '/content-research-writer': 0,
+    '/horde-gate-testing': 0,
+    '/horde-plan': 0,
+}
 MAX_TASK_DEPTH = 3
+HAIKU_TIMEOUT = 60  # Max seconds for /task-complete haiku notification
+
+
+def _is_rate_limit_error(error_msg, stdout_content=None):
+    """Detect rate limit / quota errors from Claude Code output.
+
+    Returns True if the error indicates rate limiting, quota exceeded,
+    or model unavailability that could be resolved by switching models.
+
+    Args:
+        error_msg: The stderr or error content
+        stdout_content: Optional stdout content to also check (some errors appear in stdout)
+    """
+    if not error_msg and not stdout_content:
+        return False
+
+    # Combine error and stdout for checking
+    combined = (error_msg or "") + " " + (stdout_content or "")
+    combined_lower = combined.lower()
+
+    # Rate limit patterns - expanded for comprehensive coverage
+    rate_limit_patterns = [
+        # Standard rate limiting
+        "rate limit",
+        "rate_limited",
+        "rate-limit",
+        "too many requests",
+        "429",
+        # Quota/capacity issues
+        "quota exceeded",
+        "quota limit",
+        "capacity exceeded",
+        "insufficient capacity",
+        "over capacity",
+        "temporarily unavailable",
+        "try again later",
+        "please retry",
+        "retry after",
+        # Anthropic-specific errors
+        "model is not supported",  # Model config error - also triggers fallback
+        "model not available",
+        "invalid model",
+        "model does not exist",
+        "model not found",
+        "unsupported model",
+        "overloaded",
+        "server error",
+        "503",
+        "529",  # Anthropic's overloaded error code
+        # API key/billing issues that might resolve with different model
+        "billing quota",
+        "credit limit",
+        "payment required",
+        "402",
+    ]
+
+    return any(pattern in combined_lower for pattern in rate_limit_patterns)
+
+
+# Stall detection (T14): abort tasks that produce no stdout for too long
+# Base thresholds: 10 min (sufficient for most tasks)
+STALL_SILENCE_THRESHOLD = 600  # seconds of no output before considering stall
+STALL_MIN_ELAPSED = 600        # only check for stalls after this many seconds elapsed
+# Slow skills get more generous stall thresholds (inference + subagent planning takes time)
+SLOW_SKILL_STALL_SILENCE = 900   # 15 min silence allowed for horde skills
+SLOW_SKILL_STALL_ELAPSED = 900   # don't check until 15 min for horde skills
+# High priority tasks also get relaxed thresholds (complex tasks need more time)
+HIGH_PRIORITY_STALL_SILENCE = 900
+HIGH_PRIORITY_STALL_ELAPSED = 900
+
+
+def _spawn_haiku_completion(agent_name):
+    """Spawn haiku /task-complete in a background thread with timeout.
+
+    Writes a per-agent breadcrumb file so the skill reads the correct task
+    (avoids ledger race when two agents complete near-simultaneously).
+    Ensures the process is reaped and killed if it hangs.
+    """
+    def _run():
+        try:
+            env_haiku = os.environ.copy()
+            env_haiku.pop('CLAUDECODE', None)
+            env_haiku['TASK_COMPLETE_AGENT'] = agent_name
+            proc = subprocess.Popen(
+                [CLAUDE_AGENT, "/task-complete"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                close_fds=True,
+                env=env_haiku,
+            )
+            try:
+                proc.wait(timeout=HAIKU_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+        except Exception:
+            pass
+
+    threading.Thread(target=_run, daemon=True).start()
 
 def load_agent_config(agent_name):
     """Load agent configuration"""
     config_path = f"{AGENTS_DIR}/{agent_name}/config.json"
     with open(config_path, 'r') as f:
         return json.load(f)
+
+def load_acp_fallback_config():
+    """Load ACP fallback configuration from openclaw.json.
+
+    Returns dict with fallback configuration:
+    - enabled: bool - whether fallback is enabled
+    - fallback_model: str - model to use when rate limited
+    - max_retries: int - max retries with fallback
+    - log_events: bool - whether to log fallback events
+    """
+    try:
+        openclaw_config_path = os.path.expanduser("~/.openclaw/openclaw.json")
+        with open(openclaw_config_path, 'r') as f:
+            config = json.load(f)
+
+        acp_config = config.get('acp', {})
+        fallback_config = acp_config.get('fallback', {})
+
+        return {
+            'enabled': fallback_config.get('enabled', True),
+            'fallback_model': fallback_config.get('fallbackModel', FALLBACK_MODEL),
+            'trigger_on_rate_limit': fallback_config.get('triggerOnRateLimit', True),
+            'trigger_on_stall': fallback_config.get('triggerOnStallTimeout', True),
+            'max_retries': fallback_config.get('maxRetries', MAX_RATE_LIMIT_RETRIES),
+            'log_events': fallback_config.get('logEvents', True),
+        }
+    except Exception:
+        # Return defaults if config cannot be loaded
+        return {
+            'enabled': True,
+            'fallback_model': FALLBACK_MODEL,
+            'trigger_on_rate_limit': True,
+            'trigger_on_stall': True,
+            'max_retries': MAX_RATE_LIMIT_RETRIES,
+            'log_events': True,
+        }
 
 def get_pending_tasks(agent_name):
     """Get pending tasks from agent's queue"""
@@ -74,26 +245,95 @@ def get_pending_tasks(agent_name):
     
     return tasks
 
+def _write_pid_file(executing_file):
+    """Write PID sentinel alongside .executing.md so recovery can check liveness.
+
+    Format: PID\nSTART_TIMESTAMP (Unix timestamp as float)
+    The timestamp allows recovery to calculate true process age regardless of file modifications.
+    """
+    pid_file = executing_file.replace('.executing.md', '.executing.pid')
+    start_ts = time.time()
+    with open(pid_file, 'w') as f:
+        f.write(f"{os.getpid()}\n{start_ts}")
+
+
+def _cleanup_pid_file(executing_file):
+    """Remove PID sentinel file."""
+    pid_file = executing_file.replace('.executing.md', '.executing.pid')
+    try:
+        os.unlink(pid_file)
+    except OSError:
+        pass
+
+
 def mark_task_executing(task_file):
-    """Mark task as being executed"""
+    """Mark task as being executed and write PID sentinel."""
     executing_file = task_file.replace('.md', '.executing.md')
     os.rename(task_file, executing_file)
+    _write_pid_file(executing_file)
     return executing_file
 
-def mark_task_completed(task_file, status='completed'):
+
+def mark_task_completed(task_file, status='completed', executing_file=None):
     """Mark task as completed.
 
-    Handles both cases: task_file is the original .md or already .executing.md.
-    Avoids double-suffix bug (.executing.executing.md → .executing.completed.done.md).
+    Handles the race where recover_stale_executions() renames the
+    .executing.md file before this function runs. Falls back to searching
+    for retry files created by recovery.
+
+    Args:
+        task_file: Original task file path (before .executing rename).
+        status: 'completed' or 'failed'.
+        executing_file: Actual .executing.md path if known (preferred).
     """
-    if task_file.endswith('.executing.md'):
-        executing_file = task_file
-    else:
-        executing_file = task_file.replace('.md', '.executing.md')
+    if executing_file is None:
+        if task_file.endswith('.executing.md'):
+            executing_file = task_file
+        else:
+            executing_file = task_file.replace('.md', '.executing.md')
+
+    completed_suffix = f'.{status}.done.md'
+
+    # Normal path: .executing.md still exists
     if os.path.exists(executing_file):
-        completed_file = executing_file.replace('.executing.md', f'.{status}.done.md')
-        os.rename(executing_file, completed_file)
-        print(f"✓ Task completed: {completed_file}")
+        completed_file = executing_file.replace('.executing.md', completed_suffix)
+        try:
+            os.rename(executing_file, completed_file)
+        except FileNotFoundError:
+            # Race: recover_stale_executions() renamed it between exists() and rename()
+            print(f"⚠ Race detected: {os.path.basename(executing_file)} moved during completion")
+            # Fall through to fallback search below
+        else:
+            _cleanup_pid_file(executing_file)
+            print(f"✓ Task {status}: {completed_file}")
+            return True
+
+    # .executing.md is gone — recovery renamed it
+    print(f"⚠ Executing file missing: {os.path.basename(executing_file)}")
+
+    task_dir = os.path.dirname(executing_file)
+    stem = os.path.basename(executing_file).replace('.executing.md', '')
+
+    # Search for retry files that recovery created (e.g., stem.retry-2.md)
+    for candidate in sorted(glob.glob(os.path.join(task_dir, f"{stem}*.md"))):
+        basename = os.path.basename(candidate)
+        if '.done.md' in basename or '.executing' in basename:
+            continue
+        completed_file = os.path.join(task_dir, stem + completed_suffix)
+        os.rename(candidate, completed_file)
+        _cleanup_pid_file(executing_file)
+        print(f"⚠ Task {status} (fallback): {basename} → {os.path.basename(completed_file)}")
+        return True
+
+    # Check if already marked done (idempotent)
+    for done_candidate in glob.glob(os.path.join(task_dir, f"{stem}*.done.md")):
+        print(f"⚠ Task already done: {os.path.basename(done_candidate)}")
+        _cleanup_pid_file(executing_file)
+        return True
+
+    print(f"✗ No matching file to mark as {status} for: {stem}")
+    _cleanup_pid_file(executing_file)
+    return False
 
 def _extract_depth(content):
     """Extract depth field from task frontmatter."""
@@ -117,13 +357,153 @@ def _extract_skill_hint(content):
 
 
 def _append_ledger(entry):
-    """Append an event to the unified task-ledger.jsonl."""
+    """Append an event to the unified task-ledger.jsonl (flock-safe via kurultai_paths)."""
+    _kp_append_ledger(entry)
+
+
+def _extract_skills_from_transcript(agent_name: str, start_time: float, task_id: str, skill_hint) -> list:
+    """
+    Post-execution: find the Claude Code session transcript for this task,
+    extract all Skill tool invocations, append SKILL_INVOCATION events to ledger.
+
+    Transcript location: ~/.claude/projects/{encoded_cwd}/{session_id}.jsonl
+    """
+    agent_root = f"{AGENTS_DIR}/{agent_name}"
+    encoded = agent_root.replace('/', '-').replace('.', '-').lstrip('-')
+    project_dir = Path.home() / ".claude/projects" / encoded
+
+    if not project_dir.exists():
+        return []
+
+    newest = None
+    newest_mtime = 0.0
+    for jf in project_dir.glob("*.jsonl"):
+        try:
+            mt = jf.stat().st_mtime
+            if mt >= start_time and mt > newest_mtime:
+                newest_mtime = mt
+                newest = jf
+        except OSError:
+            continue
+
+    if not newest:
+        return []
+
     try:
-        os.makedirs(os.path.dirname(TASK_LEDGER), exist_ok=True)
-        with open(TASK_LEDGER, "a") as f:
-            f.write(json.dumps(entry) + "\n")
+        lines = newest.read_text(encoding="utf-8", errors="replace").splitlines()
     except Exception:
-        pass
+        return []
+
+    skills_found = []
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except Exception:
+            continue
+        msg = record.get("message", {})
+        for block in msg.get("content", []):
+            if block.get("type") == "tool_use" and block.get("name") == "Skill":
+                skill_name = block.get("input", {}).get("skill", "")
+                if not skill_name:
+                    continue
+                skill_full = f"/{skill_name}" if not skill_name.startswith("/") else skill_name
+                _append_ledger({
+                    "task_id": task_id,
+                    "event": "SKILL_INVOCATION",
+                    "ts": datetime.now().isoformat(),
+                    "agent": agent_name,
+                    "skill": skill_full,
+                    "trigger": "skill_hint" if skill_hint and skill_name in skill_hint else "agent_choice",
+                    "skill_hint_matched": bool(skill_hint and skill_name in skill_hint),
+                    "session_id": str(newest.stem),
+                    "skill_version": 1,
+                    "executor": "claude-code",
+                })
+                skills_found.append(skill_name)
+
+    return skills_found
+
+
+_TOOL_PATTERNS = {
+    "file_ops": r'\b(Read|Write|Edit|Glob|NotebookEdit)\b',
+    "bash":     r'\bBash\b',
+    "search":   r'\b(Grep|WebSearch|WebFetch)\b',
+    "browser":  r'\b(browser_|navigate|mcp__claude-in-chrome)\b',
+    "agent_spawned": r'(spawn_subagent|Subagent spawned)',
+}
+
+_PHASE_KEYWORDS = {
+    "read_context": ["reading", "checking context", "loading memory"],
+    "plan":         ["planning", "let me plan", "approach:"],
+    "implement":    ["implementing", "writing", "creating"],
+    "verify":       ["verifying", "testing", "checking output", "confirmed"],
+    "error_recovery": ["retry", "error occurred", "trying again", "fallback"],
+    "summarize":    ["summary", "completed", "result:", "done:"],
+}
+
+
+def _analyze_tool_usage(stdout: str) -> dict:
+    """Parse stdout for tool call patterns. Returns EXECUTION_TRACE payload."""
+    import re
+    tool_categories = {k: len(re.findall(p, stdout)) for k, p in _TOOL_PATTERNS.items()}
+    phase_markers = []
+    for phase, keywords in _PHASE_KEYWORDS.items():
+        if any(kw in stdout.lower() for kw in keywords) and phase not in phase_markers:
+            phase_markers.append(phase)
+    error_lines = sum(1 for ln in stdout.splitlines()
+                      if re.search(r'\b(error|failed|traceback)\b', ln, re.IGNORECASE))
+    return {
+        "tool_categories": tool_categories,
+        "phase_markers": phase_markers,
+        "intermediate_errors": error_lines,
+        "output_tokens_est": len(stdout) // 4,
+    }
+
+
+def _check_architecture_update(agent_name: str, task_content: str, result_content: str, task_id: str):
+    """
+    Check if the completed task warrants an architecture.md update.
+    Appends ARCH_UPDATE_CHECK event to ledger. Writes to architecture.md if needed.
+
+    Triggers on: new scripts created, new patterns introduced, system design changes,
+    infrastructure changes, or agent behavior changes.
+    """
+    import re
+    arch_file = Path.home() / ".openclaw/agents/main/docs/architecture.md"
+    if not arch_file.exists():
+        return
+
+    # Keywords that signal architectural significance
+    arch_signals = [
+        "new script", "created script", "new file", "created file",
+        "new pattern", "new approach", "refactored", "restructured",
+        "new agent", "new skill", "new hook", "new pipeline",
+        "architecture", "system design", "infrastructure",
+        "launchd", "plist", "cron", "daemon", "service",
+        "database", "schema", "redis", "neo4j",
+    ]
+
+    combined = (task_content + " " + result_content).lower()
+    if not any(signal in combined for signal in arch_signals):
+        return
+
+    # Check what changed: look for file paths created/modified in result
+    created_files = re.findall(r'(?:created|wrote|saved|written to)[:\s]+([~/][^\s\n]+)', result_content, re.IGNORECASE)
+    new_scripts = [f for f in created_files if f.endswith(('.py', '.sh', '.js', '.ts'))]
+
+    if not created_files and not any(s in combined for s in ["architecture", "system design", "restructured"]):
+        return
+
+    _append_ledger({
+        "task_id": task_id,
+        "event": "ARCH_UPDATE_CHECK",
+        "ts": datetime.now().isoformat(),
+        "agent": agent_name,
+        "triggered": True,
+        "files_detected": created_files[:10],
+        "new_scripts": new_scripts[:5],
+        "note": "Review architecture.md for updates needed",
+    })
 
 
 def spawn_subagent(agent_name, task, subagent_task, depth=0):
@@ -136,7 +516,7 @@ def spawn_subagent(agent_name, task, subagent_task, depth=0):
 
     spawn_request = {
         "agent": agent_name,
-        "model": config.get('model', 'qwen3.5-plus'),
+        "model": config.get('model', 'claude-opus-4-6'),
         "task": subagent_task,
         "priority": "normal",
         "label": f"{agent_name}-sub-{int(time.time())}",
@@ -184,28 +564,147 @@ def _load_agent_memory(agent_name):
     return context.strip()
 
 
-def execute_task_with_llm(agent_name, task_text, config, skill_hint=None):
-    """Execute task via Claude Code using the claude-agent wrapper.
+def _gather_context_files(agent_name, task_text):
+    """Pre-load relevant files for context injection (replaces tool-based file reading).
 
-    Each agent runs as a sovereign Claude Code session with its own
-    CLAUDE.md (auto-discovered from workdir), identity, and tools.
+    Scans task text for file paths and loads them. Also loads recent workspace results.
+    """
+    import re
+    context = ""
+    max_context = 50000  # chars budget for file context
+
+    # Extract file paths mentioned in task
+    paths = re.findall(r'(/[^\s\n]+\.[a-zA-Z]+)', task_text)
+    for path in paths[:5]:
+        if os.path.exists(path) and os.path.isfile(path):
+            try:
+                with open(path, 'r') as f:
+                    content = f.read()[:10000]
+                context += f"\n### {path}\n```\n{content}\n```\n"
+                if len(context) > max_context:
+                    break
+            except Exception:
+                pass
+
+    # Load recent workspace results for context
+    workspace = f"{AGENTS_DIR}/{agent_name}/workspace"
+    if os.path.isdir(workspace):
+        recent_files = sorted(
+            [f for f in os.listdir(workspace) if f.endswith('.md')],
+            reverse=True
+        )[:3]
+        for fname in recent_files:
+            fpath = os.path.join(workspace, fname)
+            try:
+                with open(fpath, 'r') as f:
+                    content = f.read()[:5000]
+                context += f"\n### workspace/{fname}\n```\n{content}\n```\n"
+                if len(context) > max_context:
+                    break
+            except Exception:
+                pass
+
+    return context
+
+
+def execute_task_with_ollama(agent_name, task_text, config, timeout=None):
+    """Execute task via direct Ollama API call (no tools).
+
+    Used for agents that run local models without tool-calling support.
+    Context is pre-loaded into the prompt instead of using tools.
+    """
+    agent_root = f"{AGENTS_DIR}/{agent_name}"
+    executor_config = config.get('executor_config', {})
+    base_url = executor_config.get('base_url', 'http://localhost:11434')
+    model_name = executor_config.get('model_name', 'hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF')
+    max_tokens = executor_config.get('max_tokens', 16384)
+    temperature = executor_config.get('temperature', 0.7)
+
+    # Load agent identity from CLAUDE.md
+    claude_md = f"{agent_root}/CLAUDE.md"
+    system_prompt = ""
+    if os.path.exists(claude_md):
+        with open(claude_md, 'r') as f:
+            system_prompt = f.read()[:4000]
+
+    # Load agent memory
+    memory = _load_agent_memory(agent_name)
+    memory_section = f"\n\n## Recent Context\n{memory}" if memory else ""
+
+    # Pre-load relevant workspace files for context
+    context_files = _gather_context_files(agent_name, task_text)
+    context_section = "\n\n## Pre-loaded Files\n" + context_files if context_files else ""
+
+    user_prompt = f"{task_text}{memory_section}{context_section}"
+
+    # Call Ollama chat API directly
+    payload = json.dumps({
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "stream": False,
+        "options": {
+            "num_predict": max_tokens,
+            "temperature": temperature,
+        }
+    }).encode('utf-8')
+
+    effective_timeout = timeout or CLAUDE_TIMEOUT
+    start_time = time.time()
+    try:
+        req = urllib.request.Request(
+            f"{base_url}/api/chat",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=effective_timeout) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+
+        content = result.get('message', {}).get('content', '')
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": bool(content.strip()),
+            "content": content,
+            "error": None if content.strip() else "Empty response from Ollama",
+            "model": f"ollama/{model_name}",
+            "latency_ms": elapsed_ms,
+        }
+    except urllib.error.URLError as e:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": False,
+            "error": f"Ollama connection failed: {e}",
+            "model": f"ollama/{model_name}",
+            "latency_ms": elapsed_ms,
+        }
+    except subprocess.TimeoutExpired:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": False,
+            "error": f"Ollama request timed out after {effective_timeout}s",
+            "model": f"ollama/{model_name}",
+            "latency_ms": elapsed_ms,
+        }
+    except Exception as e:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": False,
+            "error": str(e),
+            "model": f"ollama/{model_name}",
+            "latency_ms": elapsed_ms,
+        }
+
+
+def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None, model=None, priority='normal'):
+    """Execute a single Claude Code call with stall detection.
+
+    Internal helper that performs the actual subprocess execution.
+    Returns result dict with success, content, error, model fields.
     """
     # Use agent ROOT directory as workdir so CLAUDE.md is auto-discovered
     agent_root = f"{AGENTS_DIR}/{agent_name}"
-
-    # Build prompt with agent context
-    memory = _load_agent_memory(agent_name)
-    memory_section = f"\n\n## Recent Context\n{memory}" if memory else ""
-    skill_section = f"\n\nIMPORTANT: Start this task by invoking {skill_hint} — it is the correct skill for this work." if skill_hint else ""
-
-    prompt = (
-        f"{task_text}"
-        f"{memory_section}"
-        f"{skill_section}\n\n"
-        "Execute this task completely using your tools. "
-        "Read files, write code, run commands, verify your work. "
-        "For simple questions, a direct answer is fine."
-    )
 
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)  # Allow nested Claude Code sessions
@@ -214,52 +713,393 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None):
         "/usr/local/bin:/usr/bin:/bin:" + env.get('PATH', '')
     )
 
+    # Sanitize ALL inherited ANTHROPIC_* env vars to prevent stale/poisoned
+    # values from the parent process (e.g. task-watcher launched with DashScope
+    # credentials). We strip everything, then re-apply only validated values
+    # from the agent's settings.json.
+    _stripped_anthropic = []
+    for key in list(env.keys()):
+        if key.startswith('ANTHROPIC_'):
+            _stripped_anthropic.append(key)
+            del env[key]
+    if _stripped_anthropic:
+        print(f"  ENV_SANITIZE: stripped inherited {', '.join(_stripped_anthropic)} for {agent_name}")
+
+    # Load agent-specific environment from .claude/settings.json
+    # This provides ANTHROPIC_MODEL (and optionally ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
+    VALID_CLAUDE_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'}
+    ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
     try:
-        result = subprocess.run(
-            [CLAUDE_AGENT, "--workdir", agent_root, "--", prompt],
-            capture_output=True,
+        settings_path = f"{agent_root}/.claude/settings.json"
+        with open(settings_path, 'r') as _sf:
+            settings = json.load(_sf)
+        agent_env = settings.get('env', {})
+        for key, value in agent_env.items():
+            env[key] = value
+        # Validate ANTHROPIC_MODEL env var — reject non-Claude models ONLY if using official Anthropic API
+        # Allow proxy models (kimi-k2.5, etc.) when using approved proxy endpoints
+        env_model = env.get('ANTHROPIC_MODEL')
+        base_url = env.get('ANTHROPIC_BASE_URL', '')
+        is_using_proxy = any(endpoint in base_url for endpoint in ALLOWED_PROXY_ENDPOINTS)
+        debug_msg = f"DEBUG: agent={agent_name}, env_model={env_model}, base_url={base_url[:50] if base_url else 'NONE'}..., is_using_proxy={is_using_proxy}\n"
+        with open('/tmp/agent_handler_debug.log', 'a') as f:
+            f.write(debug_msg)
+        print(f"  {debug_msg.strip()}")
+        if env_model and env_model not in VALID_CLAUDE_MODELS and not is_using_proxy:
+            print(f"  ⚠ REJECTED non-Claude ANTHROPIC_MODEL env '{env_model}' for {agent_name} — forcing claude-opus-4-6")
+            env['ANTHROPIC_MODEL'] = 'claude-opus-4-6'
+        else:
+            print(f"  ✓ ACCEPTED model '{env_model}' for {agent_name} (proxy={is_using_proxy})")
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # Use system environment if no agent settings
+
+    # Validate ANTHROPIC_BASE_URL — allow Anthropic and approved proxy endpoints
+    base_url = env.get('ANTHROPIC_BASE_URL', '')
+    allowed_proxy_endpoints = ['dashscope.aliyuncs.com', 'openrouter.ai']
+    is_allowed_proxy = any(endpoint in base_url for endpoint in allowed_proxy_endpoints)
+    if base_url and 'anthropic.com' not in base_url and not is_allowed_proxy:
+        print(f"  !! BLOCKED non-Anthropic BASE_URL for {agent_name}: {base_url}")
+        print(f"  !! Removing ANTHROPIC_BASE_URL — will use official Anthropic API")
+        env.pop('ANTHROPIC_BASE_URL', None)
+
+    # Validate ANTHROPIC_AUTH_TOKEN — allow Anthropic and approved proxy tokens
+    auth_token = env.get('ANTHROPIC_AUTH_TOKEN', '')
+    # Anthropic tokens start with sk-ant-, but proxy services may use different prefixes
+    is_anthropic_token = auth_token.startswith('sk-ant-')
+    is_proxy_token = base_url and is_allowed_proxy and auth_token.startswith('sk-')
+    if auth_token and not is_anthropic_token and not is_proxy_token:
+        print(f"  !! BLOCKED non-Anthropic AUTH_TOKEN for {agent_name} (prefix: {auth_token[:6]}...)")
+        env.pop('ANTHROPIC_AUTH_TOKEN', None)
+
+    effective_timeout = timeout or CLAUDE_TIMEOUT
+
+    try:
+        effort = config.get('effort', 'medium')
+        if effort not in {'low', 'medium', 'high'}:
+            effort = 'medium'
+
+        # Build claude-agent command with optional model override
+        cmd = [CLAUDE_AGENT, "--workdir", agent_root, "--effort", effort]
+        if model:
+            cmd.extend(["--model", model])
+        cmd.extend(["--", prompt])
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=CLAUDE_TIMEOUT,
             env=env,
         )
 
-        output = result.stdout or ""
-        error = result.stderr[-2000:] if result.stderr else ""
+        stdout_chunks = []
+        last_output_time = time.time()
+        start = time.time()
 
-        success = result.returncode == 0
+        # Read stdout in a background thread so we can monitor for stalls
+        import queue as _queue
+        stdout_q = _queue.Queue()
+
+        def _reader(pipe, q):
+            for line in pipe:
+                q.put(line)
+            q.put(None)  # sentinel
+
+        reader_thread = threading.Thread(target=_reader, args=(proc.stdout, stdout_q), daemon=True)
+        reader_thread.start()
+
+        while True:
+            elapsed = time.time() - start
+
+            # Hard timeout
+            if elapsed >= effective_timeout:
+                proc.kill()
+                proc.wait()
+                return {
+                    "success": False,
+                    "error": f"Claude Code timed out after {effective_timeout}s",
+                    "content": "".join(stdout_chunks),
+                    "model": model or "claude-code",
+                    "latency_ms": 0,
+                }
+
+            # Drain available stdout
+            got_output = False
+            while True:
+                try:
+                    line = stdout_q.get_nowait()
+                except _queue.Empty:
+                    break
+                if line is None:
+                    # Process stdout closed — process is finishing
+                    got_output = True
+                    break
+                stdout_chunks.append(line)
+                got_output = True
+
+            if got_output:
+                last_output_time = time.time()
+
+            # Stall detection (T14): check after STALL_MIN_ELAPSED
+            # Use relaxed thresholds for slow skills or high priority tasks
+            is_slow = (skill_hint in SLOW_SKILLS if skill_hint else False) or agent_name == "kublai" or priority == 'high'
+            if is_slow:
+                stall_elapsed_thresh = SLOW_SKILL_STALL_ELAPSED
+                stall_silence_thresh = SLOW_SKILL_STALL_SILENCE
+            elif priority == 'high':
+                stall_elapsed_thresh = HIGH_PRIORITY_STALL_ELAPSED
+                stall_silence_thresh = HIGH_PRIORITY_STALL_SILENCE
+            else:
+                stall_elapsed_thresh = STALL_MIN_ELAPSED
+                stall_silence_thresh = STALL_SILENCE_THRESHOLD
+            silence = time.time() - last_output_time
+            if elapsed >= stall_elapsed_thresh and silence >= stall_silence_thresh:
+                # Before killing, check if the claude session JSONL is still being written
+                # (active tool calls produce no stdout but do write to the session file)
+                session_active = False
+                try:
+                    project_slug = agent_root.replace('/', '-').lstrip('-')
+                    project_dir = os.path.expanduser(f"~/.claude/projects/{project_slug}")
+                    if os.path.isdir(project_dir):
+                        now = time.time()
+                        for fname in os.listdir(project_dir):
+                            if fname.endswith('.jsonl'):
+                                fpath = os.path.join(project_dir, fname)
+                                if now - os.path.getmtime(fpath) < 30:  # written in last 30s
+                                    session_active = True
+                                    break
+                except Exception:
+                    pass
+                if session_active:
+                    # Session is actively making tool calls — reset silence timer and continue
+                    last_output_time = time.time() - (stall_silence_thresh - 60)  # allow 60s more
+                    time.sleep(0.5)
+                    continue
+                print(f"  STALL_DETECTED: no stdout for {silence:.0f}s after {elapsed:.0f}s elapsed — aborting (skill_hint={skill_hint}, is_slow={is_slow}, thresh={stall_elapsed_thresh}/{stall_silence_thresh})")
+                proc.kill()
+                proc.wait()
+                _append_ledger({
+                    "event": "STALL_DETECTED",
+                    "ts": datetime.now().isoformat(),
+                    "agent": agent_name,
+                    "elapsed_s": round(elapsed, 1),
+                    "silence_s": round(silence, 1),
+                    "timeout_s": effective_timeout,
+                })
+                return {
+                    "success": False,
+                    "error": f"STALL_TIMEOUT: no stdout for {silence:.0f}s after {elapsed:.0f}s (killed at {elapsed:.0f}s instead of waiting for {effective_timeout}s timeout)",
+                    "content": "".join(stdout_chunks),
+                    "model": model or "claude-code",
+                    "latency_ms": 0,
+                }
+
+            # Check if process has exited
+            retcode = proc.poll()
+            if retcode is not None:
+                break
+
+            time.sleep(0.5)
+
+        # Process has exited — collect remaining output
+        reader_thread.join(timeout=5)
+        while True:
+            try:
+                line = stdout_q.get_nowait()
+            except _queue.Empty:
+                break
+            if line is not None:
+                stdout_chunks.append(line)
+
+        stderr_output = proc.stderr.read() if proc.stderr else ""
+        proc.stderr.close() if proc.stderr else None
+
+        output = "".join(stdout_chunks)
+        error = stderr_output[-2000:] if stderr_output else ""
+
+        success = proc.returncode == 0
         if success and not output.strip():
             success = False
             error = "Claude Code returned success but produced no output"
+
+        if not success and not error.strip() and output.strip():
+            error = f"exit_code={proc.returncode} stdout_tail: {output[-1000:]}"
 
         return {
             "success": success,
             "content": output,
             "error": error if not success else None,
-            "model": "claude-code",
-            "latency_ms": 0
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "error": f"Claude Code timed out after {CLAUDE_TIMEOUT}s",
-            "model": "claude-code",
-            "latency_ms": 0
+            "model": model or "claude-code",
+            "latency_ms": 0,
         }
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
-            "model": "claude-code",
-            "latency_ms": 0
+            "model": model or "claude-code",
+            "latency_ms": 0,
         }
 
-def process_task(agent_name, task):
-    """Process a single task via Claude Code.
 
-    All tasks (simple and complex) go through Claude Code, which handles
-    complexity internally via its own subagent system and skills.
+def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeout=None, model=None, priority='normal'):
+    """Execute task via Claude Code using the claude-agent wrapper.
+
+    Each agent runs as a sovereign Claude Code session with its own
+    CLAUDE.md (auto-discovered from workdir), identity, and tools.
+
+    Includes stall detection (T14): if no stdout is produced for
+    STALL_SILENCE_THRESHOLD seconds after STALL_MIN_ELAPSED seconds
+    have elapsed, the process is killed early instead of waiting for
+    the full timeout.
+
+    Includes rate limit fallback: if the primary model returns a rate limit
+    error (429), automatically retries with FALLBACK_MODEL.
+
+    Args:
+        model: Optional model to use. If None, uses agent's default from settings.
     """
-    # Use full task content for Claude Code, not just the summary line
+    # Build prompt with agent context
+    agent_root = f"{AGENTS_DIR}/{agent_name}"
+    memory = _load_agent_memory(agent_name)
+    memory_section = f"\n\n## Recent Context\n{memory}" if memory else ""
+    skill_section = f"\n\nIMPORTANT: Start this task by invoking {skill_hint} — it is the correct skill for this work." if skill_hint else ""
+
+    # Inject active behavioral rules from rules.json
+    rules_section = ""
+    try:
+        from rule_registry import get_active_rules
+        active_rules = get_active_rules(agent_name)
+        if active_rules:
+            rules_lines = "\n".join(f"  {i}. {r}" for i, r in enumerate(active_rules, 1))
+            rules_section = f"\n\n## Active Behavioral Rules\nYou MUST follow these rules. Output 'RULES LOADED' at the start of your response.\n{rules_lines}"
+    except Exception:
+        pass  # Don't block task execution if rule loading fails
+
+    prompt = (
+        f"{task_text}"
+        f"{memory_section}"
+        f"{rules_section}"
+        f"{skill_section}\n\n"
+        "Execute this task completely using your tools. "
+        "Read files, write code, run commands, verify your work. "
+        "For simple questions, a direct answer is fine."
+    )
+
+    # Load ACP fallback configuration
+    acp_fallback = load_acp_fallback_config()
+
+    # First attempt with requested model
+    result = _call_claude_code(agent_name, prompt, config, skill_hint, timeout, model, priority)
+
+    # Check if we should retry with fallback model
+    if not result.get('success') and acp_fallback['enabled']:
+        error_msg = result.get('error', '')
+        output_content = result.get('content', '')
+
+        # Check for stall timeout (also trigger fallback if configured)
+        is_stall = 'STALL_TIMEOUT' in error_msg or 'STALL_DETECTED' in error_msg
+        is_rate_limit = _is_rate_limit_error(error_msg, output_content)
+
+        should_fallback = False
+        fallback_reason = None
+
+        if is_rate_limit and acp_fallback['trigger_on_rate_limit']:
+            should_fallback = True
+            fallback_reason = "rate_limit_detected"
+        elif is_stall and acp_fallback['trigger_on_stall']:
+            should_fallback = True
+            fallback_reason = "stall_timeout_detected"
+
+        if should_fallback:
+            # Use fallback model for retry
+            fallback_model = acp_fallback['fallback_model']
+            print(f"  ⚠ {fallback_reason.replace('_', ' ').title()}, retrying with fallback model: {fallback_model}")
+
+            if acp_fallback['log_events']:
+                _append_ledger({
+                    "event": "MODEL_FALLBACK",
+                    "ts": datetime.now().isoformat(),
+                    "agent": agent_name,
+                    "original_model": model or "claude-opus-4-6",
+                    "fallback_model": fallback_model,
+                    "reason": fallback_reason,
+                    "error_preview": error_msg[:200],
+                })
+
+            result = _call_claude_code(agent_name, prompt, config, skill_hint, timeout, fallback_model, priority)
+
+            # Annotate result to indicate fallback was used
+            if result.get('success'):
+                result['model'] = f"{fallback_model} (fallback)"
+                print(f"  ✓ Fallback successful: {fallback_model}")
+                if acp_fallback['log_events']:
+                    _append_ledger({
+                        "event": "MODEL_FALLBACK_SUCCESS",
+                        "ts": datetime.now().isoformat(),
+                        "agent": agent_name,
+                        "fallback_model": fallback_model,
+                    })
+            else:
+                # Preserve original error but note fallback attempt
+                result['error'] = f"[Fallback to {fallback_model} also failed] {result.get('error', 'Unknown error')}"
+                print(f"  ✗ Fallback also failed: {fallback_model}")
+                if acp_fallback['log_events']:
+                    _append_ledger({
+                        "event": "MODEL_FALLBACK_FAILED",
+                        "ts": datetime.now().isoformat(),
+                        "agent": agent_name,
+                        "fallback_model": fallback_model,
+                        "error": result.get('error', 'Unknown error')[:200],
+                    })
+
+    return result
+
+
+def _pre_validate_research_sources(agent_name, task_content, task_id):
+    """Pre-execution source validation for research tasks (mongke).
+
+    Returns None if validation passes or is skipped.
+    Returns an error dict if ALL sources are unreachable (fail fast).
+    """
+    if agent_name != 'mongke':
+        return None
+    try:
+        from source_validator import validate_task_sources
+        result = validate_task_sources(task_content)
+        if result['urls_checked'] > 0:
+            print(f"  🔍 Source validation: {result['urls_reachable']}/{result['urls_checked']} "
+                  f"reachable ({result['elapsed_ms']}ms)")
+        if result['block']:
+            # Log to ledger for observability
+            _append_ledger({
+                "task_id": task_id or "unknown",
+                "event": "SOURCE_VALIDATION_BLOCKED",
+                "ts": datetime.now().isoformat(),
+                "agent": agent_name,
+                "urls_checked": result['urls_checked'],
+                "urls_failed": result['urls_failed'],
+                "reason": result['reason'][:300],
+                "elapsed_ms": result['elapsed_ms'],
+            })
+            return {
+                "success": False,
+                "error": f"Pre-execution source validation failed: {result['reason'][:200]}",
+                "model": "source_validator",
+                "latency_ms": result['elapsed_ms'],
+            }
+    except Exception as e:
+        # Validator import/crash should not block task execution
+        print(f"  ⚠ Source validator error (non-blocking): {e}")
+    return None
+
+
+def process_task(agent_name, task):
+    """Process a single task.
+
+    Routes to Ollama executor for agents with executor='ollama' (text-only local models).
+    Routes to Claude Code executor for all other agents (full tool access).
+    """
+    # Use full task content for execution, not just the summary line
     task_content = task.get('full_content', task['task'])
     task_id = task.get('task_id')
     print(f"\n📋 Processing: {task['task'][:80]}...")
@@ -268,15 +1108,136 @@ def process_task(agent_name, task):
     executing_file = mark_task_executing(task['file'])
     print(f"  Status: executing")
 
+    # Pre-execution snapshot for rollback capability
+    if task_id:
+        try:
+            from task_snapshot import create_snapshot
+            # Redirect snapshot logging to prevent stderr pollution affecting error detection
+            import logging
+            snapshot_logger = logging.getLogger('task_snapshot')
+            original_level = snapshot_logger.level
+            snapshot_logger.setLevel(logging.WARNING)  # Only log warnings/errors
+            snap = create_snapshot(agent_name, task_id, os.path.basename(task['file']))
+            snapshot_logger.setLevel(original_level)  # Restore original level
+            print(f"  📸 Snapshot created: {snap['file_count']} files ({snap['archive_size_bytes']} bytes)")
+        except Exception as e:
+            print(f"  ⚠ Snapshot failed (non-blocking): {e}")
+
+    # Pre-execution source validation (mongke research tasks)
+    pre_fail = _pre_validate_research_sources(agent_name, task_content, task_id)
+    if pre_fail:
+        print(f"  ✗ Source validation BLOCKED: {pre_fail['error'][:120]}")
+        mark_task_completed(task['file'], 'failed', executing_file=executing_file)
+        if task_id:
+            _append_ledger({
+                "task_id": task_id,
+                "event": "EXECUTION_DETAIL",
+                "ts": datetime.now().isoformat(),
+                "agent": agent_name,
+                "execution_time_s": pre_fail.get('latency_ms', 0) / 1000,
+                "error": pre_fail['error'][:500],
+                "success": False,
+                "executor": "source_validator",
+            })
+        return False
+
     # Load agent config
     config = load_agent_config(agent_name)
 
-    # Execute via Claude Code
+    # Route to appropriate executor based on config
+    executor = config.get('executor', 'claude-code')
     skill_hint = task.get('skill_hint')
-    print(f"  🤖 Executing via Claude Code...{f' (skill: {skill_hint})' if skill_hint else ''}")
-    start_time = time.time()
-    result = execute_task_with_llm(agent_name, task_content, config, skill_hint=skill_hint)
-    elapsed_s = round(time.time() - start_time, 1)
+    priority = task.get('priority', 'normal')
+    priority_timeout = TIMEOUT_BY_PRIORITY.get(priority, CLAUDE_TIMEOUT)
+    skill_timeout = SLOW_SKILLS.get(skill_hint, 0)
+    timeout = max(priority_timeout, skill_timeout)
+
+    if executor == 'ollama':
+        # Direct Ollama API call (no tools, text-only)
+        print(f"  🤖 Executing via Ollama (direct API)... (timeout: {timeout}s)")
+        start_time = time.time()
+        result = execute_task_with_ollama(agent_name, task_content, config, timeout=timeout)
+        elapsed_s = round(time.time() - start_time, 1)
+        executor_name = "ollama"
+    else:
+        # Claude Code with full tool access
+        print(f"  🤖 Executing via Claude Code...{f' (skill: {skill_hint})' if skill_hint else ''} (timeout: {timeout}s)")
+        start_time = time.time()
+        VALID_MODELS = {
+            # Only Claude models are valid for Claude Code executor
+            'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
+        }
+        PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+        model = config.get('model')
+        # Fallback: check .claude/settings.json if config.json has no model
+        if not model:
+            try:
+                settings_path = f"{AGENTS_DIR}/{agent_name}/.claude/settings.json"
+                with open(settings_path, 'r') as _sf:
+                    settings = json.load(_sf)
+                model = settings.get('model')
+                debug_msg = f"SETTINGS_READ: settings_path={settings_path}, model={model}\n"
+                with open('/tmp/agent_handler_debug.log', 'a') as f:
+                    f.write(debug_msg)
+            except Exception as e:
+                debug_msg = f"SETTINGS_ERROR: {type(e).__name__}: {e}\n"
+                with open('/tmp/agent_handler_debug.log', 'a') as f:
+                    f.write(debug_msg)
+                pass
+        # Check if using a proxy endpoint
+        proxy_url = None
+        try:
+            settings_path = f"{AGENTS_DIR}/{agent_name}/.claude/settings.json"
+            with open(settings_path, 'r') as _sf:
+                settings = json.load(_sf)
+            proxy_url = settings.get('env', {}).get('ANTHROPIC_BASE_URL', '')
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+        is_using_proxy = any(endpoint in proxy_url for endpoint in PROXY_ENDPOINTS) if proxy_url else False
+        # Validate model - allow proxy models when using proxy
+        if model and model not in VALID_MODELS and not is_using_proxy:
+            print(f"  ⚠ REJECTED non-Claude model '{model}' from config — using claude-opus-4-6")
+            model = None
+        # Capture env_model for fallback before potentially clearing model
+        env_model = None
+        if not env_model:
+            try:
+                settings_path = f"{AGENTS_DIR}/{agent_name}/.claude/settings.json"
+                with open(settings_path, 'r') as _sf:
+                    settings = json.load(_sf)
+                env_model = settings.get('env', {}).get('ANTHROPIC_MODEL')
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+        # If using proxy with a proxy model, don't pass --model (let env var handle it)
+        if is_using_proxy and model and model not in VALID_MODELS:
+            print(f"  ✓ Using proxy model '{model}' via ANTHROPIC_MODEL env var")
+            model = None  # Don't pass --model, let env var handle it
+        selected_model = model or env_model or 'claude-opus-4-6'
+        debug_msg = f"MODEL_SELECT: model={model}, selected_model={selected_model}, is_using_proxy={is_using_proxy}\n"
+        with open('/tmp/agent_handler_debug.log', 'a') as f:
+            f.write(debug_msg)
+        print(f"  🔧 Model selection: config={config.get('model', '(none)')}, resolved={selected_model}, proxy={is_using_proxy}")
+        result = execute_task_with_llm(agent_name, task_content, config, skill_hint=skill_hint, timeout=timeout, priority=priority, model=selected_model)
+        elapsed_s = round(time.time() - start_time, 1)
+        executor_name = "claude-code"
+
+    # Extract skill invocations from Claude Code session transcript (only for claude-code)
+    if task_id and executor == 'claude-code':
+        _extract_skills_from_transcript(agent_name, start_time, task_id, skill_hint)
+
+    # Analyze tool usage from stdout and append EXECUTION_TRACE (only for claude-code)
+    output_for_trace = result.get('content', '') or result.get('error', '') or ''
+    if task_id and executor == 'claude-code' and output_for_trace:
+        trace = _analyze_tool_usage(output_for_trace)
+        _append_ledger({
+            "task_id": task_id,
+            "event": "EXECUTION_TRACE",
+            "ts": datetime.now().isoformat(),
+            "agent": agent_name,
+            "executor": "claude-code",
+            **trace,
+            "skill_version": 1,
+        })
 
     if result.get('success'):
         # Save result to workspace
@@ -287,13 +1248,13 @@ def process_task(agent_name, task):
         with open(result_file, 'w') as f:
             f.write(f"# Task Result\n\n")
             f.write(f"**Task:** {task['task']}\n\n")
-            f.write(f"**Model:** claude-code\n\n")
+            f.write(f"**Model:** {result.get('model', executor_name)}\n\n")
             f.write(f"---\n\n")
             f.write(f"{result.get('content', 'No content')}\n")
 
         print(f"  ✓ Result saved: {result_file}")
-        mark_task_completed(task['file'], 'completed')
-        print(f"  ✓ Task completed via Claude Code ({elapsed_s}s)")
+        mark_task_completed(task['file'], 'completed', executing_file=executing_file)
+        print(f"  ✓ Task completed via {executor_name} ({elapsed_s}s)")
 
         # Emit execution metadata to ledger
         if task_id:
@@ -307,16 +1268,57 @@ def process_task(agent_name, task):
                 "output_lines": len(output_content.splitlines()),
                 "result_file": result_file,
                 "success": True,
+                "executor": executor_name,
             })
+            # Check if task warrants architecture.md update (only for claude-code)
+            if executor == 'claude-code':
+                _check_architecture_update(agent_name, task_content, output_content, task_id)
+
+        # Persist research findings to Neo4j (mongke only, non-fatal)
+        try:
+            from persist_research import persist_task_research
+            persist_task_research(agent_name, task.get('task', ''),
+                                 result.get('content', ''), task_id)
+        except Exception:
+            pass
 
         # Update Neo4j
         update_agent_state(agent_name, 'idle', None, increment_completed=True)
 
+        # Write per-agent breadcrumb for /task-complete (avoids ledger race)
+        try:
+            bc_path = os.path.join(str(_TASK_LEDGER.parent),
+                                   f"last-completion-{agent_name}.json")
+            with open(bc_path, "w") as f:
+                json.dump({
+                    "task_id": task_id,
+                    "agent": agent_name,
+                    "result_file": result_file,
+                    "execution_time_s": elapsed_s,
+                    "task_summary": task['task'][:200],
+                    "ts": datetime.now().isoformat(),
+                }, f)
+        except Exception:
+            pass
+
+        # Spawn /task-complete skill (non-blocking with timeout/reaping)
+        _spawn_haiku_completion(agent_name)
+
+        # Emit pipeline event for observability
+        try:
+            from neo4j_task_tracker import get_tracker
+            get_tracker().emit_pipeline_event(
+                "TASK_COMPLETE_REPORT", agent=agent_name,
+                payload={"task_id": task_id, "execution_time_s": elapsed_s},
+            )
+        except Exception:
+            pass
+
         return True
     else:
         error_msg = result.get('error', 'Unknown error')
-        print(f"  ✗ Claude Code failed: {error_msg[:200]}")
-        mark_task_completed(task['file'], 'failed')
+        print(f"  ✗ {executor_name} failed: {error_msg[:200]}")
+        mark_task_completed(task['file'], 'failed', executing_file=executing_file)
 
         if task_id:
             _append_ledger({
@@ -327,7 +1329,18 @@ def process_task(agent_name, task):
                 "execution_time_s": elapsed_s,
                 "error": error_msg[:500],
                 "success": False,
+                "executor": executor_name,
             })
+
+        # Emit pipeline event for observability
+        try:
+            from neo4j_task_tracker import get_tracker
+            get_tracker().emit_pipeline_event(
+                "FAILURE_ALERT", agent=agent_name,
+                payload={"task_id": task_id, "error": error_msg[:200]},
+            )
+        except Exception:
+            pass
 
         return False
 
@@ -382,13 +1395,22 @@ def execute_single_task(agent_name, task_file):
     task_id = _extract_task_id(content)
     skill_hint = _extract_skill_hint(content)
 
+    # Determine priority from filename prefix
+    basename = os.path.basename(task_file).lower()
+    if basename.startswith('high-'):
+        priority = 'high'
+    elif basename.startswith('low-'):
+        priority = 'low'
+    else:
+        priority = 'normal'
+
     task = {
         'file': task_file,
         'task': task_desc,
         'task_id': task_id,
         'skill_hint': skill_hint,
         'full_content': content,  # Pass full content to Claude Code
-        'priority': 'normal',
+        'priority': priority,
         'depth': depth,
     }
 

@@ -27,6 +27,7 @@ import time
 import subprocess
 import signal
 import json
+import fcntl
 from pathlib import Path
 from datetime import datetime, timedelta
 from threading import Thread, Event, Lock
@@ -34,30 +35,91 @@ from concurrent.futures import ThreadPoolExecutor, Future
 
 sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
+from kurultai_paths import (
+    AGENTS_DIR, TASK_LEDGER, SPAWN_QUEUE, WATCHER_STATE as STATE_FILE,
+    VALID_AGENTS as _VALID_AGENTS, CLAUDE_AGENT as _CLAUDE_AGENT_PATH,
+)
+from kurultai_ledger import append_ledger as _kp_append_ledger
+
+# Neo4j sync — lazy-loaded, never blocks task execution
+_neo4j_driver = None
+
+def _get_neo4j_driver():
+    """Lazy-load Neo4j driver. Returns None if unavailable."""
+    global _neo4j_driver
+    if _neo4j_driver is None:
+        try:
+            from neo4j_task_tracker import get_driver
+            _neo4j_driver = get_driver()
+        except Exception as e:
+            log(f"Neo4j driver init failed (non-fatal): {e}")
+            return None
+    return _neo4j_driver
+
+def _neo4j_update_status(task_id, status, agent=None, error_msg=None):
+    """Fire-and-forget Neo4j status update. Never raises."""
+    if not task_id:
+        return
+    try:
+        driver = _get_neo4j_driver()
+        if not driver:
+            return
+        with driver.session() as session:
+            is_terminal = status in ('COMPLETED', 'FAILED', 'TIMEOUT', 'CANCELLED')
+            session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                SET t.status = $status,
+                    t.updated = datetime(),
+                    t.error = CASE WHEN $error IS NOT NULL THEN $error ELSE t.error END,
+                    t.started = CASE WHEN $status = 'EXECUTING' THEN datetime() ELSE t.started END,
+                    t.completed = CASE WHEN $is_terminal THEN datetime() ELSE t.completed END
+            """, task_id=task_id, status=status, error=error_msg, is_terminal=is_terminal)
+    except Exception as e:
+        log(f"Neo4j update failed for {task_id}->{status} (non-fatal): {e}")
+
+
+def _neo4j_reconcile():
+    """Run Neo4j/filesystem state reconciliation. Never raises."""
+    try:
+        from neo4j_task_tracker import TaskTracker
+        tracker = TaskTracker()
+        try:
+            result = tracker.sync_reconcile()
+            if result.get("fixed", 0) > 0:
+                log(f"NEO4J RECONCILE: fixed {result['fixed']}/{result['discrepancies']} discrepancies (skipped {result['skipped']})")
+        finally:
+            tracker.close()
+    except Exception as e:
+        log(f"Neo4j reconcile failed (non-fatal): {e}")
+
 
 # Force unbuffered output for launchd (stdout goes to file)
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
-# Configuration
-AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
-STATE_FILE = Path("/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json")
-SPAWN_QUEUE = Path("/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json")
-TASK_LEDGER = Path("/Users/kublai/.openclaw/tasks/task-ledger.jsonl")
-CLAUDE_AGENT = "/Users/kublai/.local/bin/claude-agent"
+# Configuration (paths imported from kurultai_paths above)
+CLAUDE_AGENT = str(_CLAUDE_AGENT_PATH)
 POLL_INTERVAL_DEFAULT = 15  # seconds
-TIMEOUT_DEFAULT = 600  # 10 minutes for Claude Code execution
+TIMEOUT_DEFAULT = 7200  # 2 hours for Claude Code execution
+TIMEOUT_BY_PRIORITY = {
+    'high': 7200,   # 2 hours for complex high-priority tasks
+    'normal': 7200, # 2 hours
+    'low': 7200,    # 2 hours
+}
 CLEANUP_INTERVAL = 300  # Run cleanup every 5 minutes (aligned with tick heartbeat)
 DONE_FILE_MAX_AGE = 48 * 3600  # 48 hours in seconds
 MAX_CONCURRENT_AGENTS = 6  # One slot per agent
-VALID_AGENTS = {"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "subagent"}
+VALID_AGENTS = _VALID_AGENTS | {"subagent"}
 SPAWN_TIMEOUT_MINUTES = 30  # Mark running spawns as completed after this
-STALE_EXECUTING_AGE = TIMEOUT_DEFAULT + 120  # 12 minutes: mark .executing files as failed after this
+STALE_EXECUTING_AGE = max(TIMEOUT_BY_PRIORITY.values()) + 120  # max timeout + 2min buffer: mark .executing files as failed after this
+HARD_MAX_EXECUTING_AGE = 10800  # 3 hours: kill and recover regardless of PID status (prevents zombie accumulation across watcher restarts)
 MAX_RETRY_COUNT = 2  # After this many retries, mark as .failed.done permanently
+RATE_LIMIT_COOLDOWN = 120  # Seconds to wait before retrying a rate-limited task
 
 # Notification config
 SEND_SIGNAL_SCRIPT = Path.home() / ".claude" / "skills" / "agent-collaboration" / "scripts" / "send_signal.sh"
 NOTIFY_ON_COMPLETE = True  # Send Signal + webapp notification when tasks finish
+VERIFY_ON_COMPLETE = True  # Run post-completion verification
 
 # Global state for daemon mode
 stop_event = Event()
@@ -86,14 +148,123 @@ def _extract_task_id(task_file):
         return None
 
 
-def _append_ledger(entry):
-    """Append an event to the unified task-ledger.jsonl."""
+def _extract_skill_hint(task_file):
+    """Extract skill_hint from task file frontmatter."""
     try:
-        TASK_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-        with open(TASK_LEDGER, "a") as f:
-            f.write(json.dumps(entry) + "\n")
+        content = task_file.read_text(encoding="utf-8", errors="replace")
+        match = re.search(r'^skill_hint:\s*(\S+)', content, re.MULTILINE)
+        return match.group(1) if match else None
     except Exception:
-        pass
+        return None
+
+
+def _append_ledger(entry):
+    """Append an event to the unified task-ledger.jsonl (flock-safe via kurultai_paths)."""
+    _kp_append_ledger(entry)
+
+
+# Queue redistribution monitoring
+QUEUE_CHECK_INTERVAL = 300  # Check every 5 minutes (same as cleanup)
+_last_queue_check = 0
+
+
+def _check_queue_redistribution():
+    """Check for queue imbalance and trigger redistribution if needed.
+
+    Runs every cleanup cycle. Logs warnings when agents are overloaded
+    while others are underutilized. Auto-triggers redistribution when:
+    - Any agent exceeds QUEUE_CRITICAL_THRESHOLD (30)
+    - Underutilized agents (< 5) are available to receive tasks
+    """
+    global _last_queue_check
+
+    import time
+    current_time = time.time()
+    if current_time - _last_queue_check < QUEUE_CHECK_INTERVAL:
+        return
+    _last_queue_check = current_time
+
+    try:
+        # Import task_intake functions for queue checking
+        sys.path.insert(0, str(Path(__file__).parent))
+        from task_intake import (
+            get_all_agent_queue_depths,
+            should_redistribute_tasks,
+            QUEUE_HIGH_THRESHOLD,
+            QUEUE_CRITICAL_THRESHOLD,
+            QUEUE_LOW_THRESHOLD,
+        )
+
+        depths = get_all_agent_queue_depths()
+        redistribution = should_redistribute_tasks()
+
+        # Log summary
+        log(f"QUEUE STATUS: " + ", ".join([f"{a}={d}" for a, d in sorted(depths.items())]))
+
+        # Check for critical queues - auto-trigger redistribution
+        critical = [(a, d) for a, d in depths.items() if d >= QUEUE_CRITICAL_THRESHOLD]
+        if critical:
+            for agent, depth in critical:
+                log(f"QUEUE CRITICAL: {agent} has {depth} tasks (threshold: {QUEUE_CRITICAL_THRESHOLD})")
+
+            # Auto-redistribute if we have critical queues and underutilized agents
+            if redistribution:
+                log(f"QUEUE AUTO-REDISTRIBUTION: Triggering redistribution for critical queues")
+                _trigger_auto_redistribution()
+
+        # Log redistribution recommendations
+        if redistribution:
+            for ov_agent, underutilized in redistribution:
+                un_list = ", ".join([f"{a}({d})" for a, d in underutilized])
+                log(f"QUEUE REDISTRIBUTION: {ov_agent}({depths[ov_agent]}) can offload to: {un_list}")
+
+        # Check for ogedei idle warning (per success criteria)
+        ogedei_depth = depths.get('ogedei', 0)
+        total_pending = sum(depths.values())
+        if ogedei_depth < QUEUE_LOW_THRESHOLD and total_pending > QUEUE_HIGH_THRESHOLD:
+            log(f"QUEUE WARNING: ogedei underutilized ({ogedei_depth}) while total queue is {total_pending}")
+
+            # Trigger redistribution to get ogedei working
+            if ogedei_depth == 0:
+                log(f"QUEUE: Triggering redistribution to activate idle ogedei")
+                _trigger_auto_redistribution(max_move=5)
+
+    except Exception as e:
+        log(f"Queue check error: {e}")
+
+
+def _trigger_auto_redistribution(max_move=10):
+    """Trigger automatic task redistribution.
+
+    Calls task-redistribute.py to move tasks from overloaded to underutilized agents.
+    This runs in the background and doesn't block the task watcher.
+    """
+    try:
+        script_path = Path(__file__).parent / "task-redistribute.py"
+        if not script_path.exists():
+            log(f"Auto-redistribution: Script not found: {script_path}")
+            return
+
+        # Run redistribution in background subprocess
+        import subprocess
+        log_path = Path(__file__).parent.parent / "logs" / "redistribution.log"
+
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                str(script_path),
+                "--max-move", str(max_move),
+                "--log", str(log_path.with_suffix('.json'))
+            ],
+            stdout=open(log_path, 'a'),
+            stderr=subprocess.STDOUT,
+            cwd=str(Path(__file__).parent)
+        )
+
+        log(f"Auto-redistribution: Started (PID {proc.pid}, max_move={max_move})")
+
+    except Exception as e:
+        log(f"Auto-redistribution error: {e}")
 
 
 def load_state():
@@ -128,6 +299,26 @@ def list_pending_tasks(agent_dir):
     for f in tasks_dir.glob("*.md"):
         # Skip completed/executing tasks
         if any(x in f.name for x in ['.executing', '.completed', '.done']):
+            continue
+        # Skip continuous/recurring tasks (only run when explicitly triggered)
+        try:
+            head = f.read_text()[:500]
+            if head.startswith("---") and "\ntype: continuous" in head.split("---", 2)[1]:
+                continue
+        except Exception:
+            pass
+        # Skip paused tasks (paused: true or status: paused in frontmatter)
+        try:
+            head = f.read_text()[:500]
+            if head.startswith("---"):
+                frontmatter = head.split("---", 2)[1] if "---" in head else ""
+                if "\nstatus: paused" in frontmatter or "\npaused: true" in frontmatter:
+                    continue
+        except Exception:
+            pass
+        # Skip tasks in rate-limit cooldown
+        cooldown = _extract_cooldown_until(f)
+        if cooldown and cooldown > datetime.now():
             continue
         pending.append(f)
 
@@ -165,13 +356,112 @@ def _extract_task_source(task_file):
         return ""
 
 
+def _extract_notify_metadata(task_file):
+    """Extract notify_on_complete, notify_channel, notify_target from frontmatter.
+
+    Returns dict with keys or empty dict if notify_on_complete is not set.
+    """
+    try:
+        content = task_file.read_text(encoding="utf-8", errors="replace")[:2000]
+        notify_match = re.search(r'^notify_on_complete:\s*true', content, re.MULTILINE)
+        if not notify_match:
+            return {}
+        channel_match = re.search(r'^notify_channel:\s*(\S+)', content, re.MULTILINE)
+        target_match = re.search(r'^notify_target:\s*(\S+)', content, re.MULTILINE)
+        created_match = re.search(r'^created:\s*(.+)', content, re.MULTILINE)
+        return {
+            "notify_on_complete": True,
+            "notify_channel": channel_match.group(1) if channel_match else "signal",
+            "notify_target": target_match.group(1) if target_match else "+19194133445",
+            "created": created_match.group(1).strip() if created_match else None,
+        }
+    except Exception:
+        return {}
+
+
+# Notification log path
+NOTIFICATION_LOG = AGENTS_DIR / "main" / "logs" / "notifications.log"
+
+
+def _has_been_notified(task_id):
+    """Check if a task_id has already been notified (dedup guard)."""
+    if not task_id or not NOTIFICATION_LOG.exists():
+        return False
+    try:
+        content = NOTIFICATION_LOG.read_text(encoding="utf-8", errors="replace")
+        return f"task_id={task_id}" in content
+    except Exception:
+        return False
+
+
+def _log_notification(task_id, agent, task_label, result, target):
+    """Append to notifications.log for dedup and audit."""
+    try:
+        NOTIFICATION_LOG.parent.mkdir(parents=True, exist_ok=True)
+        entry = (
+            f"[{datetime.now().isoformat()}] task_id={task_id} agent={agent} "
+            f"result={result} target={target} label={task_label[:80]}\n"
+        )
+        with open(NOTIFICATION_LOG, "a") as f:
+            f.write(entry)
+    except Exception as e:
+        log(f"  Notification log error: {e}")
+
+
+def _send_task_notify(agent, task_label, task_id, success, elapsed_s, notify_meta):
+    """Send per-task completion notification via Signal when notify_on_complete is set."""
+    if not notify_meta.get("notify_on_complete"):
+        return
+    if _has_been_notified(task_id):
+        log(f"  NOTIFY SKIP: {task_id} already notified")
+        return
+
+    result = "completed" if success else "failed"
+    duration = f"{int(elapsed_s)}s"
+    if elapsed_s >= 60:
+        duration = f"{int(elapsed_s // 60)}m {int(elapsed_s % 60)}s"
+
+    status_icon = "✅" if success else "❌"
+    msg = (
+        f"{status_icon} Task Complete: {task_label}\n"
+        f"Agent: {agent}\n"
+        f"Task ID: {task_id or 'unknown'}\n"
+        f"Duration: {duration}\n"
+        f"Result: {result}"
+    )
+
+    target = notify_meta.get("notify_target", "+19194133445")
+    channel = notify_meta.get("notify_channel", "signal")
+
+    def _send():
+        sent = False
+        if channel == "signal" and SEND_SIGNAL_SCRIPT.exists():
+            try:
+                r = subprocess.run(
+                    ["bash", str(SEND_SIGNAL_SCRIPT), msg, "--dm", target],
+                    capture_output=True, timeout=15,
+                )
+                sent = r.returncode == 0
+                if sent:
+                    log(f"  NOTIFY OK: {task_id} -> {target}")
+                else:
+                    log(f"  NOTIFY FAIL: {task_id} signal error: {r.stderr[:200]}")
+            except Exception as e:
+                log(f"  NOTIFY ERROR: {task_id}: {e}")
+
+        _log_notification(task_id, agent, task_label, result, target)
+
+    t = Thread(target=_send, daemon=True)
+    t.start()
+
+
 # Sources that are heartbeat/automated — silent unless errors
 _HEARTBEAT_SOURCES = {"kublai-actions", "agent-self-wake", "agent-self-wake (rule t7)"}
 # Sources that always notify on completion (kurultai results)
 _KURULTAI_SOURCES = {"hourly-reflection", "kublai-reflection"}
 
 
-def _notify_completion(agent, task_label, success, elapsed_s, source=""):
+def _notify_completion(agent, task_label, success, elapsed_s, source="", result=""):
     """Send task completion notification via Signal and webapp.
 
     Notification rules:
@@ -182,13 +472,12 @@ def _notify_completion(agent, task_label, success, elapsed_s, source=""):
     """
     source_lower = source.lower()
 
-    if success and source_lower in _HEARTBEAT_SOURCES:
-        return  # Heartbeat success — silent
-
     if success:
-        msg = f"[OK] {agent}: {task_label} — completed ({elapsed_s}s)"
+        return  # Success notifications handled by /task-complete skill in agent-task-handler
+
     else:
-        msg = f"[ALERT] {agent}: {task_label} — FAILED ({elapsed_s}s)"
+        error_snippet = (" | " + result[:200]) if result else ""
+        msg = f"[ALERT] {agent}: {task_label} — FAILED ({elapsed_s}s){error_snippet}"
 
     def _send():
         # 1. Signal notification
@@ -215,6 +504,236 @@ def _notify_completion(agent, task_label, success, elapsed_s, source=""):
     t.start()
 
 
+def _schedule_verification(task_file, agent, task_id):
+    """Schedule post-completion verification in a background thread.
+
+    Finds the .completed.done.md file (agent-task-handler renames it)
+    and runs task-verifier.py against it. Non-blocking, fire-and-forget.
+    """
+    def _verify():
+        try:
+            # Find the completed file (task_file was the original .md path)
+            tasks_dir = task_file.parent
+            stem = task_file.stem.replace('.executing', '')
+            # Search for .completed.done.md matching this task
+            candidates = list(tasks_dir.glob(f"{stem}*.completed.done.md"))
+            if not candidates:
+                # Broader search by task_id prefix
+                if task_id:
+                    short_id = task_id[:8]
+                    candidates = [f for f in tasks_dir.glob("*.completed.done.md")
+                                  if short_id in f.name or
+                                  abs(f.stat().st_mtime - time.time()) < 60]
+            if not candidates:
+                log(f"  VERIFY: no .completed.done.md found for {agent}/{task_file.name}")
+                return
+
+            completed_file = str(candidates[0])
+            verifier = str(Path(__file__).parent / "task-verifier.py")
+            result = subprocess.run(
+                ["python3", verifier,
+                 "--task-file", completed_file,
+                 "--agent", agent,
+                 "--json"],
+                capture_output=True, text=True, timeout=120,
+            )
+
+            if result.returncode == 0:
+                log(f"  VERIFY OK: {agent}/{Path(completed_file).name}")
+            else:
+                # Parse JSON for failure details
+                detail = ""
+                try:
+                    data = json.loads(result.stdout)
+                    failed = [d for d in data.get("details", []) if not d.get("passed")]
+                    if failed:
+                        detail = f" ({failed[0].get('check', '')}: {failed[0].get('detail', '')[:60]})"
+                except (json.JSONDecodeError, KeyError):
+                    pass
+                log(f"  VERIFY FAIL: {agent}/{Path(completed_file).name}{detail}")
+
+        except subprocess.TimeoutExpired:
+            log(f"  VERIFY TIMEOUT: {agent}/{task_file.name}")
+        except Exception as e:
+            log(f"  VERIFY ERROR: {agent}/{task_file.name}: {e}")
+
+    t = Thread(target=_verify, daemon=True)
+    t.start()
+
+
+SLOW_SKILLS = {
+    '/horde-brainstorming': 900,
+    '/golden-horde': 900,
+    '/horde-implement': 900,
+    '/horde-review': 900,
+    '/horde-debug': 900,
+    '/horde-learn': 900,
+    '/horde-swarm': 900,
+    '/horde-test': 900,
+}
+
+
+def _timeout_for_task(task_file):
+    """Return timeout based on priority AND skill_hint (matches agent-task-handler logic)."""
+    name = task_file.name.lower()
+    priority_timeout = TIMEOUT_DEFAULT
+    for prefix in ('high-', 'normal-', 'low-'):
+        if name.startswith(prefix):
+            priority_timeout = TIMEOUT_BY_PRIORITY.get(prefix.rstrip('-'), TIMEOUT_DEFAULT)
+            break
+
+    skill_hint = _extract_skill_hint(task_file)
+    skill_timeout = SLOW_SKILLS.get(skill_hint, 0)
+    return max(priority_timeout, skill_timeout)
+
+
+def _extract_retry_count(task_file):
+    """Extract retry_count from task file frontmatter."""
+    try:
+        content = task_file.read_text(encoding="utf-8", errors="replace")[:2000]
+        match = re.search(r'^retry_count:\s*(\d+)', content, re.MULTILINE)
+        return int(match.group(1)) if match else 0
+    except Exception:
+        return 0
+
+
+def _is_rate_limit_failure(error_msg):
+    """Detect rate limit errors in failure output."""
+    if not error_msg:
+        return False
+    lower = error_msg.lower()
+    return any(p in lower for p in [
+        "rate limit", "rate_limit", "rate-limit",
+        "429", "too many requests", "quota exceeded",
+        "overloaded", "capacity", "throttl",
+    ])
+
+
+def _extract_cooldown_until(task_file):
+    """Extract cooldown_until timestamp from task file frontmatter."""
+    try:
+        content = task_file.read_text(encoding="utf-8", errors="replace")[:2000]
+        match = re.search(r'^cooldown_until:\s*(\S+)', content, re.MULTILINE)
+        if match:
+            return datetime.fromisoformat(match.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def _append_failure_context(task_file, agent, error_msg, elapsed_s):
+    """Append failure context to task file and increment retry count.
+
+    Instead of marking as .failed.done, we append the failure reason and
+    keep the file as .md so it can be re-executed. After MAX_RETRY_COUNT
+    failures, the file is marked as .failed.done permanently.
+    
+    Returns True if permanently failed, False if will retry.
+    """
+    # Determine the base name and find the actual file
+    base_name = task_file.name.replace('.executing.md', '.md').replace('.failed.done.md', '.md')
+    task_dir = task_file.parent
+    
+    # Find the actual file (could be .md, .executing.md, or .failed.done.md)
+    source_file = None
+    for candidate_name in [base_name, base_name.replace('.md', '.executing.md'), base_name.replace('.md', '.failed.done.md')]:
+        candidate = task_dir / candidate_name
+        if candidate.exists():
+            source_file = candidate
+            break
+    
+    if not source_file:
+        log(f"  WARNING: Cannot find task file for {agent}/{base_name}")
+        return True  # Treat as permanent fail if file is missing
+    
+    # Extract retry count from the source file
+    retry_count = _extract_retry_count(source_file)
+    new_retry_count = retry_count + 1
+    is_permanent = new_retry_count >= MAX_RETRY_COUNT
+    
+    # Detect rate limit failures and apply cooldown
+    is_rate_limited = _is_rate_limit_failure(error_msg)
+
+    if is_permanent:
+        # Permanently failed - mark as .failed.done
+        target_name = base_name.replace('.md', '.failed.done.md')
+        failure_section = f"""
+## Failure {new_retry_count} (PERMANENT - max retries reached)
+- **Time:** {datetime.now().isoformat()}
+- **Duration:** {elapsed_s}s
+- **Error:** {error_msg[:1000]}
+"""
+    else:
+        # Re-queue for retry - keep as .md
+        target_name = base_name
+        cooldown_note = ""
+        if is_rate_limited:
+            cooldown_note = f"\n- **Cooldown:** {RATE_LIMIT_COOLDOWN}s (rate limit backoff)"
+        failure_section = f"""
+## Failure {new_retry_count} (will retry)
+- **Time:** {datetime.now().isoformat()}
+- **Duration:** {elapsed_s}s
+- **Error:** {error_msg[:1000]}
+- **Retry count:** {new_retry_count}/{MAX_RETRY_COUNT}{cooldown_note}
+"""
+    
+    target_path = task_dir / target_name
+    
+    try:
+        # Read existing content from source file
+        content = source_file.read_text(encoding="utf-8", errors="replace")
+        
+        # Update retry_count in frontmatter
+        if 'retry_count:' in content:
+            content = re.sub(r'^retry_count:\s*\d+', f'retry_count: {new_retry_count}', content, flags=re.MULTILINE)
+        else:
+            # Insert retry_count after priority line
+            content = re.sub(r'^(priority:.*)$', f'\\1\nretry_count: {new_retry_count}', content, count=1, flags=re.MULTILINE)
+
+        # Add/update cooldown_until for rate-limited retries
+        if is_rate_limited and not is_permanent:
+            cooldown_ts = (datetime.now() + timedelta(seconds=RATE_LIMIT_COOLDOWN)).isoformat()
+            if 'cooldown_until:' in content:
+                content = re.sub(r'^cooldown_until:\s*\S+', f'cooldown_until: {cooldown_ts}', content, flags=re.MULTILINE)
+            else:
+                content = re.sub(r'^(retry_count:.*)$', f'\\1\ncooldown_until: {cooldown_ts}', content, count=1, flags=re.MULTILINE)
+            log(f"  RATE LIMIT COOLDOWN: {agent}/{base_name} will retry after {RATE_LIMIT_COOLDOWN}s")
+        elif 'cooldown_until:' in content:
+            # Clear cooldown for non-rate-limit failures
+            content = re.sub(r'^cooldown_until:.*\n?', '', content, flags=re.MULTILINE)
+
+        # Append failure context at end
+        content = content.rstrip() + '\n' + failure_section
+        
+        # Write to target path
+        target_path.write_text(content, encoding="utf-8")
+        
+        # Clean up old files (source file and any .executing/.pid sentinels)
+        if source_file != target_path:
+            source_file.unlink(missing_ok=True)
+        executing_file = task_dir / base_name.replace('.md', '.executing.md')
+        if executing_file.exists() and executing_file != target_path:
+            executing_file.unlink(missing_ok=True)
+        pid_file = task_dir / base_name.replace('.md', '.pid')
+        if pid_file.exists():
+            pid_file.unlink(missing_ok=True)
+        # Also clean up any .failed.done.md that might exist from handler
+        failed_done_file = task_dir / base_name.replace('.md', '.failed.done.md')
+        if failed_done_file.exists() and failed_done_file != target_path:
+            failed_done_file.unlink(missing_ok=True)
+        
+        if is_permanent:
+            log(f"  PERMANENT FAIL: {agent}/{base_name} → {target_name} (retry {new_retry_count}/{MAX_RETRY_COUNT})")
+        else:
+            log(f"  REQUEUE: {agent}/{base_name} will retry (attempt {new_retry_count}/{MAX_RETRY_COUNT})")
+        
+        return is_permanent
+            
+    except Exception as e:
+        log(f"  Failed to append failure context: {e}")
+        return True  # Treat as permanent fail on error
+
+
 def execute_task(task_file, agent, task_key, timeout):
     """Execute a single task file via agent-task-handler.py.
 
@@ -223,7 +742,15 @@ def execute_task(task_file, agent, task_key, timeout):
     task_id = _extract_task_id(task_file)
     start_time = time.time()
 
+    # Extract all file-dependent metadata NOW, before agent-task-handler
+    # renames the file (.md -> .executing.md -> .completed.done.md).
+    # Reading after execution silently fails because the original path is gone.
+    notify_meta = _extract_notify_metadata(task_file)
+    task_label = _extract_task_label(task_file)
+    task_source = _extract_task_source(task_file)
+
     # Emit EXECUTING event
+    skill_hint = _extract_skill_hint(task_file)
     if task_id:
         _append_ledger({
             "task_id": task_id,
@@ -231,7 +758,10 @@ def execute_task(task_file, agent, task_key, timeout):
             "ts": datetime.now().isoformat(),
             "agent": agent,
             "task_file": str(task_file),
+            "skill_hint": skill_hint,
+            "executor": "claude-code",
         })
+        _neo4j_update_status(task_id, "EXECUTING", agent=agent)
 
     cmd = [
         "python3",
@@ -240,20 +770,55 @@ def execute_task(task_file, agent, task_key, timeout):
         "--task-file", str(task_file),
     ]
 
+    proc = None
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
+            start_new_session=True,  # New session so we can kill entire tree
             cwd=str(task_file.parent.parent.parent),
         )
-        success = result.returncode == 0
-        output = result.stdout[:1000] if success else (result.stderr[:1000] or result.stdout[:1000])
+        stdout, stderr = proc.communicate(timeout=timeout)
+        success = proc.returncode == 0
+        if success:
+            output = stdout[:1000]
+        else:
+            # Combine stderr and stdout, filtering out known non-error messages
+            combined = stderr or ""
+            if stdout:
+                # Filter out snapshot info messages which are not errors
+                filtered_stdout = "\n".join(
+                    line for line in stdout.splitlines()
+                    if not any(x in line for x in [
+                        "Building file manifest",
+                        "Creating archive at",
+                        "Snapshot created:",
+                        "📸 Snapshot created:"
+                    ])
+                )
+                if filtered_stdout.strip():
+                    combined = (combined + "\n" + filtered_stdout).strip() if combined else filtered_stdout
+            output = combined[:1000] if combined else f"Task failed with exit code {proc.returncode} (no output captured)"
+            if not output.strip():
+                output = f"Task failed with exit code {proc.returncode} (no output captured)"
 
     except subprocess.TimeoutExpired:
         success = False
         output = f"Task timed out after {timeout}s"
+        # Kill entire process group (handler + claude + all children)
+        if proc:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                time.sleep(2)
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
     except Exception as e:
         success = False
         output = f"Execution error: {e}"
@@ -264,24 +829,41 @@ def execute_task(task_file, agent, task_key, timeout):
 
     # Emit COMPLETED/FAILED event
     if task_id:
+        final_status = "COMPLETED" if success else "FAILED"
         _append_ledger({
             "task_id": task_id,
-            "event": "COMPLETED" if success else "FAILED",
+            "event": final_status,
             "ts": datetime.now().isoformat(),
             "agent": agent,
             "execution_time_s": elapsed_s,
             "output_lines": len(output.splitlines()) if output else 0,
             "error": output[:500] if not success else None,
         })
+        _neo4j_update_status(task_id, final_status, agent=agent,
+                             error_msg=output[:500] if not success else None)
 
-    # Notify owner
+    # After failure, append failure context and re-queue (or mark permanent after MAX_RETRY_COUNT)
+    is_permanent_fail = False
+    if not success:
+        is_permanent_fail = _append_failure_context(task_file, agent, output, elapsed_s)
+
+    # Notify owner (global error notifications)
+    # task_label and task_source were extracted at top of execute_task()
     if NOTIFY_ON_COMPLETE:
-        task_label = _extract_task_label(task_file)
-        task_source = _extract_task_source(task_file)
-        _notify_completion(agent, task_label, success, elapsed_s, source=task_source)
+        _notify_completion(agent, task_label, success, elapsed_s, source=task_source, result=output)
 
-    # Update state (thread-safe)
-    update_state_entry(task_key, datetime.now().isoformat(), success)
+    # Per-task notify_on_complete (user-requested Signal notification)
+    # notify_meta was extracted at top of execute_task(), before file rename
+    if notify_meta:
+        _send_task_notify(agent, task_label, task_id, success, elapsed_s, notify_meta)
+
+    # Post-completion verification (background thread, non-blocking)
+    if VERIFY_ON_COMPLETE and success:
+        _schedule_verification(task_file, agent, task_id)
+
+    # Update state only on success or permanent failure (not on retry)
+    if success or is_permanent_fail:
+        update_state_entry(task_key, datetime.now().isoformat(), success)
 
     # Clear the active execution slot for this agent
     with active_lock:
@@ -295,9 +877,14 @@ def is_new_task(task_file, agent, state):
     key = f"{agent}/{task_file.name}"
     if key not in state:
         return True
+    entry = state[key]
+    # If state records a failure but the file is still .md (not .failed.done.md),
+    # the cleanup rename failed. Treat as new so it gets re-processed.
+    if not entry.get('success', True):
+        return True
     # Check if file was modified after execution (re-queued)
     try:
-        exec_time = datetime.fromisoformat(state[key]['executed'])
+        exec_time = datetime.fromisoformat(entry['executed'])
         file_mtime = datetime.fromtimestamp(task_file.stat().st_mtime)
         return file_mtime > exec_time
     except (KeyError, ValueError, OSError):
@@ -500,7 +1087,7 @@ def watch_cycle(executor):
 
         agent = agent_dir.name
 
-        # Skip if this agent already has a task running
+        # Skip if this agent already has a task running (in-memory tracking)
         with active_lock:
             if agent in active_executions:
                 fut = active_executions[agent]
@@ -509,8 +1096,36 @@ def watch_cycle(executor):
                 # Future completed but wasn't cleaned up yet
                 active_executions.pop(agent, None)
 
+        # Skip if agent has .executing files on disk (from previous watcher session)
+        # This prevents double-dispatch after watcher restart
+        tasks_dir = agent_dir / "tasks"
+        if tasks_dir.exists():
+            has_executing = any(
+                f.name.endswith('.executing.md') for f in tasks_dir.iterdir()
+                if f.is_file() and '.done' not in f.name
+            )
+            if has_executing:
+                continue
+
         pending = list_pending_tasks(agent_dir)
         new_tasks = [f for f in pending if is_new_task(f, agent, state)]
+
+        # Clean up orphaned permanently-failed tasks (retry_count >= MAX_RETRY)
+        # that weren't properly renamed to .failed.done.md
+        cleaned = []
+        for f in new_tasks:
+            rc = _extract_retry_count(f)
+            if rc >= MAX_RETRY_COUNT:
+                failed_name = f.name.replace('.md', '.failed.done.md')
+                failed_path = f.parent / failed_name
+                try:
+                    f.rename(failed_path)
+                    log(f"CLEANUP: {agent}/{f.name} → {failed_name} (retry_count={rc} >= {MAX_RETRY_COUNT})")
+                except OSError as e:
+                    log(f"CLEANUP FAILED: {agent}/{f.name}: {e}")
+                continue
+            cleaned.append(f)
+        new_tasks = cleaned
 
         if not new_tasks:
             continue
@@ -522,8 +1137,9 @@ def watch_cycle(executor):
         log(f"NEW TASK: {task_key}")
 
         # Submit to thread pool (non-blocking)
+        timeout = _timeout_for_task(task_file)
         future = executor.submit(
-            execute_task, task_file, agent, task_key, TIMEOUT_DEFAULT
+            execute_task, task_file, agent, task_key, timeout
         )
         with active_lock:
             active_executions[agent] = future
@@ -534,7 +1150,7 @@ def watch_cycle(executor):
 
 
 def cleanup_done_files():
-    """Remove .done task files older than 48 hours."""
+    """Remove .done task files older than 48 hours. Self-wake tasks are removed immediately."""
     now = time.time()
     removed = 0
     for agent_dir in AGENTS_DIR.iterdir():
@@ -548,6 +1164,12 @@ def cleanup_done_files():
                 continue
             try:
                 age = now - f.stat().st_mtime
+                # Self-wake tasks: delete immediately after completion
+                if 'self-wake' in f.name.lower() or 'selfwake' in f.name.lower():
+                    f.unlink()
+                    removed += 1
+                    continue
+                # Regular tasks: delete after 48 hours
                 if age > DONE_FILE_MAX_AGE:
                     f.unlink()
                     removed += 1
@@ -558,6 +1180,82 @@ def cleanup_done_files():
     return removed
 
 
+def recover_stuck_failed_tasks():
+    """Rename permanently-failed tasks that are stuck as .md back to .failed.done.md.
+
+    Bug: When a task hits MAX_RETRY_COUNT, _append_failure_context is supposed to
+    rename it to .failed.done.md. But a race with agent-task-handler's
+    mark_task_completed('failed') can leave the file as .md with retry_count >= MAX
+    and a state entry showing success=False. The watcher's is_new_task() then skips
+    them forever (mtime <= exec_time), blocking the agent's execution slot from
+    picking up genuinely new tasks.
+
+    Fix: Scan for .md files that are in state as permanently failed, and rename them
+    to .failed.done.md so they stop blocking the pending-task scan.
+    """
+    state = load_state()
+    recovered = 0
+
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        agent = agent_dir.name
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+
+        for f in tasks_dir.glob("*.md"):
+            if any(x in f.name for x in ['.executing', '.done']):
+                continue
+            key = f"{agent}/{f.name}"
+            entry = state.get(key)
+            if not entry:
+                continue
+            # Task is in state as failed
+            if entry.get('success', True):
+                continue
+            # Check retry_count in file
+            retry_count = _extract_retry_count(f)
+            if retry_count < MAX_RETRY_COUNT:
+                continue
+            # This task is permanently failed but stuck as .md — rename it
+            failed_name = f.name.replace('.md', '.failed.done.md')
+            failed_path = f.parent / failed_name
+            try:
+                f.rename(failed_path)
+                recovered += 1
+                log(f"  STUCK-FAIL RECOVERY: {key} → {failed_name} (retry_count={retry_count}, was stuck as .md)")
+            except OSError as e:
+                log(f"  STUCK-FAIL RECOVERY ERROR: {key}: {e}")
+
+    if recovered > 0:
+        log(f"Recovered {recovered} stuck-failed task(s)")
+    return recovered
+
+
+def _already_completed(executing_file):
+    """Check if a .completed.done.md or .failed.done.md already exists for this task.
+
+    Prevents the rename race condition where recover_stale_executions() tries to
+    recover a task that mark_task_completed() already finished. Returns True if
+    the task is already done and the .executing.md file should just be cleaned up.
+    """
+    stem = executing_file.name.replace('.executing.md', '')
+    # Strip retry suffixes to get the base stem
+    stem_base = re.sub(r'\.retry-\d+', '', stem)
+    parent = executing_file.parent
+    for done_file in parent.iterdir():
+        if not done_file.name.endswith('.done.md'):
+            continue
+        done_stem = done_file.name.split('.completed.done.md')[0] if '.completed.done.md' in done_file.name else done_file.name.split('.failed.done.md')[0] if '.failed.done.md' in done_file.name else None
+        if done_stem is None:
+            continue
+        done_stem_base = re.sub(r'\.retry-\d+', '', done_stem)
+        if done_stem_base == stem_base:
+            return True
+    return False
+
+
 def recover_stale_executions():
     """Recover tasks stuck in .executing state (orphaned by SIGTERM/crash).
 
@@ -565,9 +1263,219 @@ def recover_stale_executions():
     that was working on it is almost certainly dead. Rename it back to .md so
     the next watch_cycle retries it, or mark it failed if it's been retried
     too many times.
+
+    Also detects DUPLICATE .executing files per agent (caused by race conditions
+    when multiple watcher instances run). When an agent has >1 executing file,
+    only the newest is kept; older ones are recovered immediately.
     """
     now = time.time()
     recovered = 0
+
+    # Phase 1: Detect and recover duplicate .executing files per agent.
+    # Each agent should have at most 1 executing task. Extra ones are orphans
+    # from a double-dispatch race condition and block the agent indefinitely.
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+        agent = agent_dir.name
+        executing_files = []
+        for f in tasks_dir.iterdir():
+            # Only match .executing.md files, NOT .executing.pid sentinels
+            if f.is_file() and f.name.endswith('.executing.md') and '.done' not in f.name:
+                try:
+                    mtime = f.stat().st_mtime
+                    executing_files.append((mtime, f))
+                except OSError:
+                    continue
+        if len(executing_files) > 1:
+            # Sort newest first — keep the newest, recover all older ones
+            recovered = 0  # Reset per-agent counter
+            executing_files.sort(key=lambda x: x[0], reverse=True)
+            for mtime, f in executing_files[1:]:
+                age = now - mtime
+                # Check if this specific execution has a live PID
+                pid_file = f.parent / f.name.replace('.executing.md', '.executing.pid')
+                pid_alive = False
+                if pid_file.exists():
+                    try:
+                        handler_pid = int(pid_file.read_text().strip())
+                        os.kill(handler_pid, 0)
+                        pid_alive = True
+                    except (ValueError, ProcessLookupError, PermissionError, OSError):
+                        pass
+                if pid_alive:
+                    continue  # This one is legitimately running, skip
+
+                # Race guard: handler may have already completed this task
+                if _already_completed(f):
+                    log(f"DEDUP SKIP: {agent}/{f.name} — already completed by handler, cleaning up")
+                    try:
+                        f.unlink()
+                        pid_file_cleanup = f.parent / f.name.replace('.executing.md', '.executing.pid')
+                        if pid_file_cleanup.exists():
+                            pid_file_cleanup.unlink()
+                    except OSError:
+                        pass
+                    continue
+
+                retry_count = len(re.findall(r'\.retry-\d+', f.name))
+                if retry_count >= MAX_RETRY_COUNT:
+                    failed_path = f.parent / f.name.replace('.executing', '.failed.done')
+                    try:
+                        os.rename(f, failed_path)
+                        task_id = _extract_task_id(failed_path)
+                        log(f"DEDUP RECOVER: {agent}/{f.name} → failed.done (duplicate executing, max retries)")
+                        if task_id:
+                            _append_ledger({"task_id": task_id, "event": "FAILED",
+                                "ts": datetime.now().isoformat(), "agent": agent,
+                                "error": f"Duplicate executing file recovered (age={round(age)}s, retries={retry_count})"})
+                            _neo4j_update_status(task_id, "FAILED", agent=agent,
+                                error_msg="Duplicate executing file — double-dispatch race")
+                    except OSError:
+                        continue
+                else:
+                    base_name = f.name.replace('.executing.md', '.md').replace('.executing', '')
+                    if not base_name.endswith('.md'):
+                        base_name += '.md'
+                    retry_name = base_name.replace('.md', f'.retry-{retry_count + 1}.md')
+                    original_path = f.parent / retry_name
+                    try:
+                        if original_path.exists():
+                            dup_path = f.parent / f.name.replace('.executing', '.dup-orphan.done')
+                            os.rename(f, dup_path)
+                            log(f"DEDUP RECOVER: {agent}/{f.name} → dup-orphan.done (retry target exists)")
+                        else:
+                            os.rename(f, original_path)
+                            log(f"DEDUP RECOVER: {agent}/{f.name} → {retry_name} (duplicate executing, retry {retry_count + 1})")
+                            task_id = _extract_task_id(original_path)
+                            if task_id:
+                                _append_ledger({"task_id": task_id, "event": "RECOVERED",
+                                    "ts": datetime.now().isoformat(), "agent": agent,
+                                    "stale_age_s": round(age), "retry": retry_count + 1,
+                                    "reason": "duplicate_executing"})
+                    except OSError:
+                        continue
+                # Clean up PID file if it exists
+                try:
+                    if pid_file.exists():
+                        pid_file.unlink()
+                except OSError:
+                    pass
+                recovered += 1
+            if recovered > 0:
+                log(f"DEDUP: {agent} had {len(executing_files)} executing files, recovered {recovered} duplicate(s)")
+
+    # Phase 1.5: Dead PID fast recovery
+    # If the handler PID is confirmed dead and the task is older than a short
+    # grace period, recover immediately instead of waiting STALE_EXECUTING_AGE
+    # (~2h). This closes the throughput gap where a crashed task blocks an
+    # agent's execution slot for hours.
+    DEAD_PID_GRACE_SECS = 120  # 2 minutes grace to avoid race with startup
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+        agent = agent_dir.name
+        for f in tasks_dir.iterdir():
+            if not f.name.endswith('.executing.md') or '.done' in f.name:
+                continue
+            try:
+                age = now - f.stat().st_mtime
+            except OSError:
+                continue
+            if age < DEAD_PID_GRACE_SECS:
+                continue  # Too young — PID may still be starting up
+            if age >= STALE_EXECUTING_AGE:
+                continue  # Will be handled by Phase 2 below
+
+            # Skip if in-memory future is still running (current watcher session)
+            with active_lock:
+                if agent in active_executions and not active_executions[agent].done():
+                    continue
+
+            # Check PID liveness
+            pid_file = f.parent / f.name.replace('.executing.md', '.executing.pid')
+            if not pid_file.exists():
+                # No PID file = orphan from crash before PID was written
+                pid_alive = False
+            else:
+                try:
+                    handler_pid = int(pid_file.read_text().strip().split('\n')[0])
+                    os.kill(handler_pid, 0)
+                    pid_alive = True
+                except (ValueError, ProcessLookupError, PermissionError, OSError):
+                    pid_alive = False
+
+            if pid_alive:
+                continue  # Process is running fine, let it work
+
+            # PID is dead — fast-recover this task
+
+            # Race guard: handler may have already completed this task
+            if _already_completed(f):
+                log(f"DEAD_PID SKIP: {agent}/{f.name} — already completed by handler, cleaning up")
+                try:
+                    f.unlink()
+                    if pid_file.exists():
+                        pid_file.unlink()
+                except OSError:
+                    pass
+                continue
+
+            retry_count = len(re.findall(r'\.retry-\d+', f.name))
+            actual_age = f"{age/60:.1f}m" if age < 3600 else f"{age/3600:.1f}h"
+            task_id = _extract_task_id(f)
+
+            if retry_count >= MAX_RETRY_COUNT:
+                failed_path = f.parent / f.name.replace('.executing', '.failed.done')
+                try:
+                    os.rename(f, failed_path)
+                    log(f"DEAD_PID RECOVER: {agent}/{f.name} → failed.done (PID dead after {actual_age}, max retries={retry_count})")
+                    if task_id:
+                        _append_ledger({"task_id": task_id, "event": "FAILED",
+                            "ts": datetime.now().isoformat(), "agent": agent,
+                            "error": f"Handler PID dead after {actual_age}, max retries exhausted"})
+                        _neo4j_update_status(task_id, "FAILED", agent=agent,
+                            error_msg=f"Handler PID dead after {actual_age}")
+                except OSError:
+                    continue
+            else:
+                base_name = f.name.replace('.executing.md', '.md').replace('.executing', '')
+                if not base_name.endswith('.md'):
+                    base_name += '.md'
+                retry_name = base_name.replace('.md', f'.retry-{retry_count + 1}.md')
+                original_path = f.parent / retry_name
+                try:
+                    if original_path.exists():
+                        dup_path = f.parent / f.name.replace('.executing', '.deadpid-orphan.done')
+                        os.rename(f, dup_path)
+                        log(f"DEAD_PID RECOVER: {agent}/{f.name} → deadpid-orphan.done (retry target exists)")
+                    else:
+                        os.rename(f, original_path)
+                        log(f"DEAD_PID RECOVER: {agent}/{f.name} → {retry_name} (PID dead after {actual_age}, retry {retry_count + 1})")
+                        if task_id:
+                            _append_ledger({"task_id": task_id, "event": "RECOVERED",
+                                "ts": datetime.now().isoformat(), "agent": agent,
+                                "stale_age_s": round(age), "retry": retry_count + 1,
+                                "reason": "dead_pid_fast_recovery"})
+                            _neo4j_update_status(task_id, "PENDING", agent=agent)
+                except OSError:
+                    continue
+            # Clean up PID file
+            try:
+                if pid_file.exists():
+                    pid_file.unlink()
+            except OSError:
+                pass
+            recovered += 1
+            log(f"DEAD_PID: {agent} slot unblocked — next watch_cycle can dispatch new task")
+
+    # Phase 2: Standard age-based stale recovery
     for agent_dir in AGENTS_DIR.iterdir():
         if not agent_dir.is_dir() or agent_dir.name == 'main':
             continue
@@ -575,7 +1483,8 @@ def recover_stale_executions():
         if not tasks_dir.exists():
             continue
         for f in tasks_dir.iterdir():
-            if '.executing' not in f.name:
+            # Only match .executing.md files, NOT .executing.pid sentinels
+            if not f.name.endswith('.executing.md') or '.done' in f.name:
                 continue
             try:
                 age = now - f.stat().st_mtime
@@ -591,6 +1500,60 @@ def recover_stale_executions():
                 if agent in active_executions and not active_executions[agent].done():
                     continue  # Still running, don't touch
 
+            # Check if handler process is still alive via PID sentinel file
+            pid_file = f.parent / f.name.replace('.executing.md', '.executing.pid')
+
+            # Calculate age from PID file start timestamp (not file mtime, which gets reset on retries)
+            pid_start_ts = None
+            if pid_file.exists():
+                try:
+                    pid_content = pid_file.read_text().strip()
+                    lines = pid_content.split('\n', 1)
+                    handler_pid = int(lines[0])
+                    if len(lines) > 1:
+                        pid_start_ts = float(lines[1])
+                        # Recalculate age based on process start time, not file mtime
+                        age = now - pid_start_ts
+                except (ValueError, IndexError):
+                    handler_pid = None
+
+            force_kill = age >= HARD_MAX_EXECUTING_AGE
+            if pid_file.exists() and handler_pid:
+                try:
+                    os.kill(handler_pid, 0)  # Signal 0 = liveness check
+                    if not force_kill:
+                        actual_age = f"{age/60:.1f}m" if age < 3600 else f"{age/3600:.1f}h"
+                        log(f"RECOVER SKIP: {agent}/{f.name} — handler PID {handler_pid} still alive (age: {actual_age})")
+                        continue
+                    # Hard ceiling exceeded — kill the zombie process tree
+                    actual_age = f"{age/3600:.1f}h" if age >= 3600 else f"{age/60:.1f}m"
+                    log(f"HARD KILL: {agent}/{f.name} — PID {handler_pid} alive but age {actual_age} exceeds {HARD_MAX_EXECUTING_AGE/3600:.0f}h ceiling")
+                    try:
+                        os.killpg(os.getpgid(handler_pid), signal.SIGTERM)
+                        time.sleep(2)
+                        os.killpg(os.getpgid(handler_pid), signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError, OSError):
+                        try:
+                            os.kill(handler_pid, signal.SIGKILL)
+                        except (ProcessLookupError, PermissionError):
+                            pass
+                except (ProcessLookupError, PermissionError):
+                    # Process dead — safe to recover
+                    pass
+                try:
+                    pid_file.unlink()
+                except OSError:
+                    pass
+
+            # Race guard: handler may have already completed this task
+            if _already_completed(f):
+                log(f"RECOVER SKIP: {agent}/{f.name} — already completed by handler, cleaning up")
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+                continue
+
             # Count retries from filename (total .retry-N suffixes)
             retry_count = len(re.findall(r'\.retry-\d+', f.name))
 
@@ -602,13 +1565,15 @@ def recover_stale_executions():
                     task_id = _extract_task_id(failed_path)
                     log(f"RECOVER: {agent}/{f.name} → failed.done (max retries reached)")
                     if task_id:
+                        error_msg = f"Max retries ({MAX_RETRY_COUNT}) exceeded, stale_age={round(age)}s"
                         _append_ledger({
                             "task_id": task_id,
                             "event": "FAILED",
                             "ts": datetime.now().isoformat(),
                             "agent": agent,
-                            "error": f"Max retries ({MAX_RETRY_COUNT}) exceeded, stale_age={round(age)}s",
+                            "error": error_msg,
                         })
+                        _neo4j_update_status(task_id, "FAILED", agent=agent, error_msg=error_msg)
                 except OSError:
                     continue
             else:
@@ -651,6 +1616,62 @@ def recover_stale_executions():
     return recovered
 
 
+_DAEMON_LOCK_FILE = AGENTS_DIR / "main" / "logs" / "task-watcher.lock"
+
+
+def _acquire_daemon_lock():
+    """Acquire exclusive file lock to prevent multiple task-watcher instances.
+
+    Returns the open file descriptor (must be kept alive) or None if another
+    instance is already running.
+
+    Uses open("a+") to avoid truncation race: two processes opening with "w"
+    simultaneously both truncate the file before either acquires the lock,
+    which can cause flock to operate on different file descriptions on some
+    OS/filesystem combinations.  With "a+" the file is never truncated until
+    AFTER the lock is held.
+    """
+    _DAEMON_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = open(_DAEMON_LOCK_FILE, "a+")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        # Another instance holds the lock — check if it's still alive
+        lock_fd.seek(0)
+        existing_content = lock_fd.read().strip().split("\n")
+        lock_fd.close()
+        existing_pid = None
+        try:
+            existing_pid = int(existing_content[0])
+        except (ValueError, IndexError):
+            pass
+        if existing_pid:
+            try:
+                os.kill(existing_pid, 0)  # Liveness check
+                log(f"ABORT: Another task-watcher already running (PID {existing_pid})")
+                return None
+            except (ProcessLookupError, PermissionError):
+                # Stale lock — previous holder is dead, force-acquire
+                log(f"STALE LOCK: PID {existing_pid} is dead, force-acquiring lock")
+                lock_fd = open(_DAEMON_LOCK_FILE, "a+")
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    log("ABORT: Lock contention during stale recovery")
+                    lock_fd.close()
+                    return None
+        else:
+            log("ABORT: Another task-watcher already running (unknown PID)")
+            return None
+
+    # Lock acquired — truncate and write our PID
+    lock_fd.seek(0)
+    lock_fd.truncate()
+    lock_fd.write(f"{os.getpid()}\n{datetime.now().isoformat()}\n")
+    lock_fd.flush()
+    return lock_fd
+
+
 def daemon_loop(poll_interval):
     """Main daemon loop with concurrent execution."""
     log(f"Task Watcher starting (poll interval: {poll_interval}s, max concurrent: {MAX_CONCURRENT_AGENTS})")
@@ -658,6 +1679,7 @@ def daemon_loop(poll_interval):
     log(f"State file: {STATE_FILE}")
 
     last_cleanup = 0
+    cycle_count = 0
 
     # Recover any stale .executing files on startup
     try:
@@ -667,6 +1689,8 @@ def daemon_loop(poll_interval):
 
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_AGENTS) as executor:
         while not stop_event.is_set():
+            cycle_count += 1
+
             try:
                 dispatched = watch_cycle(executor)
                 if dispatched > 0:
@@ -678,9 +1702,20 @@ def daemon_loop(poll_interval):
             if time.time() - last_cleanup > CLEANUP_INTERVAL:
                 try:
                     cleanup_done_files()
+                    recover_stuck_failed_tasks()
                     recover_stale_executions()
                 except Exception as e:
                     log(f"Cleanup/recovery error: {e}")
+                # Neo4j/filesystem state reconciliation (every cleanup cycle)
+                try:
+                    _neo4j_reconcile()
+                except Exception as e:
+                    log(f"Neo4j reconcile error (non-fatal): {e}")
+                # Queue redistribution check
+                try:
+                    _check_queue_redistribution()
+                except Exception as e:
+                    log(f"Queue redistribution check error (non-fatal): {e}")
                 last_cleanup = time.time()
 
             # Sleep in small increments to respond to stop_event quickly
@@ -737,8 +1772,15 @@ def main():
             print(f"\nDispatched {dispatched} tasks")
         sys.exit(0)
 
-    # Daemon / interactive mode
-    daemon_loop(args.poll_interval)
+    # Daemon / interactive mode — acquire exclusive lock first
+    lock_fd = _acquire_daemon_lock()
+    if lock_fd is None:
+        sys.exit(1)
+    try:
+        daemon_loop(args.poll_interval)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
 
 
 if __name__ == "__main__":

@@ -30,18 +30,18 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_update
+from kurultai_paths import (
+    AGENTS_DIR as AGENTS_BASE, DISPATCH_AGENTS, DISPATCH_LOG, DISPATCH_STATE, LOGS_DIR,
+)
 
 # ============================================================
 # Configuration
 # ============================================================
-AGENTS_BASE = Path("/Users/kublai/.openclaw/agents")
-DISPATCH_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
-DISPATCH_LOG = AGENTS_BASE / "main/logs/auto-dispatch.jsonl"
-DISPATCH_STATE = AGENTS_BASE / "main/logs/auto-dispatch-state.json"
-LOCK_FILE = AGENTS_BASE / "main/logs/auto-dispatch.lock"
+LOCK_FILE = LOGS_DIR / "auto-dispatch.lock"
 
-# Stale task threshold: tasks stuck in .executing for >15 min get reverted
-STALE_EXECUTING_SECS = 900  # 15 minutes
+# Stale task threshold: must exceed task-watcher's max timeout (900s) + buffer (120s) = 1020s
+# Using 1200s (20 min) to avoid reverting tasks that task-watcher is still running
+STALE_EXECUTING_SECS = 1200  # 20 minutes
 
 # Max tasks to dispatch per cycle (across all agents)
 MAX_DISPATCHES_PER_CYCLE = 3
@@ -228,8 +228,27 @@ def cleanup_stale_executing(agent):
     reverted = 0
 
     for task_file in executing:
-        age_secs = time.time() - task_file.stat().st_mtime
+        try:
+            age_secs = time.time() - task_file.stat().st_mtime
+        except FileNotFoundError:
+            # Race condition: file was renamed/moved by another process (task completed)
+            log(f"SKIP revert for {agent}: {task_file.name} — file moved (likely completed)")
+            continue
         if age_secs > STALE_EXECUTING_SECS:
+            # Check .executing.pid file — if the handler process is still alive, skip
+            pid_file = task_file.parent / task_file.name.replace(".executing.md", ".executing.pid")
+            if pid_file.exists():
+                try:
+                    handler_pid = int(pid_file.read_text().strip())
+                    os.kill(handler_pid, 0)  # signal 0 = existence check
+                    log(f"SKIP revert for {agent}: {task_file.name} — handler PID {handler_pid} still alive")
+                    continue
+                except (ProcessLookupError, ValueError):
+                    pass  # PID dead or invalid — safe to revert
+                except PermissionError:
+                    log(f"SKIP revert for {agent}: {task_file.name} — handler PID still running (permission)")
+                    continue
+
             # Revert: remove .executing suffix
             original_name = task_file.name.replace(".executing", "")
             original_path = task_file.parent / original_name
@@ -244,6 +263,12 @@ def cleanup_stale_executing(agent):
                     "stuck_secs": int(age_secs),
                 })
                 reverted += 1
+                # Clean up orphaned PID file if it exists
+                if pid_file.exists():
+                    try:
+                        pid_file.unlink()
+                    except OSError:
+                        pass
             except Exception as e:
                 log(f"Failed to revert {task_file.name}: {e}", "ERROR")
 

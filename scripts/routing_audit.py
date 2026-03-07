@@ -21,10 +21,11 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents_config import AGENTS
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, WATCHER_STATE as _WATCHER_STATE, LOGS_DIR
 
-ROUTING_LOG = "/Users/kublai/.openclaw/agents/main/logs/routing-decisions.jsonl"
-WATCHER_STATE = "/Users/kublai/.openclaw/agents/main/logs/task-watcher-state.json"
-AGENT_DIR = "/Users/kublai/.openclaw/agents"
+ROUTING_LOG = str(LOGS_DIR / "routing-decisions.jsonl")
+WATCHER_STATE = str(_WATCHER_STATE)
+AGENT_DIR = str(_AGENTS_DIR)
 
 
 def read_routing_decisions(hours=1):
@@ -108,10 +109,13 @@ def generate_audit(hours=1):
         report["issues"].append(f"No routing decisions logged in the last {hours}h")
         return report
 
-    # Analyze routing decisions
+    # Analyze routing decisions (skip diagnostic entries to avoid double-counting)
+    _DIAGNOSTIC_METHODS = {"explicit_misroute", "skill_reroute"}
     for d in decisions:
         dest = d.get("dest", "unknown")
         method = d.get("method", "unknown")
+        if method in _DIAGNOSTIC_METHODS:
+            continue  # These are warnings, not actual task routings
         report["routing_methods"][method] += 1
         report["destinations"][dest] += 1
         report["by_agent"][dest]["routed"] += 1
@@ -139,21 +143,83 @@ def generate_audit(hours=1):
     report["routing_methods"] = dict(report["routing_methods"])
     report["destinations"] = dict(report["destinations"])
 
-    # --- Generate issues and suggestions ---
+    # --- Keyword disagreement analysis ---
+    # Detect when logged top_scores disagree with actual destination
+    # (signals keyword table gaps that need disambiguation rules)
+    try:
+        from task_intake import route_by_text
+        kw_disagreements = defaultdict(int)  # (kw_winner, actual_dest) -> count
+        kw_disagree_examples = []
+        for d in decisions:
+            top = d.get("top_scores", {})
+            if not top:
+                continue
+            kw_winner = max(top, key=lambda k: top[k])
+            dest = d.get("dest", "unknown")
+            if kw_winner != dest and top.get(kw_winner, 0) > top.get(dest, 0):
+                kw_disagreements[(kw_winner, dest)] += 1
+                if len(kw_disagree_examples) < 5:
+                    kw_disagree_examples.append(d.get("task", "")[:80])
 
-    # Issue: LLM fallback usage
-    fallback_count = report["routing_methods"].get("keyword_fallback", 0)
-    llm_count = report["routing_methods"].get("llm", 0)
-    total = fallback_count + llm_count
-    if total > 0 and fallback_count > 0:
-        pct = fallback_count / total * 100
-        if pct > 20:
+        # Also test current keyword router against logged tasks
+        kw_misroutes = 0
+        kw_misroute_examples = []
+        for d in decisions:
+            # Skip diagnostic entries (misroute warnings, skill reroutes)
+            if d.get("method", "") in _DIAGNOSTIC_METHODS:
+                continue
+            task_text = d.get("task", "")
+            dest = d.get("dest", "unknown")
+            if not task_text:
+                continue
+            kw_result = route_by_text(task_text)
+            if kw_result != dest:
+                kw_misroutes += 1
+                if len(kw_misroute_examples) < 5:
+                    kw_misroute_examples.append(
+                        f"'{task_text[:60]}' -> kw={kw_result} actual={dest}"
+                    )
+        report["kw_disagreements"] = dict(
+            {f"{k[0]}->{k[1]}": v for k, v in kw_disagreements.items()}
+        )
+        report["kw_misroute_count"] = kw_misroutes
+        report["kw_misroute_rate"] = f"{kw_misroutes}/{len(decisions)}" if decisions else "0/0"
+        if kw_misroute_examples:
+            report["kw_misroute_examples"] = kw_misroute_examples[:5]
+    except Exception:
+        pass
+
+    # --- Generate issues and suggestions ---
+    total = report["total_routed"]
+
+    # Track overflow and skill hint stats from decision entries
+    overflow_count = sum(1 for d in decisions if d.get("overflow"))
+    skill_hint_count = sum(1 for d in decisions if d.get("skill_hint"))
+    report["overflow_count"] = overflow_count
+    report["skill_hint_coverage"] = f"{skill_hint_count}/{total}" if total > 0 else "0/0"
+
+    # Issue: High explicit routing ratio (bypasses keyword routing — may mask routing table gaps)
+    explicit_count = report["routing_methods"].get("explicit", 0)
+    keyword_count = report["routing_methods"].get("keyword", 0)
+    mention_count = report["routing_methods"].get("mention", 0)
+    if total > 3 and explicit_count > 0:
+        explicit_pct = explicit_count / total * 100
+        if explicit_pct > 80:
             report["issues"].append(
-                f"High keyword fallback rate: {fallback_count}/{total} ({pct:.0f}%) — ollama may be unstable"
+                f"High explicit routing: {explicit_count}/{total} ({explicit_pct:.0f}%) — "
+                f"keyword table may be underused"
             )
-        elif pct > 0:
+
+    # Issue: Overflow routing frequency
+    if total > 0 and overflow_count > 0:
+        overflow_pct = overflow_count / total * 100
+        if overflow_pct > 30:
             report["issues"].append(
-                f"Some keyword fallbacks: {fallback_count}/{total} ({pct:.0f}%)"
+                f"High overflow rate: {overflow_count}/{total} ({overflow_pct:.0f}%) — agents frequently busy"
+            )
+        else:
+            report["suggestions"].append(
+                f"Overflow routing: {overflow_count}/{total} ({overflow_pct:.0f}%) — load balancing active"
             )
 
     # Issue: Agent imbalance
@@ -189,28 +255,163 @@ def generate_audit(hours=1):
                 f"{agent}: {routed} task(s) routed but 0 executed — dispatch may be stalled"
             )
 
-    # Suggestion: Subagent overuse
-    subagent_count = report["destinations"].get("subagent", 0)
-    if total > 0 and subagent_count / total > 0.4:
-        report["suggestions"].append(
-            "Over 40% of tasks going to subagent — LLM system prompt may need agent role clarification"
-        )
+    # Issue: High keyword misroute rate (keyword table drift)
+    kw_misroute_count = report.get("kw_misroute_count", 0)
+    if total > 3 and kw_misroute_count > 0:
+        kw_pct = kw_misroute_count / total * 100
+        if kw_pct > 30:
+            report["issues"].append(
+                f"Keyword table drift: {kw_misroute_count}/{total} ({kw_pct:.0f}%) tasks "
+                f"would route differently via keywords vs actual destination"
+            )
+        elif kw_pct > 10:
+            report["suggestions"].append(
+                f"Keyword divergence: {kw_misroute_count}/{total} ({kw_pct:.0f}%) — "
+                f"consider adding disambiguation rules"
+            )
 
     # Suggestion: Single-agent concentration
     for agent, count in report["destinations"].items():
-        if agent != "subagent" and total > 3 and count / total > 0.6:
+        if total > 3 and count / total > 0.6:
             report["suggestions"].append(
                 f"{agent} received {count}/{total} ({count/total*100:.0f}%) of all tasks — "
                 f"check if task descriptions are too narrow or if other agents need broader keywords"
             )
 
-    # Suggestion: All LLM, no fallbacks — good
-    if fallback_count == 0 and llm_count > 0:
+    # Suggestion: Low skill hint coverage
+    if total > 3 and skill_hint_count / total < 0.5:
         report["suggestions"].append(
-            f"All {llm_count} routing decisions used LLM — ollama is stable"
+            f"Low skill hint coverage: {skill_hint_count}/{total} — "
+            f"consider expanding SKILL_HINTS in task_intake.py"
+        )
+
+    # Suggestion: Routing method breakdown
+    if total > 0:
+        methods_str = ", ".join(f"{m}={c}" for m, c in sorted(report["routing_methods"].items(), key=lambda x: -x[1]))
+        report["suggestions"].append(f"Routing methods: {methods_str}")
+
+    # Include routing drift data from watchdog if available
+    try:
+        watchdog_state_path = LOGS_DIR / "ogedei-watchdog-state.json"
+        if watchdog_state_path.exists():
+            with open(watchdog_state_path) as f:
+                wstate = json.load(f)
+            drift = wstate.get("routing_drift", {})
+            if drift:
+                report["routing_drift"] = drift
+                drift_pct = drift.get("drift_pct", 0)
+                mismatches = drift.get("mismatches", 0)
+                drift_total = drift.get("total", 0)
+                if drift_pct > 30 and mismatches >= 2:
+                    report["issues"].append(
+                        f"Keyword routing drift: {mismatches}/{drift_total} ({drift_pct:.0f}%) "
+                        f"disagree with actual routing"
+                    )
+                elif mismatches > 0:
+                    report["suggestions"].append(
+                        f"Keyword drift: {mismatches}/{drift_total} ({drift_pct:.0f}%) — within tolerance"
+                    )
+    except Exception:
+        pass
+
+    # --- Trend tracking: detect recurring issues across audit runs ---
+    trend_data = _load_trend_state()
+    current_issue_keys = _extract_issue_keys(report.get("issues", []))
+    trend_data = _update_trend_state(trend_data, current_issue_keys, report.get("generated_at", ""))
+    _save_trend_state(trend_data)
+
+    # Flag recurring issues (3+ consecutive runs)
+    recurring = {k: v for k, v in trend_data.get("issue_streaks", {}).items()
+                 if v.get("consecutive", 0) >= 3}
+    if recurring:
+        report["recurring_issues"] = [
+            {"issue_key": k, "consecutive": v["consecutive"], "first_seen": v.get("first_seen", "")}
+            for k, v in recurring.items()
+        ]
+        report["issues"].append(
+            f"RECURRING: {len(recurring)} issue(s) unresolved for 3+ consecutive audits — escalation recommended"
         )
 
     return report
+
+
+# --- Trend state management ---
+TREND_STATE_FILE = str(LOGS_DIR / "routing-audit-trend.json")
+_TREND_MAX_KEYS = 50  # Cap tracked issue keys to prevent unbounded growth
+
+
+def _extract_issue_keys(issues):
+    """Normalize issues into stable keys for trend tracking.
+
+    Strips numbers/timestamps so 'temujin: 1 task(s) failed out of 1 executed'
+    and 'temujin: 3 task(s) failed out of 5 executed' map to the same key.
+    """
+    import re
+    keys = set()
+    for issue in issues:
+        if "No routing decisions logged" in issue:
+            continue
+        # Replace numbers with '#' to create a stable signature
+        key = re.sub(r'\d+', '#', issue).strip()
+        # Collapse repeated '#' and whitespace
+        key = re.sub(r'#+', '#', key)
+        key = re.sub(r'\s+', ' ', key)
+        keys.add(key)
+    return keys
+
+
+def _load_trend_state():
+    """Load persisted trend state."""
+    if not os.path.exists(TREND_STATE_FILE):
+        return {"issue_streaks": {}, "last_run": ""}
+    try:
+        with open(TREND_STATE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {"issue_streaks": {}, "last_run": ""}
+
+
+def _update_trend_state(trend_data, current_keys, generated_at):
+    """Update streak counts: increment for recurring issues, reset for resolved ones."""
+    streaks = trend_data.get("issue_streaks", {})
+
+    # Increment streaks for issues that are still present
+    for key in current_keys:
+        if key in streaks:
+            streaks[key]["consecutive"] = streaks[key].get("consecutive", 0) + 1
+            streaks[key]["last_seen"] = generated_at
+        else:
+            streaks[key] = {
+                "consecutive": 1,
+                "first_seen": generated_at,
+                "last_seen": generated_at,
+            }
+
+    # Reset streaks for issues that are no longer present
+    for key in list(streaks.keys()):
+        if key not in current_keys:
+            del streaks[key]
+
+    # Cap total tracked keys
+    if len(streaks) > _TREND_MAX_KEYS:
+        # Keep the ones with highest consecutive count
+        sorted_keys = sorted(streaks.keys(), key=lambda k: streaks[k].get("consecutive", 0), reverse=True)
+        for k in sorted_keys[_TREND_MAX_KEYS:]:
+            del streaks[k]
+
+    trend_data["issue_streaks"] = streaks
+    trend_data["last_run"] = generated_at
+    return trend_data
+
+
+def _save_trend_state(trend_data):
+    """Persist trend state to disk."""
+    try:
+        os.makedirs(os.path.dirname(TREND_STATE_FILE), exist_ok=True)
+        with open(TREND_STATE_FILE, "w") as f:
+            json.dump(trend_data, f, indent=2)
+    except Exception:
+        pass
 
 
 def format_report(report):
@@ -245,6 +446,13 @@ def format_report(report):
         for issue in report["issues"]:
             lines.append(f"  - {issue}")
 
+    # Keyword misroute examples
+    kw_examples = report.get("kw_misroute_examples", [])
+    if kw_examples:
+        lines.append(f"\nKeyword misroutes ({report.get('kw_misroute_count', 0)}):")
+        for ex in kw_examples[:5]:
+            lines.append(f"  - {ex}")
+
     # Suggestions
     if report.get("suggestions"):
         lines.append("\nSuggestions:")
@@ -258,7 +466,9 @@ def format_for_reflection(report):
     """Format audit as compact markdown for injection into kublai's reflection context."""
     lines = []
     lines.append(f"## Routing Audit ({report['period_hours']}h)")
-    lines.append(f"Routed: {report['total_routed']} tasks | Methods: {dict(report.get('routing_methods', {}))}")
+    overflow = report.get('overflow_count', 0)
+    skill_cov = report.get('skill_hint_coverage', '0/0')
+    lines.append(f"Routed: {report['total_routed']} tasks | Methods: {dict(report.get('routing_methods', {}))} | Overflow: {overflow} | Skills: {skill_cov}")
     lines.append("")
 
     # Compact per-agent table
@@ -283,6 +493,31 @@ def format_for_reflection(report):
         lines.append("**Observations:**")
         for s in report["suggestions"]:
             lines.append(f"- {s}")
+
+    # Keyword misroute examples (from re-routing current decisions through keyword table)
+    kw_examples = report.get("kw_misroute_examples", [])
+    if kw_examples:
+        lines.append(f"**Keyword Misroutes ({report.get('kw_misroute_count', 0)}):**")
+        for ex in kw_examples[:5]:
+            lines.append(f"- `{ex}`")
+        lines.append("")
+
+    # Routing drift summary
+    drift = report.get("routing_drift", {})
+    if drift and drift.get("total", 0) > 0:
+        lines.append("")
+        lines.append(f"**Keyword Drift:** {drift.get('mismatches', 0)}/{drift.get('total', 0)} "
+                      f"({drift.get('drift_pct', 0):.0f}%) keyword-vs-actual mismatches")
+        for ex in drift.get("top_examples", [])[:3]:
+            lines.append(f"- `{ex.get('task', '?')[:50]}` keyword→{ex.get('keyword_would', '?')} actual→{ex.get('actual', '?')}")
+
+    # Recurring issues summary
+    recurring = report.get("recurring_issues", [])
+    if recurring:
+        lines.append("")
+        lines.append("**RECURRING (3+ consecutive audits):**")
+        for r in recurring:
+            lines.append(f"- [{r['consecutive']}x] {r['issue_key']} (since {r['first_seen'][:16]})")
 
     return "\n".join(lines)
 

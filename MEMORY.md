@@ -15,6 +15,38 @@
 
 ---
 
+## Task Creation Protocol
+
+**When creating tasks, Kublai must:**
+1. **Use Claude Code** - Invoke via `sessions_spawn({ runtime: "acp", agentId: "claude" })`
+2. **Specify skills** - Always include which skills the agent should use
+3. **Prefer horde skills** - Default to horde skills when appropriate:
+   - `/horde-plan` - Structured implementation plans with dependency tracking
+   - `/horde-implement` - Execute plans with quality checkpoints
+   - `/horde-review` - Multi-domain critical review (security, perf, architecture)
+   - `/horde-test` - Parallel test suite execution
+   - `/horde-swarm` - Parallel subagent dispatch (35+ agent types)
+   - `/horde-brainstorming` - Structured ideation with diverge/evaluate/converge
+   - `/horde-gate-testing` - Integration tests between implementation phases
+   - `/golden-horde` - 9 multi-agent patterns (review loop, debate, pipeline, etc.)
+
+**Priority Guidelines:**
+- **High:** Urgent, time-sensitive, blocks other work
+- **Normal:** Regular tasks, standard priority
+- **Low:** Background tasks, idle resource utilization, research tasks
+
+**Example task creation:**
+```
+sessions_spawn({
+  task: "Use /horde-plan to design [feature], then /horde-implement to build it",
+  runtime: "acp",
+  agentId: "claude",
+  mode: "run"
+})
+```
+
+---
+
 ## Architecture Decisions
 
 - 6-agent Kurultai with independent workspaces

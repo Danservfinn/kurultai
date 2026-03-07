@@ -27,14 +27,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
+from kurultai_paths import AGENTS_DIR, WATCHER_STATE, LOGS_DIR
 
 # Configuration
-AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
 SCRIPTS_DIR = Path(__file__).parent
-WAKE_STATE_FILE = AGENTS_DIR / "main/logs/self-wake-state.json"
-WAKE_LOG_FILE = AGENTS_DIR / "main/logs/self-wake.log"
-WATCHER_STATE = AGENTS_DIR / "main/logs/task-watcher-state.json"
-WATCHDOG_LOG = AGENTS_DIR / "main/logs/watchdog.log"
+WAKE_STATE_FILE = LOGS_DIR / "self-wake-state.json"
+WAKE_LOG_FILE = LOGS_DIR / "self-wake.log"
+WATCHDOG_LOG = LOGS_DIR / "watchdog.log"
 
 AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
 # Exclude kublai -- lead agent, woken separately by LLM triage

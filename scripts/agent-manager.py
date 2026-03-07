@@ -17,9 +17,12 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-AGENTS_DIR = "/Users/kublai/.openclaw/agents"
-SPAWN_QUEUE = "/Users/kublai/.openclaw/agents/main/logs/spawn-pending.json"
-MANAGER_LOG = "/Users/kublai/.openclaw/agents/main/logs/agent-manager.log"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, LOGS_DIR
+
+AGENTS_DIR = str(_AGENTS_DIR)
+SPAWN_QUEUE = str(_SPAWN_QUEUE)
+MANAGER_LOG = str(LOGS_DIR / "agent-manager.log")
 
 AGENTS = ['kublai', 'temujin', 'mongke', 'chagatai', 'jochi', 'ogedei']
 

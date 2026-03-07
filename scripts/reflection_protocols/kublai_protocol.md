@@ -43,13 +43,52 @@ Based on your analysis above, identify **specific, implementable improvements**:
 If you identify an improvement, create a task for yourself or the appropriate agent.
 Do NOT suggest vague improvements. Every suggestion must be a concrete change to a specific file or config.
 
-## REFLECTION (complete all 5 — be specific, no hedge words)
+## REFLECTION (complete all 6 — be specific, no hedge words)
 
 1. **WORST MOMENT:** Your single worst routing or leadership decision this session. (max 30 words)
 2. **ROOT CAUSE:** The behavioral pattern that caused it. (max 20 words)
 3. **NEW RULE:** WHEN [trigger] THEN [action] INSTEAD OF [old default]. (max 30 words)
 4. **VERIFICATION:** How will you know you followed this rule next session? (binary YES/NO check)
 5. **PREVIOUS RULES:** For each active rule — did you follow it? YES or NO with brief reason.
+6. **THROUGHPUT:** Check Pipeline Health above. Bottleneck agent and system throughput rate shown.
+   What is YOUR specific routing or delegation change to reduce pending time system-wide?
+
+## Performance Review (horde-review step)
+
+Before brainstorming, /horde-review runs a critical analysis of your performance.
+The review evaluates your Squad Lead/Router output across these dimensions:
+
+- **Routing accuracy:** Correct agent selection rate. Misroutes and fallback usage.
+- **Delegation quality:** Task spec completeness. Agent workload balance.
+- **System throughput:** Queue drain rate. Pending time reduction trend.
+- **Proposal review:** Speed and quality of reviewing agent proposals.
+
+Review output is written to `logs/reviews/kublai-latest.md` and fed into brainstorming.
+
+## Brainstorming Focus (for horde-brainstorming step)
+
+After review analysis, brainstorm improvements in YOUR domain:
+- **Routing accuracy:** LLM prompt tuning, keyword table updates, disambiguation rules
+- **Delegation effectiveness:** Task spec quality, agent workload balance
+- **System throughput:** Queue drain rate, bottleneck identification, pending time reduction
+- **Proposal review:** Pattern recognition in agent proposals, auto-approval criteria
+
+Output a structured proposal using the proposal template with your top 3 recommendations.
+You also REVIEW proposals from other agents at ~/.openclaw/agents/main/proposals/.
+
+## Report Log (for hourly report generation)
+
+After completing your reflection, output a structured summary block at the end
+of your memory entry for automated parsing:
+
+```
+REPORT_LOG:
+GRADE: [A-F or INCOMPLETE]
+KEY_FINDING: [one-line summary of most important finding]
+ISSUE: [most significant issue, or NONE]
+RULE: [new WHEN/THEN rule, or NONE]
+SKILLS_USED: [comma-separated list of skills invoked]
+```
 
 ## Banned Words
 

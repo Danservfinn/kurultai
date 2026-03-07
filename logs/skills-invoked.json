@@ -1,0 +1,1085 @@
+{
+  "2026-03-06-12": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "kublai",
+        "ogedei",
+        "chagatai",
+        "temujin",
+        "jochi",
+        "mongke"
+      ],
+      "count": 6
+    }
+  },
+  "latest": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1
+  },
+  "2026-03-06-16": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "jochi",
+        "chagatai",
+        "ogedei",
+        "kublai",
+        "mongke"
+      ],
+      "count": 7
+    }
+  },
+  "2026-03-06-17": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "kublai",
+        "jochi",
+        "chagatai",
+        "mongke",
+        "ogedei"
+      ],
+      "count": 6
+    }
+  },
+  "2026-03-06-18": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1
+  },
+  "2026-03-06-19": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "jochi",
+        "chagatai",
+        "kublai",
+        "mongke",
+        "ogedei",
+        "temujin"
+      ],
+      "count": 6
+    }
+  },
+  "2026-03-06-20": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "chagatai",
+        "jochi",
+        "temujin",
+        "mongke",
+        "kublai",
+        "ogedei"
+      ],
+      "count": 11
+    }
+  },
+  "2026-03-06-21": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "ogedei",
+        "temujin",
+        "jochi",
+        "chagatai",
+        "kublai",
+        "mongke"
+      ],
+      "count": 9
+    }
+  },
+  "2026-03-06-22": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "kublai",
+        "ogedei",
+        "mongke"
+      ],
+      "count": 4
+    }
+  },
+  "2026-03-06-23": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1
+  },
+  "2026-03-07-00": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1
+  },
+  "2026-03-07-01": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "jochi",
+        "mongke",
+        "kublai",
+        "ogedei",
+        "chagatai"
+      ],
+      "count": 6
+    }
+  },
+  "2026-03-07-02": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "jochi",
+        "mongke",
+        "ogedei",
+        "chagatai",
+        "kublai",
+        "temujin"
+      ],
+      "count": 8
+    }
+  },
+  "2026-03-07-03": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "mongke",
+        "temujin"
+      ],
+      "count": 2
+    }
+  },
+  "2026-03-07-04": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1
+  },
+  "2026-03-07-05": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "ogedei",
+        "temujin",
+        "chagatai",
+        "mongke",
+        "jochi"
+      ],
+      "count": 6
+    }
+  },
+  "2026-03-07-06": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "jochi",
+        "kublai",
+        "mongke",
+        "temujin",
+        "chagatai",
+        "ogedei"
+      ],
+      "count": 11
+    }
+  },
+  "2026-03-07-07": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "jochi",
+        "chagatai",
+        "kublai",
+        "ogedei",
+        "mongke",
+        "temujin"
+      ],
+      "count": 11
+    }
+  },
+  "2026-03-07-08": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "jochi",
+        "chagatai",
+        "mongke",
+        "kublai",
+        "ogedei"
+      ],
+      "count": 10
+    }
+  },
+  "2026-03-07-09": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "jochi",
+        "ogedei",
+        "kublai",
+        "mongke",
+        "temujin",
+        "chagatai"
+      ],
+      "count": 10
+    }
+  },
+  "2026-03-07-10": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "ogedei",
+        "jochi",
+        "kublai"
+      ],
+      "count": 12
+    }
+  },
+  "2026-03-07-11": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "jochi",
+        "temujin",
+        "ogedei",
+        "chagatai",
+        "kublai",
+        "mongke"
+      ],
+      "count": 10
+    }
+  },
+  "2026-03-07-12": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "ogedei",
+        "jochi",
+        "chagatai",
+        "temujin",
+        "mongke",
+        "kublai"
+      ],
+      "count": 11
+    }
+  },
+  "2026-03-07-13": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "ogedei",
+        "chagatai",
+        "kublai",
+        "jochi",
+        "temujin",
+        "mongke"
+      ],
+      "count": 13
+    }
+  },
+  "2026-03-07-14": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "jochi",
+        "mongke",
+        "ogedei",
+        "chagatai"
+      ],
+      "count": 12
+    }
+  },
+  "2026-03-07-15": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei",
+        "temujin",
+        "kublai"
+      ],
+      "count": 11
+    }
+  },
+  "2026-03-07-16": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "chagatai",
+        "mongke",
+        "kublai",
+        "temujin",
+        "ogedei",
+        "jochi"
+      ],
+      "count": 7
+    }
+  },
+  "2026-03-07-17": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1,
+    "horde_brainstorming": {
+      "agents": [
+        "temujin",
+        "mongke"
+      ],
+      "count": 2
+    }
+  },
+  "2026-03-07-18": {
+    "protocol_reflections": {
+      "agents": [
+        "kublai",
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 6
+    },
+    "horde_review": {
+      "agents": [
+        "temujin",
+        "mongke",
+        "chagatai",
+        "jochi",
+        "ogedei"
+      ],
+      "count": 5
+    },
+    "cross_agent_rules": 1,
+    "capability_scores": 1,
+    "routing_audit": 1,
+    "kublai_actions": 1,
+    "kublai_initiative": 1,
+    "kurultai_report": 1
+  }
+}

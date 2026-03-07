@@ -1,0 +1,255 @@
+{
+  "timestamp": "2026-03-06T20:01:40-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF"
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF"
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 1,
+        "failed": 2,
+        "pending": 0,
+        "running": 0,
+        "total": 3,
+        "queue_depth": 0
+      },
+      "success_rate": 33.3,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF"
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF"
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF"
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 11,
+    "healthy": 7,
+    "erroring": 4,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 119598,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 162544,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 12375,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 263255,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "error",
+        "consecutive_errors": 1,
+        "last_duration_ms": 49440,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 35972,
+        "enabled": true
+      },
+      {
+        "name": "qmd-index-refresh",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 32481,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-competitor-monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 18734,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-openclaw-discovery",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-news-gatherer",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 0,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [
+      {
+        "from_agent": "danny_directive",
+        "to_agent": "temujin",
+        "task_label": "temujin-e30dc834-0e0"
+      },
+      {
+        "from_agent": "gateway-router",
+        "to_agent": "temujin",
+        "task_label": "temujin-8bd51f98-c7e"
+      },
+      {
+        "from_agent": "gateway-router",
+        "to_agent": "temujin",
+        "task_label": "temujin-54812ff0-2f8"
+      }
+    ],
+    "count_30m": 3
+  },
+  "errors": {
+    "clusters": [
+      {
+        "error": "Task timed out after 600s",
+        "count": 2,
+        "agents": [
+          "temujin"
+        ]
+      }
+    ]
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 190,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 11,
+    "double_suffix_fixed": 3
+  },
+  "llm_assessment": {
+    "model": "ollama/hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+    "workload_balance": "Mongke, Chagatai, Jochi, and Ogedei are idle; Kublai and Temujin are active. Temujin has 2 failures in 30m.",
+    "bottleneck": "",
+    "coordination_gap": "None - agents operating independently",
+    "recommended_action": "Monitor Temujin closely; if failures continue, reassign his queue to idle agents",
+    "severity": "MEDIUM"
+  }
+}

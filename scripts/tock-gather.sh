@@ -76,10 +76,10 @@ try:
             WHERE t.created > datetime() - duration('PT30M')
             WITH t.agent AS agent,
                  count(t) AS total,
-                 sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS completed,
-                 sum(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END) AS failed,
-                 sum(CASE WHEN t.status IN ['ready','queued'] THEN 1 ELSE 0 END) AS pending,
-                 sum(CASE WHEN t.status = 'running' THEN 1 ELSE 0 END) AS running,
+                 sum(CASE WHEN toUpper(t.status) = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+                 sum(CASE WHEN toUpper(t.status) = 'FAILED' THEN 1 ELSE 0 END) AS failed,
+                 sum(CASE WHEN toUpper(t.status) IN ['READY','QUEUED','PENDING'] THEN 1 ELSE 0 END) AS pending,
+                 sum(CASE WHEN toUpper(t.status) IN ['RUNNING','EXECUTING','IN_PROGRESS'] THEN 1 ELSE 0 END) AS running,
                  coalesce(sum(t.retry_count),0) AS retries
             RETURN agent, total, completed, failed, pending, running, retries
         """)
@@ -100,7 +100,7 @@ try:
         r = session.run("""
             MATCH (t:Task)
             WHERE t.created > datetime() - duration('PT30M')
-              AND t.status = 'failed' AND t.error IS NOT NULL
+              AND toUpper(t.status) = 'FAILED' AND t.error IS NOT NULL
             RETURN t.error AS error, count(t) AS count,
                    collect(DISTINCT t.agent) AS agents
             ORDER BY count DESC LIMIT 10
@@ -134,6 +134,14 @@ try:
     for job in jobs:
         state = job.get("state", {})
         consec = state.get("consecutiveErrors", 0)
+        last_run = state.get("lastRunAtMs")
+        running = state.get("runningAtMs")
+        # Skip disabled jobs from counts
+        if not job.get("enabled", False):
+            continue
+        # Jobs that have never run (scheduled for future) are not errors
+        if last_run is None and running is None:
+            continue
         if state.get("lastRunStatus") == "ok" and consec == 0:
             healthy += 1
         else:
@@ -175,6 +183,47 @@ PYEOF
 )
 QUEUE_DATA=${QUEUE_DATA:-'{}'}
 
+# ============================================================
+# 4a. Config model resolution (ground truth vs stale sessions)
+# ============================================================
+CONFIG_MODELS=$(python3 2>/dev/null << 'PYEOF'
+import json, os
+base = "/Users/kublai/.openclaw/agents"
+VALID_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'kimi-k2.5'}
+DEFAULT_MODEL = 'claude-opus-4-6'
+result = {}
+for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
+    model = None
+    source = "default"
+    # Layer 1: config.json model key
+    try:
+        with open(f"{base}/{agent}/config.json") as f:
+            cfg = json.load(f)
+            m = cfg.get("model")
+            if m:
+                model = m
+                source = "config.json"
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    # Layer 2: .claude/settings.json ANTHROPIC_MODEL
+    if not model:
+        try:
+            with open(f"{base}/{agent}/.claude/settings.json") as f:
+                settings = json.load(f)
+                m = settings.get("env", {}).get("ANTHROPIC_MODEL")
+                if m:
+                    model = m
+                    source = "settings.json"
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+    resolved = model if model and model in VALID_MODELS else DEFAULT_MODEL
+    valid = model is None or model in VALID_MODELS
+    result[agent] = {"configured": model, "resolved": resolved, "source": source, "valid": valid}
+print(json.dumps(result))
+PYEOF
+)
+CONFIG_MODELS=${CONFIG_MODELS:-'{}'}
+
 # Spawn queue
 SPAWN_COUNT=$(python3 -c "
 import json,os
@@ -214,31 +263,99 @@ PYEOF
 QUEUE_AUDIT=${QUEUE_AUDIT:-'{"audited":0,"fake_found":0,"requeued":0,"skipped":0}'}
 
 # ============================================================
-# 5. Last tick status
+# 4c. Ledger completions (30m) — for reconciliation against Neo4j
 # ============================================================
-TICK_STATUS=$(tail -1 "$BASE/logs/watchdog.log" 2>/dev/null | grep -o "status=[a-z]*" | cut -d= -f2; true)
+LEDGER_DATA=$(python3 2>/dev/null << 'PYEOF'
+import json, sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+ledger_path = Path.home() / ".openclaw" / "tasks" / "task-ledger.jsonl"
+cutoff = datetime.now() - timedelta(minutes=30)
+agents = ["kublai","mongke","chagatai","temujin","jochi","ogedei"]
+completed = {a: 0 for a in agents}
+failed = {a: 0 for a in agents}
+
+if ledger_path.exists():
+    try:
+        with open(ledger_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                    ts_str = ev.get("ts", "")
+                    if not ts_str:
+                        continue
+                    try:
+                        ev_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        if ev_time.tzinfo is not None:
+                            ev_time = ev_time.replace(tzinfo=None)
+                        if ev_time < cutoff:
+                            continue
+                    except (ValueError, TypeError):
+                        continue
+                    agent = ev.get("agent", "")
+                    event = ev.get("event", "")
+                    if agent in completed and event == "COMPLETED":
+                        completed[agent] += 1
+                    elif agent in failed and event == "FAILED":
+                        failed[agent] += 1
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        pass
+
+print(json.dumps({"completed": completed, "failed": failed}))
+PYEOF
+)
+LEDGER_DATA=${LEDGER_DATA:-'{"completed":{},"failed":{}}'}
+
+# ============================================================
+# 5. Last tick status + service health (from TICK lines, not TICK_LLM)
+# ============================================================
+LAST_TICK_LINE=$(tail -20 "$BASE/logs/watchdog.log" 2>/dev/null | grep "] TICK |" | grep -v "TICK_LLM" | tail -1; true)
+TICK_STATUS=$(echo "$LAST_TICK_LINE" | grep -o "status=[a-z]*" | cut -d= -f2; true)
 TICK_STATUS=${TICK_STATUS:-unknown}
+TICK_NEO4J=$(echo "$LAST_TICK_LINE" | grep -o "neo4j=[a-z]*" | cut -d= -f2; true)
+TICK_NEO4J=${TICK_NEO4J:-unknown}
+TICK_REDIS=$(echo "$LAST_TICK_LINE" | grep -o "redis=[a-z]*" | cut -d= -f2; true)
+TICK_REDIS=${TICK_REDIS:-unknown}
 
 # ============================================================
-# 6. Assemble full JSON
+# 6. Assemble full JSON (via temp files to avoid heredoc escaping issues)
 # ============================================================
+TOCK_TMP=$(mktemp -d)
+echo "$NEO4J_DATA" > "$TOCK_TMP/neo4j.json"
+echo "$SESSION_DATA" > "$TOCK_TMP/session.json"
+echo "$CRON_DATA" > "$TOCK_TMP/cron.json"
+echo "$QUEUE_DATA" > "$TOCK_TMP/queues.json"
+echo "$QUEUE_AUDIT" > "$TOCK_TMP/queue_audit.json"
+echo "$LEDGER_DATA" > "$TOCK_TMP/ledger.json"
+echo "$CONFIG_MODELS" > "$TOCK_TMP/config_models.json"
+
 ASSEMBLED=$(python3 << PYEOF
-import json
+import json, os
 
-neo4j = json.loads('''$NEO4J_DATA''')
-session_raw = '''$SESSION_DATA'''
-cron = json.loads('''$CRON_DATA''')
-queues = json.loads('''$QUEUE_DATA''')
-try:
-    queue_audit = json.loads('''$QUEUE_AUDIT''')
-except:
-    queue_audit = {"audited":0,"fake_found":0,"requeued":0,"skipped":0}
+tmp = "$TOCK_TMP"
+
+def safe_load(path, default):
+    try:
+        with open(path) as f:
+            return json.loads(f.read().strip())
+    except:
+        return default
+
+neo4j = safe_load(f"{tmp}/neo4j.json", {"error":"parse_failed"})
+cron = safe_load(f"{tmp}/cron.json", {"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]})
+queues = safe_load(f"{tmp}/queues.json", {})
+config_models = safe_load(f"{tmp}/config_models.json", {})
+queue_audit = safe_load(f"{tmp}/queue_audit.json", {"audited":0,"fake_found":0,"requeued":0,"skipped":0})
+ledger = safe_load(f"{tmp}/ledger.json", {"completed":{},"failed":{}})
 
 # Parse session data
-try:
-    session = json.loads(session_raw) if session_raw.strip() else {}
-except:
-    session = {}
+session = safe_load(f"{tmp}/session.json", {})
 
 agent_names = ["kublai","mongke","chagatai","temujin","jochi","ogedei"]
 
@@ -265,6 +382,10 @@ for name in agent_names:
     s = session_by_agent.get(name, {})
     total = t.get("total", 0)
     completed = t.get("completed", 0)
+    cm = config_models.get(name, {})
+    session_model = s.get("model", "none") if s else "none"
+    config_resolved = cm.get("resolved", "claude-opus-4-6")
+    model_match = session_model == "none" or session_model == config_resolved
     agents[name] = {
         "tasks": {
             "completed": completed, "failed": t.get("failed",0),
@@ -273,10 +394,52 @@ for name in agent_names:
         },
         "success_rate": round(100.0*completed/total,1) if total > 0 else None,
         "retries": t.get("retries",0),
-        "session": s if s else {"count":0,"pct_used":0,"model":"none"}
+        "session": s if s else {"count":0,"pct_used":0,"model":"none"},
+        "config_model": {
+            "resolved": config_resolved,
+            "source": cm.get("source", "default"),
+            "valid": cm.get("valid", True),
+            "session_match": model_match
+        }
     }
 
 queue_total = sum(queues.get(a,0) for a in agent_names)
+
+def _build_ledger_recon(neo4j_data, ledger_data):
+    """Compare Neo4j completion counts vs ledger counts. Flag mismatches."""
+    neo4j_completed = {}
+    neo4j_failed = {}
+    if "agent_tasks" in neo4j_data:
+        for row in neo4j_data["agent_tasks"]:
+            a = row.get("agent", "")
+            neo4j_completed[a] = row.get("completed", 0)
+            neo4j_failed[a] = row.get("failed", 0)
+
+    ledger_completed = ledger_data.get("completed", {})
+    ledger_failed = ledger_data.get("failed", {})
+
+    mismatches = []
+    for agent in agent_names:
+        nc = neo4j_completed.get(agent, 0)
+        lc = ledger_completed.get(agent, 0)
+        nf = neo4j_failed.get(agent, 0)
+        lf = ledger_failed.get(agent, 0)
+        if nc != lc or nf != lf:
+            mismatches.append({
+                "agent": agent,
+                "neo4j_completed": nc, "ledger_completed": lc,
+                "neo4j_failed": nf, "ledger_failed": lf,
+            })
+
+    total_neo4j = sum(neo4j_completed.values())
+    total_ledger = sum(ledger_completed.values())
+    return {
+        "neo4j_total_completed": total_neo4j,
+        "ledger_total_completed": total_ledger,
+        "delta": total_neo4j - total_ledger,
+        "mismatches": mismatches,
+        "reconciled": len(mismatches) == 0
+    }
 
 output = {
     "timestamp": "$TS_ISO",
@@ -296,14 +459,18 @@ output = {
     },
     "system": {
         "neo4j_reachable": "error" not in neo4j,
-        "tick_status": "$TICK_STATUS"
+        "tick_status": "$TICK_STATUS",
+        "neo4j_status": "$TICK_NEO4J",
+        "redis_status": "$TICK_REDIS"
     },
-    "queue_audit": queue_audit
+    "queue_audit": queue_audit,
+    "ledger_reconciliation": _build_ledger_recon(neo4j, ledger)
 }
 
 print(json.dumps(output, indent=2, default=str))
 PYEOF
 )
+rm -rf "$TOCK_TMP"
 
 if [ -z "$ASSEMBLED" ]; then
     echo "[$TS] TOCK | ERROR: assembly failed" >> "$TOCK_LOG"
@@ -314,15 +481,34 @@ fi
 # ============================================================
 # 7. Generate LLM summary (under 500 tokens)
 # ============================================================
+# Write assembled JSON to temp file for safe Python access
+TOCK_ASSEMBLED_TMP=$(mktemp)
+echo "$ASSEMBLED" > "$TOCK_ASSEMBLED_TMP"
+
 LLM_SUMMARY=$(python3 << PYEOF
 import json
-data = json.loads('''$ASSEMBLED''')
+with open("$TOCK_ASSEMBLED_TMP") as f:
+    data = json.loads(f.read().strip())
 lines = ["TOCK SUMMARY $TS", ""]
 lines.append("AGENT TASKS (30m):")
 for name, a in data["agents"].items():
     t = a["tasks"]
     s = a.get("session",{})
     lines.append(f"  {name}: done={t['completed']} fail={t['failed']} pending={t['pending']} queue={t['queue_depth']} ctx={s.get('pct_used',0)}%")
+# Model config vs session check
+model_issues = []
+for name, a in data["agents"].items():
+    cm = a.get("config_model", {})
+    if not cm.get("valid", True):
+        model_issues.append(f"  {name}: INVALID config model (resolved={cm.get('resolved','?')})")
+    elif not cm.get("session_match", True) and a.get("session",{}).get("model","none") != "none":
+        model_issues.append(f"  {name}: session={a['session']['model']} != config={cm.get('resolved','?')} (stale session, config OK)")
+if model_issues:
+    lines.append("\nMODEL STATUS:")
+    lines.extend(model_issues)
+else:
+    lines.append("\nMODEL STATUS: all configs valid, no mismatches")
+
 q = data["queues"]
 lines.append(f"\nQUEUES: file_pending={q['total_pending']} spawn={q['spawn_pending']}")
 c = data["cron"]
@@ -336,6 +522,11 @@ for cl in e.get("clusters",[]):
 d = data["delegation"]
 lines.append(f"DELEGATIONS: {d['count_30m']} in 30m")
 lines.append(f"SYSTEM: neo4j={'ok' if data['system']['neo4j_reachable'] else 'DOWN'} tick={data['system']['tick_status']}")
+lr = data.get("ledger_reconciliation", {})
+if not lr.get("reconciled", True):
+    lines.append(f"LEDGER MISMATCH: neo4j={lr.get('neo4j_total_completed',0)} vs ledger={lr.get('ledger_total_completed',0)} (delta={lr.get('delta',0)})")
+    for m in lr.get("mismatches", []):
+        lines.append(f"  {m['agent']}: neo4j_done={m['neo4j_completed']} ledger_done={m['ledger_completed']} neo4j_fail={m['neo4j_failed']} ledger_fail={m['ledger_failed']}")
 print("\n".join(lines))
 PYEOF
 )
@@ -366,7 +557,7 @@ try:
         resp = requests.post(
             "http://localhost:11434/api/chat",
             json={
-                "model": "qwen3.5:9b",
+                "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
                 "messages": [
                     {"role": "system", "content": "You are a concise operations analyst. Respond only in the exact format requested."},
                     {"role": "user", "content": prompt}
@@ -401,9 +592,10 @@ LLM_JSON=$(python3 << PYEOF
 import json
 
 raw = """$LLM_ASSESSMENT"""
-data = json.loads('''$ASSEMBLED''')
+with open("$TOCK_ASSEMBLED_TMP") as f:
+    data = json.loads(f.read().strip())
 
-assessment = {"model":"ollama/qwen3.5:9b","workload_balance":"","bottleneck":"","coordination_gap":"","recommended_action":"","severity":"LOW"}
+assessment = {"model":"ollama/hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF","workload_balance":"","bottleneck":"","coordination_gap":"","recommended_action":"","severity":"LOW"}
 
 if raw.strip() != "FALLBACK" and "WORKLOAD:" in raw:
     for line in raw.strip().split("\n"):
@@ -444,7 +636,8 @@ PYEOF
 # ============================================================
 python3 << PYEOF
 import json, os
-data = json.loads('''$ASSEMBLED''')
+with open("$TOCK_ASSEMBLED_TMP") as f:
+    data = json.loads(f.read().strip())
 assessment = json.loads('''$LLM_JSON''')
 data["llm_assessment"] = assessment
 with open("$OUTFILE", "w") as f:
@@ -458,17 +651,31 @@ PYEOF
 # One-liner to tock.log
 SEVERITY=$(python3 -c "import json; print(json.loads('''$LLM_JSON''').get('severity','?'))" 2>/dev/null || echo "?")
 BOTTLENECK=$(python3 -c "import json; print(json.loads('''$LLM_JSON''').get('bottleneck','?')[:80])" 2>/dev/null || echo "?")
-TASKS_DONE=$(python3 -c "import json; d=json.loads('''$ASSEMBLED'''); print(sum(a['tasks']['completed'] for a in d['agents'].values()))" 2>/dev/null || echo 0)
-TASKS_FAIL=$(python3 -c "import json; d=json.loads('''$ASSEMBLED'''); print(sum(a['tasks']['failed'] for a in d['agents'].values()))" 2>/dev/null || echo 0)
-Q_TOTAL=$(python3 -c "import json; print(json.loads('''$ASSEMBLED''').get('queues',{}).get('total_pending',0))" 2>/dev/null || echo 0)
+TASKS_DONE=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); print(sum(a['tasks']['completed'] for a in d['agents'].values()))" 2>/dev/null || echo 0)
+TASKS_FAIL=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); print(sum(a['tasks']['failed'] for a in d['agents'].values()))" 2>/dev/null || echo 0)
+Q_TOTAL=$(python3 -c "import json; print(json.load(open('$TOCK_ASSEMBLED_TMP')).get('queues',{}).get('total_pending',0))" 2>/dev/null || echo 0)
 CRON_ERR=$(python3 -c "import json; print(json.loads('''$CRON_DATA''').get('erroring',0))" 2>/dev/null || echo 0)
+LEDGER_DELTA=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); print(d.get('ledger_reconciliation',{}).get('delta',0))" 2>/dev/null || echo 0)
 
-echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | severity=$SEVERITY | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+LEDGER_NOTE=""
+if [ "$LEDGER_DELTA" != "0" ]; then
+    LEDGER_NOTE=" | ledger_delta=$LEDGER_DELTA"
+fi
+
+echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | severity=$SEVERITY${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+
+# ============================================================
+# NEO4J STATE SYNC: Reconcile filesystem task state with Neo4j (safety net)
+# ============================================================
+python3 "$BASE/scripts/neo4j-state-sync.py" --apply >> "$BASE/logs/neo4j-state-sync.log" 2>&1 &
 
 # ============================================================
 # KUBLAI ACTIONS: Create tasks based on tock findings
 # ============================================================
 python3 "$BASE/scripts/kublai-actions.py" --trigger tock >> "$BASE/logs/kublai-actions.log" 2>&1 &
+
+# Cleanup temp file
+rm -f "$TOCK_ASSEMBLED_TMP"
 
 # Output for LLM
 echo "TOCK COMPLETE. Severity: $SEVERITY. Bottleneck: $BOTTLENECK"

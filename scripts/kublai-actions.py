@@ -20,13 +20,14 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_read, locked_json_update
+from kurultai_paths import AGENTS_DIR, MAIN_DIR, LOGS_DIR
 
-BASE = "/Users/kublai/.openclaw/agents/main"
-AGENT_DIR = "/Users/kublai/.openclaw/agents"
-TICKS_FILE = f"{BASE}/logs/ticks.jsonl"
-TOCK_LATEST = f"{BASE}/logs/tock/latest.json"
-ACTIONS_LOG = f"{BASE}/logs/kublai-actions.log"
-COOLDOWN_FILE = f"{BASE}/logs/action-cooldowns.json"
+BASE = str(MAIN_DIR)
+AGENT_DIR = str(AGENTS_DIR)
+TICKS_FILE = str(LOGS_DIR / "ticks.jsonl")
+TOCK_LATEST = str(LOGS_DIR / "tock/latest.json")
+ACTIONS_LOG = str(LOGS_DIR / "kublai-actions.log")
+COOLDOWN_FILE = str(LOGS_DIR / "action-cooldowns.json")
 
 # Staleness thresholds — skip actions if data is too old
 MAX_TICK_AGE_SECS = 600   # 10 minutes (2 missed ticks)
@@ -137,7 +138,8 @@ def mark_fired(action_key):
     save_cooldowns(cooldowns)
 
 
-def create_task(agent, priority, title, body, source="kublai-actions", depth=0):
+def create_task(agent, priority, title, body, source="kublai-actions", depth=0,
+                skill_hint=None, force_claude_code=True):
     """Create a task via canonical task_intake pipeline.
 
     Delegates to task_intake.create_task() for Neo4j + filesystem creation,
@@ -152,6 +154,8 @@ def create_task(agent, priority, title, body, source="kublai-actions", depth=0):
         depth=depth,
         agent=agent,
         skip_duplicate_check=True,  # callers already check has_pending_task
+        skill_hint=skill_hint,
+        force_claude_code=force_claude_code,
     )
     if result:
         log(f"ACTION: Created {priority} task for {agent}: {title} (depth={depth})")
@@ -439,12 +443,26 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
 
     # Rule 3: Agent stalled — route to jochi (analyst) for investigation
     # NEVER route to the stalled agent itself (causes deadlock — see circular triage bug 2026-03-05)
+    # Cross-validate tock queue_depth against filesystem to avoid false alarms from stale Neo4j data
     for name, data in agents.items():
         t = data.get("tasks", {})
         queue_depth = t.get("queue_depth", 0)
         completed = t.get("completed", 0)
         running = t.get("running", 0)
         if queue_depth > 0 and completed == 0 and running == 0:
+            # Filesystem cross-validation: tock queue_depth can be stale (from Neo4j).
+            # Count actual pending .md files (not .done, not .executing) before alerting.
+            fs_pending = 0
+            agent_task_dir = f"{AGENT_DIR}/{name}/tasks"
+            if os.path.exists(agent_task_dir):
+                for fname in os.listdir(agent_task_dir):
+                    if '.done' in fname or fname.startswith('.') or '.executing' in fname:
+                        continue
+                    if fname.endswith('.md'):
+                        fs_pending += 1
+            if fs_pending == 0:
+                log(f"TICK: stall alert suppressed for {name} — tock reports queue_depth={queue_depth} but filesystem has 0 pending tasks (stale Neo4j data)")
+                continue
             # Guard: if jochi is stalled, route to kublai instead (prevent self-routing deadlock)
             target = "kublai" if name == "jochi" else "jochi"
             if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task(target, f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:

@@ -1,0 +1,48 @@
+---
+agent: main
+priority: high
+created: 2026-03-06T12:20:00.000000
+source: mongke-delegation
+parent_research: model-effectiveness-rankings
+task_id: model-reassign-001
+---
+
+# Implement Model Reassignment Based on Effectiveness Rankings
+
+Mongke completed a comprehensive model ranking analysis. The current config has all 6 agents on `bailian/qwen3.5-plus`, which is suboptimal. Different agent roles need different models.
+
+## Report Location
+`~/.openclaw/agents/main/reports/model-effectiveness-rankings.md`
+
+## Changes to Make in openclaw.json
+
+### Agent Model Assignments (Phase 1)
+Update each agent in the `agents.list` array:
+
+1. **Kublai** (main): Keep `bailian/qwen3.5-plus` (correct choice)
+2. **Mongke**: Change to `zai-coding/glm-5` — reasoning mode is essential for research/verification
+3. **Temujin**: Change to `bailian/MiniMax-M2.5` — best SWE-bench (80.2%), 131K output for implementations
+4. **Chagatai**: Keep `bailian/qwen3.5-plus` — 1M context ideal for docs
+5. **Jochi**: Change to `bailian/kimi-k2.5` — frontend expertise, multilingual
+6. **Ogedei**: Change to `bailian/qwen3-coder-next` — fast (3B active), efficient for ops
+
+### Cron Job Models
+Update cron jobs to use cheaper models for simple tasks:
+- heartbeat-watchdog: `zai-coding/glm-4.5-air` (currently glm-5, overqualified)
+- tock-gather: `zai-coding/glm-4.5-air`
+- scrapling spiders: `zai-coding/glm-4.5-air`
+- qmd-index-refresh: `bailian/qwen3-coder-next`
+- Hourly Reflection: `zai-coding/glm-5` (reasoning valuable here)
+
+### Config Cleanup (Phase 2)
+Remove these redundant models from providers:
+- `bailian/glm-4.7` (redundant with Z.AI variant)
+- `bailian/glm-5` (redundant with Z.AI variant which has reasoning)
+- `bailian/qwen3-max-2026-01-23` (superseded by qwen3.5-plus)
+
+## Success Criteria
+- [ ] Each agent has a role-appropriate primary model
+- [ ] Cron jobs use lightweight models for simple tasks
+- [ ] Redundant models removed
+- [ ] System restarts cleanly after config change
+- [ ] All agents respond to next heartbeat successfully

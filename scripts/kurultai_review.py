@@ -16,15 +16,17 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents_config import AGENTS
 
-BASE = Path.home() / ".openclaw/agents/main"
-LOG_FILE = BASE / "logs/kurultai-review.log"
+from kurultai_paths import LOGS_DIR, PROPOSALS_DIR
+LOG_FILE = LOGS_DIR / "kurultai-review.log"
 
 MAX_PENDING_PROPOSALS = 12
 PROPOSAL_EXPIRY_HOURS = 24
@@ -32,7 +34,10 @@ PROPOSAL_EXPIRY_HOURS = 24
 
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{ts}] {msg}"
+    sanitized = str(msg).replace('\n', ' | ').replace('\r', '')
+    sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', sanitized)
+    sanitized = re.sub(r'\x1b(?:\[[0-9;]*[a-zA-Z]|\][^\x07]*(?:\x07|\x1b\\))', '', sanitized)
+    line = f"[{ts}] {sanitized}"
     print(line)
     try:
         os.makedirs(LOG_FILE.parent, exist_ok=True)
@@ -48,34 +53,36 @@ def get_pending_proposals():
         from neo4j_task_tracker import get_driver
 
         driver = get_driver()
-        with driver.session() as session:
-            result = session.run("""
-                MATCH (f:AgentFeedback)
-                WHERE f.status = 'pending_review'
-                  AND f.source = 'kurultai_brainstorm'
-                RETURN f
-                ORDER BY
-                    CASE f.priority
-                        WHEN 'CRITICAL' THEN 1
-                        WHEN 'HIGH' THEN 2
-                        WHEN 'MEDIUM' THEN 3
-                        ELSE 4
-                    END,
-                    f.submitted DESC
-            """)
-            proposals = []
-            for r in result:
-                node = dict(r["f"])
-                raw_proposals = node.get("proposals", "[]")
-                if isinstance(raw_proposals, str):
-                    try:
-                        node["parsed_proposals"] = json.loads(raw_proposals)
-                    except Exception:
-                        node["parsed_proposals"] = []
-                else:
-                    node["parsed_proposals"] = raw_proposals if isinstance(raw_proposals, list) else []
-                proposals.append(node)
-        driver.close()
+        try:
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (f:AgentFeedback)
+                    WHERE f.status = 'pending_review'
+                      AND f.source = 'kurultai_brainstorm'
+                    RETURN f
+                    ORDER BY
+                        CASE f.priority
+                            WHEN 'CRITICAL' THEN 1
+                            WHEN 'HIGH' THEN 2
+                            WHEN 'MEDIUM' THEN 3
+                            ELSE 4
+                        END,
+                        f.submitted DESC
+                """)
+                proposals = []
+                for r in result:
+                    node = dict(r["f"])
+                    raw_proposals = node.get("proposals", "[]")
+                    if isinstance(raw_proposals, str):
+                        try:
+                            node["parsed_proposals"] = json.loads(raw_proposals)
+                        except Exception:
+                            node["parsed_proposals"] = []
+                    else:
+                        node["parsed_proposals"] = raw_proposals if isinstance(raw_proposals, list) else []
+                    proposals.append(node)
+        finally:
+            driver.close()
         return proposals
     except Exception as e:
         log(f"Failed to fetch proposals: {e}")
@@ -83,44 +90,71 @@ def get_pending_proposals():
 
 
 def expire_old_proposals():
-    """Mark proposals older than 24h as expired."""
+    """Mark proposals older than 24h as expired (Neo4j + filesystem)."""
     try:
         from neo4j_task_tracker import get_driver
 
         driver = get_driver()
-        with driver.session() as session:
-            result = session.run("""
-                MATCH (f:AgentFeedback)
-                WHERE f.status = 'pending_review'
-                  AND f.source = 'kurultai_brainstorm'
-                  AND f.submitted < datetime() - duration({hours: $hours})
-                SET f.status = 'expired',
-                    f.reviewed_at = datetime(),
-                    f.review_reason = 'Auto-expired after 24h'
-                RETURN count(f) AS expired_count
-            """, hours=PROPOSAL_EXPIRY_HOURS)
-            count = result.single()["expired_count"]
-            if count > 0:
-                log(f"EXPIRED: {count} proposals older than {PROPOSAL_EXPIRY_HOURS}h")
-        driver.close()
+        try:
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (f:AgentFeedback)
+                    WHERE f.status = 'pending_review'
+                      AND f.source = 'kurultai_brainstorm'
+                      AND f.submitted < datetime() - duration({hours: $hours})
+                    SET f.status = 'expired',
+                        f.reviewed_at = datetime(),
+                        f.review_reason = 'Auto-expired after 24h'
+                    RETURN count(f) AS expired_count
+                """, hours=PROPOSAL_EXPIRY_HOURS)
+                count = result.single()["expired_count"]
+                if count > 0:
+                    log(f"EXPIRED: {count} proposals older than {PROPOSAL_EXPIRY_HOURS}h")
+        finally:
+            driver.close()
     except Exception as e:
         log(f"Failed to expire proposals: {e}")
+
+    # Filesystem cleanup
+    try:
+        if PROPOSALS_DIR.exists():
+            cutoff = time.time() - (PROPOSAL_EXPIRY_HOURS * 3600)
+            removed = 0
+            for f in PROPOSALS_DIR.iterdir():
+                if f.suffix == '.md' and f.stat().st_mtime < cutoff:
+                    try:
+                        f.unlink()
+                        removed += 1
+                    except OSError:
+                        pass
+            if removed:
+                log(f"EXPIRED FILES: Removed {removed} proposal files older than {PROPOSAL_EXPIRY_HOURS}h")
+    except Exception as e:
+        log(f"Failed to expire filesystem proposals: {e}")
+
+
+_VALID_STATUSES = {'approved', 'rejected', 'expired', 'implemented', 'pending_review'}
 
 
 def update_proposal_status(feedback_id, status, reason=""):
     """Update a proposal's status in Neo4j."""
+    if status not in _VALID_STATUSES:
+        log(f"Invalid status '{status}' for proposal {feedback_id}")
+        return False
     try:
         from neo4j_task_tracker import get_driver
 
         driver = get_driver()
-        with driver.session() as session:
-            session.run("""
-                MATCH (f:AgentFeedback {id: $id})
-                SET f.status = $status,
-                    f.reviewed_at = datetime(),
-                    f.review_reason = $reason
-            """, id=feedback_id, status=status, reason=reason)
-        driver.close()
+        try:
+            with driver.session() as session:
+                session.run("""
+                    MATCH (f:AgentFeedback {id: $id})
+                    SET f.status = $status,
+                        f.reviewed_at = datetime(),
+                        f.review_reason = $reason
+                """, id=feedback_id, status=status, reason=reason)
+        finally:
+            driver.close()
         return True
     except Exception as e:
         log(f"Failed to update proposal {feedback_id}: {e}")
@@ -146,7 +180,7 @@ def create_task_for_proposal(agent, proposal):
 
 **Solution:** {detail.get('solution', 'See proposal')}
 
-**Expected Impact:** {detail.get('impact', 'Improved agent effectiveness')}
+**Expected Impact:** {detail.get('solution', 'Improved agent effectiveness')}
 
 ## Instructions
 1. Implement the solution described above
@@ -186,15 +220,21 @@ def approve_proposal(feedback_id):
         return False
 
     agent = target.get("agent", "unknown")
-    update_proposal_status(feedback_id, "approved", "Approved by Kublai")
-    create_task_for_proposal(agent, target)
+    if not update_proposal_status(feedback_id, "approved", "Approved by Kublai"):
+        print(f"Failed to update proposal status in Neo4j")
+        return False
+    if not create_task_for_proposal(agent, target):
+        log(f"Task creation failed for {feedback_id} — proposal marked approved but no task created")
     return True
 
 
 def reject_proposal(feedback_id, reason="Rejected by Kublai"):
     """Reject a proposal by ID."""
-    update_proposal_status(feedback_id, "rejected", reason)
+    if not update_proposal_status(feedback_id, "rejected", reason):
+        print(f"Failed to reject proposal {feedback_id}")
+        return False
     log(f"REJECTED: {feedback_id} — {reason}")
+    return True
 
 
 def list_proposals():

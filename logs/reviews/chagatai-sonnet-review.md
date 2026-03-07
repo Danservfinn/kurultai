@@ -1,0 +1,1 @@
+API Error: 400 {"error":{"code":"invalid_parameter_error","message":"model `claude-sonnet-4-6` is not supported.","param":null,"type":"invalid_request_error"},"request_id":"6290e629-6155-9ab6-905b-b431e02e11ce"}

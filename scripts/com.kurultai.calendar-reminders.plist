@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kurultai.calendar-reminders</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/kublai/.openclaw/agents/main/scripts/calendar_reminder_worker.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/kublai/.openclaw/agents/main/scripts</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StartInterval</key>
+    <integer>60</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/kublai/.openclaw/logs/calendar-reminders.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/kublai/.openclaw/logs/calendar-reminders-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONIOENCODING</key>
+        <string>UTF-8</string>
+    </dict>
+</dict>
+</plist>

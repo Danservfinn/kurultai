@@ -1,10 +1,11 @@
-TICK 2026-03-06 00:00:00
-GATEWAY: up pid=730,1537,3596,3632,14245 http=200 latency=1ms uptime=4m
-PROCESS: cpu=0.0% mem=0.1% rss=8MB threads=2
-ERRORS:  last5m=44 last1h=234 fatal=0
+TICK 2026-03-07 18:45:01
+GATEWAY: up pid=14333,14445,18874,18884,20265 http=200 latency=1ms uptime=3d14h
+PROCESS: cpu=0.0% mem=0.0% rss=1MB threads=2
+ERRORS:  last5m=12 last1h=67 fatal=0
 SERVICES: neo4j=up redis=up
 TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
-TRENDS:  uptime_1h=100.0% avg_cpu=3.3% errors_1h=391 restarts_1h=0
+TRENDS:  uptime_1h=100.0% avg_cpu=0.0% err_avg_5m=17.1 err_direction=falling restarts_1h=0
 DECISION: healthy
 ACTION:   none
 REASON:   all checks passed
+THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — Fleet-wide failure rate 91% (102/112 tasks) in last 2h. Possible model misconfiguration, API outage, or systemic error.

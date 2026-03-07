@@ -1,0 +1,127 @@
+{
+  "mongke": {
+    "overall": {
+      "avg_score": 5.16,
+      "task_count": 21,
+      "fail_rate": 0.721
+    },
+    "research": {
+      "avg_score": 8.56,
+      "task_count": 4
+    },
+    "security": {
+      "avg_score": 8.0,
+      "task_count": 1
+    },
+    "code": {
+      "avg_score": 3.0,
+      "task_count": 2
+    }
+  },
+  "jochi": {
+    "overall": {
+      "avg_score": 6.67,
+      "task_count": 32,
+      "fail_rate": 0.693
+    },
+    "security": {
+      "avg_score": 7.26,
+      "task_count": 20
+    },
+    "code": {
+      "avg_score": 5.07,
+      "task_count": 4
+    },
+    "routing": {
+      "avg_score": 6.76,
+      "task_count": 4
+    },
+    "research": {
+      "avg_score": 7.0,
+      "task_count": 1
+    }
+  },
+  "chagatai": {
+    "overall": {
+      "avg_score": 4.6,
+      "task_count": 11,
+      "fail_rate": 0.809
+    },
+    "research": {
+      "avg_score": 8.0,
+      "task_count": 1
+    }
+  },
+  "ogedei": {
+    "overall": {
+      "avg_score": 6.0,
+      "task_count": 22,
+      "fail_rate": 0.714
+    },
+    "ops": {
+      "avg_score": 7.81,
+      "task_count": 6
+    },
+    "security": {
+      "avg_score": 6.0,
+      "task_count": 1
+    },
+    "code": {
+      "avg_score": 6.73,
+      "task_count": 3
+    },
+    "content": {
+      "avg_score": 7.0,
+      "task_count": 1
+    }
+  },
+  "temujin": {
+    "overall": {
+      "avg_score": 6.03,
+      "task_count": 70,
+      "fail_rate": 0.62
+    },
+    "code": {
+      "avg_score": 7.05,
+      "task_count": 39
+    },
+    "security": {
+      "avg_score": 4.82,
+      "task_count": 8
+    },
+    "ops": {
+      "avg_score": 8.5,
+      "task_count": 2
+    },
+    "research": {
+      "avg_score": 6.0,
+      "task_count": 1
+    }
+  },
+  "kublai": {
+    "overall": {
+      "avg_score": 5.22,
+      "task_count": 16,
+      "fail_rate": 0.804
+    },
+    "security": {
+      "avg_score": 5.35,
+      "task_count": 10
+    },
+    "ops": {
+      "avg_score": 5.77,
+      "task_count": 4
+    }
+  },
+  "tolui": {
+    "overall": {
+      "avg_score": 5.16,
+      "task_count": 6,
+      "fail_rate": 0.537
+    },
+    "code": {
+      "avg_score": 5.0,
+      "task_count": 4
+    }
+  }
+}

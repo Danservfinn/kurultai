@@ -18,11 +18,12 @@ import sys
 import time
 from datetime import datetime
 
-SCRIPTS_DIR = "/Users/kublai/.openclaw/agents/main/scripts"
-AGENTS_DIR = "/Users/kublai/.openclaw/agents"
-LOG_FILE = "/Users/kublai/.openclaw/agents/main/logs/task-queue-monitor.log"
-
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPTS_DIR)
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, LOGS_DIR
+
+AGENTS_DIR = str(_AGENTS_DIR)
+LOG_FILE = str(LOGS_DIR / "task-queue-monitor.log")
 
 # Import with hyphenated filenames
 import importlib.util

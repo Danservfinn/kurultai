@@ -1,0 +1,322 @@
+{
+  "timestamp": "2026-03-07T04:31:22-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 3,
+        "pending": 1,
+        "running": 0,
+        "total": 4,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 8,
+        "model": "glm-5"
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 2,
+        "model": "qwen3.5-plus"
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 1,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 6
+      },
+      "success_rate": 100.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 12,
+        "model": "MiniMax-M2.5"
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 2,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 2,
+        "queue_depth": 1
+      },
+      "success_rate": 100.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 6,
+        "model": "kimi-k2.5"
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 1,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 100.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 19,
+        "model": "qwen3-coder-next"
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 15,
+    "healthy": 10,
+    "erroring": 5,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 161900,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 162544,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 8495,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 485862,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 30749,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 37800,
+        "enabled": true
+      },
+      {
+        "name": "qmd-index-refresh",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 32516,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-competitor-monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 12945,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-openclaw-discovery",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-news-gatherer",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 30783,
+        "enabled": true
+      },
+      {
+        "name": "calendar-reminder-worker",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 11965,
+        "enabled": true
+      },
+      {
+        "name": "signal-calendar-listener",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "Weekly the.kurult.ai review + implement",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai 3-hour review",
+        "status": "unknown",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 7,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 6,
+      "jochi": 1,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [
+      {
+        "from_agent": "cli",
+        "to_agent": "jochi",
+        "task_label": "jochi-3d105f07-7ca"
+      },
+      {
+        "from_agent": "anomaly-scanner",
+        "to_agent": "jochi",
+        "task_label": "jochi-5ca41538-de2"
+      },
+      {
+        "from_agent": "kublai-actions",
+        "to_agent": "kublai",
+        "task_label": "kublai-3a404f1a-7f6"
+      },
+      {
+        "from_agent": "routing_audit",
+        "to_agent": "kublai",
+        "task_label": "kublai-89c4d431-906"
+      },
+      {
+        "from_agent": "kublai-initiative",
+        "to_agent": "kublai",
+        "task_label": "kublai-dacc2e38-66f"
+      },
+      {
+        "from_agent": "routing_audit",
+        "to_agent": "kublai",
+        "task_label": "kublai-d505a014-ff8"
+      },
+      {
+        "from_agent": "gateway-router",
+        "to_agent": "ogedei",
+        "task_label": "ogedei-a7ca0224-735"
+      },
+      {
+        "from_agent": "cli",
+        "to_agent": "temujin",
+        "task_label": "temujin-8505e46f-7cd"
+      }
+    ],
+    "count_30m": 8
+  },
+  "errors": {
+    "clusters": [
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772874125.md\n\n\ud83d\udccb Processing: Triage stalled agent: jochi has 2 queued tasks with 0 completions...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (timeout: 7200s)\n  \u2717 claude-code failed: [claude-agent] Attempting with model: kimi-k2.5\n\n\u2713 Task failed: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772874125.failed.done.md\n",
+        "count": 1,
+        "agents": [
+          "kublai"
+        ]
+      },
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772874138.md\n\n\ud83d\udccb Processing: Review and process pending task queue backlog...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (timeout: 7200s)\n  \u2717 claude-code failed: [claude-agent] Attempting with model: kimi-k2.5\n\n\u2713 Task failed: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772874138.failed.done.md\n",
+        "count": 1,
+        "agents": [
+          "kublai"
+        ]
+      },
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772874537.md\n\n\ud83d\udccb Processing: Review routing audit findings and implement improvements...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (timeout: 7200s)\n  \u2717 claude-code failed: [claude-agent] Attempting with model: kimi-k2.5\n\n\u2713 Task failed: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772874537.failed.done.md\n",
+        "count": 1,
+        "agents": [
+          "kublai"
+        ]
+      }
+    ]
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 286,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 10,
+    "double_suffix_fixed": 0
+  },
+  "llm_assessment": {
+    "model": "ollama/hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+    "workload_balance": "Kublai is maxed at 100% capacity with 3 failures and 1 pending task; Temujin at 20% with 6 queued tasks. Mongke, Chagatai, and Jochi at low utilization.",
+    "bottleneck": "Kublai agent stuck in infinite loop retrying failed task at /Users/kublai/.openclaw/agents/kublai/tasks/",
+    "coordination_gap": "Minimal - most agents idle while Kublai is overloaded. Delegation count of 8 is healthy.",
+    "recommended_action": "Kill Kublai's zombie process and restart agent. Rebalance queue to Mongke or Temujin.",
+    "severity": "LOW"
+  }
+}

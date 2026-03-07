@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-03-07T18:06:41.485231",
+  "queue_depths": {
+    "jochi": 1,
+    "kublai": 1,
+    "temujin": 2,
+    "tolui": 0,
+    "chagatai": 0,
+    "mongke": 0,
+    "ogedei": 0
+  },
+  "overloaded": [],
+  "underutilized": [
+    [
+      "chagatai",
+      0
+    ],
+    [
+      "mongke",
+      0
+    ],
+    [
+      "ogedei",
+      0
+    ],
+    [
+      "jochi",
+      1
+    ]
+  ],
+  "moved": [],
+  "skipped": [],
+  "message": "No overloaded agents found (threshold: 3)"
+}

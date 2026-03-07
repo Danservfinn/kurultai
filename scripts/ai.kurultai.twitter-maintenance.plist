@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.kurultai.twitter-maintenance</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/kublai/.openclaw/agents/main/scripts/twitter_maintenance.py</string>
+        <string>auto</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/kublai/.openclaw/agents/main/scripts</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/kublai/.openclaw/logs/twitter-maintenance.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/kublai/.openclaw/logs/twitter-maintenance.err.log</string>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <!-- 9:00 AM - Morning tweet -->
+        <dict>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <!-- 12:00 PM - Community engagement -->
+        <dict>
+            <key>Hour</key>
+            <integer>12</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <!-- 2:00 PM - Afternoon tweet -->
+        <dict>
+            <key>Hour</key>
+            <integer>14</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <!-- 7:00 PM - Evening tweet -->
+        <dict>
+            <key>Hour</key>
+            <integer>19</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <!-- Sunday 10:00 AM - Weekly summary -->
+        <dict>
+            <key>Weekday</key>
+            <integer>0</integer>
+            <key>Hour</key>
+            <integer>10</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

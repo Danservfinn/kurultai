@@ -1,17 +1,36 @@
 {
-  "last_audit": 1772771974.646006,
-  "cycles": 1265,
-  "last_cycle": "2026-03-06T00:04:41.896176",
-  "watcher_restarts": 10,
-  "stalled_warnings": 1667,
-  "fakes_detected": 4,
+  "last_audit": 1772926463.70947,
+  "cycles": 5726,
+  "last_cycle": "2026-03-07T18:45:21.124345",
+  "watcher_restarts": 11,
+  "stalled_warnings": 226,
+  "fakes_detected": 7,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 51,
+    "audited": 5,
     "fake_found": 2,
-    "requeued": 2,
-    "skipped": 1
+    "requeued": 1,
+    "skipped": 0,
+    "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772773481.8962471,
-  "last_issues": []
+  "last_cycle_epoch": 1772927121.124419,
+  "last_issues": [],
+  "reflection_misses": 0,
+  "last_memory_audit": 1772926914.881591,
+  "memory_audit_result": {
+    "total": 0,
+    "critical": 0,
+    "warning": 0,
+    "ts": "2026-03-07T18:41:55.033135"
+  },
+  "last_routing_drift_check": 1772926915.033258,
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-07T18:41:55.036298"
+  },
+  "memory_fixes": 15,
+  "last_failure_rate_check": 1772883470.03844,
+  "agent_failure_flags": {}
 }

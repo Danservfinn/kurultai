@@ -1,0 +1,386 @@
+{
+  "timestamp": "2026-03-07T13:31:33-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 1,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": true
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 9,
+        "model": "glm-5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 3,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 2,
+        "pending": 0,
+        "running": 0,
+        "total": 2,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 37,
+        "model": "glm-5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 1,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 7,
+        "model": "kimi-k2.5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 1,
+        "pending": 0,
+        "running": 0,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 69,
+        "model": "qwen3-coder-next"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 16,
+    "healthy": 14,
+    "erroring": 0,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 201161,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 191063,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 6543,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 141047,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 27868,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 30828,
+        "enabled": true
+      },
+      {
+        "name": "qmd-index-refresh",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 25970,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-competitor-monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 13295,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-openclaw-discovery",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 20835,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-news-gatherer",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 27658,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 25281,
+        "enabled": true
+      },
+      {
+        "name": "calendar-reminder-worker",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 3021,
+        "enabled": true
+      },
+      {
+        "name": "signal-calendar-listener",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai 3-hour review",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 9904,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 0,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [
+      {
+        "from_agent": "anomaly-scanner",
+        "to_agent": "jochi",
+        "task_label": "jochi-98ee407a-4b1"
+      },
+      {
+        "from_agent": "routing_audit",
+        "to_agent": "kublai",
+        "task_label": "kublai-13ca9e64-345"
+      },
+      {
+        "from_agent": "gateway-cron",
+        "to_agent": "ogedei",
+        "task_label": "ogedei-98fa747b-8d4"
+      },
+      {
+        "from_agent": "cli",
+        "to_agent": "temujin",
+        "task_label": "temujin-5b5262e6-2fc"
+      },
+      {
+        "from_agent": "kublai-initiative",
+        "to_agent": "temujin",
+        "task_label": "temujin-301ae76b-363"
+      }
+    ],
+    "count_30m": 5
+  },
+  "errors": {
+    "clusters": [
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/temujin/tasks/high-1772906501.md\n\n\ud83d\udccb Processing: Review Ogedei performance (past hour)...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (skill: /horde-review) (timeout: 7200s)\n  \ud83d\udd27 Model selection: config=(none), resolved=claude-opus-4-6\n  !! BLOCKED non-Anthropic BASE_URL for temujin: https://coding-intl.dashscope.aliyuncs.com/apps/anthropic\n  !! Removing ANTHROPIC_BASE_URL \u2014 will use official Anthropic API\n  \u2717 claude-code failed: [claude-agen",
+        "count": 1,
+        "agents": [
+          "temujin"
+        ]
+      },
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/ogedei/tasks/normal-1772906575.md\n\n\ud83d\udccb Processing: Parse Conversion Alert Check - Run conversion alert script and report alerts or ...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (skill: /kurultai-health) (timeout: 7200s)\n  \ud83d\udd27 Model selection: config=(none), resolved=claude-opus-4-6\n  !! BLOCKED non-Anthropic BASE_URL for ogedei: https://coding-intl.dashscope.aliyuncs.com/apps/anthropic\n  !! Removing ANTHROPIC_BASE_URL \u2014 will use official Anth",
+        "count": 1,
+        "agents": [
+          "ogedei"
+        ]
+      },
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/jochi/tasks/high-1772906579.md\n\n\ud83d\udccb Processing: Investigate temujin low performance (score 1/10)...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (skill: /systematic-debugging) (timeout: 7200s)\n  \ud83d\udd27 Model selection: config=(none), resolved=claude-opus-4-6\n  !! BLOCKED non-Anthropic BASE_URL for jochi: https://coding-intl.dashscope.aliyuncs.com/apps/anthropic\n  !! Removing ANTHROPIC_BASE_URL \u2014 will use official Anthropic API\n  \u2717 claude-code faile",
+        "count": 1,
+        "agents": [
+          "jochi"
+        ]
+      },
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/kublai/tasks/normal-1772906580.md\n\n\ud83d\udccb Processing: Review routing audit findings and implement improvements...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (timeout: 7200s)\n  \ud83d\udd27 Model selection: config=(none), resolved=claude-opus-4-6\n  !! BLOCKED non-Anthropic BASE_URL for kublai: https://coding-intl.dashscope.aliyuncs.com/apps/anthropic\n  !! Removing ANTHROPIC_BASE_URL \u2014 will use official Anthropic API\n  \u2717 claude-code failed: [claude-agent] A",
+        "count": 1,
+        "agents": [
+          "kublai"
+        ]
+      },
+      {
+        "error": "Executing task: /Users/kublai/.openclaw/agents/temujin/tasks/normal-1772906580.md\n\n\ud83d\udccb Processing: Review Parse monetization blockers and create next implementation task...\n  Status: executing\n  \ud83e\udd16 Executing via Claude Code... (skill: /horde-implement) (timeout: 7200s)\n  \ud83d\udd27 Model selection: config=(none), resolved=claude-opus-4-6\n  !! BLOCKED non-Anthropic BASE_URL for temujin: https://coding-intl.dashscope.aliyuncs.com/apps/anthropic\n  !! Removing ANTHROPIC_BASE_URL \u2014 will use official Anthropic AP",
+        "count": 1,
+        "agents": [
+          "temujin"
+        ]
+      }
+    ]
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 351,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 10,
+    "double_suffix_fixed": 0
+  },
+  "ledger_reconciliation": {
+    "neo4j_total_completed": 0,
+    "ledger_total_completed": 0,
+    "delta": 0,
+    "mismatches": [
+      {
+        "agent": "kublai",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 1,
+        "ledger_failed": 0
+      },
+      {
+        "agent": "temujin",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 2,
+        "ledger_failed": 0
+      },
+      {
+        "agent": "jochi",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 1,
+        "ledger_failed": 0
+      },
+      {
+        "agent": "ogedei",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 1,
+        "ledger_failed": 0
+      }
+    ],
+    "reconciled": false
+  },
+  "llm_assessment": {
+    "model": "ollama/hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+    "workload_balance": "kublai, jochi, and ogedei each have 1 failure; temujin has 2 failures; mongke and chagatai are clean but ctx is low",
+    "bottleneck": "",
+    "coordination_gap": "none",
+    "recommended_action": "restart mongke, chagatai, and temujin sessions with correct claude-opus-4-6 config",
+    "severity": "LOW"
+  }
+}

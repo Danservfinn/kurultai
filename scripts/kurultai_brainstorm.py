@@ -25,13 +25,17 @@ Usage:
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 import glob as glob_mod
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
+import tempfile
 import time
+import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -39,16 +43,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents_config import AGENTS, AGENT_ROLES
 from json_state import locked_json_read, locked_json_update
 
-BASE = Path.home() / ".openclaw/agents"
-MAIN = BASE / "main"
-LOG_FILE = MAIN / "logs/kurultai-brainstorm.log"
-COOLDOWN_FILE = MAIN / "logs/brainstorm-cooldown.json"
-DOMAIN_FILE = MAIN / "logs/brainstorm-domain-rotation.json"
+from kurultai_paths import (AGENTS_DIR as BASE, MAIN_DIR as MAIN, PROPOSALS_DIR,
+    CLAUDE_AGENT as CLAUDE_AGENT_PATH, BRAINSTORM_LOG as LOG_FILE,
+    BRAINSTORM_COOLDOWN as COOLDOWN_FILE, BRAINSTORM_DOMAIN_ROTATION as DOMAIN_FILE)
 
 # Claude Code — opus for brainstorming (via claude-agent wrapper)
-CLAUDE_AGENT_BIN = os.getenv("CLAUDE_AGENT_BIN", "/Users/kublai/.local/bin/claude-agent")
-CLAUDE_MODEL = os.getenv("CLAUDE_BRAINSTORM_MODEL", "opus")
-CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_BRAINSTORM_TIMEOUT", "600"))
+CLAUDE_AGENT_BIN = str(CLAUDE_AGENT_PATH)
+_VALID_MODELS = {"opus", "sonnet", "haiku"}
+_env_model = os.getenv("CLAUDE_BRAINSTORM_MODEL", "opus")
+CLAUDE_MODEL = _env_model if _env_model in _VALID_MODELS else "opus"
+try:
+    CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_BRAINSTORM_TIMEOUT", "600"))
+except (ValueError, TypeError):
+    CLAUDE_TIMEOUT = 600
 CLAUDE_MAX_BUDGET = os.getenv("CLAUDE_BRAINSTORM_BUDGET", "")
 
 # Cooldown: 55 minutes per agent
@@ -57,7 +64,7 @@ BRAINSTORM_COOLDOWN_SECS = 3300
 # Context window for history/logs
 HISTORY_HOURS = 2
 
-# 6 architectural domains — one per hourly cycle, rotating
+# 7 architectural domains — one per hourly cycle, rotating
 DOMAINS = [
     "routing_pipeline",
     "task_dispatch",
@@ -65,6 +72,7 @@ DOMAINS = [
     "heartbeat_system",
     "reflection_pipeline",
     "memory_architecture",
+    "pipeline_throughput",
 ]
 
 DOMAIN_DESCRIPTIONS = {
@@ -96,12 +104,21 @@ DOMAIN_DESCRIPTIONS = {
         "lifecycle (proposed->active->deprecated->pruned), cross-agent visibility, "
         "knowledge retention vs. file bloat, ACTIVE RULES section management"
     ),
+    "pipeline_throughput": (
+        "Task pending time reduction, queue drain rate optimization, "
+        "recovery churn elimination, first-attempt success rate improvement, "
+        "overflow routing effectiveness, capability score maintenance"
+    ),
 }
 
 
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{ts}] {msg}"
+    # Sanitize: collapse newlines, strip ANSI escapes and control chars
+    sanitized = str(msg).replace('\n', ' | ').replace('\r', '')
+    sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', sanitized)
+    sanitized = re.sub(r'\x1b(?:\[[0-9;]*[a-zA-Z]|\][^\x07]*(?:\x07|\x1b\\))', '', sanitized)  # ANSI escapes (CSI + OSC)
+    line = f"[{ts}] {sanitized}"
     print(line)
     try:
         os.makedirs(LOG_FILE.parent, exist_ok=True)
@@ -125,15 +142,15 @@ def mark_fired(agent):
 
 def get_current_domain():
     """Get the current rotating domain focus. Rotates each hour."""
-    data = locked_json_read(str(DOMAIN_FILE), default={"index": 0, "last_rotated": 0})
     now = time.time()
-    if now - data.get("last_rotated", 0) > 3500:  # ~58 minutes
-        new_index = (data.get("index", 0) + 1) % len(DOMAINS)
-        with locked_json_update(str(DOMAIN_FILE)) as d:
-            d["index"] = new_index
-            d["last_rotated"] = now
-        return DOMAINS[new_index]
-    return DOMAINS[data["index"] % len(DOMAINS)]
+    try:
+        with locked_json_update(str(DOMAIN_FILE), default={"index": 0, "last_rotated": 0}) as d:
+            if now - d.get("last_rotated", 0) > 3500:  # ~58 minutes
+                d["index"] = (d.get("index", 0) + 1) % len(DOMAINS)
+                d["last_rotated"] = now
+            return DOMAINS[d["index"] % len(DOMAINS)]
+    except Exception:
+        return DOMAINS[0]
 
 
 # ── Context Gathering ────────────────────────────────────────────────
@@ -289,14 +306,12 @@ def _task_patterns():
     for agent in AGENTS:
         task_dir = BASE / agent / "tasks"
         if not task_dir.exists():
-            # Also check the main/agent/ path
-            task_dir = MAIN / "agent" / agent / "tasks"
-        if not task_dir.exists():
             continue
         try:
-            pending = list(task_dir.glob("*.md"))
-            executing = list(task_dir.glob("*.executing.md"))
-            done = list(task_dir.glob("*.done"))
+            all_files = list(task_dir.glob("*.md"))
+            done = [f for f in all_files if ".done" in f.name]
+            executing = [f for f in all_files if ".executing" in f.name and ".done" not in f.name]
+            pending = [f for f in all_files if not any(x in f.name for x in [".executing", ".completed", ".done"])]
             if pending or executing or done:
                 summaries.append(
                     f"  {agent}: pending={len(pending)} executing={len(executing)} done={len(done)}"
@@ -315,19 +330,21 @@ def _task_patterns():
     try:
         from neo4j_task_tracker import get_driver
         driver = get_driver()
-        with driver.session() as session:
-            result = session.run("""
-                MATCH (t:Task)
-                WHERE t.created > datetime() - duration({hours: 2})
-                RETURN t.status AS status, t.agent AS agent, count(t) AS cnt
-                ORDER BY cnt DESC
-            """)
-            neo4j_stats = []
-            for r in result:
-                neo4j_stats.append(f"  Neo4j: {r['agent']}={r['status']}(x{r['cnt']})")
-            if neo4j_stats:
-                summaries.extend(neo4j_stats[:6])
-        driver.close()
+        try:
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (t:Task)
+                    WHERE t.created > datetime() - duration({hours: 2})
+                    RETURN t.status AS status, t.agent AS agent, count(t) AS cnt
+                    ORDER BY cnt DESC
+                """)
+                neo4j_stats = []
+                for r in result:
+                    neo4j_stats.append(f"  Neo4j: {r['agent']}={r['status']}(x{r['cnt']})")
+                if neo4j_stats:
+                    summaries.extend(neo4j_stats[:6])
+        finally:
+            driver.close()
     except Exception:
         pass
 
@@ -358,46 +375,61 @@ def _skills_summary():
     return "\n".join(lines)
 
 
+def _latest_review(agent, max_chars=1000):
+    """Read the latest /horde-review output for this agent."""
+    review_file = MAIN / "logs" / "reviews" / f"{agent}-latest.md"
+    if not review_file.exists():
+        return "(no review available — /horde-review has not run yet)"
+    try:
+        content = review_file.read_text(encoding="utf-8", errors="replace").strip()
+        if not content or content.startswith("# Review unavailable"):
+            return "(review was unavailable this cycle)"
+        return content[-max_chars:] if len(content) > max_chars else content
+    except Exception:
+        return "(review file unreadable)"
+
+
 def _previous_proposals(agent):
     """Get recent brainstorm proposal history for meta-reflection."""
     try:
         from neo4j_task_tracker import get_driver
         driver = get_driver()
-        with driver.session() as session:
-            result = session.run("""
-                MATCH (f:AgentFeedback)
-                WHERE f.source = 'kurultai_brainstorm'
-                  AND f.agent = $agent
-                RETURN f.feedback AS feedback, f.status AS status,
-                       f.category AS category, f.effort AS effort,
-                       f.submitted AS submitted
-                ORDER BY f.submitted DESC
-                LIMIT 5
-            """, agent=agent)
-            proposals = []
-            for r in result:
-                proposals.append(
-                    f"  [{r['status']}] {r['feedback'][:80]} "
-                    f"(cat={r['category']}, effort={r['effort']})"
-                )
-        driver.close()
+        try:
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (f:AgentFeedback)
+                    WHERE f.source = 'kurultai_brainstorm'
+                      AND f.agent = $agent
+                    RETURN f.feedback AS feedback, f.status AS status,
+                           f.category AS category, f.effort AS effort,
+                           f.submitted AS submitted
+                    ORDER BY f.submitted DESC
+                    LIMIT 5
+                """, agent=agent)
+                proposals = []
+                for r in result:
+                    proposals.append(
+                        f"  [{r['status']}] {r['feedback'][:80]} "
+                        f"(cat={r['category']}, effort={r['effort']})"
+                    )
 
-        # Also get overall stats
-        with get_driver().session() as session:
-            result = session.run("""
-                MATCH (f:AgentFeedback)
-                WHERE f.source = 'kurultai_brainstorm'
-                RETURN f.status AS status, count(f) AS cnt
-            """)
-            stats = {r["status"]: r["cnt"] for r in result}
+            # Overall stats — reuse same driver
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (f:AgentFeedback)
+                    WHERE f.source = 'kurultai_brainstorm'
+                    RETURN f.status AS status, count(f) AS cnt
+                """)
+                stats = {r["status"]: r["cnt"] for r in result}
 
-        if proposals or stats:
-            lines = [f"  Overall: {json.dumps(stats)}"]
-            if proposals:
-                lines.append(f"  Your last {len(proposals)} proposals:")
-                lines.extend(proposals)
-            return "\n".join(lines)
-
+            if proposals or stats:
+                lines = [f"  Overall: {json.dumps(stats)}"]
+                if proposals:
+                    lines.append(f"  Your last {len(proposals)} proposals:")
+                    lines.extend(proposals)
+                return "\n".join(lines)
+        finally:
+            driver.close()
     except Exception:
         pass
     return "  (no previous proposals)"
@@ -467,7 +499,7 @@ def gather_context(agent):
         system = tock.get("system", {})
         all_agents = tock.get("agents", {})
         context["system_health"] = {
-            "neo4j": system.get("neo4j_status", "unknown"),
+            "neo4j": system.get("neo4j_status") or ("up" if system.get("neo4j_reachable") else "unknown"),
             "redis": system.get("redis_status", "unknown"),
             "total_queued": sum(
                 a.get("tasks", {}).get("queue_depth", 0)
@@ -503,10 +535,67 @@ def gather_context(agent):
     except Exception:
         context["task_ledger"] = "(unavailable)"
 
+    # 12. Pipeline health metrics
+    try:
+        from pipeline_health import format_pipeline_health
+        context["pipeline_health"] = format_pipeline_health(agent, hours=1) or "(unavailable)"
+    except Exception:
+        context["pipeline_health"] = "(unavailable)"
+
+    # 13. Capability scores (routing system's view)
+    try:
+        from route_quality_tracker import load_scores
+        scores = load_scores()
+        context["capability_scores"] = scores.get(agent, {})
+    except Exception:
+        context["capability_scores"] = {}
+
+    # 14. /horde-review findings (from hourly_reflection.sh review step)
+    context["horde_review"] = _latest_review(agent)
+
+    # 15. Protocol brainstorming focus (direct read, not via reflection)
+    protocol_file = MAIN / "scripts" / "reflection_protocols" / f"{agent}_protocol.md"
+    context["brainstorm_focus"] = ""
+    if protocol_file.exists():
+        try:
+            proto_text = protocol_file.read_text(encoding="utf-8", errors="replace")
+            marker = "## Brainstorming Focus"
+            idx = proto_text.find(marker)
+            if idx >= 0:
+                rest = proto_text[idx + len(marker):]
+                next_section = rest.find("\n## ")
+                if next_section > 0:
+                    context["brainstorm_focus"] = rest[:next_section].strip()
+                else:
+                    context["brainstorm_focus"] = rest.strip()
+        except Exception:
+            pass
+
     return context
 
 
 # ── Prompt Building ──────────────────────────────────────────────────
+
+
+def _format_capability_scores(cap_scores):
+    """Format capability scores dict for brainstorm prompt."""
+    if not cap_scores:
+        return "  (no data yet)"
+    lines = []
+    overall = cap_scores.get("overall", {})
+    if overall:
+        avg = overall.get("avg_score", "?")
+        n = overall.get("task_count", 0)
+        status = "HEALTHY" if isinstance(avg, float) and avg >= 6.0 else (
+            "LOW" if isinstance(avg, float) and avg < 4.0 else "OK"
+        )
+        lines.append(f"  Overall: {avg}/10 ({n} tasks, 7d) — {status}")
+    for cat, cat_data in sorted((k, v) for k, v in cap_scores.items() if k != "overall"):
+        cat_avg = cat_data.get("avg_score", "?")
+        cat_n = cat_data.get("task_count", 0)
+        flag = " [LOW — tasks may be diverted]" if isinstance(cat_avg, float) and cat_avg < 4.0 else ""
+        lines.append(f"  {cat}: {cat_avg}/10 ({cat_n} tasks){flag}")
+    return "\n".join(lines) if lines else "  (no data)"
 
 
 def build_prompt(agent, context, domain):
@@ -582,8 +671,20 @@ The Kurultai is a 6-agent AI system on Mac Mini (darwin, arm64):
 ## Task Execution Results (Last Hour)
 {context.get('task_ledger', '(none)')}
 
+## Pipeline Health (YOUR throughput data)
+{context.get('pipeline_health', '(unavailable)')}
+
+## Your Capability Scores (routing system view)
+{_format_capability_scores(context.get('capability_scores', {}))}
+
+## /horde-review Critical Analysis (This Hour)
+{context.get('horde_review', '(none)')}
+
 ## Previous Brainstorm Proposals & Outcomes (Meta-Reflection)
 {context.get('previous_proposals', '(none)')}
+
+## Your Brainstorming Focus (from protocol)
+{context.get('brainstorm_focus', '(none)')}
 
 ## Domain Focus This Cycle: {domain}
 {DOMAIN_DESCRIPTIONS.get(domain, '')}
@@ -593,10 +694,12 @@ You are an autonomous agent. Your goal is CONTINUAL SELF-IMPROVEMENT of the Kuru
 
 Analyze the context above, identify ONE high-impact improvement, AND IMPLEMENT IT.
 
-**Step 1 — Analyze** (consider ALL context above):
-1. What happened since the last reflection? What failed, what succeeded?
-2. The **{domain}** domain — what's the highest-impact change?
-3. Your failure patterns — what keeps going wrong?
+**Step 1 — Analyze** (consider ALL context above, especially /horde-review findings):
+1. /horde-review findings: What strengths to preserve? What weaknesses to fix? What's the PRIORITY_FIX?
+2. Pipeline Health: Where is time being wasted? What's the bottleneck?
+3. Your capability scores: Are you at risk of task diversion? What category needs improvement?
+4. The **{domain}** domain — what's the highest-impact change for THROUGHPUT?
+5. Your failure patterns — what keeps going wrong and what RULE would prevent it?
 
 **Step 2 — Implement** (DO the work, don't just propose):
 - If it's a code/script fix: Read the file, edit it, verify the change works
@@ -664,32 +767,36 @@ def call_claude(prompt, agent):
 
 
 def parse_proposal(raw_text):
-    """Parse the Claude Code output for the structured proposal."""
+    """Parse the Claude Code output for the structured proposal.
+
+    Only scans the last 1500 chars to avoid capturing keywords
+    from explanatory prose or code blocks earlier in the output.
+    """
     if not raw_text:
         return None
 
     fields = {}
+    all_keys = ["PROPOSAL", "PROBLEM", "SOLUTION", "IMPLEMENTED", "VERIFIED", "EFFORT", "CATEGORY"]
 
-    # Scan the full output for proposal fields (they should be near the end)
-    all_keys = ["PROPOSAL", "PROBLEM", "SOLUTION", "IMPACT", "IMPLEMENTED", "VERIFIED", "EFFORT", "CATEGORY"]
-
-    for line in raw_text.strip().split("\n"):
+    # Only scan the tail — the structured block is always last per prompt contract
+    tail = raw_text[-1500:]
+    in_fence = False
+    for line in tail.strip().split("\n"):
         line = line.strip()
+        if line.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         for key in all_keys:
             if line.upper().startswith(f"{key}:"):
                 fields[key.lower()] = line[len(key) + 1:].strip()
 
-    if "proposal" not in fields or "solution" not in fields:
-        # Try the last 3000 chars (proposal should be at the end)
-        tail = raw_text[-3000:]
-        for line in tail.strip().split("\n"):
-            line = line.strip()
-            for key in all_keys:
-                if line.upper().startswith(f"{key}:"):
-                    fields[key.lower()] = line[len(key) + 1:].strip()
+    if in_fence:
+        log(f"WARNING: Unclosed code fence in proposal tail — fields may be incomplete")
 
     if "proposal" not in fields or "solution" not in fields:
-        log(f"Failed to parse proposal from {len(raw_text)} chars of output")
+        log(f"Failed to parse proposal from {len(raw_text)} chars of output (tail={len(tail)})")
         return None
 
     # Validate category
@@ -708,6 +815,26 @@ def parse_proposal(raw_text):
     return fields
 
 
+_INSTRUCTION_PATTERNS = re.compile(
+    r'(SYSTEM\s*(INSTRUCTION|PROMPT|MESSAGE)|IMPORTANT.*INSTRUCTION|'
+    r'IGNORE\s*(PREVIOUS|ABOVE|ALL)|'
+    r'YOU\s*MUST\s*(IGNORE|DISREGARD|FORGET|OVERRIDE)|'
+    r'DO\s*NOT\s*FOLLOW\s*(PREVIOUS|ABOVE|ORIGINAL|SYSTEM))',
+    re.IGNORECASE
+)
+
+
+def _sanitize_proposal_field(text, max_len=500):
+    """Truncate and strip instruction-like patterns from proposal text."""
+    text = str(text)[:max_len]
+    # Normalize Unicode to collapse full-width and confusable chars to ASCII
+    text = unicodedata.normalize('NFKC', text)
+    # Strip zero-width characters that could bypass pattern matching
+    text = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', text)
+    text = _INSTRUCTION_PATTERNS.sub('[REDACTED]', text)
+    return text
+
+
 def submit_proposal(agent, proposal):
     """Submit proposal to Neo4j as AgentFeedback."""
     try:
@@ -719,52 +846,138 @@ def submit_proposal(agent, proposal):
         priority = "HIGH" if proposal["effort"] == "S" or proposal["category"] == "rule" else "MEDIUM"
         feedback_id = f"{agent}-brainstorm-{int(datetime.now().timestamp())}"
 
+        # Sanitize all string fields in proposal before storing
+        sanitized_proposal = {
+            k: _sanitize_proposal_field(v, max_len=500) if isinstance(v, str) else v
+            for k, v in proposal.items()
+        }
+
         driver = get_driver()
-        with driver.session() as session:
-            session.run(
-                """
-                MERGE (a:Agent {name: $agent})
-                CREATE (f:AgentFeedback {
-                    agent: $agent,
-                    feedback: $feedback,
-                    priority: $priority,
-                    proposals: $proposals,
-                    submitted: datetime(),
-                    status: $status,
-                    source: 'kurultai_brainstorm',
-                    id: $feedback_id,
-                    category: $category,
-                    effort: $effort,
-                    implemented: $implemented,
-                    verified: $verified
-                })
-                CREATE (a)-[:SUBMITTED]->(f)
-                """,
-                agent=agent,
-                feedback=proposal["proposal"][:200],
-                priority=priority,
-                proposals=json.dumps([proposal]),
-                feedback_id=feedback_id,
-                status=status,
-                category=proposal["category"],
-                effort=proposal["effort"],
-                implemented=implemented,
-                verified=verified,
-            )
-        driver.close()
+        try:
+            with driver.session() as session:
+                session.run(
+                    """
+                    MERGE (a:Agent {name: $agent})
+                    CREATE (f:AgentFeedback {
+                        agent: $agent,
+                        feedback: $feedback,
+                        priority: $priority,
+                        proposals: $proposals,
+                        submitted: datetime(),
+                        status: $status,
+                        source: 'kurultai_brainstorm',
+                        id: $feedback_id,
+                        category: $category,
+                        effort: $effort,
+                        implemented: $implemented,
+                        verified: $verified
+                    })
+                    CREATE (a)-[:SUBMITTED]->(f)
+                    """,
+                    agent=agent,
+                    feedback=sanitized_proposal["proposal"][:200],
+                    priority=priority,
+                    proposals=json.dumps([sanitized_proposal]),
+                    feedback_id=feedback_id,
+                    status=status,
+                    category=sanitized_proposal["category"],
+                    effort=sanitized_proposal["effort"],
+                    implemented=implemented,
+                    verified=verified,
+                )
+        finally:
+            driver.close()
 
         impl_tag = "DONE" if implemented else "PROPOSED"
-        log(f"SUBMITTED: [{priority}/{impl_tag}] {agent} -> {proposal['proposal'][:60]}")
+        log(f"SUBMITTED: [{priority}/{impl_tag}] {agent} -> {sanitized_proposal['proposal'][:60]}")
         return True
     except Exception as e:
         log(f"Neo4j submission failed for {agent}: {e}")
         return False
 
 
+# ── Proposal File Output ─────────────────────────────────────────────
+
+PROPOSAL_TEMPLATE = """# Proposal: {title}
+
+**Agent:** {agent} ({role})
+**Timestamp:** {timestamp}
+**Domain:** {domain}
+**Model:** {model}
+
+## Problem
+
+{problem}
+
+## Solution
+
+{solution}
+
+## Status
+
+- **Implemented:** {implemented}
+- **Verified:** {verified}
+- **Effort:** {effort}
+- **Category:** {category}
+"""
+
+
+def write_proposal_file(agent, proposal, output_dir=None):
+    """Write a structured proposal markdown file for kublai review."""
+    try:
+        out_dir = Path(output_dir) if output_dir else PROPOSALS_DIR
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        ts = datetime.now()
+        filename = f"{agent}-{ts.strftime('%Y%m%d-%H%M%S')}.md"
+
+        role = AGENT_ROLES.get(agent, "Unknown")
+        title = _sanitize_proposal_field(proposal.get("proposal", "Untitled"), max_len=200)
+        problem = _sanitize_proposal_field(proposal.get("problem", "(not specified)"))
+        solution = _sanitize_proposal_field(proposal.get("solution", "(not specified)"))
+
+        content = PROPOSAL_TEMPLATE.format(
+            title=title,
+            agent=agent,
+            role=role,
+            timestamp=ts.strftime("%Y-%m-%d %H:%M:%S"),
+            domain=proposal.get("domain", "general"),
+            model=proposal.get("model", "unknown"),
+            problem=problem,
+            solution=solution,
+            implemented=proposal.get("implemented", "NO"),
+            verified=proposal.get("verified", "NO"),
+            effort=proposal.get("effort", "M"),
+            category=proposal.get("category", "process"),
+        )
+
+        # Atomic write: temp file then rename
+        filepath = out_dir / filename
+        fd, tmp_path = tempfile.mkstemp(dir=str(out_dir), suffix=".tmp")
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.rename(tmp_path, str(filepath))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+        log(f"PROPOSAL FILE: {filepath}")
+        return str(filepath)
+    except Exception as e:
+        log(f"Failed to write proposal file for {agent}: {e}")
+        return None
+
+
 # ── Agent Brainstorming ──────────────────────────────────────────────
 
 
-def brainstorm_agent(agent, dry_run=False, domain=None):
+def brainstorm_agent(agent, dry_run=False, domain=None, proposal_output=None):
     """Run Claude Code brainstorming for a single agent."""
     log(f"--- Brainstorming: {agent} ({AGENT_ROLES.get(agent, '?')}) ---")
 
@@ -810,11 +1023,17 @@ def brainstorm_agent(agent, dry_run=False, domain=None):
             print(f"  {k}: {v}")
         return proposal
 
-    # Submit to Neo4j
-    if submit_proposal(agent, proposal):
-        mark_fired(agent)
+    # Write proposal file for kublai review
+    if proposal_output:
+        write_proposal_file(agent, proposal, output_dir=proposal_output)
     else:
-        # Log locally even if Neo4j fails
+        write_proposal_file(agent, proposal)
+
+    # Mark cooldown regardless of Neo4j success to prevent rapid re-attempts
+    mark_fired(agent)
+
+    # Submit to Neo4j
+    if not submit_proposal(agent, proposal):
         log(f"FALLBACK LOG: {json.dumps(proposal)}")
 
     return proposal
@@ -826,6 +1045,12 @@ def brainstorm_agent(agent, dry_run=False, domain=None):
 def main():
     global CLAUDE_MODEL, CLAUDE_MAX_BUDGET
 
+    def _sigterm_handler(signum, frame):
+        log("SIGTERM received — exiting with 143")
+        sys.exit(143)  # 128 + SIGTERM(15) — distinguishable from clean exit
+
+    signal.signal(signal.SIGTERM, _sigterm_handler)
+
     parser = argparse.ArgumentParser(
         description="Kurultai Self-Improvement Brainstorming (Claude Code + horde-brainstorming)"
     )
@@ -835,9 +1060,13 @@ def main():
     parser.add_argument("--domain", help="Override domain focus (default: rotating)")
     parser.add_argument("--model", help=f"Override Claude model (default: {CLAUDE_MODEL})")
     parser.add_argument("--budget", help=f"Override max budget per session (default: ${CLAUDE_MAX_BUDGET})")
+    parser.add_argument("--proposal-output", help="Directory to write proposal markdown files (default: ~/.openclaw/agents/main/proposals/)")
     args = parser.parse_args()
 
     if args.model:
+        if args.model not in _VALID_MODELS:
+            print(f"Invalid model '{args.model}'. Valid: {_VALID_MODELS}")
+            sys.exit(1)
         CLAUDE_MODEL = args.model
     if args.budget:
         CLAUDE_MAX_BUDGET = args.budget
@@ -857,15 +1086,41 @@ def main():
     log(f"Wrapper: {CLAUDE_AGENT_BIN}")
     log(f"Domain focus: {domain}")
 
-    for agent in agents:
-        if agent not in AGENTS:
-            log(f"Unknown agent: {agent}")
-            continue
+    valid_agents = [a for a in agents if a in AGENTS]
+    invalid = set(agents) - set(valid_agents)
+    for a in invalid:
+        log(f"Unknown agent: {a}")
 
-        proposal = brainstorm_agent(agent, dry_run=args.dry_run, domain=domain)
-        if proposal:
-            proposals.append(proposal)
+    BRAINSTORM_THREAD_TIMEOUT = 660  # Must exceed CLAUDE_TIMEOUT (600s) to avoid orphans
 
+    proposal_out = args.proposal_output or str(PROPOSALS_DIR)
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {
+            executor.submit(brainstorm_agent, a, dry_run=args.dry_run, domain=domain, proposal_output=proposal_out): a
+            for a in valid_agents
+        }
+        try:
+            for future in as_completed(futures):
+                agent_name = futures[future]
+                try:
+                    proposal = future.result(timeout=BRAINSTORM_THREAD_TIMEOUT)
+                except FutureTimeoutError:
+                    log(f"Brainstorm TIMEOUT for {agent_name} ({BRAINSTORM_THREAD_TIMEOUT}s)")
+                    proposal = None
+                except Exception as exc:
+                    log(f"Brainstorm thread error for {agent_name}: {exc}")
+                    proposal = None
+                if proposal:
+                    proposals.append(proposal)
+        except SystemExit:
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+
+    succeeded = [p['agent'] for p in proposals if p]
+    failed_agents = [a for a in valid_agents if a not in succeeded]
+    if failed_agents:
+        log(f"WARNING: Brainstorm failed/timed out for: {', '.join(failed_agents)}")
     log(f"=== Complete: {len(proposals)}/{len(agents)} proposals generated ===")
 
     if args.dry_run and proposals:

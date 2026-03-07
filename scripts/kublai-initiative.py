@@ -30,14 +30,14 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_read, locked_json_update
+from kurultai_paths import AGENTS_DIR, MAIN_DIR, LOGS_DIR
 
-BASE = Path.home() / ".openclaw/agents"
-MAIN = BASE / "main"
-TOCK_LATEST = MAIN / "logs/tock/latest.json"
+BASE = AGENTS_DIR
+MAIN = MAIN_DIR
+TOCK_LATEST = LOGS_DIR / "tock/latest.json"
 MEMORY_FILE = MAIN / "MEMORY.md"
-INITIATIVE_LOG = MAIN / "logs/kublai-initiative.log"
-COOLDOWN_FILE = MAIN / "logs/initiative-cooldown.json"
-AGENT_DIR = MAIN / "agent"
+INITIATIVE_LOG = LOGS_DIR / "kublai-initiative.log"
+COOLDOWN_FILE = LOGS_DIR / "initiative-cooldown.json"
 
 AGENTS = ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
 
@@ -307,7 +307,8 @@ def parse_initiative(raw_text):
     return fields
 
 
-def create_task(agent, priority, title, body, depth=0):
+def create_task(agent, priority, title, body, depth=0,
+                skill_hint=None, force_claude_code=True):
     """Create a task via canonical task_intake pipeline.
 
     Delegates to task_intake.create_task() for Neo4j + filesystem creation,
@@ -321,6 +322,8 @@ def create_task(agent, priority, title, body, depth=0):
         source="kublai-initiative",
         depth=depth,
         agent=agent,
+        skill_hint=skill_hint,
+        force_claude_code=force_claude_code,
     )
     if result:
         log(f"TASK CREATED: {priority} task for {agent}: {title} (depth={depth})")

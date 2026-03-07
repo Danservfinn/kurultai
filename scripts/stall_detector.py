@@ -24,7 +24,8 @@ import sys
 import time
 from pathlib import Path
 
-AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
+sys.path.insert(0, str(Path(__file__).parent))
+from kurultai_paths import AGENTS_DIR
 STALL_THRESHOLD_SECS = 3600  # 60 minutes
 AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"]
 

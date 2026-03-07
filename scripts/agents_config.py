@@ -1,10 +1,20 @@
 """Canonical agent configuration — single source of truth.
 
 All scripts that need agent lists, roles, or model mappings should import from here.
-Model assignments are kept in sync with openclaw.json (authoritative source).
+All agents execute via Claude Code (claude-opus-4-6). models.json has alternative providers for experimentation only.
+Task queue paths are derived from kurultai_paths.AGENTS_DIR (the canonical root).
 """
 
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
+
 AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+
+# Canonical task queue paths — single source of truth for all scripts.
+# Any script that writes or reads task files MUST use these paths.
+# Old path (main/agent/{agent}/tasks/) is DEAD — do not use.
+TASK_QUEUE_PATHS = {
+    agent: str(_AGENTS_DIR / agent / "tasks") for agent in AGENTS
+}
 
 AGENT_ROLES = {
     "kublai": "Squad Lead / Router",
@@ -16,10 +26,10 @@ AGENT_ROLES = {
 }
 
 AGENT_MODELS = {
-    "kublai": "bailian/qwen3.5-plus",
-    "mongke": "bailian/MiniMax-M2.5",
-    "chagatai": "bailian/kimi-k2.5",
-    "temujin": "bailian/MiniMax-M2.5",
-    "jochi": "bailian/qwen3.5-plus",
-    "ogedei": "bailian/qwen3.5-plus",
+    "kublai": "claude-opus-4-6",
+    "mongke": "claude-opus-4-6",
+    "chagatai": "claude-opus-4-6",
+    "temujin": "claude-opus-4-6",
+    "jochi": "claude-opus-4-6",
+    "ogedei": "claude-opus-4-6",
 }

@@ -1,0 +1,18 @@
+#!/bin/bash
+# Cron job setup for Kurultai Twitter Maintenance
+# Add these lines to your crontab: crontab -e
+
+# Twitter Maintenance Cron Jobs
+# =============================
+
+# Post tweets 3x daily (9am, 2pm, 7pm)
+0 9,14,19 * * * /usr/bin/python3 /Users/kublai/.openclaw/agents/main/scripts/twitter_maintenance.py tweet >> /Users/kublai/.openclaw/logs/twitter-maintenance.log 2>&1
+
+# Community engagement 1x daily (12pm)
+0 12 * * * /usr/bin/python3 /Users/kublai/.openclaw/agents/main/scripts/twitter_maintenance.py engage >> /Users/kublai/.openclaw/logs/twitter-maintenance.log 2>&1
+
+# Weekly summary thread (Sundays at 10am)
+0 10 * * 0 /usr/bin/python3 /Users/kublai/.openclaw/agents/main/scripts/twitter_maintenance.py weekly >> /Users/kublai/.openclaw/logs/twitter-maintenance.log 2>&1
+
+# Auto mode check (runs every hour, handles all logic internally)
+# 0 * * * * /usr/bin/python3 /Users/kublai/.openclaw/agents/main/scripts/twitter_maintenance.py auto >> /Users/kublai/.openclaw/logs/twitter-maintenance.log 2>&1

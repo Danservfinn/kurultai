@@ -1,20 +1,52 @@
 {
   "period_hours": 1,
-  "generated_at": "2026-03-04T17:26:34.754389",
-  "total_routed": 0,
-  "routing_methods": {},
-  "destinations": {},
-  "by_agent": {},
+  "generated_at": "2026-03-07T18:04:46.057378",
+  "total_routed": 19,
+  "routing_methods": {
+    "explicit": 19
+  },
+  "destinations": {
+    "jochi": 8,
+    "temujin": 6,
+    "ogedei": 3,
+    "kublai": 2
+  },
+  "by_agent": {
+    "jochi": {
+      "routed": 8,
+      "executed": 5,
+      "succeeded": 0,
+      "failed": 5
+    },
+    "temujin": {
+      "routed": 6,
+      "executed": 13,
+      "succeeded": 0,
+      "failed": 13
+    },
+    "ogedei": {
+      "routed": 3,
+      "executed": 4,
+      "succeeded": 2,
+      "failed": 2
+    },
+    "kublai": {
+      "routed": 2,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    }
+  },
   "queue_state": {
     "kublai": {
       "pending": 0,
-      "executing": 0,
-      "done": 3
+      "executing": 2,
+      "done": 0
     },
     "temujin": {
-      "pending": 0,
-      "executing": 0,
-      "done": 13
+      "pending": 1,
+      "executing": 2,
+      "done": 0
     },
     "mongke": {
       "pending": 0,
@@ -24,21 +56,70 @@
     "chagatai": {
       "pending": 0,
       "executing": 0,
-      "done": 1
+      "done": 0
     },
     "jochi": {
       "pending": 0,
-      "executing": 0,
-      "done": 17
+      "executing": 2,
+      "done": 0
     },
     "ogedei": {
       "pending": 0,
       "executing": 0,
-      "done": 3
+      "done": 1
     }
   },
   "issues": [
-    "No routing decisions logged in the last 1h"
+    "High explicit routing: 19/19 (100%) \u2014 keyword table may be underused",
+    "Workload imbalance: jochi got 8 tasks vs kublai got 2",
+    "jochi: 5 task(s) failed out of 5 executed",
+    "temujin: 13 task(s) failed out of 13 executed",
+    "ogedei: 2 task(s) failed out of 4 executed",
+    "kublai: 2 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "Keyword table drift: 14/19 (74%) tasks would route differently via keywords vs actual destination",
+    "RECURRING: 4 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
   ],
-  "suggestions": []
+  "suggestions": [
+    "Routing methods: explicit=19"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 14,
+  "kw_misroute_rate": "14/19",
+  "kw_misroute_examples": [
+    "'Investigate kublai task failures (10 in last 1h)' -> kw=mongke actual=jochi",
+    "'Investigate temujin task failures (29 in last 1h)' -> kw=mongke actual=jochi",
+    "'FIX: claude-agent model mismatch - tasks requesting claude-s' -> kw=ogedei actual=temujin",
+    "'CRITICAL: Session file lock contention causing 93% failure r' -> kw=jochi actual=ogedei",
+    "'INVESTIGATE: Root cause of session lock accumulation' -> kw=mongke actual=temujin"
+  ],
+  "overflow_count": 0,
+  "skill_hint_coverage": "13/19",
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-07T17:41:53.801456"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "temujin: # task(s) failed out of # executed",
+      "consecutive": 11,
+      "first_seen": "2026-03-07T13:35:39.814462"
+    },
+    {
+      "issue_key": "Keyword table drift: #/# (#%) tasks would route differently via keywords vs actual destination",
+      "consecutive": 8,
+      "first_seen": "2026-03-07T15:03:06.497997"
+    },
+    {
+      "issue_key": "High explicit routing: #/# (#%) \u2014 keyword table may be underused",
+      "consecutive": 6,
+      "first_seen": "2026-03-07T16:03:03.123676"
+    },
+    {
+      "issue_key": "jochi: # task(s) failed out of # executed",
+      "consecutive": 4,
+      "first_seen": "2026-03-07T17:01:28.284522"
+    }
+  ]
 }

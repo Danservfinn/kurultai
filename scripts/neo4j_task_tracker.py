@@ -15,11 +15,17 @@ Usage:
 """
 
 import os
+import sys
 import json
 import uuid
 import glob
 from datetime import datetime
 from neo4j import GraphDatabase
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
+
+_AGENTS_BASE = str(_AGENTS_DIR)
 
 # Credentials env file — single source of truth
 _NEO4J_ENV_FILE = os.path.expanduser("~/.openclaw/credentials/neo4j.env")
@@ -82,33 +88,22 @@ class TaskTracker:
             priority=priority, mode=mode, continuous=continuous, source=source)
     
     def update_status(self, label, status, error=None, session_key=None):
-        """Update task status"""
+        """Update task status in a single atomic query."""
+        is_terminal = status in ['completed', 'failed', 'killed']
+        is_running = status == 'running' and session_key is not None
         with self.driver.session() as session:
             session.run("""
                 MATCH (t:Task {label: $label})
                 SET t.status = $status,
-                    t.updated = datetime()
+                    t.updated = datetime(),
+                    t.error = CASE WHEN $error IS NOT NULL THEN $error ELSE t.error END,
+                    t.session_key = CASE WHEN $is_running THEN $session_key ELSE t.session_key END,
+                    t.started = CASE WHEN $is_running THEN datetime() ELSE t.started END,
+                    t.completed = CASE WHEN $is_terminal THEN datetime() ELSE t.completed END
                 """,
-                label=label, status=status)
-            
-            if status == 'running' and session_key:
-                session.run("""
-                    MATCH (t:Task {label: $label})
-                    SET t.session_key = $session_key,
-                        t.started = datetime()
-                """, label=label, session_key=session_key)
-            
-            if status in ['completed', 'failed', 'killed']:
-                session.run("""
-                    MATCH (t:Task {label: $label})
-                    SET t.completed = datetime()
-                """, label=label)
-            
-            if error:
-                session.run("""
-                    MATCH (t:Task {label: $label})
-                    SET t.error = $error
-                """, label=label, error=error)
+                label=label, status=status, error=error,
+                session_key=session_key or "",
+                is_running=is_running, is_terminal=is_terminal)
     
     def increment_retry(self, label):
         """Increment retry count"""
@@ -153,10 +148,10 @@ class TaskTracker:
                     count(t) AS count
                 WITH
                     agent,
-                    sum(CASE WHEN status = 'completed' THEN count ELSE 0 END) AS completed,
-                    sum(CASE WHEN status = 'failed' THEN count ELSE 0 END) AS failed,
-                    sum(CASE WHEN status = 'running' THEN count ELSE 0 END) AS running,
-                    sum(CASE WHEN status = 'ready' THEN count ELSE 0 END) AS ready,
+                    sum(CASE WHEN toUpper(status) = 'COMPLETED' THEN count ELSE 0 END) AS completed,
+                    sum(CASE WHEN toUpper(status) = 'FAILED' THEN count ELSE 0 END) AS failed,
+                    sum(CASE WHEN toUpper(status) IN ['RUNNING', 'EXECUTING'] THEN count ELSE 0 END) AS running,
+                    sum(CASE WHEN toUpper(status) IN ['READY', 'PENDING'] THEN count ELSE 0 END) AS ready,
                     sum(count) AS total
                 RETURN
                     agent,
@@ -175,14 +170,14 @@ class TaskTracker:
             result = session.run("""
                 MATCH (t:Task)
                 WHERE t.created > datetime() - duration('PT' + $hours + 'H')
-                  AND t.status IN ['completed', 'failed']
-                WITH 
+                  AND toUpper(t.status) IN ['COMPLETED', 'FAILED']
+                WITH
                     count(t) AS total,
-                    sum(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS success
-                RETURN 
+                    sum(CASE WHEN toUpper(t.status) = 'COMPLETED' THEN 1 ELSE 0 END) AS success
+                RETURN
                     total,
                     success,
-                    round(100.0 * success / total, 1) AS success_rate
+                    CASE WHEN total > 0 THEN round(100.0 * success / total, 1) ELSE 0.0 END AS success_rate
             """, hours=hours)
             record = result.single()
             return dict(record) if record else {}
@@ -239,9 +234,9 @@ class TaskTracker:
                     count(t) AS count
                 WITH
                     day,
-                    sum(CASE WHEN status = 'completed' THEN count ELSE 0 END) AS completed,
-                    sum(CASE WHEN status = 'failed' THEN count ELSE 0 END) AS failed,
-                    sum(CASE WHEN status = 'running' THEN count ELSE 0 END) AS running,
+                    sum(CASE WHEN toUpper(status) = 'COMPLETED' THEN count ELSE 0 END) AS completed,
+                    sum(CASE WHEN toUpper(status) = 'FAILED' THEN count ELSE 0 END) AS failed,
+                    sum(CASE WHEN toUpper(status) IN ['RUNNING', 'EXECUTING'] THEN count ELSE 0 END) AS running,
                     sum(count) AS total
                 RETURN
                     day,
@@ -266,12 +261,12 @@ class TaskTracker:
                 WITH 
                     agent,
                     count(t) AS total_tasks,
-                    sum(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
-                RETURN 
+                    sum(CASE WHEN toUpper(status) = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
+                RETURN
                     agent,
                     total_tasks,
                     completed,
-                    round(100.0 * completed / total_tasks, 1) AS success_rate
+                    CASE WHEN total_tasks > 0 THEN round(100.0 * completed / total_tasks, 1) ELSE 0.0 END AS success_rate
                 ORDER BY total_tasks DESC
                 """, days=days)
             return [dict(r) for r in result]
@@ -316,13 +311,26 @@ class TaskTracker:
     # ==========================================================
 
     def create_task_full(self, agent, title, body, priority="normal",
-                         source="system", depth=0, parent_id=None):
+                         source="system", depth=0, parent_id=None,
+                         skill_hint=None, notify_on_complete=False,
+                         notify_channel="signal", notify_target="+19194133445",
+                         timeout=None, bucket=None):
         """Create task in Neo4j (primary) AND filesystem (backward compat).
 
         Returns the task_id (uuid).
         """
         task_id = str(uuid.uuid4())[:12]
         label = f"{agent}-{task_id}"
+
+        # Auto-assign bucket based on priority if not provided
+        if bucket is None:
+            bucket_map = {
+                'critical': 'CRITICAL',
+                'high': 'TODAY',
+                'normal': 'WEEK',
+                'low': 'BACKLOG'
+            }
+            bucket = bucket_map.get(priority, 'BACKLOG')
 
         with self.driver.session() as session:
             session.run("""
@@ -337,6 +345,8 @@ class TaskTracker:
                     source: $source,
                     depth: $depth,
                     parent_id: $parent_id,
+                    skill_hint: $skill_hint,
+                    bucket: $bucket,
                     status: 'PENDING',
                     created: datetime(),
                     retry_count: 0,
@@ -346,15 +356,26 @@ class TaskTracker:
             """,
             task_id=task_id, label=label, agent=agent, title=title,
             body=body, priority=priority, source=source, depth=depth,
-            parent_id=parent_id)
+            parent_id=parent_id, skill_hint=skill_hint or "", bucket=bucket)
 
         # Backward-compatible filesystem write
-        base = os.path.expanduser("~/.openclaw/agents")
+        base = _AGENTS_BASE
         task_dir = f"{base}/{agent}/tasks"
         os.makedirs(task_dir, exist_ok=True)
         epoch = int(datetime.now().timestamp())
         filepath = f"{task_dir}/{priority}-{epoch}.md"
 
+        skill_line = f"skill_hint: {skill_hint}\n" if skill_hint else ""
+        bucket_line = f"bucket: {bucket}\n"
+        notify_lines = ""
+        if notify_on_complete:
+            notify_lines = f"notify_on_complete: true\nnotify_channel: {notify_channel}\nnotify_target: {notify_target}\n"
+        if timeout is None:
+            try:
+                from task_intake import compute_task_timeout
+                timeout = compute_task_timeout(priority, skill_hint)
+            except Exception:
+                timeout = 7200
         content = f"""---
 agent: {agent}
 priority: {priority}
@@ -363,7 +384,9 @@ source: {source}
 depth: {depth}
 task_id: {task_id}
 parent_id: {parent_id or ''}
----
+bucket: {bucket}
+timeout: {timeout}
+{skill_line}{notify_lines}---
 
 # Task: {title}
 
@@ -437,15 +460,20 @@ parent_id: {parent_id or ''}
             return {"success": True, "from": current, "to": new_status}
 
     def sync_check(self):
-        """Daily sync: compare Neo4j task states with filesystem.
+        """Bidirectional sync: compare Neo4j task states with filesystem.
+
+        Two query scopes:
+        - Forward (filesystem → Neo4j): recent tasks (P1D) for status mismatch
+        - Reverse (Neo4j → filesystem): ALL non-terminal tasks, any age, to catch
+          orphans that outlived the 24h window
 
         Returns a dict of discrepancies.
         """
-        base = os.path.expanduser("~/.openclaw/agents")
-        agents = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+        base = _AGENTS_BASE
+        agents = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
         discrepancies = []
 
-        # Get all recent tasks from Neo4j
+        # Get recent tasks from Neo4j (for forward pass)
         neo4j_tasks = {}
         with self.driver.session() as session:
             result = session.run("""
@@ -463,7 +491,27 @@ parent_id: {parent_id or ''}
                         "label": r["label"],
                     }
 
-        # Check filesystem for tasks with task_id in frontmatter
+            # Separate query: ALL non-terminal tasks regardless of age (for reverse pass)
+            non_terminal_tasks = {}
+            result2 = session.run("""
+                MATCH (t:Task)
+                WHERE t.status IN ['PENDING', 'ASSIGNED', 'EXECUTING', 'running', 'ready']
+                RETURN t.task_id AS task_id, t.agent AS agent,
+                       t.status AS status, t.label AS label
+            """)
+            for r in result2:
+                tid = r.get("task_id")
+                if tid:
+                    non_terminal_tasks[tid] = {
+                        "agent": r["agent"],
+                        "status": r["status"],
+                        "label": r["label"],
+                    }
+
+        # Track which Neo4j task_ids we find on filesystem
+        seen_task_ids = set()
+
+        # Forward pass: Check filesystem for tasks with task_id in frontmatter
         for agent in agents:
             task_dir = f"{base}/{agent}/tasks"
             if not os.path.isdir(task_dir):
@@ -472,23 +520,28 @@ parent_id: {parent_id or ''}
                 try:
                     with open(fpath) as f:
                         content = f.read(500)
-                    # Extract task_id from frontmatter
                     import re
                     match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
                     if not match:
                         continue
                     file_task_id = match.group(1)
 
-                    # Determine file status from filename
                     fname = os.path.basename(fpath)
-                    if '.done' in fname:
+                    seen_task_ids.add(file_task_id)
+
+                    if '.failed.done' in fname or '.orphan-failed.done' in fname:
+                        file_status = "FAILED"
+                    elif '.completed.done' in fname:
+                        file_status = "COMPLETED"
+                    elif '.done' in fname:
                         file_status = "COMPLETED"
                     elif '.executing' in fname:
                         file_status = "EXECUTING"
                     else:
                         file_status = "PENDING"
 
-                    neo_entry = neo4j_tasks.get(file_task_id)
+                    # Check against both recent and non-terminal sets
+                    neo_entry = neo4j_tasks.get(file_task_id) or non_terminal_tasks.get(file_task_id)
                     if neo_entry and neo_entry["status"] != file_status:
                         discrepancies.append({
                             "task_id": file_task_id,
@@ -500,10 +553,92 @@ parent_id: {parent_id or ''}
                 except Exception:
                     continue
 
+        # Reverse pass: non-terminal Neo4j tasks with no filesystem file = orphan
+        for tid, info in non_terminal_tasks.items():
+            if tid in seen_task_ids:
+                continue
+            discrepancies.append({
+                "task_id": tid,
+                "agent": info["agent"],
+                "file": None,
+                "file_status": "COMPLETED",  # assume done if file is gone
+                "neo4j_status": info["status"],
+                "orphan": True,
+            })
+
         return {
             "checked": datetime.now().isoformat(),
             "neo4j_count": len(neo4j_tasks),
+            "non_terminal_count": len(non_terminal_tasks),
             "discrepancies": discrepancies,
+        }
+
+    def sync_reconcile(self, dry_run=False):
+        """Detect AND fix Neo4j/filesystem state discrepancies.
+
+        Filesystem is the source of truth. When Neo4j status disagrees with
+        the filesystem file suffix (.executing, .done, plain .md), Neo4j is
+        updated to match.
+
+        Returns dict with counts of fixes applied (or would-be-applied if dry_run).
+        """
+        result = self.sync_check()
+        discrepancies = result.get("discrepancies", [])
+        fixed = 0
+        skipped = 0
+
+        if not discrepancies:
+            return {
+                "checked": result["checked"],
+                "neo4j_count": result["neo4j_count"],
+                "discrepancies": 0,
+                "fixed": 0,
+                "skipped": 0,
+                "dry_run": dry_run,
+            }
+
+        with self.driver.session() as session:
+            for d in discrepancies:
+                task_id = d["task_id"]
+                file_status = d["file_status"]
+                neo4j_status = d["neo4j_status"]
+
+                # Safe reconciliation directions (filesystem is source of truth):
+                # - Neo4j PENDING/EXECUTING but file is COMPLETED/FAILED -> fix
+                # - Neo4j EXECUTING but file is PENDING -> fix to PENDING
+                # - Neo4j FAILED/TIMEOUT -> PENDING/EXECUTING: allowed (task retried)
+                # - Do NOT downgrade COMPLETED in Neo4j (completed is final)
+                # - Do NOT downgrade CANCELLED in Neo4j
+                if neo4j_status in ("COMPLETED", "CANCELLED"):
+                    skipped += 1
+                    continue
+                # FAILED/TIMEOUT -> only allow if file shows non-terminal (retry)
+                if neo4j_status in ("FAILED", "TIMEOUT") and file_status not in ("PENDING", "EXECUTING"):
+                    skipped += 1
+                    continue
+
+                if dry_run:
+                    fixed += 1
+                    continue
+
+                is_terminal = file_status in ("COMPLETED", "FAILED")
+                session.run("""
+                    MATCH (t:Task {task_id: $task_id})
+                    SET t.status = $file_status,
+                        t.updated = datetime(),
+                        t.reconciled = true,
+                        t.reconciled_at = datetime(),
+                        t.completed = CASE WHEN $is_terminal THEN datetime() ELSE t.completed END
+                """, task_id=task_id, file_status=file_status, is_terminal=is_terminal)
+                fixed += 1
+
+        return {
+            "checked": result["checked"],
+            "neo4j_count": result["neo4j_count"],
+            "discrepancies": len(discrepancies),
+            "fixed": fixed,
+            "skipped": skipped,
+            "dry_run": dry_run,
         }
 
 
@@ -651,6 +786,75 @@ parent_id: {parent_id or ''}
                     ORDER BY r.invocations DESC
                 """)
             return [dict(r) for r in result]
+
+    # ==========================================================
+    # Pipeline observability events
+    # ==========================================================
+
+    def emit_pipeline_event(self, event_type, payload=None, agent=None,
+                            status="delivered", latency_ms=None, error=None):
+        """Create a (:PipelineEvent) node for observability.
+
+        Event types:
+        - TASK_COMPLETE_REPORT: Sent after /task-complete haiku finishes
+        - FAILURE_ALERT: Sent when a task fails
+        - HOURLY_DIGEST: Hourly reflection context generated
+        - QUEUED_EVENT: Task queued for execution
+        - CAPABILITY_SCORE_UPDATE: Capability scores recomputed
+        - RULE_PROPAGATION: Cross-agent rule proposed
+        """
+        event_id = str(uuid.uuid4())[:12]
+        try:
+            with self.driver.session() as session:
+                session.run("""
+                    CREATE (e:PipelineEvent {
+                        event_id: $event_id,
+                        event_type: $event_type,
+                        agent: $agent,
+                        status: $status,
+                        latency_ms: $latency_ms,
+                        error: $error,
+                        payload: $payload,
+                        created: datetime()
+                    })
+                """,
+                event_id=event_id, event_type=event_type,
+                agent=agent or "", status=status,
+                latency_ms=latency_ms, error=error,
+                payload=json.dumps(payload) if payload else None)
+        except Exception:
+            pass
+        return event_id
+
+    def get_pipeline_events(self, event_type=None, hours=1, limit=50):
+        """Query recent pipeline events."""
+        with self.driver.session() as session:
+            if event_type:
+                result = session.run("""
+                    MATCH (e:PipelineEvent)
+                    WHERE e.event_type = $event_type
+                      AND e.created > datetime() - duration({hours: $hours})
+                    RETURN e ORDER BY e.created DESC LIMIT $limit
+                """, event_type=event_type, hours=hours, limit=limit)
+            else:
+                result = session.run("""
+                    MATCH (e:PipelineEvent)
+                    WHERE e.created > datetime() - duration({hours: $hours})
+                    RETURN e ORDER BY e.created DESC LIMIT $limit
+                """, hours=hours, limit=limit)
+            return [dict(r['e']) for r in result]
+
+    def prune_pipeline_events(self, days=7):
+        """Remove PipelineEvent nodes older than N days."""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (e:PipelineEvent)
+                WHERE e.created < datetime() - duration({days: $days})
+                DELETE e
+                RETURN count(e) AS pruned
+            """, days=days)
+            record = result.single()
+            return record["pruned"] if record else 0
 
 
 # Singleton instance

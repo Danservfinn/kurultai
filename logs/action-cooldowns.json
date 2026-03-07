@@ -1,15 +1,18 @@
 {
-  "error_spike:high": 1772733347.9185832,
+  "error_spike:high": 1772891079.964122,
   "cron_fix:heartbeat-watchdog": 1772607015.191419,
   "cron_fix:tock-gather": 1772623104.230965,
-  "agent_stalled:jochi": 1772731892.00429,
+  "agent_stalled:jochi": 1772919117.6309261,
   "service_down:neo4j": 1772659924.601877,
-  "tock_severity": 1772737280.8646731,
-  "agent_stalled:kublai": 1772723008.567847,
-  "queue_backlog": 1772730102.364266,
-  "queue_audit": 1772771480.874868,
-  "agent_stalled:mongke": 1772730102.723966,
-  "agent_stalled:chagatai": 1772730102.7657669,
-  "agent_stalled:temujin": 1772730258.868501,
-  "agent_stalled:ogedei": 1772730258.880543
+  "tock_severity": 1772926419.652768,
+  "agent_stalled:kublai": 1772911926.7428439,
+  "queue_backlog": 1772911926.1228979,
+  "queue_audit": 1772784080.363038,
+  "agent_stalled:mongke": 1772911927.247412,
+  "agent_stalled:chagatai": 1772923121.828087,
+  "agent_stalled:temujin": 1772926419.6453152,
+  "agent_stalled:ogedei": 1772911927.276691,
+  "feedback_review:temujin-brainstorm-1772665990": 1772775470.6606631,
+  "high_cpu": 1772872687.342606,
+  "task_stall:kublai": 1772911958.6408188
 }

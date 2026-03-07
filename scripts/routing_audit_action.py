@@ -13,12 +13,38 @@ Usage:
 import json
 import os
 import sys
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from routing_audit import generate_audit, format_for_reflection
 
 AUDIT_CACHE = "/Users/kublai/.openclaw/agents/main/logs/routing-audit-latest.json"
+AUDIT_COOLDOWN_FILE = "/Users/kublai/.openclaw/agents/main/logs/routing-audit-cooldown.json"
+AUDIT_COOLDOWN_HOURS = 4  # Only create one routing audit task per 4 hours
+
+
+def _check_cooldown():
+    """Return True if cooldown has elapsed and a new task can be created."""
+    if not os.path.exists(AUDIT_COOLDOWN_FILE):
+        return True
+    try:
+        with open(AUDIT_COOLDOWN_FILE) as f:
+            data = json.load(f)
+        last_created = datetime.fromisoformat(data.get("last_created", "2000-01-01"))
+        return datetime.now() - last_created >= timedelta(hours=AUDIT_COOLDOWN_HOURS)
+    except Exception:
+        return True
+
+
+def _update_cooldown():
+    """Record that a routing audit task was just created."""
+    try:
+        os.makedirs(os.path.dirname(AUDIT_COOLDOWN_FILE), exist_ok=True)
+        with open(AUDIT_COOLDOWN_FILE, "w") as f:
+            json.dump({"last_created": datetime.now().isoformat()}, f)
+    except Exception:
+        pass
 
 
 def should_create_task(report):
@@ -33,7 +59,7 @@ def should_create_task(report):
         return False
 
     # Only create a task if there are execution failures, stalled dispatch, or high fallback rate
-    actionable_keywords = ["failed", "stalled", "backlog", "imbalance", "fallback"]
+    actionable_keywords = ["failed", "stalled", "backlog", "imbalance", "fallback", "recurring"]
     actionable = [i for i in real_issues if any(kw in i.lower() for kw in actionable_keywords)]
 
     return len(actionable) > 0
@@ -53,6 +79,11 @@ def main():
         total = report.get("total_routed", 0)
         if total > 0:
             print(f"Routing audit: {total} tasks routed, no actionable issues")
+        return
+
+    # Cooldown: don't spam routing audit tasks every hour
+    if not _check_cooldown():
+        print("Routing audit: actionable issues found but cooldown active (1 task per 4h)")
         return
 
     # Build task body from the audit
@@ -87,6 +118,7 @@ Priority: Focus on execution failures and stalled dispatch first. Workload imbal
     )
 
     if task_id:
+        _update_cooldown()
         print(f"Routing audit: created kublai task {task_id} ({len(issues)} issues)")
     else:
         print("Routing audit: task creation skipped (duplicate or depth limit)")

@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-Kublai is a **squad-leading AI agent** operating within the OpenClaw ecosystem, coordinating a team of 6 specialist agents (the Kurultai) to serve a human operator. Unlike monolithic AI systems, Kublai uses a **file-based memory architecture** combined with **Neo4j operational memory** to maintain continuity, learn from interactions, and coordinate complex multi-agent workflows.
+Kublai is a **squad-leading AI agent** operating within the OpenClaw ecosystem, coordinating a team of 7 specialist agents (the Kurultai) to serve a human operator. Unlike monolithic AI systems, Kublai uses a **file-based memory architecture** combined with **Neo4j operational memory** to maintain continuity, learn from interactions, and coordinate complex multi-agent workflows.
 
 ### Core Philosophy
 
@@ -450,7 +450,7 @@ src/
 - **Agent Tasks** (`agent_tasks.py`): Registered tasks per agent (health checks, memory curation, context review)
 - **Kublai Context Review**: LLM-powered analysis of recent chat every 12 minutes
   - Analyzes last 60 minutes of session chat
-  - Uses cloud LLM (qwen3.5-plus via DashScope) for analysis
+  - Uses claude-opus-4-6 for analysis
   - Identifies open tasks, blockers, opportunities
   - Routes code generation needs to temujin (task files in `temujin/tasks/`)
   - **Escalates to Kublai** via Signal message when tasks/blockers found
@@ -548,16 +548,16 @@ Agent A executing task
                  -> agent_b can spawn further (up to depth=3)
 ```
 
-**Agent Model Configuration**:
-| Agent | Gateway Model (agents_config.py) | Task Execution Model |
-|-------|----------------------------------|---------------------|
-| Kublai | bailian/qwen3.5-plus | Claude Opus |
-| Mongke | bailian/MiniMax-M2.5 | Claude Opus |
-| Chagatai | bailian/kimi-k2.5 | Claude Opus |
-| Temujin | bailian/MiniMax-M2.5 | Claude Opus |
-| Jochi | bailian/qwen3.5-plus | Claude Opus |
-| Ogedei | bailian/qwen3.5-plus | Claude Opus |
-| Tolui | ollama/Qwen3.5-9B-abliterated | Local Ollama |
+**Agent Model Configuration** (standardized 2026-03-07):
+| Agent | Model | Notes |
+|-------|-------|-------|
+| Kublai | claude-opus-4-6 | Gateway + task execution |
+| Mongke | claude-opus-4-6 | Gateway + task execution |
+| Chagatai | claude-opus-4-6 | Gateway + task execution |
+| Temujin | claude-opus-4-6 | Gateway + task execution |
+| Jochi | claude-opus-4-6 | Gateway + task execution |
+| Ogedei | claude-opus-4-6 | Gateway + task execution |
+| Tolui | claude-opus-4-6 | Dedicated gateway (port 18792) |
 
 ---
 
@@ -1100,7 +1100,7 @@ Agent Reflection → Kublai Heartbeat Detects New File
 - **Files Modified**: `moltbot/tools/kurultai/agent_tasks.py`
 - **Features**:
   - Collects chat context from last 60 minutes (session jsonl files)
-  - Uses cloud LLM (qwen3.5-plus via DashScope) for analysis
+  - Uses claude-opus-4-6 for analysis
   - Identifies open tasks, blockers, code generation needs
   - Routes code tasks to temujin via task files (`temujin/tasks/llm-review-*.md`)
   - **Escalates to Kublai** via Signal when tasks/blockers found

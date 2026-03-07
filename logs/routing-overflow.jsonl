@@ -1,0 +1,6 @@
+{"ts": "2026-03-06T01:51:34.946078", "from": "temujin", "to": "jochi", "title": "Configure x402 wallet and enable on testnet", "reason": "temujin busy, testing -> jochi"}
+{"ts": "2026-03-06T09:14:31.815695", "from": "mongke", "to": "chagatai", "title": "Research TinyAGI/fractals GitHub repository", "reason": "mongke busy, research -> chagatai"}
+{"ts": "2026-03-06T12:25:02.401200", "from": "temujin", "to": "jochi", "title": "Fix task_intake.py to respect explicit skill_hint and mandate Claude Code", "reason": "temujin busy, testing -> jochi"}
+{"ts": "2026-03-06T14:14:19.656995", "from": "mongke", "to": "chagatai", "title": "Research OBLITERATUS GitHub repository", "reason": "mongke busy, research -> chagatai"}
+{"ts": "2026-03-06T14:33:43.212098", "from": "temujin", "to": "jochi", "title": "test message from CLI", "reason": "temujin busy, testing -> jochi"}
+{"ts": "2026-03-07T11:01:52.301993", "from": "jochi", "to": "temujin", "title": "Critical review of jochi agent (past hour)", "reason": "load-balance: jochi busy, temujin idle (overflow-map, code_review, queue=0)"}

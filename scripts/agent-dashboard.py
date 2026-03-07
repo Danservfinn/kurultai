@@ -15,11 +15,12 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-AGENTS_DIR = "/Users/kublai/.openclaw/agents"
-METRICS_FILE = "/Users/kublai/.openclaw/agents/main/logs/heartbeat_metrics.jsonl"
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents_config import AGENTS, AGENT_ROLES
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, LOGS_DIR
+
+AGENTS_DIR = str(_AGENTS_DIR)
+METRICS_FILE = str(LOGS_DIR / "heartbeat_metrics.jsonl")
 
 def get_agent_state(agent_name):
     """Get agent state from Neo4j"""
