@@ -1,7 +1,7 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.9
-**Last Updated**: 2026-03-07
+**Version**: 1.10
+**Last Updated**: 2026-03-08
 **Status**: Active Production System
 **Agent**: Kublai (Squad Lead / Router)
 **Platform**: OpenClaw Gateway (Multi-Gateway Setup)  
@@ -906,6 +906,49 @@ Agent Reflection → Kublai Heartbeat Detects New File
 ---
 
 ## Change Log
+
+### 2026-03-08 - System Stability Fixes (v1.10)
+
+**Change**: Multiple stability fixes for task execution pipeline and notification system.
+
+**Scope**:
+
+1. **Task File Suffix Bug Fix**:
+   - **Problem**: Task files incorrectly named `.completed.md` instead of `.md` (pending) or `.completed.done.md` (finished)
+   - **Impact**: 12+ tasks across 5 agents stuck, task-watcher couldn't process them
+   - **Fix**: Renamed all `.completed.md` files to `.md`
+   - **Root Cause**: Bug in task redistribution/recovery logic adding wrong suffix
+   - **Follow-up**: Created high-priority task for temujin to fix root cause in task-watcher.py
+
+2. **Cron Delivery bestEffort Configuration**:
+   - **Problem**: Cron jobs with `delivery.mode: 'announce'` sent error notifications when Signal delivery failed
+   - **Impact**: User received spam error messages like "Agent failed before reply"
+   - **Fix**: Added `bestEffort: true` to all 17 cron jobs with announce delivery
+   - **Files Modified**: `~/.openclaw/cron/jobs.json`
+   - **Effect**: Delivery failures no longer generate error messages; successful deliveries still work
+
+3. **Task-Watcher Duplicate Process Fix**:
+   - **Problem**: Multiple task-watcher.py processes spawning (10+ duplicates observed)
+   - **Root Cause**: `retry-rate-limited-tasks.sh` spawns task-watcher via nohup, competing with launchd
+   - **Impact**: Resource waste, potential race conditions in task dispatch
+   - **Fix**: 
+     - Killed all duplicate processes
+     - Verified launchd lock file mechanism (`logs/task-watcher.lock`)
+     - Single instance now running via `com.kurultai.task-watcher` LaunchAgent
+   - **Recommendation**: Remove or fix `retry-rate-limited-tasks.sh` to not spawn task-watcher
+
+4. **Gateway Instance Deduplication** (see v1.9 below for details):
+   - Added to watchdog-gather.sh SECTION 0
+   - Automatically kills duplicate gateway processes, keeps oldest
+
+**Files Modified**: 
+- `scripts/watchdog-gather.sh` (gateway dedup)
+- `~/.openclaw/cron/jobs.json` (bestEffort)
+- `ARCHITECTURE.md` (this file)
+
+**Impact**: System stability improved, notification spam eliminated, task pipeline unblocked.
+
+---
 
 ### 2026-03-08 - Gateway Instance Deduplication (v1.9)
 

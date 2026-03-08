@@ -64,7 +64,7 @@ SLOW_SKILLS = {
     '/horde-plan': 0,
 }
 MAX_TASK_DEPTH = 3
-HAIKU_TIMEOUT = 60  # Max seconds for /task-complete haiku notification
+HAIKU_TIMEOUT = 120  # Max seconds for /task-complete haiku notification (increased from 60 due to cold start delays)
 
 # Proxy health check configuration
 PROXY_HEALTH_CHECK_TIMEOUT = 5  # seconds
@@ -346,23 +346,31 @@ def _spawn_haiku_completion(agent_name):
     Ensures the process is reaped and killed if it hangs.
     """
     def _run():
+        log_file = Path.home() / '.openclaw' / 'agents' / 'main' / 'logs' / 'task-complete-debug.log'
         try:
             env_haiku = os.environ.copy()
             env_haiku.pop('CLAUDECODE', None)
             env_haiku['TASK_COMPLETE_AGENT'] = agent_name
-            proc = subprocess.Popen(
-                [CLAUDE_AGENT, "/task-complete"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                close_fds=True,
-                env=env_haiku,
-            )
+            with open(log_file, 'a') as log_f:
+                log_f.write(f"[{datetime.now().isoformat()}] Spawning /task-complete for {agent_name}\n")
+                proc = subprocess.Popen(
+                    [CLAUDE_AGENT, "/task-complete"],
+                    stdout=log_f, stderr=log_f,
+                    close_fds=True,
+                    env=env_haiku,
+                )
             try:
-                proc.wait(timeout=HAIKU_TIMEOUT)
+                return_code = proc.wait(timeout=HAIKU_TIMEOUT)
+                with open(log_file, 'a') as log_f:
+                    log_f.write(f"[{datetime.now().isoformat()}] /task-complete for {agent_name} exited with {return_code}\n")
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
-        except Exception:
-            pass
+                with open(log_file, 'a') as log_f:
+                    log_f.write(f"[{datetime.now().isoformat()}] /task-complete for {agent_name} TIMED OUT after {HAIKU_TIMEOUT}s\n")
+        except Exception as e:
+            with open(log_file, 'a') as log_f:
+                log_f.write(f"[{datetime.now().isoformat()}] /task-complete for {agent_name} FAILED: {e}\n")
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -469,6 +477,52 @@ def _cleanup_pid_file(executing_file):
         pass
 
 
+def _verify_task_completion(task_file):
+    """Verify task file has substantial output before marking as complete.
+
+    Checks:
+    - Has content beyond frontmatter (at least 20 non-frontmatter lines)
+    - Has completion markers (## Result, ## Output, ## Summary, ## Done)
+    - Output has substance (not just headers)
+
+    Returns tuple: (is_valid, reason)
+    """
+    try:
+        with open(task_file, 'r') as f:
+            content = f.read()
+
+        # Split frontmatter from content
+        if content.startswith('---'):
+            parts = content.split('---', 2)
+            if len(parts) >= 3:
+                body = parts[2].strip()
+            else:
+                body = content
+        else:
+            body = content
+
+        # Count non-frontmatter lines
+        lines = body.split('\n')
+        content_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
+
+        # Check for minimum content (20 lines)
+        if len(content_lines) < 20:
+            return False, f"Insufficient output ({len(content_lines)} lines, need 20+)"
+
+        # Check for completion markers
+        completion_markers = ['## Result', '## Output', '## Summary', '## Done', '## Completed']
+        has_marker = any(marker in body for marker in completion_markers)
+
+        if not has_marker:
+            # For tasks without explicit markers, require more substantial content
+            if len(content_lines) < 30:
+                return False, f"No completion markers and insufficient output ({len(content_lines)} lines)"
+
+        return True, "OK"
+    except Exception as e:
+        return False, f"Verification error: {e}"
+
+
 def mark_task_executing(task_file):
     """Mark task as being executed and write PID sentinel."""
     executing_file = task_file.replace('.md', '.executing.md')
@@ -486,7 +540,7 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
 
     Args:
         task_file: Original task file path (before .executing rename).
-        status: 'completed' or 'failed'.
+        status: 'completed', 'failed', or 'no_output'.
         executing_file: Actual .executing.md path if known (preferred).
     """
     if executing_file is None:
@@ -494,6 +548,26 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
             executing_file = task_file
         else:
             executing_file = task_file.replace('.md', '.executing.md')
+
+    # Verify completion before marking as done (prevent fake completions)
+    if status == 'completed' and os.path.exists(executing_file):
+        is_valid, reason = _verify_task_completion(executing_file)
+        if not is_valid:
+            print(f"⚠ COMPLETION VERIFICATION FAILED: {reason}")
+            print(f"   Marking as no_output instead of completed")
+            status = 'no_output'
+            # Log to ledger for tracking
+            try:
+                _append_ledger({
+                    "event": "COMPLETION_VERIFICATION_FAILED",
+                    "ts": datetime.now().isoformat(),
+                    "task_file": task_file,
+                    "reason": reason,
+                    "original_status": "completed",
+                    "new_status": "no_output"
+                })
+            except Exception:
+                pass  # Don't block on ledger failure
 
     completed_suffix = f'.{status}.done.md'
 

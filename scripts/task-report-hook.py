@@ -88,12 +88,20 @@ def parse_task_file(task_path: Path) -> dict:
 
 
 def scan_session_file(agent: str, task_id: str) -> dict:
-    """Scan agent session file for token usage, context window, and model info."""
+    """Scan agent session file for token usage, context window, and model info.
+
+    Extracts:
+    - Token usage (input, output, total)
+    - Model identification (model_id, model_provider, combined model name)
+    - Temperature and context window %
+    """
     sessions_dir = AGENTS_BASE / agent / 'sessions'
     session_data = {
         'token_usage': {'input': 0, 'output': 0, 'total': 0},
         'context_window_percent': 0,
         'model': 'unknown',
+        'model_id': None,
+        'model_provider': None,
         'temperature': None,
         'session_found': False
     }
@@ -117,8 +125,25 @@ def scan_session_file(agent: str, task_id: str) -> dict:
                                 session_data['token_usage']['output'] = usage.get('output_tokens', usage.get('completion_tokens', 0))
                                 session_data['token_usage']['total'] = session_data['token_usage']['input'] + session_data['token_usage']['output']
                                 session_data['session_found'] = True
-                            # Look for model info
-                            if 'model' in entry:
+                            # Look for model change events (type: "model_change")
+                            if entry.get('type') == 'model_change':
+                                provider = entry.get('provider')
+                                model_id = entry.get('modelId')
+                                if provider and model_id:
+                                    session_data['model_provider'] = provider
+                                    session_data['model_id'] = model_id
+                                    session_data['model'] = f"{provider}/{model_id}"
+                            # Look for model snapshot events (customType: "model-snapshot")
+                            if entry.get('customType') == 'model-snapshot':
+                                data = entry.get('data', {})
+                                provider = data.get('provider')
+                                model_id = data.get('modelId')
+                                if provider and model_id:
+                                    session_data['model_provider'] = provider
+                                    session_data['model_id'] = model_id
+                                    session_data['model'] = f"{provider}/{model_id}"
+                            # Legacy: look for direct 'model' field
+                            if 'model' in entry and session_data['model'] == 'unknown':
                                 session_data['model'] = entry['model']
                             # Look for temperature
                             if 'temperature' in entry:
@@ -700,18 +725,39 @@ def send_signal_notification(task_id: str, report_path: Path, status: str):
         pass
 
 
-def append_ledger_event(task_id: str, agent: str, status: str, metrics: dict):
-    """Append TASK_REPORT_GENERATED event to ledger."""
+def append_ledger_event(task_id: str, agent: str, status: str, metrics: dict, session_data: dict = None):
+    """Append TASK_REPORT_GENERATED and MODEL_USED events to ledger."""
     ledger_path = Path.home() / '.openclaw' / 'tasks' / 'task-ledger.jsonl'
 
-    event = {
+    events = []
+
+    # Main task report event
+    events.append({
         'event': 'TASK_REPORT_GENERATED',
         'ts': datetime.now().isoformat(),
         'task_id': task_id,
         'agent': agent,
         'status': status,
         'metrics': metrics
-    }
+    })
+
+    # Model tracking event (if model data available)
+    if session_data:
+        model_id = session_data.get('model_id')
+        model_provider = session_data.get('model_provider')
+        if model_id and model_provider:
+            events.append({
+                'event': 'MODEL_USED',
+                'ts': datetime.now().isoformat(),
+                'task_id': task_id,
+                'agent': agent,
+                'model_id': model_id,
+                'model_provider': model_provider,
+                'model_full': session_data.get('model', f'{model_provider}/{model_id}'),
+                'success': (status == 'completed'),
+                'duration_seconds': metrics.get('duration_seconds', 0),
+                'tokens_total': session_data.get('token_usage', {}).get('total', 0)
+            })
 
     try:
         import fcntl
@@ -719,7 +765,8 @@ def append_ledger_event(task_id: str, agent: str, status: str, metrics: dict):
         with open(ledger_path, "a", encoding="utf-8") as f:
             fcntl.flock(f, fcntl.LOCK_EX)
             try:
-                f.write(json.dumps(event) + "\n")
+                for event in events:
+                    f.write(json.dumps(event) + "\n")
                 f.flush()
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
@@ -781,6 +828,12 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
                     t.temperature = $temperature,
                     t.context_window_percent = $context_window_percent,
 
+                    // Model tracking for analytics
+                    t.model_id = $model_id,
+                    t.model_provider = $model_provider,
+                    t.model_success = $model_success,
+                    t.model_duration_seconds = $duration_seconds,
+
                     // Agent state
                     t.queue_depth = $queue_depth,
                     t.pending_tasks = $pending_tasks,
@@ -828,6 +881,10 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
                 model=session_data.get('model', 'unknown'),
                 temperature=session_data.get('temperature'),
                 context_window_percent=session_data.get('context_window_percent', 0),
+
+                model_id=session_data.get('model_id'),
+                model_provider=session_data.get('model_provider'),
+                model_success=(status == 'completed'),
 
                 queue_depth=agent_state.get('queue_depth', 0),
                 pending_tasks=agent_state.get('pending_tasks', 0),
@@ -946,7 +1003,7 @@ def main():
         'status': args.status,
         'error_category': error_analysis.get('category')
     }
-    append_ledger_event(task_id, agent, args.status, metrics)
+    append_ledger_event(task_id, agent, args.status, metrics, session_data)
 
     # Send notification
     send_signal_notification(task_id, report_path, args.status)

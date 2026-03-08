@@ -371,18 +371,178 @@ def get_tracker():
     return _tracker
 
 
-if __name__ == "__main__":
-    # Test
+def compare_models(model1: str, model2: str, days: int = 7):
+    """Compare two models side-by-side."""
     tracker = get_tracker()
-    print("Model Tracker initialized")
-    print("\n=== Model Stats (7 days) ===")
-    stats = tracker.get_model_stats(days=7)
-    for s in stats:
-        print(f"  {s['model']}: {s['total']} tasks, {s['success_rate']}% success, {s['avg_duration_seconds']}s avg")
 
-    print("\n=== Provider Stats ===")
-    provider_stats = tracker.get_provider_stats(days=7)
-    for p in provider_stats:
-        print(f"  {p['provider']}: {p['total']} tasks, {p['success_rate']}% success")
+    # Get stats for each model
+    stats1_all = tracker.get_model_stats(days=days)
+    stats2_all = tracker.get_model_stats(days=days)
+
+    # Find matching models
+    stats1 = next((s for s in stats1_all if s['model'] == model1), None)
+    stats2 = next((s for s in stats2_all if s['model'] == model2), None)
+
+    if not stats1:
+        print(f"Model '{model1}' not found in data")
+        tracker.close()
+        return
+
+    if not stats2:
+        print(f"Model '{model2}' not found in data")
+        tracker.close()
+        return
+
+    print(f"\n# Model Comparison ({days} days)")
+    print(f"\n## {model1}")
+    print(f"  Tasks: {stats1['total']}")
+    print(f"  Success: {stats1['success']}/{stats1['total']} ({stats1['success_rate']}%)")
+    print(f"  Failed: {stats1['failed']}")
+    print(f"  Avg Duration: {stats1['avg_duration_seconds']}s")
+    print(f"  Input Tokens: {stats1.get('total_input_tokens', 0)}")
+    print(f"  Output Tokens: {stats1.get('total_output_tokens', 0)}")
+
+    print(f"\n## {model2}")
+    print(f"  Tasks: {stats2['total']}")
+    print(f"  Success: {stats2['success']}/{stats2['total']} ({stats2['success_rate']}%)")
+    print(f"  Failed: {stats2['failed']}")
+    print(f"  Avg Duration: {stats2['avg_duration_seconds']}s")
+    print(f"  Input Tokens: {stats2.get('total_input_tokens', 0)}")
+    print(f"  Output Tokens: {stats2.get('total_output_tokens', 0)}")
+
+    # Calculate improvement
+    print(f"\n## Improvement ({model2} vs {model1})")
+    if stats1['total'] > 0 and stats2['total'] > 0:
+        sr_diff = stats2['success_rate'] - stats1['success_rate']
+        print(f"  Success Rate: {sr_diff:+.1f}%")
+
+        dur_diff = stats1['avg_duration_seconds'] - stats2['avg_duration_seconds']
+        if stats1['avg_duration_seconds'] > 0:
+            dur_pct = (dur_diff / stats1['avg_duration_seconds']) * 100
+            print(f"  Duration: {dur_diff:+.1f}s ({dur_pct:+.1f}%)")
+
+    tracker.close()
+
+
+def export_jsonl(output_path: str, days: int = 7):
+    """Export model usage data to JSONL."""
+    import json as _json
+
+    tracker = get_tracker()
+    entries = tracker.get_recent_model_usage(limit=10000)
+
+    # Filter by date if needed
+    if days > 0:
+        cutoff = datetime.now().timestamp() - (days * 86400)
+        from datetime import datetime as _dt
+        filtered = []
+        for e in entries:
+            try:
+                ts = _dt.fromisoformat(e['ts'].replace('Z', '+00:00')).timestamp()
+                if ts >= cutoff:
+                    filtered.append(e)
+            except:
+                filtered.append(e)
+        entries = filtered
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, 'w') as f:
+        for e in entries:
+            f.write(_json.dumps(e) + '\n')
+
+    print(f"Exported {len(entries)} entries to {output_path}")
+    tracker.close()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description='LLM Model Performance Tracker')
+    parser.add_argument('--summary', action='store_true', help='Show overall model summary')
+    parser.add_argument('--by-agent', action='store_true', help='Show per-agent breakdown')
+    parser.add_argument('--by-provider', action='store_true', help='Show per-provider breakdown')
+    parser.add_argument('--compare', nargs=2, metavar=('MODEL1', 'MODEL2'), help='Compare two models')
+    parser.add_argument('--export', metavar='PATH', help='Export to JSONL file')
+    parser.add_argument('--days', type=int, default=7, help='Days to look back (default: 7)')
+    parser.add_argument('--agent', metavar='NAME', help='Filter by agent name')
+    parser.add_argument('--json', action='store_true', help='Output as JSON')
+    parser.add_argument('--errors', action='store_true', help='Show error breakdown')
+
+    args = parser.parse_args()
+
+    tracker = get_tracker()
+
+    if args.summary:
+        stats = tracker.get_model_stats(days=args.days, agent=args.agent)
+        if args.json:
+            import json as _json
+            print(_json.dumps(stats, indent=2, default=str))
+        else:
+            print(f"\n# Model Performance Summary ({args.days} days)")
+            if args.agent:
+                print(f"Agent: {args.agent}")
+            print(f"\n{'Model':<30} {'Tasks':>8} {'Success':>8} {'Failed':>8} {'Rate':>7} {'AvgDur':>8}")
+            print("-" * 77)
+            for s in stats:
+                print(f"{s['model']:<30} {s['total']:>8} {s['success']:>8} {s['failed']:>8} {s['success_rate']:>6.1f}% {s['avg_duration_seconds']:>8.1f}s")
+
+    elif args.by_agent:
+        by_agent = tracker.get_agent_model_stats(days=args.days)
+        if args.json:
+            import json as _json
+            print(_json.dumps(by_agent, indent=2, default=str))
+        else:
+            print(f"\n# Per-Agent Model Breakdown ({args.days} days)")
+            for agent, models in sorted(by_agent.items()):
+                print(f"\n## {agent}")
+                print(f"{'Model':<30} {'Tasks':>8} {'Success':>8} {'Rate':>7}")
+                print("-" * 59)
+                for m in models[:10]:
+                    print(f"{m['model']:<30} {m['total']:>8} {m['success']:>8} {m['success_rate']:>6.1f}%")
+
+    elif args.by_provider:
+        stats = tracker.get_provider_stats(days=args.days)
+        if args.json:
+            import json as _json
+            print(_json.dumps(stats, indent=2, default=str))
+        else:
+            print(f"\n# Provider Performance ({args.days} days)")
+            print(f"\n{'Provider':<15} {'Tasks':>8} {'Success':>8} {'Failed':>8} {'Rate':>7} {'AvgDur':>8}")
+            print("-" * 62)
+            for s in stats:
+                print(f"{s['provider']:<15} {s['total']:>8} {s['success']:>8} {s['failed']:>8} {s['success_rate']:>6.1f}% {s['avg_duration_seconds']:>8.1f}s")
+
+    elif args.compare:
+        tracker.close()
+        compare_models(args.compare[0], args.compare[1], days=args.days)
+        exit(0)
+
+    elif args.export:
+        tracker.close()
+        export_jsonl(args.export, days=args.days)
+        exit(0)
+
+    elif args.errors:
+        by_model = tracker.get_model_error_breakdown(days=args.days)
+        if args.json:
+            import json as _json
+            print(_json.dumps(by_model, indent=2, default=str))
+        else:
+            print(f"\n# Error Breakdown by Model ({args.days} days)")
+            for model, errors in sorted(by_model.items()):
+                print(f"\n## {model}")
+                for e in errors[:10]:
+                    print(f"  {e['error_type']}: {e['count']}")
+
+    else:
+        # Default: show summary
+        stats = tracker.get_model_stats(days=args.days)
+        print(f"\n# Model Performance Summary ({args.days} days)")
+        print(f"\n{'Model':<30} {'Tasks':>8} {'Success':>8} {'Failed':>8} {'Rate':>7} {'AvgDur':>8}")
+        print("-" * 77)
+        for s in stats[:20]:
+            print(f"{s['model']:<30} {s['total']:>8} {s['success']:>8} {s['failed']:>8} {s['success_rate']:>6.1f}% {s['avg_duration_seconds']:>8.1f}s")
 
     tracker.close()

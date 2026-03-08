@@ -131,6 +131,52 @@ active_executions: dict[str, Future] = {}
 active_lock = Lock()
 
 
+def _verify_task_completion(task_file):
+    """Verify task file has substantial output before marking as complete.
+
+    Checks:
+    - Has content beyond frontmatter (at least 20 non-frontmatter lines)
+    - Has completion markers (## Result, ## Output, ## Summary, ## Done)
+    - Output has substance (not just headers)
+
+    Returns tuple: (is_valid, reason)
+    """
+    try:
+        with open(task_file, 'r') as f:
+            content = f.read()
+
+        # Split frontmatter from content
+        if content.startswith('---'):
+            parts = content.split('---', 2)
+            if len(parts) >= 3:
+                body = parts[2].strip()
+            else:
+                body = content
+        else:
+            body = content
+
+        # Count non-frontmatter lines
+        lines = body.split('\n')
+        content_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
+
+        # Check for minimum content (20 lines)
+        if len(content_lines) < 20:
+            return False, f"Insufficient output ({len(content_lines)} lines, need 20+)"
+
+        # Check for completion markers
+        completion_markers = ['## Result', '## Output', '## Summary', '## Done', '## Completed']
+        has_marker = any(marker in body for marker in completion_markers)
+
+        if not has_marker:
+            # For tasks without explicit markers, require more substantial content
+            if len(content_lines) < 30:
+                return False, f"No completion markers and insufficient output ({len(content_lines)} lines)"
+
+        return True, "OK"
+    except Exception as e:
+        return False, f"Verification error: {e}"
+
+
 def log(msg):
     """Thread-safe print with timestamp."""
     ts = datetime.now().isoformat()
