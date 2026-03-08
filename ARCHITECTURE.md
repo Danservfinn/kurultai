@@ -1729,3 +1729,31 @@ Week 2-3:
 
 **Files Modified**: `scripts/kurultai-monitor.py` (browser-based), `cron/jobs.json` (new entry)
 
+
+---
+
+### 2026-03-08 - Horde Skills Installation (v1.11)
+
+**Change**: Installed claude-code-setup-v2 repository with 86+ skills including full horde skill pack.
+
+**Scope**:
+
+1. **Repository Cloned**: `~/claude-code-setup` (Danservfinn/claude-code-setup-v2)
+
+2. **Skills Installed** (86 total):
+   - **Horde Pack** (14 skills): golden-horde, horde-review, horde-implement, horde-plan, horde-brainstorming, horde-swarm, horde-test, horde-debug, horde-learn, horde-prompt, horde-skill-creator, horde-gate-testing, horde-test-SKILL.md, horde-plan-SKILL.md
+   - **Senior Agents**: senior-frontend, senior-backend, senior-fullstack, senior-devops, senior-architect, etc.
+   - **Quality**: code-reviewer, systematic-debugging, verification-before-completion
+   - **Workflow**: ship-it, brainstorming, writing-plans, executing-plans
+
+3. **Distribution**: All 14 horde skills copied to each Kurultai agent's `~/.openclaw/agents/{agent}/.claude/skills/`
+
+4. **Plugins Enabled** (25 total): claude-mem, hookify, ralph-loop, feature-dev, playwright, supabase, vercel, code-simplifier, chrome-devtools-mcp, agent-orchestration, beads, backend-development, frontend-mobile-development, payment-processing, python-development, ralph-wiggum, frontend-design, agent-sdk-dev, code-review, database-migrations, stripe, commit-commands, superpowers, code-documentation
+
+**Impact**: 
+- Hourly Kurultai reflections now produce valid grades and proposals (was: N/A due to missing /horde-review)
+- All agents have access to multi-agent orchestration patterns
+- Code review, planning, and implementation workflows fully enabled
+
+**Files Modified**: `ARCHITECTURE.md`
+
