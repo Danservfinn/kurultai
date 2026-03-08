@@ -635,6 +635,17 @@ ROUTING_METRICS=${ROUTING_METRICS:-'{"queue_balance_index":0,"missed_opportuniti
 SUBPROCESS_AUDIT=$(python3 "$BASE/scripts/subprocess-audit.py" --json 2>/dev/null || echo '{}')
 
 # ============================================================
+# 4f. Queue Cleanup — Remove obsolete tasks/escalations (every tock)
+# ============================================================
+# Prevents queue bloat by auto-cleaning completed task escalations and old failures
+QUEUE_CLEANUP_LOG="$BASE/logs/queue-cleanup.log"
+echo "[$TS] QUEUE_CLEANUP: Starting" >> "$QUEUE_CLEANUP_LOG"
+QUEUE_CLEANUP_RESULT=$(python3 "$BASE/scripts/queue-cleanup.py" --quiet 2>/dev/null || echo "removed=0,kept=0")
+QUEUE_CLEANUP_REMOVED=$(echo "$QUEUE_CLEANUP_RESULT" | grep -o "removed=[0-9]*" | cut -d= -f2)
+QUEUE_CLEANUP_KEPT=$(echo "$QUEUE_CLEANUP_RESULT" | grep -o "kept=[0-9]*" | cut -d= -f2)
+echo "[$TS] QUEUE_CLEANUP: $QUEUE_CLEANUP_RESULT" >> "$QUEUE_CLEANUP_LOG"
+
+# ============================================================
 # 5. Last tick status + service health (from TICK lines, not TICK_LLM)
 # ============================================================
 LAST_TICK_LINE=$(tail -20 "$BASE/logs/watchdog.log" 2>/dev/null | grep "] TICK |" | grep -v "TICK_LLM" | tail -1; true)
@@ -1262,7 +1273,7 @@ if [ "$LEDGER_DELTA" != "0" ]; then
     LEDGER_NOTE=" | ledger_delta=$LEDGER_DELTA"
 fi
 
-echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | calendar_reminder=$CAL_STATUS | backup=$BACKUP_STATUS | severity=$SEVERITY${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | calendar_reminder=$CAL_STATUS | backup=$BACKUP_STATUS | severity=$SEVERITY | cleanup_removed=${QUEUE_CLEANUP_REMOVED:-0} | cleanup_kept=${QUEUE_CLEANUP_KEPT:-0}${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
 
 # ============================================================
 # NEO4J STATE SYNC: Reconcile filesystem task state with Neo4j (safety net)
