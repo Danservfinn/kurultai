@@ -62,6 +62,34 @@ EPOCH=$(date '+%s')
 mkdir -p "$LOGDIR"
 
 # ============================================================
+# SECTION 0: Gateway Instance Deduplication
+# ============================================================
+# Count gateway processes and kill extras (keep only 1)
+GW_PIDS=$(pgrep -af "openclaw.*gateway\|gateway.*openclaw\|node.*openclaw.*dist.*gateway" 2>/dev/null | awk '{print $1}' | sort -n)
+GW_COUNT=$(echo "$GW_PIDS" | grep -c . 2>/dev/null || echo 0)
+
+if [ "$GW_COUNT" -gt 1 ]; then
+    # Keep the oldest (first) gateway, kill the rest
+    KEEP_PID=$(echo "$GW_PIDS" | head -1)
+    KILL_PIDS=$(echo "$GW_PIDS" | tail -n +2)
+    
+    for pid in $KILL_PIDS; do
+        if [ -n "$pid" ] && [ "$pid" != "$KEEP_PID" ]; then
+            kill "$pid" 2>/dev/null
+            sleep 0.5
+            # Force kill if still running
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null
+            fi
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] TICK | KILLED duplicate gateway pid=$pid (kept pid=$KEEP_PID)" >> "$WATCHDOG_LOG"
+        fi
+    done
+    
+    GW_COUNT=1
+    GW_PIDS="$KEEP_PID"
+fi
+
+# ============================================================
 # SECTION 1: Gateway Process
 # ============================================================
 PIDS=$(pgrep -f "openclaw" 2>/dev/null | head -5 | tr '\n' ',' | sed 's/,$//')
@@ -379,8 +407,8 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s}},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
-    "$TS_ISO" "$EPOCH" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" \
+printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s}},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+    "$TS_ISO" "$EPOCH" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
@@ -392,8 +420,8 @@ printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"lat
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
-    "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" \
+printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+    "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
