@@ -62,12 +62,18 @@ EPOCH=$(date '+%s')
 mkdir -p "$LOGDIR"
 
 # ============================================================
-# SECTION 0: Gateway Instance Deduplication
+# SECTION 0: Gateway Instance Deduplication + Health Check
 # ============================================================
 # Count gateway processes and kill extras (keep only 1)
 # Use -x for exact match on command name, exclude our own pgrep
 GW_PIDS=$(pgrep -x "openclaw-gateway" 2>/dev/null | sort -n)
 GW_COUNT=$(echo "$GW_PIDS" | grep -c . 2>/dev/null || echo 0)
+
+# Track if we found duplicates BEFORE killing (for health reporting)
+GW_DUPLICATES_FOUND=0
+if [ "$GW_COUNT" -gt 1 ]; then
+    GW_DUPLICATES_FOUND=$GW_COUNT
+fi
 
 if [ "$GW_COUNT" -gt 1 ]; then
     # Keep the oldest (first) gateway, kill the rest
@@ -88,6 +94,7 @@ if [ "$GW_COUNT" -gt 1 ]; then
     
     GW_COUNT=1
     GW_PIDS="$KEEP_PID"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] TICK | GATEWAY HEALTH: Found $GW_DUPLICATES_FOUND instances, reduced to 1" >> "$WATCHDOG_LOG"
 fi
 
 # ============================================================
@@ -366,6 +373,11 @@ if [ "$STATUS" = "healthy" ]; then
     elif [ "${ERRORS_1H:-0}" -gt 100 ] && [ "$ERR_DIRECTION" = "rising" ] 2>/dev/null; then
         _SAFETY_HIT="errors_1h=${ERRORS_1H}>100+rising"
         STATUS="degraded"; ACTION="warn"; REASON="rising errors early warning: $ERRORS_1H in 1h (safety-net)"; EXIT_CODE=1
+    fi
+    # Gateway instance count check (after dedup)
+    if [ "${GW_DUPLICATES_FOUND:-0}" -gt 1 ] 2>/dev/null; then
+        _SAFETY_HIT="gateway_instances=${GW_DUPLICATES_FOUND}>1"
+        STATUS="degraded"; ACTION="warn"; REASON="gateway running $GW_DUPLICATES_FOUND instances (auto-reduced to 1) - investigate root cause"; EXIT_CODE=1
     fi
     if [ -n "$_SAFETY_HIT" ]; then
         echo "[$TS] SAFETY_NET_HIT | trigger=$_SAFETY_HIT | errors_5m=$ERRORS_5M errors_1h=$ERRORS_1H err_avg=$ERR_AVG_5M err_dir=$ERR_DIRECTION" >> "$WATCHDOG_LOG"
