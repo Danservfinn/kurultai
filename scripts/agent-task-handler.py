@@ -354,7 +354,7 @@ def _spawn_haiku_completion(agent_name):
             with open(log_file, 'a') as log_f:
                 log_f.write(f"[{datetime.now().isoformat()}] Spawning /task-complete for {agent_name}\n")
                 proc = subprocess.Popen(
-                    [CLAUDE_AGENT, "/task-complete"],
+                    [CLAUDE_AGENT, "--model", "kimi-k2.5", "/task-complete"],
                     stdout=log_f, stderr=log_f,
                     close_fds=True,
                     env=env_haiku,
