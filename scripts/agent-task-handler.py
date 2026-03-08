@@ -49,9 +49,8 @@ CLAUDE_AGENT = str(_CLAUDE_AGENT)
 CLAUDE_TIMEOUT = 7200  # 2 hours for Claude Code execution
 
 # Fallback model configuration for rate limit recovery
-# When the primary model (claude-opus-4-6) is rate limited, fallback to claude-sonnet-4-6
-# Sonnet has higher rate limits and is suitable for most tasks
-FALLBACK_MODEL = "claude-sonnet-4-6"  # Fallback when rate limited (higher limits than opus)
+# CLAUDE API RATE LIMITED until 2026-03-12 — using glm-5 as primary
+FALLBACK_MODEL = "glm-5"  # Primary model (Claude API unavailable)
 MAX_RATE_LIMIT_RETRIES = 1  # Only retry once with fallback model
 TIMEOUT_BY_PRIORITY = {
     'high': 7200,   # 2 hours for complex high-priority tasks
@@ -1867,7 +1866,8 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
 
     # Load agent-specific environment from .claude/settings.json
     # This provides ANTHROPIC_MODEL (and optionally ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
-    VALID_CLAUDE_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'}
+    # CLAUDE API RATE LIMITED until 2026-03-12 — using Z.ai models
+    VALID_MODELS = {'glm-5', 'kimi-k2.5', 'qwen3.5-plus'}
     ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
     try:
         settings_path = f"{agent_root}/.claude/settings.json"
@@ -1885,9 +1885,10 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
         with open('/tmp/agent_handler_debug.log', 'a') as f:
             f.write(debug_msg)
         print(f"  {debug_msg.strip()}")
-        if env_model and env_model not in VALID_CLAUDE_MODELS and not is_using_proxy:
-            print(f"  ⚠ REJECTED non-Claude ANTHROPIC_MODEL env '{env_model}' for {agent_name} — forcing claude-opus-4-6")
-            env['ANTHROPIC_MODEL'] = 'claude-opus-4-6'
+        # CLAUDE API RATE LIMITED until 2026-03-12 — accept Z.ai models
+        if env_model and env_model not in VALID_MODELS and not is_using_proxy:
+            print(f"  ⚠ Model '{env_model}' not in VALID_MODELS — using glm-5")
+            env['ANTHROPIC_MODEL'] = 'glm-5'
         else:
             print(f"  ✓ ACCEPTED model '{env_model}' for {agent_name} (proxy={is_using_proxy})")
     except (FileNotFoundError, json.JSONDecodeError):
@@ -2390,7 +2391,7 @@ def process_task(agent_name, task):
         start_time = time.time()
         VALID_MODELS = {
             # Only Claude models are valid for Claude Code executor
-            'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
+            'glm-5', 'kimi-k2.5', 'qwen3.5-plus',  # CLAUDE API RATE LIMITED until 2026-03-12
         }
         PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
         model = config.get('model')
@@ -2421,7 +2422,8 @@ def process_task(agent_name, task):
         is_using_proxy = any(endpoint in proxy_url for endpoint in PROXY_ENDPOINTS) if proxy_url else False
         # Validate model - allow proxy models when using proxy
         if model and model not in VALID_MODELS and not is_using_proxy:
-            print(f"  ⚠ REJECTED non-Claude model '{model}' from config — using claude-opus-4-6")
+            # CLAUDE API RATE LIMITED until 2026-03-12 — using glm-5
+            print(f"  ⚠ Model '{model}' not available — using glm-5")
             model = None
         # Capture env_model for fallback before potentially clearing model
         env_model = None
@@ -2437,7 +2439,8 @@ def process_task(agent_name, task):
         if is_using_proxy and model and model not in VALID_MODELS:
             print(f"  ✓ Using proxy model '{model}' via ANTHROPIC_MODEL env var")
             model = None  # Don't pass --model, let env var handle it
-        selected_model = model or env_model or 'claude-opus-4-6'
+        # CLAUDE API RATE LIMITED until 2026-03-12 — default to glm-5
+        selected_model = model or env_model or 'glm-5'
         debug_msg = f"MODEL_SELECT: model={model}, selected_model={selected_model}, is_using_proxy={is_using_proxy}\n"
         with open('/tmp/agent_handler_debug.log', 'a') as f:
             f.write(debug_msg)

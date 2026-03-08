@@ -371,8 +371,8 @@ QUEUE_DATA=${QUEUE_DATA:-'{}'}
 CONFIG_MODELS=$(python3 2>/dev/null << 'PYEOF'
 import json, os
 base = "/Users/kublai/.openclaw/agents"
-VALID_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'kimi-k2.5', 'glm-5'}
-DEFAULT_MODEL = 'claude-opus-4-6'
+VALID_MODELS = {'glm-5', 'kimi-k2.5', 'qwen3.5-plus'}  # Claude API rate limited until 2026-03-12
+DEFAULT_MODEL = 'glm-5'
 result = {}
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     model = None
