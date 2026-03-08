@@ -65,7 +65,8 @@ mkdir -p "$LOGDIR"
 # SECTION 0: Gateway Instance Deduplication
 # ============================================================
 # Count gateway processes and kill extras (keep only 1)
-GW_PIDS=$(pgrep -af "openclaw.*gateway\|gateway.*openclaw\|node.*openclaw.*dist.*gateway" 2>/dev/null | awk '{print $1}' | sort -n)
+# Use -x for exact match on command name, exclude our own pgrep
+GW_PIDS=$(pgrep -x "openclaw-gateway" 2>/dev/null | sort -n)
 GW_COUNT=$(echo "$GW_PIDS" | grep -c . 2>/dev/null || echo 0)
 
 if [ "$GW_COUNT" -gt 1 ]; then
