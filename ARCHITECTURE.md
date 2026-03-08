@@ -609,7 +609,30 @@ Agent A executing task
   - State: `logs/ogedei-watchdog-state.json` (read by tock-gather.sh)
   - Log: `logs/ogedei-watchdog.log`
 
-### 5b. Stale Task Cleanup (auto_dispatch cron)
+### 5b. Gateway Instance Deduplication (watchdog-gather.sh)
+
+**Purpose**: Detect and kill duplicate gateway processes, keeping only the oldest instance
+**Status**: Active (implemented 2026-03-08)
+**Schedule**: Every 5 minutes (watchdog tick)
+
+**How It Works**:
+1. SECTION 0 of `watchdog-gather.sh` runs before health checks
+2. Uses `pgrep -af` to find all gateway processes matching patterns:
+   - `openclaw.*gateway`
+   - `gateway.*openclaw`
+   - `node.*openclaw.*dist.*gateway`
+3. If count > 1, keeps oldest (lowest PID), kills rest with `kill` then `kill -9`
+4. Logs each killed PID to `watchdog.log`
+5. Adds `instance_count` field to `ticks.jsonl` and `tick-summary.txt`
+
+**Files Modified**: `scripts/watchdog-gather.sh`
+
+**Benefits**:
+- Prevents resource waste from multiple gateway instances
+- Automatic recovery from race conditions or manual restarts
+- Visibility into instance count via telemetry
+
+### 5c. Stale Task Cleanup (auto_dispatch cron)
 
 **Purpose**: Clean up stale `.executing` files and clear dead dispatch state
 **Status**: Active (restored from archive 2026-03-06, cleanup-only since 2026-03-05)
@@ -883,6 +906,31 @@ Agent Reflection → Kublai Heartbeat Detects New File
 ---
 
 ## Change Log
+
+### 2026-03-08 - Gateway Instance Deduplication (v1.9)
+
+**Change**: Added automatic gateway instance deduplication to watchdog-gather.sh tick heartbeat.
+
+**Scope**:
+
+1. **SECTION 0: Gateway Instance Deduplication** (`scripts/watchdog-gather.sh`):
+   - Runs before health checks on every 5-minute tick
+   - Uses `pgrep -af` to find all gateway processes
+   - If count > 1, keeps oldest (lowest PID), kills rest with `kill` then `kill -9`
+   - Logs each killed PID to `watchdog.log`
+   - Adds `instance_count` field to `ticks.jsonl` JSON output
+   - Adds `instances=N` to human-readable `tick-summary.txt`
+
+2. **Patterns Matched**:
+   - `openclaw.*gateway`
+   - `gateway.*openclaw`
+   - `node.*openclaw.*dist.*gateway`
+
+**Files Modified**: `scripts/watchdog-gather.sh`, `ARCHITECTURE.md`
+
+**Impact**: Prevents resource waste from multiple gateway instances; automatic recovery from race conditions or manual restarts; visibility into instance count via telemetry.
+
+---
 
 ### 2026-03-06 - Tolui Independent Gateway (v1.8)
 
