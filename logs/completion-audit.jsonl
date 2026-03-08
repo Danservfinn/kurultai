@@ -22,3 +22,10 @@
 {"ts": "2026-03-08T00:28:33.282716", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
 {"ts": "2026-03-08T00:32:27.764873", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
 {"ts": "2026-03-08T00:37:31.768419", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
+{"ts": "2026-03-08T00:42:30.044694", "totals": {"audited": 1, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 1}, "details": [{"agent": "jochi", "task": "normal-1772944838.failed.done.md", "action": "verified", "has_result": true}]}
+{"ts": "2026-03-08T00:43:44.329640", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
+{"ts": "2026-03-08T00:47:28.142030", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
+{"ts": "2026-03-08T00:48:35.469256", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
+{"ts": "2026-03-08T00:50:39.180317", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}
+{"ts": "2026-03-08T00:57:38.320179", "totals": {"audited": 2, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 2}, "details": [{"agent": "temujin", "task": "high-1772940689.verified.verified.done.md", "action": "verified", "has_result": true}, {"agent": "mongke", "task": "high-1772942585.unverified.unverified.done.md", "action": "verified", "has_result": true}]}
+{"ts": "2026-03-08T00:58:47.614031", "totals": {"audited": 0, "fake_found": 0, "requeued": 0, "skipped": 0, "verified": 0}, "details": []}

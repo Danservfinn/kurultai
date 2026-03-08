@@ -1,51 +1,50 @@
 #!/usr/bin/env python3
 """
-Kurultai Website Uptime Monitor
+Kurultai Website Browser-Based Uptime Monitor
 
-Monitors https://the.kurult.ai for availability and correctness.
-- HTTP GET → verify 200 status
-- Check response contains expected HTML markers
-- Verify API endpoints: /api/health, /api/tasks
-- Optional: Validate JavaScript syntax
+Monitors https://the.kurult.ai using REAL BROWSER to detect:
+- JavaScript console errors
+- Rendering failures (page stuck on "Loading...")
+- Network failures
+- HTTP errors
 
-Run via cron every 5-10 minutes.
+This is CRITICAL because HTTP 200 with valid HTML does NOT mean the page works.
+JavaScript syntax errors cause the page to hang forever with HTTP 200.
+
+Run via cron every 5 minutes.
 """
 
 import json
 import os
-import re
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    import requests
+    from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 except ImportError:
-    print("ERROR: requests not installed. Run: pip install requests")
+    print("ERROR: playwright not installed. Run: pip install playwright && playwright install chromium")
     sys.exit(1)
 
 # Configuration
 BASE_URL = "https://the.kurult.ai"
-API_ENDPOINTS = ["/api/health", "/api/tasks"]
-HTML_MARKERS = ['<div class="board">', "renderBoard", "<div id=\"app\">", "window.__INITIAL_STATE__"]
-JS_MARKER = "<script"
 LOG_DIR = Path.home() / ".openclaw" / "agents" / "main" / "logs"
 LOG_FILE = LOG_DIR / "kurultai-monitor.log"
 STATE_FILE = LOG_DIR / "kurultai-monitor-state.json"
 
 # Thresholds
-FAILURE_WARNING_THRESHOLD = 3  # After 3 consecutive failures → create task for Ogedei
-FAILURE_CRITICAL_THRESHOLD = 10  # After 10 consecutive failures → escalate to Kublai
+FAILURE_WARNING_THRESHOLD = 3  # After 3 consecutive failures (15 min) → create task for Ogedei
+FAILURE_CRITICAL_THRESHOLD = 10  # After 10 consecutive failures (50 min) → escalate to Kublai
 
-# Timeouts
-HTTP_TIMEOUT = 10  # seconds
-JS_VALIDATION_TIMEOUT = 5  # seconds
+# Timeouts (seconds)
+PAGE_LOAD_TIMEOUT = 15
+RENDER_TIMEOUT = 10
 
 
 def log(message: str, level: str = "INFO"):
     """Log a message with timestamp."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     log_line = f"[{timestamp}] [{level}] {message}"
     print(log_line)
 
@@ -63,7 +62,12 @@ def load_state() -> dict:
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
             pass
-    return {"consecutive_failures": 0, "last_failure": None, "last_success": None}
+    return {
+        "consecutive_failures": 0,
+        "last_failure": None,
+        "last_success": None,
+        "downtime_start": None
+    }
 
 
 def save_state(state: dict):
@@ -73,107 +77,151 @@ def save_state(state: dict):
         json.dump(state, f, indent=2)
 
 
-def check_http_status(url: str) -> tuple[int, float, str]:
+def check_kurultai() -> tuple[bool, list[str], dict]:
     """
-    Check HTTP status of URL.
-    Returns: (status_code, latency_ms, error_message)
+    Check the.kurult.ai using a real browser.
+
+    Returns:
+        (is_healthy, issues, metrics)
     """
-    try:
-        start = datetime.now(timezone.utc)
-        response = requests.get(url, timeout=HTTP_TIMEOUT, allow_redirects=True)
-        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
-        return response.status_code, latency_ms, ""
-    except requests.Timeout:
-        return 0, 0, f"Timeout after {HTTP_TIMEOUT}s"
-    except requests.ConnectionError as e:
-        return 0, 0, f"Connection error: {e}"
-    except requests.RequestException as e:
-        return 0, 0, f"Request error: {e}"
+    issues = []
+    metrics = {
+        "console_errors": [],
+        "console_warnings": [],
+        "http_status": None,
+        "load_time_ms": None,
+        "render_time_ms": None,
+        "board_found": False,
+        "stuck_on_loading": False
+    }
 
+    with sync_playwright() as p:
+        console_errors = []
+        console_warnings = []
 
-def validate_html_content(html: str) -> tuple[bool, list[str]]:
-    """
-    Validate HTML contains expected markers.
-    Returns: (is_valid, list of missing markers found)
-    """
-    found_markers = []
-    missing_markers = []
+        def console_handler(msg):
+            """Capture console messages."""
+            text = msg.text
+            if msg.type == "error":
+                console_errors.append(text)
+            elif msg.type == "warning":
+                console_warnings.append(text)
 
-    for marker in HTML_MARKERS:
-        if marker.lower() in html.lower():
-            found_markers.append(marker)
-        else:
-            missing_markers.append(marker)
-
-    # Consider valid if at least one marker is found
-    is_valid = len(found_markers) > 0
-    return is_valid, missing_markers
-
-
-def extract_and_validate_js(html: str) -> tuple[bool, str]:
-    """
-    Extract inline JavaScript from HTML and validate syntax.
-    Returns: (is_valid, error_message)
-    """
-    # Find inline scripts
-    script_pattern = re.compile(r'<script[^>]*>(.*?)</script>', re.DOTALL | re.IGNORECASE)
-    scripts = script_pattern.findall(html)
-
-    if not scripts:
-        return True, ""  # No inline scripts to validate
-
-    for i, script in enumerate(scripts):
-        script = script.strip()
-        if not script or script.startswith('{'):  # Skip JSON data or empty
-            continue
-
-        # Write to temp file and validate with node --check
         try:
-            import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
-                f.write(script)
-                temp_path = f.name
+            # Launch browser
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            )
+            page = context.new_page()
 
-            result = subprocess.run(
-                ['node', '--check', temp_path],
-                capture_output=True,
-                text=True,
-                timeout=JS_VALIDATION_TIMEOUT
+            # Attach console handler
+            page.on("console", console_handler)
+
+            # Navigation and page load
+            load_start = datetime.now(timezone.utc)
+            response = page.goto(
+                BASE_URL,
+                wait_until="domcontentloaded",
+                timeout=PAGE_LOAD_TIMEOUT * 1000
             )
 
-            os.unlink(temp_path)
+            if response:
+                metrics["http_status"] = response.status
+                load_time = (datetime.now(timezone.utc) - load_start).total_seconds() * 1000
+                metrics["load_time_ms"] = round(load_time, 0)
 
-            if result.returncode != 0:
-                return False, f"JS syntax error in script {i}: {result.stderr[:200]}"
-        except subprocess.TimeoutExpired:
-            return False, f"JS validation timeout for script {i}"
-        except FileNotFoundError:
-            return True, ""  # Node not available, skip JS validation
+                if response.status != 200:
+                    issues.append(f"HTTP {response.status} - expected 200")
+
+            # Wait for network idle (all requests finished)
+            try:
+                page.wait_for_load_state("networkidle", timeout=5000)
+            except PlaywrightTimeout:
+                # Network idle timeout is not critical - some polling connections stay open
+                pass
+
+            # CRITICAL CHECK: Wait for actual board rendering
+            # The page should NOT be stuck on "Loading..."
+            render_start = datetime.now(timezone.utc)
+
+            try:
+                # Check if we're stuck on "Loading..." text
+                page_content = page.content()
+                has_loading_text = "Loading" in page_content and "board" not in page_content.lower()
+
+                # Wait for actual board element to appear
+                page.wait_for_selector(".board, [data-testid='board'], #board, main", timeout=RENDER_TIMEOUT * 1000)
+                metrics["board_found"] = True
+                render_time = (datetime.now(timezone.utc) - render_start).total_seconds() * 1000
+                metrics["render_time_ms"] = round(render_time, 0)
+
+            except PlaywrightTimeout:
+                # Board didn't render - page is stuck
+                metrics["stuck_on_loading"] = True
+                issues.append("Page stuck on 'Loading...' - board did not render within 10s")
+
+                # Check if "Loading" text is visible
+                try:
+                    body_text = page.evaluate("() => document.body.innerText")
+                    if "Loading" in body_text:
+                        metrics["stuck_on_loading"] = True
+                except:
+                    pass
+
+            # Collect console errors
+            metrics["console_errors"] = console_errors
+            metrics["console_warnings"] = console_warnings
+
+            # Filter out common benign errors (not actual site breakage)
+            benign_patterns = [
+                "Non-Error promise rejection",
+                "chrome-extension://",
+                "extension",
+                "cloudflareinsights.com",
+                "Content Security Policy",
+                "CSP directive",
+                "beacon.min.js",
+            ]
+            critical_errors = [
+                e for e in console_errors
+                if not any(pattern.lower() in e.lower() for pattern in benign_patterns)
+            ]
+
+            if critical_errors:
+                issues.append(f"JavaScript console errors: {len(critical_errors)}")
+                for error in critical_errors[:3]:  # Log first 3
+                    issues.append(f"  - {error[:200]}")
+
+            # Additional check: page title
+            try:
+                title = page.title()
+                if not title or title == "":
+                    issues.append("Page has no title")
+            except:
+                pass
+
+            # Final check: body not empty
+            try:
+                body_html = page.evaluate("() => document.body.innerHTML")
+                if len(body_html) < 100:
+                    issues.append("Page body suspiciously empty")
+            except:
+                pass
+
+            browser.close()
+
+        except PlaywrightTimeout:
+            issues.append(f"Page load timeout after {PAGE_LOAD_TIMEOUT}s")
+            return False, issues, metrics
+
         except Exception as e:
-            return True, f"JS validation skip: {e}"
+            issues.append(f"Browser check failed: {e}")
+            return False, issues, metrics
 
-    return True, ""
-
-
-def check_api_endpoint(base_url: str, endpoint: str) -> tuple[bool, int, str]:
-    """
-    Check API endpoint.
-    Returns: (success, status_code, error_message)
-    """
-    url = f"{base_url}{endpoint}"
-    try:
-        start = datetime.now(timezone.utc)
-        response = requests.get(url, timeout=HTTP_TIMEOUT)
-        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
-
-        if response.status_code == 200:
-            return True, response.status_code, f"OK ({latency_ms:.0f}ms)"
-        else:
-            return False, response.status_code, f"Unexpected status: {response.status_code}"
-    except requests.Timeout:
-        return False, 0, f"Timeout after {HTTP_TIMEOUT}s"
-    except requests.RequestException as e:
-        return False, 0, str(e)
+    is_healthy = len(issues) == 0
+    return is_healthy, issues, metrics
 
 
 def create_task(agent: str, priority: str, title: str, body: str):
@@ -209,152 +257,154 @@ def create_task(agent: str, priority: str, title: str, body: str):
         return False
 
 
+def format_downtime(start_iso: str | None) -> str:
+    """Calculate and format downtime duration."""
+    if not start_iso:
+        return "unknown"
+
+    try:
+        start = datetime.fromisoformat(start_iso)
+        now = datetime.now(timezone.utc)
+        duration = now - start
+        minutes = int(duration.total_seconds() / 60)
+        return f"{minutes} minutes"
+    except:
+        return "unknown"
+
+
 def main():
     """Main monitoring function."""
-    log("=== Kurultai Monitor Check Started ===")
+    log("=== Kurultai Browser-Based Monitor Check Started ===")
 
     state = load_state()
-    issues_found = []
-    checks_passed = 0
-    checks_failed = 0
+    is_healthy, issues, metrics = check_kurultai()
 
-    # ============================================
-    # CHECK 1: Main website HTTP status
-    # ============================================
-    log("CHECK 1: Main website HTTP status")
-    status_code, latency_ms, error = check_http_status(BASE_URL)
+    # Log metrics
+    log(f"HTTP Status: {metrics.get('http_status', 'N/A')}")
+    log(f"Load Time: {metrics.get('load_time_ms', 'N/A')}ms")
+    log(f"Render Time: {metrics.get('render_time_ms', 'N/A')}ms")
+    log(f"Board Found: {metrics.get('board_found', False)}")
+    log(f"Console Errors: {len(metrics.get('console_errors', []))}")
+    log(f"Console Warnings: {len(metrics.get('console_warnings', []))}")
 
-    if status_code == 200:
-        log(f"✓ Main site: HTTP {status_code} ({latency_ms:.0f}ms)")
-        checks_passed += 1
-        main_site_ok = True
-
-        # Get HTML content for further checks
-        try:
-            response = requests.get(BASE_URL, timeout=HTTP_TIMEOUT)
-            html_content = response.text
-        except Exception as e:
-            html_content = ""
-            log(f"Failed to fetch HTML content: {e}", "WARN")
-    else:
-        log(f"✗ Main site: HTTP {status_code} - {error}", "ERROR")
-        checks_failed += 1
-        main_site_ok = False
-        html_content = ""
-
-    # ============================================
-    # CHECK 2: HTML content validation
-    # ============================================
-    if main_site_ok and html_content:
-        log("CHECK 2: HTML content validation")
-        is_valid, missing = validate_html_content(html_content)
-
-        if is_valid:
-            log(f"✓ HTML markers found")
-            checks_passed += 1
-            html_valid = True
-        else:
-            log(f"✗ HTML markers missing: {missing}", "ERROR")
-            checks_failed += 1
-            html_valid = False
-            issues_found.append(f"HTML markers missing: {missing}")
-
-        # ============================================
-        # CHECK 3: JavaScript syntax validation (optional)
-        # ============================================
-        log("CHECK 3: JavaScript syntax validation")
-        js_valid, js_error = extract_and_validate_js(html_content)
-
-        if js_valid:
-            log(f"✓ JavaScript syntax valid")
-            checks_passed += 1
-        else:
-            log(f"✗ JavaScript syntax error: {js_error}", "ERROR")
-            checks_failed += 1
-            issues_found.append(f"JS syntax error: {js_error}")
-    else:
-        html_valid = False
-        js_valid = True  # Skip if main site down
-
-    # ============================================
-    # CHECK 4: API endpoints
-    # ============================================
-    log("CHECK 4: API endpoints")
-    for endpoint in API_ENDPOINTS:
-        success, status, message = check_api_endpoint(BASE_URL, endpoint)
-
-        if success:
-            log(f"✓ {endpoint}: {message}")
-            checks_passed += 1
-        else:
-            log(f"✗ {endpoint}: HTTP {status} - {message}", "ERROR")
-            checks_failed += 1
-            issues_found.append(f"{endpoint}: {message}")
-
-    # ============================================
-    # Determine overall status
-    # ============================================
-    all_checks_passed = checks_failed == 0
-
-    if all_checks_passed:
+    if is_healthy:
         # Recovery detection
         if state["consecutive_failures"] > 0:
-            log(f"✓ RECOVERY: Site back online after {state['consecutive_failures']} failures", "INFO")
+            downtime = format_downtime(state.get("downtime_start"))
+            log(f"✓ RECOVERY: Site back online after {downtime} downtime ({state['consecutive_failures']} checks)", "INFO")
+
+            # Create recovery task
+            recovery_body = f"""## the.kurult.ai Recovery Detected
+
+The website has recovered after being down.
+
+**Downtime:** {downtime}
+**Consecutive Failures:** {state['consecutive_failures']}
+**Downtime Started:** {state.get('downtime_start', 'unknown')}
+**Recovered At:** {datetime.now(timezone.utc).isoformat()}
+
+**Current Metrics:**
+- HTTP Status: {metrics.get('http_status', 'N/A')}
+- Load Time: {metrics.get('load_time_ms', 'N/A')}ms
+- Render Time: {metrics.get('render_time_ms', 'N/A')}ms
+
+Site is now healthy. No action required.
+"""
+            create_task("ogedei", "normal", f"the.kurult.ai recovered after {downtime} downtime", recovery_body)
+
+            # Reset state
             state["consecutive_failures"] = 0
             state["last_success"] = datetime.now(timezone.utc).isoformat()
+            state["downtime_start"] = None
             save_state(state)
         else:
             log("✓ All checks passed - site healthy")
+            state["last_success"] = datetime.now(timezone.utc).isoformat()
+            save_state(state)
     else:
         # Failure tracking
         state["consecutive_failures"] += 1
+
+        # First failure - record downtime start
+        if state["consecutive_failures"] == 1:
+            state["downtime_start"] = datetime.now(timezone.utc).isoformat()
+
         state["last_failure"] = datetime.now(timezone.utc).isoformat()
         save_state(state)
 
         log(f"✗ Check failed (consecutive failures: {state['consecutive_failures']})", "ERROR")
 
+        for issue in issues:
+            log(f"  - {issue}", "ERROR")
+
         # Alerting logic
         if state["consecutive_failures"] >= FAILURE_CRITICAL_THRESHOLD:
-            log(f"CRITICAL ALERT: {state['consecutive_failures']} consecutive failures - escalating to Kublai", "CRITICAL")
-            create_task(
-                agent="main",
-                priority="critical",
-                title="CRITICAL: the.kurult.ai down for 50+ minutes",
-                body=f"## the.kurult.ai Critical Alert\n\n"
-                     f"The website has failed {state['consecutive_failures']} consecutive health checks.\n\n"
-                     f"Issues detected:\n" + "\n".join(f"- {issue}" for issue in issues_found) + "\n\n"
-                     f"Last successful check: {state.get('last_success', 'unknown')}\n\n"
-                     f"Immediate action required. Site may be down or broken."
-            )
-        elif state["consecutive_failures"] >= FAILURE_WARNING_THRESHOLD:
-            log(f"WARNING ALERT: {state['consecutive_failures']} consecutive failures - notifying Ogedei", "WARN")
-            create_task(
-                agent="ogedei",
-                priority="high",
-                title=f"the.kurult.ai failing health checks ({state['consecutive_failures']}x)",
-                body=f"## the.kurult.ai Health Check Failed\n\n"
-                     f"The website has failed {state['consecutive_failures']} consecutive health checks.\n\n"
-                     f"Issues detected:\n" + "\n".join(f"- {issue}" for issue in issues_found) + "\n\n"
-                     f"Last successful check: {state.get('last_success', 'unknown')}\n\n"
-                     f"Please investigate and remediate."
-            )
+            downtime = format_downtime(state.get("downtime_start"))
+            log(f"CRITICAL ALERT: {state['consecutive_failures']} consecutive failures ({downtime} downtime) - escalating to Kublai", "CRITICAL")
 
-    # ============================================
+            critical_body = f"""## CRITICAL: the.kurult.ai Down
+
+The website has been failing browser-based health checks.
+
+**Downtime:** {downtime}
+**Consecutive Failures:** {state['consecutive_failures']}
+**Downtime Started:** {state.get('downtime_start')}
+
+**Issues Detected:**
+""" + "\n".join(f"- {issue}" for issue in issues) + f"""
+
+**Metrics:**
+- HTTP Status: {metrics.get('http_status', 'N/A')}
+- Load Time: {metrics.get('load_time_ms', 'N/A')}ms
+- Board Rendered: {metrics.get('board_found', False)}
+- Stuck on Loading: {metrics.get('stuck_on_loading', False)}
+- Console Errors: {len(metrics.get('console_errors', []))}
+
+**Last Successful Check:** {state.get('last_success', 'Never')}
+
+**IMMEDIATE ACTION REQUIRED** - The primary UI is down or broken.
+"""
+            create_task("main", "critical", f"CRITICAL: the.kurult.ai down for {downtime}", critical_body)
+
+        elif state["consecutive_failures"] >= FAILURE_WARNING_THRESHOLD:
+            downtime = format_downtime(state.get("downtime_start"))
+            log(f"WARNING ALERT: {state['consecutive_failures']} consecutive failures ({downtime} downtime) - notifying Ogedei", "WARN")
+
+            warning_body = f"""## the.kurult.ai Health Check Failed
+
+The website has failed consecutive health checks.
+
+**Downtime:** {downtime}
+**Consecutive Failures:** {state['consecutive_failures']}
+**Downtime Started:** {state.get('downtime_start')}
+
+**Issues Detected:**
+""" + "\n".join(f"- {issue}" for issue in issues) + f"""
+
+**Metrics:**
+- HTTP Status: {metrics.get('http_status', 'N/A')}
+- Board Rendered: {metrics.get('board_found', False)}
+- Stuck on Loading: {metrics.get('stuck_on_loading', False)}
+- Console Errors: {len(metrics.get('console_errors', []))}
+
+**Last Successful Check:** {state.get('last_success', 'Unknown')}
+
+Please investigate and remediate.
+"""
+            create_task("ogedei", "high", f"the.kurult.ai failing health checks ({state['consecutive_failures']}x, {downtime})", warning_body)
+
     # Summary
-    # ============================================
     log(f"")
     log(f"=== SUMMARY ===")
-    log(f"Checks Passed: {checks_passed}")
-    log(f"Checks Failed: {checks_failed}")
+    log(f"Status: {'HEALTHY' if is_healthy else 'UNHEALTHY'}")
     log(f"Consecutive Failures: {state['consecutive_failures']}")
-
-    if checks_failed > 0:
-        log(f"Issues: {issues_found}")
-
+    if state.get("downtime_start") and state["consecutive_failures"] > 0:
+        log(f"Current Downtime: {format_downtime(state['downtime_start'])}")
     log(f"=== Kurultai Monitor Check Complete ===")
+    log(f"")
 
-    # Exit with error if any checks failed
-    sys.exit(0 if checks_failed == 0 else 1)
+    # Exit with error if unhealthy
+    sys.exit(0 if is_healthy else 1)
 
 
 if __name__ == "__main__":

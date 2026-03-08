@@ -23,32 +23,32 @@ AGENT_CAPABILITIES = {
     "kublai": {
         "role": "Squad Lead / Router",
         "capabilities": ["task_routing", "synthesis", "oversight", "escalation", "strategic_planning"],
-        "model": "qwen3.5-plus"
+        "model": "claude-opus-4-6"
     },
     "temujin": {
         "role": "Developer",
         "capabilities": ["code_generation", "code_review", "debugging", "deployment", "infrastructure"],
-        "model": "qwen3.5-plus"
+        "model": "claude-opus-4-6"
     },
     "mongke": {
         "role": "Researcher",
         "capabilities": ["web_research", "api_discovery", "truth_seeking", "knowledge_gap_analysis", "ecosystem_intelligence"],
-        "model": "qwen3.5-plus"
+        "model": "claude-opus-4-6"
     },
     "chagatai": {
         "role": "Writer",
         "capabilities": ["writing", "documentation", "creative_content", "blog_posts", "social_media"],
-        "model": "qwen3.5-plus"
+        "model": "claude-opus-4-6"
     },
     "jochi": {
         "role": "Analyst",
         "capabilities": ["testing", "security", "pattern_recognition", "analysis", "validation"],
-        "model": "MiniMax-M2.5"
+        "model": "claude-opus-4-6"
     },
     "ogedei": {
         "role": "Operations",
         "capabilities": ["monitoring", "health_checks", "failover", "infrastructure", "alerting"],
-        "model": "qwen3.5-plus"
+        "model": "claude-opus-4-6"
     }
 }
 

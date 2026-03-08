@@ -10,6 +10,12 @@ REPLACEMENTS = {
     ("ogedei", "r011"): "WHEN task fails with execution_time < 120s THEN read full error output, verify config resolution in settings.json, and check auth credentials before retrying INSTEAD OF blind retry",
 }
 
+# Task 7.3: Track results for proper exit code and summary
+updated_count = 0
+failed_count = 0
+agents_updated = set()
+missing_files = []
+
 for (agent, rule_id), new_text in REPLACEMENTS.items():
     rules_path = os.path.expanduser(f"~/.openclaw/agents/{agent}/memory/rules.json")
     if os.path.exists(rules_path):
@@ -36,7 +42,21 @@ for (agent, rule_id), new_text in REPLACEMENTS.items():
         deprecate_rule(agent, rule_id, "superseded: model-agnostic replacement (pipeline fix 2026-03-07)")
         add_rule(agent, new_text, source="fix_model_rules.py")
         print(f"  Updated {agent}/{rule_id}")
+        updated_count += 1
+        agents_updated.add(agent)
     else:
-        print(f"  WARNING: {rules_path} not found")
+        # Task 7.3: Log error for missing files instead of silent continue
+        print(f"  ERROR: {rules_path} not found - cannot update {agent}/{rule_id}")
+        missing_files.append(f"{agent}/{rule_id}")
+        failed_count += 1
 
-print("Done. All model-specific rules replaced with model-agnostic versions.")
+# Task 7.3: Print summary and return proper exit code
+print(f"\n=== SUMMARY ===")
+print(f"Updated {updated_count} rules across {len(agents_updated)} agent(s)")
+if missing_files:
+    print(f"Failed: {failed_count} (missing files: {', '.join(missing_files)})")
+    print("Done with errors.")
+    sys.exit(1)
+else:
+    print("Done. All model-specific rules replaced with model-agnostic versions.")
+    sys.exit(0)

@@ -54,15 +54,34 @@ def load_rules(agent: str) -> dict:
 
 
 def save_rules(agent: str, data: dict) -> bool:
-    """Persist rules registry to disk."""
+    """Persist rules registry to disk with atomic write pattern.
+    
+    Task 7.2: Uses temp file + validate + atomic rename to prevent corruption.
+    """
     path = _rules_path(agent)
     path.parent.mkdir(parents=True, exist_ok=True)
     data["last_updated"] = datetime.now().isoformat()
+    
+    # Task 7.2: Atomic write pattern - write to temp, validate, then rename
+    temp_path = f"{path}.tmp"
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        # Write to temp file first
+        with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        
+        # Validate by reading it back
+        with open(temp_path, "r", encoding="utf-8") as f:
+            json.load(f)  # Will raise JSONDecodeError if corrupt
+        
+        # Atomic rename (os.replace is atomic on POSIX)
+        os.replace(temp_path, path)
         return True
-    except IOError:
+    except (IOError, json.JSONDecodeError) as e:
+        # Clean up temp file on failure
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
         return False
 
 

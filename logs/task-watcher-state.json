@@ -1239,10 +1239,6 @@
     "executed": "2026-03-07T23:52:12.270135",
     "success": true
   },
-  "chagatai/normal-1772936030.md": {
-    "executed": "2026-03-08T00:21:52.543752",
-    "success": false
-  },
   "mongke/normal-1772942251.md": {
     "executed": "2026-03-08T00:00:54.181812",
     "success": true
@@ -1283,22 +1279,6 @@
     "executed": "2026-03-08T00:23:09.014583",
     "success": true
   },
-  "chagatai/high-1772946600.md": {
-    "executed": "2026-03-08T00:23:26.213124",
-    "success": false
-  },
-  "jochi/normal-1741405500.md": {
-    "executed": "2026-03-08T00:24:32.539007",
-    "success": false
-  },
-  "ogedei/high-1772944810.md": {
-    "executed": "2026-03-08T00:25:02.345157",
-    "success": false
-  },
-  "jochi/normal-1772941194.md": {
-    "executed": "2026-03-08T00:25:31.613633",
-    "success": false
-  },
   "mongke/high-1772942824.md": {
     "executed": "2026-03-08T00:26:04.300665",
     "success": true
@@ -1331,8 +1311,52 @@
     "executed": "2026-03-08T00:37:04.433229",
     "success": true
   },
-  "jochi/normal-1772944838.md": {
-    "executed": "2026-03-08T00:40:53.392120",
-    "success": false
+  "ogedei/high-1772948092.md": {
+    "executed": "2026-03-08T00:47:25.924359",
+    "success": true
+  },
+  "ogedei/high-1772925598.unverified.md": {
+    "executed": "2026-03-08T00:48:07.865401",
+    "success": true
+  },
+  "jochi/high-1772924585.unverified.md": {
+    "executed": "2026-03-08T00:48:57.561527",
+    "success": true
+  },
+  "ogedei/high-1772939543.verified.md": {
+    "executed": "2026-03-08T00:49:37.322529",
+    "success": true
+  },
+  "chagatai/high-1772939300.unverified.md": {
+    "executed": "2026-03-08T00:50:57.442054",
+    "success": true
+  },
+  "jochi/high-1772931999.unverified.md": {
+    "executed": "2026-03-08T00:51:09.961707",
+    "success": true
+  },
+  "ogedei/high-1772940031.verified.md": {
+    "executed": "2026-03-08T00:52:51.649282",
+    "success": true
+  },
+  "jochi/high-1772932087.unverified.md": {
+    "executed": "2026-03-08T00:53:57.012355",
+    "success": true
+  },
+  "mongke/high-1772942585.unverified.md": {
+    "executed": "2026-03-08T00:56:04.830179",
+    "success": true
+  },
+  "temujin/high-1772940689.verified.md": {
+    "executed": "2026-03-08T00:57:08.156052",
+    "success": true
+  },
+  "kublai/high-1772935630.unverified.md": {
+    "executed": "2026-03-08T00:58:23.569872",
+    "success": true
+  },
+  "mongke/normal-1772936030.md": {
+    "executed": "2026-03-08T00:58:34.511520",
+    "success": true
   }
 }

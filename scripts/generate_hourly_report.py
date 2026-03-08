@@ -118,7 +118,12 @@ def collect_agent_reflections():
             for line in latest.split('\n'):
                 stripped = line.strip()
                 if stripped.startswith(('- ', '* ', '1.', '2.', '3.')) and len(stripped) > 15:
-                    findings_lines.append(stripped[:120])
+                    # Task 7.1: Preserve full text for structured data (JSON, URLs, arrays)
+                    if stripped.startswith(('{', 'http', '[')):
+                        # Don't truncate JSON, URLs, or JSON arrays
+                        findings_lines.append(stripped)
+                    else:
+                        findings_lines.append(stripped[:120])
                     if len(findings_lines) >= 2:
                         break
             findings = "; ".join(findings_lines) if findings_lines else "See memory file"
@@ -127,7 +132,12 @@ def collect_agent_reflections():
             for line in latest.split('\n'):
                 stripped = line.strip().lower()
                 if any(kw in stripped for kw in ['issue:', 'problem:', 'error:', 'blocked', 'warning:']):
-                    issues.append(line.strip()[:100])
+                    # Task 7.1: Preserve full text for structured data (JSON, URLs, arrays)
+                    line_stripped = line.strip()
+                    if line_stripped.startswith(('{', 'http', '[')):
+                        issues.append(line_stripped)
+                    else:
+                        issues.append(line_stripped[:100])
                     if len(issues) >= 2:
                         break
 
