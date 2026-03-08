@@ -18,7 +18,8 @@ TIMEOUT_SECONDS=420
 # ============================================================
 # CONCURRENCY CONTROL: Semaphore limiting for Claude processes
 # ============================================================
-MAX_CONCURRENT=3
+MAX_CONCURRENT=3  # Reflections: 3 concurrent (fast, ~30s each)
+MAX_CONCURRENT_REVIEW=2  # Reviews: 2 concurrent (horde-review is complex, dispatches multiple agents)
 MAX_LOAD=4.0  # Max system load (1-min avg) before blocking new spawns
 
 # Job control for process group management
@@ -186,7 +187,7 @@ SCRIPTS="/Users/kublai/.openclaw/agents/main/scripts"
 STEP_TIMING_FILE="$LOGS_DIR/reflection-step-timing.json"
 REVIEWS_DIR="$LOGS_DIR/reviews"
 CLAUDE_AGENT_BIN="/Users/kublai/.local/bin/claude-agent"
-REVIEW_TIMEOUT=120
+REVIEW_TIMEOUT=300  # 5 minutes - horde-review dispatches multiple parallel agents, needs more time
 
 mkdir -p "$REVIEWS_DIR"
 
@@ -346,10 +347,18 @@ SCORE: (1-10 performance rating with one-line justification)"
     local rc=$?
 
     if [ $rc -eq 0 ] && [ -s "$REVIEW_FILE" ]; then
-        echo "[$(date)] [$AGENT] /horde-review complete -> $REVIEW_FILE"
+        # Verify review has actual content (not just error message)
+        if grep -q "^STRENGTHS:" "$REVIEW_FILE" 2>/dev/null; then
+            echo "[$(date)] [$AGENT] /horde-review complete -> $REVIEW_FILE"
+        else
+            echo "[$(date)] [$AGENT] /horde-review returned but no structured output (rc=$rc)"
+            echo "# Review returned but missing expected format (rc=$rc, timeout=${REVIEW_TIMEOUT}s)" > "$REVIEW_FILE"
+        fi
     else
-        echo "[$(date)] [$AGENT] /horde-review failed or timed out (rc=$rc)"
+        echo "[$(date)] [$AGENT] /horde-review failed or timed out (rc=$rc, timeout=${REVIEW_TIMEOUT}s)"
         echo "# Review unavailable (rc=$rc, timeout=${REVIEW_TIMEOUT}s)" > "$REVIEW_FILE"
+        # Log error details for debugging
+        tail -5 "$LOGS_DIR/horde-review-error.log" >> "$LOGS_DIR/reflection.log" 2>/dev/null
     fi
 }
 
@@ -394,19 +403,32 @@ echo "================================================================"
 # Review output consumed by kurultai_brainstorm.py at :30
 # ============================================================
 
-echo "[$(date)] Starting /horde-review analysis for all agents (parallel, timeout=${REVIEW_TIMEOUT}s, max concurrent=$MAX_CONCURRENT)..."
+echo "[$(date)] Starting /horde-review analysis for all agents (batched, timeout=${REVIEW_TIMEOUT}s, max concurrent=$MAX_CONCURRENT_REVIEW)..."
 
-review_pids=()
-for agent in "${AGENTS[@]}"; do
-    # Wait for semaphore slot before spawning
-    wait_for_semaphore
-    run_agent_review "$agent" &
-    review_pids+=($!)
-    echo "[$(date)] Spawned $agent review (running: $(jobs -p | wc -l))"
-done
-for pid in "${review_pids[@]}"; do
-    wait "$pid" || true
-done
+# Run reviews in batches of 2 to reduce resource contention
+# horde-review dispatches multiple parallel agents, so we limit concurrency
+review_batch() {
+    local agents=("$@")
+    local pids=()
+    for agent in "${agents[@]}"; do
+        wait_for_semaphore
+        run_agent_review "$agent" &
+        pids+=($!)
+        echo "[$(date)] Spawned $agent review (running: $(jobs -p | wc -l))"
+    done
+    for pid in "${pids[@]}"; do
+        wait "$pid" || true
+    done
+}
+
+# Batch 1: kublai, mongke
+review_batch "kublai" "mongke"
+
+# Batch 2: chagatai, temujin
+review_batch "chagatai" "temujin"
+
+# Batch 3: jochi, ogedei
+review_batch "jochi" "ogedei"
 
 echo "[$(date)] All agent /horde-review analyses complete"
 echo "================================================================"
