@@ -1599,3 +1599,45 @@ Reflection file: logs/kurultai-reflection-2026-03-05-0310.md
 [Sun Mar  8 00:01:43 EST 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
 [Sun Mar  8 00:01:43 EST 2026] Hourly reflection pipeline complete (all steps)
 [Sun Mar  8 00:01:43 EST 2026] Reflection finished in 98s
+[Sun Mar  8 13:00:05 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Sun Mar  8 13:00:05 EDT 2026] Hard timeout: 420s | Watchdog PID: 35293
+================================================================
+[Sun Mar  8 13:00:05 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Sun Mar  8 13:00:05 EDT 2026] Spawned kublai (running:        2)
+[Sun Mar  8 13:00:05 EDT 2026] [kublai] Starting protocol reflection...
+[Sun Mar  8 13:00:05 EDT 2026] [mongke] Starting protocol reflection...
+[Sun Mar  8 13:00:05 EDT 2026] Spawned mongke (running:        3)
+[Sun Mar  8 13:00:40 EDT 2026] WARNING: Semaphore wait timeout (load=, running=       3)
+[Sun Mar  8 13:00:41 EDT 2026] Spawned chagatai (running:        4)
+[Sun Mar  8 13:00:41 EDT 2026] [chagatai] Starting protocol reflection...
+[Sun Mar  8 13:01:05 EDT 2026] [kublai] Protocol reflection complete -> /Users/kublai/.openclaw/agents/kublai/memory/2026-03-08.md
+[Sun Mar  8 13:01:05 EDT 2026] [mongke] Protocol reflection complete -> /Users/kublai/.openclaw/agents/mongke/memory/2026-03-08.md
+[Sun Mar  8 13:01:05 EDT 2026] Spawned temujin (running:        3)
+[Sun Mar  8 13:01:05 EDT 2026] [temujin] Starting protocol reflection...
+[Sun Mar  8 13:01:40 EDT 2026] WARNING: Semaphore wait timeout (load=, running=       3)
+[Sun Mar  8 13:01:40 EDT 2026] Spawned jochi (running:        4)
+[Sun Mar  8 13:01:40 EDT 2026] [jochi] Starting protocol reflection...
+[Sun Mar  8 13:01:41 EDT 2026] [chagatai] Protocol reflection complete -> /Users/kublai/.openclaw/agents/chagatai/memory/2026-03-08.md
+[Sun Mar  8 13:02:05 EDT 2026] [temujin] Protocol reflection complete -> /Users/kublai/.openclaw/agents/temujin/memory/2026-03-08.md
+[Sun Mar  8 13:02:06 EDT 2026] Spawned ogedei (running:        3)
+[Sun Mar  8 13:02:06 EDT 2026] [ogedei] Starting protocol reflection...
+[Sun Mar  8 13:02:40 EDT 2026] [jochi] Protocol reflection complete -> /Users/kublai/.openclaw/agents/jochi/memory/2026-03-08.md
+[Sun Mar  8 13:03:07 EDT 2026] [ogedei] Protocol reflection complete -> /Users/kublai/.openclaw/agents/ogedei/memory/2026-03-08.md
+[Sun Mar  8 13:03:07 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Sun Mar  8 13:03:07 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Sun Mar  8 13:03:07 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Sun Mar  8 13:03:07 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=300s, max concurrent=2)...
+[Sun Mar  8 13:03:07 EDT 2026] [kublai] Starting review with fallback mode...
+[Sun Mar  8 13:03:07 EDT 2026] Spawned kublai review (running:        2)
+[Sun Mar  8 13:03:07 EDT 2026] [mongke] Starting review with fallback mode...
+[Sun Mar  8 13:03:07 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: full)
+[Sun Mar  8 13:05:27 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: full)
+[Sun Mar  8 13:05:48 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+[Sun Mar  8 13:05:48 EDT 2026] [chagatai] Starting review with fallback mode...
+[Sun Mar  8 13:05:48 EDT 2026] Spawned chagatai review (running:        2)
+[Sun Mar  8 13:05:48 EDT 2026] [temujin] Starting review with fallback mode...
+[Sun Mar  8 13:05:48 EDT 2026] Spawned temujin review (running:        3)

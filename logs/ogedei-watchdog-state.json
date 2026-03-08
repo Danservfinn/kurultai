@@ -1,36 +1,39 @@
 {
-  "last_audit": 1772948316.5340228,
-  "cycles": 6369,
-  "last_cycle": "2026-03-08T00:58:57.385683",
+  "last_audit": 1772988992.8597891,
+  "cycles": 6385,
+  "last_cycle": "2026-03-08T13:06:29.142358",
   "watcher_restarts": 11,
-  "stalled_warnings": 279,
-  "fakes_detected": 8,
+  "stalled_warnings": 284,
+  "fakes_detected": 12,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 57,
-    "fake_found": 1,
+    "audited": 184,
+    "fake_found": 2,
     "requeued": 0,
-    "skipped": 0,
+    "skipped": 7,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772949537.385707,
+  "last_cycle_epoch": 1772989589.1424189,
   "last_issues": [
-    "reflection-status.json missing"
+    "kublai/high-1772986310.executing.md stalled 3277s",
+    "temujin/high-1772983582.executing.md stalled 6004s",
+    "mongke/high-1772986139.executing.md stalled 3448s",
+    "ogedei/high-1772986452.executing.md stalled 932s"
   ],
   "reflection_misses": 0,
-  "last_memory_audit": 1772948765.323684,
+  "last_memory_audit": 1772989015.476128,
   "memory_audit_result": {
-    "total": 0,
+    "total": 1,
     "critical": 0,
-    "warning": 0,
-    "ts": "2026-03-08T00:46:05.463233"
+    "warning": 1,
+    "ts": "2026-03-08T12:57:06.610151"
   },
-  "last_routing_drift_check": 1772948765.4633589,
+  "last_routing_drift_check": 1772989026.815148,
   "routing_drift": {
     "total": 0,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "ts": "2026-03-08T00:46:05.469629"
+    "ts": "2026-03-08T12:57:07.454314"
   },
   "memory_fixes": 15,
   "last_failure_rate_check": 1772883470.03844,

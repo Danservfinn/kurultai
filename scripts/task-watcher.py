@@ -1936,8 +1936,8 @@ def recover_stale_executions():
                         log(f"RECOVER ERROR: {agent}/{f.name} — {action} - {detail}")
                     continue
                 else:
-                    try:
-                        os.rename(f, original_path)
+                    success, action, detail = _safe_rename_if_not_done(f, original_path, agent)
+                    if success:
                         log(f"RECOVER: {agent}/{f.name} → {retry_name} (retry {retry_count + 1}/{MAX_RETRY_COUNT})")
                         task_id = _extract_task_id(original_path)
                         if task_id:
@@ -1949,13 +1949,11 @@ def recover_stale_executions():
                                 "stale_age_s": round(age),
                                 "retry": retry_count + 1,
                             })
-                    except OSError as e:
-                        # Handler won the race — check if task completed successfully
-                        if _already_completed(f):
-                            log(f"RECOVER RACE: {agent}/{f.name} — handler completed during retry rename")
-                            continue
-                        log(f"RECOVER ERROR: {agent}/{f.name} — {e}")
-                        continue
+                    elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                        log(f"RECOVER SKIP: {agent}/{f.name} — {detail}")
+                    else:
+                        log(f"RECOVER ERROR: {agent}/{f.name} — {action} - {detail}")
+                    continue
 
             recovered += 1
 

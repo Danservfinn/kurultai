@@ -699,6 +699,17 @@ def handle_message(
     except Exception:
         pass  # Never block message processing for tracking
 
+    # Log inbound conversation (fire and forget)
+    try:
+        log_inbound(
+            sender_phone,
+            message,
+            channel="signal",
+            message_id=str(raw_msg.get("message_id", ""))
+        )
+    except Exception:
+        pass  # Never block message processing for logging
+
     # Check for pending interrogation first (follow-up questions)
     interrogation = get_pending_interrogation(sender_phone)
     if interrogation:
