@@ -27,6 +27,14 @@ from json_state import locked_json_update
 from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER, CLAUDE_AGENT as _CLAUDE_AGENT
 from kurultai_ledger import append_ledger as _kp_append_ledger
 
+# Circuit breaker for agent health tracking
+try:
+    from circuit_breaker import AgentCircuitBreaker
+    _circuit_breaker = AgentCircuitBreaker()
+except Exception as e:
+    print(f"[circuit_breaker] Init failed (non-fatal): {e}")
+    _circuit_breaker = None
+
 AGENTS_DIR = str(_AGENTS_DIR)
 SPAWN_QUEUE = str(_SPAWN_QUEUE)
 CLAUDE_AGENT = str(_CLAUDE_AGENT)
@@ -417,10 +425,17 @@ def load_acp_fallback_config():
         }
 
 def get_pending_tasks(agent_name):
-    """Get pending tasks from agent's queue"""
+    """Get pending tasks from agent's queue.
+
+    Parses task frontmatter for metadata including:
+    - task_id, skill_hint, priority (existing)
+    - audience, clarification_deadline (new communication fields)
+    - context_history (previous agent work for cross-agent clarity)
+    - output_format (expected deliverables)
+    """
     config = load_agent_config(agent_name)
     task_queue_path = config.get('task_queue_path', f"{AGENTS_DIR}/{agent_name}/tasks")
-    
+
     tasks = []
     for pattern in ['high-*.md', 'normal-*.md', 'low-*.md']:
         for task_file in glob.glob(f"{task_queue_path}/{pattern}"):
@@ -428,32 +443,53 @@ def get_pending_tasks(agent_name):
                 # Read task content
                 with open(task_file, 'r') as f:
                     content = f.read()
-                
+
                 # Extract task description
                 task_desc = content
                 for line in content.split('\n'):
                     if line.startswith('# Task:'):
                         task_desc = line.replace('# Task:', '').strip()
                         break
-                
-                # Determine priority
+
+                # Determine priority from filename
                 priority = 'normal'
                 if 'high-' in task_file:
                     priority = 'high'
                 elif 'low-' in task_file:
                     priority = 'low'
-                
-                tasks.append({
+
+                # Extract frontmatter fields
+                task_id = _extract_task_id(content)
+                skill_hint = _extract_skill_hint(content)
+                depth = _extract_depth(content)
+
+                # Extract new communication/context fields
+                audience = _extract_audience(content)
+                clarification_deadline = _extract_clarification_deadline(content)
+                context_history = _extract_context_history(content)
+                output_format = _extract_output_format(content)
+
+                task_dict = {
                     'file': task_file,
                     'task': task_desc,
                     'priority': priority,
-                    'created': datetime.fromtimestamp(os.path.getmtime(task_file)).isoformat()
-                })
-    
+                    'created': datetime.fromtimestamp(os.path.getmtime(task_file)).isoformat(),
+                    'full_content': content,  # Pass full content for execution
+                    'task_id': task_id,
+                    'skill_hint': skill_hint,
+                    'depth': depth,
+                    'audience': audience,
+                    'clarification_deadline': clarification_deadline,
+                    'context_history': context_history,
+                    'output_format': output_format,
+                }
+
+                tasks.append(task_dict)
+
     # Sort by priority
     priority_order = {'high': 0, 'normal': 1, 'low': 2}
     tasks.sort(key=lambda x: priority_order.get(x['priority'], 1))
-    
+
     return tasks
 
 def _write_pid_file(executing_file):
@@ -477,13 +513,83 @@ def _cleanup_pid_file(executing_file):
         pass
 
 
+# O_EXCL constant for file locking (may not be available on all platforms)
+O_OEXCL = os.O_EXCL if hasattr(os, 'O_EXCL') else 0x800
+
+
+def _safe_rename_with_lock(source_path, target_path, agent="unknown"):
+    """Atomic rename with file lock to prevent race conditions.
+
+    Prevents the race condition where:
+    1. Handler checks if file exists -> True
+    2. Recovery renames the file to .md
+    3. Handler tries to rename to .completed.done.md -> FileNotFoundError
+
+    Uses exclusive file lock per-task-stem to ensure only one process
+    handles the rename at a time.
+
+    Returns (success: bool, action: str, error: str)
+    """
+    if not os.path.exists(source_path):
+        return False, "skip", "source_not_found"
+
+    # Extract task stem for lock file naming
+    source_name = os.path.basename(source_path)
+    stem = source_name.replace('.executing', '').replace('.md', '')
+    import re
+    stem_base = re.sub(r'\.retry-\d+', '', stem)
+    lock_path = os.path.join(os.path.dirname(source_path), f".{stem_base}.rename-lock")
+
+    lock_fd = None
+    try:
+        # Create exclusive lock - fails if another process has it
+        lock_fd = os.open(lock_path, os.O_CREAT | O_OEXCL | os.O_WRONLY)
+    except (FileExistsError, PermissionError):
+        # Another process is handling this rename - log for monitoring
+        print(f"[SAFE_RENAME] Race prevented: {agent} - lock held for {stem_base}")
+        return False, "skip", "concurrent_operation"
+
+    try:
+        # RECHECK: source still exists after acquiring lock
+        if not os.path.exists(source_path):
+            return False, "skip", "source_gone_during_lock_wait"
+
+        # RECHECK: target doesn't already exist (avoid clobbering)
+        if os.path.exists(target_path):
+            return False, "skip", "target_already_exists"
+
+        # Atomic rename
+        os.rename(source_path, target_path)
+        return True, "renamed", "ok"
+
+    except FileNotFoundError:
+        # File vanished during our operation (race won by another process)
+        return False, "skip", "race_file_not_found"
+    except OSError as e:
+        return False, "error", str(e)
+    finally:
+        # Always release lock
+        try:
+            if lock_fd is not None:
+                os.close(lock_fd)
+            try:
+                os.unlink(lock_path)
+            except OSError:
+                pass
+        except (OSError, AttributeError):
+            pass
+
+
 def _verify_task_completion(task_file):
-    """Verify task file has substantial output before marking as complete.
+    """Verify task file has actual execution output before marking as complete.
+
+    CRITICAL FIX: This function now requires the presence of an "## Execution Output"
+    section to distinguish actual execution results from the original task description.
 
     Checks:
-    - Has content beyond frontmatter (at least 20 non-frontmatter lines)
-    - Has completion markers (## Result, ## Output, ## Summary, ## Done)
-    - Output has substance (not just headers)
+    - Has "## Execution Output" section (added by _append_output_to_executing)
+    - Content AFTER "## Execution Output" has substance (not just empty)
+    - At least 10 non-empty lines of actual execution output
 
     Returns tuple: (is_valid, reason)
     """
@@ -491,32 +597,40 @@ def _verify_task_completion(task_file):
         with open(task_file, 'r') as f:
             content = f.read()
 
-        # Split frontmatter from content
-        if content.startswith('---'):
-            parts = content.split('---', 2)
-            if len(parts) >= 3:
-                body = parts[2].strip()
-            else:
-                body = content
-        else:
-            body = content
+        # CRITICAL: Check for execution output section
+        # This is the separator added by _append_output_to_executing()
+        execution_marker = '## Execution Output'
 
-        # Count non-frontmatter lines
-        lines = body.split('\n')
-        content_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
+        if execution_marker not in content:
+            return False, f"No execution output section found (missing '{execution_marker}')"
 
-        # Check for minimum content (20 lines)
-        if len(content_lines) < 20:
-            return False, f"Insufficient output ({len(content_lines)} lines, need 20+)"
+        # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
+        # which is always the system-controlled marker. This prevents injection
+        # attacks where task descriptions contain the marker.
+        parts = content.rsplit(execution_marker, 1)
+        if len(parts) < 2:
+            return False, "Execution output section exists but has no content"
 
-        # Check for completion markers
-        completion_markers = ['## Result', '## Output', '## Summary', '## Done', '## Completed']
-        has_marker = any(marker in body for marker in completion_markers)
+        execution_output = parts[1].strip()
 
-        if not has_marker:
-            # For tasks without explicit markers, require more substantial content
-            if len(content_lines) < 30:
-                return False, f"No completion markers and insufficient output ({len(content_lines)} lines)"
+        # Count actual execution output lines (non-empty, excluding known metadata patterns)
+        # Only filter lines that are EXACTLY metadata format, not all bold text
+        import re
+        metadata_pattern = re.compile(r'^\*\*(Model|Duration|Status|Timestamp|Session|Agent|Task ID):\*\*')
+
+        exec_lines = [l for l in execution_output.split('\n')
+                      if l.strip()
+                      and not metadata_pattern.match(l.strip())  # only filter known metadata
+                      and not l.strip() == '---']
+
+        # Require at least 8 lines of actual output (lowered from 10 to account for markdown formatting)
+        if len(exec_lines) < 8:
+            return False, f"Execution output too short ({len(exec_lines)} lines, need 8+)"
+
+        # Also check for some substance (not just repeated markers)
+        total_output_chars = sum(len(l) for l in exec_lines)
+        if total_output_chars < 500:
+            return False, f"Execution output too brief ({total_output_chars} chars, need 500+)"
 
         return True, "OK"
     except Exception as e:
@@ -573,6 +687,36 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
         status: 'completed', 'failed', or 'no_output'.
         executing_file: Actual .executing.md path if known (preferred).
     """
+    # Extract agent name from task file path for circuit breaker + safe rename lock
+    # Path format: /Users/kublai/.openclaw/agents/{agent}/tasks/{task}.md
+    agent = "unknown"
+    path_parts = Path(task_file).parts
+    if 'agents' in path_parts:
+        agent_idx = path_parts.index('agents')
+        if agent_idx + 1 < len(path_parts):
+            agent = path_parts[agent_idx + 1]
+
+    # Record result for circuit breaker (non-blocking)
+    if _circuit_breaker:
+        try:
+                    # Extract task_id from task file for logging
+                    task_id = None
+                    try:
+                        with open(executing_file or task_file.replace('.md', '.executing.md'), 'r') as f:
+                            content = f.read(2000)
+                            import re
+                            task_match = re.search(r'task_id:\s*(\S+)', content)
+                            if task_match:
+                                task_id = task_match.group(1)
+                    except Exception:
+                        pass
+
+                    # Determine success (completed = True, failed/no_output = False)
+                    success = status == 'completed'
+                    _circuit_breaker.record_result(agent, success, task_id)
+        except Exception as e:
+            print(f"[circuit_breaker] Record result failed (non-fatal): {e}")
+
     if executing_file is None:
         if task_file.endswith('.executing.md'):
             executing_file = task_file
@@ -599,21 +743,245 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
             except Exception:
                 pass  # Don't block on ledger failure
 
+    # ==========================================================
+    # COMPLETION GATE AUDIT (runs before final .done.md rename)
+    # ==========================================================
+    # Check if task should go through completion gate
+    # Gate runs for:
+    # - Tasks with completion_gate: true in frontmatter, OR
+    # - High priority tasks (gradual rollout - Phase 1)
+    #
+    # Gate skips for:
+    # - Tasks with completion_gate_optout: true
+    # - Tasks with depth > 2 (follow-up follow-ups)
+    # - Trivial tasks (< 100 lines of output)
+    # - Failed/no_output status
+    #
+    # Design: ~/.openclaw/agents/mongke/workspace/completion-gate-design-2026-03-08.md
+
+    gate_enabled = False
+    gate_result = None
+
+    if status == 'completed' and os.path.exists(executing_file):
+        try:
+            # Read frontmatter to check gate settings
+            with open(executing_file, 'r') as f:
+                content = f.read(5000)
+                frontmatter_lower = content.lower()
+
+            # VULN-2 FIX: Check for explicit opt-out with agent-source validation
+            # Agents are NOT allowed to opt themselves out - only Kublai/humans can grant opt-out
+            has_optout_flag = 'completion_gate_optout:true' in frontmatter_lower or \
+                             'completion_gate_optout: true' in frontmatter_lower
+
+            # Check who created this task (source field)
+            # Agents cannot opt out their own tasks
+            source_match = re.search(r'source:\s*(\S+)', content)
+            task_source = source_match.group(1) if source_match else "unknown"
+
+            # Agent sources that cannot grant opt-out
+            agent_sources = ['mongke', 'chagatai', 'temujin', 'jochi', 'ogedei', 'tolui',
+                           'kublai_router', 'task-redistribute', 'completion-gate']
+
+            opt_out_denied = False
+            if has_optout_flag:
+                # Check if source is an agent (cannot self-opt-out)
+                if any(agent_s in task_source.lower() for agent_s in agent_sources):
+                    print(f"[COMPLETION_GATE] ❌ OPT-OUT DENIED - agent '{task_source}' cannot self-opt-out")
+                    opt_out_denied = True
+
+                    # Log to security if available
+                    try:
+                        from security_event_logger import log_security_event, EventType, Severity
+                        task_id_match = re.search(r'task_id:\s*(\S+)', content)
+                        task_id = task_id_match.group(1) if task_id_match else "unknown"
+                        log_security_event(
+                            event_type=EventType.OPT_OUT_DENIED,
+                            severity=Severity.MEDIUM,
+                            details={
+                                "task_id": task_id,
+                                "source": task_source,
+                                "reason": "Agent attempted self-opt-out"
+                            }
+                        )
+                    except ImportError:
+                        pass  # Security logger not available
+
+                # Check rate limit for opt-outs (prevent abuse)
+                # Only 3 opt-outs per day per agent
+                optout_log = Path.home() / ".openclaw" / "logs" / "optout-ratelimit.log"
+                optout_log.parent.mkdir(parents=True, exist_ok=True)
+
+                today = datetime.now().strftime('%Y-%m-%d')
+                today_count = 0
+
+                if optout_log.exists():
+                    with open(optout_log, 'r') as f:
+                        for line in f:
+                            if line.strip().startswith(today):
+                                today_count += 1
+
+                if today_count >= 3:
+                    print(f"[COMPLETION_GATE] ❌ OPT-OUT DENIED - daily limit exceeded (3/day)")
+                    opt_out_denied = True
+                else:
+                    # Log this opt-out
+                    with open(optout_log, 'a') as f:
+                        f.write(f"{today} optout_granted\n")
+
+            if has_optout_flag and not opt_out_denied:
+                print("[COMPLETION_GATE] Opted out via frontmatter (authorized)")
+            elif opt_out_denied:
+                print("[COMPLETION_GATE] Opt-out flag ignored - proceeding with gate audit")
+                has_optout_flag = False  # Force gate to run
+
+            if not has_optout_flag:
+                # Check if gate is explicitly enabled
+                if 'completion_gate:true' in frontmatter_lower or \
+                   'completion_gate: true' in frontmatter_lower:
+                    gate_enabled = True
+                    print("[COMPLETION_GATE] Enabled via frontmatter")
+                # Phase 1 rollout: High priority tasks
+                elif 'priority: high' in frontmatter_lower or 'priority:critical' in frontmatter_lower:
+                    # Check depth - skip deep follow-up chains
+                    depth_match = re.search(r'depth:\s*(\d+)', content)
+                    depth = int(depth_match.group(1)) if depth_match else 0
+                    if depth <= 2:
+                        gate_enabled = True
+                        print(f"[COMPLETION_GATE] Enabled for high-priority task (depth={depth})")
+
+            if gate_enabled:
+                print("[COMPLETION_GATE] Running audit...")
+
+                # Import audit module (try v2 first, fallback to v1)
+                try:
+                    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+                    try:
+                        from completion_gate_audit_v2 import completion_gate_audit_v2, extract_frontmatter, save_audit_log_v2, create_followup_tasks_v2
+                        use_v2 = True
+                        print("[COMPLETION_GATE] Using v2 audit (three-tier fallback)")
+                    except ImportError:
+                        from completion_gate_audit import completion_gate_audit, extract_frontmatter, save_audit_result, create_followup_tasks
+                        use_v2 = False
+                        print("[COMPLETION_GATE] Using v1 audit")
+
+                    # Extract agent from path
+                    path_parts = Path(executing_file).parts
+                    agent = path_parts[path_parts.index('agents') + 1] if 'agents' in path_parts else 'temujin'
+
+                    # Run the audit
+                    if use_v2:
+                        gate_result = completion_gate_audit_v2(Path(executing_file), agent)
+                    else:
+                        gate_result = completion_gate_audit(Path(executing_file), agent)
+
+                    print(f"[COMPLETION_GATE] Completion: {gate_result.completion_percentage}%")
+                    print(f"[COMPLETION_GATE] Can complete: {gate_result.can_complete}")
+
+                    # v2-specific logging
+                    if use_v2 and hasattr(gate_result, 'audit_tier'):
+                        print(f"[COMPLETION_GATE] Audit Tier: {gate_result.audit_tier}")
+                        if hasattr(gate_result, 'retries_performed') and gate_result.retries_performed > 0:
+                            print(f"[COMPLETION_GATE] Retries: {gate_result.retries_performed}")
+                        if hasattr(gate_result, 'audit_fallback') and gate_result.audit_fallback:
+                            print(f"[COMPLETION_GATE] ⚠️ WARNING: Permissive fallback used - manual review recommended")
+
+                    # Save audit result
+                    if use_v2:
+                        audit_path = save_audit_log_v2(gate_result, Path(executing_file))
+                    else:
+                        audit_path = save_audit_result(gate_result, gate_result.original_task)
+                    print(f"[COMPLETION_GATE] Audit saved to: {audit_path}")
+
+                    # Check gate result
+                    if not gate_result.can_complete:
+                        print(f"[COMPLETION_GATE] ❌ Gate FAILED - {len(gate_result.required_followups)} required follow-ups")
+
+                        # Create follow-up tasks
+                        task_metadata = extract_frontmatter(Path(executing_file))
+                        if use_v2:
+                            followup_paths = create_followup_tasks_v2(gate_result, task_metadata, executing_file)
+                        else:
+                            followup_paths = create_followup_tasks(gate_result, task_metadata)
+
+                        print(f"[COMPLETION_GATE] Created {len(followup_paths)} follow-up tasks")
+
+                        # Rename to .pending-gate.md instead of .done.md (with safe lock)
+                        pending_gate_file = executing_file.replace('.executing.md', '.pending-gate.md')
+                        success, action, detail = _safe_rename_with_lock(executing_file, pending_gate_file, agent)
+                        if success:
+                            print(f"[COMPLETION_GATE] Task renamed to: {os.path.basename(pending_gate_file)}")
+
+                            # Update Neo4j gate status
+                            try:
+                                from neo4j_task_tracker import get_tracker
+                                tracker = get_tracker()
+                                tracker.update_gate_status(
+                                    gate_result.original_task,
+                                    "WAITING_FOLLOWUPS",
+                                    completion_percentage=gate_result.completion_percentage,
+                                    audit_ref=str(audit_path)
+                                )
+                            except Exception:
+                                pass  # Neo4j not available
+
+                            # Log to ledger
+                            try:
+                                _append_ledger({
+                                    "event": "COMPLETION_GATE_BLOCKED",
+                                    "ts": datetime.now().isoformat(),
+                                    "task_file": task_file,
+                                    "task_id": gate_result.original_task,
+                                    "completion_percentage": gate_result.completion_percentage,
+                                    "followups_created": len(followup_paths),
+                                    "blockers": gate_result.blockers,
+                                    "audit_ref": str(audit_path)
+                                })
+                            except Exception:
+                                pass  # Don't block on ledger failure
+
+                            # Clean up PID file and return (task not complete)
+                            _cleanup_pid_file(executing_file)
+                            return False
+                        else:
+                            print(f"[COMPLETION_GATE] Error renaming to pending-gate: {action} - {detail}")
+                            # Fall through to normal completion on error
+                    else:
+                        print(f"[COMPLETION_GATE] ✓ Gate PASSED - task can complete")
+
+                except ImportError as e:
+                    print(f"[COMPLETION_GATE] Audit module not available: {e}")
+                    print("[COMPLETION_GATE] Continuing without gate check")
+                except Exception as e:
+                    print(f"[COMPLETION_GATE] Audit failed: {e}")
+                    print("[COMPLETION_GATE] Continuing without gate check (non-fatal)")
+
+        except Exception as e:
+            print(f"[COMPLETION_GATE] Gate check error (non-fatal): {e}")
+
+    # ==========================================================
+    # END COMPLETION GATE
+    # ==========================================================
+
     completed_suffix = f'.{status}.done.md'
 
     # Normal path: .executing.md still exists
     if os.path.exists(executing_file):
         completed_file = executing_file.replace('.executing.md', completed_suffix)
-        try:
-            os.rename(executing_file, completed_file)
-        except FileNotFoundError:
-            # Race: recover_stale_executions() renamed it between exists() and rename()
-            print(f"⚠ Race detected: {os.path.basename(executing_file)} moved during completion")
-            # Fall through to fallback search below
-        else:
+        # Use safe rename with file lock to prevent race conditions
+        success, action, detail = _safe_rename_with_lock(executing_file, completed_file, agent)
+        if success:
             _cleanup_pid_file(executing_file)
             print(f"✓ Task {status}: {completed_file}")
             return True
+        elif action == "skip" and detail in ("source_not_found", "source_gone_during_lock_wait", "target_already_exists"):
+            # File was already handled by another process (race won by recovery)
+            print(f"⚠ Race detected: {os.path.basename(executing_file)} already handled ({detail})")
+            # Fall through to verification below
+        else:
+            # Unexpected error
+            print(f"✗ Safe rename failed: {action} - {detail}")
+            # Fall through to fallback path
 
     # .executing.md is gone — recovery renamed it
     print(f"⚠ Executing file missing: {os.path.basename(executing_file)}")
@@ -626,11 +994,39 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
         basename = os.path.basename(candidate)
         if '.done.md' in basename or '.executing' in basename:
             continue
+
+        # CRITICAL: Verify completion before renaming in fallback path too
+        # This prevents fake completions when recovery has moved the file
+        if status == 'completed':
+            is_valid, reason = _verify_task_completion(candidate)
+            if not is_valid:
+                print(f"⚠ FAKE COMPLETION BLOCKED in fallback: {reason}")
+                print(f"   Marking as no_output instead of completed")
+                status = 'no_output'
+                completed_suffix = f'.{status}.done.md'
+                try:
+                    _append_ledger({
+                        "event": "COMPLETION_VERIFICATION_FAILED",
+                        "ts": datetime.now().isoformat(),
+                        "task_file": task_file,
+                        "reason": reason,
+                        "original_status": "completed",
+                        "new_status": "no_output",
+                        "fallback_path": True
+                    })
+                except Exception:
+                    pass  # Don't block on ledger failure
+
         completed_file = os.path.join(task_dir, stem + completed_suffix)
-        os.rename(candidate, completed_file)
-        _cleanup_pid_file(executing_file)
-        print(f"⚠ Task {status} (fallback): {basename} → {os.path.basename(completed_file)}")
-        return True
+        # Use safe rename with file lock to prevent race conditions
+        success, action, detail = _safe_rename_with_lock(candidate, completed_file, agent)
+        if success:
+            _cleanup_pid_file(executing_file)
+            print(f"⚠ Task {status} (fallback): {basename} → {os.path.basename(completed_file)}")
+            return True
+        else:
+            print(f"✗ Fallback rename failed: {action} - {detail}")
+            # Continue to check if already done
 
     # Check if already marked done (idempotent)
     for done_candidate in glob.glob(os.path.join(task_dir, f"{stem}*.done.md")):
@@ -661,6 +1057,265 @@ def _extract_skill_hint(content):
     import re
     match = re.search(r'^skill_hint:\s*(\S+)', content, re.MULTILINE)
     return match.group(1) if match else None
+
+
+def _extract_audience(content):
+    """Extract audience field from task frontmatter.
+
+    Returns: 'agent', 'human', 'both', or None if not specified.
+    """
+    import re
+    match = re.search(r'^audience:\s*(agent|human|both)', content, re.MULTILINE | re.IGNORECASE)
+    return match.group(1).lower() if match else None
+
+
+def _extract_clarification_deadline(content):
+    """Extract clarification_deadline from task frontmatter.
+
+    Returns: ISO8601 datetime string or None if not specified.
+    Validates the format is parseable.
+    """
+    import re
+    from datetime import datetime
+    match = re.search(r'^clarification_deadline:\s*(\S+)', content, re.MULTILINE)
+    if not match:
+        return None
+    deadline_str = match.group(1)
+    # Validate it's a valid ISO8601 format
+    try:
+        datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
+        return deadline_str
+    except ValueError:
+        return None
+
+
+def _extract_context_history(content):
+    """Extract context_history list from task frontmatter.
+
+    Parses YAML-style list entries for context history:
+        context_history:
+          - agent: temujin
+            attempt: "Analyzed as implementation task"
+            deliverable: "workspace/prelim-analysis.md"
+
+    Returns: List of dicts with agent, attempt, and optional deliverable/findings.
+    """
+    import re
+    history = []
+    in_context_history = False
+    current_entry = {}
+
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        # Detect start of context_history block
+        if stripped.startswith('context_history:'):
+            in_context_history = True
+            continue
+
+        # Detect end of context_history block (another top-level key or end of frontmatter)
+        if in_context_history:
+            # Check if we've left the context_history block
+            # Skip comment lines (start with #)
+            if stripped.startswith('#'):
+                continue
+            # Check for new top-level key (non-indented, contains ':', not a list item)
+            if line and not line[0].isspace() and ':' in stripped and not stripped.startswith('-'):
+                # New top-level key, end of context_history
+                if current_entry:
+                    history.append(current_entry)
+                break
+            if stripped == '---':
+                # End of frontmatter
+                if current_entry:
+                    history.append(current_entry)
+                break
+
+            # Parse list item start
+            if stripped.startswith('- agent:'):
+                # Save previous entry if exists
+                if current_entry:
+                    history.append(current_entry)
+                current_entry = {'agent': stripped.split(':', 1)[1].strip()}
+            elif stripped.startswith('attempt:') and current_entry:
+                # Extract attempt value (may be quoted)
+                val = stripped.split(':', 1)[1].strip().strip('"\'')
+                current_entry['attempt'] = val
+            elif stripped.startswith('deliverable:') and current_entry:
+                val = stripped.split(':', 1)[1].strip().strip('"\'')
+                current_entry['deliverable'] = val
+            elif stripped.startswith('findings:') and current_entry:
+                val = stripped.split(':', 1)[1].strip().strip('"\'')
+                current_entry['findings'] = val
+
+    # Don't forget the last entry (in case we didn't hit an end condition)
+    if current_entry and current_entry not in history:
+        history.append(current_entry)
+
+    return history
+
+
+def _extract_output_format(content):
+    """Extract output_format settings from task frontmatter.
+
+    Parses YAML-style block:
+        output_format:
+          human_summary: true
+          agent_full: true
+          deliverable: "workspace/final-report.md"
+
+    Returns: Dict with output format settings.
+    """
+    import re
+    output_format = {}
+    in_output_format = False
+
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        # Detect start of output_format block
+        if stripped.startswith('output_format:'):
+            in_output_format = True
+            continue
+
+        # Detect end of output_format block
+        if in_output_format:
+            if line and not line[0].isspace() and ':' in stripped and not stripped.startswith('human_') and not stripped.startswith('agent_') and not stripped.startswith('deliverable'):
+                break
+            if stripped == '---':
+                break
+
+            # Parse settings
+            if stripped.startswith('human_summary:'):
+                val = stripped.split(':', 1)[1].strip().lower()
+                output_format['human_summary'] = val in ('true', 'yes', '1')
+            elif stripped.startswith('agent_full:'):
+                val = stripped.split(':', 1)[1].strip().lower()
+                output_format['agent_full'] = val in ('true', 'yes', '1')
+            elif stripped.startswith('deliverable:'):
+                val = stripped.split(':', 1)[1].strip().strip('"\'')
+                output_format['deliverable'] = val
+
+    return output_format if output_format else None
+
+
+def _format_context_history_for_prompt(context_history):
+    """Format context_history for injection into Claude Code prompt.
+
+    Returns: Formatted string describing previous agent work.
+    """
+    if not context_history:
+        return ""
+
+    lines = ["## Context History (Previous Agent Work)\n"]
+    lines.append("This task has been worked on by other agents. Here's what they found:\n")
+
+    for entry in context_history:
+        agent = entry.get('agent', 'unknown')
+        attempt = entry.get('attempt', 'No details provided')
+        lines.append(f"\n### {agent.capitalize()}'s Work:")
+        lines.append(f"- **What was tried:** {attempt}")
+        if 'deliverable' in entry:
+            lines.append(f"- **Deliverable:** `{entry['deliverable']}`")
+        if 'findings' in entry:
+            lines.append(f"- **Key findings:** {entry['findings']}")
+
+    lines.append("\n---\n")
+    return "\n".join(lines)
+
+
+def _validate_session_model(agent_name: str, expected_model: str) -> tuple[bool, str, str]:
+    """
+    Validate that the agent's active session is using the expected model.
+
+    Reads the most recent session file to detect model drift. If the session
+    is using a different model than configured, rejects execution to prevent
+    wasted tasks on a misconfigured agent.
+
+    Returns:
+        (is_valid, session_model, reason)
+        - is_valid: True if session model matches expected, False otherwise
+        - session_model: The model detected in the session (or 'unknown')
+        - reason: Human-readable explanation of any mismatch
+    """
+    sessions_dir = Path(f"{AGENTS_DIR}/{agent_name}/sessions")
+    if not sessions_dir.exists():
+        # No session history = no drift detected
+        return True, 'no-session', 'No session history to validate'
+
+    # Find the most recent session file
+    try:
+        session_files = sorted(sessions_dir.glob('*.jsonl'), key=os.path.getmtime, reverse=True)
+        if not session_files:
+            return True, 'no-session', 'No session files found'
+
+        latest_session = session_files[0]
+        session_model = 'unknown'
+
+        # Scan the last 50 lines of the session for model info
+        with open(latest_session, 'r') as f:
+            lines = f.readlines()[-50:]  # Last 50 lines most relevant
+            for line in reversed(lines):  # Most recent first
+                try:
+                    entry = json.loads(line)
+                    # Check for model_change event
+                    if entry.get('type') == 'model_change':
+                        provider = entry.get('provider', '')
+                        model_id = entry.get('modelId', '')
+                        if provider and model_id:
+                            session_model = f"{provider}/{model_id}"
+                            break
+                    # Check for model-snapshot
+                    if entry.get('customType') == 'model-snapshot':
+                        data = entry.get('data', {})
+                        provider = data.get('provider', '')
+                        model_id = data.get('modelId', '')
+                        if provider and model_id:
+                            session_model = f"{provider}/{model_id}"
+                            break
+                    # Check direct model field (top-level)
+                    if 'model' in entry and entry.get('model') != 'unknown':
+                        session_model = entry.get('model', 'unknown')
+                        break
+                    # Check inside message object (common format for Claude Code sessions)
+                    message = entry.get('message', {})
+                    if isinstance(message, dict):
+                        msg_model = message.get('model')
+                        msg_provider = message.get('provider', '')
+                        if msg_model and msg_model != 'unknown':
+                            if msg_provider and msg_provider != 'anthropic':
+                                session_model = f"{msg_provider}/{msg_model}"
+                            else:
+                                session_model = msg_model
+                            break
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+        # Normalize model names for comparison
+        # expected_model is like "claude-opus-4-6"
+        # session_model is like "anthropic/claude-opus-4-6" or "zai-coding/glm-5"
+        norm_expected = expected_model.replace('anthropic/', '').lower()
+        norm_session = session_model.replace('anthropic/', '').lower()
+
+        # Check for mismatch
+        if norm_expected not in norm_session and session_model != 'unknown':
+            # Known non-Claude models that indicate drift
+            known_drift_patterns = ['glm-5', 'kimi', 'qwen', 'bailian', 'dashscope', 'minimax', 'zai-coding']
+            if any(pattern in norm_session for pattern in known_drift_patterns):
+                reason = f"Session model drift: session using '{session_model}' but config expects '{expected_model}'"
+                return False, session_model, reason
+
+        # If session_model contains expected_model, we're good
+        if norm_expected in norm_session or session_model == 'unknown':
+            return True, session_model, 'Session model matches config'
+
+    except Exception as e:
+        # On error, allow execution but log the issue
+        return True, 'error', f'Session validation failed: {e}'
+
+    return True, session_model, 'Session model validated'
 
 
 def _append_ledger(entry):
@@ -1341,7 +1996,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
         }
 
 
-def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeout=None, model=None, priority='normal', task_id=None):
+def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeout=None, model=None, priority='normal', task_id=None, context_history=None, audience=None):
     """Execute task via Claude Code using the claude-agent wrapper.
 
     Each agent runs as a sovereign Claude Code session with its own
@@ -1357,12 +2012,27 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
 
     Args:
         model: Optional model to use. If None, uses agent's default from settings.
+        context_history: Optional list of dicts with previous agent work for cross-agent clarity.
+        audience: Optional audience hint ('agent', 'human', 'both') for output formatting.
     """
     # Build prompt with agent context
     agent_root = f"{AGENTS_DIR}/{agent_name}"
     memory = _load_agent_memory(agent_name)
     memory_section = f"\n\n## Recent Context\n{memory}" if memory else ""
     skill_section = f"\n\nIMPORTANT: Start this task by invoking {skill_hint} — it is the correct skill for this work." if skill_hint else ""
+
+    # Inject context history for cross-agent clarity
+    context_history_section = ""
+    if context_history:
+        context_history_section = _format_context_history_for_prompt(context_history)
+
+    # Inject audience instruction if specified
+    audience_section = ""
+    if audience:
+        if audience == 'human':
+            audience_section = "\n\n**Output Format:** This task's output is intended for human review. Prioritize clarity, include summaries, and use markdown formatting."
+        elif audience == 'both':
+            audience_section = "\n\n**Output Format:** This task's output is for both agent and human consumption. Include a clear summary section and detailed technical content."
 
     # Inject active behavioral rules from rules.json
     rules_section = ""
@@ -1376,8 +2046,10 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
         pass  # Don't block task execution if rule loading fails
 
     prompt = (
+        f"{context_history_section}"
         f"{task_text}"
         f"{memory_section}"
+        f"{audience_section}"
         f"{rules_section}"
         f"{skill_section}\n\n"
         "Execute this task completely using your tools. "
@@ -1565,6 +2237,15 @@ def process_task(agent_name, task):
     skill_timeout = SLOW_SKILLS.get(skill_hint, 0)
     timeout = max(priority_timeout, skill_timeout)
 
+    # Extract cross-agent communication fields
+    context_history = task.get('context_history')
+    audience = task.get('audience')
+    clarification_deadline = task.get('clarification_deadline')
+
+    # Log context history presence for observability
+    if context_history:
+        print(f"  📎 Context history: {len(context_history)} previous agent(s) worked on this task")
+
     if executor == 'ollama':
         # Direct Ollama API call (no tools, text-only)
         print(f"  🤖 Executing via Ollama (direct API)... (timeout: {timeout}s)")
@@ -1630,9 +2311,45 @@ def process_task(agent_name, task):
         with open('/tmp/agent_handler_debug.log', 'a') as f:
             f.write(debug_msg)
         print(f"  🔧 Model selection: config={config.get('model', '(none)')}, resolved={selected_model}, proxy={is_using_proxy}")
-        result = execute_task_with_llm(agent_name, task_content, config, skill_hint=skill_hint, timeout=timeout, priority=priority, model=selected_model, task_id=task_id)
-        elapsed_s = round(time.time() - start_time, 1)
-        executor_name = "claude-code"
+
+        # CRITICAL: Validate session model matches config model
+        # Prevents execution on agents with session drift (e.g., session using GLM-5 while config expects claude-opus-4-6)
+        is_valid, session_model, reason = _validate_session_model(agent_name, selected_model)
+        if not is_valid:
+            # Session model drift detected - reject execution
+            error_msg = f"🚨 SESSION MODEL DRIFT REJECTED: {reason}"
+            print(f"  {error_msg}")
+            print(f"  📋 Action required: Restart agent session or fix config in ~/.openclaw/agents/{agent_name}/.claude/settings.json")
+
+            # Log to ledger for escalation
+            if task_id:
+                _append_ledger({
+                    "task_id": task_id,
+                    "event": "MODEL_DRIFT_REJECTED",
+                    "ts": datetime.now().isoformat(),
+                    "agent": agent_name,
+                    "expected_model": selected_model,
+                    "session_model": session_model,
+                    "reason": reason,
+                })
+
+            # Return failure result to trigger retry logic
+            result = {
+                'success': False,
+                'error': f"Session model drift: {reason}",
+                'model': session_model,
+            }
+            elapsed_s = 0
+            executor_name = "rejected-model-drift"
+        else:
+            result = execute_task_with_llm(
+                agent_name, task_content, config,
+                skill_hint=skill_hint, timeout=timeout, priority=priority,
+                model=selected_model, task_id=task_id,
+                context_history=context_history, audience=audience
+            )
+            elapsed_s = round(time.time() - start_time, 1)
+            executor_name = "claude-code"
 
     # Extract skill invocations from Claude Code session transcript (only for claude-code)
     if task_id and executor == 'claude-code':
@@ -1949,6 +2666,12 @@ def execute_single_task(agent_name, task_file):
     task_id = _extract_task_id(content)
     skill_hint = _extract_skill_hint(content)
 
+    # Extract new communication/context fields
+    audience = _extract_audience(content)
+    clarification_deadline = _extract_clarification_deadline(content)
+    context_history = _extract_context_history(content)
+    output_format = _extract_output_format(content)
+
     # Determine priority from filename prefix
     basename = os.path.basename(task_file).lower()
     if basename.startswith('high-'):
@@ -1966,6 +2689,10 @@ def execute_single_task(agent_name, task_file):
         'full_content': content,  # Pass full content to Claude Code
         'priority': priority,
         'depth': depth,
+        'audience': audience,
+        'clarification_deadline': clarification_deadline,
+        'context_history': context_history,
+        'output_format': output_format,
     }
 
     return process_task(agent_name, task)

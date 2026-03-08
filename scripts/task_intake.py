@@ -57,6 +57,118 @@ def compute_task_timeout(priority, skill_hint=None):
     return max(priority_timeout, skill_timeout)
 
 
+# =============================================================================
+# Domain Classification System
+# =============================================================================
+
+# Valid task domains for frontmatter classification
+VALID_DOMAINS = {"research", "implementation", "ops", "documentation", "strategy", "analysis"}
+
+# Domain-to-agent compatibility matrix for redistribution
+# Agents listed can receive tasks of that domain via load balancing or redistribution
+DOMAIN_AGENT_COMPATIBILITY = {
+    "research": ["mongke"],
+    "implementation": ["temujin", "ogedei"],
+    "ops": ["ogedei", "temujin"],
+    "documentation": ["chagatai"],
+    "strategy": ["temujin", "kublai"],
+    "analysis": ["jochi", "mongke"],
+}
+
+# Skill hint to domain mapping for classification
+SKILL_DOMAIN_MAP = {
+    # Research skills
+    "/horde-learn": "research",
+    # Implementation skills
+    "/horde-implement": "implementation",
+    "/horde-debug": "implementation",
+    # Strategy skills
+    "/horde-brainstorming": "strategy",
+    "/horde-plan": "strategy",
+    # Analysis skills
+    "/horde-review": "analysis",
+    "/code-reviewer": "analysis",
+    # Ops skills
+    "/kurultai-health": "ops",
+    "/dev-deploy": "ops",
+    # Documentation skills
+    "/content-research-writer": "documentation",
+}
+
+# Domain classification by keyword matching (fallback when no skill hint)
+DOMAIN_KEYWORDS = {
+    "research": [
+        "research", "investigate", "discover", "explore", "competitor", "market",
+        "analyze", "study", "benchmark", "survey", "literature", "paper"
+    ],
+    "implementation": [
+        "implement", "build", "create", "fix", "code", "develop", "scaffold",
+        "deploy", "refactor", "migrate", "integrate", "bug", "feature"
+    ],
+    "ops": [
+        "monitor", "restart", "health", "backup", "pipeline", "queue", "docker",
+        "container", "railway", "infrastructure", "server", "cron", "cleanup"
+    ],
+    "documentation": [
+        "document", "write", "blog", "readme", "changelog", "content", "guide",
+        "tutorial", "article", "post", "draft", "edit"
+    ],
+    "strategy": [
+        "design", "plan", "architect", "brainstorm", "strategy", "roadmap",
+        "proposal", "evaluate approach", "decision", "prioritize"
+    ],
+    "analysis": [
+        "review", "audit", "verify", "test", "security", "performance", "qa",
+        "inspect", "assess", "quality", "compliance", "risk"
+    ],
+}
+
+
+def classify_task_domain(task_text, skill_hint=None):
+    """Classify task into domain based on skill hints and keywords.
+
+    Args:
+        task_text: Task title or body text
+        skill_hint: Optional skill hint (takes precedence over keywords)
+
+    Returns:
+        Domain string: "research", "implementation", "ops", "documentation", "strategy", or "analysis"
+    """
+    # 1. Skill hint takes precedence
+    if skill_hint and skill_hint in SKILL_DOMAIN_MAP:
+        return SKILL_DOMAIN_MAP[skill_hint]
+
+    # 2. Keyword-based classification
+    task_lower = task_text.lower()
+    scores = {}
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in task_lower)
+        if score > 0:
+            scores[domain] = score
+
+    if scores:
+        best_domain = max(scores.items(), key=lambda x: x[1])
+        return best_domain[0]
+
+    # 3. Default to implementation (most common for dev agents)
+    return "implementation"
+
+
+def is_domain_compatible(domain, target_agent):
+    """Check if an agent can handle tasks of a given domain.
+
+    Args:
+        domain: Task domain string
+        target_agent: Agent name to check
+
+    Returns:
+        True if agent is compatible with the domain
+    """
+    if domain not in DOMAIN_AGENT_COMPATIBILITY:
+        return False
+    return target_agent in DOMAIN_AGENT_COMPATIBILITY[domain]
+
+
 # Valid agents for @mention direct routing
 VALID_AGENTS = {"temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai", "tolui"}
 
@@ -246,6 +358,12 @@ _DISAMBIGUATION = [
     ({"billing", "implement"}, "temujin"),
     ({"oauth", "implement"}, "temujin"),
     ({"oauth", "setup"}, "temujin"),
+    # Evaluation of implementation features -> temujin (not mongke who has "evaluate")
+    ({"evaluate", "integrate"}, "temujin"),            # evaluate integration -> dev
+    ({"evaluate", "integration"}, "temujin"),          # evaluate integration -> dev
+    ({"evaluate", "kanban"}, "temujin"),               # evaluate kanban -> dev
+    ({"evaluate", "implement"}, "temujin"),            # evaluate implementation -> dev
+    ({"evaluate", "implementation"}, "temujin"),       # evaluate implementation (noun) -> dev
     ({"fix", "401"}, "ogedei"),                        # auth error fix -> ogedei
     ({"fix", "api"}, "ogedei"),                        # API error fix -> ogedei
     ({"fix", "model"}, "ogedei"),                      # model config fix -> ogedei
@@ -257,6 +375,23 @@ _DISAMBIGUATION = [
     ({"market", "research"}, "mongke"),                # market research -> mongke
     ({"competitor", "research"}, "mongke"),
     ({"competitor", "analysis"}, "mongke"),
+    # Visual content creation -> chagatai (not temujin who has "create")
+    ({"create", "avatar"}, "chagatai"),                # avatar creation -> writer
+    ({"create", "visual"}, "chagatai"),                # visual content -> writer
+    ({"create", "image"}, "chagatai"),                 # image creation -> writer
+    ({"create", "graphic"}, "chagatai"),               # graphics -> writer
+    ({"photorealistic"}, "chagatai"),                  # photorealistic content -> writer
+    # Code modification with review -> temujin (not jochi who has "review")
+    ({"add", "review", "audit"}, "temujin"),           # add review feature -> dev
+    ({"modify", "review"}, "temujin"),                 # modify review system -> dev
+    ({"implement", "review"}, "temujin"),              # implement review feature -> dev
+    # Design/architecture tasks -> temujin (not mongke)
+    ({"design", "schema"}, "temujin"),                 # schema design -> dev
+    ({"design", "neo4j"}, "temujin"),                  # neo4j design -> dev
+    ({"brainstorm", "schema"}, "temujin"),             # schema brainstorm -> dev
+    ({"brainstorm", "neo4j"}, "temujin"),              # neo4j brainstorm -> dev
+    ({"proposal", "voting"}, "temujin"),               # voting system design -> dev
+    ({"voting", "system"}, "temujin"),                 # voting system -> dev
 ]
 
 def _kw_match(kw, text_lower):
@@ -308,8 +443,9 @@ AGENT_CAPABILITY_MATRIX = {
         ("mongke", ["research", "discover", "benchmark", "study", "competitor", "market analysis"]),
         # jochi can handle testing/QA tasks from temujin
         ("jochi", ["test", "testing", "verify", "audit", "review code", "QA", "quality"]),
-        # ogedei can handle deployment/ops tasks from temujin
-        ("ogedei", ["deploy", "railway", "docker", "container", "infrastructure", "monitor", "restart", "cleanup"]),
+        # ogedei can handle deployment/ops tasks AND implementation tasks from temujin
+        # Added "implement" per 2026-03-08 routing audit: ogedei is in DOMAIN_AGENT_COMPATIBILITY["implementation"]
+        ("ogedei", ["deploy", "railway", "docker", "container", "infrastructure", "monitor", "restart", "cleanup", "implement", "build"]),
         # chagatai can handle documentation tasks from temujin
         ("chagatai", ["document", "documentation", "write", "readme", "changelog", "content"]),
     ],
@@ -359,9 +495,11 @@ CATEGORY_KEYWORDS = {
 # --- SKILL-AGENT COMPATIBILITY ---
 # Skills that belong exclusively to one agent. Prevents misroutes like
 # /horde-brainstorming going to chagatai (writer) instead of temujin (dev).
+# NOTE: /horde-implement removed 2026-03-08 to allow load balancing to ogedei.
+# Implementation tasks will still route to temujin via keywords, but can be
+# load-balanced to ogedei when temujin is overloaded.
 _SKILL_OWNER = {
     "/horde-brainstorming": "temujin",
-    "/horde-implement": "temujin",
     "/horde-plan": "temujin",
     "/golden-horde": "temujin",
     "/horde-debug": "temujin",
@@ -635,18 +773,22 @@ def get_capable_alternates(primary_agent, task_text):
         if cap_match_count == 0:
             continue
 
-        # Domain guard: if primary agent matches 2+ of its own domain keywords
-        # and the capability match is weak (only 1 keyword), skip this alternate.
-        # This prevents "investigate" alone from redirecting a dev task to research.
-        if primary_score >= 2 and cap_match_count <= 1:
-            continue
-
         # Also check the alternate's own domain keywords — if the task doesn't
         # match any of the alternate's core keywords, it's likely a false positive.
         alt_domain_keywords = AGENT_KEYWORDS.get(alt_agent, [])
         alt_domain_score = sum(1 for kw in alt_domain_keywords if _kw_match(kw, task_lower))
         if alt_domain_score == 0:
             continue
+
+        # Domain guard: if primary agent matches 2+ of its own domain keywords
+        # and the capability match is weak (only 1 keyword), skip this alternate.
+        # This prevents "investigate" alone from redirecting a dev task to research.
+        # EXCEPTION: If alternate has strong domain match (>= 50% of primary score), allow it.
+        # This prevents blocking capable alternates when primary is overloaded.
+        domain_guard_ratio = 0.5  # Alternate needs >= 50% of primary's keyword score
+        if primary_score >= 2 and cap_match_count <= 1:
+            if alt_domain_score < primary_score * domain_guard_ratio:
+                continue
 
         depth = get_queue_depth(alt_agent)
         capable.append((alt_agent, depth))
@@ -901,8 +1043,12 @@ AGENT_DIR = str(AGENTS_DIR)
 ROUTING_LOG = str(LOGS_DIR / "routing-decisions.jsonl")
 
 
-def _log_routing_decision(title, dest, method, overflow_reason=None, skill_hint=None, scores=None, queue_info=None):
-    """Append routing decision to JSONL log for routing_audit.py consumption."""
+def _log_routing_decision(title, dest, method, overflow_reason=None, skill_hint=None, scores=None, queue_info=None, original_agent=None, domain=None):
+    """Append routing decision to JSONL log for routing_audit.py consumption.
+
+    Enhanced logging (2026-03-08): includes alt_scores, idle_agents, would_overflow
+    for missed opportunity analysis.
+    """
     try:
         entry = {
             "ts": datetime.now().isoformat(),
@@ -914,10 +1060,34 @@ def _log_routing_decision(title, dest, method, overflow_reason=None, skill_hint=
             entry["overflow"] = overflow_reason
         if skill_hint:
             entry["skill_hint"] = skill_hint
+        if domain:
+            entry["domain"] = domain
         if scores:
             entry["top_scores"] = {k: v for k, v in scores.items() if v > 0}
         if queue_info:
             entry["queue"] = queue_info
+
+        # Enhanced logging: alt_scores, idle_agents, would_overflow
+        # Compute all agent scores for missed opportunity analysis
+        all_scores = get_agent_scores(title)
+        entry["alt_scores"] = all_scores
+
+        # Identify idle agents (queue=0 and not busy)
+        idle = []
+        for agent_name in VALID_AGENTS:
+            if queue_info and queue_info.get(agent_name, 0) == 0 and not is_agent_busy(agent_name):
+                idle.append(agent_name)
+        entry["idle_agents"] = idle
+
+        # Detect if this routing would trigger overflow (dest queue >= threshold and idle alternatives exist)
+        dest_queue = queue_info.get(dest, 0) if queue_info else 0
+        would_overflow = dest_queue >= QUEUE_HIGH_THRESHOLD and len(idle) > 0 and dest not in idle
+        entry["would_overflow"] = would_overflow
+
+        # Track if routing was changed from original (load balancing)
+        if original_agent and original_agent != dest:
+            entry["load_balanced_from"] = original_agent
+
         os.makedirs(os.path.dirname(ROUTING_LOG), exist_ok=True)
         with open(ROUTING_LOG, "a") as f:
             f.write(json.dumps(entry) + "\n")
@@ -1040,7 +1210,7 @@ def create_self_task(
     skill_hint: str = None,
     parent_task_id: str = None,
     justification: str = None,
-) -> str | None:
+) -> Optional[str]:
     """Create a self-initiated task with rate limiting.
 
     Args:
@@ -1179,11 +1349,26 @@ def create_task(title, body, priority="normal", source="task_intake",
     # 2.6. Load balancing — prefer agents with low queue depth
     # Skip for @mentions (user explicitly chose agent), kublai/subagent,
     # and tasks locked to an agent by skill ownership.
+    # EXCEPT: If primary agent is CRITICALLY overloaded, still try load balancing
+    # even for explicitly-routed tasks to prevent queue starvation.
     original_agent = agent
     overflow_reason = None
     original_depth = get_queue_depth(agent)
 
-    if agent not in ("kublai", "subagent") and not mention_agent and not _caller_provided_agent and not _skill_locked_agent:
+    # Load balancing applies to:
+    # - Auto-routed tasks (not _caller_provided_agent)
+    # - OR explicitly-routed tasks to CRITICALLY overloaded agents (>= QUEUE_CRITICAL_THRESHOLD)
+    load_balance_needed = (
+        agent not in ("kublai", "subagent")
+        and not mention_agent
+        and not _skill_locked_agent
+        and (
+            not _caller_provided_agent  # Auto-routed: always load-balance
+            or original_depth >= QUEUE_CRITICAL_THRESHOLD  # Explicit: only if critically overloaded
+        )
+    )
+
+    if load_balance_needed:
         original_agent = agent
         agent, overflow_reason = find_best_idle_agent(title, agent)
 
@@ -1240,6 +1425,9 @@ def create_task(title, body, priority="normal", source="task_intake",
     # Build queue info for audit
     _queue_info = get_all_agent_queue_depths()
 
+    # Classify domain for audit trail (will be re-used when task is created)
+    _task_domain = classify_task_domain(title, skill_hint)
+
     _log_routing_decision(
         title=title,
         dest=agent,
@@ -1247,6 +1435,8 @@ def create_task(title, body, priority="normal", source="task_intake",
         overflow_reason=overflow_reason if overflow_reason and agent != original_agent else None,
         skill_hint=skill_hint,
         queue_info=_queue_info,
+        original_agent=original_agent if original_agent != agent else None,
+        domain=_task_domain,
     )
 
     # 2.9. Force Claude Code preamble

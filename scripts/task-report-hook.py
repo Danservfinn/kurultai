@@ -26,6 +26,7 @@ import sys
 import subprocess
 import hashlib
 import re
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -37,6 +38,17 @@ try:
     HAS_PSUTIL = True
 except ImportError:
     HAS_PSUTIL = False
+
+# Task completion standard validator
+try:
+    from task_completion_standard import (
+        validate_completion_report,
+        score_report_quality,
+        extract_completion_summary,
+    )
+    HAS_COMPLETION_STANDARD = True
+except ImportError:
+    HAS_COMPLETION_STANDARD = False
 
 # Configuration
 REPORTS_DIR = Path(os.getenv(
@@ -57,7 +69,7 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def parse_task_file(task_path: Path) -> dict:
-    """Parse task frontmatter and content."""
+    """Parse task frontmatter and content, including cross-agent context fields."""
     if not task_path.exists():
         return {}
 
@@ -68,17 +80,89 @@ def parse_task_file(task_path: Path) -> dict:
     metadata = {}
     in_frontmatter = False
     body_start = 0
+    context_history = []
+    output_format = {}
 
-    for i, line in enumerate(lines):
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         if line.strip() == '---':
             if not in_frontmatter:
                 in_frontmatter = True
             else:
                 body_start = i + 1
                 break
-        elif in_frontmatter and ':' in line:
-            key, value = line.split(':', 1)
-            metadata[key.strip()] = value.strip()
+        elif in_frontmatter:
+            if ':' in line and not line.strip().startswith('-'):
+                key, value = line.split(':', 1)
+                key = key.strip()
+                value = value.strip()
+                metadata[key] = value
+
+                # Parse context_history block
+                if key == 'context_history':
+                    # Continue parsing list items
+                    i += 1
+                    current_entry = {}
+                    while i < len(lines):
+                        inner = lines[i]
+                        inner_stripped = inner.strip()
+                        # Skip comment lines
+                        if inner_stripped.startswith('#'):
+                            i += 1
+                            continue
+                        # Check for end of context_history block
+                        if inner and not inner[0].isspace() and ':' in inner_stripped and not inner_stripped.startswith('-'):
+                            if current_entry:
+                                context_history.append(current_entry)
+                                current_entry = {}
+                            break
+                        if inner_stripped == '---':
+                            if current_entry:
+                                context_history.append(current_entry)
+                                current_entry = {}
+                            break
+                        if inner_stripped.startswith('- agent:'):
+                            if current_entry:
+                                context_history.append(current_entry)
+                            current_entry = {'agent': inner_stripped.split(':', 1)[1].strip()}
+                        elif inner_stripped.startswith('attempt:') and current_entry:
+                            current_entry['attempt'] = inner_stripped.split(':', 1)[1].strip().strip('"\'')
+                        elif inner_stripped.startswith('deliverable:') and current_entry:
+                            current_entry['deliverable'] = inner_stripped.split(':', 1)[1].strip().strip('"\'')
+                        elif inner_stripped.startswith('findings:') and current_entry:
+                            current_entry['findings'] = inner_stripped.split(':', 1)[1].strip().strip('"\'')
+                        i += 1
+                    # Don't append if already added by break condition
+                    if current_entry and current_entry not in context_history:
+                        context_history.append(current_entry)
+                    continue  # Skip the normal i += 1 at end of loop
+
+                # Parse output_format block
+                if key == 'output_format':
+                    i += 1
+                    while i < len(lines):
+                        inner = lines[i]
+                        inner_stripped = inner.strip()
+                        if inner and not inner[0].isspace() and ':' in inner_stripped:
+                            break
+                        if inner_stripped == '---':
+                            break
+                        if inner_stripped.startswith('human_summary:'):
+                            output_format['human_summary'] = inner_stripped.split(':', 1)[1].strip().lower() in ('true', 'yes', '1')
+                        elif inner_stripped.startswith('agent_full:'):
+                            output_format['agent_full'] = inner_stripped.split(':', 1)[1].strip().lower() in ('true', 'yes', '1')
+                        elif inner_stripped.startswith('deliverable:'):
+                            output_format['deliverable'] = inner_stripped.split(':', 1)[1].strip().strip('"\'')
+                        i += 1
+                    continue
+        i += 1
+
+    # Add parsed complex fields to metadata
+    if context_history:
+        metadata['context_history'] = context_history
+    if output_format:
+        metadata['output_format'] = output_format
 
     return {
         'metadata': metadata,
@@ -163,6 +247,92 @@ def scan_session_file(agent: str, task_id: str) -> dict:
     return session_data
 
 
+def extract_prompt_construction(parsed_task: dict) -> dict:
+    """Extract prompt construction metadata from parsed task.
+
+    Returns dict with:
+    - template_version: version of prompt template used
+    - template_name: name of template
+    - context_sources: list of sources providing context
+    - constraint_count: number of explicit constraints
+    - instruction_complexity: score based on instruction detail
+    - estimated_tokens: rough token estimate
+    """
+    metadata = parsed_task.get('metadata', {})
+    body = parsed_task.get('body', '')
+
+    result = {
+        'template_version': metadata.get('template_version', 'unknown'),
+        'template_name': metadata.get('prompt_template', metadata.get('template', 'standard')),
+        'context_sources': [],
+        'constraint_count': 0,
+        'instruction_complexity': 0,
+        'estimated_tokens': 0
+    }
+
+    # Extract context sources from context_history or explicit sources
+    context_history = metadata.get('context_history', [])
+    if context_history:
+        result['context_sources'] = [entry.get('agent', 'unknown') for entry in context_history]
+    else:
+        # Infer from other metadata
+        if metadata.get('parent_research'):
+            result['context_sources'].append('parent_research')
+        if metadata.get('skill_hint'):
+            result['context_sources'].append(f'skill:{metadata["skill_hint"]}')
+
+    # Count constraints (lines with "MUST", "SHOULD", "MUST NOT", "Constraints:")
+    constraint_patterns = [
+        r'\bMUST\b', r'\bSHOULD\b', r'\bMUST NOT\b',
+        r'constraint', r'requirement', r'^##+.*constraint'
+    ]
+    for pattern in constraint_patterns:
+        result['constraint_count'] += len(re.findall(pattern, body, re.IGNORECASE))
+
+    # Calculate instruction complexity
+    lines = body.split('\n')
+    code_blocks = len(re.findall(r'```', body)) // 2
+    list_items = len(re.findall(r'^[\s]*[-*]\s', body, re.MULTILINE))
+    result['instruction_complexity'] = min(100, (
+        len([l for l in lines if len(l.strip()) > 50]) * 2 +
+        code_blocks * 10 +
+        list_items * 3
+    ))
+
+    # Estimate tokens (rough: 1 token ≈ 4 chars)
+    result['estimated_tokens'] = len(body) // 4
+
+    return result
+
+
+def extract_task_params(parsed_task: dict) -> dict:
+    """Extract task parameters from parsed task metadata.
+
+    Returns dict with:
+    - priority: task priority level
+    - timeout_seconds: allocated timeout
+    - skill_hint: suggested skill
+    - effort_level: effort level if specified
+    - thinking_enabled: whether thinking mode enabled
+    """
+    metadata = parsed_task.get('metadata', {})
+
+    # Parse timeout to seconds
+    timeout_str = metadata.get('timeout', '7200')
+    try:
+        timeout_seconds = int(timeout_str)
+    except (ValueError, TypeError):
+        timeout_seconds = 7200
+
+    return {
+        'priority': metadata.get('priority', 'normal'),
+        'timeout_seconds': timeout_seconds,
+        'skill_hint': metadata.get('skill_hint'),
+        'effort_level': metadata.get('effort_level'),
+        'thinking_enabled': metadata.get('thinking_enabled', 'false').lower() == 'true'
+    }
+
+
 def scan_workspace(agent: str, task_id: str) -> dict:
     """Scan agent workspace for new/modified files with detailed metrics."""
     workspace = AGENTS_BASE / agent / 'workspace'
@@ -238,6 +408,92 @@ def scan_workspace(agent: str, task_id: str) -> dict:
         'by_type': file_types,
         'complexity': complexity_metrics
     }
+
+
+def validate_workspace_completion(agent: str, task_id: str, task_metadata: dict) -> dict:
+    """Validate workspace completion output against the Kurultai standard.
+
+    Reads the workspace result file (task-*.md) and validates it against
+    the completion report standard.
+
+    Args:
+        agent: Agent name
+        task_id: Task ID (short or full)
+        task_metadata: Task metadata for type detection
+
+    Returns:
+        dict with:
+            - is_valid: bool
+            - report_quality_score: float (0-100)
+            - missing_sections: list
+            - report_type: str
+            - summary: str
+            - content_length: int
+            - recommendations: list
+    """
+    result = {
+        'is_valid': True,
+        'report_quality_score': 100,
+        'missing_sections': [],
+        'report_type': 'qa',
+        'summary': '',
+        'content_length': 0,
+        'recommendations': [],
+    }
+
+    if not HAS_COMPLETION_STANDARD:
+        result['recommendations'].append("Completion standard module not available")
+        return result
+
+    # Find workspace result file
+    workspace = AGENTS_BASE / agent / 'workspace'
+    if not workspace.exists():
+        result['is_valid'] = False
+        result['recommendations'].append("No workspace directory found")
+        return result
+
+    # Look for task-*.md files matching this task
+    task_prefix = task_id[:12] if len(task_id) > 12 else task_id
+    result_files = list(workspace.glob(f'task-{task_prefix}*.md'))
+
+    if not result_files:
+        result_files = list(workspace.glob('task-*.md'))
+
+    if not result_files:
+        result['is_valid'] = False
+        result['recommendations'].append("No workspace result file found")
+        return result
+
+    # Read the most recent result file
+    result_file = max(result_files, key=os.path.getmtime)
+    try:
+        with open(result_file, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+    except (IOError, OSError) as e:
+        result['is_valid'] = False
+        result['recommendations'].append(f"Could not read result file: {e}")
+        return result
+
+    result['content_length'] = len(content)
+
+    # Validate against standard
+    is_valid, missing, report_type = validate_completion_report(content, task_metadata)
+    scores = score_report_quality(content, task_metadata)
+    summary = extract_completion_summary(content)
+
+    result.update({
+        'is_valid': is_valid,
+        'report_quality_score': scores['overall_score'],
+        'missing_sections': missing,
+        'report_type': report_type,
+        'summary': summary,
+        'recommendations': scores['recommendations'],
+        'has_summary': scores['has_summary'],
+        'has_changes': scores['has_changes'],
+        'has_verification': scores['has_verification'],
+    })
+
+    return result
 
 
 def get_git_diff(agent: str) -> dict:
@@ -659,6 +915,34 @@ Task executed by {agent} agent. {workspace_scan['stats']['files_created']} file(
     if not task_context.get('downstream_tasks'):
         report += "| Downstream | none | N/A | N/A |\n"
 
+    # Add Context History section for cross-agent clarity
+    context_history = meta.get('context_history', [])
+    if context_history:
+        report += """
+## Context History (Cross-Agent)
+
+This task was previously worked on by other agents:
+
+| Agent | What Was Tried | Deliverable | Findings |
+|-------|----------------|-------------|----------|
+"""
+        for entry in context_history:
+            agent_name = entry.get('agent', 'unknown')
+            attempt = entry.get('attempt', 'N/A')[:50]
+            deliverable = entry.get('deliverable', '-')
+            findings = entry.get('findings', '-')[:40] if entry.get('findings') else '-'
+            report += f"| {agent_name} | {attempt} | `{deliverable}` | {findings} |\n"
+
+    # Add audience and clarification deadline if present
+    audience = meta.get('audience')
+    clarification_deadline = meta.get('clarification_deadline')
+    if audience or clarification_deadline:
+        report += "\n## Communication Settings\n\n"
+        if audience:
+            report += f"- **Audience:** {audience}\n"
+        if clarification_deadline:
+            report += f"- **Clarification Deadline:** {clarification_deadline}\n"
+
     report += """
 ## Related Tasks (Same Agent, Today)
 
@@ -862,7 +1146,11 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
                     t.parent_task_id = $parent_id,
                     t.parent_title = $parent_title,
                     t.downstream_count = $downstream_count,
-                    t.related_count = $related_count
+                    t.related_count = $related_count,
+
+                    // Prompt construction metadata
+                    t.prompt_construction = $prompt_construction,
+                    t.task_params = $task_params
             """,
                 task_id=task_id,
                 files_created=workspace_scan['stats'].get('files_created', 0),
@@ -909,7 +1197,11 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
                 parent_id=task_context.get('parent_task_id'),
                 parent_title=task_context.get('parent_title'),
                 downstream_count=len(task_context.get('downstream_tasks', [])),
-                related_count=len(task_context.get('related_tasks', []))
+                related_count=len(task_context.get('related_tasks', [])),
+
+                # Prompt construction and task parameters
+                prompt_construction=json.dumps(task_context.get('prompt_construction', {})),
+                task_params=json.dumps(task_context.get('task_params', {}))
             )
 
         driver.close()
@@ -917,6 +1209,144 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
     except Exception as e:
         print(f"Neo4j save failed: {e}", file=sys.stderr)
         return False
+
+
+def record_task_outcome(task_id: str, agent: str, task: dict,
+                        workspace_scan: dict, duration_seconds: float,
+                        error_analysis: dict, validation_result: dict = None) -> bool:
+    """Record TaskOutcome node with success dimensions.
+
+    Args:
+        task_id: Task identifier
+        agent: Agent name
+        task: Task dict with metadata
+        workspace_scan: Workspace scan results
+        duration_seconds: Task execution duration
+        error_analysis: Error analysis results
+        validation_result: Optional validation from validate_workspace_completion()
+    """
+    try:
+        from neo4j import GraphDatabase
+
+        driver = GraphDatabase.driver(
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", "myStrongPassword123")),
+            connection_timeout=5
+        )
+
+        # Calculate success scores
+        output_quality_score = _calculate_output_quality(workspace_scan, error_analysis)
+        efficiency_score = _calculate_efficiency(task, duration_seconds)
+
+        # Report quality score from validation
+        report_quality_score = validation_result.get('report_quality_score', 100) if validation_result else 100
+        report_is_valid = validation_result.get('is_valid', True) if validation_result else True
+
+        # Default scores (agent can override via reflection)
+        difficulty_score = 5  # Medium difficulty baseline
+        clarity_score = 5     # Medium clarity baseline
+        autonomy_score = 5    # Medium autonomy baseline
+
+        with driver.session() as session:
+            outcome_id = str(uuid.uuid4())[:12]
+            session.run("""
+                MERGE (t:Task {task_id: $task_id})
+                CREATE (t)-[:HAS_OUTCOME]->(o:TaskOutcome {
+                    outcome_id: $outcome_id,
+                    task_id: $task_id,
+                    agent: $agent,
+                    recorded_at: datetime(),
+
+                    // Success dimensions
+                    output_quality_score: $output_quality_score,
+                    efficiency_score: $efficiency_score,
+                    difficulty_score: $difficulty_score,
+                    clarity_score: $clarity_score,
+                    autonomy_score: $autonomy_score,
+
+                    // Report quality (Kurultai completion standard)
+                    report_quality_score: $report_quality_score,
+                    report_is_valid: $report_is_valid,
+
+                    // Status (for quick filtering)
+                    status: CASE WHEN $is_completed THEN 'success' ELSE 'failure' END,
+
+                    // Error tracking
+                    error_category: $error_category,
+                    had_error: CASE WHEN $error_category IS NOT NULL THEN true ELSE false END
+                })
+            """,
+            outcome_id=outcome_id, task_id=task_id, agent=agent,
+            output_quality_score=output_quality_score, efficiency_score=efficiency_score,
+            difficulty_score=difficulty_score, clarity_score=clarity_score, autonomy_score=autonomy_score,
+            report_quality_score=report_quality_score, report_is_valid=report_is_valid,
+            is_completed=(error_analysis.get('category') is None),
+            error_category=error_analysis.get('category'))
+
+        driver.close()
+        return True
+    except Exception as e:
+        print(f"TaskOutcome creation failed: {e}", file=sys.stderr)
+        return False
+
+
+def _calculate_output_quality(workspace_scan: dict, error_analysis: dict) -> float:
+    """Calculate output quality score (0-10) from observable metrics."""
+    score = 0.0
+
+    # Files created (up to 3 points)
+    files_created = workspace_scan.get('stats', {}).get('files_created', 0)
+    if files_created > 0:
+        score += min(files_created * 0.5, 3.0)
+
+    # Lines added (up to 2 points)
+    lines_added = workspace_scan.get('stats', {}).get('lines_added', 0)
+    if lines_added > 10:
+        score += 2.0
+    elif lines_added > 0:
+        score += 1.0
+
+    # Complexity (up to 3 points)
+    complexity = workspace_scan.get('complexity', {})
+    if complexity.get('tests', 0) > 0:
+        score += 1.0
+    if complexity.get('docs', 0) > 0:
+        score += 0.5
+    if complexity.get('functions', 0) > 0:
+        score += 1.0
+    if complexity.get('classes', 0) > 0:
+        score += 0.5
+
+    # No errors (2 points)
+    if error_analysis.get('category') is None:
+        score += 2.0
+
+    return min(score, 10.0)
+
+
+def _calculate_efficiency(task: dict, duration_seconds: float) -> float:
+    """Calculate efficiency score (0-10) based on time usage."""
+    meta = task.get('metadata', {})
+    timeout = int(meta.get('timeout', 7200))
+
+    if duration_seconds == 0:
+        return 5.0  # Default
+
+    # Calculate ratio: used / allowed
+    ratio = duration_seconds / timeout
+
+    # Efficiency: closer to 0.5 (used half the timeout) is better
+    # > 1.0 = overtime (bad), < 0.1 = too fast/complexity underestimated
+    if 0.3 <= ratio <= 0.8:
+        return 10.0  # Sweet spot
+    elif 0.8 < ratio <= 1.0:
+        return 8.0   # Good but used most of time
+    elif 1.0 < ratio <= 1.2:
+        return 5.0   # Went over a bit
+    elif ratio > 1.2:
+        return 2.0   # Significantly over
+    else:  # ratio < 0.3
+        return 6.0   # Very fast, maybe too easy?
 
 
 def main():
@@ -956,6 +1386,20 @@ def main():
     # Scan workspace for deliverables
     workspace_scan = scan_workspace(agent, task_id)
 
+    # Validate completion report quality (Kurultai standard)
+    validation_result = None
+    if HAS_COMPLETION_STANDARD and args.status == 'completed':
+        validation_result = validate_workspace_completion(
+            agent, task_id, task.get('metadata', {})
+        )
+        # Log validation results
+        if not validation_result['is_valid']:
+            print(f"[WARNING] Completion report validation failed:")
+            for rec in validation_result.get('recommendations', [])[:5]:
+                print(f"  - {rec}")
+        if validation_result.get('report_quality_score', 100) < 70:
+            print(f"[WARNING] Low report quality score: {validation_result['report_quality_score']}/100")
+
     # Get git diff
     git_diff = get_git_diff(agent) if ENABLE_GIT_DIFF else {'diff': '', 'stats': {}, 'files_by_type': {}}
 
@@ -967,6 +1411,10 @@ def main():
 
     # Get task context
     task_context = get_task_context(task_id, agent, parent_id)
+
+    # Extract prompt construction metadata and task parameters
+    task_context['prompt_construction'] = extract_prompt_construction(task)
+    task_context['task_params'] = extract_task_params(task)
 
     # Get resource usage
     resource_usage = get_resource_usage(agent, args.duration or 0)
@@ -992,6 +1440,12 @@ def main():
         task_id, agent, args.status, workspace_scan, git_diff,
         session_data, agent_state, error_analysis, task_context,
         resource_usage, duration_seconds
+    )
+
+    # Record task outcome with success dimensions
+    record_task_outcome(
+        task_id, agent, task, workspace_scan,
+        duration_seconds, error_analysis, validation_result
     )
 
     # Append to ledger

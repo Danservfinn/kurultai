@@ -552,6 +552,22 @@ def get_action_quality_block(agent, hours=2):
     return "\n".join(lines)
 
 
+def get_task_completion_block(agent, hours=1):
+    """Generate task completion summary from report analyzer.
+
+    Shows what the agent actually accomplished in the last hour,
+    including problems solved, solutions built, testing, and verification.
+    """
+    try:
+        from report_analyzer import ReportAnalyzer
+        analyzer = ReportAnalyzer()
+        block = analyzer.generate_reflection_block(agent, hours)
+        analyzer.close()
+        return block
+    except Exception as e:
+        return None
+
+
 def generate_context(agent, hours=1):
     """Generate the compact reflection context for an agent."""
     role = AGENT_ROLES.get(agent, "Unknown")
@@ -620,6 +636,14 @@ def generate_context(agent, hours=1):
             _sources["pipeline_health"] = "empty"
     except Exception:
         _sources["pipeline_health"] = "error"
+
+    # Task Completion Summary — what the agent actually accomplished
+    task_completion_block = get_task_completion_block(agent, hours)
+    if task_completion_block:
+        lines.append(task_completion_block)
+        _sources["task_completion"] = "ok"
+    else:
+        _sources["task_completion"] = "empty"
 
     # Routing audit + scorecard (kublai only — not budget-capped, important for router)
     if agent == "kublai":

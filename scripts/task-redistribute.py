@@ -38,6 +38,9 @@ from task_intake import (
     QUEUE_LOW_THRESHOLD,
     QUEUE_CRITICAL_THRESHOLD,
     _log_routing_decision,
+    DOMAIN_AGENT_COMPATIBILITY,
+    classify_task_domain,
+    is_domain_compatible,
 )
 from kurultai_paths import AGENTS_DIR
 
@@ -45,7 +48,7 @@ from kurultai_paths import AGENTS_DIR
 def get_pending_tasks(agent):
     """Get list of pending tasks for an agent.
 
-    Returns list of (filepath, title, content) tuples.
+    Returns list of (filepath, title, content, domain) tuples.
     """
     task_dir = AGENTS_DIR / agent / "tasks"
     if not task_dir.exists():
@@ -54,8 +57,11 @@ def get_pending_tasks(agent):
     pending = []
     for fpath in task_dir.iterdir():
         fname = fpath.name
-        # Skip done, executing, hidden, or archived files
-        if '.done' in fname or '.executing' in fname or fname.startswith('.') or 'archived' in fname:
+        # Skip done, executing, completed, hidden, or archived files
+        # Note: .completed.md is a malformed suffix (should be .completed.done.md)
+        # Agents sometimes write these directly, so we must skip them during redistribution
+        if ('.done' in fname or '.executing' in fname or fname.startswith('.') or
+            'archived' in fname or fname.endswith('.completed.md')):
             continue
         if not fname.endswith('.md'):
             continue
@@ -65,7 +71,18 @@ def get_pending_tasks(agent):
             # Extract title
             title_match = re.search(r'^# Task: (.+)$', content, re.MULTILINE)
             title = title_match.group(1) if title_match else fname
-            pending.append((fpath, title, content))
+
+            # Extract domain from frontmatter
+            domain_match = re.search(r'^domain: (\w+)$', content, re.MULTILINE)
+            if domain_match:
+                domain = domain_match.group(1)
+            else:
+                # Fallback: classify from title (for tasks created before domain field existed)
+                skill_hint_match = re.search(r'^skill_hint: (.+)$', content, re.MULTILINE)
+                skill_hint = skill_hint_match.group(1) if skill_hint_match else None
+                domain = classify_task_domain(title, skill_hint)
+
+            pending.append((fpath, title, content, domain))
         except Exception:
             continue
 
@@ -124,6 +141,9 @@ def move_task(src_path, dest_agent, dry_run=False):
 def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
     """Find tasks from overloaded agent that can be moved to underutilized agents.
 
+    Domain compatibility is checked first (if domain field exists in frontmatter).
+    Falls back to keyword-based capability matching for tasks without domain.
+
     Returns list of (task_path, task_title, dest_agent) tuples.
     """
     pending = get_pending_tasks(overloaded_agent)
@@ -132,11 +152,23 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
     # Get underutilized agents as list of names
     underutilized_names = [a for a, _ in underutilized_agents]
 
-    for fpath, title, content in pending:
+    for fpath, title, content, domain in pending:
         if len(movable) >= max_tasks:
             break
 
-        # Check if any underutilized agent can handle this task
+        # 1. Check domain compatibility first (explicit domain field in frontmatter)
+        domain_compatible_agents = [
+            agent for agent in underutilized_names
+            if is_domain_compatible(domain, agent)
+        ]
+
+        if domain_compatible_agents:
+            # Use the first domain-compatible underutilized agent
+            dest_agent = domain_compatible_agents[0]
+            movable.append((fpath, title, dest_agent))
+            continue
+
+        # 2. Fallback: keyword-based capability matching (for backward compat)
         capable = get_capable_alternates(overloaded_agent, title)
 
         for alt_agent, _ in capable:

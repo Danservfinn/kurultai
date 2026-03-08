@@ -185,10 +185,31 @@ SPAWN_COUNT=0
 # ============================================================
 # Run lightweight audit of recently completed tasks to catch fake completions
 # Integrated into heartbeat cycle (every 5 minutes) for continuous monitoring
+# LLM review provides intelligent escalation decisions
 COMPLETION_AUDIT_OUTPUT=$(python3 "$SCRIPTS/completion-audit.py" --json 2>/dev/null || echo "{}")
 COMPLETION_AUDIT_FAKE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fake_found',0))" 2>/dev/null || echo "0")
 COMPLETION_AUDIT_REQUEUED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('requeued',0))" 2>/dev/null || echo "0")
 COMPLETION_AUDIT_VERIFIED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('verified',0))" 2>/dev/null || echo "0")
+COMPLETION_AUDIT_LLM_DECISION=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_decision','IGNORE'))" 2>/dev/null || echo "IGNORE")
+COMPLETION_AUDIT_LLM_CONFIDENCE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_confidence',0))" 2>/dev/null || echo "0")
+
+# ============================================================
+# SECTION 5c: Sync agent votes to Neo4j
+# ============================================================
+# Sync vote files from each agent's votes/ directory to Neo4j
+# This enables agents to vote by writing markdown files during reflection
+VOTE_SYNC_COUNT=0
+VOTE_SYNC_ERRORS=0
+for agent in kublai temujin mongke chagatai jochi ogedei; do
+    SYNC_RESULT=$(python3 "$SCRIPTS/vote_manager.py" sync --agent "$agent" 2>&1 || echo "error")
+    if echo "$SYNC_RESULT" | grep -q "Synced [1-9]"; then
+        SYNCED=$(echo "$SYNC_RESULT" | grep -o 'Synced [0-9]*' | grep -o '[0-9]*' || echo "0")
+        VOTE_SYNC_COUNT=$((VOTE_SYNC_COUNT + SYNCED))
+    fi
+    if echo "$SYNC_RESULT" | grep -q "error"; then
+        VOTE_SYNC_ERRORS=$((VOTE_SYNC_ERRORS + 1))
+    fi
+done
 
 for agent in "${AGENTS[@]}"; do
     TASK_DIR="$AGENT_BASE/$agent/tasks"
@@ -278,7 +299,55 @@ ERR_DIRECTION=$(echo "$TRENDS" | awk '{print $5}')
 RESTARTS_1H=$(echo "$TRENDS" | awk '{print $6}')
 
 # ============================================================
-# SECTION 6b: Pre-decision throughput anomaly check
+# SECTION 6b: Routing Metrics (from routing-metrics.sh or latest hourly file)
+# ============================================================
+# Read or compute routing metrics for queue balance index
+ROUTING_BALANCE_IDX=0
+ROUTING_MISSED=0
+ROUTING_ACCURACY=0.87
+ROUTING_P95=420
+ROUTING_TOTAL=0
+
+# Try to get from latest hourly file
+LATEST_ROUTING_JSON=$(ls -t "$LOGDIR"/routing-metrics-*.json 2>/dev/null | head -1)
+if [ -n "$LATEST_ROUTING_JSON" ]; then
+    FILE_AGE_S=$(( $(date +%s) - $(stat -f%m "$LATEST_ROUTING_JSON" 2>/dev/null || stat -c%Y "$LATEST_ROUTING_JSON" 2>/dev/null) ))
+    if [ "$FILE_AGE_S" -lt 7200 ]; then  # File is fresh (< 2 hours)
+        ROUTING_BALANCE_IDX=$(python3 -c "import json; print(json.load(open('$LATEST_ROUTING_JSON')).get('queue_balance',{}).get('index',0))" 2>/dev/null || echo "0")
+        ROUTING_MISSED=$(python3 -c "import json; print(json.load(open('$LATEST_ROUTING_JSON')).get('routing',{}).get('missed_opportunities',0))" 2>/dev/null || echo "0")
+        ROUTING_ACCURACY=$(python3 -c "import json; print(json.load(open('$LATEST_ROUTING_JSON')).get('routing',{}).get('routing_accuracy',0.87))" 2>/dev/null || echo "0.87")
+        ROUTING_P95=$(python3 -c "import json; print(json.load(open('$LATEST_ROUTING_JSON')).get('routing',{}).get('time_to_start_p95_seconds',420))" 2>/dev/null || echo "420")
+        ROUTING_TOTAL=$(python3 -c "import json; print(json.load(open('$LATEST_ROUTING_JSON')).get('routing',{}).get('total_routed',0))" 2>/dev/null || echo "0")
+    fi
+fi
+
+# Fallback: compute queue balance index from current queue state
+if [ "$ROUTING_BALANCE_IDX" = "0" ]; then
+    ROUTING_BALANCE_IDX=$(python3 -c "
+import statistics, os, glob
+agents = ['temujin', 'mongke', 'chagatai', 'jochi', 'ogedei']
+base = '$AGENT_BASE'
+depths = []
+for agent in agents:
+    task_dir = f'{base}/{agent}/tasks'
+    if os.path.isdir(task_dir):
+        pending = 0
+        for f in glob.glob(f'{task_dir}/*.md'):
+            if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed', '.obsolete', '.cancelled']):
+                continue
+            pending += 1
+        depths.append(pending)
+    else:
+        depths.append(0)
+mean_depth = statistics.mean(depths) if depths else 0
+std_depth = statistics.stdev(depths) if len(depths) > 1 else 0
+balance_idx = round(std_depth / mean_depth, 3) if mean_depth > 0 else 0
+print(balance_idx)
+" 2>/dev/null || echo "0")
+fi
+
+# ============================================================
+# SECTION 6c: Pre-decision throughput anomaly check
 # ============================================================
 THROUGHPUT_ANOMALY_TYPE=""
 THROUGHPUT_SEVERITY=""
@@ -420,26 +489,29 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s}},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
     "$TS_ISO" "$EPOCH" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "${SPAWN_COUNT:-0}" "$TASK_QUEUE_STATUS" \
-    "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" \
+    "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" "$VOTE_SYNC_COUNT" \
+    "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$ROUTING_ACCURACY" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$AVG_LAT_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" >> "$TICKS"
 
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
     "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "$SPAWN_COUNT" "$TASK_QUEUE_STATUS" \
-    "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" \
+    "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" \
+    "$VOTE_SYNC_COUNT" "$VOTE_SYNC_ERRORS" \
+    "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$(python3 -c "print(int($ROUTING_ACCURACY*100))" 2>/dev/null || echo "87")" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
 
@@ -467,7 +539,7 @@ fi
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
-echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
+echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
 
 # ============================================================
 # SECTION 8: LLM Triage (local ollama — decide if Kublai should act)

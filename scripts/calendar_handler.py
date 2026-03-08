@@ -41,6 +41,9 @@ from calendar_parser import (
 
 from profile_handler import apply_profile_hints, get_context_for_conversation, format_context_for_agent
 
+# Conversation logging
+from conversation_logger import log_inbound, log_outbound
+
 from neo4j_calendar import (
     create_event,
     get_upcoming_events,

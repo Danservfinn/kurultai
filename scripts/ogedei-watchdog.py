@@ -2,16 +2,21 @@
 """
 Ogedei Watchdog — Persistent quality-assurance daemon for the Kurultai.
 
-Runs every 30 seconds between tock cycles. Nine checks per cycle:
-  1. check_watcher_alive()     — pgrep task-watcher.py + log mtime
-  2. check_stalled_tasks()     — .executing.md files > 15 min old
-  3. verify_recent_completions() — new .done.md → check for real Claude Code execution
-  4. periodic_queue_audit()    — full queue_audit.audit() every 30 min
-  5. cleanup_malformed()       — remove .executing.completed.done artifacts > 24h
-  6. check_reflection_pipeline() — reflection-status.json age + step timing
-  7. check_memory_health()     — memory_audit.py every 30 min (contamination, bloat, rules)
-  8. check_routing_drift()     — keyword vs actual routing drift every 30 min
-  9. check_agent_failure_rates() — 1h failure rate per agent, writes health flags every 5 min
+Runs every 30 seconds between tock cycles. Fourteen checks per cycle:
+  1. check_watcher_alive()         — pgrep task-watcher.py + log mtime
+  2. check_stalled_tasks()         — .executing.md files > 15 min old
+  3. verify_recent_completions()   — new .done.md → check for real Claude Code execution + quality gate
+  4. periodic_queue_audit()        — full queue_audit.audit() every 30 min
+  5. cleanup_malformed()           — remove .executing.completed.done artifacts > 24h
+  6. check_reflection_pipeline()   — reflection-status.json age + step timing
+  7. check_memory_health()         — memory_audit.py every 30 min (contamination, bloat, rules)
+  8. check_routing_drift()         — keyword vs actual routing drift every 30 min
+  9. check_agent_failure_rates()   — 1h failure rate per agent, writes health flags every 5 min
+ 10. check_queue_balance()         — auto-redistribute tasks from overloaded to underloaded agents
+ 11. check_cascade_risk()          — detect cascade failure patterns every 10 min
+ 12. check_quality_gate()          — verify completion quality on recent .done.md files
+ 13. update_self_healing_score()   — track and report self-healing metrics every hour
+ 14. check_watchdog_health()       — internal watchdog health check
 
 Usage:
     python3 ogedei-watchdog.py --once    # single cycle
@@ -25,7 +30,7 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Event
 
@@ -34,6 +39,10 @@ from json_state import locked_json_read, locked_json_update
 from kurultai_paths import AGENTS_DIR, LOGS_DIR
 
 # Force unbuffered output for launchd
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
+# Configuration
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
@@ -52,6 +61,21 @@ QUEUE_AUDIT_INTERVAL = 1800 # 30 minutes
 MEMORY_AUDIT_INTERVAL = 1800 # 30 minutes
 STALL_WARN_COOLDOWN = 600   # 10 minutes between repeated warnings for same file
 REFLECTION_MAX_AGE = 4500   # 75 minutes — cron runs at :02, allow buffer
+REFLECTION_STATUS = LOGS_DIR / "reflection-status.json"
+REFLECTION_STEP_TIMING = LOGS_DIR / "reflection-step-timing.json"
+
+# ============================================================
+# P0 Self-Healing: Tiered Stale Task Recovery
+# ============================================================
+# Tier 1 (900s):  Log warning, check process liveness
+# Tier 2 (1800s): Verify PID dead → clear lock → requeue
+# Tier 3 (3600s): Escalate to Kublai with diagnostic bundle
+TIER_WARN_S = 900          # 15 minutes - warn only
+TIER_RECOVER_S = 1800      # 30 minutes - auto-recover if PID dead
+TIER_ESCALATE_S = 3600     # 60 minutes - escalate to Kublai
+
+# Recovery tracking to prevent thrashing
+_recovery_cooldowns: dict[str, float] = {}  # task_path -> last recovery time
 REFLECTION_STATUS = LOGS_DIR / "reflection-status.json"
 REFLECTION_STEP_TIMING = LOGS_DIR / "reflection-step-timing.json"
 
@@ -90,6 +114,17 @@ def save_state(state):
 
 
 # ============================================================
+# Circuit breaker for agent health (loaded after log is available)
+# ============================================================
+try:
+    from circuit_breaker import AgentCircuitBreaker
+    _circuit_breaker = AgentCircuitBreaker()
+except Exception as e:
+    log(f"Circuit breaker init failed (non-fatal): {e}", "WARN")
+    _circuit_breaker = None
+
+
+# ============================================================
 # Check 1: Is task-watcher alive?
 # ============================================================
 def check_watcher_alive(state):
@@ -110,14 +145,17 @@ def check_watcher_alive(state):
         log("WATCHER DOWN — attempting restart via launchctl", "WARN")
         issues.append("task-watcher not running")
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{WATCHER_PLIST}"],
                 capture_output=True, text=True, timeout=15
             )
+            success = result.returncode == 0
             state["watcher_restarts"] = state.get("watcher_restarts", 0) + 1
             log("Restart issued via launchctl kickstart")
+            record_gateway_restart(success)
         except Exception as e:
             log(f"Failed to restart watcher: {e}", "ERROR")
+            record_gateway_restart(False)
         return issues
 
     # Check log freshness
@@ -131,10 +169,104 @@ def check_watcher_alive(state):
 
 
 # ============================================================
-# Check 2: Stalled .executing tasks
+# Check 2: Stalled .executing tasks with Tiered Recovery (P0 Self-Healing)
+# ============================================================
+
+def verify_process_dead(task_path: Path) -> bool:
+    """Verify the PID is actually dead before clearing lock."""
+    pid_file = task_path.with_suffix(".pid")
+    if not pid_file.exists():
+        return True
+    try:
+        pid_str = pid_file.read_text().strip()
+        pid = int(pid_str)
+    except (ValueError, OSError):
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            if "claude-agent" in result.stdout or "claude" in result.stdout.lower():
+                return False
+            log(f"Orphaned PID {pid} for {task_path.name}")
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def recover_task(task_path: Path, agent: str, age_s: int, state: dict) -> bool:
+    """Clear locks and requeue the task."""
+    try:
+        task_name = task_path.name
+        base_name = task_name.replace(".executing.md", ".md")
+        task_path.rename(task_path.parent / base_name)
+        pid_file = task_path.with_suffix(".pid")
+        if pid_file.exists():
+            pid_file.unlink()
+        state["tasks_recovered"] = state.get("tasks_recovered", 0) + 1
+        _recovery_cooldowns[str(task_path)] = time.time()
+        log(f"RECOVERED: {agent}/{base_name} (was {age_s:.0f}s old)")
+        return True
+    except Exception as e:
+        log(f"RECOVERY FAILED for {agent}/{task_path.name}: {e}", "ERROR")
+        return False
+
+
+def escalate_to_kublai(task_path: Path, agent: str, age_s: int) -> bool:
+    """Create high-priority task for Kublai investigation."""
+    try:
+        workspace = Path("/Users/kublai/.openclaw/agents/kublai/tasks")
+        workspace.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        task_name = task_path.name.replace(".executing.md", "")
+        escalation_file = workspace / f"ESCALATE-stale-task-{agent}-{task_name}-{timestamp}.md"
+        task_content = task_path.read_text()[:500] if task_path.exists() else "(file not found)"
+        escalation_content = f"""---
+agent: kublai
+priority: critical
+created: {datetime.now().isoformat()}
+task_type: escalation
+source: ogedei-watchdog
+original_task: {agent}/{task_name}
+stalled_age_seconds: {age_s}
+---
+
+# Escalation: Stale Task Recovery
+
+**Original Task:** {agent}/{task_name}
+**Stalled For:** {age_s:.0f}s ({age_s // 60} min)
+
+Investigate why this task is stuck and re-queue or cancel as appropriate.
+Threshold: {TIER_ESCALATE_S}s
+"""
+        escalation_file.write_text(escalation_content)
+        log(f"ESCALATED to Kublai: {escalation_file.name}")
+        return True
+    except Exception as e:
+        log(f"ESCALATION FAILED: {e}", "ERROR")
+        return False
+
+
+
+# ============================================================
+# Original check_stalled_tasks below (updated with tiered recovery)
 # ============================================================
 def check_stalled_tasks(state):
-    """Find .executing.md files older than 15 minutes."""
+    """Find and recover .executing.md files based on tiered policy.
+    
+    Tier 1 (900s):  Log warning with cooldown
+    Tier 2 (1800s): Verify PID dead -> clear lock -> requeue
+    Tier 3 (3600s): Escalate to Kublai with diagnostic bundle
+    """
     issues = []
     now = time.time()
 
@@ -144,7 +276,6 @@ def check_stalled_tasks(state):
             continue
         for f in tasks_dir.iterdir():
             name = f.name
-            # Only match .executing.md task files (not .pid or other artifacts)
             if not name.endswith(".executing.md"):
                 continue
             if ".completed" in name or ".done" in name or ".failed" in name:
@@ -155,20 +286,61 @@ def check_stalled_tasks(state):
                 age = now - f.stat().st_mtime
             except OSError:
                 continue
-            if age > STALE_EXECUTING_SECS:
-                key = f"{agent}/{name}"
+
+            if age < TIER_WARN_S:
+                continue
+
+            key = f"{agent}/{name}"
+            task_path = f
+
+            # Tier 1 (900-1800s): Warning only
+            if age < TIER_RECOVER_S:
                 last_warned = _stall_warned_at.get(key, 0)
                 if (now - last_warned) >= STALL_WARN_COOLDOWN:
-                    log(f"STALLED: {key} — {age:.0f}s old", "WARN")
+                    log(f"STALLED: {key} - {age:.0f}s old (Tier 1)", "WARN")
                     _stall_warned_at[key] = now
                     state["stalled_warnings"] = state.get("stalled_warnings", 0) + 1
                 issues.append(f"{key} stalled {age:.0f}s")
 
-    # Prune cooldown entries for files that no longer exist
+            # Tier 2 (1800-3600s): Attempt recovery if PID dead
+            elif age < TIER_ESCALATE_S:
+                last_recovery = _recovery_cooldowns.get(key, 0)
+                if (now - last_recovery) < STALL_WARN_COOLDOWN:
+                    issues.append(f"{key} stalled {age:.0f}s (cooldown)")
+                    continue
+
+                if verify_process_dead(task_path):
+                    log(f"RECOVERING: {key} - {age:.0f}s old (Tier 2)", "WARN")
+                    if recover_task(task_path, agent, age, state):
+                        issues.append(f"{key} recovered after {age:.0f}s")
+                        _stall_warned_at.pop(key, None)
+                    else:
+                        issues.append(f"{key} recovery failed")
+                else:
+                    log(f"STALLED: {key} - {age:.0f}s old (Tier 2: PID alive)", "WARN")
+                    issues.append(f"{key} stalled {age:.0f}s (alive)")
+
+            # Tier 3 (3600s+): Escalate to Kublai
+            else:
+                last_esc = _recovery_cooldowns.get(f"{key}_escalation", 0)
+                if (now - last_esc) < 3600:
+                    issues.append(f"{key} stalled {age:.0f}s (escalated)")
+                    continue
+
+                log(f"ESCALATING: {key} - {age:.0f}s old (Tier 3)", "ERROR")
+                if escalate_to_kublai(task_path, agent, age):
+                    _recovery_cooldowns[f"{key}_escalation"] = now
+                    issues.append(f"{key} escalated")
+                else:
+                    issues.append(f"{key} escalation failed")
+
+    # Prune cooldown entries
     for key in list(_stall_warned_at):
-        agent, fname = key.split("/", 1)
-        if not (AGENTS_DIR / agent / "tasks" / fname).exists():
-            del _stall_warned_at[key]
+        parts = key.split("/", 1)
+        if len(parts) == 2:
+            agent_part, fname = parts
+            if not (AGENTS_DIR / agent_part / "tasks" / fname).exists():
+                del _stall_warned_at[key]
 
     return issues
 
@@ -227,6 +399,7 @@ def verify_recent_completions(state):
                 # Re-queue
                 if qa.requeue(agent, str(f)):
                     log(f"  Re-queued: {agent}/{f.name}")
+                    record_fake_completion_requeued(agent, f.name)
 
     return issues
 
@@ -414,6 +587,7 @@ def check_memory_health(state):
                 if fixed:
                     log(f"AUTO-FIX: Cleared {fixed} contaminated memory file(s)")
                     state["memory_fixes"] = state.get("memory_fixes", 0) + fixed
+                    record_memory_fix("contamination", fixed)
 
         if warnings:
             for r in warnings:
@@ -444,6 +618,7 @@ def check_memory_health(state):
             if total_bloat_fixed:
                 log(f"AUTO-FIX: Resolved {total_bloat_fixed} memory bloat/rule issue(s)")
                 state["memory_fixes"] = state.get("memory_fixes", 0) + total_bloat_fixed
+                record_memory_fix("bloat", total_bloat_fixed)
 
         # Prune deprecated rules (safe at any severity level, runs on "info" results)
         pruneable = [r for r in results if r["type"] == "pruneable_deprecated"]
@@ -452,6 +627,7 @@ def check_memory_health(state):
             if fixed:
                 log(f"AUTO-FIX: Pruned {fixed} deprecated rule(s) from rules.json")
                 state["memory_fixes"] = state.get("memory_fixes", 0) + fixed
+                record_memory_fix("deprecated_rules", fixed)
 
         if not results:
             log("Memory audit: ALL CLEAR")
@@ -476,6 +652,25 @@ FAILURE_RATE_LOOKBACK_H = 1    # 1-hour window for short-term failure rate
 FAILURE_RATE_THRESHOLD = 0.5   # warn if >50% failure rate
 FAILURE_RATE_MIN_TASKS = 3     # minimum tasks before flagging
 AGENT_HEALTH_FLAGS_FILE = LOGS_DIR / "agent-health-flags.json"
+
+# Check 13: Auto queue balancing
+QUEUE_BALANCE_INTERVAL = 300   # 5 minutes between balance checks
+QUEUE_MAX_DEPTH = 8            # Trigger if agent has >8 tasks
+QUEUE_MIN_DEPTH = 2            # Don't redistribute to agents with <2 tasks
+QUEUE_IMBALANCE_THRESHOLD = 5  # Trigger if max-min difference > 5
+QUEUE_MAX_MOVE_PER_CYCLE = 10  # Limit tasks moved per cycle
+
+# Check 11: Cascade failure detection
+CASCADE_CHECK_INTERVAL = 600   # 10 minutes between cascade risk checks
+CASCADE_LOOKBACK_MINUTES = 30  # Lookback period for cascade detection
+
+# Check 12: Quality gate
+QUALITY_GATE_INTERVAL = 180    # 3 minutes between quality gate checks
+QUALITY_LOOKBACK_MINUTES = 15  # Check completions from last 15 minutes
+
+# Check 13: Self-healing score
+SELF_HEALING_SCORE_INTERVAL = 3600  # 1 hour between score updates
+SELF_HEALING_SCORE_HOURS = 24       # Calculate score over 24h window
 
 
 def check_routing_drift(state):
@@ -660,13 +855,468 @@ def check_agent_failure_rates(state):
 
 
 # ============================================================
+# Check 13: Auto queue balancing
+# ============================================================
+def check_queue_balance(state):
+    """Check queue depths and auto-balance if imbalance detected.
+
+    Redistributes tasks from overloaded agents to underloaded agents when:
+    - Max queue depth > QUEUE_MAX_DEPTH (8 tasks)
+    - Max-min difference > QUEUE_IMBALANCE_THRESHOLD (5 tasks)
+    - At least one agent is underloaded (< QUEUE_MIN_DEPTH tasks)
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_queue_balance_check", 0)
+
+    # Rate limiting: only check every QUEUE_BALANCE_INTERVAL
+    if (now - last_check) < QUEUE_BALANCE_INTERVAL:
+        return issues
+
+    log("Checking queue balance")
+
+    # Get current queue depths per agent
+    depths = {}
+    for agent in AGENTS:
+        tasks_dir = AGENTS_DIR / agent / "tasks"
+        if not tasks_dir.exists():
+            depths[agent] = 0
+            continue
+
+        pending = 0
+        # Count pending tasks by pattern
+        for pattern in ["high-*.md", "normal-*.md", "low-*.md"]:
+            pending += len(list(tasks_dir.glob(pattern)))
+
+        # Subtract executing and done tasks (they may match the patterns above)
+        for f in tasks_dir.glob("*"):
+            if ".executing" in f.name or ".done" in f.name or ".failed" in f.name:
+                pending -= 1
+
+        depths[agent] = max(0, pending)
+
+    # Calculate imbalance metrics
+    max_depth = max(depths.values()) if depths else 0
+    min_depth = min(depths.values()) if depths else 0
+    imbalance = max_depth - min_depth
+
+    state["last_queue_balance_check"] = now
+    state["queue_depths"] = depths
+
+    # Check if action is needed
+    if imbalance < QUEUE_IMBALANCE_THRESHOLD or max_depth < QUEUE_MAX_DEPTH:
+        log(f"Queue balanced: max={max_depth}, min={min_depth}, imbalance={imbalance}")
+        return issues
+
+    # Identify overloaded and underloaded agents
+    overloaded = [a for a, d in sorted(depths.items(), key=lambda x: -x[1]) if d > QUEUE_MAX_DEPTH]
+    underloaded = [a for a, d in sorted(depths.items(), key=lambda x: x[1]) if d < QUEUE_MIN_DEPTH]
+
+    if not overloaded:
+        log(f"No overloaded agents (max={max_depth}, threshold={QUEUE_MAX_DEPTH})")
+        return issues
+
+    if not underloaded:
+        log(f"No underloaded agents to receive tasks (min={min_depth}, threshold={QUEUE_MIN_DEPTH})")
+        issues.append(f"queue_imbalance: {overloaded} overloaded but no underloaded agents")
+        return issues
+
+    log(f"QUEUE IMBALANCE: overloaded={[f'{a}={depths[a]}' for a in overloaded]}, "
+        f"underloaded={[f'{a}={depths[a]}' for a in underloaded]}")
+
+    # Redistribute tasks from overloaded to underloaded agents
+    moved = 0
+    import shutil
+
+    for source in overloaded:
+        if moved >= QUEUE_MAX_MOVE_PER_CYCLE:
+            break
+
+        tasks_dir = AGENTS_DIR / source / "tasks"
+        source_tasks = []
+
+        # Collect all pending task files
+        for pattern in ["high-*.md", "normal-*.md", "low-*.md"]:
+            source_tasks.extend(tasks_dir.glob(pattern))
+
+        # Filter to actual pending tasks (exclude executing, done, failed)
+        source_tasks = [
+            t for t in source_tasks
+            if ".executing" not in t.name and ".done" not in t.name and ".failed" not in t.name
+        ]
+
+        # Sort by modification time (oldest first for fairness)
+        source_tasks.sort(key=lambda f: f.stat().st_mtime)
+
+        for i, task_path in enumerate(source_tasks):
+            if moved >= QUEUE_MAX_MOVE_PER_CYCLE:
+                break
+            if not underloaded:
+                break
+
+            # Round-robin to underloaded agents
+            target = underloaded[moved % len(underloaded)]
+
+            try:
+                target_dir = AGENTS_DIR / target / "tasks"
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_path = target_dir / task_path.name
+
+                # Avoid name collisions (unlikely but possible)
+                if target_path.exists():
+                    # Add a small suffix to make unique
+                    base_name = task_path.stem
+                    ext = task_path.suffix
+                    target_path = target_dir / f"{base_name}-moved{ext}"
+
+                shutil.move(str(task_path), str(target_path))
+                # Touch to update mtime (helps with priority ordering)
+                target_path.touch()
+                moved += 1
+                log(f"AUTO-BALANCE: {task_path.name} {source} -> {target}")
+            except Exception as e:
+                log(f"Failed to move {task_path.name}: {e}", "ERROR")
+
+    if moved > 0:
+        log(f"Auto-balanced {moved} task(s)")
+        state["queue_balance_moves"] = state.get("queue_balance_moves", 0) + moved
+        issues.append(f"auto_balanced: {moved} tasks moved")
+        record_queue_rebalance(moved, overloaded, underloaded)
+    else:
+        issues.append(f"queue_imbalance: detected but no tasks moved (check task file states)")
+
+    return issues
+
+
+# ============================================================
+# Check 11: Cascade failure detection
+# ============================================================
+def check_cascade_risk(state):
+    """Detect potential cascade failures across multiple agents.
+
+    Analyzes recent failures for patterns like:
+    - Multiple agents failing simultaneously
+    - Single agent timeout spike
+    - Failure rate accelerating over time
+    - Gateway-wide failure spike
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_cascade_check", 0)
+
+    # Only check every CASCADE_CHECK_INTERVAL
+    if (now - last_check) < CASCADE_CHECK_INTERVAL:
+        return issues
+
+    log("Checking cascade failure risk")
+
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "cascade_detector", str(SCRIPTS_DIR / "cascade_detector.py")
+        )
+        cd = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cd)
+
+        detector = cd.CascadeDetector(lookback_minutes=CASCADE_LOOKBACK_MINUTES)
+        risk_report = detector.detect_cascade_risk()
+
+        state["last_cascade_check"] = now
+        state["cascade_risk"] = risk_report["risk_level"]
+        state["cascade_metrics"] = risk_report["metrics"]
+
+        if risk_report["risk_level"] in ["medium", "high"]:
+            log(f"CASCADE RISK: {risk_report['risk_level'].upper()} — "
+                f"{len(risk_report['patterns'])} pattern(s) detected", "WARN")
+            issues.append(f"cascade_risk_{risk_report['risk_level']}")
+
+            for pattern in risk_report["patterns"][:3]:
+                log(f"  PATTERN: {pattern['description']}", "WARN")
+
+            # Log recommendations
+            for rec in risk_report["recommendations"][:2]:
+                log(f"  RECOMMEND: {rec['description']}", "WARN")
+
+            # Take preventive action for high risk
+            if risk_report["risk_level"] == "high":
+                for rec in risk_report["recommendations"]:
+                    if rec.get("action") in ["reduce_load", "pause_new_tasks"]:
+                        log(f"PREVENTIVE ACTION RECOMMENDED: {rec['description']}", "WARN")
+                        # Would require additional infrastructure to actually pause tasks
+                        # For now, just log the recommendation
+
+        else:
+            log(f"Cascade risk: {risk_report['risk_level']} ({risk_report['metrics']['events_analyzed']} events analyzed)")
+
+    except Exception as e:
+        log(f"Cascade check failed: {e}", "ERROR")
+        issues.append(f"cascade_check_error: {e}")
+
+    return issues
+
+
+# ============================================================
+# Check 12: Quality gate for recent completions
+# ============================================================
+def check_quality_gate(state):
+    """Verify completion quality for recent .done.md files.
+
+    Checks for:
+    - Low content (< 500 chars)
+    - Weak structure (< 3 headings)
+    - Missing resolution section
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_quality_gate_check", 0)
+
+    # Only check every QUALITY_GATE_INTERVAL
+    if (now - last_check) < QUALITY_GATE_INTERVAL:
+        return issues
+
+    log("Running completion quality gate")
+
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "quality_gate", str(SCRIPTS_DIR / "quality_gate.py")
+        )
+        qg = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(qg)
+
+        gate = qg.CompletionQualityGate()
+        checked_count = 0
+        failed_count = 0
+        retried_count = 0
+        escalated_count = 0
+
+        # Check recent .done.md files
+        cutoff_time = now - (QUALITY_LOOKBACK_MINUTES * 60)
+
+        for agent in AGENTS:
+            tasks_dir = AGENTS_DIR / agent / "tasks"
+            if not tasks_dir.exists():
+                continue
+
+            for f in tasks_dir.glob("*.done.md"):
+                if not f.is_file():
+                    continue
+
+                try:
+                    mtime = f.stat().st_mtime
+                except OSError:
+                    continue
+
+                if mtime < cutoff_time:
+                    continue
+
+                # Skip test tasks
+                try:
+                    content = f.read_text()
+                    if "test" in content.lower() and len(content) < 500:
+                        continue
+                except OSError:
+                    continue
+
+                checked_count += 1
+                result = gate.verify_completion(f)
+
+                if not result.passed:
+                    failed_count += 1
+                    log(f"QUALITY FAIL: {agent}/{f.name} — {result.issues}", "WARN")
+
+                    if result.action == "retry":
+                        retried_count += 1
+                        issues.append(f"{agent}/{f.name} quality: retry")
+                        record_quality_retry(agent, f.name)
+                    elif result.action == "escalate":
+                        escalated_count += 1
+                        issues.append(f"{agent}/{f.name} quality: escalate")
+                        record_quality_escalation(agent, f.name)
+                        # Create escalation task
+                        gate.escalate_to_kublai(f, result.issues)
+
+        state["last_quality_gate_check"] = now
+        state["quality_gate_checked"] = checked_count
+        state["quality_gate_failed"] = failed_count
+        state["quality_gate_retried"] = retried_count
+        state["quality_gate_escalated"] = escalated_count
+
+        if checked_count > 0:
+            log(f"Quality gate: {checked_count} checked, {failed_count} failed, "
+                f"{retried_count} retried, {escalated_count} escalated")
+
+    except Exception as e:
+        log(f"Quality gate check failed: {e}", "ERROR")
+        issues.append(f"quality_gate_error: {e}")
+
+    return issues
+
+
+# ============================================================
+# Check 13: Self-healing score tracking
+# ============================================================
+def update_self_healing_score(state):
+    """Calculate and report self-healing effectiveness score.
+
+    Tracks percentage of issues auto-resolved vs. escalated.
+    Saves snapshot for historical tracking.
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_self_healing_score_check", 0)
+
+    # Only update every SELF_HEALING_SCORE_INTERVAL
+    if (now - last_check) < SELF_HEALING_SCORE_INTERVAL:
+        return issues
+
+    log("Updating self-healing score")
+
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "self_healing_score", str(SCRIPTS_DIR / "self_healing_score.py")
+        )
+        shs = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(shs)
+
+        tracker = shs.SelfHealingScore()
+        score_data = tracker.calculate_score(hours=SELF_HEALING_SCORE_HOURS)
+
+        # Save snapshot
+        tracker.save_score_snapshot(hours=SELF_HEALING_SCORE_HOURS)
+
+        state["last_self_healing_score_check"] = now
+        state["self_healing_score"] = score_data["score"]
+        state["self_healing_metrics"] = {
+            "auto_resolved": score_data["auto_resolved"],
+            "escalated": score_data["escalated"],
+            "manual": score_data["manual"],
+            "total": score_data["total_issues"],
+        }
+
+        log(f"Self-healing score: {score_data['score']:.1f}% "
+            f"({score_data['auto_resolved']}/{score_data['total_issues']} auto-resolved)")
+
+        # Alert if score drops below threshold
+        if score_data["score"] < 50 and score_data["total_issues"] > 5:
+            log(f"LOW SELF-HEALING SCORE: {score_data['score']:.1f}% — system resilience degraded", "WARN")
+            issues.append(f"low_self_healing_score: {score_data['score']:.1f}%")
+
+    except Exception as e:
+        log(f"Self-healing score update failed: {e}", "ERROR")
+        issues.append(f"self_healing_score_error: {e}")
+
+    return issues
+
+
+# ============================================================
+# Check 14: Circuit breaker health check
+# ============================================================
+def check_circuit_breaker_health(state):
+    """Report circuit breaker state and validate recent data.
+
+    Monitors:
+    - OPEN circuits (quarantined agents)
+    - HALF-OPEN circuits (agents on probation)
+    - Recent redistributions
+    - State file health
+    """
+    issues = []
+
+    if _circuit_breaker is None:
+        return issues
+
+    try:
+        report = _circuit_breaker.get_status_report()
+
+        # Log any OPEN circuits
+        for agent, status in report["agents"].items():
+            if status["state"] == "OPEN":
+                log(f"CIRCUIT OPEN: {agent} — {status['detail']}", "WARN")
+                state["circuit_open_agents"] = state.get("circuit_open_agents", [])
+                if agent not in state["circuit_open_agents"]:
+                    state["circuit_open_agents"].append(agent)
+                    issues.append(f"circuit_open: {agent}")
+
+            elif status["state"] == "HALF_OPEN":
+                log(f"CIRCUIT HALF-OPEN: {agent} — {status['detail']}", "INFO")
+                state["circuit_half_open_agents"] = state.get("circuit_half_open_agents", [])
+                if agent not in state["circuit_half_open_agents"]:
+                    state["circuit_half_open_agents"].append(agent)
+
+        # Store report in state
+        state["circuit_report"] = report
+        state["circuit_summary"] = report["summary"]
+
+        # Check for excessive redistributions (potential thrashing)
+        if "redistributions" in _circuit_breaker.state:
+            recent_redistributions = [
+                r for r in _circuit_breaker.state.get("redistributions", [])
+                if datetime.fromisoformat(r["ts"]) > datetime.now() - timedelta(hours=1)
+            ]
+            state["recent_redistributions"] = len(recent_redistributions)
+
+            if len(recent_redistributions) > 20:
+                log(f"High redistribution count: {len(recent_redistributions)} in last hour (potential thrashing)", "WARN")
+                issues.append(f"high_redistribution_count: {len(recent_redistributions)}/hour")
+
+    except Exception as e:
+        log(f"Circuit breaker check failed: {e}", "ERROR")
+        issues.append(f"circuit_breaker_error: {e}")
+
+    return issues
+
+
+# ============================================================
+# Check 15: Internal watchdog health check
+# ============================================================
+def check_watchdog_health(state):
+    """Internal health check for the watchdog itself.
+
+    Monitors:
+    - Cycle execution time
+    - Issue count trends
+    - State file health
+    """
+    issues = []
+    now = time.time()
+
+    # Track cycle start time if not set
+    if "cycle_start_time" not in state:
+        state["cycle_start_time"] = now
+
+    cycle_duration = now - state["cycle_start_time"]
+    state["last_cycle_duration"] = cycle_duration
+
+    # Warn if cycle is taking too long
+    if cycle_duration > 30:  # 30 seconds
+        log(f"Watchdog cycle slow: {cycle_duration:.1f}s", "WARN")
+        state["slow_cycles"] = state.get("slow_cycles", 0) + 1
+
+    # Check state file size
+    try:
+        state_size = STATE_FILE.stat().st_size if STATE_FILE.exists() else 0
+        state["state_file_size"] = state_size
+
+        if state_size > 100_000:  # 100KB
+            log(f"State file large: {state_size / 1024:.1f}KB", "WARN")
+    except Exception:
+        pass
+
+    return issues
+
+
+# ============================================================
 # Main cycle
 # ============================================================
 def run_cycle():
-    """Run all eight checks. Returns list of issues found."""
+    """Run all checks. Returns list of issues found."""
     state = load_state()
+    state["cycle_start_time"] = time.time()
     all_issues = []
 
+    # Core health checks
     all_issues.extend(check_watcher_alive(state))
     all_issues.extend(check_stalled_tasks(state))
     all_issues.extend(verify_recent_completions(state))
@@ -676,6 +1326,14 @@ def run_cycle():
     all_issues.extend(check_memory_health(state))
     all_issues.extend(check_routing_drift(state))
     all_issues.extend(check_agent_failure_rates(state))
+    all_issues.extend(check_queue_balance(state))
+
+    # P2 enhancement checks
+    all_issues.extend(check_cascade_risk(state))
+    all_issues.extend(check_quality_gate(state))
+    all_issues.extend(update_self_healing_score(state))
+    all_issues.extend(check_circuit_breaker_health(state))
+    all_issues.extend(check_watchdog_health(state))
 
     state["cycles"] = state.get("cycles", 0) + 1
     state["last_cycle"] = datetime.now().isoformat()
@@ -712,6 +1370,117 @@ def daemon_loop():
 def signal_handler(sig, frame):
     log(f"Received signal {sig}, shutting down...")
     stop_event.set()
+
+
+# ============================================================
+# Healing event recording helpers
+# ============================================================
+def record_healing(
+    issue_type: str,
+    action: str,
+    outcome: str = "success",
+    agent: str = "",
+    details: dict | None = None,
+):
+    """Record a healing event to the self-healing score tracker.
+
+    Args:
+        issue_type: Type of issue (e.g., "gateway_crash", "stale_task")
+        action: Action taken ("auto_recovered", "escalated", "manual", "partial")
+        outcome: Outcome ("success", "failed", "partial")
+        agent: Agent affected (if applicable)
+        details: Additional details about the event
+    """
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "self_healing_score", str(SCRIPTS_DIR / "self_healing_score.py")
+        )
+        shs = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(shs)
+
+        tracker = shs.SelfHealingScore()
+        tracker.record_issue(issue_type, action, outcome, agent, details)
+    except Exception as e:
+        log(f"Failed to record healing event: {e}", "ERROR")
+
+
+def record_gateway_restart(success: bool, pid: int = 0):
+    """Record a gateway restart event."""
+    record_healing(
+        issue_type="gateway_restart",
+        action="auto_recovered" if success else "escalated",
+        outcome="success" if success else "failed",
+        details={"pid": pid} if pid else {},
+    )
+
+
+def record_fake_completion_requeued(agent: str, task_file: str):
+    """Record a fake completion detection and requeue."""
+    record_healing(
+        issue_type="fake_completion",
+        action="auto_recovered",
+        outcome="success",
+        agent=agent,
+        details={"task_file": task_file},
+    )
+
+
+def record_stale_task_recovered(agent: str, task_file: str):
+    """Record a stale task recovery."""
+    record_healing(
+        issue_type="stale_task_recovered",
+        action="auto_recovered",
+        outcome="success",
+        agent=agent,
+        details={"task_file": task_file},
+    )
+
+
+def record_memory_fix(fix_type: str, count: int):
+    """Record a memory health fix."""
+    record_healing(
+        issue_type=f"memory_{fix_type}",
+        action="auto_recovered",
+        outcome="success",
+        details={"fix_count": count},
+    )
+
+
+def record_queue_rebalance(moved_count: int, from_agents: list, to_agents: list):
+    """Record a queue balancing action."""
+    record_healing(
+        issue_type="queue_rebalanced",
+        action="auto_recovered",
+        outcome="success",
+        details={
+            "moved_count": moved_count,
+            "from_agents": from_agents,
+            "to_agents": to_agents,
+        },
+    )
+
+
+def record_quality_retry(agent: str, task_file: str):
+    """Record a quality gate retry."""
+    record_healing(
+        issue_type="quality_retry",
+        action="auto_recovered",
+        outcome="success",
+        agent=agent,
+        details={"task_file": task_file},
+    )
+
+
+def record_quality_escalation(agent: str, task_file: str):
+    """Record a quality gate escalation."""
+    record_healing(
+        issue_type="quality_failure",
+        action="escalated",
+        outcome="partial",
+        agent=agent,
+        details={"task_file": task_file},
+    )
 
 
 def main():

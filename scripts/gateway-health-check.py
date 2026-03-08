@@ -13,6 +13,9 @@ import subprocess
 import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from enum import Enum
+import time
 
 # Configuration
 LOG_DIR = Path("/Users/kublai/.openclaw/logs")
@@ -35,6 +38,212 @@ GATEWAYS = [
 ]
 
 ALERT_LOG = LOG_DIR / "gateway-health-alerts.jsonl"
+
+
+# ============================================================
+# Smart Gateway Pre-Flight Check - P0 Self-Healing Enhancement
+# ============================================================
+
+class PreflightStatus(Enum):
+    """Possible pre-flight check results."""
+    CLEAR = "clear"                    # Port free, safe to start
+    ALREADY_RUNNING = "already_running"  # Our gateway owns the port
+    ZOMBIE_CLEARED = "zombie_cleared"    # Killed zombie, port will free
+    PORT_CONFLICT = "port_conflict"      # Another process owns port
+    LAUNCHD_MISMATCH = "launchd_mismatch"  # launchd says not running but port taken
+
+
+@dataclass
+class PreflightResult:
+    """Result of gateway pre-flight check."""
+    status: PreflightStatus
+    action: str  # use_existing, start_fresh, alert_only, clear_zombie
+    pid: Optional[int] = None
+    reason: Optional[str] = None
+    process_command: Optional[str] = None
+
+
+def get_process_on_port(port: int, timeout: int = 5) -> Optional[int]:
+    """Get PID of process listening on a port using lsof."""
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f"-i:{port}", "-sTCP:LISTEN"],
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return int(result.stdout.strip())
+        return None
+    except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
+        return None
+
+
+def is_our_gateway(label: str, port_pid: int) -> bool:
+    """Check if the PID on the port belongs to our launchd service."""
+    # Get the PID from launchd for our service
+    try:
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        for line in result.stdout.split("\n"):
+            parts = line.strip().split("\t")
+            if len(parts) >= 3 and parts[2] == label:
+                launchd_pid = int(parts[0]) if parts[0] != "-" else None
+                if launchd_pid and launchd_pid == port_pid:
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+def get_process_command(pid: int) -> Optional[str]:
+    """Get the command line for a process."""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()[:200]  # Truncate long commands
+        return None
+    except Exception:
+        return None
+
+
+def force_kill_process(pid: int, timeout: int = 10) -> bool:
+    """Force kill a process with SIGKILL and verify termination."""
+    try:
+        # Try SIGTERM first (graceful)
+        subprocess.run(["kill", str(pid)], capture_output=True, timeout=5)
+        time.sleep(1)
+
+        # Check if still running
+        try:
+            os.kill(pid, 0)
+            # Still alive, use SIGKILL
+            subprocess.run(["kill", "-9", str(pid)], capture_output=True, timeout=5)
+            time.sleep(0.5)
+        except ProcessLookupError:
+            return True
+
+        # Final verification
+        try:
+            os.kill(pid, 0)
+            return False  # Still running
+        except ProcessLookupError:
+            return True  # Dead
+    except Exception:
+        return False
+
+
+def wait_for_port_release(port: int, timeout: int = 10) -> bool:
+    """Poll until port is free or timeout expires."""
+    start = time.time()
+    while (time.time() - start) < timeout:
+        if get_process_on_port(port) is None:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def gateway_preflight_check(label: str, port: int) -> PreflightResult:
+    """Comprehensive pre-flight check before gateway operations.
+
+    Detects:
+    - Our gateway already running (use existing)
+    - Zombie processes (port taken but launchd says not running)
+    - Port conflicts with other processes (alert only)
+
+    Returns:
+        PreflightResult with recommended action
+    """
+    # 1. Check if port is in use
+    port_pid = get_process_on_port(port)
+
+    # 2. Check launchd status
+    try:
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        launchd_running = False
+        launchd_pid = None
+        for line in result.stdout.split("\n"):
+            parts = line.strip().split("\t")
+            if len(parts) >= 3 and parts[2] == label:
+                launchd_pid = int(parts[0]) if parts[0] != "-" else None
+                launchd_running = launchd_pid is not None and launchd_pid > 0
+                break
+    except Exception:
+        launchd_running = False
+        launchd_pid = None
+
+    # 3. If port free, clear to start
+    if port_pid is None:
+        return PreflightResult(
+            status=PreflightStatus.CLEAR,
+            action="start_gateway",
+            reason="Port is free"
+        )
+
+    # 4. Port is in use - check if it's our gateway
+    if launchd_running and launchd_pid == port_pid:
+        # Our gateway is already healthy
+        return PreflightResult(
+            status=PreflightStatus.ALREADY_RUNNING,
+            action="use_existing",
+            pid=port_pid,
+            reason=f"Our gateway (PID {port_pid}) owns port {port}"
+        )
+
+    # 5. Check if port PID matches our gateway command (edge case: launchd out of sync)
+    port_command = get_process_command(port_pid)
+    if port_command and "gateway" in port_command.lower():
+        # Looks like our gateway but launchd doesn't know about it
+        if is_our_gateway(label, port_pid):
+            return PreflightResult(
+                status=PreflightStatus.ALREADY_RUNNING,
+                action="use_existing",
+                pid=port_pid,
+                reason=f"Gateway process (PID {port_pid}) running but launchd out of sync"
+            )
+
+    # 6. Zombie detection: port taken but launchd says not running
+    if port_pid and not launchd_running:
+        command = get_process_command(port_pid)
+        return PreflightResult(
+            status=PreflightStatus.ZOMBIE_CLEARED,
+            action="clear_zombie",
+            pid=port_pid,
+            reason=f"Zombie process (PID {port_pid}, cmd: {command})",
+            process_command=command
+        )
+
+    # 7. Port conflict: another process owns the port
+    if port_pid:
+        command = get_process_command(port_pid) or "unknown"
+        return PreflightResult(
+            status=PreflightStatus.PORT_CONFLICT,
+            action="alert_only",
+            pid=port_pid,
+            reason=f"Port {port} owned by {command}",
+            process_command=command
+        )
+
+    # 8. Default: clear to start
+    return PreflightResult(
+        status=PreflightStatus.CLEAR,
+        action="start_gateway",
+        reason="No conflicts detected"
+    )
 
 
 class GatewayHealthChecker:
@@ -299,20 +508,64 @@ source: gateway-health-check
             elif alert_for_this == "WARNING" and self.alert_level == "OK":
                 self.alert_level = "WARNING"
 
-            # Take action if critical
+            # Take action if critical - with pre-flight check
             action_taken = "none"
             if alert_for_this in ["CRITICAL", "HIGH"]:
-                restarted, restart_msg = self.restart_gateway(gateway["label"])
-                action_taken = f"restart_attempt: {'success' if restarted else 'failed'} - {restart_msg}"
+                # Run pre-flight check before any restart attempt
+                preflight = gateway_preflight_check(gateway["label"], gateway["port"])
+                result["preflight"] = {
+                    "status": preflight.status.value,
+                    "action": preflight.action,
+                    "pid": preflight.pid,
+                    "reason": preflight.reason
+                }
 
-                # Create incident
-                incident_id = self.create_incident(gateway["name"], issues, action_taken)
-                result["incident_id"] = incident_id
-                result["action_taken"] = action_taken
+                # Handle pre-flight results
+                if preflight.status == PreflightStatus.ALREADY_RUNNING:
+                    # Our gateway is healthy, just mark as recovered
+                    action_taken = f"preflight: using_existing_gateway (PID {preflight.pid})"
+                    result["status"] = "healthy"
+                    result["recovered"] = True
+                    log(f"Gateway {gateway['name']} already running (PID {preflight.pid}), skipping restart")
 
-                # Create self-task for follow-up
-                task_file = self.create_self_task(gateway["name"], issues)
-                result["self_task"] = task_file
+                elif preflight.status == PreflightStatus.ZOMBIE_CLEARED:
+                    # Kill zombie process and restart
+                    log(f"Clearing zombie gateway process (PID {preflight.pid}) for {gateway['name']}")
+                    if force_kill_process(preflight.pid):
+                        wait_for_port_release(gateway["port"], timeout=10)
+                        restarted, restart_msg = self.restart_gateway(gateway["label"])
+                        action_taken = f"zombie_cleared + restart: {'success' if restarted else 'failed'} - {restart_msg}"
+                    else:
+                        action_taken = f"zombie_cleared_failed: could not kill PID {preflight.pid}"
+
+                elif preflight.status == PreflightStatus.PORT_CONFLICT:
+                    # Don't restart - another process owns the port
+                    action_taken = f"preflight: port_conflict - {preflight.reason}"
+                    log(f"Gateway {gateway['name']}: PORT CONFLICT - {preflight.reason}", "ERROR")
+                    # Don't attempt restart, create alert-only incident
+                    incident_id = self.create_incident(
+                        gateway["name"],
+                        issues + [f"Port conflict: {preflight.reason}"],
+                        action_taken
+                    )
+                    result["incident_id"] = incident_id
+                    result["action_taken"] = action_taken
+                    result["port_conflict"] = True
+
+                else:
+                    # Normal restart path
+                    restarted, restart_msg = self.restart_gateway(gateway["label"])
+                    action_taken = f"restart_attempt: {'success' if restarted else 'failed'} - {restart_msg}"
+
+                # Create incident for restarts (not for already_running case)
+                if preflight.status != PreflightStatus.ALREADY_RUNNING:
+                    incident_id = self.create_incident(gateway["name"], issues, action_taken)
+                    result["incident_id"] = incident_id
+                    result["action_taken"] = action_taken
+
+                    # Create self-task for follow-up
+                    task_file = self.create_self_task(gateway["name"], issues)
+                    result["self_task"] = task_file
 
             self.results.append(result)
 

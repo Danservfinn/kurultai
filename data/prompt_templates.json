@@ -1,0 +1,148 @@
+{
+  "$schema": "./prompt-template-schema.json",
+  "version": "1.0.0",
+  "last_updated": "2026-03-08",
+  "description": "Versioned library of prompt templates used by Kublai for task creation across the Kurultai agent system.",
+  "templates": {
+    "agent-protocol-v1": {
+      "version": 1,
+      "created": "2026-02-15",
+      "deprecated": "2026-03-01",
+      "status": "deprecated",
+      "structure": [
+        "task_description",
+        "context_layer",
+        "constraints"
+      ],
+      "sections": {
+        "task_description": "# Task: {imperative_title}",
+        "context_layer": "## Context\n{background_information}",
+        "constraints": "## Constraints\n{boundaries}"
+      },
+      "avg_quality": 6.5,
+      "sample_size": 120,
+      "recommended_for": ["temujin", "ogedei", "jochi"],
+      "replaced_by": "agent-protocol-v2",
+      "notes": "Legacy protocol with minimal structure. Sufficient for simple tasks but lacks clear success criteria."
+    },
+    "agent-protocol-v2": {
+      "version": 2,
+      "created": "2026-03-01",
+      "status": "active",
+      "structure": [
+        "task_description",
+        "context_layer",
+        "success_criteria",
+        "constraints",
+        "agent_guidance"
+      ],
+      "sections": {
+        "task_description": "# Task: {imperative_title}",
+        "context_layer": "## 1. Context & Background\n\n### Trigger\n{what_caused_task}\n\n### Background\n{relevant_history}\n\n### Why This Matters\n{business_impact}\n\n### Related Work\n{related_links}",
+        "success_criteria": "## 2. Success Criteria\n\n### Must Have\n- {specific_outcome_1}\n- {specific_outcome_2}\n\n### Should Have\n- {important_outcome}\n\n### Nice to Have\n- {bonus_outcome}\n\n### Validation Steps\n1. {verification_step_1}\n2. {verification_step_2}",
+        "constraints": "## 3. Constraints & Boundaries\n\n### Must NOT Do\n- {explicit_boundary_1}\n- {explicit_boundary_2}\n\n### Limitations\n{technical_limitations}\n\n### Dependencies\n{required_prerequisites}",
+        "agent_guidance": "## 4. Agent-Specific Guidance\n\n### For {agent_name}\n{domain_context}\n\n### Relevant Skills\n- {skill_hint}: {when_to_use}\n\n### Expected Output Format\n{output_specification}"
+      },
+      "avg_quality": 8.2,
+      "sample_size": 42,
+      "recommended_for": ["temujin", "ogedei", "jochi"],
+      "tags": ["default", "implementation", "operations"],
+      "notes": "Current standard protocol with comprehensive structure. Includes clear success criteria and explicit boundaries."
+    },
+    "research-protocol-v1": {
+      "version": 1,
+      "created": "2026-03-01",
+      "status": "active",
+      "structure": [
+        "research_question",
+        "context_sources",
+        "validation_criteria",
+        "output_format"
+      ],
+      "sections": {
+        "research_question": "# Task: {imperative_title}\n\n## Research Question\n{what_to_investigate}",
+        "context_sources": "## 1. Context & Background\n\n### Trigger\n{what_caused_research}\n\n### Background\n{relevant_history}\n\n### Why This Matters\n{impact}",
+        "validation_criteria": "## 2. Success Criteria\n\n### Must Have\n- {specific_finding_1}\n- {specific_finding_2}\n\n### Validation\n- {verification_method}",
+        "output_format": "## 3. Expected Output\n\n{output_specification}\n\n## 4. Resources\n\n### Sources to Check\n- {source_1}\n- {source_2}"
+      },
+      "avg_quality": 7.8,
+      "sample_size": 35,
+      "recommended_for": ["mongke"],
+      "tags": ["research", "analysis"],
+      "notes": "Optimized for research tasks with emphasis on source validation and structured findings."
+    },
+    "minimal-context": {
+      "version": 1,
+      "created": "2026-02-20",
+      "status": "active",
+      "structure": [
+        "task_description",
+        "execution_directive"
+      ],
+      "sections": {
+        "task_description": "# Task: {imperative_title}\n\n{brief_context}",
+        "execution_directive": "Execute this task completely using your tools."
+      },
+      "avg_quality": 5.1,
+      "sample_size": 15,
+      "recommended_for": ["all"],
+      "tags": ["urgent", "emergency", "simple"],
+      "notes": "Streamlined protocol for urgent tasks or well-understood work. Faster to create but may require clarification."
+    },
+    "writing-protocol-v1": {
+      "version": 1,
+      "created": "2026-03-01",
+      "status": "active",
+      "structure": [
+        "task_description",
+        "context_layer",
+        "success_criteria",
+        "tone_guidelines",
+        "agent_guidance"
+      ],
+      "sections": {
+        "task_description": "# Task: {imperative_title}",
+        "context_layer": "## 1. Context & Background\n\n### Trigger\n{what_caused_task}\n\n### Background\n{relevant_history}\n\n### Why This Matters\n{impact}",
+        "success_criteria": "## 2. Success Criteria\n\n### Must Have\n- {content_requirement_1}\n- {content_requirement_2}\n\n### Should Have\n- {enhancement}\n\n### Validation Steps\n1. {verification_step}",
+        "tone_guidelines": "## 3. Tone & Style\n\n- {tone_guideline_1}\n- {tone_guideline_2}",
+        "agent_guidance": "## 4. Agent-Specific Guidance\n\n### For {agent_name}\n{writing_context}\n\n### Relevant Skills\n- {skill_hint}: {when_to_use}\n\n### Expected Output Format\n{output_specification}"
+      },
+      "avg_quality": 7.5,
+      "sample_size": 28,
+      "recommended_for": ["chagatai"],
+      "tags": ["writing", "documentation", "blog"],
+      "notes": "Specialized protocol for writing tasks with emphasis on tone, style, and content structure."
+    },
+    "debugging-protocol-v1": {
+      "version": 1,
+      "created": "2026-03-05",
+      "status": "active",
+      "structure": [
+        "task_description",
+        "problem_context",
+        "investigation_steps",
+        "success_criteria",
+        "agent_guidance"
+      ],
+      "sections": {
+        "task_description": "# Task: {imperative_title}",
+        "problem_context": "## 1. Context & Background\n\n### Trigger\n{anomaly_detected}\n\n### Background\n{system_state}\n\n### Why This Matters\n{impact_assessment}",
+        "investigation_steps": "## 2. Investigation Approach\n\n### Phase 1: Data Collection\n1. {collection_step_1}\n2. {collection_step_2}\n\n### Phase 2: Analysis\n1. {analysis_step}\n\n### Phase 3: Resolution\n1. {resolution_step}",
+        "success_criteria": "## 3. Success Criteria\n\n### Must Have\n- [ ] Root cause identified\n- [ ] {resolution_criterion}",
+        "agent_guidance": "## 4. Agent-Specific Guidance\n\n### For {agent_name}\n{debugging_context}\n\n### Relevant Skills\n- {skill_hint}: {when_to_use}"
+      },
+      "avg_quality": 8.0,
+      "sample_size": 18,
+      "recommended_for": ["jochi"],
+      "tags": ["debugging", "analysis", "troubleshooting"],
+      "notes": "Optimized for systematic debugging with structured investigation phases."
+    }
+  },
+  "metadata": {
+    "total_templates": 6,
+    "active_templates": 5,
+    "deprecated_templates": 1,
+    "agents_supported": ["temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui", "kublai"],
+    "default_template": "agent-protocol-v2"
+  }
+}

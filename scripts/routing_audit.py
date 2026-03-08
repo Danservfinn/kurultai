@@ -332,6 +332,78 @@ def generate_audit(hours=1):
             f"RECURRING: {len(recurring)} issue(s) unresolved for 3+ consecutive audits — escalation recommended"
         )
 
+    # --- Missed opportunity detection (2026-03-08) ---
+    # Identify tasks routed to busy agents when idle alternatives with capability existed
+    missed_opportunities = []
+    missed_by_agent = defaultdict(list)
+
+    for d in decisions:
+        # Skip diagnostic entries
+        if d.get("method", "") in _DIAGNOSTIC_METHODS:
+            continue
+
+        dest = d.get("dest", "")
+        queue_info = d.get("queue", {})
+        idle_agents = d.get("idle_agents", [])
+        alt_scores = d.get("alt_scores", {})
+        would_overflow = d.get("would_overflow", False)
+
+        # Skip if no enhanced logging data available
+        if not queue_info or not idle_agents:
+            continue
+
+        dest_queue = queue_info.get(dest, 0)
+
+        # Check if routed to busy agent when idle alternatives existed
+        if dest_queue > 0 and idle_agents:
+            # Find idle agents with non-zero scores (capable of handling task)
+            capable_idle = []
+            for idle_agent in idle_agents:
+                idle_score = alt_scores.get(idle_agent, 0)
+                if idle_score > 0:
+                    capable_idle.append((idle_agent, idle_score))
+
+            if capable_idle:
+                # Sort by score descending
+                capable_idle.sort(key=lambda x: -x[1])
+                missed = {
+                    "task": d.get("task", "")[:80],
+                    "routed_to": dest,
+                    "dest_queue": dest_queue,
+                    "idle_alternatives": capable_idle,
+                    "method": d.get("method"),
+                    "ts": d.get("ts"),
+                }
+                missed_opportunities.append(missed)
+                missed_by_agent[dest].append(missed)
+
+    # Add missed opportunity stats to report
+    if missed_opportunities:
+        report["missed_opportunities"] = {
+            "count": len(missed_opportunities),
+            "by_agent": {agent: len(missed) for agent, missed in missed_by_agent.items()},
+            "examples": missed_opportunities[:5],
+        }
+
+        # Flag as issue if significant
+        missed_pct = len(missed_opportunities) / max(total, 1) * 100
+        if missed_pct > 15 and len(missed_opportunities) >= 3:
+            report["issues"].append(
+                f"Missed routing opportunities: {len(missed_opportunities)} tasks routed to busy agents "
+                f"when idle alternatives existed ({missed_pct:.0f}% of routed tasks)"
+            )
+            # Add per-agent breakdown
+            for agent, count in sorted(report["missed_opportunities"]["by_agent"].items(), key=lambda x: -x[1]):
+                if count >= 2:
+                    report["suggestions"].append(
+                        f"  {agent}: {count} missed opportunities — consider adjusting load balancing thresholds"
+                    )
+        elif len(missed_opportunities) >= 1:
+            report["suggestions"].append(
+                f"Missed opportunities: {len(missed_opportunities)} task(s) could have been routed to idle agents"
+            )
+
+
     return report
 
 
@@ -518,6 +590,16 @@ def format_for_reflection(report):
         lines.append("**RECURRING (3+ consecutive audits):**")
         for r in recurring:
             lines.append(f"- [{r['consecutive']}x] {r['issue_key']} (since {r['first_seen'][:16]})")
+
+    # Missed opportunities (tasks routed to busy agents when idle alternatives existed)
+    missed = report.get("missed_opportunities", {})
+    if missed and missed.get("count", 0) > 0:
+        lines.append("")
+        lines.append(f"**Missed Opportunities ({missed['count']}):**")
+        for agent, count in sorted(missed.get("by_agent", {}).items(), key=lambda x: -x[1]):
+            lines.append(f"- {agent}: {count} tasks could have gone to idle agents")
+        for ex in missed.get("examples", [])[:3]:
+            lines.append(f"  - `{ex['task']}` → {ex['routed_to']} (q={ex['dest_queue']}) idle: {ex['idle_alternatives']}")
 
     return "\n".join(lines)
 

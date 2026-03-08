@@ -111,6 +111,9 @@ if [ -d "$AGENTS_DIR" ]; then
   rsync -a \
     --exclude='*.lock' \
     --exclude='*.deleted.*' \
+    --exclude='*.executing.*' \
+    --exclude='*.executing.pid' \
+    --exclude='*.executing.md' \
     "$AGENTS_DIR/" "${WORK_DIR}/agents/"
   SESSIONS_COUNT=$(find "${WORK_DIR}/agents" -name "*.jsonl" | wc -l | tr -d ' ')
   info "  agents → model config + ${SESSIONS_COUNT} sessions"

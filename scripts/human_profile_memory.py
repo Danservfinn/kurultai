@@ -189,6 +189,69 @@ class HumanProfileMemory:
 
         return "\n".join(lines)
 
+    def _format_conversion_context(self, conversion_context: Dict[str, Any]) -> str:
+        """Format conversion context for markdown."""
+        if not conversion_context:
+            return "*No conversion data recorded.*"
+
+        lines = []
+
+        # First touch
+        first_touch = conversion_context.get("first_touch", {})
+        if first_touch:
+            source = first_touch.get("source", "unknown")
+            date = first_touch.get("date", "unknown")
+            lines.append(f"- **First Touch:** {date} via {source.title()}")
+
+        # Pricing views
+        pricing_views = conversion_context.get("pricing_views", {})
+        if pricing_views:
+            count = pricing_views.get("count", 0)
+            last = pricing_views.get("last_viewed", "never")
+            if count > 0:
+                lines.append(f"- **Pricing Views:** {count} (last: {last})")
+
+        # Checkout attempts
+        attempts = conversion_context.get("checkout_attempts", 0)
+        if attempts > 0:
+            lines.append(f"- **Checkout Attempts:** {attempts}")
+
+        # Abort reasons
+        aborts = conversion_context.get("abort_reasons", [])
+        if aborts:
+            lines.append(f"- **Abort Reasons:** {', '.join(aborts)}")
+
+        # Subscription
+        subscription = conversion_context.get("subscription", {})
+        if subscription:
+            status = subscription.get("status", "none")
+            if status != "none":
+                mrr = subscription.get("mrr_cents", 0)
+                start = subscription.get("start_date", "unknown")
+                if mrr > 0:
+                    lines.append(f"- **Subscription:** {status.replace('_', ' ').title()} (${mrr/100:.0f}/mo) since {start}")
+                else:
+                    lines.append(f"- **Subscription:** {status.replace('_', ' ').title()} since {start}")
+
+        # Conversion trigger
+        trigger = conversion_context.get("conversion_trigger")
+        if trigger:
+            lines.append(f"- **Conversion Trigger:** \"{trigger}\"")
+
+        # Plan preferences
+        prefs = conversion_context.get("plan_preferences", {})
+        if prefs:
+            lines.append(f"- **Plan Preferences:**")
+            for key, value in prefs.items():
+                if isinstance(value, list):
+                    lines.append(f"  - **{key.replace('_', ' ').title()}:** {', '.join(value)}")
+                elif isinstance(value, bool):
+                    lines.append(f"  - **{key.replace('_', ' ').title()}:** {'Yes' if value else 'No'}")
+                else:
+                    lines.append(f"  - **{key.replace('_', ' ').title()}:** {value}")
+
+        return "\n".join(lines) if lines else "*No conversion data recorded.*"
+
     def _parse_profile(self, content: str) -> Dict[str, Any]:
         """Parse a markdown profile back into a dict."""
         profile = {
@@ -253,6 +316,7 @@ class HumanProfileMemory:
         preferences = data.get("preferences", {})
         projects = data.get("projects", {})
         conversations = data.get("conversations", [])
+        conversion_context = data.get("conversion_context", {})
 
         content = f"""# Human Profile: {display_name}
 
@@ -288,6 +352,11 @@ class HumanProfileMemory:
 
 ## Notes
 {notes if notes else "*No personal notes.*"}
+
+---
+
+## Conversion Context
+{self._format_conversion_context(conversion_context)}
 
 ---
 
@@ -451,6 +520,22 @@ class HumanProfileMemory:
             True if exists
         """
         return self._get_file_path(human_id).exists()
+
+    def update_conversion_context(self, human_id: str, conversion_context: Dict[str, Any]) -> bool:
+        """
+        Update the conversion context section of a profile.
+
+        Args:
+            human_id: Phone number
+            conversion_context: Conversion context dict
+
+        Returns:
+            True if successful
+        """
+        profile = self.read_profile(human_id) or {}
+        profile["conversion_context"] = conversion_context
+        self.write_profile(human_id, profile)
+        return True
 
 
 # ==========================================================================

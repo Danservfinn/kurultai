@@ -314,15 +314,28 @@ class TaskTracker:
                          source="system", depth=0, parent_id=None,
                          skill_hint=None, notify_on_complete=False,
                          notify_channel="signal", notify_target="+19194133445",
-                         timeout=None, bucket=None):
+                         timeout=None, bucket=None, domain=None,
+                         template_version=None, prompt_template=None,
+                         use_optimization=True):
         """Create task in Neo4j (primary) AND filesystem (backward compat).
+
+        Args:
+            domain: Task domain (research/implementation/ops/documentation/strategy/analysis).
+                    Auto-classified from title+skill_hint if not provided.
+            template_version: Version of prompt template used for this task.
+            prompt_template: Name of prompt template used for this task.
+            use_optimization: If True, apply learned prompt optimizations (default True).
+                             Set OPTIMIZATION_ENABLED=false env var to disable globally.
 
         Returns the task_id (uuid).
         """
         task_id = str(uuid.uuid4())[:12]
         label = f"{agent}-{task_id}"
 
-        # Auto-assign bucket based on priority if not provided
+        # Track optimization metadata
+        prompt_optimization = {}
+
+        # Auto-assign bucket based on priority if not provided (needed for optimizer context)
         if bucket is None:
             bucket_map = {
                 'critical': 'CRITICAL',
@@ -331,6 +344,51 @@ class TaskTracker:
                 'low': 'BACKLOG'
             }
             bucket = bucket_map.get(priority, 'BACKLOG')
+
+        # Auto-classify domain if not provided (needed for optimizer task_type)
+        if domain is None:
+            try:
+                from task_intake import classify_task_domain
+                domain = classify_task_domain(title, skill_hint)
+            except Exception:
+                domain = "implementation"  # Safe default
+
+        # Apply optimization if enabled (after domain is classified)
+        if use_optimization:
+            try:
+                from kublai_task_optimizer import create_optimized_task
+                # Build kwargs, excluding None values so optimizer can fill them
+                opt_kwargs = {
+                    "priority": priority,
+                    "task_type": domain,  # Domain is properly classified now
+                }
+                # Only include these if they have values
+                if skill_hint is not None:
+                    opt_kwargs["skill_hint"] = skill_hint
+                if timeout is not None:
+                    opt_kwargs["timeout"] = timeout
+                optimized = create_optimized_task(
+                    agent=agent,
+                    title=title,
+                    body=body,
+                    **opt_kwargs
+                )
+                # Apply optimized values (only if not explicitly provided)
+                if skill_hint is None:
+                    skill_hint = optimized.get("skill_hint")
+                if timeout is None:
+                    timeout = optimized.get("timeout")
+                if template_version is None:
+                    template_version = optimized.get("template_version")
+                if prompt_template is None:
+                    prompt_template = optimized.get("prompt_template")
+                prompt_optimization = optimized.get("prompt_optimization", {})
+            except ImportError:
+                # Optimization module not available, continue with defaults
+                pass
+            except Exception as e:
+                # Log but don't fail on optimization errors
+                print(f"[task_tracker] Optimization failed: {e}")
 
         with self.driver.session() as session:
             session.run("""
@@ -347,6 +405,11 @@ class TaskTracker:
                     parent_id: $parent_id,
                     skill_hint: $skill_hint,
                     bucket: $bucket,
+                    domain: $domain,
+                    template_version: $template_version,
+                    prompt_template: $prompt_template,
+                    prompt_construction: $prompt_construction,
+                    task_params: $task_params,
                     status: 'PENDING',
                     created: datetime(),
                     retry_count: 0,
@@ -356,7 +419,21 @@ class TaskTracker:
             """,
             task_id=task_id, label=label, agent=agent, title=title,
             body=body, priority=priority, source=source, depth=depth,
-            parent_id=parent_id, skill_hint=skill_hint or "", bucket=bucket)
+            parent_id=parent_id, skill_hint=skill_hint or "", bucket=bucket, domain=domain,
+            template_version=template_version or "unknown", prompt_template=prompt_template or "standard",
+            prompt_construction=json.dumps({
+                "template_used": prompt_template or "standard",
+                "template_version": template_version or "unknown",
+                "optimization_source": prompt_optimization.get("source", "none"),
+                "optimization_confidence": prompt_optimization.get("confidence"),
+                "optimized_at": prompt_optimization.get("applied_at"),
+            }),
+            task_params=json.dumps({
+                "priority": priority,
+                "timeout_seconds": timeout,
+                "skill_hint": skill_hint,
+                "bucket": bucket,
+            }))
 
         # Backward-compatible filesystem write
         base = _AGENTS_BASE
@@ -366,7 +443,11 @@ class TaskTracker:
         filepath = f"{task_dir}/{priority}-{epoch}.md"
 
         skill_line = f"skill_hint: {skill_hint}\n" if skill_hint else ""
-        bucket_line = f"bucket: {bucket}\n"
+        template_line = f"template_version: {template_version}\n" if template_version else ""
+        prompt_template_line = f"prompt_template: {prompt_template}\n" if prompt_template else ""
+        opt_source = prompt_optimization.get("source", "none")
+        opt_confidence = prompt_optimization.get("confidence", 0)
+        optimization_line = f"optimization_source: {opt_source}\noptimization_confidence: {opt_confidence}\n" if use_optimization else ""
         notify_lines = ""
         if notify_on_complete:
             notify_lines = f"notify_on_complete: true\nnotify_channel: {notify_channel}\nnotify_target: {notify_target}\n"
@@ -385,8 +466,9 @@ depth: {depth}
 task_id: {task_id}
 parent_id: {parent_id or ''}
 bucket: {bucket}
+domain: {domain}
 timeout: {timeout}
-{skill_line}{notify_lines}---
+{skill_line}{template_line}{prompt_template_line}{optimization_line}{notify_lines}---
 
 # Task: {title}
 
@@ -855,6 +937,260 @@ timeout: {timeout}
             """, days=days)
             record = result.single()
             return record["pruned"] if record else 0
+
+
+    # ==========================================================
+    # Completion Gate Support
+    # ==========================================================
+
+    def create_gate_node(self, task_id: str, audit_data: dict):
+        """Create GateAudit node for tracking.
+
+        Args:
+            task_id: The task being audited
+            audit_data: Dictionary with completion_percentage, can_complete,
+                       required_followups_count, optional_improvements_count
+        """
+        audit_id = f"audit-{task_id}-{datetime.now().strftime('%Y%m%d')}"
+        with self.driver.session() as session:
+            session.run("""
+                CREATE (g:GateAudit {
+                    audit_id: $audit_id,
+                    task_id: $task_id,
+                    timestamp: datetime(),
+                    completion_percentage: $completion_pct,
+                    can_complete: $can_complete,
+                    required_followups_count: $required_count,
+                    optional_improvements_count: $optional_count
+                })
+            """,
+            audit_id=audit_id,
+            task_id=task_id,
+            completion_pct=audit_data.get("completion_percentage", 100),
+            can_complete=audit_data.get("can_complete", True),
+            required_count=len(audit_data.get("required_followups", [])),
+            optional_count=len(audit_data.get("optional_improvements", []))
+            )
+
+        return audit_id
+
+    def update_gate_status(self, task_id: str, status: str,
+                          completion_percentage: int = None,
+                          audit_ref: str = None):
+        """Update gate_status property on Task.
+
+        Args:
+            task_id: Task to update
+            status: Gate status (pending, auditing, waiting_followups, ready,
+                   blocked, passed, bypassed)
+            completion_percentage: Optional completion percentage
+            audit_ref: Optional path to audit JSON file
+        """
+        with self.driver.session() as session:
+            query = """
+                MATCH (t:Task {task_id: $task_id})
+                SET t.gate_status = $status,
+                    t.gate_updated = datetime()
+            """
+            params = {"task_id": task_id, "status": status}
+
+            if completion_percentage is not None:
+                query += ", t.completion_percentage = $completion_pct"
+                params["completion_pct"] = completion_percentage
+
+            if audit_ref:
+                query += ", t.gate_audit_ref = $audit_ref"
+                params["audit_ref"] = audit_ref
+
+            session.run(query, **params)
+
+    def link_followup(self, parent_id: str, followup_id: str,
+                     gate_required: bool = True):
+        """Create HAS_FOLLOWUP relationship between parent and follow-up.
+
+        Args:
+            parent_id: Parent task ID
+            followup_id: Follow-up task ID
+            gate_required: Whether this followup must complete for parent gate
+        """
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (parent:Task {task_id: $parent_id})
+                MATCH (followup:Task {task_id: $followup_id})
+                CREATE (parent)-[:HAS_FOLLOWUP {gate_required: $gate_required, created: datetime()}]->(followup)
+                CREATE (followup)-[:FOLLOWS_UP {created: datetime()}]->(parent)
+            """, parent_id=parent_id, followup_id=followup_id, gate_required=gate_required)
+
+    def get_followup_tasks(self, task_id: str) -> list:
+        """Query for all follow-ups of a task.
+
+        Args:
+            task_id: Parent task ID
+
+        Returns:
+            List of dicts with followup task info
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (parent:Task {task_id: $task_id})-[:HAS_FOLLOWUP]->(followup:Task)
+                RETURN followup.task_id AS task_id,
+                       followup.agent AS agent,
+                       followup.status AS status,
+                       followup.gate_required AS gate_required
+                ORDER BY followup.created ASC
+            """, task_id=task_id)
+            return [dict(r) for r in result]
+
+    def get_gate_metrics(self) -> dict:
+        """Return aggregate gate metrics.
+
+        Returns dict with:
+        - pass_rate: Percentage of gates that passed
+        - avg_completion: Average completion percentage
+        - avg_followups: Average follow-ups per task
+        - active_gates: Count of gates in non-terminal states
+        - blocked_gates: Count of blocked gates
+        """
+        with self.driver.session() as session:
+            # Get audit metrics (handle empty case to avoid division by zero)
+            result = session.run("""
+                MATCH (g:GateAudit)
+                WHERE g.timestamp > datetime() - duration('PT24H')
+                WITH
+                    count(CASE WHEN g.can_complete THEN 1 END) as passed,
+                    count(*) as total,
+                    avg(g.completion_percentage) as avg_pct,
+                    avg(g.required_followups_count) as avg_followups
+                RETURN {
+                    passed: passed,
+                    total: total,
+                    pass_rate: CASE WHEN total > 0 THEN round(100.0 * passed / total, 1) ELSE 0.0 END,
+                    avg_completion: round(coalesce(avg_pct, 0), 1),
+                    avg_followups: round(coalesce(avg_followups, 0), 1)
+                } as audit_metrics
+            """)
+            record = result.single()
+            audit_metrics = dict(record["audit_metrics"]) if record and record.get("audit_metrics") else {
+                "passed": 0, "total": 0, "pass_rate": 0.0, "avg_completion": 0.0, "avg_followups": 0.0
+            }
+
+            # Get active gate counts
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.gate_status IS NOT NULL
+                  AND t.gate_status IN ['pending', 'auditing', 'waiting_followups', 'blocked']
+                WITH
+                    count(CASE WHEN t.gate_status = 'blocked' THEN 1 END) as blocked,
+                    count(*) as active
+                RETURN {active: active, blocked: blocked} as gate_counts
+            """)
+            record = result.single()
+            gate_counts = dict(record["gate_counts"]) if record and record.get("gate_counts") else {"active": 0, "blocked": 0}
+
+            return {
+                **audit_metrics,
+                **gate_counts
+            }
+
+    def find_pending_gates(self, limit: int = 100) -> list:
+        """Find tasks in pending gate states.
+
+        Args:
+            limit: Maximum number of gates to return
+
+        Returns:
+            List of dicts with task_id, gate_status, agent, etc.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.gate_status IN ['pending', 'waiting_followups', 'auditing']
+                RETURN t.task_id AS task_id,
+                       t.agent AS agent,
+                       t.gate_status AS gate_status,
+                       t.completion_percentage AS completion_percentage,
+                       t.created AS created
+                ORDER BY t.created ASC
+                LIMIT $limit
+            """, limit=limit)
+            return [dict(r) for r in result]
+
+    def check_gate_resolve_status(self, task_id: str) -> dict:
+        """Check if a gate can be resolved (all follow-ups complete).
+
+        Args:
+            task_id: Parent task ID
+
+        Returns:
+            Dict with can_resolve (bool), total_followups, completed_followups
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (parent:Task {task_id: $task_id})-[:HAS_FOLLOWUP]->(followup:Task)
+                WITH parent,
+                     count(followup) as total,
+                     sum(CASE WHEN followup.status = 'COMPLETED' THEN 1 ELSE 0 END) as completed
+                RETURN total,
+                       completed,
+                       total = completed as can_resolve
+            """, task_id=task_id)
+            record = result.single()
+            if record:
+                return {
+                    "total_followups": record["total"],
+                    "completed_followups": record["completed"],
+                    "can_resolve": record["can_resolve"]
+                }
+            return {"total_followups": 0, "completed_followups": 0, "can_resolve": True}
+
+    def create_gate_resolution(self, task_id: str, status: str,
+                             total_followups: int, resolution_cycles: int = 1):
+        """Create GateResolution node when a gate is resolved.
+
+        Args:
+            task_id: Original task ID
+            status: Resolution status (PASSED, BLOCKED, BYPASSED)
+            total_followups: Number of follow-ups created
+            resolution_cycles: How many audit/followup cycles
+        """
+        with self.driver.session() as session:
+            session.run("""
+                CREATE (gr:GateResolution {
+                    gate_id: $gate_id,
+                    original_task: $task_id,
+                    status: $status,
+                    created_at: datetime(),
+                    resolved_at: datetime(),
+                    total_followups: $total_followups,
+                    resolution_cycles: $resolution_cycles
+                })
+            """,
+            gate_id=f"gate-{task_id}",
+            task_id=task_id,
+            status=status,
+            total_followups=total_followups,
+            resolution_cycles=resolution_cycles
+            )
+
+    def detect_gate_cycles(self, max_depth: int = 3) -> list:
+        """Detect circular dependencies in follow-up chains.
+
+        Args:
+            max_depth: Maximum depth to traverse
+
+        Returns:
+            List of cycles found (each cycle is a list of task_ids)
+        """
+        with self.driver.session() as session:
+            # Neo4j 5 doesn't allow parameters in relationship pattern length
+            # Build query with literal depth
+            result = session.run(f"""
+                MATCH path = (start:Task)-[:HAS_FOLLOWUP*..{max_depth}]->(start)
+                WITH [node in nodes(path) | node.task_id] as cycle
+                RETURN DISTINCT cycle
+                LIMIT 10
+            """)
+            return [record["cycle"] for record in result]
 
 
 # Singleton instance

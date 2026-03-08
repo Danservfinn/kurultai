@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-08T10:30:00Z",
+  "description": "Valid agent names for completion gate audit validation. This is the single source of truth for valid agent names in follow-up tasks.",
+  "agents": [
+    "mongke",
+    "chagatai",
+    "temujin",
+    "jochi",
+    "ogedei",
+    "kublai",
+    "tolui"
+  ],
+  "metadata": {
+    "primary_agents": ["mongke", "chagatai", "temujin", "jochi", "ogedei"],
+    "coordinator": "kublai",
+    "specialist": "tolui"
+  }
+}

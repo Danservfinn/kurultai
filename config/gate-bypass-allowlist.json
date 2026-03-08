@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-08T09:00:00Z",
+  "description": "Authorized approvers for completion gate bypass. Agents are NOT on allowlist - only humans and Kublai.",
+  "approvers": {
+    "kublai": {
+      "name": "Kublai",
+      "type": "agent_coordinator",
+      "can_bypass_any_priority": true,
+      "requires_second_approval": false,
+      "added": "2026-03-08T09:00:00Z"
+    },
+    "human": {
+      "name": "Human User",
+      "type": "human",
+      "can_bypass_any_priority": true,
+      "requires_second_approval": false,
+      "added": "2026-03-08T09:00:00Z"
+    }
+  },
+  "restricted_patterns": [
+    "^temujin$",
+    "^mongke$",
+    "^jochi$",
+    "^ogedei$",
+    "^chagatai$",
+    "^tolui$",
+    "^agent-",
+    "-agent$",
+    "^bot",
+    "^automation"
+  ],
+  "multi_party_rules": {
+    "enabled": true,
+    "threshold_priorities": ["critical", "high"],
+    "required_approvers": 2,
+    "description": "Critical and high priority tasks require 2 separate approvers"
+  },
+  "rate_limits": {
+    "max_per_day": 10,
+    "max_per_hour": 3,
+    "cooldown_seconds": 300
+  },
+  "audit": {
+    "log_to_neo4j": true,
+    "log_to_file": true,
+    "signal_alert": true,
+    "immutable": true
+  }
+}

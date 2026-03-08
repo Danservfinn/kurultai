@@ -445,6 +445,60 @@ PYEOF
 QUEUE_AUDIT=${QUEUE_AUDIT:-'{"audited":0,"fake_found":0,"requeued":0,"skipped":0}'}
 
 # ============================================================
+# 4b. Stale lock detection — scan all agent task directories for .pid files
+# ============================================================
+STALE_LOCKS=$(python3 2>/dev/null << 'PYEOF'
+import json, os, glob, time, subprocess
+base = "/Users/kublai/.openclaw/agents"
+agents = ["kublai","mongke","chagatai","temujin","jochi","ogedei","tolui"]
+now = time.time()
+stale_locks = []
+by_agent = {}
+
+for agent in agents:
+    task_dir = f"{base}/{agent}/tasks"
+    if not os.path.isdir(task_dir):
+        continue
+    by_agent[agent] = 0
+    # Find all .executing.pid files
+    for pid_file in glob.glob(f"{task_dir}/*.executing.pid"):
+        try:
+            with open(pid_file, 'r') as f:
+                lines = f.readlines()
+                if not lines:
+                    continue
+                pid = lines[0].strip()
+                if not pid.isdigit():
+                    continue
+                pid = int(pid)
+            # Check if process is alive
+            result = subprocess.run(['ps', '-p', str(pid)], capture_output=True, text=True)
+            is_alive = str(pid) in result.stdout
+            # Calculate age
+            age_seconds = int(now - os.path.getmtime(pid_file))
+            if not is_alive:
+                task_file = os.path.basename(pid_file).replace('.executing.pid', '')
+                stale_locks.append({
+                    "agent": agent,
+                    "task_file": task_file,
+                    "pid": pid,
+                    "age_seconds": age_seconds
+                })
+                by_agent[agent] += 1
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+
+output = {
+    "total": len(stale_locks),
+    "by_agent": by_agent,
+    "details": stale_locks
+}
+print(json.dumps(output))
+PYEOF
+)
+STALE_LOCKS=${STALE_LOCKS:-'{"total":0,"by_agent":{},"details":[]}'}
+
+# ============================================================
 # 4c. Ledger completions (30m) — for reconciliation against Neo4j
 # ============================================================
 LEDGER_DATA=$(python3 2>/dev/null << 'PYEOF'
@@ -495,6 +549,86 @@ PYEOF
 LEDGER_DATA=${LEDGER_DATA:-'{"completed":{},"failed":{}}'}
 
 # ============================================================
+# 4d. Routing Metrics (from routing-metrics.sh or latest hourly file)
+# ============================================================
+ROUTING_METRICS=$(python3 2>/dev/null << 'PYEOF'
+import json, os, glob
+from datetime import datetime, timedelta
+
+logs_dir = "/Users/kublai/.openclaw/agents/main/logs"
+
+# Try to read the most recent hourly routing metrics file
+try:
+    pattern = os.path.join(logs_dir, "routing-metrics-*.json")
+    files = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
+    if files:
+        # Use the most recent file (within last 2 hours to be relevant)
+        latest_file = files[0]
+        file_age = datetime.now().timestamp() - os.path.getmtime(latest_file)
+        if file_age < 7200:  # 2 hours
+            with open(latest_file) as f:
+                data = json.load(f)
+            # Extract key metrics
+            routing = data.get("routing", {})
+            queue_balance = data.get("queue_balance", {})
+            print(json.dumps({
+                "queue_balance_index": queue_balance.get("index", 0),
+                "queue_depths": queue_balance.get("depths", {}),
+                "missed_opportunities": routing.get("missed_opportunities", 0),
+                "routing_accuracy": routing.get("routing_accuracy", 0),
+                "time_to_start_p95": routing.get("time_to_start_p95_seconds", 0),
+                "total_routed": routing.get("total_routed", 0),
+                "overflow_count": routing.get("overflow_count", 0),
+                "source": "file",
+                "file_age_minutes": int(file_age / 60)
+            }))
+        else:
+            # File too old, compute fresh metrics
+            raise ValueError("stale_file")
+    else:
+        raise ValueError("no_file")
+except Exception:
+    # Fallback: compute queue balance index from current queue state
+    import statistics
+    base = "/Users/kublai/.openclaw/agents"
+    agents = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
+    depths = []
+    depth_map = {}
+    for agent in agents:
+        task_dir = f"{base}/{agent}/tasks"
+        if os.path.isdir(task_dir):
+            import glob
+            pending = 0
+            for f in glob.glob(f"{task_dir}/*.md"):
+                if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed']):
+                    continue
+                pending += 1
+            depth_map[agent] = pending
+            depths.append(pending)
+        else:
+            depth_map[agent] = 0
+            depths.append(0)
+
+    mean_depth = statistics.mean(depths) if depths else 0
+    std_depth = statistics.stdev(depths) if len(depths) > 1 else 0
+    balance_index = round(std_depth / mean_depth, 3) if mean_depth > 0 else 0
+
+    print(json.dumps({
+        "queue_balance_index": balance_index,
+        "queue_depths": depth_map,
+        "missed_opportunities": 0,
+        "routing_accuracy": 0.87,  # Default
+        "time_to_start_p95": 420,  # Default
+        "total_routed": 0,
+        "overflow_count": 0,
+        "source": "computed",
+        "file_age_minutes": None
+    }))
+PYEOF
+)
+ROUTING_METRICS=${ROUTING_METRICS:-'{"queue_balance_index":0,"missed_opportunities":0,"routing_accuracy":0.87,"time_to_start_p95":420}'}
+
+# ============================================================
 # 5. Last tick status + service health (from TICK lines, not TICK_LLM)
 # ============================================================
 LAST_TICK_LINE=$(tail -20 "$BASE/logs/watchdog.log" 2>/dev/null | grep "] TICK |" | grep -v "TICK_LLM" | tail -1; true)
@@ -517,9 +651,11 @@ echo "$QUEUE_DATA" > "$TOCK_TMP/queues.json"
 echo "$QUEUE_AUDIT" > "$TOCK_TMP/queue_audit.json"
 echo "$LEDGER_DATA" > "$TOCK_TMP/ledger.json"
 echo "$CONFIG_MODELS" > "$TOCK_TMP/config_models.json"
+echo "$STALE_LOCKS" > "$TOCK_TMP/stale_locks.json"
+echo "$ROUTING_METRICS" > "$TOCK_TMP/routing.json"
 
 ASSEMBLED=$(python3 << PYEOF
-import json, os
+import json, os, sys
 
 tmp = "$TOCK_TMP"
 
@@ -537,6 +673,14 @@ queues = safe_load(f"{tmp}/queues.json", {})
 config_models = safe_load(f"{tmp}/config_models.json", {})
 queue_audit = safe_load(f"{tmp}/queue_audit.json", {"audited":0,"fake_found":0,"requeued":0,"skipped":0})
 ledger = safe_load(f"{tmp}/ledger.json", {"completed":{},"failed":{}})
+stale_locks = safe_load(f"{tmp}/stale_locks.json", {"total":0,"by_agent":{},"details":[]})
+routing = safe_load(f"{tmp}/routing.json", {
+    "queue_balance_index": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95": 420,
+    "queue_depths": {}
+})
 
 # Parse session data
 session = safe_load(f"{tmp}/session.json", {})
@@ -589,6 +733,88 @@ for name in agent_names:
 
 queue_total = sum(queues.get(a,0) for a in agent_names)
 
+def _gather_gate_metrics():
+    """Gather completion gate metrics for system observability."""
+    import os
+    import json
+    from pathlib import Path
+
+    gate_metrics = {
+        "pending_gates": 0,
+        "blocked_gates": 0,
+        "pass_rate_24h": 0.0,
+        "avg_completion_24h": 0.0,
+        "avg_followups": 0.0,
+        "recent_audits": 0
+    }
+
+    try:
+        # Method 1: Use gate resolver if available
+        sys.path.insert(0, "/Users/kublai/.openclaw/agents/main/scripts")
+        try:
+            from completion_gate_resolver import GateResolver
+            resolver = GateResolver(dry_run=True)
+            metrics = resolver.get_gate_metrics()
+            return {
+                "pending_gates": metrics.get("pending_gates", 0),
+                "blocked_gates": metrics.get("blocked_gates", 0),
+                "pass_rate_24h": metrics.get("pass_rate_24h", 0.0),
+                "avg_completion_24h": metrics.get("avg_completion_24h", 0.0),
+                "avg_followups": metrics.get("total_followups", 0) / max(metrics.get("recent_audits", 1), 1),
+                "recent_audits": metrics.get("recent_audits_24h", 0)
+            }
+        except ImportError:
+            pass
+
+        # Method 2: Scan filesystem for pending gates
+        pending_count = 0
+        blocked_count = 0
+
+        agents_dir = Path("/Users/kublai/.openclaw/agents")
+        for agent_dir in agents_dir.iterdir():
+            if not agent_dir.is_dir() or agent_dir.name.startswith('.'):
+                continue
+            tasks_dir = agent_dir / "tasks"
+            if not tasks_dir.exists():
+                continue
+            pending_count += len(list(tasks_dir.glob("*.pending-gate.md")))
+            blocked_count += len(list(tasks_dir.glob("*.gate-blocked.md")))
+
+        gate_metrics["pending_gates"] = pending_count
+        gate_metrics["blocked_gates"] = blocked_count
+
+        # Method 3: Read audit JSON files for metrics
+        audit_dir = Path("/Users/kublai/.openclaw/agents/main/logs/gate-audits")
+        if audit_dir.exists():
+            import time
+            cutoff = time.time() - (24 * 3600)  # 24 hours ago
+            recent_audits = []
+            total_completion = 0
+            passed_count = 0
+
+            for audit_file in audit_dir.glob("*.json"):
+                try:
+                    mtime = audit_file.stat().st_mtime
+                    if mtime > cutoff:
+                        with open(audit_file) as f:
+                            data = json.load(f)
+                        recent_audits.append(data)
+                        total_completion += data.get("completion_percentage", 100)
+                        if data.get("can_complete"):
+                            passed_count += 1
+                except Exception:
+                    continue
+
+            if recent_audits:
+                gate_metrics["recent_audits"] = len(recent_audits)
+                gate_metrics["avg_completion_24h"] = round(total_completion / len(recent_audits), 1)
+                gate_metrics["pass_rate_24h"] = round(100.0 * passed_count / len(recent_audits), 1)
+
+    except Exception as e:
+        gate_metrics["error"] = str(e)
+
+    return gate_metrics
+
 def _build_ledger_recon(neo4j_data, ledger_data):
     """Compare Neo4j completion counts vs ledger counts. Flag mismatches."""
     neo4j_completed = {}
@@ -630,6 +856,7 @@ output = {
     "agents": agents,
     "cron": cron if "error" not in cron else {"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]},
     "cron_jobs": cron_jobs,
+    "completion_gate": _gather_gate_metrics(),
     "queues": {
         "total_pending": queue_total,
         "by_agent": queues,
@@ -649,7 +876,18 @@ output = {
         "redis_status": "$TICK_REDIS"
     },
     "queue_audit": queue_audit,
-    "ledger_reconciliation": _build_ledger_recon(neo4j, ledger)
+    "ledger_reconciliation": _build_ledger_recon(neo4j, ledger),
+    "stale_locks": stale_locks,
+    "routing": {
+        "queue_balance_index": routing.get("queue_balance_index", 0),
+        "missed_opportunities": routing.get("missed_opportunities", 0),
+        "routing_accuracy": routing.get("routing_accuracy", 0.87),
+        "time_to_start_p95": routing.get("time_to_start_p95", 420),
+        "total_routed": routing.get("total_routed", 0),
+        "overflow_count": routing.get("overflow_count", 0),
+        "queue_depths": routing.get("queue_depths", {}),
+        "source": routing.get("source", "unknown")
+    }
 }
 
 print(json.dumps(output, indent=2, default=str))
@@ -696,6 +934,15 @@ else:
 
 q = data["queues"]
 lines.append(f"\nQUEUES: file_pending={q['total_pending']} spawn={q['spawn_pending']}")
+# Stale locks reporting
+sl = data.get("stale_locks", {})
+stale_total = sl.get("total", 0)
+if stale_total > 0:
+    lines.append(f"STALE LOCKS: {stale_total} detected")
+    for lock in sl.get("details", [])[:5]:  # Show up to 5 stale locks
+        lines.append(f"  {lock['agent']}: {lock['task_file'][:50]} pid={lock['pid']} age={lock['age_seconds']}s")
+else:
+    lines.append("STALE LOCKS: none")
 c = data["cron"]
 lines.append(f"CRON: {c.get('healthy',0)}/{c.get('total_jobs',0)} healthy")
 for j in c.get("jobs",[]):
@@ -718,6 +965,9 @@ if not lr.get("reconciled", True):
     lines.append(f"LEDGER MISMATCH: neo4j={lr.get('neo4j_total_completed',0)} vs ledger={lr.get('ledger_total_completed',0)} (delta={lr.get('delta',0)})")
     for m in lr.get("mismatches", []):
         lines.append(f"  {m['agent']}: neo4j_done={m['neo4j_completed']} ledger_done={m['ledger_completed']} neo4j_fail={m['neo4j_failed']} ledger_fail={m['ledger_failed']}")
+# Routing metrics (from routing-metrics.sh)
+r = data.get("routing", {})
+lines.append(f"ROUTING: balance_idx={r.get('queue_balance_index',0):.2f} missed={r.get('missed_opportunities',0)} accuracy={r.get('routing_accuracy',0):.0%} p95={r.get('time_to_start_p95',0)}s routed={r.get('total_routed',0)}")
 print("\n".join(lines))
 PYEOF
 )
@@ -804,8 +1054,13 @@ else:
     q = data.get("queues",{})
     total_pending = q.get("total_pending",0)
     cron_errors = data.get("cron",{}).get("erroring",0)
+    stale_total = data.get("stale_locks",{}).get("total",0)
 
-    if total_pending > 20:
+    if stale_total > 0:
+        assessment["bottleneck"] = f"{stale_total} stale task locks blocking system"
+        assessment["severity"] = "HIGH"
+        assessment["recommended_action"] = "Run stale-lock-cleanup cron job or manually remove .executing.pid files"
+    elif total_pending > 20:
         assessment["workload_balance"] = f"IMBALANCED: {total_pending} tasks queued"
         assessment["bottleneck"] = f"Queue backlog: {total_pending} pending"
         assessment["severity"] = "MEDIUM"
@@ -990,6 +1245,23 @@ python3 "$BASE/scripts/kublai-actions.py" --trigger tock >> "$BASE/logs/kublai-a
 
 # Cleanup temp file
 rm -f "$TOCK_ASSEMBLED_TMP"
+
+# ============================================================
+# QMD INDEX REFRESH: Update semantic search index (every 60 min at :01)
+# ============================================================
+CURRENT_MIN=$(date +%M)
+if [ "$CURRENT_MIN" = "01" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] QMD: Refreshing semantic search index" >> "$TOCK_LOG"
+    QMD_LOG="$BASE/logs/qmd-index.log"
+    mkdir -p "$(dirname "$QMD_LOG")"
+
+    # Run QMD update and embed
+    if qmd update >> "$QMD_LOG" 2>&1 && qmd embed >> "$QMD_LOG" 2>&1; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] QMD: Index refresh complete" >> "$TOCK_LOG"
+    else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] QMD: Index refresh FAILED (see $QMD_LOG)" >> "$TOCK_LOG"
+    fi
+fi
 
 # Output for LLM
 echo "TOCK COMPLETE. Severity: $SEVERITY. Bottleneck: $BOTTLENECK"

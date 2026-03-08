@@ -283,82 +283,31 @@ run_agent_reflection() {
 }
 
 # Function to run /horde-review critical analysis for a single agent
+# P0 Self-Healing: Now uses review-with-fallback.py for graceful degradation
 run_agent_review() {
     local AGENT="$1"
-    local DATE=$(date +%Y-%m-%d)
-    local MEMORY_FILE="/Users/kublai/.openclaw/agents/$AGENT/memory/$DATE.md"
     local REVIEW_FILE="$REVIEWS_DIR/${AGENT}-latest.md"
 
-    echo "[$(date)] [$AGENT] Starting /horde-review performance analysis..."
+    echo "[$(date)] [$AGENT] Starting review with fallback mode..."
 
-    # Gather latest reflection (last 80 lines of today's memory)
-    local REFLECTION=""
-    if [ -f "$MEMORY_FILE" ]; then
-        REFLECTION=$(tail -80 "$MEMORY_FILE" 2>/dev/null || echo "(no reflection)")
-    else
-        REFLECTION="(no reflection data for today)"
-    fi
+    # Use review-with-fallback.py which implements:
+    # 1. Full horde-review
+    # 2. Degraded single-agent review
+    # 3. Static checklist (last resort)
+    python3 "$SCRIPTS/review-with-fallback.py" \
+        --agent "$AGENT" \
+        --timeout "$REVIEW_TIMEOUT" \
+        --output "$REVIEW_FILE"
 
-    # Gather tock metrics
-    local TOCK_DATA=""
-    local TOCK_FILE="$LOGS_DIR/tock/latest.json"
-    if [ -f "$TOCK_FILE" ]; then
-        TOCK_DATA=$(TOCK_FILE="$TOCK_FILE" AGENT="$AGENT" python3 -c "
-import json, os
-tf = os.environ['TOCK_FILE']
-agent = os.environ['AGENT']
-target = os.path.realpath(tf) if os.path.islink(tf) else tf
-with open(target) as f:
-    d = json.load(f)
-a = d.get('agents',{}).get(agent,{})
-t = a.get('tasks',{})
-print(f'Completed: {t.get(\"completed\",0)} | Failed: {t.get(\"failed\",0)} | Queue: {t.get(\"queue_depth\",0)} | Retries: {a.get(\"retries\",0)} | Success: {a.get(\"success_rate\",\"N/A\")}%')
-" 2>/dev/null || echo "Tock data unavailable")
-    fi
-
-    # Build review prompt and invoke /horde-review via claude-agent
-    local REVIEW_PROMPT="/horde-review
-
-Critically review ${AGENT} agent performance for the past hour.
-
-## Agent Metrics (from tock)
-${TOCK_DATA}
-
-## Latest Reflection Data
-${REFLECTION}
-
-## Review Focus
-Analyze this agent's performance with structured critical analysis:
-1. Task completion effectiveness — what succeeded, what failed, why
-2. Behavioral rule compliance — are WHEN/THEN rules being followed
-3. Efficiency — time spent vs output produced
-4. Cross-agent impact — how does this agent affect system throughput
-
-Output EXACTLY this format:
-STRENGTHS: (2-3 bullet points of what worked well)
-WEAKNESSES: (2-3 bullet points of what failed or underperformed)
-PATTERNS: (recurring issues or successes observed)
-PRIORITY_FIX: (single most impactful improvement for next hour)
-SCORE: (1-10 performance rating with one-line justification)"
-
-    # Clear ANTHROPIC_* env vars that may override OAuth auth (settings.json env section)
-    # Use haiku for agent reflections (fast, cost-effective for reviews)
-    run_with_timeout "$REVIEW_TIMEOUT" env -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL -u ANTHROPIC_MODEL "$CLAUDE_AGENT_BIN" --model haiku "$REVIEW_PROMPT" > "$REVIEW_FILE" 2>>"$LOGS_DIR/horde-review-error.log"
     local rc=$?
 
     if [ $rc -eq 0 ] && [ -s "$REVIEW_FILE" ]; then
-        # Verify review has actual content (not just error message)
-        if grep -q "^STRENGTHS:" "$REVIEW_FILE" 2>/dev/null; then
-            echo "[$(date)] [$AGENT] /horde-review complete -> $REVIEW_FILE"
-        else
-            echo "[$(date)] [$AGENT] /horde-review returned but no structured output (rc=$rc)"
-            echo "# Review returned but missing expected format (rc=$rc, timeout=${REVIEW_TIMEOUT}s)" > "$REVIEW_FILE"
-        fi
+        # Extract mode used from the review content
+        local mode=$(grep -E "^\(.*Mode\)" "$REVIEW_FILE" 2>/dev/null | head -1 | sed 's/.*(\(.*\) Mode).*/\1/' || echo "unknown")
+        echo "[$(date)] [$AGENT] Review complete (mode: ${mode}) -> $REVIEW_FILE"
     else
-        echo "[$(date)] [$AGENT] /horde-review failed or timed out (rc=$rc, timeout=${REVIEW_TIMEOUT}s)"
-        echo "# Review unavailable (rc=$rc, timeout=${REVIEW_TIMEOUT}s)" > "$REVIEW_FILE"
-        # Log error details for debugging
-        tail -5 "$LOGS_DIR/horde-review-error.log" >> "$LOGS_DIR/reflection.log" 2>/dev/null
+        echo "[$(date)] [$AGENT] Review failed even with fallback (rc=$rc)"
+        echo "# Review unavailable - all modes failed (rc=$rc)" > "$REVIEW_FILE"
     fi
 }
 
@@ -448,6 +397,14 @@ timed_step "rule-compliance" \
     run_with_timeout 15 python3 "$SCRIPTS/parse_rule_compliance.py" --auto-deprecate >> "$LOGS_DIR/rule-compliance.log" 2>&1
 
 # ============================================================
+# TASK METRICS: Aggregate hourly metrics into TaskMetric nodes
+# Creates pre-aggregated metrics for faster reflection queries
+# Gracefully degrades when TaskOutcome nodes don't exist (Phase 1 incomplete)
+# ============================================================
+timed_step "task-metrics" \
+    run_with_timeout 30 python3 "$SCRIPTS/aggregate_task_metrics.py" --period hourly --hours 1 >> "$LOGS_DIR/metrics-aggregation.log" 2>&1
+
+# ============================================================
 # BRAINSTORMING: Decoupled to run_brainstorm.sh (separate schedule at :30)
 # ============================================================
 
@@ -481,7 +438,7 @@ _bg_timed_step() {
 
 echo "[$(date)] Starting Tier 1 (independent steps) with semaphore..."
 
-for step_name in "memory-audit-fix" "cross-agent-rules" "capability-scores" "routing-audit" "score-skills" "action-scorer"; do
+for step_name in "memory-audit-fix" "cross-agent-rules" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis"; do
     wait_for_semaphore
     case "$step_name" in
         memory-audit-fix)
@@ -501,6 +458,9 @@ for step_name in "memory-audit-fix" "cross-agent-rules" "capability-scores" "rou
             ;;
         action-scorer)
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/action_scorer.py" --all --hours 2 >> "$LOGS_DIR/action-scorer.log" 2>&1 &
+            ;;
+        report-analysis)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/report_analyzer.py" --all-agents --hours 1 --reflection-block > "$LOGS_DIR/task-completion-report.md" 2>&1 &
             ;;
     esac
     t1_pids+=($!)

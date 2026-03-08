@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/kublai/.openclaw/agents/main/monitor-venv/bin/python3
 """
 Kurultai Website Browser-Based Uptime Monitor
 
@@ -29,7 +29,7 @@ except ImportError:
 
 # Configuration
 BASE_URL = "https://the.kurult.ai"
-LOG_DIR = Path.home() / ".openclaw" / "agents" / "main" / "logs"
+LOG_DIR = Path.home() / ".openclaw" / "logs"
 LOG_FILE = LOG_DIR / "kurultai-monitor.log"
 STATE_FILE = LOG_DIR / "kurultai-monitor-state.json"
 
@@ -183,6 +183,8 @@ def check_kurultai() -> tuple[bool, list[str], dict]:
                 "Content Security Policy",
                 "CSP directive",
                 "beacon.min.js",
+                "404",  # Missing resources (favicons, tracking pixels) are not critical
+                "Failed to load resource",  # Often benign 404s
             ]
             critical_errors = [
                 e for e in console_errors

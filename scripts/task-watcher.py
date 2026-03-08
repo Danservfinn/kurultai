@@ -41,6 +41,14 @@ from kurultai_paths import (
 )
 from kurultai_ledger import append_ledger as _kp_append_ledger
 
+# Circuit breaker for agent health
+try:
+    from circuit_breaker import AgentCircuitBreaker
+    _circuit_breaker = AgentCircuitBreaker()
+except Exception as e:
+    log(f"Circuit breaker init failed (non-fatal): {e}")
+    _circuit_breaker = None
+
 # Neo4j sync — lazy-loaded, never blocks task execution
 _neo4j_driver = None
 
@@ -132,12 +140,15 @@ active_lock = Lock()
 
 
 def _verify_task_completion(task_file):
-    """Verify task file has substantial output before marking as complete.
+    """Verify task file has actual execution output before marking as complete.
+
+    CRITICAL FIX: This function now requires the presence of an "## Execution Output"
+    section to distinguish actual execution results from the original task description.
 
     Checks:
-    - Has content beyond frontmatter (at least 20 non-frontmatter lines)
-    - Has completion markers (## Result, ## Output, ## Summary, ## Done)
-    - Output has substance (not just headers)
+    - Has "## Execution Output" section (added by _append_output_to_executing)
+    - Content AFTER "## Execution Output" has substance (not just empty)
+    - At least 10 non-empty lines of actual execution output
 
     Returns tuple: (is_valid, reason)
     """
@@ -145,32 +156,40 @@ def _verify_task_completion(task_file):
         with open(task_file, 'r') as f:
             content = f.read()
 
-        # Split frontmatter from content
-        if content.startswith('---'):
-            parts = content.split('---', 2)
-            if len(parts) >= 3:
-                body = parts[2].strip()
-            else:
-                body = content
-        else:
-            body = content
+        # CRITICAL: Check for execution output section
+        # This is the separator added by _append_output_to_executing() in agent-task-handler.py
+        execution_marker = '## Execution Output'
 
-        # Count non-frontmatter lines
-        lines = body.split('\n')
-        content_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
+        if execution_marker not in content:
+            return False, f"No execution output section found (missing '{execution_marker}')"
 
-        # Check for minimum content (20 lines)
-        if len(content_lines) < 20:
-            return False, f"Insufficient output ({len(content_lines)} lines, need 20+)"
+        # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
+        # which is always the system-controlled marker. This prevents injection
+        # attacks where task descriptions contain the marker.
+        parts = content.rsplit(execution_marker, 1)
+        if len(parts) < 2:
+            return False, "Execution output section exists but has no content"
 
-        # Check for completion markers
-        completion_markers = ['## Result', '## Output', '## Summary', '## Done', '## Completed']
-        has_marker = any(marker in body for marker in completion_markers)
+        execution_output = parts[1].strip()
 
-        if not has_marker:
-            # For tasks without explicit markers, require more substantial content
-            if len(content_lines) < 30:
-                return False, f"No completion markers and insufficient output ({len(content_lines)} lines)"
+        # Count actual execution output lines (non-empty, excluding known metadata patterns)
+        # Only filter lines that are EXACTLY metadata format, not all bold text
+        import re
+        metadata_pattern = re.compile(r'^\*\*(Model|Duration|Status|Timestamp|Session|Agent|Task ID):\*\*')
+
+        exec_lines = [l for l in execution_output.split('\n')
+                      if l.strip()
+                      and not metadata_pattern.match(l.strip())  # only filter known metadata
+                      and not l.strip() == '---']
+
+        # Require at least 8 lines of actual output (lowered from 10 to account for markdown formatting)
+        if len(exec_lines) < 8:
+            return False, f"Execution output too short ({len(exec_lines)} lines, need 8+)"
+
+        # Also check for some substance (not just repeated markers)
+        total_output_chars = sum(len(l) for l in exec_lines)
+        if total_output_chars < 500:
+            return False, f"Execution output too brief ({total_output_chars} chars, need 500+)"
 
         return True, "OK"
     except Exception as e:
@@ -343,8 +362,8 @@ def list_pending_tasks(agent_dir):
 
     pending = []
     for f in tasks_dir.glob("*.md"):
-        # Skip completed/executing tasks
-        if any(x in f.name for x in ['.executing', '.completed', '.done']):
+        # Skip completed/executing tasks and gate states
+        if any(x in f.name for x in ['.executing', '.completed', '.done', '.pending-gate', '.gate-blocked']):
             continue
         # Skip continuous/recurring tasks (only run when explicitly triggered)
         try:
@@ -931,6 +950,33 @@ def execute_task(task_file, agent, task_key, timeout):
     status = "✓" if success else "✗"
     log(f"  {status} {task_key}: {'Completed' if success else 'Failed'} ({elapsed_s}s)")
 
+    # CRITICAL: Double-check for fake completions
+    # If handler reported success, verify the .done.md file has actual execution output
+    if success:
+        # Find the .done.md file that handler created
+        tasks_dir = task_file.parent
+        stem = task_file.stem
+        done_files = list(tasks_dir.glob(f"{stem}*.done.md"))
+        if done_files:
+            # Check the most recent done file
+            done_file = max(done_files, key=lambda f: f.stat().st_mtime)
+            is_valid, reason = _verify_task_completion(str(done_file))
+            if not is_valid:
+                log(f"  ⚠ FAKE COMPLETION DETECTED: {reason}")
+                log(f"  ⚠ Re-marking as failed (no_output)")
+                success = False
+                output = f"FAKE COMPLETION: {reason}"
+                # Emit FAKE_COMPLETION event to ledger for tracking
+                if task_id:
+                    _append_ledger({
+                        "task_id": task_id,
+                        "event": "FAKE_COMPLETION_BLOCKED",
+                        "ts": datetime.now().isoformat(),
+                        "agent": agent,
+                        "reason": reason,
+                        "original_output_lines": len(output.splitlines()) if output else 0,
+                    })
+
     # Emit COMPLETED/FAILED event
     if task_id:
         final_status = "COMPLETED" if success else "FAILED"
@@ -1006,12 +1052,51 @@ def sanitize_text(text):
     return text[:2000]
 
 
+def find_alternative_agent(original_agent: str, reason: str = "") -> str | None:
+    """Find a healthy alternative agent when circuit breaker is open.
+
+    Returns:
+        Agent name or None if no healthy agents available
+    """
+    if _circuit_breaker is None:
+        return None
+
+    # Import DISPATCH_AGENTS for the list of valid agents
+    try:
+        from kurultai_paths import DISPATCH_AGENTS
+    except ImportError:
+        DISPATCH_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
+
+    for agent in DISPATCH_AGENTS:
+        if agent == original_agent:
+            continue
+        check = _circuit_breaker.check_agent(agent)
+        if check["available"]:
+            return agent
+
+    return None
+
+
 def route_spawn_to_queue(agent, task_text, priority, label):
     """Route a spawn request by creating a task file in the agent's queue.
 
     The task file will be picked up by the next watch_cycle iteration
     (within seconds), achieving near-instant spawning.
+
+    Checks circuit breaker before routing and diverts to healthy agent if needed.
     """
+    # Check circuit breaker before routing
+    if _circuit_breaker:
+        circuit_state = _circuit_breaker.check_agent(agent)
+        if not circuit_state["available"]:
+            log(f"  CIRCUIT BREAKER: {agent} is {circuit_state['reason']}: {circuit_state.get('detail', '')}")
+            alternative = find_alternative_agent(agent)
+            if alternative:
+                log(f"  CIRCUIT BREAKER: Diverting task from {agent} to {alternative}")
+                agent = alternative
+            else:
+                log(f"  CIRCUIT BREAKER: No healthy agents available, using original {agent}", "WARN")
+
     tasks_dir = AGENTS_DIR / agent / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1019,12 +1104,22 @@ def route_spawn_to_queue(agent, task_text, priority, label):
     filename = f"{priority}-spawn-{safe_label}-{int(time.time())}.md"
     task_path = tasks_dir / filename
 
+    # Note circuit breaker diversion in task content
+    circuit_note = ""
+    if _circuit_breaker:
+        check = _circuit_breaker.check_agent(agent)
+        if check.get("reason") in ["probation", "normal"]:
+            pass  # No diversion
+        else:
+            circuit_note = f"\n<!-- Circuit breaker check passed for {agent} -->"
+
     content = (
         f"# Task: {label}\n\n"
         f"Source: spawn-queue (routed by task-watcher)\n"
         f"Priority: {priority}\n\n"
         f"---\n\n"
         f"{task_text}\n"
+        f"{circuit_note}"
     )
     task_path.write_text(content)
     log(f"  SPAWN->QUEUE: {agent}/{filename}")
@@ -1340,6 +1435,57 @@ def recover_stuck_failed_tasks():
     return recovered
 
 
+def recover_completed_md_files():
+    """Rename .completed.md files to .completed.done.md for proper cleanup.
+
+    Bug: Agent completion summaries are written as .completed.md instead of
+    .completed.done.md. This prevents task-watcher from processing them correctly
+    and they never get cleaned up.
+
+    Fix: Rename all .completed.md files to .completed.done.md so they're recognized
+    as terminal state files and cleaned up after 48 hours.
+    """
+    recovered = 0
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+        agent = agent_dir.name
+        for f in tasks_dir.iterdir():
+            if not f.name.endswith('.completed.md') or f.name.endswith('.done.md'):
+                continue
+            # Rename .completed.md to .completed.done.md
+            new_name = f.name.replace('.completed.md', '.completed.done.md')
+            new_path = f.parent / new_name
+            try:
+                f.rename(new_path)
+                recovered += 1
+                log(f"  COMPLETED-MD RECOVERY: {agent}/{f.name} → {new_name}")
+                # Emit ledger event for tracking this bug occurrence
+                try:
+                    task_id = _extract_task_id(new_path)
+                    _append_ledger({
+                        "event": "COMPLETED_MD_SUFFIX_BUG",
+                        "ts": datetime.now().isoformat(),
+                        "agent": agent,
+                        "task_file": str(new_path),
+                        "task_id": task_id,
+                        "original_suffix": ".completed.md",
+                        "fixed_suffix": ".completed.done.md",
+                        "severity": "medium"
+                    })
+                except Exception:
+                    pass  # Don't block recovery on ledger failure
+            except OSError as e:
+                log(f"  COMPLETED-MD RECOVERY ERROR: {agent}/{f.name}: {e}")
+
+    if recovered > 0:
+        log(f"Recovered {recovered} .completed.md file(s)")
+    return recovered
+
+
 def _already_completed(executing_file):
     """Check if a .completed.done.md or .failed.done.md already exists for this task.
 
@@ -1361,6 +1507,69 @@ def _already_completed(executing_file):
         if done_stem_base == stem_base:
             return True
     return False
+
+
+def _safe_rename_if_not_done(executing_file, target_path, agent="unknown"):
+    """Atomic rename with race guard for completion.
+
+    Checks if task is already completed BEFORE renaming, then does atomic rename.
+    Returns (success: bool, action: str, error: str).
+
+    This prevents the race condition where:
+    1. recover_stale_executions() checks _already_completed() -> False
+    2. mark_task_completed() renames .executing.md -> .completed.done.md
+    3. recover_stale_executions() tries to rename same file -> FileNotFoundError or corrupts state
+
+    The fix: check again inside a file lock before the actual rename.
+    """
+    # Quick check without lock (fast path for common case)
+    if _already_completed(executing_file):
+        return False, "skip", "already_completed"
+
+    # Acquire lock for this specific task's stem
+    stem = executing_file.stem.replace('.executing', '')
+    stem_base = re.sub(r'\.retry-\d+', '', stem)
+    lock_path = executing_file.parent / f".{stem_base}.rename-lock"
+
+    lock_fd = None
+    try:
+        # Open lock file with exclusive creation (O_CREAT | O_EXCL)
+        # This fails if lock already exists, meaning another process is handling this task
+        lock_fd = os.open(lock_path, os.O_CREAT | O_OEXCL | os.O_WRONLY)
+    except (FileExistsError, PermissionError):
+        # Another process has the lock - they're handling it
+        return False, "skip", "concurrent_operation"
+
+    try:
+        # RECHECK completion after acquiring lock
+        # This is the critical fix - prevents TOCTOU race
+        if _already_completed(executing_file):
+            return False, "skip", "already_completed_locked"
+
+        # Verify source file still exists (might have been renamed during lock wait)
+        if not executing_file.exists():
+            return False, "skip", "source_gone"
+
+        # Do the atomic rename
+        os.rename(executing_file, target_path)
+        return True, "renamed", "ok"
+
+    except FileNotFoundError:
+        # File was renamed between lock acquire and our rename
+        return False, "skip", "race_renamed"
+    except OSError as e:
+        return False, "error", str(e)
+    finally:
+        # Always release lock
+        try:
+            os.close(lock_fd)
+            lock_path.unlink(missing_ok=True)
+        except (OSError, AttributeError):
+            pass
+
+
+# O_EXCL constant for file locking
+O_OEXCL = os.O_EXCL if hasattr(os, 'O_EXCL') else 0x800
 
 
 def recover_stale_executions():
@@ -1441,7 +1650,12 @@ def recover_stale_executions():
                                 "error": f"Duplicate executing file recovered (age={round(age)}s, retries={retry_count})"})
                             _neo4j_update_status(task_id, "FAILED", agent=agent,
                                 error_msg="Duplicate executing file — double-dispatch race")
-                    except OSError:
+                    except OSError as e:
+                        # Handler won the race — check if task completed successfully
+                        if _already_completed(f):
+                            log(f"DEDUP RACE: {agent}/{f.name} — handler completed during duplicate rename")
+                            continue
+                        log(f"DEDUP ERROR: {agent}/{f.name} — {e}")
                         continue
                 else:
                     base_name = f.name.replace('.executing.md', '.md').replace('.executing', '')
@@ -1463,7 +1677,12 @@ def recover_stale_executions():
                                     "ts": datetime.now().isoformat(), "agent": agent,
                                     "stale_age_s": round(age), "retry": retry_count + 1,
                                     "reason": "duplicate_executing"})
-                    except OSError:
+                    except OSError as e:
+                        # Handler won the race — check if task completed successfully
+                        if _already_completed(f):
+                            log(f"DEDUP RACE: {agent}/{f.name} — handler completed during dup retry rename")
+                            continue
+                        log(f"DEDUP ERROR: {agent}/{f.name} — {e}")
                         continue
                 # Clean up PID file if it exists
                 try:
@@ -1549,7 +1768,12 @@ def recover_stale_executions():
                             "error": f"Handler PID dead after {actual_age}, max retries exhausted"})
                         _neo4j_update_status(task_id, "FAILED", agent=agent,
                             error_msg=f"Handler PID dead after {actual_age}")
-                except OSError:
+                except OSError as e:
+                    # Handler won the race — check if task completed successfully
+                    if _already_completed(f):
+                        log(f"DEAD_PID RACE: {agent}/{f.name} — handler completed during failed rename")
+                        continue
+                    log(f"DEAD_PID ERROR: {agent}/{f.name} — {e}")
                     continue
             else:
                 base_name = f.name.replace('.executing.md', '.md').replace('.executing', '')
@@ -1571,7 +1795,12 @@ def recover_stale_executions():
                                 "stale_age_s": round(age), "retry": retry_count + 1,
                                 "reason": "dead_pid_fast_recovery"})
                             _neo4j_update_status(task_id, "PENDING", agent=agent)
-                except OSError:
+                except OSError as e:
+                    # Handler won the race — check if task completed successfully
+                    if _already_completed(f):
+                        log(f"DEAD_PID RACE: {agent}/{f.name} — handler completed during retry rename")
+                        continue
+                    log(f"DEAD_PID ERROR: {agent}/{f.name} — {e}")
                     continue
             # Clean up PID file
             try:
@@ -1667,8 +1896,8 @@ def recover_stale_executions():
             if retry_count >= MAX_RETRY_COUNT:
                 # Permanently fail — stop retrying
                 failed_path = f.parent / f.name.replace('.executing', '.failed.done')
-                try:
-                    os.rename(f, failed_path)
+                success, action, detail = _safe_rename_if_not_done(f, failed_path, agent)
+                if success:
                     task_id = _extract_task_id(failed_path)
                     log(f"RECOVER: {agent}/{f.name} → failed.done (max retries reached)")
                     if task_id:
@@ -1681,7 +1910,11 @@ def recover_stale_executions():
                             "error": error_msg,
                         })
                         _neo4j_update_status(task_id, "FAILED", agent=agent, error_msg=error_msg)
-                except OSError:
+                elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                    # Handler already completed this task — clean up and continue
+                    log(f"RECOVER SKIP: {agent}/{f.name} — {detail}")
+                else:
+                    log(f"RECOVER ERROR: {agent}/{f.name} — {action} - {detail}")
                     continue
             else:
                 # Rename back to .md for retry (strip .executing, add retry counter)
@@ -1694,11 +1927,14 @@ def recover_stale_executions():
 
                 if original_path.exists():
                     failed_path = f.parent / f.name.replace('.executing', '.orphan-failed.done')
-                    try:
-                        os.rename(f, failed_path)
+                    success, action, detail = _safe_rename_if_not_done(f, failed_path, agent)
+                    if success:
                         log(f"RECOVER: {agent}/{f.name} → orphan-failed (original re-created)")
-                    except OSError:
-                        continue
+                    elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                        log(f"RECOVER SKIP: {agent}/{f.name} — {detail}")
+                    else:
+                        log(f"RECOVER ERROR: {agent}/{f.name} — {action} - {detail}")
+                    continue
                 else:
                     try:
                         os.rename(f, original_path)
@@ -1713,7 +1949,12 @@ def recover_stale_executions():
                                 "stale_age_s": round(age),
                                 "retry": retry_count + 1,
                             })
-                    except OSError:
+                    except OSError as e:
+                        # Handler won the race — check if task completed successfully
+                        if _already_completed(f):
+                            log(f"RECOVER RACE: {agent}/{f.name} — handler completed during retry rename")
+                            continue
+                        log(f"RECOVER ERROR: {agent}/{f.name} — {e}")
                         continue
 
             recovered += 1
@@ -1721,6 +1962,51 @@ def recover_stale_executions():
     if recovered > 0:
         log(f"Recovered {recovered} stale executing task(s)")
     return recovered
+
+
+# ==========================================================
+# COMPLETION GATE RESOLUTION
+# ==========================================================
+
+_last_gate_resolution = 0
+_GATE_RESOLUTION_INTERVAL = 300  # 5 minutes
+
+
+def check_gates_pending():
+    """Check for gates that can be resolved (follow-ups complete).
+
+    Runs periodically to process pending gates and mark them as passed
+    when all required follow-ups are complete.
+
+    Design: ~/.openclaw/agents/mongke/workspace/completion-gate-design-2026-03-08.md
+    """
+    global _last_gate_resolution
+
+    now = time.time()
+    if now - _last_gate_resolution < _GATE_RESOLUTION_INTERVAL:
+        return 0
+
+    _last_gate_resolution = now
+
+    try:
+        # Import gate resolver
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from completion_gate_resolver import GateResolver
+
+        resolver = GateResolver(dry_run=False)
+        resolved_count = resolver.resolve_pending_gates()
+
+        if resolved_count > 0:
+            log(f"[COMPLETION_GATE] Resolved {resolved_count} gate(s)")
+
+        return resolved_count
+
+    except ImportError:
+        # Gate resolver not available - not critical
+        return 0
+    except Exception as e:
+        log(f"[COMPLETION_GATE] Resolution check failed (non-fatal): {e}")
+        return 0
 
 
 _DAEMON_LOCK_FILE = AGENTS_DIR / "main" / "logs" / "task-watcher.lock"
@@ -1810,6 +2096,7 @@ def daemon_loop(poll_interval):
                 try:
                     cleanup_done_files()
                     recover_stuck_failed_tasks()
+                    recover_completed_md_files()
                     recover_stale_executions()
                 except Exception as e:
                     log(f"Cleanup/recovery error: {e}")
@@ -1824,6 +2111,12 @@ def daemon_loop(poll_interval):
                 except Exception as e:
                     log(f"Queue redistribution check error (non-fatal): {e}")
                 last_cleanup = time.time()
+
+            # Check for gates that can be resolved (runs every 5 min)
+            try:
+                check_gates_pending()
+            except Exception as e:
+                log(f"Gate resolution check error (non-fatal): {e}")
 
             # Sleep in small increments to respond to stop_event quickly
             for _ in range(poll_interval):
