@@ -141,10 +141,8 @@ def is_fake_completion(result_path, done_content, agent, task_name):
     if "delegated to" in result_content.lower() and "spawn queue" in result_content.lower():
         return True
 
-    # Legacy fake markers (from old model routing)
-    if "**Model:** qwen3.5-plus" in result_content:
-        return True
-
+    # Note: qwen3.5-plus check removed - legitimate proxy model, not fake
+    # Legacy fake markers (from old model routing) kept for other models
     if "**Latency:** 0ms" in result_content and "**Model:**" in result_content:
         return True
 

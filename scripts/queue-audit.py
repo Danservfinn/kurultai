@@ -189,8 +189,8 @@ def is_fake(result_path, done_path=None):
         return False
     if "delegated to" in content.lower() and "spawn queue" in content.lower():
         return True
-    if "**Model:** qwen3.5-plus" in content:
-        return True
+    # Note: qwen3.5-plus was removed from fake check - it's a legitimate proxy model
+    # The old check incorrectly flagged real completions that used proxy routing
     if "**Model:** fallback" in content:
         return True
     if "**Latency:** 0ms" in content and "**Model:**" in content:

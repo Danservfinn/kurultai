@@ -180,7 +180,7 @@ Kublai operates on the belief that **AI should liberate humans from labor**, fun
 |---------|--------|-----------|--------|----------|
 | **watchdog-gather.sh** | Gateway process | 5 min | PID, CPU, MEM, endpoint, logs | LLM triage → Kublai dispatch |
 | **gateway-health-check.sh** | tolui gateway | 5 min | Port 18792 listener, /health | Auto-restart + incident log |
-| **kurultai-monitor.py** | the.kurult.ai | 5 min | HTTP 200, HTML markers, API, JS syntax | 3 failures → Ogedei task; 10 failures → Kublai critical |
+| **kurultai-monitor.py** | the.kurult.ai | 5 min | Browser-based: JS console errors, rendering, board element, network idle | 3 failures → Ogedei task; 10 failures → Kublai critical |
 | **cron-health-monitor.sh** | Cron jobs | 15 min | Job exists, last status OK | Auto-restart failed jobs |
 
 **kurultai-monitor.py** — Website Uptime Monitor:
@@ -189,14 +189,22 @@ Kublai operates on the belief that **AI should liberate humans from labor**, fun
 - **Log File**: `~/.openclaw/agents/main/logs/kurultai-monitor.log`
 - **State File**: `~/.openclaw/agents/main/logs/kurultai-monitor-state.json`
 
-**Checks Performed**:
-1. HTTP GET https://the.kurult.ai → verify 200 status
-2. HTML content validation → markers like `<div class="board">`, `renderBoard`
-3. JavaScript syntax validation → extracts inline scripts, runs `node --check`
-4. API endpoint checks → `/api/health`, `/api/tasks`
+**Browser-Based Checks (Playwright)**:
+1. **Real Browser**: Headless Chromium loads full page (not HTTP request)
+2. **Console Errors**: Captures JavaScript console.error() events during load
+3. **Rendering Check**: Waits for `.board` element (page NOT stuck on "Loading...")
+4. **HTTP Status**: Verifies 200 response
+5. **Network Idle**: All requests completed
+6. **Body Validation**: Page not suspiciously empty
+7. **Benign Filter**: Ignores non-critical errors (cloudflareinsights.com, extensions)
+
+**Why Browser-Based Matters**:
+- JavaScript syntax errors return HTTP 200 but break page rendering
+- HTTP-only checks see "200 OK" and report healthy
+- Browser check catches rendering failures, stuck on "Loading...", console errors
 
 **Alert Thresholds**:
-- **3 consecutive failures** → Creates high-priority task for Ogedei
+- **3 consecutive failures** → Creates high-priority task for Ögedei
 - **10 consecutive failures** → Creates critical task for Kublai (50+ min outage)
 
 **Recovery Detection**:
@@ -1689,27 +1697,35 @@ Week 2-3:
 
 ---
 
-## 2026-03-07 - Kurultai Website Uptime Monitor
+## 2026-03-08 - Kurultai Website Browser-Based Uptime Monitor
 
-- **Change**: Automated uptime monitoring for the.kurult.ai website
-- **Reason**: 20-minute JavaScript syntax error outage went undetected until user reported
+- **Change**: Browser-based automated uptime monitoring for the.kurult.ai website
+- **Reason**: HTTP 200 with valid HTML does NOT mean page works. JavaScript syntax errors cause page to hang forever with HTTP 200, which HTTP-only checks cannot detect.
 - **Script Created**: `scripts/kurultai-monitor.py`
 - **Cron Job ID**: `kurultai-uptime-monitor` (every 5 minutes)
 - **Log File**: `logs/kurultai-monitor.log`
 - **State File**: `logs/kurultai-monitor-state.json`
 
-**Checks Performed**:
-1. HTTP GET https://the.kurult.ai → verify 200 status
-2. HTML content validation → markers (`<div class="board">`, `renderBoard`)
-3. JavaScript syntax validation → extracts inline scripts, runs `node --check`
-4. API endpoint checks → `/api/health`, `/api/tasks`
+**Browser-Based Checks (Playwright)**:
+1. **Real Browser Launch**: Headless Chromium with viewport 1920x1080
+2. **Console Error Capture**: Listens for `console.error()` events during page load
+3. **Page Load Timeout**: 15 seconds for initial HTTP response + DOM content
+4. **Rendering Verification**: Waits up to 10 seconds for `.board` element (NOT just "Loading..." text)
+5. **Network Idle Check**: Waits for all network requests to complete
+6. **Body Content Validation**: Checks page body is not suspiciously empty
+7. **Benign Error Filtering**: Ignores common non-critical errors (cloudflareinsights.com, extension-related)
+
+**Key Difference from HTTP Checks**:
+- HTTP check: `curl https://the.kurult.ai` returns 200 OK → assumes healthy
+- Browser check: Actually loads page in Chromium, detects if JavaScript broke rendering
+- **Critical**: JavaScript syntax errors return HTTP 200 but page stuck on "Loading..." forever
 
 **Alert Thresholds**:
-- 3 consecutive failures → High-priority task for Ogedei
-- 10 consecutive failures → Critical task for Kublai (50+ min outage)
+- 3 consecutive failures (15 min) → High-priority task for Ögedei
+- 10 consecutive failures (50 min) → Critical task for Kublai (immediate action required)
 
 **Recovery Detection**:
-- On success after failure → Logs recovery event, resets counter
+- On success after failure → Logs recovery event with downtime duration, resets counter, creates notification task
 
-**Files Modified**: `scripts/kurultai-monitor.py` (created), `cron/jobs.json` (new entry)
+**Files Modified**: `scripts/kurultai-monitor.py` (browser-based), `cron/jobs.json` (new entry)
 

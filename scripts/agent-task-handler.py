@@ -68,7 +68,7 @@ HAIKU_TIMEOUT = 120  # Max seconds for /task-complete haiku notification (increa
 
 # Proxy health check configuration
 PROXY_HEALTH_CHECK_TIMEOUT = 5  # seconds
-PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
 
 
 def check_proxy_health(proxy_url: str) -> bool:
@@ -521,6 +521,36 @@ def _verify_task_completion(task_file):
         return True, "OK"
     except Exception as e:
         return False, f"Verification error: {e}"
+
+
+def _append_output_to_executing(executing_file, content, model, duration_s, success=True):
+    """Append execution output to .executing.md file before completion verification.
+
+    This is CRITICAL for fake completion prevention. The verification function
+    checks the .executing.md file for substantial output, so we must append
+    the actual execution results BEFORE marking as done.
+
+    Args:
+        executing_file: Path to .executing.md file
+        content: Execution output content (stdout result or error)
+        model: Model used for execution
+        duration_s: Execution duration in seconds
+        success: True if successful execution, False if failed
+    """
+    if not os.path.exists(executing_file):
+        return
+
+    try:
+        with open(executing_file, 'a') as f:
+            f.write(f"\n\n## Execution Output\n\n")
+            f.write(f"**Model:** {model}\n")
+            f.write(f"**Duration:** {duration_s}s\n")
+            f.write(f"**Status:** {'Completed' if success else 'Failed'}\n")
+            f.write(f"\n---\n\n")
+            f.write(content)
+            f.write(f"\n")
+    except Exception as e:
+        print(f"  ⚠ Failed to append output to executing file: {e}")
 
 
 def mark_task_executing(task_file):
@@ -1096,7 +1126,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
     # Load agent-specific environment from .claude/settings.json
     # This provides ANTHROPIC_MODEL (and optionally ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
     VALID_CLAUDE_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'}
-    ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+    ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
     try:
         settings_path = f"{agent_root}/.claude/settings.json"
         with open(settings_path, 'r') as _sf:
@@ -1123,7 +1153,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
 
     # Validate ANTHROPIC_BASE_URL — allow Anthropic and approved proxy endpoints
     base_url = env.get('ANTHROPIC_BASE_URL', '')
-    allowed_proxy_endpoints = ['dashscope.aliyuncs.com', 'openrouter.ai']
+    allowed_proxy_endpoints = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
     is_allowed_proxy = any(endpoint in base_url for endpoint in allowed_proxy_endpoints)
     if base_url and 'anthropic.com' not in base_url and not is_allowed_proxy:
         print(f"  !! BLOCKED non-Anthropic BASE_URL for {agent_name}: {base_url}")
@@ -1134,7 +1164,8 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
     auth_token = env.get('ANTHROPIC_AUTH_TOKEN', '')
     # Anthropic tokens start with sk-ant-, but proxy services may use different prefixes
     is_anthropic_token = auth_token.startswith('sk-ant-')
-    is_proxy_token = base_url and is_allowed_proxy and auth_token.startswith('sk-')
+    is_proxy_token = (base_url and is_allowed_proxy and
+                      (auth_token.startswith('sk-') or 'api.z.ai' in base_url))
     if auth_token and not is_anthropic_token and not is_proxy_token:
         print(f"  !! BLOCKED non-Anthropic AUTH_TOKEN for {agent_name} (prefix: {auth_token[:6]}...)")
         env.pop('ANTHROPIC_AUTH_TOKEN', None)
@@ -1507,6 +1538,8 @@ def process_task(agent_name, task):
     pre_fail = _pre_validate_research_sources(agent_name, task_content, task_id)
     if pre_fail:
         print(f"  ✗ Source validation BLOCKED: {pre_fail['error'][:120]}")
+        # Append validation failure to task file for traceability
+        _append_output_to_executing(executing_file, f"**Blocked:** {pre_fail['error']}", "source_validator", 0, success=False)
         mark_task_completed(task['file'], 'failed', executing_file=executing_file)
         if task_id:
             _append_ledger({
@@ -1547,7 +1580,7 @@ def process_task(agent_name, task):
             # Only Claude models are valid for Claude Code executor
             'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
         }
-        PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+        PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
         model = config.get('model')
         # Fallback: check .claude/settings.json if config.json has no model
         if not model:
@@ -1633,6 +1666,12 @@ def process_task(agent_name, task):
             f.write(f"{result.get('content', 'No content')}\n")
 
         print(f"  ✓ Result saved: {result_file}")
+
+        # CRITICAL: Append execution output to .executing.md BEFORE completion verification
+        # This prevents fake completions - verification checks the file has substantial output
+        output_content = result.get('content', '')
+        _append_output_to_executing(executing_file, output_content, result.get('model', executor_name), elapsed_s, success=True)
+
         mark_task_completed(task['file'], 'completed', executing_file=executing_file)
         print(f"  ✓ Task completed via {executor_name} ({elapsed_s}s)")
 
@@ -1769,6 +1808,11 @@ def process_task(agent_name, task):
         error_msg = result.get('error', 'Unknown error')
         output_content = result.get('content', '') or result.get('error', '')
         print(f"  ✗ {executor_name} failed: {error_msg[:200]}")
+
+        # CRITICAL: Append error output to .executing.md so task file has execution trace
+        # This ensures the task file reflects what actually happened during execution
+        _append_output_to_executing(executing_file, output_content[:10000], result.get('model', executor_name), elapsed_s, success=False)
+
         mark_task_completed(task['file'], 'failed', executing_file=executing_file)
 
         if task_id:

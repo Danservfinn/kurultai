@@ -1,0 +1,1 @@
+WHEN fleet shows 0 completions across all agents for 30+ minutes THEN auto-investigate routing pipeline AND auto-dispatch findings to Kublai
