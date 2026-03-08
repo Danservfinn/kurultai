@@ -67,7 +67,26 @@ def generate_protocol_reflection(agent, hours=1, include_heartbeat_review=False)
     Uses role-specific protocols, injects active rules and last commitment
     from prepare_reflection_context.py, reads tock data instead of CLI.
     Target: ~800 tokens per agent (vs ~6400 in legacy mode).
+    
+    MODEL CHANGE EXCLUSION: Agents are explicitly prohibited from proposing
+    model configuration changes. Only humans can change models.
     """
+    # Model change exclusion header — agents MUST NOT propose model changes
+    model_lock_header = """## ⚠️ MODEL CONFIGURATION LOCK
+
+**CRITICAL:** You are PROHIBITED from proposing, suggesting, or considering any changes to agent model configuration (ANTHROPIC_MODEL, config.json, .claude/settings.json). Model changes are exclusively a human operator decision.
+
+During this reflection:
+- DO NOT include model configuration as a potential improvement
+- DO NOT create tasks to fix model mismatches
+- DO NOT suggest model changes in any deliverable
+- If you detect a model mismatch, log it but take NO action
+
+Violating this rule wastes compute and violates human operator authority.
+
+---
+"""
+    
     try:
         from prepare_reflection_context import generate_context
         context = generate_context(agent, hours=hours)
@@ -95,8 +114,8 @@ def generate_protocol_reflection(agent, hours=1, include_heartbeat_review=False)
     except Exception:
         metrics_block = ""
 
-    # Assemble compact prompt
-    parts = [context]
+    # Assemble compact prompt with model lock header first
+    parts = [model_lock_header, context]
     if metrics_block:
         parts.append(metrics_block)
     if heartbeat_block:
