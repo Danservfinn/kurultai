@@ -6,7 +6,7 @@
 
 ## Model Configuration
 
-- **Default:** zai-coding/glm-5 (dispatches to Claude Code via ACP)
+- **Default:** zai-coding/glm-5 (dispatches to Claude Code via subprocess)
 - **Fallback:** zai-coding/glm-4.7, bailian/qwen3.5-plus
 - **Heartbeat:** Every 30 minutes
 
@@ -53,9 +53,12 @@ When invoking `claude-agent`, you can reference these skills in the prompt:
 - `/senior-data-engineer`, `/senior-ml-engineer`, `/senior-data-scientist`
 - `/security-auditor`, `/brainstorming`, `/critical-reviewer`
 
-**Example with skill (via ACP):**
+**Example with skill (via claude-agent):**
 ```
-sessions_spawn({ task: "Use /horde-plan to design a caching layer for the Parse project, then /horde-implement to build it", runtime: "acp", agentId: "claude", mode: "run" })
+# Task is routed to agent via task_intake.py
+# Agent executes via claude-agent subprocess with skill hint
+skill_hint: /horde-plan
+# In agent-task-handler.py, the skill is invoked in the prompt
 ```
 
 ### Other Skills
@@ -99,12 +102,29 @@ sessions_spawn({ task: "Use /horde-plan to design a caching layer for the Parse 
 3. Set clear review expectations
 4. Track completion via Neo4j
 
-### Coding with Claude Code (via ACP)
-1. Always dispatch via `sessions_spawn({ runtime: "acp", agentId: "claude" })`
-2. Include full context (URLs, file paths, requirements) in the `task` field
-3. Use `mode: "session"` with `thread: true` for multi-turn work
-4. For complex tasks, reference horde skills in the task description
-5. Monitor via `session_status` tool
+### Task Execution Architecture (IMPORTANT)
+
+**Specialist agents do NOT use ACP sessions.** Tasks are executed via direct subprocess:
+
+```
+task-watcher.py (15s poll)
+    └── detects .md task files in agent/tasks/
+    └── calls agent-task-handler.py via subprocess
+            └── calls claude-agent --workdir ~/.openclaw/agents/{agent}/
+                    └── Runs Claude Code CLI in agent workspace
+```
+
+**Why subprocess, not ACP:**
+- Agent sovereignty — independent workspaces, configs, and execution contexts
+- Scale efficiency — no session registry pollution from high-frequency task execution
+- Recovery semantics — PID-based tracking matches subprocess model
+- Heartbeat integration — tick/tock filesystem scans are direct and reliable
+
+**When to use ACP sessions:**
+- One-off tasks spawned from human chat messages
+- Cross-agent collaboration requiring OpenClaw session routing
+- Model switching mid-task (OpenClaw can route to different models)
+- Short-lived subagent work (not persistent agent execution)
 
 ### Context Management
 - Do NOT read workspace files to answer human questions — route instead
@@ -118,20 +138,23 @@ sessions_spawn({ task: "Use /horde-plan to design a caching layer for the Parse 
 
 ---
 
-## Quick Commands (via ACP)
+## Quick Commands
 
 ```
-# One-shot task via Claude Code ACP
+# Route task to specialist agent (creates task file)
+python3 scripts/task_intake.py --title 'Task title' --body 'Task description' --agent temujin --priority high
+
+# Check executing tasks
+ls ~/.openclaw/agents/*/tasks/*.executing.md
+
+# Check claude-agent processes
+ps -ef | grep claude-agent | grep -v grep
+
+# One-shot coordination task via ACP (Kublai-only work)
 sessions_spawn({ task: "Your task here", runtime: "acp", agentId: "claude", mode: "run" })
 
-# Multi-turn session via Claude Code ACP
+# Multi-turn session via ACP (Kublai-only work)
 sessions_spawn({ task: "Your task here", runtime: "acp", agentId: "claude", mode: "session", thread: true })
-
-# Task with horde skills
-sessions_spawn({ task: "Use /horde-review to review the auth module", runtime: "acp", agentId: "claude", mode: "run" })
-
-# Image generation
-sessions_spawn({ task: "Generate image with prompt: 'prompt' and save to out.png using nano-banana-pro", runtime: "acp", agentId: "claude", mode: "run" })
 ```
 
 ---
@@ -143,3 +166,4 @@ sessions_spawn({ task: "Generate image with prompt: 'prompt' and save to out.png
 - Nano-banana-pro: gemini-3.1-flash tested & working
 - Parse: OpenRouter integration LIVE
 - Claude Code: Installed & configured with 90+ skills, 23 plugins (via claude-code-setup-v2)
+- **Architecture:** Specialist agents execute via claude-agent subprocess, NOT ACP sessions

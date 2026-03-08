@@ -1,7 +1,7 @@
 # Kublai — Coordination Memory
 
 **Role:** Squad Lead / Router
-**Model:** zai-coding/glm-5 (dispatches to Claude Code via ACP)
+**Model:** zai-coding/glm-5 (dispatches to Claude Code via subprocess)
 
 ---
 
@@ -18,8 +18,8 @@
 ## Task Creation Protocol
 
 **When creating tasks, Kublai must:**
-1. **Use Claude Code** - Invoke via `sessions_spawn({ runtime: "acp", agentId: "claude" })`
-2. **Specify skills** - Always include which skills the agent should use
+1. **Use task_intake.py** - Creates task file in agent's tasks/ directory
+2. **Specify skills** - Include skill_hint in task frontmatter for agent-task-handler
 3. **Prefer horde skills** - Default to horde skills when appropriate:
    - `/horde-plan` - Structured implementation plans with dependency tracking
    - `/horde-implement` - Execute plans with quality checkpoints
@@ -37,12 +37,7 @@
 
 **Example task creation:**
 ```
-sessions_spawn({
-  task: "Use /horde-plan to design [feature], then /horde-implement to build it",
-  runtime: "acp",
-  agentId: "claude",
-  mode: "run"
-})
+python3 scripts/task_intake.py --title 'Task title' --body 'Task description' --agent temujin --priority high --skill_hint /horde-implement
 ```
 
 ---
@@ -54,22 +49,41 @@ sessions_spawn({
 - heartbeat_master.py daemon (5m) for continuous operation
 - Cron jobs under Kublai for high-level tasks
 - File-based memory + Neo4j operational memory
+- **Task execution via claude-agent subprocess** (not ACP sessions)
+
+### Task Execution Flow
+
+```
+task-watcher.py (15s poll)
+    └── detects .md task files in agent/tasks/
+    └── calls agent-task-handler.py via subprocess
+            └── calls claude-agent --workdir ~/.openclaw/agents/{agent}/
+                    └── Runs Claude Code CLI in agent workspace
+```
+
+**Why subprocess, not ACP:**
+- Agent sovereignty — independent workspaces, configs, and execution contexts
+- Scale efficiency — no session registry pollution from high-frequency task execution
+- Recovery semantics — PID-based tracking (.executing.pid files) matches subprocess model
+- Heartbeat integration — tick/tock filesystem scans are direct and reliable
 
 ---
 
 ## What Works
 
 - Hourly reflections with self-awareness checks
-- Subagent spawning for parallel work
-- Task-watcher daemon (10s polling)
-- Claude Code ACP for specialist execution
+- Subagent spawning for parallel work (Kublai coordination tasks only)
+- Task-watcher daemon (15s polling)
+- Claude Code via claude-agent subprocess for specialist execution
+- PID-based execution tracking (.executing.pid sentinel files)
 
 ## What Doesn't Work
 
 - Cross-agent file writing (use Neo4j instead)
 - Single cron job for all reflections (broken for non-Kublai)
 - Self-answering product questions (always route to specialists)
+- ACP sessions for specialist tasks (wrong architecture — use subprocess)
 
 ---
 
-*Last updated: 2026-03-05*
+*Last updated: 2026-03-08*
