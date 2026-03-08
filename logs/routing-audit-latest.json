@@ -1,125 +1,115 @@
 {
   "period_hours": 1,
-  "generated_at": "2026-03-07T18:04:46.057378",
+  "generated_at": "2026-03-08T00:01:35.014112",
   "total_routed": 19,
   "routing_methods": {
     "explicit": 19
   },
   "destinations": {
     "jochi": 8,
-    "temujin": 6,
-    "ogedei": 3,
-    "kublai": 2
+    "kublai": 3,
+    "temujin": 2,
+    "ogedei": 4,
+    "mongke": 2
   },
   "by_agent": {
     "jochi": {
       "routed": 8,
-      "executed": 5,
-      "succeeded": 0,
-      "failed": 5
-    },
-    "temujin": {
-      "routed": 6,
-      "executed": 13,
-      "succeeded": 0,
-      "failed": 13
-    },
-    "ogedei": {
-      "routed": 3,
-      "executed": 4,
-      "succeeded": 2,
-      "failed": 2
+      "executed": 6,
+      "succeeded": 6,
+      "failed": 0
     },
     "kublai": {
+      "routed": 3,
+      "executed": 2,
+      "succeeded": 2,
+      "failed": 0
+    },
+    "temujin": {
       "routed": 2,
       "executed": 0,
       "succeeded": 0,
+      "failed": 0
+    },
+    "ogedei": {
+      "routed": 4,
+      "executed": 5,
+      "succeeded": 5,
+      "failed": 0
+    },
+    "mongke": {
+      "routed": 2,
+      "executed": 3,
+      "succeeded": 3,
       "failed": 0
     }
   },
   "queue_state": {
     "kublai": {
       "pending": 0,
-      "executing": 2,
-      "done": 0
+      "executing": 0,
+      "done": 11
     },
     "temujin": {
-      "pending": 1,
-      "executing": 2,
-      "done": 0
+      "pending": 2,
+      "executing": 0,
+      "done": 2
     },
     "mongke": {
       "pending": 0,
-      "executing": 0,
-      "done": 0
+      "executing": 2,
+      "done": 4
     },
     "chagatai": {
       "pending": 0,
       "executing": 0,
-      "done": 0
+      "done": 2
     },
     "jochi": {
-      "pending": 0,
-      "executing": 2,
-      "done": 0
+      "pending": 2,
+      "executing": 0,
+      "done": 13
     },
     "ogedei": {
-      "pending": 0,
-      "executing": 0,
-      "done": 1
+      "pending": 2,
+      "executing": 2,
+      "done": 13
     }
   },
   "issues": [
     "High explicit routing: 19/19 (100%) \u2014 keyword table may be underused",
-    "Workload imbalance: jochi got 8 tasks vs kublai got 2",
-    "jochi: 5 task(s) failed out of 5 executed",
-    "temujin: 13 task(s) failed out of 13 executed",
-    "ogedei: 2 task(s) failed out of 4 executed",
-    "kublai: 2 task(s) routed but 0 executed \u2014 dispatch may be stalled",
-    "Keyword table drift: 14/19 (74%) tasks would route differently via keywords vs actual destination",
-    "RECURRING: 4 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+    "Workload imbalance: jochi got 8 tasks vs temujin got 2",
+    "temujin: 2 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "Keyword table drift: 12/19 (63%) tasks would route differently via keywords vs actual destination",
+    "RECURRING: 1 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
   ],
   "suggestions": [
     "Routing methods: explicit=19"
   ],
   "kw_disagreements": {},
-  "kw_misroute_count": 14,
-  "kw_misroute_rate": "14/19",
+  "kw_misroute_count": 12,
+  "kw_misroute_rate": "12/19",
   "kw_misroute_examples": [
-    "'Investigate kublai task failures (10 in last 1h)' -> kw=mongke actual=jochi",
-    "'Investigate temujin task failures (29 in last 1h)' -> kw=mongke actual=jochi",
-    "'FIX: claude-agent model mismatch - tasks requesting claude-s' -> kw=ogedei actual=temujin",
-    "'CRITICAL: Session file lock contention causing 93% failure r' -> kw=jochi actual=ogedei",
-    "'INVESTIGATE: Root cause of session lock accumulation' -> kw=mongke actual=temujin"
+    "'Create kublai-task-report skill for instant task completion ' -> kw=temujin actual=kublai",
+    "'Implement LLM model tracking per agent for success measureme' -> kw=temujin actual=jochi",
+    "'Enhance kublai-task-report with comprehensive data collectio' -> kw=mongke actual=kublai",
+    "'Triage stalled agent: mongke has 1 queued tasks with 0 compl' -> kw=kublai actual=jochi",
+    "'Triage stalled agent: ogedei has 1 queued tasks with 0 compl' -> kw=kublai actual=jochi"
   ],
   "overflow_count": 0,
-  "skill_hint_coverage": "13/19",
+  "skill_hint_coverage": "14/19",
   "routing_drift": {
-    "total": 0,
+    "total": 1,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "ts": "2026-03-07T17:41:53.801456"
+    "top_examples": [],
+    "ts": "2026-03-07T23:45:13.248284"
   },
   "recurring_issues": [
     {
-      "issue_key": "temujin: # task(s) failed out of # executed",
-      "consecutive": 11,
-      "first_seen": "2026-03-07T13:35:39.814462"
-    },
-    {
-      "issue_key": "Keyword table drift: #/# (#%) tasks would route differently via keywords vs actual destination",
-      "consecutive": 8,
-      "first_seen": "2026-03-07T15:03:06.497997"
-    },
-    {
       "issue_key": "High explicit routing: #/# (#%) \u2014 keyword table may be underused",
-      "consecutive": 6,
+      "consecutive": 19,
       "first_seen": "2026-03-07T16:03:03.123676"
-    },
-    {
-      "issue_key": "jochi: # task(s) failed out of # executed",
-      "consecutive": 4,
-      "first_seen": "2026-03-07T17:01:28.284522"
     }
   ]
 }

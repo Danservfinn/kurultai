@@ -1,0 +1,352 @@
+{
+  "timestamp": "2026-03-07T19:07:17-0500",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 1,
+        "failed": 0,
+        "pending": 0,
+        "running": 1,
+        "total": 2,
+        "queue_depth": 0
+      },
+      "success_rate": 50.0,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": true
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 2,
+        "model": "lukey03/qwen3.5-9b-abliterated-vision"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 4,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 2,
+        "model": "lukey03/qwen3.5-9b-abliterated-vision"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 1,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 12,
+        "model": "kimi-k2.5"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 1,
+        "total": 1,
+        "queue_depth": 0
+      },
+      "success_rate": 0.0,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": 75,
+        "model": "qwen3-coder-next"
+      },
+      "config_model": {
+        "resolved": "claude-opus-4-6",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 18,
+    "healthy": 16,
+    "erroring": 0,
+    "jobs": [
+      {
+        "name": "Architecture Verification - 12hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 201161,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 191063,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 11844,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Kurultai Reflection",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 197379,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 53134,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 25389,
+        "enabled": true
+      },
+      {
+        "name": "qmd-index-refresh",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 22491,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-competitor-monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 17083,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-openclaw-discovery",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 20835,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-news-gatherer",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 27658,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 118805,
+        "enabled": true
+      },
+      {
+        "name": "calendar-reminder-worker",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120034,
+        "enabled": true
+      },
+      {
+        "name": "signal-calendar-listener",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai 3-hour review",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 45519,
+        "enabled": true
+      },
+      {
+        "name": "Failed Task Review - Hourly",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120023,
+        "enabled": true
+      },
+      {
+        "name": "stale-lock-cleanup",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120235,
+        "enabled": true
+      }
+    ]
+  },
+  "queues": {
+    "total_pending": 0,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [
+      {
+        "from_agent": "anomaly-scanner",
+        "to_agent": "jochi",
+        "task_label": "jochi-72dd53eb-865"
+      },
+      {
+        "from_agent": "temujin",
+        "to_agent": "kublai",
+        "task_label": "kublai-3a853f1f-30b"
+      },
+      {
+        "from_agent": "kublai-initiative",
+        "to_agent": "kublai",
+        "task_label": "kublai-d1e9f275-e8c"
+      },
+      {
+        "from_agent": "gateway-router",
+        "to_agent": "ogedei",
+        "task_label": "ogedei-09be2b15-415"
+      }
+    ],
+    "count_30m": 4
+  },
+  "errors": {
+    "clusters": []
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 10,
+    "fake_found": 6,
+    "requeued": 4,
+    "skipped": 0,
+    "double_suffix_fixed": 0
+  },
+  "ledger_reconciliation": {
+    "neo4j_total_completed": 1,
+    "ledger_total_completed": 6,
+    "delta": -5,
+    "mismatches": [
+      {
+        "agent": "temujin",
+        "neo4j_completed": 0,
+        "ledger_completed": 1,
+        "neo4j_failed": 0,
+        "ledger_failed": 0
+      },
+      {
+        "agent": "jochi",
+        "neo4j_completed": 0,
+        "ledger_completed": 2,
+        "neo4j_failed": 0,
+        "ledger_failed": 5
+      },
+      {
+        "agent": "ogedei",
+        "neo4j_completed": 0,
+        "ledger_completed": 2,
+        "neo4j_failed": 0,
+        "ledger_failed": 0
+      }
+    ],
+    "reconciled": false
+  },
+  "llm_assessment": {
+    "model": "ollama/hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+    "workload_balance": "mongke, chagatai, temujin, ogedei idle; kublai, jochi active",
+    "bottleneck": "jochi stale session; ledger sync delta (-5)",
+    "coordination_gap": "none",
+    "recommended_action": "refresh jochi session; reconcile ledger",
+    "severity": "HIGH"
+  }
+}

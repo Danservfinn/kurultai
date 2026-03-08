@@ -160,6 +160,9 @@ def is_fake(result_path, done_path=None):
             # The agent ran but failed (timeout, session lock, model error, etc).
             if ".failed.done" in basename or ".orphan-failed.done" in basename:
                 return False
+            # Verified/unverified tasks have passed through task-verifier.py - legitimate states
+            if ".verified.done" in basename or ".unverified.done" in basename:
+                return False
         except OSError:
             pass
     if result_path is None:
@@ -199,7 +202,8 @@ def original_name(done_filename):
     """Strip .done suffixes to get original pending filename."""
     name = done_filename
     # Standard suffixes from agent-task-handler
-    for suf in [".completed.done.md", ".in_progress.done.md", ".failed.done.md"]:
+    for suf in [".completed.done.md", ".in_progress.done.md", ".failed.done.md",
+                ".verified.done.md", ".unverified.done.md"]:
         if name.endswith(suf):
             return name[:-len(suf)] + ".md"
     # Non-standard suffixes created by LLM agents during cleanup/reflection

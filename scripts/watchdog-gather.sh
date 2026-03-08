@@ -144,6 +144,16 @@ TASKS_PENDING_TOTAL=0
 TASK_QUEUE_STATUS=""
 SPAWN_COUNT=0
 
+# ============================================================
+# SECTION 5b: Completion Audit (continuous verification)
+# ============================================================
+# Run lightweight audit of recently completed tasks to catch fake completions
+# Integrated into heartbeat cycle (every 5 minutes) for continuous monitoring
+COMPLETION_AUDIT_OUTPUT=$(python3 "$SCRIPTS/completion-audit.py" --json 2>/dev/null || echo "{}")
+COMPLETION_AUDIT_FAKE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fake_found',0))" 2>/dev/null || echo "0")
+COMPLETION_AUDIT_REQUEUED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('requeued',0))" 2>/dev/null || echo "0")
+COMPLETION_AUDIT_VERIFIED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('verified',0))" 2>/dev/null || echo "0")
+
 for agent in "${AGENTS[@]}"; do
     TASK_DIR="$AGENT_BASE/$agent/tasks"
     if [ ! -d "$TASK_DIR" ]; then
@@ -369,24 +379,26 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s"},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s}},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
     "$TS_ISO" "$EPOCH" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "${SPAWN_COUNT:-0}" "$TASK_QUEUE_STATUS" \
+    "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$AVG_LAT_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" >> "$TICKS"
 
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
     "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" \
     "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "$SPAWN_COUNT" "$TASK_QUEUE_STATUS" \
+    "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
 
@@ -414,7 +426,7 @@ fi
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
-echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
+echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
 
 # ============================================================
 # SECTION 8: LLM Triage (local ollama — decide if Kublai should act)
@@ -569,6 +581,12 @@ This anomaly has persisted too long for LLM triage to handle. Investigate root c
 fi
 
 # ============================================================
+# ============================================================
+# STALE LOCK CLEANUP: Remove orphaned session lock files
+# Runs every 5 minutes to prevent "session file locked" errors
+# ============================================================
+python3 "$BASE/scripts/stale-lock-cleanup.py" --json >> "$BASE/logs/stale-lock-cleanup.log" 2>&1
+
 # KUBLAI ACTIONS: Rule-based actions (safety net, runs alongside LLM triage)
 # ============================================================
 python3 "$SCRIPTS/kublai-actions.py" --trigger tick >> "$LOGDIR/kublai-actions.log" 2>&1 &

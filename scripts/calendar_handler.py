@@ -57,6 +57,13 @@ from neo4j_calendar import (
     get_daily_digest,
     check_time_conflicts,
     get_or_create_person,
+    # Notification rules (advanced)
+    create_notification_rule,
+    get_event_notification_rules,
+    update_notification_rule,
+    delete_notification_rule,
+    create_notification_instances_from_rules,
+    apply_notification_preset,
 )
 
 # Signal configuration
@@ -542,6 +549,66 @@ def handle_remind(
     return "[Calendar] Could not create reminder"
 
 
+def handle_notification_rule(
+    sender_phone: str,
+    message: str,
+    group_id: str
+) -> Optional[str]:
+    """Handle advanced notification rule creation.
+
+    Supports patterns like:
+    - "notify me 15 min before dinner"
+    - "set escalating reminders for the meeting"
+    - "remind me with travel presets for the trip"
+    - "add 3 notifications before the deadline"
+    """
+    # Find event from message
+    event_query = None
+    for word in message.split():
+        if word[0].isupper():
+            event_query = word
+            break
+
+    if not event_query:
+        # Try most recent event
+        recent = get_upcoming_events(hours=24)
+        if recent:
+            event_query = recent[0].get("name", "")
+        else:
+            return "[Calendar] Which event? Please specify the event name."
+
+    # Find event to get event_id
+    events = search_events(event_query, limit=1)
+    if not events:
+        return f"[Calendar] Could not find event '{event_query}'"
+
+    event = events[0]
+    event_id = event.get("event_id", "")
+
+    # Detect preset type from keywords
+    message_lower = message.lower()
+    if "travel" in message_lower or "trip" in message_lower:
+        preset = "travel"
+    elif "deadline" in message_lower or "due" in message_lower:
+        preset = "deadline"
+    elif "escalat" in message_lower:
+        preset = "deadline"  # Escalating = deadline preset
+    elif "meeting" in message_lower:
+        preset = "meeting"
+    else:
+        preset = "meeting"  # Default
+
+    # Apply preset
+    result = apply_notification_preset(event_id, sender_phone, preset)
+
+    if result and "rules" in result:
+        rules_count = len(result.get("rules", []))
+        notifs_count = len(result.get("notifications", []))
+        return f"[Calendar] Added {rules_count} notification rule(s) ({notifs_count} alerts) for {event_query} using {preset} template"
+
+    return "[Calendar] Could not create notification rules"
+
+
 def handle_person_query(person_name: str) -> Optional[str]:
     """Handle 'what is X going to?' queries."""
     events = get_events_for_person(person_name)
@@ -682,6 +749,10 @@ def handle_message(
 
     elif parsed.intent == Intent.EVENT_REMIND:
         return handle_remind(sender_phone, parsed, group_id)
+
+    # Check for advanced notification rule patterns
+    if any(kw in message.lower() for kw in ["notify me", "set reminder", "add notification", "set alert"]):
+        return handle_notification_rule(sender_phone, message, group_id)
 
     # Check for "add X to Y" pattern
     if "add" in message.lower() and "to" in message.lower():

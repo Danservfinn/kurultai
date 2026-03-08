@@ -505,10 +505,11 @@ def _notify_completion(agent, task_label, success, elapsed_s, source="", result=
 
 
 def _schedule_verification(task_file, agent, task_id):
-    """Schedule post-completion verification in a background thread.
+    """Schedule post-completion verification + report generation in a background thread.
 
     Finds the .completed.done.md file (agent-task-handler renames it)
-    and runs task-verifier.py against it. Non-blocking, fire-and-forget.
+    and runs task-verifier.py against it. Then generates completion report.
+    Non-blocking, fire-and-forget.
     """
     def _verify():
         try:
@@ -540,6 +541,8 @@ def _schedule_verification(task_file, agent, task_id):
 
             if result.returncode == 0:
                 log(f"  VERIFY OK: {agent}/{Path(completed_file).name}")
+                # Generate completion report
+                _generate_completion_report(completed_file, agent, task_id)
             else:
                 # Parse JSON for failure details
                 detail = ""
@@ -551,6 +554,8 @@ def _schedule_verification(task_file, agent, task_id):
                 except (json.JSONDecodeError, KeyError):
                     pass
                 log(f"  VERIFY FAIL: {agent}/{Path(completed_file).name}{detail}")
+                # Generate failure report
+                _generate_completion_report(completed_file, agent, task_id, status='failed')
 
         except subprocess.TimeoutExpired:
             log(f"  VERIFY TIMEOUT: {agent}/{task_file.name}")
@@ -561,15 +566,68 @@ def _schedule_verification(task_file, agent, task_id):
     t.start()
 
 
+def _generate_completion_report(completed_file: str, agent: str, task_id: str, status: str = 'completed'):
+    """Generate task completion report using kublai-task-report skill."""
+    try:
+        hook = str(Path(__file__).parent / "task-report-hook.py")
+        result = subprocess.run(
+            ["python3", hook,
+             "--task-file", completed_file,
+             "--agent", agent,
+             "--task-id", task_id or "unknown",
+             "--status", status],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            log(f"  REPORT: Generated for {agent}/{Path(completed_file).name}")
+        else:
+            log(f"  REPORT: Failed for {agent}/{Path(completed_file).name}: {result.stderr[:200]}")
+    except subprocess.TimeoutExpired:
+        log(f"  REPORT: Timeout for {agent}/{Path(completed_file).name}")
+    except Exception as e:
+        log(f"  REPORT: Error for {agent}/{Path(completed_file).name}: {e}")
+
+
+def _schedule_task_report(task_file, agent, task_id, success, elapsed_s, output):
+    """Schedule task completion report generation in a background thread.
+
+    Non-blocking, fire-and-forget. Called for both success and failure cases.
+    """
+    def _report():
+        try:
+            hook = str(Path(__file__).parent / "task-report-hook.py")
+            status = "completed" if success else "failed"
+            result = subprocess.run(
+                ["python3", hook,
+                 "--task-file", str(task_file),
+                 "--agent", agent,
+                 "--status", status,
+                 "--duration", str(elapsed_s),
+                 "--output", output[:1000] if output else ""],
+                capture_output=True, text=True, timeout=60,
+            )
+            if result.returncode == 0:
+                log(f"  REPORT: Generated for {agent}/{task_file.name}")
+            else:
+                log(f"  REPORT: Failed for {agent}/{task_file.name}: {result.stderr[:200]}")
+        except subprocess.TimeoutExpired:
+            log(f"  REPORT: Timeout for {agent}/{task_file.name}")
+        except Exception as e:
+            log(f"  REPORT: Error for {agent}/{task_file.name}: {e}")
+
+    t = Thread(target=_report, daemon=True)
+    t.start()
+
+
 SLOW_SKILLS = {
-    '/horde-brainstorming': 900,
-    '/golden-horde': 900,
-    '/horde-implement': 900,
-    '/horde-review': 900,
-    '/horde-debug': 900,
-    '/horde-learn': 900,
-    '/horde-swarm': 900,
-    '/horde-test': 900,
+    '/horde-brainstorming': 7200,
+    '/golden-horde': 7200,
+    '/horde-implement': 7200,
+    '/horde-review': 7200,
+    '/horde-debug': 7200,
+    '/horde-learn': 7200,
+    '/horde-swarm': 7200,
+    '/horde-test': 7200,
 }
 
 
@@ -860,6 +918,9 @@ def execute_task(task_file, agent, task_key, timeout):
     # Post-completion verification (background thread, non-blocking)
     if VERIFY_ON_COMPLETE and success:
         _schedule_verification(task_file, agent, task_id)
+
+    # Generate completion report (background thread, non-blocking)
+    _schedule_task_report(task_file, agent, task_id, success, elapsed_s, output)
 
     # Update state only on success or permanent failure (not on retry)
     if success or is_permanent_fail:

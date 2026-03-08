@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR, VALID_AGENTS
 
 MAX_ACTIVE_RULES = 7
+MAX_PRUNED_RETENTION_DAYS = 30
 
 
 def _rules_path(agent: str) -> Path:
@@ -261,13 +262,157 @@ def format_rules_block(agent: str) -> str:
     return "\n".join(lines)
 
 
+
+def prune_stale_rules(agent: str, max_age_days: int = 7, dry_run: bool = False, create_backup: bool = True) -> int:
+    """Prune deprecated rules with 0 evaluations older than max_age_days.
+    
+    Args:
+        agent: Agent name
+        max_age_days: Age threshold for pruning deprecated rules
+        dry_run: If True, only report what would be pruned without modifying
+        create_backup: If True, create backup before pruning
+    
+    Returns count of rules pruned.
+    """
+    from datetime import timedelta
+    
+    data = load_rules(agent)
+    cutoff = datetime.now() - timedelta(days=max_age_days)
+    pruned = 0
+    kept = []
+
+    # Create backup before pruning (if not dry run)
+    if not dry_run and create_backup:
+        import shutil
+        rules_path = _rules_path(agent)
+        if rules_path.exists():
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            backup_path = f"{rules_path}.bak.{timestamp}"
+            shutil.copy2(rules_path, backup_path)
+            print(f"  Backup created: {backup_path}")
+    
+    for rule in data["rules"]:
+        # Keep active rules
+        if rule.get("status") == "active":
+            kept.append(rule)
+            continue
+        
+        # Keep deprecated rules with evaluation history
+        follow = rule.get("follow_count", 0)
+        violate = rule.get("violate_count", 0)
+        if follow > 0 or violate > 0:
+            kept.append(rule)
+            continue
+        
+        # Check if deprecated rule is old enough to prune
+        deprecated_at = rule.get("deprecated_at")
+        if deprecated_at:
+            try:
+                dep_time = datetime.fromisoformat(deprecated_at)
+                if dep_time > cutoff:
+                    kept.append(rule)  # Not old enough yet
+                    continue
+            except:
+                kept.append(rule)  # Can't parse, keep it
+                continue
+        
+        # Mark as pruned (only if not dry run)
+        if not dry_run:
+            rule["status"] = "pruned"
+            rule["pruned_at"] = datetime.now().isoformat()
+            rule["pruned_reason"] = f"stale: 0 evaluations, deprecated > {max_age_days} days"
+        kept.append(rule)
+        pruned += 1
+    
+    if pruned > 0 and not dry_run:
+        data["rules"] = kept
+        data["last_updated"] = datetime.now().isoformat()
+        path = _rules_path(agent)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    
+    return pruned
+
+
+def archive_pruned_rules(agent: str, dry_run: bool = False) -> int:
+    """Archive pruned rules to separate file after retention period."""
+    from datetime import timedelta
+    
+    data = load_rules(agent)
+    cutoff = datetime.now() - timedelta(days=MAX_PRUNED_RETENTION_DAYS)
+    archived = 0
+    kept = []
+    
+    archive_path = AGENTS_DIR / agent / "memory" / "rules_archive.json"
+    archive_data = {"archived_rules": [], "last_archived": None}
+    
+    if archive_path.exists():
+        try:
+            with open(archive_path, "r") as f:
+                archive_data = json.load(f)
+        except:
+            pass
+    
+    for rule in data["rules"]:
+        if rule.get("status") != "pruned":
+            kept.append(rule)
+            continue
+        
+        pruned_at = rule.get("pruned_at")
+        if pruned_at:
+            try:
+                if datetime.fromisoformat(pruned_at) > cutoff:
+                    kept.append(rule)
+                    continue
+            except:
+                kept.append(rule)
+                continue
+        
+        if not dry_run:
+            rule["archived_at"] = datetime.now().isoformat()
+            archive_data["archived_rules"].append(rule)
+        archived += 1
+    
+    if archived > 0 and not dry_run:
+        archive_data["last_archived"] = datetime.now().isoformat()
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(archive_path, "w") as f:
+            json.dump(archive_data, f, indent=2)
+        
+        data["rules"] = kept
+        data["last_updated"] = datetime.now().isoformat()
+        with open(_rules_path(agent), "w") as f:
+            json.dump(data, f, indent=2)
+        
+        print(f"  Archived {archived} rules to: {archive_path}")
+    
+    return archived
+
+
+def archive_all_agents(dry_run: bool = False) -> dict:
+    """Archive pruned rules for all agents."""
+    results = {}
+    total = 0
+    for agent in sorted(VALID_AGENTS):
+        count = archive_pruned_rules(agent, dry_run=dry_run)
+        if count > 0:
+            results[agent] = count
+            total += count
+    if total == 0:
+        print("No pruned rules to archive")
+    else:
+        print(f"Total: {total} rules archived")
+    return results
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Agent rule registry management")
-    parser.add_argument("command", choices=["list", "seed", "seed-all", "stats"],
+    parser.add_argument("command", choices=["list", "seed", "seed-all", "stats", "prune-all", "archive", "archive-all"],
                         help="Command to run")
     parser.add_argument("--agent", help="Agent name (required for list/seed)")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be pruned without modifying")
     args = parser.parse_args()
 
     if args.command == "seed-all":
@@ -297,3 +442,33 @@ if __name__ == "__main__":
             deprecated = sum(1 for r in data["rules"] if r.get("status") == "deprecated")
             total = len(data["rules"])
             print(f"{agent}: {active} active, {deprecated} deprecated, {total} total")
+    elif args.command == "archive-all":
+        archive_all_agents(dry_run=args.dry_run)
+
+    elif args.command == "archive":
+        if not args.agent:
+            print("--agent required")
+            sys.exit(1)
+        count = archive_pruned_rules(args.agent, dry_run=args.dry_run)
+        print(f"{args.agent}: archived {count} pruned rules" if count else f"{args.agent}: no rules to archive")
+
+    elif args.command == "prune-all":
+        total_pruned = 0
+        for agent in sorted(VALID_AGENTS):
+            pruned = prune_stale_rules(agent, dry_run=args.dry_run)
+            if pruned > 0:
+                if args.dry_run:
+                    print(f"{agent}: would prune {pruned} stale deprecated rules")
+                else:
+                    print(f"{agent}: pruned {pruned} stale deprecated rules")
+                total_pruned += pruned
+        if total_pruned == 0:
+            if args.dry_run:
+                print("No stale rules found to prune")
+            else:
+                print("No stale rules to prune")
+        else:
+            if args.dry_run:
+                print(f"Total: {total_pruned} rules would be pruned")
+            else:
+                print(f"Total: {total_pruned} rules pruned")

@@ -21,7 +21,13 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_calendar import get_due_reminders, mark_reminder_sent, get_daily_digest
+from neo4j_calendar import (
+    get_due_reminders,
+    mark_reminder_sent,
+    get_daily_digest,
+    get_due_notifications,
+    mark_notification_sent,
+)
 
 # Signal configuration
 SIGNAL_ACCOUNT = os.getenv("SIGNAL_ACCOUNT", "+15165643945")
@@ -186,6 +192,95 @@ def process_due_reminders(state: dict) -> int:
     return sent_count
 
 
+def process_due_notifications(state: dict) -> int:
+    """
+    Process all due notification instances from advanced notification rules.
+    Supports templates, escalating reminders, and multiple channels.
+    Returns count of notifications sent.
+    """
+    notifications = get_due_notifications()
+
+    if not notifications:
+        return 0
+
+    # Clear old failures (older than 1 hour)
+    now = datetime.now()
+    state["failed_notifications"] = [
+        n for n in state.get("failed_notifications", [])
+        if (now - datetime.fromisoformat(n["time"])).total_seconds() < 3600
+    ]
+    failed_ids = {n["id"] for n in state["failed_notifications"]}
+
+    sent_count = 0
+    for notif in notifications:
+        notification_id = notif["notification_id"]
+
+        # Skip if we already tried and failed recently
+        if notification_id in failed_ids:
+            continue
+
+        event_name = notif["event_name"]
+        event_start = notif["event_start"]
+        person_name = notif["person_name"]
+        phone = notif["person_phone"]
+        template = notif.get("template", "meeting")
+        channel = notif.get("channel", "signal")
+        message_template = notif.get("message_template")
+
+        # Skip if this person opted out
+        if phone in DO_NOT_REMIND_LIST:
+            mark_notification_sent(notification_id)
+            continue
+
+        # Format message based on template
+        if event_start:
+            start_str = event_start.strftime("%I:%M %p")
+            day_str = event_start.strftime("%a %B %d")
+        else:
+            start_str = "soon"
+            day_str = "TBD"
+
+        # Template-based messages
+        if message_template:
+            message = message_template.format(
+                event_name=event_name,
+                start_time=start_str,
+                start_date=day_str
+            )
+        elif template == "deadline":
+            message = f"Deadline Alert: {event_name} at {start_str} ({day_str})"
+        elif template == "travel":
+            message = f"Travel Reminder: {event_name} departs {start_str} ({day_str})"
+        else:
+            # Default meeting template
+            message = f"Reminder: {event_name} at {start_str}"
+
+        # Send via appropriate channel (currently only Signal supported)
+        if channel == "signal":
+            success = send_signal_dm(phone, message)
+        else:
+            # For unsupported channels, mark as sent with a note
+            success = True
+            log(f"Notification {notification_id} uses unsupported channel: {channel}")
+
+        if success:
+            mark_notification_sent(notification_id)
+            sent_count += 1
+            log(f"Sent {template} notification to {person_name}: {event_name}")
+        else:
+            # Track failure
+            if "failed_notifications" not in state:
+                state["failed_notifications"] = []
+            state["failed_notifications"].append({
+                "id": notification_id,
+                "time": now.isoformat()
+            })
+            if notification_id not in failed_ids:
+                log(f"Failed to send notification to {person_name}: {event_name} (will retry)")
+
+    return sent_count
+
+
 def should_send_digest(state: dict) -> bool:
     """
     Determine if we should attempt to send the daily digest.
@@ -278,10 +373,15 @@ def main():
     state = _load_state()
     work_done = []
 
-    # Process due reminders (event-specific notifications)
+    # Process due reminders (legacy single reminders)
     sent = process_due_reminders(state)
     if sent > 0:
         work_done.append(f"Sent {sent} reminder(s)")
+
+    # Process due notifications (advanced notification rules)
+    notif_sent = process_due_notifications(state)
+    if notif_sent > 0:
+        work_done.append(f"Sent {notif_sent} notification(s)")
 
     # Check if we should send daily digest
     if should_send_digest(state):

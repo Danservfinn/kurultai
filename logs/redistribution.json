@@ -1,18 +1,22 @@
 {
-  "timestamp": "2026-03-07T18:06:41.485231",
+  "timestamp": "2026-03-08T00:34:35.178410",
   "queue_depths": {
+    "tolui": 1,
     "jochi": 1,
-    "kublai": 1,
-    "temujin": 2,
-    "tolui": 0,
-    "chagatai": 0,
-    "mongke": 0,
-    "ogedei": 0
+    "kublai": 2,
+    "ogedei": 0,
+    "chagatai": 1,
+    "temujin": 0,
+    "mongke": 0
   },
   "overloaded": [],
   "underutilized": [
     [
-      "chagatai",
+      "ogedei",
+      0
+    ],
+    [
+      "temujin",
       0
     ],
     [
@@ -20,11 +24,11 @@
       0
     ],
     [
-      "ogedei",
-      0
+      "jochi",
+      1
     ],
     [
-      "jochi",
+      "chagatai",
       1
     ]
   ],

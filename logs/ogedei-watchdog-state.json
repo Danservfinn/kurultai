@@ -1,34 +1,37 @@
 {
-  "last_audit": 1772926463.70947,
-  "cycles": 5726,
-  "last_cycle": "2026-03-07T18:45:21.124345",
+  "last_audit": 1772946490.3078709,
+  "cycles": 6332,
+  "last_cycle": "2026-03-08T00:37:26.982702",
   "watcher_restarts": 11,
-  "stalled_warnings": 226,
-  "fakes_detected": 7,
+  "stalled_warnings": 278,
+  "fakes_detected": 8,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 5,
-    "fake_found": 2,
-    "requeued": 1,
+    "audited": 50,
+    "fake_found": 10,
+    "requeued": 9,
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772927121.124419,
-  "last_issues": [],
+  "last_cycle_epoch": 1772948246.982719,
+  "last_issues": [
+    "reflection-status.json missing"
+  ],
   "reflection_misses": 0,
-  "last_memory_audit": 1772926914.881591,
+  "last_memory_audit": 1772946943.050126,
   "memory_audit_result": {
     "total": 0,
     "critical": 0,
     "warning": 0,
-    "ts": "2026-03-07T18:41:55.033135"
+    "ts": "2026-03-08T00:15:43.192887"
   },
-  "last_routing_drift_check": 1772926915.033258,
+  "last_routing_drift_check": 1772946943.193026,
   "routing_drift": {
-    "total": 0,
+    "total": 1,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "ts": "2026-03-07T18:41:55.036298"
+    "top_examples": [],
+    "ts": "2026-03-08T00:15:43.199111"
   },
   "memory_fixes": 15,
   "last_failure_rate_check": 1772883470.03844,

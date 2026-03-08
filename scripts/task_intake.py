@@ -179,6 +179,7 @@ _DISAMBIGUATION = [
     ({"investigate", "spike"}, "jochi"),
     ({"investigate", "timeout"}, "jochi"),
     ({"investigate", "failure"}, "jochi"),
+    ({"investigate", "failures"}, "jochi"),  # plural form for task failure investigations
     ({"investigate", "performance"}, "jochi"),  # perf analysis -> analyst
     ({"investigate", "score"}, "jochi"),
     ({"investigate", "cpu"}, "ogedei"),      # resource investigation -> ops

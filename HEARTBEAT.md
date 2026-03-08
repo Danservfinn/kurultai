@@ -1,36 +1,63 @@
 # Kublai Heartbeat Checklist
 
-**Schedule:** Every 30 minutes  
+**Schedule:** Every 30 minutes
 **Deep Reflection Hours:** 0, 6, 12, 18 (every 6 hours)
 
 ---
 
-## Quick Check (Every 30m)
+## Quick Check (Every 30m) — Miller's Law: 7 Items Max
 
-### Infrastructure
-- [ ] **Gateway:** `openclaw gateway status` → running?
-- [ ] **Sessions:** Recent activity in last 30 min?
-- [ ] **Parse:** `curl -s -o /dev/null -w "%{http_code}" https://www.parsethe.media` → 200?
-- [ ] **LLM Survivor:** `curl -s -o /dev/null -w "%{http_code}" https://llmsurvivor.kurult.ai/` → 200?
+### 1. Critical Alerts
+- [ ] Any CRITICAL escalations from Ögedei or Jochi?
 
-### Agent Health
-- [ ] Any CRITICAL escalations from Ögedei?
-- [ ] Any agents blocked >4 hours?
-- [ ] `subagents list` → any stuck?
+### 2. Infrastructure Pulse
+- [ ] Gateway running? Parse/LLM Survivor responding 200?
 
-### Task Queue Check (Every Heartbeat)
-- [ ] **Check pending tasks:** Scan `~/.openclaw/agents/*/tasks/` for pending `.md` files
-- [ ] **Verify executing tasks:** Check `.executing.md` files — is the agent process running?
-  - If task not truly executing: Re-create task file and dispatch to agent
-- [ ] **Activate idle agents:** If assigned agent is idle, create task file to activate them
+### 3. Agent Health
+- [ ] Any agents blocked >4 hours? Any stuck subagents?
 
-### Self-Direction (Every Heartbeat)
-- [ ] **Review results:** What happened since last heartbeat? Any new signals/tasks/escalations?
-- [ ] Ask: **"What do I want to do?"**
-- [ ] Review current goals/missions from MEMORY.md
-- [ ] Identify any proactive action I could take
-- [ ] If something calls to me -> route it to the right specialist (NEVER self-execute specialist work)
-- [ ] If nothing urgent → respond `HEARTBEAT_OK`
+### 4. Task Queue
+- [ ] Pending tasks in `~/.openclaw/agents/*/tasks/`? Any fake `.executing.md` files?
+
+### 5. Blocked Items
+- [ ] Anything in MEMORY.md blocked >24 hours?
+
+### 6. Self-Direction
+- [ ] Review: What changed since last heartbeat? What do I want to do?
+
+### 7. Action or OK
+- [ ] If something calls → route to specialist. If nothing → `HEARTBEAT_OK`
+
+<details>
+<summary><b>Quick Check Details (Expand for commands)</b></summary>
+
+**Infrastructure Commands:**
+```bash
+openclaw gateway status
+curl -s -o /dev/null -w "%{http_code}" https://www.parsethe.media
+curl -s -o /dev/null -w "%{http_code}" https://llmsurvivor.kurult.ai/
+```
+
+**Agent Health:**
+```bash
+# Check for blocked agents
+python3 ~/.openclaw/agents/main/scripts/task_intake.py --list-blocked
+# Check subagents
+subagents list
+```
+
+**Task Queue:**
+```bash
+# Scan for pending tasks
+ls ~/.openclaw/agents/*/tasks/*.md 2>/dev/null | grep -v ".executing.md" | wc -l
+# Check executing tasks
+ls ~/.openclaw/agents/*/tasks/*.executing.md 2>/dev/null
+```
+
+**Blocked Items:**
+- Check `MEMORY.md` blocked section
+- Run: `python3 ~/.openclaw/agents/main/scripts/task_intake.py --stats`
+</details>
 
 ---
 

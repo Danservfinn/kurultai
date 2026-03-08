@@ -33,6 +33,23 @@ LOCAL_TZ = ZoneInfo("America/New_York")
 DEFAULT_DURATION_HOURS = 2
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder for Neo4j datetime objects."""
+    def default(self, obj):
+        # Handle Neo4j DateTime objects
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        # Handle regular datetime
+        if isinstance(obj, (datetime, timedelta)):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+def json_dumps(obj, **kwargs):
+    """JSON dumps with Neo4j datetime support."""
+    return json.dumps(obj, cls=DateTimeEncoder, **kwargs)
+
+
 # =============================================================================
 # Schema Setup
 # =============================================================================
@@ -637,6 +654,434 @@ def mark_reminder_sent(reminder_id: str):
 
 
 # =============================================================================
+# Notification Rules Operations (Advanced)
+# =============================================================================
+
+def init_notification_rules_schema():
+    """Create constraints and indexes for notification rules."""
+    driver = get_driver()
+
+    constraints = [
+        "CREATE CONSTRAINT notification_rule_id_unique IF NOT EXISTS FOR (r:NotificationRule) REQUIRE r.rule_id IS UNIQUE",
+        "CREATE CONSTRAINT notification_id_unique IF NOT EXISTS FOR (n:Notification) REQUIRE n.notification_id IS UNIQUE",
+    ]
+
+    indexes = [
+        "CREATE INDEX notification_rule_event_idx IF NOT EXISTS FOR ()-[r:HAS_NOTIFICATION_RULE]->() ON r.event_id",
+        "CREATE INDEX notification_due_idx IF NOT EXISTS FOR (n:Notification) ON (n.scheduled_at)",
+        "CREATE INDEX notification_status_idx IF NOT EXISTS FOR (n:Notification) ON (n.status)",
+    ]
+
+    with driver.session() as session:
+        for constraint in constraints:
+            session.run(constraint)
+        for index in indexes:
+            session.run(index)
+
+    driver.close()
+    return True
+
+
+def create_notification_rule(
+    event_id: str,
+    person_phone: str,
+    name: str,
+    offset_minutes: int = None,
+    offset_type: str = "before",
+    repeat_type: str = "single",
+    repeat_count: int = 1,
+    interval_minutes: int = None,
+    channel: str = "signal",
+    template: str = "meeting",
+    custom_schedule: List[str] = None,
+    escalating_intervals: List[int] = None,
+    message_template: str = None
+) -> Dict[str, Any]:
+    """Create a notification rule for an event."""
+    driver = get_driver()
+    rule_id = f"rule-{uuid.uuid4().hex[:8]}"
+
+    with driver.session() as session:
+        # Ensure person exists
+        session.run("""
+            MERGE (p:Person {phone_number: $phone})
+            ON CREATE SET p.name = 'Unknown', p.created_at = datetime()
+        """, phone=person_phone)
+
+        result = session.run("""
+            MATCH (e:Event {event_id: $event_id})
+            MATCH (p:Person {phone_number: $phone})
+            CREATE (e)-[r:HAS_NOTIFICATION_RULE {
+                rule_id: $rule_id,
+                name: $name,
+                offset_minutes: $offset_minutes,
+                offset_type: $offset_type,
+                repeat_type: $repeat_type,
+                repeat_count: $repeat_count,
+                interval_minutes: $interval_minutes,
+                channel: $channel,
+                template: $template,
+                custom_schedule: $custom_schedule,
+                escalating_intervals: $escalating_intervals,
+                message_template: $message_template,
+                is_active: true,
+                created_at: datetime()
+            }]->(p)
+            RETURN r, e.name as event_name, p.name as person_name
+        """,
+            rule_id=rule_id,
+            event_id=event_id,
+            phone=person_phone,
+            name=name,
+            offset_minutes=offset_minutes,
+            offset_type=offset_type,
+            repeat_type=repeat_type,
+            repeat_count=repeat_count,
+            interval_minutes=interval_minutes,
+            channel=channel,
+            template=template,
+            custom_schedule=custom_schedule,
+            escalating_intervals=escalating_intervals,
+            message_template=message_template
+        )
+
+        record = result.single()
+        if record:
+            return {
+                "rule_id": rule_id,
+                "event_id": event_id,
+                "person_phone": person_phone,
+                "name": record["person_name"],
+                "event_name": record["event_name"]
+            }
+
+    driver.close()
+    return None
+
+
+def get_event_notification_rules(event_id: str) -> List[Dict[str, Any]]:
+    """Get all active notification rules for an event."""
+    driver = get_driver()
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (e:Event {event_id: $event_id})-[r:HAS_NOTIFICATION_RULE]->(p:Person)
+            WHERE r.is_active = true
+            RETURN r, p.name as person_name, p.phone_number as person_phone, e.name as event_name
+            ORDER BY r.offset_minutes ASC
+        """, event_id=event_id)
+
+        rules = []
+        for record in result:
+            rule = dict(record["r"])
+            rule["person_name"] = record["person_name"]
+            rule["person_phone"] = record["person_phone"]
+            rule["event_name"] = record["event_name"]
+            rules.append(rule)
+
+    driver.close()
+    return rules
+
+
+def update_notification_rule(
+    event_id: str,
+    rule_id: str,
+    person_phone: str,
+    offset_minutes: int = None,
+    interval_minutes: int = None,
+    is_active: bool = None,
+    name: str = None
+) -> Dict[str, Any]:
+    """Update an existing notification rule."""
+    driver = get_driver()
+
+    with driver.session() as session:
+        set_clauses = []
+        params = {"event_id": event_id, "rule_id": rule_id, "phone": person_phone}
+
+        if offset_minutes is not None:
+            set_clauses.append("r.offset_minutes = $offset_minutes")
+            params["offset_minutes"] = offset_minutes
+        if interval_minutes is not None:
+            set_clauses.append("r.interval_minutes = $interval_minutes")
+            params["interval_minutes"] = interval_minutes
+        if is_active is not None:
+            set_clauses.append("r.is_active = $is_active")
+            params["is_active"] = is_active
+        if name is not None:
+            set_clauses.append("r.name = $name")
+            params["name"] = name
+
+        if not set_clauses:
+            return {"error": "No fields to update"}
+
+        set_clauses.append("r.updated_at = datetime()")
+
+        result = session.run(f"""
+            MATCH (e:Event {{event_id: $event_id}})-[r:HAS_NOTIFICATION_RULE]->(p:Person {{phone_number: $phone}})
+            WHERE r.rule_id = $rule_id
+            SET {', '.join(set_clauses)}
+            RETURN r, p.name as person_name
+        """, **params)
+
+        record = result.single()
+        if record:
+            return {
+                "rule_id": rule_id,
+                "updated": True,
+                "person_name": record["person_name"]
+            }
+
+    driver.close()
+    return None
+
+
+def delete_notification_rule(event_id: str, rule_id: str, person_phone: str) -> Dict[str, Any]:
+    """Delete a notification rule."""
+    driver = get_driver()
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (e:Event {event_id: $event_id})-[r:HAS_NOTIFICATION_RULE]->(p:Person {phone_number: $phone})
+            WHERE r.rule_id = $rule_id
+            DELETE r
+            RETURN r.rule_id as deleted_rule_id
+        """, event_id=event_id, rule_id=rule_id, phone=person_phone)
+
+        record = result.single()
+        if record:
+            return {"rule_id": record["deleted_rule_id"], "deleted": True}
+
+    driver.close()
+    return None
+
+
+def create_notification_instances_from_rules(event_id: str) -> List[Dict[str, Any]]:
+    """Create notification instances from active rules for an event."""
+    driver = get_driver()
+    created = []
+
+    with driver.session() as session:
+        # Get all active rules for the event
+        rules_result = session.run("""
+            MATCH (e:Event {event_id: $event_id})-[r:HAS_NOTIFICATION_RULE]->(p:Person)
+            WHERE r.is_active = true
+            RETURN e, r, p
+        """, event_id=event_id)
+
+        for rule_record in rules_result:
+            e = rule_record["e"]
+            r = rule_record["r"]
+            p = rule_record["p"]
+
+            # Calculate notification times based on rule type
+            notification_times = []
+
+            if r["offset_type"] == "escalating" and r["escalating_intervals"]:
+                # Escalating: create notifications at each interval before event
+                for interval in r["escalating_intervals"]:
+                    notification_times.append(-interval)
+            elif r["repeat_type"] == "multiple" and r["interval_minutes"]:
+                # Fixed intervals: start from offset, repeat every interval_minutes
+                for i in range(r["repeat_count"]):
+                    notification_times.append(r["offset_minutes"] + (i * r["interval_minutes"]))
+            elif r["offset_type"] == "custom_schedule" and r["custom_schedule"]:
+                # Custom schedule: use provided ISO datetime strings
+                for iso_dt in r["custom_schedule"]:
+                    notification_times.append(("absolute", iso_dt))
+            else:
+                # Single notification
+                notification_times.append(r["offset_minutes"])
+
+            # Create notification instances
+            for notif_time in notification_times:
+                notification_id = f"notif-{uuid.uuid4().hex[:8]}"
+
+                if isinstance(notif_time, tuple) and notif_time[0] == "absolute":
+                    # Absolute time from custom schedule
+                    session.run("""
+                        MATCH (e:Event {event_id: $event_id})
+                        MATCH (p:Person {phone_number: $phone})
+                        CREATE (n:Notification {
+                            notification_id: $notification_id,
+                            rule_id: $rule_id,
+                            scheduled_at: datetime($scheduled_at),
+                            status: 'pending',
+                            channel: $channel,
+                            template: $template,
+                            created_at: datetime()
+                        })
+                        CREATE (n)-[:NOTIFICATION_FOR]->(e)
+                        CREATE (p)-[:RECEIVES_NOTIFICATION]->(n)
+                    """,
+                        notification_id=notification_id,
+                        rule_id=r["rule_id"],
+                        event_id=event_id,
+                        phone=p["phone_number"],
+                        scheduled_at=notif_time[1],
+                        channel=r["channel"],
+                        template=r["template"]
+                    )
+                else:
+                    # Relative time (minutes from event start)
+                    session.run("""
+                        MATCH (e:Event {event_id: $event_id})
+                        MATCH (p:Person {phone_number: $phone})
+                        WITH e, p, e.start_datetime + duration({minutes: $offset}) AS scheduled_at
+                        CREATE (n:Notification {
+                            notification_id: $notification_id,
+                            rule_id: $rule_id,
+                            scheduled_at: scheduled_at,
+                            status: 'pending',
+                            channel: $channel,
+                            template: $template,
+                            created_at: datetime()
+                        })
+                        CREATE (n)-[:NOTIFICATION_FOR]->(e)
+                        CREATE (p)-[:RECEIVES_NOTIFICATION]->(n)
+                    """,
+                        notification_id=notification_id,
+                        rule_id=r["rule_id"],
+                        event_id=event_id,
+                        phone=p["phone_number"],
+                        offset=notif_time,
+                        channel=r["channel"],
+                        template=r["template"]
+                    )
+
+                created.append({
+                    "notification_id": notification_id,
+                    "rule_id": r["rule_id"],
+                    "person_phone": p["phone_number"]
+                })
+
+    driver.close()
+    return created
+
+
+def get_due_notifications() -> List[Dict[str, Any]]:
+    """Get all due notifications that haven't been sent."""
+    driver = get_driver()
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (n:Notification)-[:NOTIFICATION_FOR]->(e:Event)
+            MATCH (p:Person)-[:RECEIVES_NOTIFICATION]->(n)
+            WHERE n.status = 'pending'
+              AND n.scheduled_at <= datetime()
+              AND e.status = 'active'
+            RETURN n.notification_id, n.rule_id, n.channel, n.template,
+                   e.name as event_name, e.start_datetime as event_start,
+                   p.name as person_name, p.phone_number as person_phone
+            ORDER BY n.scheduled_at ASC
+        """)
+
+        notifications = []
+        for record in result:
+            notifications.append({
+                "notification_id": record["n.notification_id"],
+                "rule_id": record["n.rule_id"],
+                "channel": record["n.channel"],
+                "template": record["n.template"],
+                "event_name": record["event_name"],
+                "event_start": record["event_start"],
+                "person_name": record["person_name"],
+                "person_phone": record["person_phone"]
+            })
+
+    driver.close()
+    return notifications
+
+
+def mark_notification_sent(notification_id: str):
+    """Mark a notification as sent."""
+    driver = get_driver()
+
+    with driver.session() as session:
+        session.run("""
+            MATCH (n:Notification {notification_id: $notification_id})
+            SET n.status = 'sent', n.sent_at = datetime()
+        """, notification_id=notification_id)
+
+    driver.close()
+
+
+def delete_notification_rule_instances(event_id: str, rule_id: str) -> Dict[str, Any]:
+    """Delete all notification instances for a rule."""
+    driver = get_driver()
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (n:Notification {rule_id: $rule_id})-[:NOTIFICATION_FOR]->(e:Event {event_id: $event_id})
+            DELETE n
+            RETURN count(n) as deleted_count
+        """, event_id=event_id, rule_id=rule_id)
+
+        record = result.single()
+        if record:
+            return {"deleted_count": record["deleted_count"]}
+
+    driver.close()
+    return None
+
+
+# Preset templates for common notification patterns
+NOTIFICATION_PRESETS = {
+    "meeting": {
+        "name": "Meeting Reminders",
+        "rules": [
+            {"offset_minutes": -15, "offset_type": "before", "repeat_type": "single", "name": "15 min before"},
+        ]
+    },
+    "deadline": {
+        "name": "Deadline Reminders",
+        "rules": [
+            {"offset_minutes": -1440, "offset_type": "before", "repeat_type": "multiple", "repeat_count": 4,
+             "interval_minutes": None, "escalating_intervals": [1440, 720, 120, 30], "name": "Escalating reminders"},
+        ]
+    },
+    "travel": {
+        "name": "Travel Reminders",
+        "rules": [
+            {"offset_minutes": -2880, "offset_type": "before", "repeat_type": "single", "name": "2 days before"},
+            {"offset_minutes": -1440, "offset_type": "before", "repeat_type": "single", "name": "1 day before"},
+            {"offset_minutes": -120, "offset_type": "before", "repeat_type": "single", "name": "2 hours before"},
+        ]
+    }
+}
+
+
+def apply_notification_preset(event_id: str, person_phone: str, preset_name: str) -> List[Dict[str, Any]]:
+    """Apply a notification preset to an event."""
+    if preset_name not in NOTIFICATION_PRESETS:
+        return {"error": f"Unknown preset: {preset_name}"}
+
+    preset = NOTIFICATION_PRESETS[preset_name]
+    created_rules = []
+
+    for rule_config in preset["rules"]:
+        result = create_notification_rule(
+            event_id=event_id,
+            person_phone=person_phone,
+            name=rule_config["name"],
+            offset_minutes=rule_config.get("offset_minutes"),
+            offset_type=rule_config.get("offset_type", "before"),
+            repeat_type=rule_config.get("repeat_type", "single"),
+            repeat_count=rule_config.get("repeat_count", 1),
+            interval_minutes=rule_config.get("interval_minutes"),
+            escalating_intervals=rule_config.get("escalating_intervals"),
+            template=preset_name
+        )
+        if result:
+            created_rules.append(result)
+
+    # Create notification instances from the rules
+    created_notifications = create_notification_instances_from_rules(event_id)
+
+    return {"rules": created_rules, "notifications": created_notifications}
+
+
+# =============================================================================
 # Query Helpers
 # =============================================================================
 
@@ -729,14 +1174,290 @@ def check_time_conflicts(start: datetime, end: datetime) -> List[Dict[str, Any]]
     return conflicts
 
 
+# =============================================================================
+# JSON API for Web Interface
+# =============================================================================
+
+def handle_json_api(operation: str, params: dict) -> dict:
+    """Handle JSON API requests from the web interface."""
+    try:
+        if operation == "get_events":
+            start = params.get("start")
+            end = params.get("end")
+            person = params.get("person")
+            limit = params.get("limit", 50)
+
+            driver = get_driver()
+            with driver.session() as session:
+                # Build query based on filters
+                query_parts = ["MATCH (e:Event)", "WHERE e.status = 'active'"]
+                query_params = {}
+
+                if start:
+                    query_parts.append("AND e.start_datetime >= datetime($start)")
+                    query_params["start"] = start
+                if end:
+                    query_parts.append("AND e.start_datetime <= datetime($end)")
+                    query_params["end"] = end
+
+                if person:
+                    query_parts.extend([
+                        "MATCH (p:Person {name: $person})-[att:ATTENDING]->(e)",
+                        "WHERE att.rsvp IN ['going', 'maybe']"
+                    ])
+                    query_params["person"] = person
+
+                query_parts.extend([
+                    "OPTIONAL MATCH (e)-[:AT_LOCATION]->(l:Location)",
+                    "OPTIONAL MATCH (attendee:Person)-[a:ATTENDING]->(e)",
+                    "WITH e, l, collect({name: attendee.name, rsvp: a.rsvp}) AS attendees",
+                    "RETURN e, l, attendees",
+                    "ORDER BY e.start_datetime ASC",
+                    "LIMIT $limit"
+                ])
+                query_params["limit"] = limit
+
+                result = session.run(" ".join(query_parts), **query_params)
+                events = []
+                for record in result:
+                    event = dict(record["e"])
+                    event["location"] = dict(record["l"]) if record["l"] else None
+                    event["attendees"] = record["attendees"]
+                    events.append(event)
+
+            driver.close()
+            return {"events": events, "count": len(events)}
+
+        elif operation == "get_event":
+            event_id = params.get("event_id")
+            driver = get_driver()
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (e:Event {event_id: $event_id})
+                    OPTIONAL MATCH (e)-[:AT_LOCATION]->(l:Location)
+                    OPTIONAL MATCH (creator:Person)-[:CREATED_BY]-(e)
+                    OPTIONAL MATCH (attendee:Person)-[a:ATTENDING]->(e)
+                    RETURN e, l, creator, collect({name: attendee.name, rsvp: a.rsvp, added_by: a.added_by}) AS attendees
+                """, event_id=event_id)
+
+                record = result.single()
+                if record:
+                    event = dict(record["e"])
+                    event["location"] = dict(record["l"]) if record["l"] else None
+                    event["creator"] = dict(record["creator"]) if record["creator"] else None
+                    event["attendees"] = record["attendees"]
+                    return {"event": event}
+                return {"event": None}
+            driver.close()
+
+        elif operation == "create_event":
+            event = create_event(
+                name=params["name"],
+                start_datetime=datetime.fromisoformat(params["start_datetime"].replace('Z', '+00:00')),
+                end_datetime=datetime.fromisoformat(params["end_datetime"].replace('Z', '+00:00')) if params.get("end_datetime") else None,
+                creator_phone=params.get("creator_phone"),
+                description=params.get("description"),
+                location_name=params.get("location_name"),
+                location_address=params.get("location_address"),
+                all_day=params.get("all_day", False)
+            )
+            return {"event": event, "created": True}
+
+        elif operation == "update_event":
+            event_id = params.get("event_id")
+            # Get existing event
+            driver = get_driver()
+            with driver.session() as session:
+                set_clauses = []
+                query_params = {"event_id": event_id}
+
+                if "name" in params:
+                    set_clauses.append("e.name = $name")
+                    query_params["name"] = params["name"]
+                if "description" in params:
+                    set_clauses.append("e.description = $description")
+                    query_params["description"] = params["description"]
+                if "start_datetime" in params:
+                    set_clauses.append("e.start_datetime = datetime($start)")
+                    query_params["start"] = params["start_datetime"]
+                if "end_datetime" in params:
+                    set_clauses.append("e.end_datetime = datetime($end)")
+                    query_params["end"] = params["end_datetime"]
+                if "status" in params:
+                    set_clauses.append("e.status = $status")
+                    query_params["status"] = params["status"]
+
+                set_clauses.append("e.updated_at = datetime()")
+
+                result = session.run(f"""
+                    MATCH (e:Event {{event_id: $event_id}})
+                    SET {', '.join(set_clauses)}
+                    RETURN e
+                """, **query_params)
+
+                record = result.single()
+                return {"event": dict(record["e"]) if record else None}
+            driver.close()
+
+        elif operation == "cancel_event":
+            event_id = params.get("event_id")
+            creator_phone = params.get("creator_phone")
+            driver = get_driver()
+            with driver.session() as session:
+                if creator_phone:
+                    result = session.run("""
+                        MATCH (e:Event {event_id: $event_id})
+                        MATCH (e)-[:CREATED_BY]->(creator:Person {phone_number: $creator_phone})
+                        SET e.status = 'cancelled', e.updated_at = datetime()
+                        RETURN e
+                    """, event_id=event_id, creator_phone=creator_phone)
+                else:
+                    result = session.run("""
+                        MATCH (e:Event {event_id: $event_id})
+                        SET e.status = 'cancelled', e.updated_at = datetime()
+                        RETURN e
+                    """, event_id=event_id)
+
+                record = result.single()
+                return {"event": dict(record["e"]) if record else None, "cancelled": record is not None}
+            driver.close()
+
+        elif operation == "get_people":
+            driver = get_driver()
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (p:Person)
+                    RETURN p {
+                        .*,
+                        created_at: toString(p.created_at),
+                        updated_at: toString(p.updated_at)
+                    } as person
+                    ORDER BY p.name ASC
+                """)
+                people = [dict(record["person"]) for record in result]
+            driver.close()
+            return {"people": people, "count": len(people)}
+
+        elif operation == "rsvp_to_event":
+            result = rsvp_to_event(
+                person_phone=params["person_phone"],
+                event_query=params.get("event_id", ""),
+                rsvp_status=params["rsvp"]
+            )
+            return {"rsvp": result}
+
+        elif operation == "get_event_reminders":
+            event_id = params.get("event_id")
+            driver = get_driver()
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (e:Event {event_id: $event_id})
+                    MATCH (r:Reminder)-[:REMINDER_FOR]->(e)
+                    MATCH (r)-[:REMIND]->(p:Person)
+                    RETURN r, p.name AS person_name
+                """, event_id=event_id)
+
+                reminders = []
+                for record in result:
+                    rem = dict(record["r"])
+                    rem["person_name"] = record["person_name"]
+                    reminders.append(rem)
+            driver.close()
+            return {"reminders": reminders}
+
+        elif operation == "create_reminder":
+            result = create_reminder(
+                person_phone=params["person_phone"],
+                event_query=params["event_id"],
+                remind_at=datetime.fromisoformat(params["remind_at"].replace('Z', '+00:00')),
+                offset_desc=params.get("offset_desc", "custom"),
+                channel=params.get("channel", "signal")
+            )
+            return {"reminder": result}
+
+        elif operation == "get_todays_events":
+            events = get_todays_events()
+            return {"events": events, "count": len(events)}
+
+        elif operation == "get_notification_settings":
+            phone = params.get("phone")
+            driver = get_driver()
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (p:Person {phone_number: $phone})
+                    RETURN p.calendar_notifications_enabled as enabled,
+                           p.calendar_notification_channel as channel,
+                           p.calendar_default_reminders as reminders
+                """, phone=phone)
+
+                record = result.single()
+                if record:
+                    return {
+                        "enabled": record["enabled"] if record["enabled"] is not None else True,
+                        "channel": record["channel"] if record["channel"] is not None else "signal",
+                        "default_reminders": record["reminders"] if record["reminders"] is not None else [15, 60]
+                    }
+                else:
+                    return {"error": "Person not found"}, 404
+            driver.close()
+
+        elif operation == "update_notification_settings":
+            phone = params.get("phone")
+            enabled = params.get("enabled", True)
+            channel = params.get("channel", "signal")
+            reminders = params.get("default_reminders", [15, 60])
+
+            driver = get_driver()
+            with driver.session() as session:
+                result = session.run("""
+                    MATCH (p:Person {phone_number: $phone})
+                    SET p.calendar_notifications_enabled = $enabled,
+                        p.calendar_notification_channel = $channel,
+                        p.calendar_default_reminders = $reminders,
+                        p.updated_at = datetime()
+                    RETURN p.phone_number as updated
+                """, phone=phone, enabled=enabled, channel=channel, reminders=reminders)
+
+                record = result.single()
+                if record:
+                    return {"success": True, "phone": record["updated"]}
+                else:
+                    return {"error": "Person not found"}, 404
+            driver.close()
+
+        else:
+            return {"error": f"Unknown operation: {operation}"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def main():
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description="Neo4j Calendar API")
+    parser.add_argument("--json", action="store_true", help="Output JSON for API mode")
+    parser.add_argument("operation", nargs="?", help="API operation")
+    args = parser.parse_args()
+
+    if args.json:
+        # JSON API mode
+        params = json.loads(os.environ.get("CALENDAR_PARAMS", "{}"))
+        result = handle_json_api(args.operation, params)
+        print(json_dumps(result))
+    else:
+        # CLI mode - run tests
+        print("Initializing calendar schema...")
+        init_schema()
+        print("Schema initialized")
+
+        print("\nSeeding persons...")
+        seed_persons()
+        print("Persons seeded")
+
+        print("\nCalendar module ready")
+
+
 if __name__ == "__main__":
-    # Test initialization
-    print("Initializing calendar schema...")
-    init_schema()
-    print("Schema initialized")
-
-    print("\nSeeding persons...")
-    seed_persons()
-    print("Persons seeded")
-
-    print("\nCalendar module ready")
+    main()

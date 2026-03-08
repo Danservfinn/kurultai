@@ -66,6 +66,209 @@ SLOW_SKILLS = {
 MAX_TASK_DEPTH = 3
 HAIKU_TIMEOUT = 60  # Max seconds for /task-complete haiku notification
 
+# Proxy health check configuration
+PROXY_HEALTH_CHECK_TIMEOUT = 5  # seconds
+PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+
+
+def check_proxy_health(proxy_url: str) -> bool:
+    """Check if proxy endpoint is responding.
+
+    Args:
+        proxy_url: The proxy base URL to check
+
+    Returns:
+        True if proxy is reachable, False otherwise
+    """
+    import urllib.request
+    import ssl
+
+    if not proxy_url:
+        return False
+
+    try:
+        # Create SSL context that doesn't verify certificates (for proxy endpoints)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        # Try a simple HEAD request to the proxy endpoint
+        req = urllib.request.Request(proxy_url, method='HEAD')
+        req.add_header('User-Agent', 'Kurultai-Agent/1.0')
+
+        # Try with HTTPS first
+        if proxy_url.startswith('https://'):
+            urllib.request.urlopen(req, timeout=PROXY_HEALTH_CHECK_TIMEOUT, context=ssl_context)
+        else:
+            urllib.request.urlopen(req, timeout=PROXY_HEALTH_CHECK_TIMEOUT)
+        return True
+    except urllib.error.HTTPError as e:
+        # HTTP error but endpoint is reachable (4xx/5xx means service is up)
+        print(f"  Proxy health check: {proxy_url} responded with HTTP {e.code}")
+        return True  # Service is reachable, even if returning errors
+    except urllib.error.URLError as e:
+        # Network-level error (DNS, connection refused, etc.)
+        print(f"  Proxy health check FAILED: {proxy_url} - {e.reason}")
+        return False
+    except Exception as e:
+        print(f"  Proxy health check FAILED: {proxy_url} - {str(e)}")
+        return False
+
+
+def log_proxy_status(agent_name: str, proxy_url: str, is_using_proxy: bool) -> dict:
+    """Log proxy status at agent startup.
+
+    Args:
+        agent_name: Name of the agent
+        proxy_url: The proxy URL being used
+        is_using_proxy: Whether the agent is configured to use a proxy
+
+    Returns:
+        dict with health check results
+    """
+    result = {
+        "agent": agent_name,
+        "is_using_proxy": is_using_proxy,
+        "proxy_url": proxy_url if is_using_proxy else None,
+        "proxy_healthy": None,
+        "proxy_error": None,
+    }
+
+    if not is_using_proxy:
+        return result
+
+    # Run health check
+    is_healthy = check_proxy_health(proxy_url)
+    result["proxy_healthy"] = is_healthy
+
+    if not is_healthy:
+        result["proxy_error"] = f"Proxy endpoint {proxy_url} is not reachable"
+        print(f"  WARNING: Proxy health check failed for {agent_name}")
+    else:
+        print(f"  Proxy health check PASSED for {agent_name}")
+
+    # Log to ledger for observability
+    _append_ledger({
+        "event": "PROXY_HEALTH_CHECK",
+        "ts": datetime.now().isoformat(),
+        "agent": agent_name,
+        "proxy_url": proxy_url,
+        "proxy_healthy": is_healthy,
+        "proxy_error": result.get("proxy_error"),
+    })
+
+    return result
+
+
+def categorize_error(error_msg: str, output_content: str = None) -> str:
+    """Categorize error into structured error types.
+
+    Args:
+        error_msg: The error message
+        output_content: Optional stdout content for additional context
+
+    Returns:
+        Error type string: PROXY_AUTH, PROXY_ERROR, RATE_LIMIT, MODEL_FAILURE,
+                          STALL_TIMEOUT, VERIFICATION_FAILED, or UNKNOWN
+    """
+    if not error_msg:
+        return "UNKNOWN"
+
+    combined = (error_msg or "") + " " + (output_content or "")
+    combined_lower = combined.lower()
+
+    # Model fallback failures (check first - highest priority for this fix)
+    if any(pattern in combined_lower for pattern in [
+        "model_fallback_failed", "fallback to claude", "both models failed"
+    ]):
+        return "MODEL_FAILURE"
+
+    # Stall timeout
+    if any(pattern in combined_lower for pattern in [
+        "stall_timeout", "stall_detected", "no stdout for"
+    ]):
+        return "STALL_TIMEOUT"
+
+    # Verification failures (also check with spaces, not just underscores)
+    if any(pattern in combined_lower for pattern in [
+        "verification_failed", "verification failed", "test failed",
+        "assertion failed", "test assertion"
+    ]):
+        return "VERIFICATION_FAILED"
+
+    # Proxy/rate limit errors
+    if any(pattern in combined_lower for pattern in [
+        "rate limit", "too many requests", "quota exceeded", "429",
+        "over capacity", "capacity exceeded"
+    ]):
+        return "RATE_LIMIT"
+
+    # Proxy authentication errors (check after model failure)
+    if any(pattern in combined_lower for pattern in [
+        "unauthorized", "authentication", "invalid token", "api key",
+        "sk-sp-", "credential", "permission denied"
+    ]):
+        if "proxy" in combined_lower or "dashscope" in combined_lower:
+            return "PROXY_AUTH"
+        return "AUTH"
+
+    # Generic proxy errors
+    if any(pattern in combined_lower for pattern in [
+        "proxy", "dashscope", "connection refused", "connection error",
+        "network error", "urlopen error"
+    ]):
+        return "PROXY_ERROR"
+
+    return "UNKNOWN"
+
+
+def save_error_content(agent_name: str, task_id: str, error_msg: str,
+                       output_content: str, error_type: str) -> str:
+    """Save full error content to a persistent file before any truncation.
+
+    Args:
+        agent_name: Name of the agent
+        task_id: Task ID
+        error_msg: The error message
+        output_content: stdout content from execution
+        error_type: Categorized error type
+
+    Returns:
+        Path to saved error file
+    """
+    from pathlib import Path
+
+    error_dir = Path(f"{AGENTS_DIR}/{agent_name}/errors")
+    error_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    error_file = error_dir / f"{task_id}-{timestamp}.error.md"
+
+    content = f"""# Task Error Report
+
+**Task ID:** {task_id}
+**Agent:** {agent_name}
+**Error Type:** {error_type}
+**Timestamp:** {datetime.now().isoformat()}
+
+## Error Message
+
+```
+{error_msg}
+```
+
+## Output Content
+
+```
+{output_content[:10000] if output_content else '(no output)'}
+```
+"""
+
+    with open(error_file, 'w') as f:
+        f.write(content)
+
+    return str(error_file)
+
 
 def _is_rate_limit_error(error_msg, stdout_content=None):
     """Detect rate limit / quota errors from Claude Code output.
@@ -124,15 +327,15 @@ def _is_rate_limit_error(error_msg, stdout_content=None):
 
 
 # Stall detection (T14): abort tasks that produce no stdout for too long
-# Base thresholds: 10 min (sufficient for most tasks)
-STALL_SILENCE_THRESHOLD = 600  # seconds of no output before considering stall
-STALL_MIN_ELAPSED = 600        # only check for stalls after this many seconds elapsed
+# Base thresholds: 15 min (reduced from 10 min to reduce premature task kills)
+STALL_SILENCE_THRESHOLD = 900  # seconds of no output before considering stall
+STALL_MIN_ELAPSED = 900        # only check for stalls after this many seconds elapsed
 # Slow skills get more generous stall thresholds (inference + subagent planning takes time)
-SLOW_SKILL_STALL_SILENCE = 900   # 15 min silence allowed for horde skills
-SLOW_SKILL_STALL_ELAPSED = 900   # don't check until 15 min for horde skills
+SLOW_SKILL_STALL_SILENCE = 1200   # 20 min silence allowed for horde skills
+SLOW_SKILL_STALL_ELAPSED = 1200   # don't check until 20 min for horde skills
 # High priority tasks also get relaxed thresholds (complex tasks need more time)
-HIGH_PRIORITY_STALL_SILENCE = 900
-HIGH_PRIORITY_STALL_ELAPSED = 900
+HIGH_PRIORITY_STALL_SILENCE = 1200
+HIGH_PRIORITY_STALL_ELAPSED = 1200
 
 
 def _spawn_haiku_completion(agent_name):
@@ -458,6 +661,97 @@ def _analyze_tool_usage(stdout: str) -> dict:
         "intermediate_errors": error_lines,
         "output_tokens_est": len(stdout) // 4,
     }
+
+
+def _analyze_code_changes(output_text: str, agent_name: str) -> dict:
+    """Analyze code changes from task output.
+
+    Parses Claude Code output for file operations and change metrics.
+
+    Args:
+        output_text: stdout content from task execution
+        agent_name: Agent name for workspace lookup
+
+    Returns:
+        Dict with code change metrics
+    """
+    import re
+
+    changes = {
+        "lines_added": 0,
+        "lines_removed": 0,
+        "files_modified": [],
+        "files_created": [],
+        "files_deleted": [],
+        "code_lines_added": 0,
+        "doc_lines_added": 0,
+        "test_lines_added": 0,
+    }
+
+    if not output_text:
+        return None
+
+    # Pattern for file creation
+    created = re.findall(r'(?:Created|Wrote|Saved|Written)[:\s]+([~/][^\s\n]+)', output_text, re.IGNORECASE)
+    changes["files_created"] = list(set(created))[:20]
+
+    # Pattern for file modification
+    modified = re.findall(r'(?:Modified|Updated|Edited)[:\s]+([~/][^\s\n]+)', output_text, re.IGNORECASE)
+    changes["files_modified"] = list(set(modified))[:20]
+
+    # Pattern for file deletion
+    deleted = re.findall(r'(?:Deleted|Removed)[:\s]+([~/][^\s\n]+)', output_text, re.IGNORECASE)
+    changes["files_deleted"] = list(set(deleted))[:10]
+
+    # Count lines added/removed from diff-like output
+    lines_added = len(re.findall(r'^\+[^+]', output_text, re.MULTILINE))
+    lines_removed = len(re.findall(r'^-[^-]', output_text, re.MULTILINE))
+    changes["lines_added"] = lines_added
+    changes["lines_removed"] = lines_removed
+
+    # Categorize by file type
+    code_extensions = {'.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.rs', '.java', '.cpp', '.c', '.h'}
+    doc_extensions = {'.md', '.txt', '.rst', '.html'}
+    test_patterns = {'test_', '_test.', '.test.', '.spec.'}
+
+    for f in changes["files_created"]:
+        lower_f = f.lower()
+        ext = os.path.splitext(f)[1].lower()
+
+        # Count lines (estimate from output)
+        file_lines = 50  # Default estimate
+
+        if ext in code_extensions:
+            changes["code_lines_added"] += file_lines
+            changes["lines_added"] += file_lines
+        elif ext in doc_extensions:
+            changes["doc_lines_added"] += file_lines
+            changes["lines_added"] += file_lines
+
+        # Check if test file
+        if any(p in lower_f for p in test_patterns):
+            changes["test_lines_added"] += file_lines
+
+    # Only return if we found meaningful changes
+    if not (changes["files_created"] or changes["files_modified"] or changes["lines_added"] > 100):
+        return None
+
+    return changes
+
+
+def count_queue_depth(agent: str) -> int:
+    """Count pending tasks in agent queue."""
+    agents_dir = str(AGENTS_DIR)
+    queue_dir = f"{agents_dir}/{agent}/tasks"
+    if not os.path.isdir(queue_dir):
+        return 0
+
+    count = 0
+    for pattern in ['*.md', '*.executing.md']:
+        for f in glob.glob(f"{queue_dir}/{pattern}"):
+            if not f.endswith('.done.md'):
+                count += 1
+    return count
 
 
 def _check_architecture_update(agent_name: str, task_content: str, result_content: str, task_id: str):
@@ -865,7 +1159,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
                         for fname in os.listdir(project_dir):
                             if fname.endswith('.jsonl'):
                                 fpath = os.path.join(project_dir, fname)
-                                if now - os.path.getmtime(fpath) < 30:  # written in last 30s
+                                if now - os.path.getmtime(fpath) < 60:  # written in last 60s (increased from 30s)
                                     session_active = True
                                     break
                 except Exception:
@@ -873,6 +1167,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
                 if session_active:
                     # Session is actively making tool calls — reset silence timer and continue
                     last_output_time = time.time() - (stall_silence_thresh - 60)  # allow 60s more
+                    print(f"  SESSION_ACTIVE: JSONL modified recently, resetting stall timer (skill_hint={skill_hint}, elapsed={elapsed:.0f}s)")
                     time.sleep(0.5)
                     continue
                 print(f"  STALL_DETECTED: no stdout for {silence:.0f}s after {elapsed:.0f}s elapsed — aborting (skill_hint={skill_hint}, is_slow={is_slow}, thresh={stall_elapsed_thresh}/{stall_silence_thresh})")
@@ -941,7 +1236,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
         }
 
 
-def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeout=None, model=None, priority='normal'):
+def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeout=None, model=None, priority='normal', task_id=None):
     """Execute task via Claude Code using the claude-agent wrapper.
 
     Each agent runs as a sovereign Claude Code session with its own
@@ -1042,14 +1337,25 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
             else:
                 # Preserve original error but note fallback attempt
                 result['error'] = f"[Fallback to {fallback_model} also failed] {result.get('error', 'Unknown error')}"
+                result['output_content'] = output_content  # Preserve full output for error analysis
                 print(f"  ✗ Fallback also failed: {fallback_model}")
                 if acp_fallback['log_events']:
+                    # Categorize error and save full content before truncation
+                    error_type = categorize_error(result['error'], output_content)
+                    error_file = None
+                    if task_id:
+                        error_file = save_error_content(
+                            agent_name, task_id, result['error'],
+                            output_content, error_type
+                        )
                     _append_ledger({
                         "event": "MODEL_FALLBACK_FAILED",
                         "ts": datetime.now().isoformat(),
                         "agent": agent_name,
                         "fallback_model": fallback_model,
-                        "error": result.get('error', 'Unknown error')[:200],
+                        "error": result.get('error', 'Unknown error')[:500],  # Increased from 200
+                        "error_type": error_type,  # NEW: structured error category
+                        "error_file": error_file,  # NEW: path to full error content
                     })
 
     return result
@@ -1217,7 +1523,7 @@ def process_task(agent_name, task):
         with open('/tmp/agent_handler_debug.log', 'a') as f:
             f.write(debug_msg)
         print(f"  🔧 Model selection: config={config.get('model', '(none)')}, resolved={selected_model}, proxy={is_using_proxy}")
-        result = execute_task_with_llm(agent_name, task_content, config, skill_hint=skill_hint, timeout=timeout, priority=priority, model=selected_model)
+        result = execute_task_with_llm(agent_name, task_content, config, skill_hint=skill_hint, timeout=timeout, priority=priority, model=selected_model, task_id=task_id)
         elapsed_s = round(time.time() - start_time, 1)
         executor_name = "claude-code"
 
@@ -1304,6 +1610,58 @@ def process_task(agent_name, task):
         # Spawn /task-complete skill (non-blocking with timeout/reaping)
         _spawn_haiku_completion(agent_name)
 
+        # Record comprehensive task data for reflections
+        try:
+            from kublai_task_report import TaskReporter, estimate_token_cost
+            reporter = TaskReporter()
+
+            # Parse token usage from output if available
+            output_text = output_content or ""
+            input_tokens = None
+            output_tokens = None
+            total_tokens = None
+
+            # Extract token info from Claude Code output
+            import re
+            token_match = re.search(r'(\d+)\s*input.*?(\d+)\s*output', output_text, re.IGNORECASE)
+            if token_match:
+                input_tokens = int(token_match.group(1))
+                output_tokens = int(token_match.group(2))
+                total_tokens = input_tokens + output_tokens
+
+            # Record task execution metrics
+            reporter.record_task_execution(task_id, agent_name, {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+                "token_cost_usd": estimate_token_cost(total_tokens or 0, result.get('model', '')),
+                "model_effort": config.get('effort', 'medium'),
+                "actual_duration_seconds": elapsed_s,
+                "skills_invoked": _extract_skills_from_transcript(agent_name, start_time, task_id, skill_hint),
+            })
+
+            # Record agent state
+            reporter.record_agent_state(agent_name, {
+                "queue_depth_at_start": count_queue_depth(agent_name),
+                "health_flags": ["normal"],
+            }, task_id=task_id)
+
+            # Analyze and record code changes from output
+            code_changes = _analyze_code_changes(output_text, agent_name)
+            if code_changes:
+                reporter.record_code_changes(task_id, code_changes)
+
+            # Record quality signals
+            reporter.record_quality_signals(task_id, {
+                "verification_checks_passed": 1 if result.get('success') else 0,
+                "verification_checks_failed": 0 if result.get('success') else 1,
+                "verification_score": 100.0 if result.get('success') else 0.0,
+            })
+
+            reporter.close()
+        except Exception as e:
+            print(f"  WARNING: Task data collection failed: {e}")
+
         # Emit pipeline event for observability
         try:
             from neo4j_task_tracker import get_tracker
@@ -1314,13 +1672,37 @@ def process_task(agent_name, task):
         except Exception:
             pass
 
+        # Log model usage for tracking
+        try:
+            from model_tracker import get_tracker as get_model_tracker
+            model_used = result.get('model', selected_model if 'selected_model' in dir() else executor_name)
+            # Strip "(fallback)" suffix if present
+            if isinstance(model_used, str):
+                model_used = model_used.replace(" (fallback)", "").strip()
+            get_model_tracker().log_model_usage(
+                task_id=task_id,
+                agent=agent_name,
+                model=model_used,
+                success=True,
+                duration_seconds=elapsed_s,
+            )
+        except Exception as e:
+            # Don't block task completion on model tracking failure
+            print(f"  WARNING: Model tracking failed: {e}")
+
         return True
     else:
         error_msg = result.get('error', 'Unknown error')
+        output_content = result.get('content', '') or result.get('error', '')
         print(f"  ✗ {executor_name} failed: {error_msg[:200]}")
         mark_task_completed(task['file'], 'failed', executing_file=executing_file)
 
         if task_id:
+            # Categorize error and save full content before truncation
+            error_type = categorize_error(error_msg, output_content)
+            error_file = save_error_content(
+                agent_name, task_id, error_msg, output_content, error_type
+            )
             _append_ledger({
                 "task_id": task_id,
                 "event": "EXECUTION_DETAIL",
@@ -1328,6 +1710,8 @@ def process_task(agent_name, task):
                 "agent": agent_name,
                 "execution_time_s": elapsed_s,
                 "error": error_msg[:500],
+                "error_type": error_type,  # NEW: structured error category
+                "error_file": error_file,  # NEW: path to full error content
                 "success": False,
                 "executor": executor_name,
             })
@@ -1337,10 +1721,62 @@ def process_task(agent_name, task):
             from neo4j_task_tracker import get_tracker
             get_tracker().emit_pipeline_event(
                 "FAILURE_ALERT", agent=agent_name,
-                payload={"task_id": task_id, "error": error_msg[:200]},
+                payload={"task_id": task_id, "error": error_msg[:200], "error_type": error_type},
             )
         except Exception:
             pass
+
+        # Record comprehensive error data for failed tasks
+        try:
+            from kublai_task_report import TaskReporter
+            reporter = TaskReporter()
+
+            # Record error analysis
+            reporter.record_error(task_id, {
+                "error_category": error_type,
+                "error_message": error_msg,
+                "recovery_attempts": 1,  # Already tried once
+                "fallback_models_tried": [result.get('model', '')] if "fallback" in str(result.get('model', '')).lower() else [],
+                "recovery_success": False,
+            })
+
+            # Record agent state
+            reporter.record_agent_state(agent_name, {
+                "queue_depth_at_start": count_queue_depth(agent_name),
+                "health_flags": ["stressed"] if error_type in ["STALL_TIMEOUT", "MODEL_FAILURE"] else ["normal"],
+            }, task_id=task_id)
+
+            # Record quality signals for failed task
+            reporter.record_quality_signals(task_id, {
+                "verification_checks_passed": 0,
+                "verification_checks_failed": 1,
+                "verification_score": 0.0,
+                "rework_required": True,
+                "rework_reason": f"Task failed: {error_type}",
+            })
+
+            reporter.close()
+        except Exception as e:
+            print(f"  WARNING: Error data collection failed: {e}")
+
+        # Log model usage for tracking (failure case)
+        try:
+            from model_tracker import get_tracker as get_model_tracker
+            model_used = result.get('model', selected_model if 'selected_model' in dir() else executor_name)
+            # Strip "(fallback)" suffix if present
+            if isinstance(model_used, str):
+                model_used = model_used.replace(" (fallback)", "").strip()
+            get_model_tracker().log_model_usage(
+                task_id=task_id,
+                agent=agent_name,
+                model=model_used,
+                success=False,
+                duration_seconds=elapsed_s,
+                error_type=error_type,
+            )
+        except Exception as e:
+            # Don't block task completion on model tracking failure
+            print(f"  WARNING: Model tracking failed: {e}")
 
         return False
 
@@ -1433,7 +1869,7 @@ def main():
     
     agent_name = args.agent
     print(f"=== Agent Task Handler: {agent_name.capitalize()} ===\n")
-    
+
     # Load config
     try:
         config = load_agent_config(agent_name)
@@ -1444,7 +1880,19 @@ def main():
     except Exception as e:
         print(f"✗ Failed to load config: {e}")
         sys.exit(1)
-    
+
+    # Check proxy health if configured
+    try:
+        settings_path = f"{AGENTS_DIR}/{agent_name}/.claude/settings.json"
+        with open(settings_path, 'r') as _sf:
+            settings = json.load(_sf)
+        proxy_url = settings.get('env', {}).get('ANTHROPIC_BASE_URL', '')
+        is_using_proxy = any(endpoint in proxy_url for endpoint in PROXY_ENDPOINTS) if proxy_url else False
+        if is_using_proxy:
+            log_proxy_status(agent_name, proxy_url, is_using_proxy)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # Skip proxy check if no settings
+
     # Update state to idle
     update_agent_state(agent_name, 'idle')
     

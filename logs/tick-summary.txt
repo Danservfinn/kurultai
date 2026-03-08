@@ -1,11 +1,12 @@
-TICK 2026-03-07 18:45:01
-GATEWAY: up pid=14333,14445,18874,18884,20265 http=200 latency=1ms uptime=3d14h
-PROCESS: cpu=0.0% mem=0.0% rss=1MB threads=2
-ERRORS:  last5m=12 last1h=67 fatal=0
+TICK 2026-03-08 00:37:31
+GATEWAY: up pid=7142,14333,14445,16259,16405 http=200 latency=4ms uptime=33m
+PROCESS: cpu=0.1% mem=0.5% rss=76MB threads=20
+ERRORS:  last5m=3 last1h=122 fatal=0
 SERVICES: neo4j=up redis=up
 TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
-TRENDS:  uptime_1h=100.0% avg_cpu=0.0% err_avg_5m=17.1 err_direction=falling restarts_1h=0
+AUDIT:   verified=0 fake=0 requeued=0
+TRENDS:  uptime_1h=100.0% avg_cpu=0.0% err_avg_5m=14.8 err_direction=falling restarts_1h=0
 DECISION: healthy
 ACTION:   none
 REASON:   all checks passed
-THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — Fleet-wide failure rate 91% (102/112 tasks) in last 2h. Possible model misconfiguration, API outage, or systemic error.
+THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — Per-agent failure spike: [temujin=90%(9/10)] in last 2h. Check agent config, model assignment, or task compatibility.

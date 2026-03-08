@@ -1,9 +1,9 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.8
-**Last Updated**: 2026-03-06
-**Status**: Active Production System  
-**Agent**: Kublai (Squad Lead / Router)  
+**Version**: 1.9
+**Last Updated**: 2026-03-07
+**Status**: Active Production System
+**Agent**: Kublai (Squad Lead / Router)
 **Platform**: OpenClaw Gateway (Multi-Gateway Setup)  
 
 ---
@@ -171,6 +171,36 @@ Kublai operates on the belief that **AI should liberate humans from labor**, fun
 | **Jochi** | Analysis Specialist | Pattern recognition, testing, security | All operational data | Kublai, Temüjin | 18789 |
 | **Ögedei** | Operations Specialist | System monitoring, health checks, failover | All system metrics | Kublai (escalations) | 18789 |
 | **Tolui** | Truth Teller | Blunt code review, BS detection, quality verification | All agent outputs | Kublai, all agents | 18792 (dedicated) |
+
+### Ögedei Monitoring Systems
+
+**Ögedei** operates multiple monitoring systems to ensure infrastructure reliability:
+
+| Monitor | Target | Frequency | Checks | Alerting |
+|---------|--------|-----------|--------|----------|
+| **watchdog-gather.sh** | Gateway process | 5 min | PID, CPU, MEM, endpoint, logs | LLM triage → Kublai dispatch |
+| **gateway-health-check.sh** | tolui gateway | 5 min | Port 18792 listener, /health | Auto-restart + incident log |
+| **kurultai-monitor.py** | the.kurult.ai | 5 min | HTTP 200, HTML markers, API, JS syntax | 3 failures → Ogedei task; 10 failures → Kublai critical |
+| **cron-health-monitor.sh** | Cron jobs | 15 min | Job exists, last status OK | Auto-restart failed jobs |
+
+**kurultai-monitor.py** — Website Uptime Monitor:
+- **Script**: `~/.openclaw/agents/main/scripts/kurultai-monitor.py`
+- **Cron Job ID**: `kurultai-uptime-monitor` (every 5 min)
+- **Log File**: `~/.openclaw/agents/main/logs/kurultai-monitor.log`
+- **State File**: `~/.openclaw/agents/main/logs/kurultai-monitor-state.json`
+
+**Checks Performed**:
+1. HTTP GET https://the.kurult.ai → verify 200 status
+2. HTML content validation → markers like `<div class="board">`, `renderBoard`
+3. JavaScript syntax validation → extracts inline scripts, runs `node --check`
+4. API endpoint checks → `/api/health`, `/api/tasks`
+
+**Alert Thresholds**:
+- **3 consecutive failures** → Creates high-priority task for Ogedei
+- **10 consecutive failures** → Creates critical task for Kublai (50+ min outage)
+
+**Recovery Detection**:
+- On success after failure → Logs recovery event, resets counter
 
 ### Agent Handoff Patterns
 
@@ -1565,4 +1595,30 @@ Week 2-3:
   - Contextual diagnostic reports
 - **Cron Updated**: Model changed to `lmstudio/qwen3.5-9b-mlx`
 - **Config**: Added to `~/.openclaw/openclaw.json` allowed models
+
+---
+
+## 2026-03-07 - Kurultai Website Uptime Monitor
+
+- **Change**: Automated uptime monitoring for the.kurult.ai website
+- **Reason**: 20-minute JavaScript syntax error outage went undetected until user reported
+- **Script Created**: `scripts/kurultai-monitor.py`
+- **Cron Job ID**: `kurultai-uptime-monitor` (every 5 minutes)
+- **Log File**: `logs/kurultai-monitor.log`
+- **State File**: `logs/kurultai-monitor-state.json`
+
+**Checks Performed**:
+1. HTTP GET https://the.kurult.ai → verify 200 status
+2. HTML content validation → markers (`<div class="board">`, `renderBoard`)
+3. JavaScript syntax validation → extracts inline scripts, runs `node --check`
+4. API endpoint checks → `/api/health`, `/api/tasks`
+
+**Alert Thresholds**:
+- 3 consecutive failures → High-priority task for Ogedei
+- 10 consecutive failures → Critical task for Kublai (50+ min outage)
+
+**Recovery Detection**:
+- On success after failure → Logs recovery event, resets counter
+
+**Files Modified**: `scripts/kurultai-monitor.py` (created), `cron/jobs.json` (new entry)
 

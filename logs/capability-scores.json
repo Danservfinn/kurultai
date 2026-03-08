@@ -1,9 +1,9 @@
 {
   "mongke": {
     "overall": {
-      "avg_score": 5.16,
-      "task_count": 21,
-      "fail_rate": 0.721
+      "avg_score": 5.13,
+      "task_count": 26,
+      "fail_rate": 0.67
     },
     "research": {
       "avg_score": 8.56,
@@ -14,61 +14,65 @@
       "task_count": 1
     },
     "code": {
-      "avg_score": 3.0,
-      "task_count": 2
+      "avg_score": 3.68,
+      "task_count": 3
     }
   },
   "jochi": {
     "overall": {
-      "avg_score": 6.67,
-      "task_count": 32,
-      "fail_rate": 0.693
+      "avg_score": 6.79,
+      "task_count": 58,
+      "fail_rate": 0.544
     },
     "security": {
-      "avg_score": 7.26,
-      "task_count": 20
+      "avg_score": 7.13,
+      "task_count": 38
     },
     "code": {
-      "avg_score": 5.07,
-      "task_count": 4
+      "avg_score": 5.27,
+      "task_count": 5
     },
     "routing": {
-      "avg_score": 6.76,
-      "task_count": 4
+      "avg_score": 6.55,
+      "task_count": 9
     },
     "research": {
-      "avg_score": 7.0,
-      "task_count": 1
+      "avg_score": 7.7,
+      "task_count": 3
     }
   },
   "chagatai": {
     "overall": {
-      "avg_score": 4.6,
-      "task_count": 11,
-      "fail_rate": 0.809
+      "avg_score": 4.54,
+      "task_count": 14,
+      "fail_rate": 0.761
     },
     "research": {
       "avg_score": 8.0,
+      "task_count": 1
+    },
+    "security": {
+      "avg_score": 5.0,
       "task_count": 1
     }
   },
   "ogedei": {
     "overall": {
-      "avg_score": 6.0,
-      "task_count": 22,
-      "fail_rate": 0.714
+      "avg_score": 6.24,
+      "task_count": 45,
+      "fail_rate": 0.532
     },
     "ops": {
-      "avg_score": 7.81,
-      "task_count": 6
+      "avg_score": 8.33,
+      "task_count": 10
     },
     "security": {
-      "avg_score": 6.0,
-      "task_count": 1
+      "avg_score": 6.31,
+      "task_count": 13
     },
     "code": {
-      "avg_score": 6.73,
-      "task_count": 3
+      "avg_score": 6.81,
+      "task_count": 4
     },
     "content": {
       "avg_score": 7.0,
@@ -77,17 +81,17 @@
   },
   "temujin": {
     "overall": {
-      "avg_score": 6.03,
-      "task_count": 70,
-      "fail_rate": 0.62
+      "avg_score": 5.64,
+      "task_count": 95,
+      "fail_rate": 0.539
     },
     "code": {
-      "avg_score": 7.05,
-      "task_count": 39
+      "avg_score": 6.94,
+      "task_count": 43
     },
     "security": {
-      "avg_score": 4.82,
-      "task_count": 8
+      "avg_score": 5.26,
+      "task_count": 14
     },
     "ops": {
       "avg_score": 8.5,
@@ -100,28 +104,40 @@
   },
   "kublai": {
     "overall": {
-      "avg_score": 5.22,
-      "task_count": 16,
-      "fail_rate": 0.804
+      "avg_score": 5.25,
+      "task_count": 34,
+      "fail_rate": 0.647
     },
     "security": {
-      "avg_score": 5.35,
-      "task_count": 10
+      "avg_score": 5.47,
+      "task_count": 12
     },
     "ops": {
-      "avg_score": 5.77,
+      "avg_score": 5.46,
+      "task_count": 13
+    },
+    "code": {
+      "avg_score": 5.25,
       "task_count": 4
+    },
+    "research": {
+      "avg_score": 4.0,
+      "task_count": 1
     }
   },
   "tolui": {
     "overall": {
-      "avg_score": 5.16,
-      "task_count": 6,
-      "fail_rate": 0.537
+      "avg_score": 4.69,
+      "task_count": 11,
+      "fail_rate": 0.373
     },
     "code": {
+      "avg_score": 4.27,
+      "task_count": 6
+    },
+    "security": {
       "avg_score": 5.0,
-      "task_count": 4
+      "task_count": 1
     }
   }
 }

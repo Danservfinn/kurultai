@@ -15,6 +15,15 @@
 SCRIPT_START=$(date +%s)
 TIMEOUT_SECONDS=420
 
+# ============================================================
+# CONCURRENCY CONTROL: Semaphore limiting for Claude processes
+# ============================================================
+MAX_CONCURRENT=3
+MAX_LOAD=4.0  # Max system load (1-min avg) before blocking new spawns
+
+# Job control for process group management
+set -m
+
 LOGS_DIR="/Users/kublai/.openclaw/agents/main/logs"
 mkdir -p "$LOGS_DIR"
 rm -f "$LOGS_DIR/reflection-status.json"
@@ -33,10 +42,8 @@ cleanup_and_exit() {
     echo "[$(date)] Reflection finished in ${elapsed}s"
     # Write whatever step timing data we have so far
     write_step_timing
-    # Kill any straggler background processes from review phase
-    for _pid in "${review_pids[@]}"; do
-        kill "$_pid" 2>/dev/null || true
-    done
+    # Kill entire process group (cleans up all orphaned child processes)
+    kill -- -$$ 2>/dev/null || true
     # Always exit 0 if core reflections completed
     if [ -f "$LOGS_DIR/reflection-status.json" ]; then
         exit 0
@@ -55,9 +62,123 @@ timeout_watchdog &
 WATCHDOG_PID=$!
 trap "kill $WATCHDOG_PID 2>/dev/null; cleanup_and_exit" EXIT TERM INT
 
+# ============================================================
+# LOAD-BASED BACKOFF: Check system load before spawning processes
+# ============================================================
+check_system_load() {
+    # Get 1-minute load average (macOS compatible)
+    local load=$(sysctl -n vm.loadavg 2>/dev/null | awk '{print $2}' || echo "0")
+    if (( $(echo "$load > $MAX_LOAD" | bc -l 2>/dev/null || echo 0) )); then
+        return 1  # Load too high
+    fi
+    return 0  # Load OK
+}
+
+wait_for_semaphore() {
+    # Wait for a slot in the semaphore (max concurrent processes)
+    local wait_count=0
+    while true; do
+        running=$(jobs -p 2>/dev/null | wc -l)
+        if [ "$running" -lt "$MAX_CONCURRENT" ]; then
+            # Also check system load before spawning
+            if check_system_load; then
+                return 0  # Slot available and load OK
+            fi
+        fi
+        # Wait a bit before checking again
+        sleep 0.5
+        wait_count=$((wait_count + 1))
+        if [ $wait_count -gt 60 ]; then  # Timeout after 30s
+            echo "[$(date)] WARNING: Semaphore wait timeout (load=$load, running=$running)"
+            return 0  # Proceed anyway to avoid deadlock
+        fi
+    done
+}
+
 echo "[$(date)] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]"
 echo "[$(date)] Hard timeout: ${TIMEOUT_SECONDS}s | Watchdog PID: $WATCHDOG_PID"
 echo "================================================================"
+
+# ============================================================
+# SHORT-CIRCUIT: Skip reflection if tock shows zero activity
+# ============================================================
+TOCK_FILE="$LOGS_DIR/tock/latest.json"
+if [ -f "$TOCK_FILE" ]; then
+    ZERO_ACTIVITY=$(python3 -c "
+import json
+try:
+    with open('$TOCK_FILE') as f:
+        data = json.load(f)
+    total_completed = sum(a.get('tasks', {}).get('completed', 0) for a in data.get('agents', {}).values())
+    total_failed = sum(a.get('tasks', {}).get('failed', 0) for a in data.get('agents', {}).values())
+    total_pending = data.get('queues', {}).get('total_pending', 0)
+    cron_errors = data.get('cron', {}).get('erroring', 0)
+    if total_completed == 0 and total_failed == 0 and total_pending == 0 and cron_errors == 0:
+        print('ZERO')
+    else:
+        print('ACTIVITY')
+except:
+    print('ACTIVITY')
+")
+    if [ "$ZERO_ACTIVITY" = "ZERO" ]; then
+        # Task 6.5: Check agent heartbeat before short-circuiting
+        HEARTBEAT_FILE="$LOGS_DIR/last-heartbeat.json"
+        HEARTBEAT_STALE=$(python3 -c "
+import json, os, time
+from datetime import datetime
+hb_file = '$HEARTBEAT_FILE'
+now = time.time()
+stale_agents = []
+try:
+    with open(hb_file) as f:
+        hb = json.load(f)
+    for agent, ts in hb.items():
+        try:
+            # Parse ISO format timestamp
+            dt = datetime.fromisoformat(ts)
+            age = now - dt.timestamp()
+            if age > 90:  # Stale if > 90 seconds
+                stale_agents.append(f'{agent}({int(age)}s)')
+        except:
+            stale_agents.append(f'{agent}(parse_error)')
+    if stale_agents:
+        print(','.join(stale_agents))
+    else:
+        print('OK')
+except Exception as e:
+    print(f'CHECK_FAILED:{e}')
+")
+        if [ "$HEARTBEAT_STALE" != "OK" ]; then
+            echo "[$(date)] AGENT OFFLINE - skipping reflection (stale heartbeats: $HEARTBEAT_STALE)"
+            # Write minimal step timing JSON even on heartbeat failure
+            STEP_TIMING_FILE="$LOGS_DIR/reflection-step-timing.json"
+            cat > "$STEP_TIMING_FILE" << 'TIMING_HB_EOF'
+{"timestamp":"TIMESTAMP_HB_PLACEHOLDER","total_elapsed_s":0,"steps":[],"short_circuited":true,"reason":"agent_offline","stale_agents":"STALE_AGENTS_PLACEHOLDER"}
+TIMING_HB_EOF
+            sed -i.tmp "s/TIMESTAMP_HB_PLACEHOLDER/$(date -Iseconds)/" "$STEP_TIMING_FILE"
+            sed -i.tmp2 "s/STALE_AGENTS_PLACEHOLDER/$HEARTBEAT_STALE/" "$STEP_TIMING_FILE"
+            exit 0
+        fi
+        echo "[$(date)] SKIP: Zero activity detected - writing minimal report"
+        MINIMAL_REPORT="$LOGS_DIR/hourly-reports/$(date +%Y-%m-%d-%H%M)-reflection-report.md"
+        mkdir -p "$LOGS_DIR/hourly-reports"
+        echo "# Kurultai Reflection Report - Minimal Cycle" > "$MINIMAL_REPORT"
+        echo "" >> "$MINIMAL_REPORT"
+        echo "**Period:** $(date +"%Y-%m-%d %H:00")" >> "$MINIMAL_REPORT"
+        echo "**Status:** No activity detected - skipping full pipeline" >> "$MINIMAL_REPORT"
+        echo "" >> "$MINIMAL_REPORT"
+        echo "No agent tasks completed, failed, or pending. No cron errors." >> "$MINIMAL_REPORT"
+        # Task 6.3: Write minimal step timing JSON even when short-circuiting
+        STEP_TIMING_FILE="$LOGS_DIR/reflection-step-timing.json"
+        cat > "$STEP_TIMING_FILE" << 'TIMING_EOF'
+{"timestamp":"TIMESTAMP_PLACEHOLDER","total_elapsed_s":0,"steps":[],"short_circuited":true,"reason":"zero_activity"}
+TIMING_EOF
+        # Replace timestamp placeholder with actual timestamp
+        sed -i.tmp "s/TIMESTAMP_PLACEHOLDER/$(date -Iseconds)/" "$STEP_TIMING_FILE"
+        echo "[$(date)] Step timing written (short-circuit mode)"
+        exit 0
+    fi
+fi
 
 AGENTS=("kublai" "mongke" "chagatai" "temujin" "jochi" "ogedei")
 HOURS=1
@@ -219,7 +340,9 @@ PATTERNS: (recurring issues or successes observed)
 PRIORITY_FIX: (single most impactful improvement for next hour)
 SCORE: (1-10 performance rating with one-line justification)"
 
-    run_with_timeout "$REVIEW_TIMEOUT" "$CLAUDE_AGENT_BIN" --model sonnet "$REVIEW_PROMPT" > "$REVIEW_FILE" 2>>"$LOGS_DIR/horde-review-error.log"
+    # Clear ANTHROPIC_* env vars that may override OAuth auth (settings.json env section)
+    # Use haiku for agent reflections (fast, cost-effective for reviews)
+    run_with_timeout "$REVIEW_TIMEOUT" env -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_BASE_URL -u ANTHROPIC_MODEL "$CLAUDE_AGENT_BIN" --model haiku "$REVIEW_PROMPT" > "$REVIEW_FILE" 2>>"$LOGS_DIR/horde-review-error.log"
     local rc=$?
 
     if [ $rc -eq 0 ] && [ -s "$REVIEW_FILE" ]; then
@@ -230,13 +353,16 @@ SCORE: (1-10 performance rating with one-line justification)"
     fi
 }
 
-# Run all 6 agents in parallel (reflections are pure Python, no API rate limit concern)
-echo "[$(date)] Launching ${#AGENTS[@]} agents in parallel..."
+# Run all 6 agents in parallel with concurrency limiting
+echo "[$(date)] Launching ${#AGENTS[@]} agents with semaphore (max $MAX_CONCURRENT concurrent)..."
 
 pids=()
 for agent in "${AGENTS[@]}"; do
+    # Wait for semaphore slot before spawning
+    wait_for_semaphore
     run_agent_reflection "$agent" &
     pids+=($!)
+    echo "[$(date)] Spawned $agent (running: $(jobs -p | wc -l))"
 done
 for pid in "${pids[@]}"; do
     wait "$pid" || true
@@ -268,12 +394,15 @@ echo "================================================================"
 # Review output consumed by kurultai_brainstorm.py at :30
 # ============================================================
 
-echo "[$(date)] Starting /horde-review analysis for all agents (parallel, timeout=${REVIEW_TIMEOUT}s)..."
+echo "[$(date)] Starting /horde-review analysis for all agents (parallel, timeout=${REVIEW_TIMEOUT}s, max concurrent=$MAX_CONCURRENT)..."
 
 review_pids=()
 for agent in "${AGENTS[@]}"; do
+    # Wait for semaphore slot before spawning
+    wait_for_semaphore
     run_agent_review "$agent" &
     review_pids+=($!)
+    echo "[$(date)] Spawned $agent review (running: $(jobs -p | wc -l))"
 done
 for pid in "${review_pids[@]}"; do
     wait "$pid" || true
@@ -307,7 +436,7 @@ timed_step "rule-compliance" \
 # Tier 3: Depends on all above (sequential after Tier 2)
 # ============================================================
 
-# --- Tier 1: Independent (parallel) ---
+# --- Tier 1: Independent (parallel with semaphore) ---
 # _bg_timed_step writes timing to $_STEP_TIMING_DIR (same as timed_step)
 # so all step durations are captured by write_step_timing().
 t1_pids=()
@@ -328,29 +457,33 @@ _bg_timed_step() {
     echo "[$(date)] Completed: $step_name (${step_dur}s, rc=$step_rc)"
 }
 
-_bg_timed_step "memory-audit-fix" \
-    run_with_timeout 30 python3 "$SCRIPTS/memory_audit.py" --fix >> "$LOGS_DIR/memory-audit.log" 2>&1 &
-t1_pids+=($!)
+echo "[$(date)] Starting Tier 1 (independent steps) with semaphore..."
 
-_bg_timed_step "cross-agent-rules" \
-    run_with_timeout 30 python3 "$SCRIPTS/cross_agent_rules.py" >> "$LOGS_DIR/cross-agent-rules.log" 2>&1 &
-t1_pids+=($!)
-
-_bg_timed_step "capability-scores" \
-    run_with_timeout 30 python3 "$SCRIPTS/route_quality_tracker.py" >> "$LOGS_DIR/capability-scores.log" 2>&1 &
-t1_pids+=($!)
-
-_bg_timed_step "routing-audit" \
-    run_with_timeout 30 python3 "$SCRIPTS/routing_audit_action.py" >> "$LOGS_DIR/routing-audit.log" 2>&1 &
-t1_pids+=($!)
-
-_bg_timed_step "score-skills" \
-    run_with_timeout 30 python3 "$SCRIPTS/score_skills.py" --hours 2 >> "$LOGS_DIR/skill-scorer.log" 2>&1 &
-t1_pids+=($!)
-
-_bg_timed_step "action-scorer" \
-    run_with_timeout 30 python3 "$SCRIPTS/action_scorer.py" --all --hours 2 >> "$LOGS_DIR/action-scorer.log" 2>&1 &
-t1_pids+=($!)
+for step_name in "memory-audit-fix" "cross-agent-rules" "capability-scores" "routing-audit" "score-skills" "action-scorer"; do
+    wait_for_semaphore
+    case "$step_name" in
+        memory-audit-fix)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/memory_audit.py" --fix >> "$LOGS_DIR/memory-audit.log" 2>&1 &
+            ;;
+        cross-agent-rules)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/cross_agent_rules.py" >> "$LOGS_DIR/cross-agent-rules.log" 2>&1 &
+            ;;
+        capability-scores)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/route_quality_tracker.py" >> "$LOGS_DIR/capability-scores.log" 2>&1 &
+            ;;
+        routing-audit)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/routing_audit_action.py" >> "$LOGS_DIR/routing-audit.log" 2>&1 &
+            ;;
+        score-skills)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/score_skills.py" --hours 2 >> "$LOGS_DIR/skill-scorer.log" 2>&1 &
+            ;;
+        action-scorer)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/action_scorer.py" --all --hours 2 >> "$LOGS_DIR/action-scorer.log" 2>&1 &
+            ;;
+    esac
+    t1_pids+=($!)
+    echo "[$(date)] Spawned $step_name (running: $(jobs -p | wc -l))"
+done
 
 for pid in "${t1_pids[@]}"; do wait "$pid" || true; done
 

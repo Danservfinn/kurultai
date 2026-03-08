@@ -58,8 +58,21 @@ mkdir -p "$OUTDIR"
 # 1. Neo4j: Per-agent task metrics + delegations + errors
 # ============================================================
 NEO4J_DATA=$(python3 2>/dev/null << 'PYEOF'
-import json, signal
+import json, signal, sys
 signal.alarm(30)  # kill after 30 seconds
+
+results = {"_failed_queries": []}  # Track which queries failed for diagnostics
+
+def run_query(session, query, name):
+    """Run a Neo4j query with graceful degradation - returns [] on failure."""
+    try:
+        r = session.run(query)
+        return [dict(rec) for rec in r]
+    except Exception as e:
+        results["_failed_queries"].append(f"{name}: {str(e)[:100]}")
+        print(f"Neo4j query failed ({name}): {e}", file=sys.stderr)
+        return []
+
 try:
     from neo4j import GraphDatabase
     import os as _os
@@ -68,10 +81,9 @@ try:
         auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123")),
         connection_timeout=5, max_transaction_retry_time=5
     )
-    results = {}
     with driver.session() as session:
         # Per-agent tasks (30m)
-        r = session.run("""
+        results["agent_tasks"] = run_query(session, """
             MATCH (t:Task)
             WHERE t.created > datetime() - duration('PT30M')
             WITH t.agent AS agent,
@@ -82,35 +94,74 @@ try:
                  sum(CASE WHEN toUpper(t.status) IN ['RUNNING','EXECUTING','IN_PROGRESS'] THEN 1 ELSE 0 END) AS running,
                  coalesce(sum(t.retry_count),0) AS retries
             RETURN agent, total, completed, failed, pending, running, retries
-        """)
-        results["agent_tasks"] = [dict(rec) for rec in r]
+        """, "agent_tasks")
+
+        # Model usage stats (30m)
+        results["model_stats"] = run_query(session, """
+            MATCH (t:Task)
+            WHERE t.created > datetime() - duration('PT30M')
+              AND t.model_id IS NOT NULL
+            WITH
+                t.model_id AS model,
+                t.model_provider AS provider,
+                count(t) AS total,
+                sum(CASE WHEN t.model_success = true THEN 1 ELSE 0 END) AS success,
+                coalesce(avg(t.model_duration_seconds), 0) AS avg_duration
+            RETURN
+                model,
+                provider,
+                total,
+                success,
+                CASE WHEN total > 0 THEN round(100.0 * success / total, 1) ELSE 0.0 END AS success_rate,
+                round(avg_duration, 1) AS avg_duration
+        """, "model_stats")
+
+        # Per-agent model breakdown (30m)
+        results["agent_model_stats"] = run_query(session, """
+            MATCH (t:Task)
+            WHERE t.created > datetime() - duration('PT30M')
+              AND t.model_id IS NOT NULL
+            WITH
+                t.agent AS agent,
+                t.model_id AS model,
+                count(t) AS total,
+                sum(CASE WHEN t.model_success = true THEN 1 ELSE 0 END) AS success
+            RETURN
+                agent,
+                model,
+                total,
+                success,
+                CASE WHEN total > 0 THEN round(100.0 * success / total, 1) ELSE 0.0 END AS success_rate
+            ORDER BY agent, total DESC
+        """, "agent_model_stats")
 
         # Delegations (30m)
-        r = session.run("""
+        results["delegations"] = run_query(session, """
             MATCH (t:Task)
             WHERE t.created > datetime() - duration('PT30M')
               AND t.source IS NOT NULL AND t.source <> t.agent
             RETURN t.source AS from_agent, t.agent AS to_agent,
                    t.label AS task_label
             LIMIT 20
-        """)
-        results["delegations"] = [dict(rec) for rec in r]
+        """, "delegations")
 
         # Error clusters (30m)
-        r = session.run("""
+        results["error_clusters"] = run_query(session, """
             MATCH (t:Task)
             WHERE t.created > datetime() - duration('PT30M')
               AND toUpper(t.status) = 'FAILED' AND t.error IS NOT NULL
             RETURN t.error AS error, count(t) AS count,
                    collect(DISTINCT t.agent) AS agents
             ORDER BY count DESC LIMIT 10
-        """)
-        results["error_clusters"] = [dict(rec) for rec in r]
+        """, "error_clusters")
 
     driver.close()
     print(json.dumps(results, default=str))
 except Exception as e:
-    print(json.dumps({"error": str(e)}))
+    # Graceful degradation: return partial data with error info
+    results["_error"] = str(e)[:200]
+    results["_partial"] = True
+    print(json.dumps(results, default=str))
 PYEOF
 )
 NEO4J_DATA=${NEO4J_DATA:-'{"error":"neo4j_unavailable"}'}
@@ -121,7 +172,7 @@ NEO4J_DATA=${NEO4J_DATA:-'{"error":"neo4j_unavailable"}'}
 SESSION_DATA=$(timeout 15 openclaw gateway call status --json 2>/dev/null || echo '{}')
 
 # ============================================================
-# 3. Cron job health
+# 3. Cron job health (generic from jobs.json)
 # ============================================================
 CRON_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json
@@ -155,30 +206,159 @@ try:
         })
     print(json.dumps({"total_jobs": len(jobs), "healthy": healthy, "erroring": erroring, "jobs": job_list}))
 except Exception as e:
-    print(json.dumps({"error": str(e)}))
+    # Graceful degradation: return partial data with error info
+    results["_error"] = str(e)[:200]
+    results["_partial"] = True
+    print(json.dumps(results, default=str))
 PYEOF
 )
 CRON_DATA=${CRON_DATA:-'{"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]}'}
 
 # ============================================================
+# 3b. Specific cron job monitoring - calendar_reminder and backup
+# ============================================================
+CRON_JOBS=$(python3 2>/dev/null << 'PYEOF'
+import json
+import os
+from datetime import datetime, timedelta
+
+now = datetime.now()
+result = {
+    "calendar_reminder": {
+        "status": "unknown",
+        "last_run": None,
+        "ran_last_5min": False,
+        "error_log_exists": False,
+        "error_log_lines_24h": 0
+    },
+    "backup": {
+        "status": "unknown",
+        "last_backup": None,
+        "ran_last_24h": False,
+        "backup_file_exists": False,
+        "latest_backup_size": None
+    }
+}
+
+# --- Calendar Reminder Worker ---
+# Check log file: ~/.openclaw/logs/calendar_reminders.log
+log_file = os.path.expanduser("~/.openclaw/logs/calendar_reminders.log")
+if os.path.exists(log_file):
+    result["calendar_reminder"]["error_log_exists"] = True
+    try:
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+        # Find most recent entry
+        recent_lines = []
+        cutoff_5min = now - timedelta(minutes=5)
+        cutoff_24h = now - timedelta(hours=24)
+
+        for line in lines:
+            # Parse timestamp from format: [2026-03-07T09:05:12.123456] message
+            if line.startswith('['):
+                try:
+                    ts_end = line.index(']')
+                    ts_str = line[1:ts_end]
+                    ts = datetime.fromisoformat(ts_str)
+                    if ts > cutoff_5min:
+                        recent_lines.append(line)
+                    if ts > cutoff_24h:
+                        result["calendar_reminder"]["error_log_lines_24h"] += 1
+                        # Track most recent
+                        if result["calendar_reminder"]["last_run"] is None:
+                            result["calendar_reminder"]["last_run"] = ts.isoformat()
+                except (ValueError, IndexError):
+                    pass
+
+        result["calendar_reminder"]["ran_last_5min"] = len(recent_lines) > 0
+        if result["calendar_reminder"]["last_run"] is None and lines:
+            # Fallback: use last line timestamp
+            try:
+                last_line = lines[-1]
+                if last_line.startswith('['):
+                    ts_end = last_line.index(']')
+                    ts_str = last_line[1:ts_end]
+                    result["calendar_reminder"]["last_run"] = datetime.fromisoformat(ts_str).isoformat()
+            except (ValueError, IndexError):
+                pass
+    except Exception:
+        pass
+
+# Determine calendar_reminder status
+if result["calendar_reminder"]["ran_last_5min"]:
+    result["calendar_reminder"]["status"] = "ok"
+elif result["calendar_reminder"]["error_log_exists"]:
+    result["calendar_reminder"]["status"] = "stale"
+else:
+    result["calendar_reminder"]["status"] = "no_log"
+
+# --- Backup Job ---
+# Check backup directory: /tmp/openclaw-backups/
+backup_dir = "/tmp/openclaw-backups"
+if os.path.isdir(backup_dir):
+    try:
+        backups = [f for f in os.listdir(backup_dir) if f.startswith("openclaw-backup_") and f.endswith(".tar.gz")]
+        if backups:
+            # Sort by modification time
+            backups_with_time = []
+            for b in backups:
+                full_path = os.path.join(backup_dir, b)
+                mtime = os.path.getmtime(full_path)
+                backups_with_time.append((b, mtime, os.path.getsize(full_path)))
+            backups_with_time.sort(key=lambda x: x[1], reverse=True)
+
+            latest = backups_with_time[0]
+            latest_time = datetime.fromtimestamp(latest[1])
+            result["backup"]["last_backup"] = latest_time.isoformat()
+            result["backup"]["latest_backup_size"] = latest[2]
+            result["backup"]["backup_file_exists"] = True
+            result["backup"]["ran_last_24h"] = (now - latest_time) < timedelta(hours=24)
+    except Exception:
+        pass
+
+# Determine backup status
+if result["backup"]["ran_last_24h"]:
+    result["backup"]["status"] = "ok"
+elif result["backup"]["backup_file_exists"]:
+    result["backup"]["status"] = "stale"
+else:
+    result["backup"]["status"] = "no_backup"
+
+print(json.dumps(result))
+PYEOF
+)
+CRON_JOBS=${CRON_JOBS:-'{"calendar_reminder":{"status":"unknown","error_log_exists":false},"backup":{"status":"unknown","backup_file_exists":false}}'}
+
+# ============================================================
 # 4. Task queue depths (file-based)
 # ============================================================
 QUEUE_DATA=$(python3 2>/dev/null << 'PYEOF'
-import json, os, glob
+import json, os, glob, time
 base = "/Users/kublai/.openclaw/agents"
 queues = {}
+oldest_ages = {}
+now = time.time()
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     task_dir = f"{base}/{agent}/tasks"
     if not os.path.isdir(task_dir):
         queues[agent] = 0
+        oldest_ages[agent] = None
         continue
     pending = 0
+    oldest_age_s = 0  # Default: 0 means no pending tasks (distinguishes from measurement failure)
     for pattern in ["high-*.md", "normal-*.md", "low-*.md"]:
         for f in glob.glob(f"{task_dir}/{pattern}"):
             if ".executing" not in f and ".done" not in f:
                 pending += 1
+                try:
+                    age = now - os.path.getmtime(f)
+                    if age > oldest_age_s:  # oldest_age_s starts at 0 for empty queue
+                        oldest_age_s = age
+                except:
+                    pass
     queues[agent] = pending
-print(json.dumps(queues))
+    oldest_ages[agent] = round(oldest_age_s)  # Returns 0 when queue empty (not null)
+print(json.dumps({"queues": queues, "oldest_age_s": oldest_ages}))
 PYEOF
 )
 QUEUE_DATA=${QUEUE_DATA:-'{}'}
@@ -189,7 +369,7 @@ QUEUE_DATA=${QUEUE_DATA:-'{}'}
 CONFIG_MODELS=$(python3 2>/dev/null << 'PYEOF'
 import json, os
 base = "/Users/kublai/.openclaw/agents"
-VALID_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'kimi-k2.5'}
+VALID_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'kimi-k2.5', 'glm-5'}
 DEFAULT_MODEL = 'claude-opus-4-6'
 result = {}
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
@@ -330,6 +510,7 @@ TOCK_TMP=$(mktemp -d)
 echo "$NEO4J_DATA" > "$TOCK_TMP/neo4j.json"
 echo "$SESSION_DATA" > "$TOCK_TMP/session.json"
 echo "$CRON_DATA" > "$TOCK_TMP/cron.json"
+echo "$CRON_JOBS" > "$TOCK_TMP/cron_jobs.json"
 echo "$QUEUE_DATA" > "$TOCK_TMP/queues.json"
 echo "$QUEUE_AUDIT" > "$TOCK_TMP/queue_audit.json"
 echo "$LEDGER_DATA" > "$TOCK_TMP/ledger.json"
@@ -349,6 +530,7 @@ def safe_load(path, default):
 
 neo4j = safe_load(f"{tmp}/neo4j.json", {"error":"parse_failed"})
 cron = safe_load(f"{tmp}/cron.json", {"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]})
+cron_jobs = safe_load(f"{tmp}/cron_jobs.json", {})
 queues = safe_load(f"{tmp}/queues.json", {})
 config_models = safe_load(f"{tmp}/config_models.json", {})
 queue_audit = safe_load(f"{tmp}/queue_audit.json", {"audited":0,"fake_found":0,"requeued":0,"skipped":0})
@@ -445,6 +627,7 @@ output = {
     "timestamp": "$TS_ISO",
     "agents": agents,
     "cron": cron if "error" not in cron else {"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]},
+    "cron_jobs": cron_jobs,
     "queues": {
         "total_pending": queue_total,
         "by_agent": queues,
@@ -516,6 +699,12 @@ lines.append(f"CRON: {c.get('healthy',0)}/{c.get('total_jobs',0)} healthy")
 for j in c.get("jobs",[]):
     if j.get("consecutive_errors",0) > 0:
         lines.append(f"  ERR: {j['name']} consec={j['consecutive_errors']}")
+# Cron jobs monitoring (calendar_reminder, backup)
+cj = data.get("cron_jobs", {})
+if cj:
+    cal = cj.get("calendar_reminder", {})
+    backup = cj.get("backup", {})
+    lines.append(f"CRON_JOBS: calendar_reminder={cal.get('status','?')} (5min={cal.get('ran_last_5min',False)}) | backup={backup.get('status','?')} (24h={backup.get('ran_last_24h',False)})")
 e = data["errors"]
 for cl in e.get("clusters",[]):
     lines.append(f"  error: '{str(cl.get('error',''))[:60]}' x{cl.get('count',0)}")
@@ -647,6 +836,126 @@ if os.path.islink(latest) or os.path.exists(latest):
     os.remove(latest)
 os.symlink("$OUTFILE", latest)
 PYEOF
+# ============================================================
+# 10.5 Model Mismatch Remediation (Finding 2)
+# ============================================================
+python3 << 'PYEND'
+import json, os, hashlib
+from datetime import datetime
+
+TOCK_FILE = os.environ.get("OUTFILE", "/Users/kublai/.openclaw/agents/main/logs/tock/latest.json")
+AGENTS_DIR = os.path.expanduser("~/.openclaw/agents")
+
+# Neo4j connection for idempotency check
+def check_existing_remediation_task(agent_name, mismatch_type):
+    """Check Neo4j for existing pending remediation task to prevent duplicates."""
+    try:
+        from neo4j import GraphDatabase
+        import os as _os
+        driver = GraphDatabase.driver(
+            _os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123")),
+            connection_timeout=5, max_transaction_retry_time=5
+        )
+        with driver.session() as session:
+            # Check for existing Task nodes with same idempotency key
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.idempotency_key = $idempotency_key
+                  AND NOT t.status = 'completed'
+                  AND t.created > datetime() - duration({hours: 24})
+                RETURN t.task_id AS task_id, t.status AS status
+                LIMIT 1
+            """, idempotency_key=f"model-mismatch-{agent_name}-{mismatch_type}")
+            record = result.single()
+            if record:
+                return {"exists": True, "task_id": record["task_id"], "status": record["status"]}
+        driver.close()
+    except Exception as e:
+        # If Neo4j fails, fall back to file check only
+        pass
+    return {"exists": False}
+
+try:
+    with open(TOCK_FILE) as f:
+        data = json.load(f)
+except Exception as e:
+    exit(0)
+
+for agent_name, agent_data in data.get("agents", {}).items():
+    config_model = agent_data.get("config_model", "")
+    session_model = agent_data.get("session_model", "")
+    
+    if not session_model or session_model == "none":
+        continue
+    
+    if config_model and session_model and config_model != session_model:
+        # Create mismatch type hash for idempotency key
+        mismatch_type = hashlib.md5(f"{config_model}:{session_model}".encode()).hexdigest()[:8]
+        idempotency_key = f"model-mismatch-{agent_name}-{mismatch_type}"
+        
+        # Check Neo4j for existing remediation task (idempotency check)
+        existing = check_existing_remediation_task(agent_name, mismatch_type)
+        if existing["exists"]:
+            print(f"  {agent_name}: Skipping - remediation already exists ({existing['task_id']}, status={existing['status']})")
+            continue
+        
+        agent_tasks_dir = os.path.join(AGENTS_DIR, agent_name, "tasks")
+        if not os.path.exists(agent_tasks_dir):
+            continue
+        
+        # Fallback: check filesystem for recent task files
+        existing_task = None
+        for task_file in os.listdir(agent_tasks_dir):
+            if task_file.endswith(".md"):
+                task_path = os.path.join(agent_tasks_dir, task_file)
+                try:
+                    with open(task_path) as tf:
+                        content = tf.read().lower()
+                        if "model mismatch" in content and agent_name in content:
+                            # Check if task is recent (within 24 hours by filename timestamp)
+                            existing_task = task_file
+                            break
+                except:
+                    pass
+        
+        if not existing_task:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            task_file = f"normal-{timestamp}-model-mismatch.md"
+            task_path = os.path.join(agent_tasks_dir, task_file)
+            
+            task_content = f"""---
+task_id: auto-model-mismatch-{timestamp}
+agent: {agent_name}
+priority: high
+created_at: {datetime.now().isoformat()}
+source: tock-gather-remediation
+idempotency_key: {idempotency_key}
+remediation_triggered_by: tock-gather
+tags: [model-mismatch, configuration, idempotent]
+---
+
+# Model Mismatch Detected
+
+**Config model:** {config_model}
+**Session model:** {session_model}
+**Idempotency key:** {idempotency_key}
+
+## Actions
+1. Verify settings.json model config
+2. Check session spawn parameters
+3. Restart agent if needed
+
+## Notes
+- Triggered by: tock-gather.sh
+- This task is idempotent - duplicates prevented by idempotency_key
+- Do not create multiple remediation tasks for same agent+mismatch
+"""
+            with open(task_path, "w") as f:
+                f.write(task_content)
+            print(f"  {agent_name}: Created {task_file} (idempotency_key={idempotency_key})")
+PYEND
+
 
 # One-liner to tock.log
 SEVERITY=$(python3 -c "import json; print(json.loads('''$LLM_JSON''').get('severity','?'))" 2>/dev/null || echo "?")
@@ -656,13 +965,16 @@ TASKS_FAIL=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); 
 Q_TOTAL=$(python3 -c "import json; print(json.load(open('$TOCK_ASSEMBLED_TMP')).get('queues',{}).get('total_pending',0))" 2>/dev/null || echo 0)
 CRON_ERR=$(python3 -c "import json; print(json.loads('''$CRON_DATA''').get('erroring',0))" 2>/dev/null || echo 0)
 LEDGER_DELTA=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); print(d.get('ledger_reconciliation',{}).get('delta',0))" 2>/dev/null || echo 0)
+# Cron jobs status
+CAL_STATUS=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); print(d.get('cron_jobs',{}).get('calendar_reminder',{}).get('status','?'))" 2>/dev/null || echo "?")
+BACKUP_STATUS=$(python3 -c "import json; d=json.load(open('$TOCK_ASSEMBLED_TMP')); print(d.get('cron_jobs',{}).get('backup',{}).get('status','?'))" 2>/dev/null || echo "?")
 
 LEDGER_NOTE=""
 if [ "$LEDGER_DELTA" != "0" ]; then
     LEDGER_NOTE=" | ledger_delta=$LEDGER_DELTA"
 fi
 
-echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | severity=$SEVERITY${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | calendar_reminder=$CAL_STATUS | backup=$BACKUP_STATUS | severity=$SEVERITY${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
 
 # ============================================================
 # NEO4J STATE SYNC: Reconcile filesystem task state with Neo4j (safety net)

@@ -887,3 +887,96 @@
 {"ts": "2026-03-07T18:35:00.762891", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
 {"ts": "2026-03-07T18:40:00.788417", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
 {"ts": "2026-03-07T18:45:00.462482", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T18:50:00.288839", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T18:55:00.947073", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:00:00.597976", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:05:00.497812", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:10:00.211988", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:15:01.092018", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:20:00.927179", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:25:01.329083", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:30:01.138925", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:35:00.873511", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:40:00.730358", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:45:00.564222", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:50:01.237393", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T19:55:01.017976", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:00:00.479023", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:05:01.054175", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:10:00.677392", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:15:00.207104", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:20:01.073662", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:25:01.000509", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:30:00.908494", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:35:00.734404", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:40:00.669699", "action": "revert_stale", "agent": "temujin", "task": "normal-1772932747.pid", "stuck_secs": 1241}
+{"ts": "2026-03-07T20:40:00.671579", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:45:00.575407", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:50:00.570464", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T20:55:00.302939", "action": "revert_stale", "agent": "ogedei", "task": "high-1772933574.pid", "stuck_secs": 1303}
+{"ts": "2026-03-07T20:55:00.304212", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:00:00.976185", "action": "revert_stale", "agent": "temujin", "task": "high-1772930849.md", "stuck_secs": 1315}
+{"ts": "2026-03-07T21:00:00.978177", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:05:00.717986", "action": "revert_stale", "agent": "jochi", "task": "high-1772932087.md", "stuck_secs": 1429}
+{"ts": "2026-03-07T21:05:00.719215", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:10:00.383489", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:15:00.787132", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:20:00.509786", "action": "revert_stale", "agent": "tolui", "task": "high-1772933574.md", "stuck_secs": 1402}
+{"ts": "2026-03-07T21:20:00.510585", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:25:01.149274", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:30:00.782767", "action": "revert_stale", "agent": "tolui", "task": "normal-1772932116.md", "stuck_secs": 2003}
+{"ts": "2026-03-07T21:30:00.783419", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:35:00.508025", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:40:01.102130", "action": "revert_stale", "agent": "temujin", "task": "high-1772930849.md", "stuck_secs": 1270}
+{"ts": "2026-03-07T21:40:01.103300", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:45:00.460804", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:50:01.192574", "action": "revert_stale", "agent": "temujin", "task": "high-1772936098.md", "stuck_secs": 1870}
+{"ts": "2026-03-07T21:50:01.193793", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T21:55:00.883342", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:00:00.703981", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:05:00.554518", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:10:00.386889", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:15:01.041741", "action": "revert_stale", "agent": "temujin", "task": "high-1772936098.md", "stuck_secs": 1480}
+{"ts": "2026-03-07T22:15:01.043680", "action": "revert_stale", "agent": "tolui", "task": "selfwake-redistribution-1772934997631.md", "stuck_secs": 1491}
+{"ts": "2026-03-07T22:15:01.043918", "action": "cycle_complete", "stats": {"reverted": 2, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:20:00.881535", "action": "revert_stale", "agent": "tolui", "task": "selfwake-redistribution-1772934997631.md", "stuck_secs": 1791}
+{"ts": "2026-03-07T22:20:00.882623", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:25:00.576122", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:30:00.241990", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:35:01.039467", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:40:00.675816", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:45:00.573070", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:50:00.274367", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T22:55:00.862233", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:00:00.598635", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:05:00.316539", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:10:01.057936", "action": "revert_stale", "agent": "tolui", "task": "high-fix-proxy-failure-2026-03-07.verified.md", "stuck_secs": 1239}
+{"ts": "2026-03-07T23:10:01.058620", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:15:00.872469", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:20:00.617213", "action": "revert_stale", "agent": "temujin", "task": "high-1772942171.pid", "stuck_secs": 1253}
+{"ts": "2026-03-07T23:20:00.618189", "action": "revert_stale", "agent": "temujin", "task": "high-1772942171.md", "stuck_secs": 1428}
+{"ts": "2026-03-07T23:20:00.619462", "action": "cycle_complete", "stats": {"reverted": 2, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:25:00.610241", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:30:00.355917", "action": "revert_stale", "agent": "mongke", "task": "normal-1772942251.md", "stuck_secs": 1372}
+{"ts": "2026-03-07T23:30:00.359412", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:35:01.125000", "action": "revert_stale", "agent": "temujin", "task": "high-1772943245.md", "stuck_secs": 1255}
+{"ts": "2026-03-07T23:35:01.127268", "action": "revert_stale", "agent": "mongke", "task": "selfwake-redistribution-1772942827854.md", "stuck_secs": 1673}
+{"ts": "2026-03-07T23:35:01.129023", "action": "revert_stale", "agent": "jochi", "task": "high-1772943245.md", "stuck_secs": 1255}
+{"ts": "2026-03-07T23:35:01.129935", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:40:01.123448", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:45:00.856029", "action": "revert_stale", "agent": "temujin", "task": "high-1772942171.md.redistributed.md", "stuck_secs": 1489}
+{"ts": "2026-03-07T23:45:00.858260", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:50:00.741182", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-07T23:55:01.253296", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-08T00:00:00.913774", "action": "revert_stale", "agent": "jochi", "task": "normal-1772941194.md", "stuck_secs": 1571}
+{"ts": "2026-03-08T00:00:00.914522", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-08T00:05:00.890732", "action": "revert_stale", "agent": "mongke", "task": "selfwake-redistribution-1772942827854.md", "stuck_secs": 1642}
+{"ts": "2026-03-08T00:05:00.893765", "action": "revert_stale", "agent": "jochi", "task": "normal-1772944838.md", "stuck_secs": 1462}
+{"ts": "2026-03-08T00:05:00.895157", "action": "revert_stale", "agent": "ogedei", "task": "high-1772944810.md", "stuck_secs": 1489}
+{"ts": "2026-03-08T00:05:00.896136", "action": "cycle_complete", "stats": {"reverted": 3, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-08T00:10:00.842042", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-08T00:15:00.718594", "action": "cycle_complete", "stats": {"reverted": 0, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-08T00:20:00.424402", "action": "revert_stale", "agent": "temujin", "task": "high-calendar-notification-gaps.md", "stuck_secs": 1461}
+{"ts": "2026-03-08T00:20:00.425994", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}
+{"ts": "2026-03-08T00:25:01.265607", "action": "revert_stale", "agent": "tolui", "task": "high-1772946121.md", "stuck_secs": 1205}
+{"ts": "2026-03-08T00:25:01.266313", "action": "cycle_complete", "stats": {"reverted": 1, "dispatched": 0, "skipped_busy": 0, "skipped_empty": 0, "errors": 0}, "elapsed_secs": 0.0}

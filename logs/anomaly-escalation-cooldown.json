@@ -1,15 +1,6 @@
 {
-  "low_review_score:kublai": 1772913786.356208,
-  "low_review_score:chagatai": 1772877781.238165,
-  "low_review_score:temujin": 1772906579.8372421,
-  "low_review_score:mongke": 1772902982.929271,
-  "low_review_score:ogedei": 1772884983.784103,
-  "system_wide_low_scores:system": 1772910153.6229,
-  "low_review_score:jochi": 1772895785.492074,
-  "reflection_gap:ogedei": 1772899382.716685,
-  "reflection_gap:kublai": 1772899382.724853,
-  "unanalyzed_failures:kublai": 1772921209.0771909,
-  "unanalyzed_failures:temujin": 1772924585.890365,
-  "unanalyzed_failures:mongke": 1772920888.1080692,
-  "unanalyzed_failures:jochi": 1772924585.8768058
+  "low_review_score:temujin": 1772938985.951107,
+  "unanalyzed_failures:temujin": 1772942824.936037,
+  "unanalyzed_failures:jochi": 1772939723.962867,
+  "unanalyzed_failures:mongke": 1772942585.959635
 }

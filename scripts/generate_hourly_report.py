@@ -23,6 +23,8 @@ Usage:
     python3 generate_hourly_report.py
     python3 generate_hourly_report.py --dry-run   # Print report without sending Signal
     python3 generate_hourly_report.py --no-signal  # Save file only, skip Signal
+    python3 generate_hourly_report.py --force      # Force regenerate, bypass hour dedup
+    # Or set env var: FORCE_REGENERATE=true python3 generate_hourly_report.py
 """
 
 import argparse
@@ -32,7 +34,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +51,7 @@ STEP_TIMING = LOGS_DIR / "reflection-step-timing.json"
 SEND_SIGNAL_SCRIPT = Path.home() / ".claude" / "skills" / "agent-collaboration" / "scripts" / "send_signal.sh"
 SIGNAL_TARGET = "+19194133445"
 
-NOW = datetime.now()
+NOW = datetime.now(timezone.utc)  # Task 6.4: Use UTC for consistent keys across agents
 DATE_STR = NOW.strftime("%Y-%m-%d")
 TIME_STR = NOW.strftime("%H%M")
 REPORT_FILENAME = f"{DATE_STR}-{TIME_STR}-reflection-report.md"
@@ -68,6 +70,14 @@ def collect_agent_reflections():
     reflections = {}
     for agent in AGENTS:
         memory_file = AGENTS_DIR / agent / "memory" / f"{DATE_STR}.md"
+        # SECURITY: File size check before reading (max 1MB)
+        max_file_size = 1048576  # 1MB
+        file_size = memory_file.stat().st_size
+        if file_size > max_file_size:
+            reflections[agent] = {"grade": "N/A", "findings": f"File too large ({file_size} bytes, max {max_file_size})", "issues": [], "rules": []}
+            log(f"Skipping {memory_file}: file size ({file_size}) exceeds maximum ({max_file_size} bytes)")
+            continue
+
         if not memory_file.exists():
             reflections[agent] = {"grade": "N/A", "findings": "No reflection today", "issues": [], "rules": []}
             continue
@@ -615,9 +625,20 @@ def main():
     parser = argparse.ArgumentParser(description="Generate hourly Kurultai reflection report")
     parser.add_argument("--dry-run", action="store_true", help="Print report without sending Signal")
     parser.add_argument("--no-signal", action="store_true", help="Save file only, skip Signal")
+    parser.add_argument("--force", action="store_true", help="Force regenerate, bypass hour dedup check")
     args = parser.parse_args()
 
     log("Generating hourly reflection report...")
+
+    # Hour-level dedup (can be bypassed with --force or FORCE_REGENERATE=true)
+    force_regenerate = args.force or os.environ.get("FORCE_REGENERATE", "").lower() == "true"
+    hour_key = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H")  # Task 6.4: UTC for consistent dedup
+    existing = list(REPORTS_DIR.glob(f"{hour_key}*-reflection-report.md"))
+    if existing and not force_regenerate:
+        log(f"Report already exists for hour {hour_key}. Skipping.")
+        return
+    if existing and force_regenerate:
+        log(f"FORCE_REGENERATE enabled - regenerating report for hour {hour_key} (existing: {existing[0].name})")
 
     # Collect all data
     reflections = collect_agent_reflections()
