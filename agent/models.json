@@ -68,8 +68,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 1000000,
-          "maxTokens": 65536,
-          "api": "openai-completions"
+          "maxTokens": 65536
         },
         {
           "id": "qwen3-coder-next",
@@ -85,8 +84,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 65536,
-          "api": "openai-completions"
+          "maxTokens": 65536
         },
         {
           "id": "qwen3-coder-plus",
@@ -102,8 +100,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 1000000,
-          "maxTokens": 65536,
-          "api": "openai-completions"
+          "maxTokens": 65536
         },
         {
           "id": "MiniMax-M2.5",
@@ -119,8 +116,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 204800,
-          "maxTokens": 131072,
-          "api": "openai-completions"
+          "maxTokens": 131072
         },
         {
           "id": "kimi-k2.5",
@@ -137,8 +133,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 32768,
-          "api": "openai-completions"
+          "maxTokens": 32768
         }
       ]
     },
@@ -161,8 +156,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 128000,
-          "maxTokens": 8192,
-          "api": "openai-completions"
+          "maxTokens": 8192
         }
       ]
     },
@@ -235,8 +229,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 202752,
-          "maxTokens": 16384,
-          "api": "anthropic-messages"
+          "maxTokens": 16384
         },
         {
           "id": "glm-4.7",
@@ -252,8 +245,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 202752,
-          "maxTokens": 16384,
-          "api": "anthropic-messages"
+          "maxTokens": 16384
         },
         {
           "id": "glm-4.5-air",
@@ -269,8 +261,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 131072,
-          "maxTokens": 8192,
-          "api": "anthropic-messages"
+          "maxTokens": 8192
         }
       ]
     },

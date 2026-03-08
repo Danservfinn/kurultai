@@ -67,7 +67,11 @@ mkdir -p "$LOGDIR"
 # Count gateway processes and kill extras (keep only 1)
 # Use -x for exact match on command name, exclude our own pgrep
 GW_PIDS=$(pgrep -x "openclaw-gateway" 2>/dev/null | sort -n)
-GW_COUNT=$(echo "$GW_PIDS" | grep -c . 2>/dev/null || echo 0)
+if [ -z "$GW_PIDS" ]; then
+    GW_COUNT=0
+else
+    GW_COUNT=$(echo "$GW_PIDS" | wc -l | tr -d ' ')
+fi
 
 # Track if we found duplicates BEFORE killing (for health reporting)
 GW_DUPLICATES_FOUND=0
@@ -210,6 +214,20 @@ for agent in kublai temujin mongke chagatai jochi ogedei; do
         VOTE_SYNC_ERRORS=$((VOTE_SYNC_ERRORS + 1))
     fi
 done
+
+# ============================================================
+# SECTION 5d: Subprocess Audit (claude-agent process correlation)
+# ============================================================
+# Audit active claude-agent processes and correlate with executing tasks
+# Detects orphaned files, missing PID sentinels, zombie processes, stale executions
+SUBPROCESS_AUDIT_OUTPUT=$(python3 "$SCRIPTS/subprocess-audit.py" --json 2>/dev/null || echo "{}")
+SUBPROCESS_EXECUTING=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('total_executing',0))" 2>/dev/null || echo "0")
+SUBPROCESS_ALIVE=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('alive',0))" 2>/dev/null || echo "0")
+SUBPROCESS_DEAD=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('dead',0))" 2>/dev/null || echo "0")
+SUBPROCESS_STALE=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('stale',0))" 2>/dev/null || echo "0")
+SUBPROCESS_ZOMBIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='zombie_process'))" 2>/dev/null || echo "0")
+SUBPROCESS_ORPHANED=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='orphaned_executing'))" 2>/dev/null || echo "0")
+SUBPROCESS_ANOMALIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('anomaly_count',0))" 2>/dev/null || echo "0")
 
 for agent in "${AGENTS[@]}"; do
     TASK_DIR="$AGENT_BASE/$agent/tasks"
@@ -468,6 +486,19 @@ if [ -n "$THROUGHPUT_ANOMALY_TYPE" ]; then
     fi
 fi
 
+# Subprocess anomaly escalation: orphaned or stale executions require recovery
+if [ "${SUBPROCESS_ORPHANED:-0}" -gt 0 ] || [ "${SUBPROCESS_STALE:-0}" -gt 0 ]; then
+    if [ "$STATUS" = "healthy" ]; then
+        STATUS="degraded"; ACTION="warn"
+        REASON="subprocess anomaly: orphaned=$SUBPROCESS_ORPHANED stale=$SUBPROCESS_STALE (recovery needed)"
+        EXIT_CODE=1
+    fi
+    # Log anomaly details for investigation
+    echo "[$TS] SUBPROCESS_ANOMALY | orphaned=$SUBPROCESS_ORPHANED stale=$SUBPROCESS_STALE zombies=$SUBPROCESS_ZOMBIES dead=$SUBPROCESS_DEAD" >> "$WATCHDOG_LOG"
+    # Trigger task-watcher recovery by touching a flag file
+    touch "$BASE/logs/subprocess-recovery-needed.flag"
+fi
+
 # Disk space check
 AVAIL_KB=$(df -k "$LOGDIR" 2>/dev/null | awk 'NR==2{print $4}')
 if [ "${AVAIL_KB:-0}" -lt 524288 ] 2>/dev/null; then  # < 512MB
@@ -489,13 +520,14 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
     "$TS_ISO" "$EPOCH" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "${SPAWN_COUNT:-0}" "$TASK_QUEUE_STATUS" \
     "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" "$VOTE_SYNC_COUNT" \
+    "$SUBPROCESS_EXECUTING" "$SUBPROCESS_ALIVE" "$SUBPROCESS_DEAD" "$SUBPROCESS_STALE" "$SUBPROCESS_ZOMBIES" "$SUBPROCESS_ORPHANED" "$SUBPROCESS_ANOMALIES" \
     "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$ROUTING_ACCURACY" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$AVG_LAT_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" >> "$TICKS"
@@ -503,7 +535,7 @@ printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"lat
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nSUBPROC: executing=%s alive=%s dead=%s stale=%s zombies=%s orphaned=%s anomalies=%s\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
     "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
@@ -511,6 +543,7 @@ printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "$SPAWN_COUNT" "$TASK_QUEUE_STATUS" \
     "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" \
     "$VOTE_SYNC_COUNT" "$VOTE_SYNC_ERRORS" \
+    "$SUBPROCESS_EXECUTING" "$SUBPROCESS_ALIVE" "$SUBPROCESS_DEAD" "$SUBPROCESS_STALE" "$SUBPROCESS_ZOMBIES" "$SUBPROCESS_ORPHANED" "$SUBPROCESS_ANOMALIES" \
     "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$(python3 -c "print(int($ROUTING_ACCURACY*100))" 2>/dev/null || echo "87")" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
@@ -539,7 +572,7 @@ fi
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
-echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
+echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | subprocess_exec=$SUBPROCESS_EXECUTING | subprocess_alive=$SUBPROCESS_ALIVE | subprocess_dead=$SUBPROCESS_DEAD | subprocess_stale=$SUBPROCESS_STALE | subprocess_anomalies=$SUBPROCESS_ANOMALIES | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
 
 # ============================================================
 # SECTION 8: LLM Triage (local ollama — decide if Kublai should act)

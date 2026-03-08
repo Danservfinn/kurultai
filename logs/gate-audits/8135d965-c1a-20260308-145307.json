@@ -1,0 +1,22 @@
+{
+  "original_task": "8135d965-c1a",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "ogedei",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T14:53:07.582409",
+  "audit_version": "1.0"
+}

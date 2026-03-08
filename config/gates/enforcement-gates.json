@@ -1,0 +1,98 @@
+{
+  "gates": {
+    "reviewGate": {
+      "enabled": true,
+      "description": "Require review score before task completion",
+      "config": {
+        "min_review_score": 3,
+        "required_reviewers": 1,
+        "skip_for_trivial": true,
+        "trivial_patterns": [
+          "test",
+          "hello",
+          "demo",
+          "example"
+        ]
+      }
+    },
+    "closingComments": {
+      "enabled": true,
+      "description": "Require deliverable summary before task completion",
+      "config": {
+        "min_length": 20,
+        "require_deliverable_summary": true,
+        "require_what_changed": true,
+        "exempt_skills": [
+          "/task-complete",
+          "/heartbeat"
+        ]
+      }
+    },
+    "autoTelemetry": {
+      "enabled": true,
+      "description": "Auto-emit run.started/run.completed telemetry events",
+      "config": {
+        "events": [
+          "run.started",
+          "run.completed",
+          "run.failed"
+        ],
+        "include_metrics": true,
+        "emit_to_ledger": true,
+        "emit_to_squad_chat": true
+      }
+    },
+    "autoTimeTracking": {
+      "enabled": true,
+      "description": "Auto-start/stop timers on task status change",
+      "config": {
+        "track_status_changes": true,
+        "emit_on_status": [
+          "EXECUTING",
+          "COMPLETED",
+          "FAILED",
+          "BLOCKED"
+        ],
+        "store_in_task_file": true
+      }
+    },
+    "orchestratorDelegation": {
+      "enabled": true,
+      "description": "Warn when orchestrator (Kublai) does implementation work",
+      "config": {
+        "warn_threshold": 2,
+        "escalate_after": 3,
+        "implementation_skills": [
+          "/horde-implement",
+          "/senior-backend",
+          "/senior-frontend",
+          "/systematic-debugging"
+        ],
+        "warning_message": "Kublai should delegate implementation to temujin/mongke/chagatai"
+      }
+    },
+    "squadChat": {
+      "enabled": true,
+      "description": "Auto-post lifecycle events to squad chat",
+      "config": {
+        "post_lifecycle_events": true,
+        "post_progress": true,
+        "events_to_post": [
+          "agent.spawned",
+          "agent.completed",
+          "agent.failed",
+          "task.started",
+          "task.completed",
+          "task.failed"
+        ]
+      }
+    }
+  },
+  "global": {
+    "enforcement_mode": "warn",
+    "allow_override": true,
+    "override_patterns": [
+      "completion_gate_optout: true"
+    ]
+  }
+}

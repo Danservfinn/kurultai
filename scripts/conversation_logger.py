@@ -419,6 +419,211 @@ class ConversationLogger:
 
         return True
 
+    def log_human_conversation(
+        self,
+        phone_number: str,
+        direction: str,
+        content: str,
+        channel: str = "signal",
+        context: Optional[str] = None,
+        topics: Optional[List[str]] = None,
+        action_items: Optional[List[str]] = None,
+        sentiment: Optional[str] = None,
+        related_events: Optional[List[str]] = None,
+        related_tasks: Optional[List[str]] = None,
+        message_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Comprehensive conversation logging with full context extraction.
+
+        This is the primary method for logging human conversations with
+        automatic extraction of topics, action items, sentiment, and
+        optional linking to related events/tasks.
+
+        Args:
+            phone_number: E.164 phone number
+            direction: "inbound" or "outbound"
+            content: Message content
+            channel: Communication channel (signal, email, etc.)
+            context: Override auto-detected context
+            topics: Override auto-extracted topics
+            action_items: Override auto-extracted action items
+            sentiment: Override auto-detected sentiment
+            related_events: List of related calendar event names/IDs
+            related_tasks: List of related task IDs
+            message_id: Optional message ID for deduplication
+            metadata: Additional metadata dict
+
+        Returns:
+            True if logged successfully
+        """
+        # Check if we need to archive first
+        if self._should_archive(phone_number):
+            self._archive_old_conversations(phone_number)
+
+        # Use provided values or auto-extract
+        detected_context = context or self._detect_context(content)
+        detected_topics = topics if topics is not None else self._extract_topics(content)
+        detected_action_items = action_items if action_items is not None else self._extract_action_items(content)
+        detected_sentiment = sentiment or self._analyze_sentiment(content)
+
+        # Build comprehensive conversation entry
+        conversation = {
+            "date": datetime.now().isoformat(),
+            "channel": channel,
+            "direction": direction,
+            "content": content[:2000],  # Increased limit for full context
+            "context": detected_context,
+            "topics": detected_topics,
+            "action_items": detected_action_items,
+            "sentiment": detected_sentiment,
+        }
+
+        if message_id:
+            conversation["message_id"] = message_id
+
+        if related_events:
+            conversation["related_events"] = related_events
+
+        if related_tasks:
+            conversation["related_tasks"] = related_tasks
+
+        if metadata:
+            conversation["metadata"] = metadata
+
+        # Add to profile
+        success = self.memory.add_conversation(phone_number, conversation)
+
+        # Ensure proper file permissions
+        file_path = self.memory._get_file_path(phone_number)
+        self._set_file_permissions(file_path)
+
+        return success
+
+    def get_recent_conversations(
+        self,
+        phone_number: str,
+        limit: int = 10,
+        context_filter: Optional[str] = None,
+        sentiment_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent conversations with optional filtering.
+
+        Args:
+            phone_number: Phone number
+            limit: Maximum conversations to return
+            context_filter: Filter by context type
+            sentiment_filter: Filter by sentiment
+
+        Returns:
+            List of conversation dicts
+        """
+        profile = self.memory.read_profile(phone_number)
+        if not profile:
+            return []
+
+        conversations = profile.get("conversations", [])
+
+        # Apply filters
+        if context_filter:
+            conversations = [c for c in conversations if c.get("context") == context_filter]
+
+        if sentiment_filter:
+            conversations = [c for c in conversations if c.get("sentiment") == sentiment_filter]
+
+        # Return most recent first, limited
+        return list(reversed(conversations[-limit:]))
+
+    def get_action_items(self, phone_number: str, pending_only: bool = True) -> List[Dict[str, Any]]:
+        """
+        Extract all action items from conversations.
+
+        Args:
+            phone_number: Phone number
+            pending_only: Only return items not marked as completed
+
+        Returns:
+            List of action item dicts with conversation context
+        """
+        profile = self.memory.read_profile(phone_number)
+        if not profile:
+            return []
+
+        conversations = profile.get("conversations", [])
+        all_action_items = []
+
+        for conv in conversations:
+            items = conv.get("action_items", [])
+            for item in items:
+                action_item = {
+                    "item": item,
+                    "date": conv.get("date"),
+                    "context": conv.get("context"),
+                    "completed": item in conv.get("completed_items", [])
+                }
+                if not pending_only or not action_item["completed"]:
+                    all_action_items.append(action_item)
+
+        return all_action_items
+
+    def link_to_event(self, phone_number: str, conversation_date: str, event_name: str) -> bool:
+        """
+        Link a conversation to a calendar event.
+
+        Args:
+            phone_number: Phone number
+            conversation_date: ISO date string of conversation
+            event_name: Name of the event to link
+
+        Returns:
+            True if linked successfully
+        """
+        profile = self.memory.read_profile(phone_number)
+        if not profile:
+            return False
+
+        conversations = profile.get("conversations", [])
+        for conv in conversations:
+            if conv.get("date") == conversation_date:
+                if "related_events" not in conv:
+                    conv["related_events"] = []
+                if event_name not in conv["related_events"]:
+                    conv["related_events"].append(event_name)
+                self.memory.write_profile(phone_number, profile)
+                return True
+
+        return False
+
+    def link_to_task(self, phone_number: str, conversation_date: str, task_id: str) -> bool:
+        """
+        Link a conversation to a task.
+
+        Args:
+            phone_number: Phone number
+            conversation_date: ISO date string of conversation
+            task_id: Task ID to link
+
+        Returns:
+            True if linked successfully
+        """
+        profile = self.memory.read_profile(phone_number)
+        if not profile:
+            return False
+
+        conversations = profile.get("conversations", [])
+        for conv in conversations:
+            if conv.get("date") == conversation_date:
+                if "related_tasks" not in conv:
+                    conv["related_tasks"] = []
+                if task_id not in conv["related_tasks"]:
+                    conv["related_tasks"].append(task_id)
+                self.memory.write_profile(phone_number, profile)
+                return True
+
+        return False
+
 
 # Singleton instance for convenience
 _logger_instance: Optional[ConversationLogger] = None
@@ -488,6 +693,70 @@ def export_conversations(phone_number: str) -> Optional[str]:
 def delete_all_conversations(phone_number: str) -> bool:
     """Delete all conversations (privacy request)."""
     return get_logger().delete_all_conversations(phone_number)
+
+
+def log_human_conversation(
+    phone_number: str,
+    direction: str,
+    content: str,
+    channel: str = "signal",
+    context: Optional[str] = None,
+    topics: Optional[List[str]] = None,
+    action_items: Optional[List[str]] = None,
+    sentiment: Optional[str] = None,
+    related_events: Optional[List[str]] = None,
+    related_tasks: Optional[List[str]] = None,
+    message_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Comprehensive conversation logging with full context extraction.
+
+    This is the primary function for logging human conversations with
+    automatic extraction of topics, action items, sentiment, and
+    optional linking to related events/tasks.
+
+    Args:
+        phone_number: E.164 phone number
+        direction: "inbound" or "outbound"
+        content: Message content
+        channel: Communication channel (signal, email, etc.)
+        context: Override auto-detected context (calendar, task, code, business, general)
+        topics: Override auto-extracted topics
+        action_items: Override auto-extracted action items
+        sentiment: Override auto-detected sentiment (positive, negative, neutral)
+        related_events: List of related calendar event names/IDs
+        related_tasks: List of related task IDs
+        message_id: Optional message ID for deduplication
+        metadata: Additional metadata dict
+
+    Returns:
+        True if logged successfully
+
+    Example:
+        log_human_conversation(
+            phone_number="+19194133445",
+            direction="inbound",
+            content="Can you schedule a meeting for Friday?",
+            channel="signal",
+            related_events=["Team Standup"],
+            related_tasks=["task-abc123"]
+        )
+    """
+    return get_logger().log_human_conversation(
+        phone_number=phone_number,
+        direction=direction,
+        content=content,
+        channel=channel,
+        context=context,
+        topics=topics,
+        action_items=action_items,
+        sentiment=sentiment,
+        related_events=related_events,
+        related_tasks=related_tasks,
+        message_id=message_id,
+        metadata=metadata
+    )
 
 
 # CLI interface

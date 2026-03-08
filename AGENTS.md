@@ -31,7 +31,7 @@ ONLY these topics (everything else -> route):
 |-------|--------|---------------|
 | temujin | Dev | Code, builds, bugs, APIs, architecture, payment, SDKs, deploy |
 | mongke | Research | Market research, competitors, fact-finding, external discovery |
-| chagatai | Writer | Blog posts, docs, marketing copy, changelogs, prose |
+| chagatai | Writer | Blog posts, docs, marketing copy, changelogs, prose (see docs/chagatai-routing-guide.md) |
 | jochi | Analyst | Security, testing, code review, error investigation, audits |
 | ogedei | Ops | Status checks, monitoring, alerts, backups, cron, incidents, health |
 

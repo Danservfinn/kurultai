@@ -1648,3 +1648,52 @@ Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-lates
 [Sun Mar  8 13:07:44 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
 Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: full)
 [Sun Mar  8 13:07:58 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Sun Mar  8 15:00:05 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Sun Mar  8 15:00:05 EDT 2026] Hard timeout: 420s | Watchdog PID: 40915
+================================================================
+[Sun Mar  8 15:00:05 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Sun Mar  8 15:00:05 EDT 2026] Spawned kublai (running:        2)
+[Sun Mar  8 15:00:05 EDT 2026] [kublai] Starting protocol reflection...
+[Sun Mar  8 15:00:05 EDT 2026] Spawned mongke (running:        3)
+[Sun Mar  8 15:00:05 EDT 2026] [mongke] Starting protocol reflection...
+[Sun Mar  8 15:00:43 EDT 2026] WARNING: Semaphore wait timeout (load=, running=       3)
+[Sun Mar  8 15:00:43 EDT 2026] Spawned chagatai (running:        4)
+[Sun Mar  8 15:00:43 EDT 2026] [chagatai] Starting protocol reflection...
+[Sun Mar  8 15:01:05 EDT 2026] [kublai] Protocol reflection complete -> /Users/kublai/.openclaw/agents/kublai/memory/2026-03-08.md
+[Sun Mar  8 15:01:05 EDT 2026] [mongke] Protocol reflection complete -> /Users/kublai/.openclaw/agents/mongke/memory/2026-03-08.md
+[Sun Mar  8 15:01:06 EDT 2026] Spawned temujin (running:        3)
+[Sun Mar  8 15:01:06 EDT 2026] [temujin] Starting protocol reflection...
+[Sun Mar  8 15:01:43 EDT 2026] WARNING: Semaphore wait timeout (load=, running=       3)
+[Sun Mar  8 15:01:43 EDT 2026] Spawned jochi (running:        4)
+[Sun Mar  8 15:01:43 EDT 2026] [jochi] Starting protocol reflection...
+[Sun Mar  8 15:01:43 EDT 2026] [chagatai] Protocol reflection complete -> /Users/kublai/.openclaw/agents/chagatai/memory/2026-03-08.md
+[Sun Mar  8 15:02:06 EDT 2026] [temujin] Protocol reflection complete -> /Users/kublai/.openclaw/agents/temujin/memory/2026-03-08.md
+[Sun Mar  8 15:02:06 EDT 2026] Spawned ogedei (running:        3)
+[Sun Mar  8 15:02:06 EDT 2026] [ogedei] Starting protocol reflection...
+[Sun Mar  8 15:02:43 EDT 2026] [jochi] Protocol reflection complete -> /Users/kublai/.openclaw/agents/jochi/memory/2026-03-08.md
+[Sun Mar  8 15:03:06 EDT 2026] [ogedei] Protocol reflection complete -> /Users/kublai/.openclaw/agents/ogedei/memory/2026-03-08.md
+[Sun Mar  8 15:03:06 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Sun Mar  8 15:03:06 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Sun Mar  8 15:03:06 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Sun Mar  8 15:03:06 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=300s, max concurrent=2)...
+[Sun Mar  8 15:03:06 EDT 2026] [kublai] Starting review with fallback mode...
+[Sun Mar  8 15:03:06 EDT 2026] Spawned kublai review (running:        2)
+[Sun Mar  8 15:03:06 EDT 2026] [mongke] Starting review with fallback mode...
+[Sun Mar  8 15:03:06 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: full)
+[Sun Mar  8 15:04:53 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Sun Mar  8 15:04:53 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Sun Mar  8 15:04:53 EDT 2026] [chagatai] Starting review with fallback mode...
+[Sun Mar  8 15:04:53 EDT 2026] Spawned chagatai review (running:        2)
+[Sun Mar  8 15:04:53 EDT 2026] [temujin] Starting review with fallback mode...
+[Sun Mar  8 15:04:53 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: full)
+[Sun Mar  8 15:06:25 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Sun Mar  8 15:07:05 EDT 2026] TIMEOUT: Reflection exceeded 420s, forcing exit
+[Sun Mar  8 15:07:05 EDT 2026] Reflection finished in 420s
+[Sun Mar  8 15:07:05 EDT 2026] Reflection finished in 420s
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: full)
+[Sun Mar  8 15:07:05 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md

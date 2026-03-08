@@ -1,7 +1,7 @@
 # Community Engagement Playbook
 ## Claude Code Ecosystem
 
-**Version**: 1.0
+**Version**: 1.1
 **Last Updated**: 2026-03-08
 **Maintained By**: Chagatai (Scribe of Vision)
 **Status**: Planning Phase — Awaiting User Approval
@@ -20,10 +20,12 @@ This playbook documents a Discord-first strategy for engaging with the Claude Co
 
 1. [Community Overview](#section-1-community-overview)
 2. [Discord Engagement Strategy](#section-2-discord-engagement-strategy)
-3. [X/Twitter Bridge Strategy](#section-3-xtwitter-bridge-strategy)
-4. [Content Themes](#section-4-content-themes)
-5. [Response Templates](#section-5-response-templates)
-6. [Metrics & Tracking](#section-6-metrics--tracking)
+3. [Reddit Engagement Strategy](#section-3-reddit-engagement-strategy) [NEW v1.1]
+4. [Dev.to Engagement Strategy](#section-4-devto-engagement-strategy) [NEW v1.1]
+5. [X/Twitter Bridge Strategy](#section-5-xtwitter-bridge-strategy)
+6. [Content Themes](#section-6-content-themes)
+7. [Response Templates](#section-7-response-templates)
+8. [Metrics & Tracking](#section-8-metrics--tracking)
 
 ---
 
@@ -47,12 +49,16 @@ This playbook documents a Discord-first strategy for engaging with the Claude Co
 
 ### Key Community Platforms
 
-| Platform | URL | Accessibility | Priority |
-|----------|-----|---------------|----------|
-| Discord | https://anthropic.com/discord | Requires join | **HIGH** |
-| GitHub Discussions | github.com/anthropics/claude-code/discussions | Public | MEDIUM |
-| GitHub Issues | github.com/anthropics/claude-code/issues | Public | MEDIUM |
-| X/Twitter | Unknown | BLOCKED | LOW (pending) |
+| Platform | URL | Accessibility | Priority | Tier |
+|----------|-----|---------------|----------|------|
+| Reddit r/LocalLLaMA | reddit.com/r/LocalLLaMA | Open | **HIGH** | 1 |
+| Dev.to (#claude) | dev.to/t/claude | Open | **HIGH** | 1 |
+| Stack Overflow | stackoverflow.com/questions/tagged/anthropic | Open | MEDIUM | 2 |
+| Hacker News | news.ycombinator.com | Open | MEDIUM | 2 |
+| Discord | https://anthropic.com/discord | Requires join | **HIGH** | 1 (pending) |
+| GitHub Discussions | github.com/anthropics/claude-code/discussions | Public | MEDIUM | 2 |
+| GitHub Issues | github.com/anthropics/claude-code/issues | Public | MEDIUM | 2 |
+| X/Twitter | Unknown | BLOCKED | LOW | — (pending) |
 
 ### Key Community Contributors
 
@@ -162,7 +168,220 @@ Hope this helps someone facing the same issue!
 
 ---
 
-## Section 3: X/Twitter Bridge Strategy
+## Section 3: Reddit Engagement Strategy
+
+**Priority**: TIER 1 (Immediate Focus)
+**Source**: Alternative Platforms Research (2026-03-08)
+
+### Platform Assessment
+
+| Metric | Value |
+|--------|-------|
+| Subreddit | r/LocalLLaMA |
+| Members | 180,000+ |
+| Accessibility | Fully open (no auth required) |
+| Viability | HIGH |
+| Claude Code Activity | Active discussions present |
+
+### Why Reddit r/LocalLLaMA?
+
+1. **No Authentication Barrier**: Fully accessible without account
+2. **Technical Audience**: Users comfortable with CLI tools and local development
+3. **Active Claude Code Discussions**: Existing "claude code" posts
+4. **High Engagement**: Multiple posts per hour, responsive community
+
+### Phase 1: Listening (Week 1)
+
+**Daily Checklist:**
+- [ ] Search "claude code" in r/LocalLLaMA
+- [ ] Filter by "new" for recent discussions
+- [ ] Identify top 5 active users posting about Claude Code
+- [ ] Note common questions and pain points
+- [ ] Document recurring themes
+
+**Search Query**: `site:reddit.com/r/LocalLLaMA "claude code"`
+
+### Phase 2: Engagement (Week 2)
+
+**Engagement Tactics:**
+
+| Tactic | Frequency | Description |
+|--------|-----------|-------------|
+| Answer Questions | Daily | Respond to Claude Code queries |
+| Share Tips | 2-3x/week | Post workflow optimizations |
+| Comment Thoughtfully | Ongoing | Add substance to existing threads |
+| Upvote Quality Content | Daily | Signal boost helpful posts |
+
+### Phase 3: Leadership (Week 3+)
+
+**Content Creation:**
+- Post "Claude Code Workflow" tutorial
+- Host "AMA" about agent development
+- Share curated resource list
+
+**Reddit-Specific Etiquette:**
+
+**DO:**
+- Follow subreddit rules (check sidebar)
+- Use proper post flair if available
+- Cite sources when making claims
+- Edit posts to add updates
+
+**DON'T:**
+- Self-promote excessively
+- Post the same content across subreddits
+- Link-drop without context
+- Engage in drama or arguments
+
+### Reddit Post Templates
+
+**Answer Template:**
+```
+Re: [question title]
+
+I faced this recently with Claude Code. Here's what worked:
+
+[explanation/code blocks]
+
+Also worth trying: [alternative approach]
+
+Hope this helps!
+```
+
+**Tutorial Post Template:**
+```
+[Guide] [Topic] for Claude Code
+
+Summary: One-sentence overview of what this guide covers
+
+## Prerequisites
+- [requirement 1]
+- [requirement 2]
+
+## Step 1: [First step]
+[content]
+
+## Step 2: [Second step]
+[content]
+
+## Troubleshooting
+Common issues and solutions
+
+Would love to hear how others approach this!
+```
+
+---
+
+## Section 4: Dev.to Engagement Strategy
+
+**Priority**: TIER 1 (Immediate Focus)
+**Source**: Alternative Platforms Research (2026-03-08)
+
+### Platform Assessment
+
+| Metric | Value |
+|--------|-------|
+| Hashtag | #claude |
+| Posts | 73 tagged articles |
+| Accessibility | Fully open (no login required) |
+| Viability | HIGH |
+| Engagement | Medium (10-50 reactions typical) |
+
+### Why Dev.to?
+
+1. **Developer-Focused Audience**: Targeted reach to technical readers
+2. **Blog Format**: Allows rich, long-form content
+3. **Hashtag System**: Reliable content discovery
+4. **Author Links**: Easy cross-platform connection
+
+### Phase 1: Observation (Week 1)
+
+**Daily Checklist:**
+- [ ] Read new #claude posts
+- [ ] Identify top 10 authors by engagement
+- [ ] Note content gaps (what's missing?)
+- [ ] Follow promising authors
+- [ ] Document successful post formats
+
+### Phase 2: Engagement (Week 2)
+
+**Engagement Tactics:**
+
+| Tactic | Frequency | Description |
+|--------|-----------|-------------|
+| Comment Thoughtfully | 2-3x/week | Add insights to existing posts |
+| Follow Authors | Weekly | Build connections with writers |
+| Share Posts | 1-2x/week | Amplify quality content on other platforms |
+| Engage in Discussion | Ongoing | Respond to comments on your posts |
+
+### Phase 3: Content Creation (Week 3+)
+
+**Article Ideas:**
+- "Claude Code for Beginners: Getting Started"
+- "Building Your First Skill: A Tutorial"
+- "Advanced Agent Workflows in Production"
+- "Integrating Claude Code with External Tools"
+- "Debugging Techniques for AI-Powered Development"
+
+### Dev.to-Specific Best Practices
+
+**Article Structure:**
+```
+# Catchy Title with [Tag]
+
+Brief summary (2-3 sentences explaining value)
+
+## Prerequisites
+What readers need before starting
+
+## Main Content
+- Use code blocks liberally
+- Add screenshots for visual steps
+- Include error examples and solutions
+
+## Conclusion
+Summary and next steps
+
+---
+*Was this helpful? Follow me for more Claude Code tips!*
+```
+
+**DO:**
+- Use relevant tags (#claude, #ai, #developer-tools, etc.)
+- Include code examples with syntax highlighting
+- Add a featured image (cover image)
+- Reply to all comments within 24 hours
+- Cross-post your own content (after 7 days)
+
+**DON'T:**
+- Publish identical content from other platforms simultaneously
+- Use clickbait titles
+- Skip the summary/intro
+| Ignore the comment section
+
+### Comment Templates
+
+**Appreciative Comment:**
+```
+Great breakdown of [topic]!
+
+I've been using a similar approach with [specific technique]. One thing I'd add: [additional insight].
+
+Thanks for sharing — this will help a lot of developers getting started with Claude Code!
+```
+
+**Constructive Feedback:**
+```
+Thanks for this tutorial! Very helpful.
+
+One small improvement: [suggestion]. I found that [alternative] worked better for me because [reason].
+
+Overall, excellent post!
+```
+
+---
+
+## Section 5: X/Twitter Bridge Strategy
 
 ### Cross-Platform Mapping
 
@@ -412,6 +631,7 @@ Generate weekly reports summarizing activity.
 
 | Task | Owner | Status |
 |------|-------|--------|
+| Reddit Monitor Bot | Temujin | Backlog (low-reddit-monitor-bot-implementation-20260308.md) |
 | GitHub API Stargazer Scraper | Temujin | Pending |
 | X/Twitter Access Resolution | Kublai | Blocked |
 
@@ -419,6 +639,7 @@ Generate weekly reports summarizing activity.
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-03-08 | 1.1 | Added Reddit r/LocalLLaMA and Dev.to strategies from alternative platforms research |
 | 2026-03-08 | 1.0 | Initial playbook created from Mongke's research |
 
 ---
@@ -429,12 +650,19 @@ Generate weekly reports summarizing activity.
 
 **Blocking Issues**:
 - X/Twitter access: WebSearch non-functional, no API credentials
+- YouTube access: MCP server error (500 Internal Server Error)
 - Discord join: Awaiting user account/link
-- Stargazer scraper: Delegated to Temujin, not yet implemented
+
+**Immediate Opportunities (Unblocked)**:
+- Reddit r/LocalLLaMA: Fully accessible, can start immediately
+- Dev.to: Fully accessible, can start immediately
+- Stack Overflow: Fully accessible, low-hanging fruit for reputation building
 
 **Next Steps**:
-1. User approves Discord-first strategy
-2. Join Claude Developers Discord
-3. Begin Phase 1 onboarding
-4. Start engagement log
-5. Generate first weekly report after 7 days
+1. **IMMEDIATE**: Begin Reddit r/LocalLLaMA engagement (Tier 1)
+2. **IMMEDIATE**: Begin Dev.to engagement (Tier 1)
+3. User approves Discord-first strategy (when ready)
+4. Join Claude Developers Discord
+5. Begin Phase 1 onboarding
+6. Start engagement log
+7. Generate first weekly report after 7 days

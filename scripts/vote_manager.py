@@ -12,14 +12,28 @@ import os
 import sys
 import uuid
 import re
+import json
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_driver
-from kurultai_paths import AGENTS_DIR
+from kurultai_paths import AGENTS_DIR, LOGS_DIR
 
 KURULTAI_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+VOTING_LOG = LOGS_DIR / "voting.jsonl"
+
+
+def _log_voting_event(event_type: str, data: dict):
+    """Log voting events to voting.jsonl."""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "event_type": event_type,
+        **data
+    }
+    with open(VOTING_LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 class VoteManager:
@@ -70,6 +84,14 @@ class VoteManager:
 
         # Create vote file in agent's votes/ directory
         self._create_vote_file(proposal_id, agent, decision, reasoning)
+
+        # Log the vote event
+        _log_voting_event("vote_cast", {
+            "proposal_id": proposal_id,
+            "agent": agent,
+            "decision": decision,
+            "vote_id": vote_id
+        })
 
         return vote_id
 

@@ -165,6 +165,32 @@ def extract_failures_from_task(content):
     return failures
 
 
+def _safe_parse_int(value, default=0):
+    """Safely parse an integer from potentially JSON-escaped strings.
+
+    Handles corrupted metadata like '"\\"\\\\\\"0\\\\\\"\\""' by stripping
+    excessive JSON escaping and falling back to default if parsing fails.
+    """
+    if isinstance(value, int):
+        return value
+    if not value:
+        return default
+
+    # Remove JSON string escaping layers
+    cleaned = value.strip().strip('"')
+    # Handle nested escaping: "\"0\"" -> "0" -> 0
+    while cleaned.startswith('"') or cleaned.startswith('\\'):
+        cleaned = cleaned.strip('"').strip('\\').strip('"')
+
+    try:
+        return int(cleaned)
+    except (ValueError, TypeError):
+        # Log warning for debugging but don't crash
+        import warnings
+        warnings.warn(f"Failed to parse int from: {value!r}, using default: {default}")
+        return default
+
+
 def extract_task_metadata(content):
     """Extract frontmatter metadata from task markdown."""
     meta = {}
@@ -238,7 +264,7 @@ def scan_failed_tasks(max_age_hours=MAX_AGE_HOURS):
                 "meta": meta,
                 "failures": failures,
                 "age_hours": age_hours,
-                "retry_count": int(meta.get("retry_count", 0)),
+                "retry_count": _safe_parse_int(meta.get("retry_count", 0)),
             })
 
     # Sort by most recent first

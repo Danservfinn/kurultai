@@ -76,9 +76,10 @@ except ImportError:
 
     def check_rate_limits(identifier: str, max_per_day: int = 10, max_per_hour: int = 3):
         """Stub function when security logger unavailable."""
-        # SECURITY FIX: Fail closed when rate limiting unavailable
-        # Always allow in degraded mode for now, but log warning
-        return True, {"day_count": 0, "day_limit": max_per_day, "hour_count": 0, "hour_limit": max_per_hour, "allowed": True}
+        # CRIT-001 FIX: Fail CLOSED when rate limiting unavailable
+        # Deny all bypass requests in degraded mode - security first
+        print(f"[WARN] Rate limiting unavailable - denying bypass for {identifier}")
+        return False, {"error": "Rate limiting unavailable - denying by policy", "allowed": False}
 
 # Config paths
 ALLOWLIST_PATH = Path.home() / ".openclaw" / "agents" / "main" / "config" / "gate-bypass-allowlist.json"
@@ -135,13 +136,22 @@ def is_generic_reason(reason: str) -> tuple[bool, str]:
     return False, ""
 
 
+# Maximum JSON file size to load (prevents memory exhaustion attacks)
+MAX_JSON_SIZE_BYTES = 1024 * 1024  # 1 MB
+
+
 def load_allowlist() -> Dict[str, Any]:
     """Load the bypass allowlist from config."""
     if not ALLOWLIST_PATH.exists():
-        raise FileNotFoundError(
-            f"Allowlist not found at {ALLOWLIST_PATH}. "
-            "Completion gate bypass requires allowlist configuration."
-        )
+        # SECURITY: Don't reveal path in error message - fail closed
+        print("Error: Bypass allowlist not configured. Contact administrator.")
+        raise FileNotFoundError("Allowlist configuration missing")
+
+    # SECURITY: Check file size before loading to prevent memory exhaustion
+    file_size = ALLOWLIST_PATH.stat().st_size
+    if file_size > MAX_JSON_SIZE_BYTES:
+        print("Error: Allowlist file too large. Possible corruption or attack.")
+        raise ValueError(f"Allowlist file exceeds maximum size ({file_size} > {MAX_JSON_SIZE_BYTES})")
 
     with open(ALLOWLIST_PATH, 'r') as f:
         return json.load(f)
@@ -430,6 +440,21 @@ def bypass_gate(
     agent = frontmatter.get("agent", "unknown")
     parent_task = frontmatter.get("parent_task", "none")
 
+    # CRIT-002 FIX: Self-authorization check - agent coordinator cannot bypass own tasks
+    approver_lower = approver.strip().lower()
+    if agent.lower() == approver_lower and is_agent_name(approver_lower):
+        print(f"Authorization FAILED: Agent coordinator cannot authorize bypass for own tasks")
+        print(f"  Task agent: {agent}")
+        print(f"  Approver: {approver}")
+        if SECURITY_LOGGER_AVAILABLE and EventType and Severity:
+            log_security_event(
+                event_type=EventType.SELF_AUTHORIZATION_BLOCKED if EventType and hasattr(EventType, 'SELF_AUTHORIZATION_BLOCKED') else EventType.UNAUTHORIZED_BYPASS_ATTEMPT if EventType else None,
+                severity=Severity.HIGH if Severity else None,
+                details={"task_id": task_id, "approver": approver, "task_agent": agent, "reason": "self_authorization_blocked"},
+                send_alert=True
+            )
+        return False
+
     # VULN-1 FIX: Check multi-party approval requirement
     requires_mpa, required_count, mpa_reason = check_multi_party_requirement(task_file, allowlist)
     existing_approvals = find_pending_approvals(task_id)
@@ -438,7 +463,15 @@ def bypass_gate(
     if approver not in all_approvers:
         all_approvers.append(approver)
 
-    approval_count = len(all_approvers)
+    # MED-006 FIX: Require DISTINCT approvers (same approver can't count twice)
+    distinct_approver_count = len(set(a.lower().strip() for a in all_approvers))
+    approval_count = len(all_approvers)  # Keep for logging
+
+    if requires_mpa and distinct_approver_count < required_count and approval_count >= required_count:
+        print(f"⚠️  Multi-party approval requires {required_count} DISTINCT approvers")
+        print(f"  Found {approval_count} approvals but only {distinct_approver_count} distinct approvers")
+        print(f"  Approvers: {all_approvers}")
+        return False
 
     # Show what we're doing
     print(f"=== COMPLETION GATE BYPASS (HARDENED) ===")
@@ -453,19 +486,19 @@ def bypass_gate(
     if requires_mpa:
         print(f"\n[MULTI-PARTY APPROVAL REQUIRED]")
         print(f"  Reason: {mpa_reason}")
-        print(f"  Approvals: {approval_count}/{required_count}")
+        print(f"  Distinct Approvers: {distinct_approver_count}/{required_count}")  # MED-006 FIX: Show distinct count
         for i, ap in enumerate(all_approvers, 1):
             print(f"    {i}. {ap}")
 
-        if approval_count < required_count:
-            print(f"\n⚠️  {required_count - approval_count} more approval(s) needed before bypass can proceed")
+        if distinct_approver_count < required_count:  # MED-006 FIX: Use distinct count
+            print(f"\n⚠️  {required_count - distinct_approver_count} more distinct approver(s) needed before bypass can proceed")
             if not dry_run:
                 confirm = input(f"Record approval from '{approver}' and wait for more? [y/N] ")
                 if confirm.lower() == 'y':
                     # Record this approval but don't bypass yet
                     log_bypass(task_id, reason, approver, all_approvers, frontmatter)
                     print(f"✓ Approval recorded. Task remains pending-gate.")
-                    print(f"  Get {required_count - approval_count} more approval(s) and re-run this command.")
+                    print(f"  Get {required_count - distinct_approver_count} more distinct approver(s) and re-run this command.")  # MED-006 FIX
                     if SECURITY_LOGGER_AVAILABLE:
                         log_security_event(
                             event_type=EventType.MULTI_PARTY_APPROVAL if EventType else None,

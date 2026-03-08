@@ -12,14 +12,28 @@ Usage:
 import uuid
 import sys
 import os
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_driver
-from kurultai_paths import AGENTS_DIR
+from kurultai_paths import AGENTS_DIR, LOGS_DIR
 
 KURULTAI_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+VOTING_LOG = LOGS_DIR / "voting.jsonl"
+
+
+def _log_voting_event(event_type: str, data: dict):
+    """Log voting events to voting.jsonl."""
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "event_type": event_type,
+        **data
+    }
+    with open(VOTING_LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 class ProposalManager:
@@ -74,6 +88,15 @@ class ProposalManager:
 
         # Create file in proposals/pending/
         self._create_proposal_file(proposal_id, title, description, proposing_agent, priority, category)
+
+        # Log the proposal creation
+        _log_voting_event("proposal_created", {
+            "proposal_id": proposal_id,
+            "title": title,
+            "proposing_agent": proposing_agent,
+            "priority": priority,
+            "category": category
+        })
 
         return proposal_id
 
@@ -203,6 +226,13 @@ category: {category}
                 SET p.status = $new_status,
                     p.updated_at = datetime()
             """, proposal_id=proposal_id, new_status=new_status)
+
+            # Log the status change
+            _log_voting_event("proposal_status_changed", {
+                "proposal_id": proposal_id,
+                "new_status": new_status,
+                "actor": actor
+            })
 
             # If approved, move file
             if new_status == "approved":

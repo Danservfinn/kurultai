@@ -366,7 +366,7 @@ The website has been failing browser-based health checks.
 
 **IMMEDIATE ACTION REQUIRED** - The primary UI is down or broken.
 """
-            create_task("main", "critical", f"CRITICAL: the.kurult.ai down for {downtime}", critical_body)
+            create_task("main", "high", f"CRITICAL: the.kurult.ai down for {downtime}", critical_body)
 
         elif state["consecutive_failures"] >= FAILURE_WARNING_THRESHOLD:
             downtime = format_downtime(state.get("downtime_start"))

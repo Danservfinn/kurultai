@@ -1,31 +1,36 @@
 {
-  "last_run": "2026-03-08T00:35:00.898059",
-  "last_count": 5,
+  "last_run": "2026-03-08T15:01:18.516335",
+  "last_count": 6,
   "reported_tasks": [
     {
-      "agent": "jochi",
-      "filename": "normal-1772941194.failed.done.md",
-      "ts": "2026-03-08T00:35:00.898079"
-    },
-    {
       "agent": "ogedei",
-      "filename": "high-1772944810.failed.done.md",
-      "ts": "2026-03-08T00:35:00.898083"
+      "filename": "high-1772962334.no_output.failed.done.md",
+      "ts": "2026-03-08T15:01:18.516354"
+    },
+    {
+      "agent": "chagatai",
+      "filename": "high-1772976018.verified.failed.done.md",
+      "ts": "2026-03-08T15:01:18.516358"
     },
     {
       "agent": "jochi",
-      "filename": "normal-1741405500.failed.done.md",
-      "ts": "2026-03-08T00:35:00.898085"
+      "filename": "high-review-implement-completion-gate-core-scripts-1772979392877.verified.failed.done.md",
+      "ts": "2026-03-08T15:01:18.516360"
     },
     {
-      "agent": "chagatai",
-      "filename": "high-1772946600.failed.done.md",
-      "ts": "2026-03-08T00:35:00.898087"
+      "agent": "tolui",
+      "filename": "high-1772960139.verified.failed.done.md",
+      "ts": "2026-03-08T15:01:18.516362"
     },
     {
-      "agent": "chagatai",
-      "filename": "normal-1772936030.failed.done.md",
-      "ts": "2026-03-08T00:35:00.898088"
+      "agent": "mongke",
+      "filename": "high-1772936098.unverified.unverified.failed.done.md",
+      "ts": "2026-03-08T15:01:18.516363"
+    },
+    {
+      "agent": "temujin",
+      "filename": "high-1772983582.failed.done.md",
+      "ts": "2026-03-08T15:01:18.516365"
     }
   ]
 }

@@ -1,24 +1,28 @@
-Based on my analysis of the telemetry data, task completions, and configuration state, here is the critical review:
+---
+
+# Critical Review Report: Chagatai Agent (Past Hour)
+
+## Executive Summary
+Chagatai shows low throughput (3 completions/hour) with 100% of completed tasks being domain rejections or meta-tasks. Zero actual content produced. Active session is using wrong model (qwen3.5-plus) despite config. Queue at 16 tasks but agent is idle — content work stalling.
 
 ---
 
-**STRENGTHS:**
-- **100% success rate** — 1 completed, 0 failed in past hour; all recent tasks (7 visible from 12:51 batch) delivered with quality
-- **High-quality output format** — Landing page design (546.5s) produced 4 comprehensive deliverables with conversion strategy, component guide, and proper completion report format
-- **Proper completion reports** — Following the new standard with Summary/Changes/Verification/Follow-up sections
+STRENGTHS:
+- **Domain compliance strong** — Correctly rejected research task (5b82a9f6-1a9) and routed to mongke per Rule C16
+- **Self-diagnostic capability** — Identified own model routing failure and blog output stall in operational efficiency task
+- **Proper meta-task handling** — Redistribution wake processed correctly; recognized no actionable content task present
 
-**WEAKNESSES:**
-- **Model session drift** — Session using `qwen3.5-plus` while config specifies `claude-opus-4-6` (session_match=false in tock); caused one task failure requiring retry with `glm-5`
-- **Zero queue depth** — Chagatai has 0 queued tasks while other agents (per earlier reviews) showed 9-11 tasks; persistent underutilization not addressing queue imbalance
-- **Rule tracking broken** — follow_count=0 for all 6 active rules indicates telemetry failure, not actual compliance
+WEAKNESSES:
+- **Zero content output** — No blog posts, docs, or marketing produced in past hour despite 35 blog topics queued in blog-workflow
+- **Session model drift (CRITICAL)** — Active session uses `qwen3.5-plus` (bailian) despite config showing `glm-5` — both non-Claude, both violating validation guard
+- **Queue utilization failure** — 16 tasks queued but 0 executing — not absorbing queue despite WHEN/THEN rule requiring proactive absorption at 5+ tasks
 
-**PATTERNS:**
-- Tasks complete in batch windows (12:51 cluster of 7 completions) rather than steady absorption
-- Domain boundary rule (C16) defined but violations persist — operational tasks still displacing content focus
-- Model drift causes sporadic failures (`rejected-model-drift`) followed by successful retry with fallback model
+PATTERNS:
+- **Config → Session mismatch recurrence** — Same pattern as temujin/mongke model drift (config fixed but session retains stale model)
+- **Domain rejection as primary output** — 2/3 completions this hour were rejections/meta-tasks, not actual content work
+- **Idle during imbalance** — System shows queue imbalance (temujin=49, mongke=30 vs chagatai=16) but chagatai not actively absorbing
 
-**PRIORITY_FIX:**
-Restart Chagatai session to align with claude-opus-4-6 config OR update config to accept current session model (glm-5/qwen3.5-plus). The model drift guard is blocking execution and causing unnecessary retries.
+PRIORITY_FIX:
+**Archive stale session and reset to force fresh model selection.** Session file `697cd3ee-471a-4e48-9c0e-cfecc0408c72.jsonl` has `model: qwen3.5-plus` baked in — config changes won't apply until session reset. Then inject actual blog/doc tasks from blog-workflow queue to restart content pipeline.
 
-**SCORE: 7/10**
-High quality when tasks land (100% success, excellent outputs) but model drift and underutilization prevent full system contribution. Would be 8+ if queue absorption improved.
+SCORE: **3/10** — Domain compliance works, but model drift + zero content output + idle queue means the agent is effectively non-functional for its primary purpose (content creation).

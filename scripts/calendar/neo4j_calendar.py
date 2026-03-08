@@ -19,10 +19,12 @@ from neo4j import Driver, GraphDatabase
 
 # Get Neo4j connection from existing task tracker
 def get_driver() -> Driver:
-    """Get Neo4j driver from environment or default."""
+    """Get Neo4j driver from environment (NEO4J_PASSWORD required)."""
     uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "password")
+    password = os.getenv("NEO4J_PASSWORD")
+    if not password:
+        raise ValueError("NEO4J_PASSWORD environment variable not set")
     return GraphDatabase.driver(uri, auth=(user, password))
 
 

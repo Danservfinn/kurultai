@@ -1,0 +1,15 @@
+{
+  "id": "ckpt-test-deb-20260308153449",
+  "task_id": "test-debug-789",
+  "agent": "temujin",
+  "created_at": "2026-03-08T15:34:49.413736",
+  "expires_at": "2026-03-09T15:34:49.413736",
+  "stage": "execution",
+  "state": {
+    "stage": "testing",
+    "output_so_far": "This is test output",
+    "timestamp": "2026-03-08T15:34:49.413523"
+  },
+  "size_bytes": 103,
+  "checksum": "72b7df089c3a318f"
+}

@@ -1,0 +1,29 @@
+{
+  "original_task": "8a7b3c2d-1e4f-5a6b-7c8d-9e0f1a2b3c4d",
+  "completion_percentage": 70,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written",
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "chagatai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    },
+    {
+      "title": "Insufficient execution output",
+      "agent": "chagatai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T14:27:37.061902",
+  "audit_version": "1.0"
+}

@@ -98,6 +98,7 @@ class AgentCircuitBreaker:
 
     # State file location
     STATE_FILE = LOGS_DIR / "circuit-breaker-state.json"
+    STATE_BACKUP_FILE = LOGS_DIR / "circuit-breaker-state.backup.json"
     LOG_FILE = LOGS_DIR / "circuit-breaker.log"
 
     def __init__(self, state_file: str | Path | None = None):
@@ -374,7 +375,7 @@ class AgentCircuitBreaker:
             self.log(f"Redistribution complete: {moved} tasks moved from {failed_agent}")
 
     def load_state(self) -> dict:
-        """Load circuit state from file."""
+        """Load circuit state from file with backup recovery."""
         default_state = {
             "ts": datetime.now().isoformat(),
             "agents": {},
@@ -382,28 +383,69 @@ class AgentCircuitBreaker:
         }
 
         if not self.STATE_FILE.exists():
+            # Try backup if main doesn't exist
+            if self.STATE_BACKUP_FILE.exists():
+                self.log(f"Main state missing, trying backup", "WARN")
+                try:
+                    with open(self.STATE_BACKUP_FILE, "r") as f:
+                        loaded = json.load(f)
+                        # Restore main file from backup
+                        self.STATE_FILE.write_text(self.STATE_BACKUP_FILE.read_text())
+                        self.log(f"Restored state from backup", "INFO")
+                        return self._validate_state(loaded)
+                except Exception as backup_err:
+                    self.log(f"Backup recovery failed: {backup_err}", "ERROR")
             return default_state
 
         try:
             with open(self.STATE_FILE, "r") as f:
                 loaded = json.load(f)
-                # Ensure structure is valid
-                if "agents" not in loaded:
-                    loaded["agents"] = {}
-                if "redistributions" not in loaded:
-                    loaded["redistributions"] = []
-                return loaded
-        except Exception as e:
-            self.log(f"Error loading state: {e}", "ERROR")
+                return self._validate_state(loaded)
+        except (json.JSONDecodeError, Exception) as e:
+            self.log(f"Error loading state (corrupted?): {e}", "ERROR")
+            # Try to recover from backup
+            if self.STATE_BACKUP_FILE.exists():
+                try:
+                    with open(self.STATE_BACKUP_FILE, "r") as f:
+                        loaded = json.load(f)
+                        # Restore main file from backup
+                        self.STATE_FILE.write_text(self.STATE_BACKUP_FILE.read_text())
+                        self.log(f"Recovered state from backup after corruption", "INFO")
+                        return self._validate_state(loaded)
+                except Exception as backup_err:
+                    self.log(f"Backup recovery also failed: {backup_err}", "ERROR")
             return default_state
 
+    def _validate_state(self, state: dict) -> dict:
+        """Ensure state structure is valid."""
+        if "agents" not in state:
+            state["agents"] = {}
+        if "redistributions" not in state:
+            state["redistributions"] = []
+        return state
+
     def save_state(self):
-        """Save circuit state to file."""
+        """Save circuit state to file using atomic write with backup."""
         try:
             self.STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
             self.state["ts"] = datetime.now().isoformat()
-            with open(self.STATE_FILE, "w") as f:
+
+            # Create backup of existing state before overwriting
+            if self.STATE_FILE.exists():
+                try:
+                    import shutil
+                    shutil.copy2(self.STATE_FILE, self.STATE_BACKUP_FILE)
+                except Exception as backup_err:
+                    self.log(f"Warning: backup creation failed: {backup_err}", "WARN")
+
+            # Atomic write: write to temp file, then rename
+            temp_file = self.STATE_FILE.with_suffix('.tmp.json')
+            with open(temp_file, "w") as f:
                 json.dump(self.state, f, indent=2)
+
+            # Atomic rename (overwrites target)
+            temp_file.replace(self.STATE_FILE)
+
         except Exception as e:
             self.log(f"Error saving state: {e}", "ERROR")
 

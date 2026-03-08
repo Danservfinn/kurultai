@@ -24,9 +24,147 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+# Optional: psutil for checking if PID is alive
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+
 # Add scripts directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR
+
+# File-based locking constants
+LOCK_DIR = Path.home() / ".openclaw" / "agents" / "main" / "locks"
+RESOLVER_PID_FILE = LOCK_DIR / "gate-resolver.pid"
+LOCK_TIMEOUT_SECONDS = 300  # 5 minutes max lock age
+
+# Platform-specific O_EXCL constant
+try:
+    O_OEXCL = os.O_EXCL
+except AttributeError:
+    O_OEXCL = 0  # Fallback for platforms without O_EXCL
+
+
+def _acquire_resolver_lock() -> Tuple[bool, Optional[int], str]:
+    """
+    Acquire exclusive resolver lock to prevent concurrent runs.
+
+    Returns:
+        (success, lock_fd, message)
+    """
+    LOCK_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Check for stale lock
+    if RESOLVER_PID_FILE.exists():
+        try:
+            lock_age = datetime.now().timestamp() - RESOLVER_PID_FILE.stat().st_mtime
+            pid_content = RESOLVER_PID_FILE.read_text().strip()
+
+            # Parse PID from lock file
+            try:
+                lock_pid = int(pid_content.split('\n')[0])
+            except (ValueError, IndexError):
+                lock_pid = None
+
+            # Check if lock is stale (too old OR process dead)
+            is_stale = lock_age > LOCK_TIMEOUT_SECONDS
+            is_dead = False
+
+            if PSUTIL_AVAILABLE and lock_pid:
+                # Use psutil to check if process is alive
+                if psutil.pid_exists(lock_pid):
+                    try:
+                        proc = psutil.Process(lock_pid)
+                        # Check if it's actually our resolver process
+                        if 'completion-gate-resolver' not in ' '.join(proc.cmdline()):
+                            is_dead = True  # PID reused by different process
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        is_dead = True
+                else:
+                    is_dead = True  # PID doesn't exist
+            elif lock_pid:
+                # No psutil - use kill(0) to check if process exists
+                try:
+                    os.kill(lock_pid, 0)  # Signal 0 = check if process exists
+                    # Process exists - we can't verify it's our resolver without psutil
+                except OSError:
+                    is_dead = True  # PID doesn't exist
+
+            if is_stale or is_dead:
+                print(f"[LOCK] Cleaning up stale lock (age={lock_age:.0f}s, dead={is_dead})")
+                RESOLVER_PID_FILE.unlink(missing_ok=True)
+            else:
+                return False, None, f"Lock held by PID {lock_pid}"
+        except Exception as e:
+            print(f"[LOCK] Error checking lock: {e}, proceeding anyway")
+            RESOLVER_PID_FILE.unlink(missing_ok=True)
+
+    # Try to create lock file atomically
+    try:
+        lock_fd = os.open(str(RESOLVER_PID_FILE), os.O_CREAT | O_OEXCL | os.O_WRONLY)
+        # Write our PID
+        os.write(lock_fd, f"{os.getpid()}\n{datetime.now().isoformat()}\n".encode())
+        return True, lock_fd, "Lock acquired"
+    except FileExistsError:
+        return False, None, "Lock acquired by another process (race)"
+    except Exception as e:
+        return False, None, f"Lock error: {e}"
+
+
+def _release_resolver_lock(lock_fd: Optional[int]):
+    """Release resolver lock."""
+    if lock_fd is not None:
+        try:
+            os.close(lock_fd)
+        except Exception:
+            pass
+    RESOLVER_PID_FILE.unlink(missing_ok=True)
+
+
+def _atomic_rename_with_lock(source_path: Path, target_path: Path) -> Tuple[bool, str]:
+    """
+    Atomic rename with per-gate lock to prevent race conditions.
+
+    Returns:
+        (success, message)
+    """
+    if not source_path.exists():
+        return False, "source_not_found"
+
+    # Create per-gate lock
+    stem = source_path.name.replace('.pending-gate.md', '').replace('.md', '')
+    lock_path = LOCK_DIR / f"{stem}.gate-lock"
+
+    lock_fd = None
+    try:
+        lock_fd = os.open(str(lock_path), os.O_CREAT | O_OEXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False, "concurrent_operation"
+    except Exception as e:
+        return False, f"lock_error: {e}"
+
+    try:
+        # Recheck source after lock
+        if not source_path.exists():
+            return False, "source_gone_after_lock"
+
+        # Check target doesn't exist
+        if target_path.exists():
+            return False, "target_already_exists"
+
+        # Atomic rename
+        source_path.rename(target_path)
+        return True, "ok"
+    finally:
+        if lock_fd is not None:
+            try:
+                os.close(lock_fd)
+            except Exception:
+                pass
+        lock_path.unlink(missing_ok=True)
+
 
 # Import shared gate utilities (prevents code duplication)
 from gate_utils import (
@@ -102,6 +240,11 @@ class GateResolver:
 
                 if not task_id:
                     print(f"[WARN] Could not extract task ID from {gate_task}")
+                    continue
+
+                # IDEMPOTENCY CHECK: Verify gate is still in waiting state
+                if self._is_gate_already_resolved(task_id):
+                    print(f"[GATE_RESOLVER] Gate already resolved (idempotent skip): {task_id}")
                     continue
 
                 print(f"[GATE_RESOLVER] Checking gate: {task_id}")
@@ -259,6 +402,36 @@ class GateResolver:
 
         return False
 
+    def _is_gate_already_resolved(self, task_id: str) -> bool:
+        """
+        Check if gate is already resolved (idempotency check).
+
+        Checks Neo4j first, falls back to filesystem check.
+
+        Returns:
+            True if gate is already passed, blocked, or bypassed (skip processing)
+        """
+        # Neo4j check if repository available
+        if self._gate_repo is not None:
+            try:
+                # Query current gate status from Neo4j
+                gate_status = self._gate_repo.get_gate_status(task_id)
+                # These states mean gate is resolved - skip processing
+                if gate_status in (GateState.PASSED, GateState.BLOCKED):
+                    return True
+            except Exception as e:
+                print(f"[DEBUG] Neo4j status check failed: {e}, using filesystem fallback")
+
+        # Filesystem fallback: Check if file extension indicates resolution
+        task_file = find_task_file(task_id, AGENTS_DIR)
+        if task_file:
+            name_lower = task_file.name.lower()
+            # Resolved states: passed, blocked, bypassed (but NOT pending-gate)
+            if any(s in name_lower for s in ['.gate-passed', '.gate-blocked', '.gate-bypassed']):
+                return True
+
+        return False
+
     def re_audit(self, gate_task: Path, task_id: str) -> Optional[dict]:
         """
         Re-run audit on a pending gate.
@@ -292,6 +465,7 @@ class GateResolver:
         Mark gate as passed and rename to .done.md.
 
         This is the FINAL completion that was originally blocked.
+        Uses atomic rename with per-gate lock to prevent race conditions.
         """
         task_id = extract_task_id(gate_task)
 
@@ -302,31 +476,39 @@ class GateResolver:
             print(f"[DRY_RUN] Would rename {gate_task.name} -> {done_file.name}")
             return
 
-        try:
-            gate_task.rename(done_file)
-            print(f"[GATE_RESOLVER] ✓ Gate passed: {task_id} -> {done_file.name}")
+        # Use atomic rename with lock
+        success, message = _atomic_rename_with_lock(gate_task, done_file)
 
-            # Update Neo4j gate status if repository available
-            if self._gate_repo is not None:
-                try:
-                    self._gate_repo.set_gate_status(task_id, GateState.PASSED)
-                    self._gate_repo.invalidate_cache()
-                except Exception as e:
-                    print(f"[WARN] Failed to update Neo4j gate status: {e}")
+        if not success:
+            if message in ("concurrent_operation", "source_not_found", "source_gone_after_lock"):
+                print(f"[GATE_RESOLVER] ⚠ Skip pass_gate for {task_id}: {message}")
+                return
+            print(f"[ERROR] Atomic rename failed for {task_id}: {message}")
+            return
 
-            # Log completion
-            self._log_gate_event({
-                "event": "GATE_PASSED",
-                "task_id": task_id,
-                "timestamp": datetime.now().isoformat(),
-                "file": str(done_file)
-            })
+        print(f"[GATE_RESOLVER] ✓ Gate passed: {task_id} -> {done_file.name}")
 
-        except Exception as e:
-            print(f"[ERROR] Failed to pass gate for {task_id}: {e}")
+        # Update Neo4j gate status if repository available
+        if self._gate_repo is not None:
+            try:
+                self._gate_repo.set_gate_status(task_id, GateState.PASSED)
+                self._gate_repo.invalidate_cache()
+            except Exception as e:
+                print(f"[WARN] Failed to update Neo4j gate status: {e}")
+
+        # Log completion
+        self._log_gate_event({
+            "event": "GATE_PASSED",
+            "task_id": task_id,
+            "timestamp": datetime.now().isoformat(),
+            "file": str(done_file)
+        })
 
     def mark_gate_blocked(self, gate_task: Path, reason: str):
-        """Mark gate as blocked (external blocker requires human action)."""
+        """Mark gate as blocked (external blocker requires human action).
+
+        Uses atomic rename with per-gate lock to prevent race conditions.
+        """
         task_id = extract_task_id(gate_task)
 
         blocked_file = gate_task.with_suffix(".gate-blocked.md")
@@ -335,26 +517,32 @@ class GateResolver:
             print(f"[DRY_RUN] Would mark {gate_task.name} as blocked")
             return
 
-        try:
-            gate_task.rename(blocked_file)
-            print(f"[GATE_RESOLVER] ⚠ Gate blocked: {task_id} - {reason}")
+        # Use atomic rename with lock
+        success, message = _atomic_rename_with_lock(gate_task, blocked_file)
 
-            # Update Neo4j gate status if repository available
-            if self._gate_repo is not None:
-                try:
-                    self._gate_repo.set_gate_status(task_id, GateState.BLOCKED)
-                    self._gate_repo.invalidate_cache()
-                except Exception as e:
-                    print(f"[WARN] Failed to update Neo4j gate status: {e}")
+        if not success:
+            if message in ("concurrent_operation", "source_not_found", "source_gone_after_lock"):
+                print(f"[GATE_RESOLVER] ⚠ Skip mark_gate_blocked for {task_id}: {message}")
+                return
+            print(f"[ERROR] Atomic rename failed for {task_id}: {message}")
+            return
 
-            self._log_gate_event({
-                "event": "GATE_BLOCKED",
-                "task_id": task_id,
-                "reason": reason,
-                "timestamp": datetime.now().isoformat()
-            })
-        except Exception as e:
-            print(f"[ERROR] Failed to block gate for {task_id}: {e}")
+        print(f"[GATE_RESOLVER] ⚠ Gate blocked: {task_id} - {reason}")
+
+        # Update Neo4j gate status if repository available
+        if self._gate_repo is not None:
+            try:
+                self._gate_repo.set_gate_status(task_id, GateState.BLOCKED)
+                self._gate_repo.invalidate_cache()
+            except Exception as e:
+                print(f"[WARN] Failed to update Neo4j gate status: {e}")
+
+        self._log_gate_event({
+            "event": "GATE_BLOCKED",
+            "task_id": task_id,
+            "reason": reason,
+            "timestamp": datetime.now().isoformat()
+        })
 
     def get_gate_metrics(self) -> dict:
         """Return aggregate gate metrics."""
@@ -467,9 +655,18 @@ Examples:
         return 0
 
     elif args.resolve_all:
-        resolved = resolver.resolve_pending_gates()
-        print(f"\n[GATE_RESOLVER] Resolved {resolved} gates")
-        return 0
+        # Acquire process lock to prevent concurrent resolver runs
+        success, lock_fd, message = _acquire_resolver_lock()
+        if not success:
+            print(f"[GATE_RESOLVER] {message}, skipping this cycle")
+            return 0  # Not an error - another instance is running
+
+        try:
+            resolved = resolver.resolve_pending_gates()
+            print(f"\n[GATE_RESOLVER] Resolved {resolved} gates")
+            return 0
+        finally:
+            _release_resolver_lock(lock_fd)
 
     elif args.task:
         # Check specific task

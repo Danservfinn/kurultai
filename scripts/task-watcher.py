@@ -1500,7 +1500,15 @@ def _already_completed(executing_file):
     for done_file in parent.iterdir():
         if not done_file.name.endswith('.done.md'):
             continue
-        done_stem = done_file.name.split('.completed.done.md')[0] if '.completed.done.md' in done_file.name else done_file.name.split('.failed.done.md')[0] if '.failed.done.md' in done_file.name else None
+        # Check for .completed.done.md, .failed.done.md, .dup-orphan.done.md (duplicate recovery)
+        done_stem = None
+        if '.completed.done.md' in done_file.name:
+            done_stem = done_file.name.split('.completed.done.md')[0]
+        elif '.failed.done.md' in done_file.name:
+            done_stem = done_file.name.split('.failed.done.md')[0]
+        elif '.dup-orphan.done.md' in done_file.name:
+            done_stem = done_file.name.split('.dup-orphan.done.md')[0]
+
         if done_stem is None:
             continue
         done_stem_base = re.sub(r'\.retry-\d+', '', done_stem)
@@ -1640,8 +1648,8 @@ def recover_stale_executions():
                 retry_count = len(re.findall(r'\.retry-\d+', f.name))
                 if retry_count >= MAX_RETRY_COUNT:
                     failed_path = f.parent / f.name.replace('.executing', '.failed.done')
-                    try:
-                        os.rename(f, failed_path)
+                    success, action, detail = _safe_rename_if_not_done(f, failed_path, agent)
+                    if success:
                         task_id = _extract_task_id(failed_path)
                         log(f"DEDUP RECOVER: {agent}/{f.name} → failed.done (duplicate executing, max retries)")
                         if task_id:
@@ -1650,26 +1658,29 @@ def recover_stale_executions():
                                 "error": f"Duplicate executing file recovered (age={round(age)}s, retries={retry_count})"})
                             _neo4j_update_status(task_id, "FAILED", agent=agent,
                                 error_msg="Duplicate executing file — double-dispatch race")
-                    except OSError as e:
-                        # Handler won the race — check if task completed successfully
-                        if _already_completed(f):
-                            log(f"DEDUP RACE: {agent}/{f.name} — handler completed during duplicate rename")
-                            continue
-                        log(f"DEDUP ERROR: {agent}/{f.name} — {e}")
-                        continue
+                    elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                        log(f"DEDUP SKIP: {agent}/{f.name} — {detail}")
+                    else:
+                        log(f"DEDUP ERROR: {agent}/{f.name} — {action} - {detail}")
+                    continue
                 else:
                     base_name = f.name.replace('.executing.md', '.md').replace('.executing', '')
                     if not base_name.endswith('.md'):
                         base_name += '.md'
                     retry_name = base_name.replace('.md', f'.retry-{retry_count + 1}.md')
                     original_path = f.parent / retry_name
-                    try:
-                        if original_path.exists():
-                            dup_path = f.parent / f.name.replace('.executing', '.dup-orphan.done')
-                            os.rename(f, dup_path)
+                    if original_path.exists():
+                        dup_path = f.parent / f.name.replace('.executing', '.dup-orphan.done')
+                        success, action, detail = _safe_rename_if_not_done(f, dup_path, agent)
+                        if success:
                             log(f"DEDUP RECOVER: {agent}/{f.name} → dup-orphan.done (retry target exists)")
+                        elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                            log(f"DEDUP SKIP: {agent}/{f.name} — {detail}")
                         else:
-                            os.rename(f, original_path)
+                            log(f"DEDUP ERROR: {agent}/{f.name} — {action} - {detail}")
+                    else:
+                        success, action, detail = _safe_rename_if_not_done(f, original_path, agent)
+                        if success:
                             log(f"DEDUP RECOVER: {agent}/{f.name} → {retry_name} (duplicate executing, retry {retry_count + 1})")
                             task_id = _extract_task_id(original_path)
                             if task_id:
@@ -1677,13 +1688,11 @@ def recover_stale_executions():
                                     "ts": datetime.now().isoformat(), "agent": agent,
                                     "stale_age_s": round(age), "retry": retry_count + 1,
                                     "reason": "duplicate_executing"})
-                    except OSError as e:
-                        # Handler won the race — check if task completed successfully
-                        if _already_completed(f):
-                            log(f"DEDUP RACE: {agent}/{f.name} — handler completed during dup retry rename")
-                            continue
-                        log(f"DEDUP ERROR: {agent}/{f.name} — {e}")
-                        continue
+                        elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                            log(f"DEDUP SKIP: {agent}/{f.name} — {detail}")
+                        else:
+                            log(f"DEDUP ERROR: {agent}/{f.name} — {action} - {detail}")
+                    continue
                 # Clean up PID file if it exists
                 try:
                     if pid_file.exists():
@@ -1759,8 +1768,8 @@ def recover_stale_executions():
 
             if retry_count >= MAX_RETRY_COUNT:
                 failed_path = f.parent / f.name.replace('.executing', '.failed.done')
-                try:
-                    os.rename(f, failed_path)
+                success, action, detail = _safe_rename_if_not_done(f, failed_path, agent)
+                if success:
                     log(f"DEAD_PID RECOVER: {agent}/{f.name} → failed.done (PID dead after {actual_age}, max retries={retry_count})")
                     if task_id:
                         _append_ledger({"task_id": task_id, "event": "FAILED",
@@ -1768,26 +1777,30 @@ def recover_stale_executions():
                             "error": f"Handler PID dead after {actual_age}, max retries exhausted"})
                         _neo4j_update_status(task_id, "FAILED", agent=agent,
                             error_msg=f"Handler PID dead after {actual_age}")
-                except OSError as e:
-                    # Handler won the race — check if task completed successfully
-                    if _already_completed(f):
-                        log(f"DEAD_PID RACE: {agent}/{f.name} — handler completed during failed rename")
-                        continue
-                    log(f"DEAD_PID ERROR: {agent}/{f.name} — {e}")
-                    continue
+                elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                    log(f"DEAD_PID SKIP: {agent}/{f.name} — {detail}")
+                else:
+                    log(f"DEAD_PID ERROR: {agent}/{f.name} — {action} - {detail}")
+                continue
             else:
                 base_name = f.name.replace('.executing.md', '.md').replace('.executing', '')
                 if not base_name.endswith('.md'):
                     base_name += '.md'
                 retry_name = base_name.replace('.md', f'.retry-{retry_count + 1}.md')
                 original_path = f.parent / retry_name
-                try:
-                    if original_path.exists():
-                        dup_path = f.parent / f.name.replace('.executing', '.deadpid-orphan.done')
-                        os.rename(f, dup_path)
+                if original_path.exists():
+                    dup_path = f.parent / f.name.replace('.executing', '.deadpid-orphan.done')
+                    success, action, detail = _safe_rename_if_not_done(f, dup_path, agent)
+                    if success:
                         log(f"DEAD_PID RECOVER: {agent}/{f.name} → deadpid-orphan.done (retry target exists)")
+                    elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                        log(f"DEAD_PID SKIP: {agent}/{f.name} — {detail}")
                     else:
-                        os.rename(f, original_path)
+                        log(f"DEAD_PID ERROR: {agent}/{f.name} — {action} - {detail}")
+                    continue
+                else:
+                    success, action, detail = _safe_rename_if_not_done(f, original_path, agent)
+                    if success:
                         log(f"DEAD_PID RECOVER: {agent}/{f.name} → {retry_name} (PID dead after {actual_age}, retry {retry_count + 1})")
                         if task_id:
                             _append_ledger({"task_id": task_id, "event": "RECOVERED",
@@ -1795,12 +1808,10 @@ def recover_stale_executions():
                                 "stale_age_s": round(age), "retry": retry_count + 1,
                                 "reason": "dead_pid_fast_recovery"})
                             _neo4j_update_status(task_id, "PENDING", agent=agent)
-                except OSError as e:
-                    # Handler won the race — check if task completed successfully
-                    if _already_completed(f):
-                        log(f"DEAD_PID RACE: {agent}/{f.name} — handler completed during retry rename")
-                        continue
-                    log(f"DEAD_PID ERROR: {agent}/{f.name} — {e}")
+                    elif action == "skip" and detail in ("already_completed", "already_completed_locked", "source_gone"):
+                        log(f"DEAD_PID SKIP: {agent}/{f.name} — {detail}")
+                    else:
+                        log(f"DEAD_PID ERROR: {agent}/{f.name} — {action} - {detail}")
                     continue
             # Clean up PID file
             try:

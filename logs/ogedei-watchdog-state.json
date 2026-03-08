@@ -1,41 +1,143 @@
 {
-  "last_audit": 1772988992.8597891,
-  "cycles": 6390,
-  "last_cycle": "2026-03-08T13:09:36.101102",
-  "watcher_restarts": 11,
-  "stalled_warnings": 287,
+  "last_audit": 1772998334.595098,
+  "cycles": 6660,
+  "last_cycle": "2026-03-08T15:59:10.814369",
+  "watcher_restarts": 14,
+  "stalled_warnings": 321,
   "fakes_detected": 12,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 184,
-    "fake_found": 2,
-    "requeued": 0,
-    "skipped": 7,
+    "audited": 159,
+    "fake_found": 1,
+    "requeued": 1,
+    "skipped": 5,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772989776.10115,
+  "last_cycle_epoch": 1772999950.814382,
   "last_issues": [
-    "kublai/high-1772986310.executing.md stalled 3464s",
-    "temujin/high-1772983582.executing.md stalled 6191s",
-    "mongke/high-1772986139.executing.md stalled 3635s",
-    "chagatai/high-1772946600.unverified.executing.md stalled 1050s"
+    "temujin/high-1772988683.executing.md stalled 10125s (escalated)",
+    "mongke/normal-github-data-update-1772974522.executing.md stalled 6229s (escalated)",
+    "chagatai/normal-1772932865.unverified.executing.md stalled 5155s (escalated)",
+    "jochi/high-review-implement-completion-gate-core-scripts-1772979392765.verified.executing.md stalled 8969s (escalated)"
   ],
   "reflection_misses": 0,
-  "last_memory_audit": 1772989015.476128,
+  "last_memory_audit": 1772998347.386375,
   "memory_audit_result": {
-    "total": 1,
+    "total": 11,
     "critical": 0,
-    "warning": 1,
-    "ts": "2026-03-08T12:57:06.610151"
+    "warning": 11,
+    "ts": "2026-03-08T15:32:27.656648"
   },
-  "last_routing_drift_check": 1772989026.815148,
+  "last_routing_drift_check": 1772998347.712183,
   "routing_drift": {
-    "total": 0,
-    "mismatches": 0,
-    "drift_pct": 0.0,
-    "ts": "2026-03-08T12:57:07.454314"
+    "total": 2,
+    "mismatches": 1,
+    "drift_pct": 50.0,
+    "top_examples": [
+      {
+        "task": "FIX: Ogedei model configuration - glm-5 failing",
+        "actual": "temujin",
+        "keyword_would": "ogedei"
+      }
+    ],
+    "ts": "2026-03-08T15:32:27.735326"
   },
-  "memory_fixes": 15,
-  "last_failure_rate_check": 1772883470.03844,
-  "agent_failure_flags": {}
+  "memory_fixes": 49,
+  "last_failure_rate_check": 1772999887.152043,
+  "agent_failure_flags": {},
+  "cycle_start_time": 1772999950.7408051,
+  "last_queue_balance_check": 1772999887.18397,
+  "queue_depths": {
+    "kublai": 2,
+    "temujin": 26,
+    "mongke": 9,
+    "chagatai": 1,
+    "jochi": 6,
+    "ogedei": 15
+  },
+  "last_cascade_check": 1772999694.961013,
+  "cascade_risk": "low",
+  "cascade_metrics": {
+    "events_analyzed": 1,
+    "patterns_detected": 0,
+    "agents_failing": 1,
+    "failures_by_agent": {
+      "kublai": 1
+    },
+    "lookback_minutes": 30
+  },
+  "last_quality_gate_check": 1772999918.911798,
+  "quality_gate_checked": 5,
+  "quality_gate_failed": 0,
+  "quality_gate_retried": 0,
+  "quality_gate_escalated": 0,
+  "last_self_healing_score_check": 1772996515.15454,
+  "self_healing_score": 100.0,
+  "self_healing_metrics": {
+    "auto_resolved": 11,
+    "escalated": 0,
+    "manual": 0,
+    "total": 11
+  },
+  "circuit_half_open_agents": [
+    "ogedei",
+    "jochi"
+  ],
+  "circuit_report": {
+    "ts": "2026-03-08T15:59:10.813616",
+    "agents": {
+      "mongke": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "ogedei": {
+        "state": "HALF_OPEN",
+        "available": true,
+        "reason": "probation",
+        "detail": "Testing recovery, 0 trial(s)"
+      },
+      "tolui": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "chagatai": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "temujin": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "jochi": {
+        "state": "HALF_OPEN",
+        "available": true,
+        "reason": "probation",
+        "detail": "Testing recovery, 0 trial(s)"
+      }
+    },
+    "summary": {
+      "closed": 4,
+      "open": 0,
+      "half_open": 2
+    }
+  },
+  "circuit_summary": {
+    "closed": 4,
+    "open": 0,
+    "half_open": 2
+  },
+  "recent_redistributions": 0,
+  "last_cycle_duration": 0.073516845703125,
+  "state_file_size": 3672,
+  "tasks_recovered": 22,
+  "slow_cycles": 1,
+  "queue_balance_moves": 40
 }

@@ -15,6 +15,7 @@ Usage:
 import os
 import re
 import sys
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional
@@ -32,6 +33,33 @@ try:
 except ImportError:
     def append_ledger(entry):
         pass
+
+# Track consecutive Neo4j failures for alerting
+_neo4j_failure_count = 0
+_NEO4J_FAILURE_THRESHOLD = 3  # Alert after this many consecutive failures
+
+
+def _handle_neo4j_failure(operation: str, error: Exception):
+    """Track and potentially alert on Neo4j failures."""
+    global _neo4j_failure_count
+    _neo4j_failure_count += 1
+
+    # Log the failure
+    print(f"[gate_resolver] Neo4j {operation} failed (attempt {_neo4j_failure_count}): {error}")
+
+    # Alert if threshold reached
+    if _neo4j_failure_count == _NEO4J_FAILURE_THRESHOLD:
+        print(f"[gate_resolver] ⚠️ ALERT: Neo4j has failed {_neo4j_failure_count} consecutive times")
+        print("[gate_resolver] Operating in degraded mode - using filesystem only")
+
+    return _neo4j_failure_count >= _NEO4J_FAILURE_THRESHOLD
+
+
+def _handle_neo4j_success():
+    """Reset failure counter on successful Neo4j operation."""
+    global _neo4j_failure_count
+    if _neo4j_failure_count > 0:
+        _neo4j_failure_count = 0
 
 # Gate file suffixes
 SUFFIX_PENDING_GATE = ".pending-gate.md"
@@ -184,8 +212,9 @@ class GateResolver:
                 tracker = get_tracker()
                 task_id = extract_yaml_frontmatter(blocked_file.read_text()).get('task_id', '')
                 tracker.update_gate_status(task_id, "BLOCKED")
-            except Exception:
-                pass
+                _handle_neo4j_success()
+            except Exception as e:
+                _handle_neo4j_failure("update_gate_status(BLOCKED)", e)
 
             append_ledger({
                 "event": "GATE_BLOCKED",
@@ -196,7 +225,7 @@ class GateResolver:
 
             print(f"⚠ Gate blocked: {gate_task.name} - {reason}")
 
-        except Exception as e:
+        except (OSError, IOError) as e:
             self.errors.append(f"Failed to block {gate_task}: {e}")
 
     def pass_gate(self, gate_task: Path):
@@ -220,8 +249,9 @@ class GateResolver:
                 tracker = get_tracker()
                 tracker.update_gate_status(task_id, "PASSED")
                 tracker.update_status(task_id, "COMPLETED")
-            except Exception:
-                pass
+                _handle_neo4j_success()
+            except Exception as e:
+                _handle_neo4j_failure("update_gate_status(PASSED)", e)
 
             # Log completion
             append_ledger({
@@ -232,7 +262,7 @@ class GateResolver:
 
             print(f"✓ Gate passed: {task_id} → {passed_file.name}")
 
-        except Exception as e:
+        except (OSError, IOError) as e:
             self.errors.append(f"Failed to pass gate {gate_task}: {e}")
 
     def bypass_gate(self, task_id: str, reason: str = "Manual bypass") -> bool:
@@ -266,8 +296,9 @@ class GateResolver:
                             tracker = get_tracker()
                             tracker.update_gate_status(task_id, "BYPASSED")
                             tracker.update_status(task_id, "COMPLETED")
-                        except Exception:
-                            pass
+                            _handle_neo4j_success()
+                        except Exception as e:
+                            _handle_neo4j_failure("update_gate_status(BYPASSED)", e)
 
                         # Log
                         append_ledger({
@@ -280,7 +311,7 @@ class GateResolver:
                         print(f"⚠ Gate bypassed: {task_id}")
                         return True
 
-                except Exception as e:
+                except (OSError, IOError, json.JSONDecodeError) as e:
                     self.errors.append(f"Error checking {gate_file}: {e}")
 
         print(f"✗ Gate not found: {task_id}")

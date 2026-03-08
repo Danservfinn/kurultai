@@ -1,11 +1,14 @@
-TICK 2026-03-08 00:58:47
-GATEWAY: up pid=7142,14333,14445,16259,16405 http=200 latency=15ms uptime=54m
-PROCESS: cpu=6.2% mem=0.5% rss=74MB threads=20
-ERRORS:  last5m=16 last1h=125 fatal=0
+TICK 2026-03-08 15:57:18
+GATEWAY: up pid=1381,2726,42609,42616,42617 http=200 latency=2ms uptime=1h56m instances=0
+PROCESS: cpu=0.0% mem=0.0% rss=6MB threads=2
+ERRORS:  last5m=4 last1h=35 fatal=0
 SERVICES: neo4j=up redis=up
-TASKS:   pending=11 dispatched=0 spawn=0 queues=[temujin=2,jochi=4,ogedei=5]
-AUDIT:   verified=0 fake=0 requeued=0
-TRENDS:  uptime_1h=100.0% avg_cpu=0.9% err_avg_5m=10.6 err_direction=rising restarts_1h=0
-DECISION: degraded
-ACTION:   warn
-REASON:   rising errors early warning: 125 in 1h (trend: rising)
+TASKS:   pending=124 dispatched=0 spawn=0 queues=[temujin=56,mongke=19,chagatai=11,jochi=13,ogedei=24,main=1]
+AUDIT:   verified=1 fake=0 requeued=0 llm_decision=IGNORE llm_confidence=90%
+VOTES:   synced=2 errors=6
+SUBPROC: executing=4 alive=4 dead=0 stale=0 zombies=2 orphaned=0 anomalies=2
+ROUTING: balance_idx=0.743 missed=0 accuracy=87% p95=420s routed=0
+TRENDS:  uptime_1h=100.0% avg_cpu=0.0% err_avg_5m=4.4 err_direction=falling restarts_1h=0
+DECISION: healthy
+ACTION:   none
+REASON:   all checks passed

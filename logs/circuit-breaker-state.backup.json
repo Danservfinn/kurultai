@@ -1,0 +1,176 @@
+{
+  "ts": "2026-03-08T15:58:22.989696",
+  "agents": {
+    "chagatai": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 3,
+      "last_failure_rate": 0.0
+    },
+    "mongke": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 6,
+      "last_failure_rate": 0.0
+    },
+    "tolui": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 1,
+      "last_failure_rate": 0.0
+    },
+    "jochi": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 7,
+      "last_failure_rate": 0.8
+    },
+    "ogedei": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 4,
+      "last_failure_rate": 0.8333333333333334
+    },
+    "temujin": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 19,
+      "last_failure_rate": 0.0
+    },
+    "kublai": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 2,
+      "last_failure_rate": 0.0
+    }
+  },
+  "redistributions": [
+    {
+      "from": "jochi",
+      "to": "temujin",
+      "task": "completion-gate-documentation-1772980125.verified.md",
+      "ts": "2026-03-08T13:14:24.104807"
+    },
+    {
+      "from": "jochi",
+      "to": "mongke",
+      "task": "high-1772932087.unverified.unverified.md",
+      "ts": "2026-03-08T13:14:24.141855"
+    },
+    {
+      "from": "jochi",
+      "to": "chagatai",
+      "task": "high-1772949587.unverified.md",
+      "ts": "2026-03-08T13:14:24.149445"
+    },
+    {
+      "from": "jochi",
+      "to": "ogedei",
+      "task": "high-1772962334.no_output.md",
+      "ts": "2026-03-08T13:14:24.163037"
+    },
+    {
+      "from": "jochi",
+      "to": "tolui",
+      "task": "high-1772962464.no_output.md",
+      "ts": "2026-03-08T13:14:24.166504"
+    },
+    {
+      "from": "jochi",
+      "to": "temujin",
+      "task": "high-1772962505.no_output.md",
+      "ts": "2026-03-08T13:14:24.183794"
+    },
+    {
+      "from": "jochi",
+      "to": "mongke",
+      "task": "high-1772962552.no_output.md",
+      "ts": "2026-03-08T13:14:24.236980"
+    },
+    {
+      "from": "jochi",
+      "to": "chagatai",
+      "task": "high-1772976019.verified.md",
+      "ts": "2026-03-08T13:14:24.323312"
+    },
+    {
+      "from": "jochi",
+      "to": "ogedei",
+      "task": "high-1772984633.md",
+      "ts": "2026-03-08T13:14:24.331251"
+    },
+    {
+      "from": "jochi",
+      "to": "tolui",
+      "task": "high-1772986451.md",
+      "ts": "2026-03-08T13:14:24.395733"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "kublai-learning-cron-1772992004.verified.md",
+      "ts": "2026-03-08T13:16:25.266028"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "kublai-learning-generator-1772992001.verified.md",
+      "ts": "2026-03-08T13:16:25.279094"
+    },
+    {
+      "from": "ogedei",
+      "to": "chagatai",
+      "task": "mongke-delegate-routing-cron.verified.md",
+      "ts": "2026-03-08T13:16:25.309485"
+    },
+    {
+      "from": "ogedei",
+      "to": "tolui",
+      "task": "normal-1772943946.unverified.md",
+      "ts": "2026-03-08T13:16:25.369811"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "normal-1772946631.verified.unverified.md",
+      "ts": "2026-03-08T13:16:25.387674"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "normal-1772950273.no_output.md",
+      "ts": "2026-03-08T13:16:25.398691"
+    },
+    {
+      "from": "ogedei",
+      "to": "chagatai",
+      "task": "normal-1772950631.no_output.md",
+      "ts": "2026-03-08T13:16:25.573616"
+    },
+    {
+      "from": "ogedei",
+      "to": "tolui",
+      "task": "normal-1772950686.no_output.md",
+      "ts": "2026-03-08T13:16:25.580015"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "normal-1772976909.no_output.md",
+      "ts": "2026-03-08T13:16:25.595591"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "normal-1772987707.md",
+      "ts": "2026-03-08T13:16:25.687466"
+    }
+  ]
+}

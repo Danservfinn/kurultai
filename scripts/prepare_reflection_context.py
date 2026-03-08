@@ -749,9 +749,14 @@ def generate_context(agent, hours=1):
         for i, rule in enumerate(active_rules, 1):
             lines.append(f"{i}. {rule}")
         lines.append("")
-        lines.append(
-            "At the end of this reflection, you MUST evaluate whether you followed each rule above."
-        )
+        # Add explicit evaluation template to improve compliance
+        lines.append("## RULE COMPLIANCE (fill this out at the end)")
+        lines.append("Copy each rule below and mark YES or NO:")
+        for i, rule in enumerate(active_rules, 1):
+            # Shorten rule for template (first 60 chars)
+            short_rule = rule[:57] + "..." if len(rule) > 60 else rule
+            lines.append(f"- [ ] Rule {i}: {short_rule} — **YES** or **NO** (reason)")
+        lines.append("")
     else:
         lines.append("(No active rules yet. You will create your first one below.)")
     lines.append("")

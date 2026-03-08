@@ -201,16 +201,45 @@ def is_fake(result_path, done_path=None):
 def original_name(done_filename):
     """Strip .done suffixes to get original pending filename."""
     name = done_filename
-    # Standard suffixes from agent-task-handler
-    for suf in [".completed.done.md", ".in_progress.done.md", ".failed.done.md",
-                ".verified.done.md", ".unverified.done.md"]:
-        if name.endswith(suf):
-            return name[:-len(suf)] + ".md"
-    # Non-standard suffixes created by LLM agents during cleanup/reflection
-    m = re.match(r'^(.+)\.(stale-cleared|orphan-failed|stale)\.done\.md$', name)
-    if m:
-        return m.group(1) + ".md"
-    # .obsolete.done and .resolved.done are intentional closures — not re-queueable
+
+    # Step 1: Remove -DISPATCHED-TO-ACP prefix (ACP dispatch marker)
+    if name.endswith("-DISPATCHED-TO-ACP.done.md"):
+        name = name[:-len("-DISPATCHED-TO-ACP.done.md")] + ".md"
+        return name
+
+    # Step 2: Must end with .done.md to be a done file
+    if not name.endswith(".done.md"):
+        return None
+
+    # Step 3: Strip .done.md first
+    base = name[:-len(".done.md")]
+
+    # Step 4: Iteratively strip status suffixes (e.g., .completed, .no_output, .verified)
+    # until we reach the core filename (priority-timestamp)
+    status_suffixes = [
+        "completed", "in_progress", "failed", "verified", "unverified",
+        "no_output", "stale-cleared", "orphan-failed", "stale", "obsolete",
+        "resolved", "domain-rejected", "config-verified", "retry-1", "retry-2"
+    ]
+
+    changed = True
+    while changed:
+        changed = False
+        for suf in status_suffixes:
+            if base.endswith("." + suf):
+                base = base[:-len("." + suf)]
+                changed = True
+                break
+
+    # Step 5: If we're left with just priority-timestamp, add .md back
+    if re.match(r'^(high|normal|low|critical)-\d+$', base):
+        return base + ".md"
+
+    # Step 6: Check for named task files (e.g., "mongke-delegate-comm-docs")
+    if re.match(r'^[a-z][a-z0-9_-]+$', base):
+        return base + ".md"
+
+    # If we can't extract a clean name, return None (not re-queueable)
     return None
 
 

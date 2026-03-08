@@ -93,13 +93,29 @@ def find_latest_reflection(agent: str) -> Path | None:
 def extract_rule_compliance(content: str) -> list[dict]:
     """Extract rule compliance YES/NO from reflection output.
 
-    Handles two formats:
+    Handles four formats:
     1. Table format: | WHEN x THEN y | **YES** — reason |
-    2. List format:  - WHEN x THEN y — **NO** reason
+    2. Checkbox format: - [ ] Rule N: WHEN x THEN y — **YES** or **NO**
+    3. List format:  - WHEN x THEN y — **NO** reason
+    4. Inline pattern: WHEN x THEN y — **YES**
     """
     results = []
 
-    # Pattern 1: Markdown table rows with rule text and YES/NO
+    # Pattern 1: Checkbox format (NEW - matches template added in prepare_reflection_context.py)
+    # e.g., "- [ ] Rule 1: WHEN task fails THEN escalate — **YES** or **NO**"
+    # Uses exact match for duplicate detection since format is structured
+    checkbox_pattern = re.compile(
+        r"^[-*]\s*\[[ xX]\]\s*Rule\s+\d+:\s*(.+?WHEN\b.+?THEN\b.+?)\s*[\u2014—-]+\s*\*{0,2}(YES|NO)\*{0,2}\b",
+        re.IGNORECASE | re.MULTILINE,
+    )
+    for m in checkbox_pattern.finditer(content):
+        rule_text = m.group(1).strip()
+        followed = m.group(2).upper() == "YES"
+        # Use exact match for structured format (less false positives than fuzzy)
+        if not any(_is_exact_match(rule_text, r["rule_snippet"]) for r in results):
+            results.append({"rule_snippet": rule_text, "followed": followed})
+
+    # Pattern 2: Markdown table rows with rule text and YES/NO
     # e.g., "| WHEN research task assigned THEN validate... | **NO** — not enforced |"
     table_pattern = re.compile(
         r"\|\s*(.+?WHEN\b.+?THEN\b.+?)\s*\|\s*\*{0,2}(YES|NO)\*{0,2}\b",
@@ -108,9 +124,10 @@ def extract_rule_compliance(content: str) -> list[dict]:
     for m in table_pattern.finditer(content):
         rule_text = m.group(1).strip().rstrip("|").strip()
         followed = m.group(2).upper() == "YES"
-        results.append({"rule_snippet": rule_text, "followed": followed})
+        if not any(_fuzzy_match(rule_text, r["rule_snippet"]) for r in results):
+            results.append({"rule_snippet": rule_text, "followed": followed})
 
-    # Pattern 2: List items with rule and YES/NO
+    # Pattern 3: List items with rule and YES/NO
     # e.g., "- Rule R1: WHEN x THEN y — YES, followed consistently"
     # e.g., "1. WHEN x THEN y — **NO** (reason)"
     list_pattern = re.compile(
@@ -120,11 +137,11 @@ def extract_rule_compliance(content: str) -> list[dict]:
     for m in list_pattern.finditer(content):
         rule_text = m.group(1).strip()
         followed = m.group(2).upper() == "YES"
-        # Avoid duplicates from table parse
+        # Avoid duplicates
         if not any(_fuzzy_match(rule_text, r["rule_snippet"]) for r in results):
             results.append({"rule_snippet": rule_text, "followed": followed})
 
-    # Pattern 3: Section-based (## 5. PREVIOUS RULES COMPLIANCE) with inline YES/NO
+    # Pattern 4: Section-based (## 5. PREVIOUS RULES COMPLIANCE) with inline YES/NO
     # Catch any remaining WHEN...THEN with YES/NO on the same line
     inline_pattern = re.compile(
         r"(WHEN\b.+?THEN\b[^|]*?)\s*\|\s*\*{0,2}(YES|NO)\*{0,2}\b",
@@ -143,6 +160,7 @@ def _fuzzy_match(snippet: str, registry_text: str) -> bool:
     """Check if a snippet from a reflection matches a registry rule text.
 
     Uses normalized word overlap since reflections may abbreviate rules.
+    Requires 70% overlap with stricter common-word filtering.
     """
     def normalize(s):
         return set(re.sub(r"[^a-z0-9\s]", "", s.lower()).split())
@@ -153,7 +171,36 @@ def _fuzzy_match(snippet: str, registry_text: str) -> bool:
         return False
     overlap = len(words_a & words_b)
     smaller = min(len(words_a), len(words_b))
-    return overlap / smaller >= 0.5
+
+    # Require 70% overlap for duplicate detection (stricter than original 50%)
+    if overlap / smaller < 0.7:
+        return False
+
+    # Expanded common words to prevent generic verb matches
+    common_words = {
+        "when", "then", "instead", "of", "and", "or", "to", "the", "a", "an",
+        "fails", "failed", "check", "task", "agent", "use", "using", "not",
+        "for", "with", "from", "into", "by", "on", "in", "at", "is", "are"
+    }
+    unique_a = words_a - common_words
+    unique_b = words_b - common_words
+
+    # Require unique keyword overlap unless one rule has no unique words
+    if unique_a and unique_b and not (unique_a & unique_b):
+        return False
+
+    return True
+
+
+def _is_exact_match(snippet: str, registry_text: str) -> bool:
+    """Check if two rule texts are exact matches after normalization.
+
+    Used for structured formats like checkbox where fuzzy match is too aggressive.
+    """
+    def normalize(s):
+        return re.sub(r"[^a-z0-9\s]", "", s.lower()).strip()
+
+    return normalize(snippet) == normalize(registry_text)
 
 
 def match_to_registry(agent: str, compliance: list[dict]) -> list[dict]:

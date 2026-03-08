@@ -27,6 +27,14 @@ from json_state import locked_json_update
 from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER, CLAUDE_AGENT as _CLAUDE_AGENT
 from kurultai_ledger import append_ledger as _kp_append_ledger
 
+# Prompt optimization integration
+try:
+    from prompt_optimizer import enhance_task_prompt, load_optimizer_config
+    PROMPT_OPTIMIZER_AVAILABLE = True
+except ImportError as e:
+    print(f"[prompt_optimizer] Not available: {e}")
+    PROMPT_OPTIMIZER_AVAILABLE = False
+
 # Circuit breaker for agent health tracking
 try:
     from circuit_breaker import AgentCircuitBreaker
@@ -76,7 +84,7 @@ HAIKU_TIMEOUT = 120  # Max seconds for /task-complete haiku notification (increa
 
 # Proxy health check configuration
 PROXY_HEALTH_CHECK_TIMEOUT = 5  # seconds
-PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
+PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
 
 
 def check_proxy_health(proxy_url: str) -> bool:
@@ -344,6 +352,9 @@ SLOW_SKILL_STALL_ELAPSED = 1200   # don't check until 20 min for horde skills
 # High priority tasks also get relaxed thresholds (complex tasks need more time)
 HIGH_PRIORITY_STALL_SILENCE = 1200
 HIGH_PRIORITY_STALL_ELAPSED = 1200
+# Proxy endpoints (like z.ai) can have longer response times for complex reasoning
+PROXY_STALL_SILENCE = 2400   # 40 min silence allowed when using proxy (z.ai, openrouter, etc.)
+PROXY_STALL_ELAPSED = 1800   # don't check until 30 min when using proxy
 
 
 def _spawn_haiku_completion(agent_name):
@@ -362,7 +373,7 @@ def _spawn_haiku_completion(agent_name):
             with open(log_file, 'a') as log_f:
                 log_f.write(f"[{datetime.now().isoformat()}] Spawning /task-complete for {agent_name}\n")
                 proc = subprocess.Popen(
-                    [CLAUDE_AGENT, "--model", "kimi-k2.5", "/task-complete"],
+                    [CLAUDE_AGENT, "--model", "glm-5", "/task-complete"],
                     stdout=log_f, stderr=log_f,
                     close_fds=True,
                     env=env_haiku,
@@ -517,6 +528,45 @@ def _cleanup_pid_file(executing_file):
 O_OEXCL = os.O_EXCL if hasattr(os, 'O_EXCL') else 0x800
 
 
+def _already_completed(source_path):
+    """Check if a .completed.done.md or .failed.done.md already exists for this task.
+
+    This prevents the rename race condition where recover_stale_executions() tries to
+    recover a task that mark_task_completed() already finished. Returns True if
+    the task is already done and the .executing.md file should just be cleaned up.
+
+    This matches the logic in task-watcher.py to ensure both sides of the race
+    use the same completion detection.
+    """
+    import re
+    from pathlib import Path
+
+    source_path = Path(source_path)
+    stem = source_path.name.replace('.executing.md', '').replace('.executing', '')
+    # Strip retry suffixes to get the base stem
+    stem_base = re.sub(r'\.retry-\d+', '', stem)
+    parent = source_path.parent
+
+    for done_file in parent.iterdir():
+        if not done_file.name.endswith('.done.md'):
+            continue
+        # Check for .completed.done.md, .failed.done.md, .dup-orphan.done.md (duplicate recovery)
+        done_stem = None
+        if '.completed.done.md' in done_file.name:
+            done_stem = done_file.name.split('.completed.done.md')[0]
+        elif '.failed.done.md' in done_file.name:
+            done_stem = done_file.name.split('.failed.done.md')[0]
+        elif '.dup-orphan.done.md' in done_file.name:
+            done_stem = done_file.name.split('.dup-orphan.done.md')[0]
+
+        if done_stem is None:
+            continue
+        done_stem_base = re.sub(r'\.retry-\d+', '', done_stem)
+        if done_stem_base == stem_base:
+            return True
+    return False
+
+
 def _safe_rename_with_lock(source_path, target_path, agent="unknown"):
     """Atomic rename with file lock to prevent race conditions.
 
@@ -528,10 +578,22 @@ def _safe_rename_with_lock(source_path, target_path, agent="unknown"):
     Uses exclusive file lock per-task-stem to ensure only one process
     handles the rename at a time.
 
+    CRITICAL FIX: Also checks _already_completed() to handle the case where
+    the task was completed via a different retry file path. This prevents
+    queue metric inflation from VERIFY FAIL on legitimately completed tasks.
+
     Returns (success: bool, action: str, error: str)
     """
     if not os.path.exists(source_path):
         return False, "skip", "source_not_found"
+
+    # CRITICAL: Check if task is already completed via ANY path
+    # This prevents the race where recovery moved the file to a retry path,
+    # handler completed it there, but then recovery tries to "recover" the
+    # original .executing.md without realizing it's already done.
+    if _already_completed(source_path):
+        print(f"[SAFE_RENAME] Task already completed: {os.path.basename(source_path)}")
+        return False, "skip", "already_completed"
 
     # Extract task stem for lock file naming
     source_name = os.path.basename(source_path)
@@ -550,6 +612,11 @@ def _safe_rename_with_lock(source_path, target_path, agent="unknown"):
         return False, "skip", "concurrent_operation"
 
     try:
+        # CRITICAL: RECHECK completion after acquiring lock (TOCTOU guard)
+        if _already_completed(source_path):
+            print(f"[SAFE_RENAME] Task already completed (locked): {os.path.basename(source_path)}")
+            return False, "skip", "already_completed_locked"
+
         # RECHECK: source still exists after acquiring lock
         if not os.path.exists(source_path):
             return False, "skip", "source_gone_during_lock_wait"
@@ -1304,8 +1371,28 @@ def _validate_session_model(agent_name: str, expected_model: str) -> tuple[bool,
             # Known non-Claude models that indicate drift
             known_drift_patterns = ['glm-5', 'kimi', 'qwen', 'bailian', 'dashscope', 'minimax', 'zai-coding']
             if any(pattern in norm_session for pattern in known_drift_patterns):
-                reason = f"Session model drift: session using '{session_model}' but config expects '{expected_model}'"
-                return False, session_model, reason
+                # AUTO-CLEANUP: Archive stale session instead of rejecting
+                # This allows fresh session to start with correct model
+                try:
+                    archive_path = str(latest_session) + f".drift-{int(time.time())}"
+                    os.rename(str(latest_session), archive_path)
+                    reason = f"Auto-archived stale session (was using '{session_model}', config expects '{expected_model}'). Fresh session will start."
+                    print(f"  🧹 AUTO-CLEANUP: {reason}")
+                    print(f"  📦 Archived to: {archive_path}")
+                    # Log to ledger for observability
+                    _append_ledger({
+                        "event": "SESSION_AUTO_CLEANUP",
+                        "ts": datetime.now().isoformat(),
+                        "agent": agent_name,
+                        "stale_model": session_model,
+                        "expected_model": expected_model,
+                        "archived_to": archive_path
+                    })
+                    return True, 'cleaned', reason
+                except Exception as cleanup_err:
+                    # If cleanup fails, still reject to prevent drift
+                    reason = f"Session model drift (cleanup failed): session using '{session_model}' but config expects '{expected_model}'"
+                    return False, session_model, reason
 
         # If session_model contains expected_model, we're good
         if norm_expected in norm_session or session_model == 'unknown':
@@ -1781,7 +1868,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
     # Load agent-specific environment from .claude/settings.json
     # This provides ANTHROPIC_MODEL (and optionally ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
     VALID_CLAUDE_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'}
-    ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
+    ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
     try:
         settings_path = f"{agent_root}/.claude/settings.json"
         with open(settings_path, 'r') as _sf:
@@ -1808,7 +1895,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
 
     # Validate ANTHROPIC_BASE_URL — allow Anthropic and approved proxy endpoints
     base_url = env.get('ANTHROPIC_BASE_URL', '')
-    allowed_proxy_endpoints = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
+    allowed_proxy_endpoints = ['dashscope.aliyuncs.com', 'openrouter.ai']
     is_allowed_proxy = any(endpoint in base_url for endpoint in allowed_proxy_endpoints)
     if base_url and 'anthropic.com' not in base_url and not is_allowed_proxy:
         print(f"  !! BLOCKED non-Anthropic BASE_URL for {agent_name}: {base_url}")
@@ -1819,8 +1906,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
     auth_token = env.get('ANTHROPIC_AUTH_TOKEN', '')
     # Anthropic tokens start with sk-ant-, but proxy services may use different prefixes
     is_anthropic_token = auth_token.startswith('sk-ant-')
-    is_proxy_token = (base_url and is_allowed_proxy and
-                      (auth_token.startswith('sk-') or 'api.z.ai' in base_url))
+    is_proxy_token = (base_url and is_allowed_proxy and auth_token.startswith('sk-'))
     if auth_token and not is_anthropic_token and not is_proxy_token:
         print(f"  !! BLOCKED non-Anthropic AUTH_TOKEN for {agent_name} (prefix: {auth_token[:6]}...)")
         env.pop('ANTHROPIC_AUTH_TOKEN', None)
@@ -1895,9 +1981,17 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
                 last_output_time = time.time()
 
             # Stall detection (T14): check after STALL_MIN_ELAPSED
-            # Use relaxed thresholds for slow skills or high priority tasks
+            # Use relaxed thresholds for slow skills, high priority tasks, or proxy usage
             is_slow = (skill_hint in SLOW_SKILLS if skill_hint else False) or agent_name == "kublai" or priority == 'high'
-            if is_slow:
+            # Proxy endpoints (z.ai, openrouter, etc.) need longer timeouts for complex reasoning
+            # Use is_allowed_proxy which was set earlier in this function
+            is_proxy = is_allowed_proxy if 'is_allowed_proxy' in dir() else False
+
+            if is_proxy:
+                # Proxy gets most generous thresholds - complex reasoning can take time
+                stall_elapsed_thresh = PROXY_STALL_ELAPSED
+                stall_silence_thresh = PROXY_STALL_SILENCE
+            elif is_slow:
                 stall_elapsed_thresh = SLOW_SKILL_STALL_ELAPSED
                 stall_silence_thresh = SLOW_SKILL_STALL_SILENCE
             elif priority == 'high':
@@ -2036,26 +2130,63 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
 
     # Inject active behavioral rules from rules.json
     rules_section = ""
+    active_rules = []  # Initialize for later use in rules_first_section
     try:
         from rule_registry import get_active_rules
         active_rules = get_active_rules(agent_name)
         if active_rules:
             rules_lines = "\n".join(f"  {i}. {r}" for i, r in enumerate(active_rules, 1))
             rules_section = f"\n\n## Active Behavioral Rules\nYou MUST follow these rules. Output 'RULES LOADED' at the start of your response.\n{rules_lines}"
-    except Exception:
+    except Exception as e:
+        print(f"  ⚠ Rule loading failed for {agent_name}: {e}")
         pass  # Don't block task execution if rule loading fails
 
-    prompt = (
-        f"{context_history_section}"
-        f"{task_text}"
-        f"{memory_section}"
-        f"{audience_section}"
-        f"{rules_section}"
-        f"{skill_section}\n\n"
-        "Execute this task completely using your tools. "
-        "Read files, write code, run commands, verify your work. "
-        "For simple questions, a direct answer is fine."
-    )
+    # Build prompt with rules FIRST (C16: rules must be at line 1 for agent compliance)
+    # When rules exist, prepend mandatory first action to ensure they're loaded
+    rules_first_section = ""
+    if active_rules:
+        rules_first_section = "\n\n## MANDATORY FIRST ACTION\nBefore any other work, read ~/.openclaw/agents/{}/memory/rules.json and output 'RULES LOADED: [rule IDs]' at the start of your response.\n\n".format(agent_name)
+
+    # Try to use prompt optimizer for enhanced prompts
+    prompt = None
+    optimization_metadata = None
+    if PROMPT_OPTIMIZER_AVAILABLE:
+        try:
+            opt_config = load_optimizer_config()
+            if opt_config.get("enabled", True):
+                prompt, optimization_metadata = enhance_task_prompt(
+                    task=task_text,
+                    agent_name=agent_name,
+                    memory=memory if memory else None,
+                    skill_hint=skill_hint,
+                    context_history=context_history_section if context_history_section else None,
+                    audience=audience,
+                    rules=rules_section if rules_section else None,
+                )
+                # Prepend rules first section if present (must be at line 1)
+                if rules_first_section:
+                    prompt = rules_first_section + prompt
+                # Log optimization result
+                if optimization_metadata:
+                    print(f"  PROMPT_OPTIMIZED: cached={optimization_metadata.get('cached', False)}, "
+                          f"agent_type={optimization_metadata.get('agent_type', 'unknown')}")
+        except Exception as e:
+            print(f"  ⚠ Prompt optimization failed, using original: {e}")
+
+    # Fallback to original prompt construction
+    if prompt is None:
+        prompt = (
+            f"{rules_first_section}"
+            f"{context_history_section}"
+            f"{task_text}"
+            f"{memory_section}"
+            f"{audience_section}"
+            f"{rules_section}"
+            f"{skill_section}\n\n"
+            "Execute this task completely using your tools. "
+            "Read files, write code, run commands, verify your work. "
+            "For simple questions, a direct answer is fine."
+        )
 
     # Load ACP fallback configuration
     acp_fallback = load_acp_fallback_config()
@@ -2261,7 +2392,7 @@ def process_task(agent_name, task):
             # Only Claude models are valid for Claude Code executor
             'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
         }
-        PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
+        PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
         model = config.get('model')
         # Fallback: check .claude/settings.json if config.json has no model
         if not model:

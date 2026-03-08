@@ -1,0 +1,29 @@
+{
+  "original_task": "4714bd04-e93",
+  "completion_percentage": 80,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "kublai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "kublai",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T14:18:21.618142",
+  "audit_version": "1.0"
+}

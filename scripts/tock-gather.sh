@@ -629,6 +629,12 @@ PYEOF
 ROUTING_METRICS=${ROUTING_METRICS:-'{"queue_balance_index":0,"missed_opportunities":0,"routing_accuracy":0.87,"time_to_start_p95":420}'}
 
 # ============================================================
+# 4e. Subprocess Audit (claude-agent process correlation)
+# ============================================================
+# Audit active claude-agent processes and correlate with executing tasks
+SUBPROCESS_AUDIT=$(python3 "$BASE/scripts/subprocess-audit.py" --json 2>/dev/null || echo '{}')
+
+# ============================================================
 # 5. Last tick status + service health (from TICK lines, not TICK_LLM)
 # ============================================================
 LAST_TICK_LINE=$(tail -20 "$BASE/logs/watchdog.log" 2>/dev/null | grep "] TICK |" | grep -v "TICK_LLM" | tail -1; true)
@@ -653,6 +659,7 @@ echo "$LEDGER_DATA" > "$TOCK_TMP/ledger.json"
 echo "$CONFIG_MODELS" > "$TOCK_TMP/config_models.json"
 echo "$STALE_LOCKS" > "$TOCK_TMP/stale_locks.json"
 echo "$ROUTING_METRICS" > "$TOCK_TMP/routing.json"
+echo "$SUBPROCESS_AUDIT" > "$TOCK_TMP/subprocess.json"
 
 ASSEMBLED=$(python3 << PYEOF
 import json, os, sys
@@ -680,6 +687,11 @@ routing = safe_load(f"{tmp}/routing.json", {
     "routing_accuracy": 0.87,
     "time_to_start_p95": 420,
     "queue_depths": {}
+})
+subprocess_audit = safe_load(f"{tmp}/subprocess.json", {
+    "summary": {"total_executing": 0, "alive": 0, "dead": 0, "stale": 0, "anomaly_count": 0},
+    "anomalies": [],
+    "executing_tasks": []
 })
 
 # Parse session data
@@ -887,6 +899,16 @@ output = {
         "overflow_count": routing.get("overflow_count", 0),
         "queue_depths": routing.get("queue_depths", {}),
         "source": routing.get("source", "unknown")
+    },
+    "subprocess": {
+        "executing": subprocess_audit.get("summary", {}).get("total_executing", 0),
+        "alive": subprocess_audit.get("summary", {}).get("alive", 0),
+        "dead": subprocess_audit.get("summary", {}).get("dead", 0),
+        "stale": subprocess_audit.get("summary", {}).get("stale", 0),
+        "zombies": subprocess_audit.get("summary", {}).get("zombies", 0),
+        "orphaned": subprocess_audit.get("summary", {}).get("orphaned", 0),
+        "anomaly_count": subprocess_audit.get("summary", {}).get("anomaly_count", 0),
+        "anomalies": subprocess_audit.get("anomalies", [])
     }
 }
 
@@ -968,6 +990,15 @@ if not lr.get("reconciled", True):
 # Routing metrics (from routing-metrics.sh)
 r = data.get("routing", {})
 lines.append(f"ROUTING: balance_idx={r.get('queue_balance_index',0):.2f} missed={r.get('missed_opportunities',0)} accuracy={r.get('routing_accuracy',0):.0%} p95={r.get('time_to_start_p95',0)}s routed={r.get('total_routed',0)}")
+# Subprocess audit (claude-agent process correlation)
+sp = data.get("subprocess", {})
+sp_anomalies = sp.get("anomaly_count", 0)
+if sp_anomalies > 0:
+    lines.append(f"SUBPROCESS: {sp.get('executing',0)} executing (alive={sp.get('alive',0)} dead={sp.get('dead',0)} stale={sp.get('stale',0)}) ANOMALIES={sp_anomalies}")
+    for a in sp.get("anomalies", [])[:3]:  # Show up to 3 anomalies
+        lines.append(f"  {a.get('type','?')}: agent={a.get('agent','?')} task={a.get('task_id','?')[:30]} action={a.get('action','?')}")
+else:
+    lines.append(f"SUBPROCESS: {sp.get('executing',0)} executing (alive={sp.get('alive',0)} dead={sp.get('dead',0)} stale={sp.get('stale',0)}) all healthy")
 print("\n".join(lines))
 PYEOF
 )

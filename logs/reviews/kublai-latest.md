@@ -1,63 +1,70 @@
-Based on my analysis of logs, task states, and system telemetry, here is the critical review:
+Based on the data gathered, here's the critical review:
 
 ---
 
 # Critical Review Report: Kublai Agent (Past Hour)
 
 ## Executive Summary
-Kublai shows **severe metric corruption** causing systemic routing failures. Queue depth reports 23 tasks but actual is 0, blocking all new task assignments. One task stalled 52+ minutes without recovery. Telemetry gap of 4.5 hours indicates monitoring failure.
-
----
+Kublai's queue depth doubled (22→54) while only receiving 1 routed task. The router is not absorbing its own queue despite 71% completion rate. Report quality is uniformly poor (avg score 10/100) with all tasks missing standard sections.
 
 ## Findings by Domain
 
-### System Reliability
-- **Critical**: Queue depth metric shows 23 tasks but filesystem shows 0 queued (`kublai/tasks/*.queued.md` returns no matches)
-- **Critical**: Task `high-1772986310.executing.md` stalled for 3113s (52+ min) — exceeds STALE_EXECUTING_AGE (2820s) but not recovered
-- **High**: Tock telemetry gap — last snapshot 08:42, now 13:03 (4.5 hours stale)
+### Task Completion Effectiveness
+- **71% success rate** (5 completed, 2 failed of 7 total)
+- Fail rate 28.6% — flagged but not critical threshold
+- Circuit breaker healthy (CLOSED, 0 failures)
+- **Critical gap:** Only 1 task routed to Kublai all hour (14:14 escalation)
 
-### Behavioral Compliance (WHEN/THEN Rules)
-- **Critical**: Queue absorption rule not firing — rule triggers at "agent idle while others >5 tasks" but Kublai's inflated metrics (23) prevent it from being considered idle
-- **High**: Load-balancing bypassed — routing decision at 13:02 chose ogedei with queue=6 over kublai with inflated queue=23
+### Behavioral Rule Compliance (WHEN/THEN)
+- **FAILED:** Queue absorption rule not triggered
+  - Rule: "WHEN queue imbalance AND capacity THEN accept overflow"
+  - Reality: Queue 22→54 while routing to others
+  - Kublai never load-balanced tasks to itself despite being analysis-capable
+- Only explicit routing (manual keyword match) delivered work to Kublai
+
+### Efficiency
+- **Queue throughput:** 7 tasks/hour with 54 queued = 7.7 hour backlog
+- **Report quality:** 0-35 scores, all flagged for missing sections
+  - Every verified task lacks: problem/solution/testing sections
+  - 2 tasks had "fake completion" requeued earlier today
+- **Self-blocking:** High queue depth prevents load-balancing TO kublai
 
 ### Cross-Agent Impact
-- **Critical**: Rename race condition (known bug) affects mongke, ogedei, temujin, AND kublai — 5 total stalled tasks in watchdog state
-- **High**: Kublai's false queue depth causes system-wide load imbalance — other agents overloaded while kublai sits empty
+- Kublai's inflated queue (54) distorts fleet-wide load metrics
+- Appears "busy" in routing decisions, blocking overflow dispatch
+- Creates feedback loop: queue grows → appears busy → no dispatch → queue grows
+- Only tolui (8) and chagatai (15) have lower queues; kublai should absorb
 
-### Task Execution
-- **Medium**: Executing task (proposal quality improvement) is well-structured but timeout risk — complex multi-file changes with 2h timeout may not complete
-- **Low**: 12 completed tasks shows historical throughput capacity
-
----
+## Cross-Cutting Concerns
+- **Queue depth measurement vs. actual work:** Kublai reports 54 queued but only processes analysis/coordination tasks. The queue may contain routing-metadata tasks that shouldn't count toward capacity.
+- **Report quality standard:** Completion audit flagged 100% of kublai reports for missing sections. This is a systemic documentation gap, not isolated.
 
 ## Prioritized Improvement List
 
 | Priority | Domain | Issue | Suggested Action |
 |----------|--------|-------|------------------|
-| Critical | Reliability | Stalled task not recovered (52+ min) | Add file-lock guard in `recover_stale_executions()` to prevent rename race |
-| Critical | Metrics | Queue depth 23 vs actual 0 | Fix `mark_task_completed()` to check for existing `.completed.done.md` before rename |
-| High | Telemetry | 4.5hr tock gap | Verify tock-gather cron is running; add alerting on tock staleness |
-| High | Routing | False queue depth blocks task assignment | Add validation in `task_intake.py` to cross-check queue depth vs filesystem |
+| Critical | Routing | Self-blocking queue growth | Add queue self-absorption logic: if kublai queue >20 AND no dispatch in 30m, route 1 analysis task to kublai |
+| High | Quality | Missing report sections | Enforce report template validation in completion gate |
+| Medium | Load-balancing | False queue depth | Audit kublai queue for non-executable routing metadata files |
+| Low | Efficiency | Backlog accumulation | Auto-expire stale analysis tasks >24h old |
 
 ---
 
-## Output Format
+STRENGTHS:
+- Circuit breaker healthy, no cascade failures
+- Routing to other agents working correctly (ogedei, temujin receiving load-balanced tasks)
+- One escalation task (14:14) processed successfully
 
-**STRENGTHS:**
-- Reflection pipeline completed successfully at 13:00 (all 6 agents parallel)
-- 12 completed tasks shows baseline execution capacity
-- Current task (proposal quality) is well-structured with clear deliverables
+WEAKNESSES:
+- Queue doubled (22→54) while only processing 7 tasks — massive efficiency gap
+- Zero self-routing despite queue absorption rule — behavioral rule not triggering
+- 100% of completion reports flagged for missing standard sections
 
-**WEAKNESSES:**
-- 52+ minute stalled task not recovered despite exceeding STALE_EXECUTING_AGE
-- Queue metrics completely corrupted (23 reported vs 0 actual) causing routing bypass
-- 4.5-hour telemetry gap means no performance data for decision-making
+PATTERNS:
+- Queue grows exponentially when kublai doesn't self-dispatch
+- Reports uniformly lack problem/solution/testing structure
+- Only explicit/keyword routing delivers work; load-balancing never selects kublai
 
-**PATTERNS:**
-- Rename race condition consistently affects kublai alongside mongke, ogedei, temujin
-- Queue metric inflation grows over time as stale completions aren't properly cleaned
-- Telemetry staleness correlates with cron job failures or scheduling gaps
+PRIORITY_FIX: Add self-absorption trigger in task_intake.py: when kublai queue >20 AND no kublai dispatch in 30 min, route next analysis task to kublai regardless of queue depth.
 
-**PRIORITY_FIX:** Add file-lock guard + `.completed.done.md` existence check in both `mark_task_completed()` AND `recover_stale_executions()` to fix the root cause of metric corruption. This single fix resolves queue depth inflation AND enables proper load-balancing.
-
-**SCORE:** 3/10 — System is functionally broken: false metrics prevent task routing, stalled tasks aren't recovered, and telemetry has been dead for 4.5 hours. The agent exists but cannot receive work.
+SCORE: **4/10** — Healthy execution but queue management failure and zero self-routing caused 2.4x queue growth. Router cannot route to itself, breaking the coordination agent's primary function.

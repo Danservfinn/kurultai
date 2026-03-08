@@ -31,6 +31,9 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from kurultai_paths import AGENTS_DIR, LOGS_DIR, agent_tasks_dir
+from kurultai_ledger import append_ledger as _kp_append_ledger
+
 # Timeout configuration (mirrors agent-task-handler.py)
 _TIMEOUT_BY_PRIORITY = {
     'high': 7200,
@@ -98,8 +101,12 @@ SKILL_DOMAIN_MAP = {
 # Domain classification by keyword matching (fallback when no skill hint)
 DOMAIN_KEYWORDS = {
     "research": [
-        "research", "investigate", "discover", "explore", "competitor", "market",
-        "analyze", "study", "benchmark", "survey", "literature", "paper"
+        "research", "discover", "competitor", "market", "study", "benchmark",
+        "survey", "literature", "paper", "citation", "documentation research",
+        "api discovery", "product analysis", "feature analysis", "pricing research",
+        "ecosystem", "alternatives", "comparison", "market intel", "source triangulation",
+        "fact check", "investigate sources", "data gathering", "research methodology",
+        "evidence"
     ],
     "implementation": [
         "implement", "build", "create", "fix", "code", "develop", "scaffold",
@@ -237,9 +244,14 @@ AGENT_KEYWORDS = {
                 "refactor", "scaffold", "endpoint", "database", "schema", "sdk",
                 "integrate", "migration", "configure", "setup", "create",
                 "frontend", "ui", "kanban", "sort", "component", "react", "next"],
-    "mongke": ["research", "investigate", "discover", "explore", "competitor", "market",
-               "trend", "study", "landscape", "benchmark", "compare", "survey",
-               "analyze", "source", "find", "gather", "collect", "report", "evaluate"],
+    "mongke": ["research", "discover", "competitor", "market", "trend", "study",
+               "landscape", "benchmark", "survey", "literature", "paper", "citation",
+               "documentation research", "api discovery", "product analysis", "feature analysis",
+               "pricing research", "ecosystem", "alternatives", "comparison", "market intel",
+               "source triangulation", "fact check", "investigate sources", "data gathering",
+               "report findings", "gather sources", "research methodology", "evidence"],
+    # Removed: "investigate", "explore", "analyze", "evaluate", "find", "compare" (too generic, overlap with other agents)
+    # Removed: "source", "gather", "collect" (weak matches, added context-specific variants)
     "chagatai": ["write", "document", "blog", "content", "changelog", "copy", "article",
                  "social", "twitter", "marketing", "announcement", "readme", "presence",
                  "draft", "summarize", "summary", "guide", "tutorial", "outline",
@@ -490,6 +502,65 @@ CATEGORY_KEYWORDS = {
     "docs": ["document", "documentation", "readme", "changelog"],
     "monitoring": ["monitor", "health", "alert", "status", "uptime"],
 }
+
+
+# --- KUBLAI SELF-ABSORPTION ---
+# Kublai (router) can absorb certain coordination/analysis tasks when its queue is high
+# but it has been idle. This prevents the "router cannot route to itself" failure mode.
+KUBLAI_SELF_ABSORB_THRESHOLD = 20      # Trigger when kublai queue >= this
+KUBLAI_SELF_ABSORB_IDLE_MINUTES = 30   # No kublai dispatch in this many minutes
+KUBLAI_SELF_ABSORB_KEYWORDS = [
+    # Core coordination keywords (from AGENT_KEYWORDS["kublai"])
+    "triage", "coordinate", "prioritize", "system-wide", "assessment", "status assessment",
+    "agent status", "backlog", "routing", "dispatch", "workload",
+    # Expanded analysis keywords for self-absorption
+    "queue analysis", "queue depth", "throughput", "pipeline health", "bottleneck",
+    "agent utilization", "load balance", "routing analysis", "coordination",
+    "performance review", "system health", "fleet status", "agent review",
+]
+_KUBLAI_LAST_DISPATCH_FILE = f"{LOGS_DIR}/kublai_last_dispatch.txt"
+
+
+def _update_kublai_dispatch_timestamp():
+    """Record when kublai last received a task."""
+    try:
+        with open(_KUBLAI_LAST_DISPATCH_FILE, 'w') as f:
+            f.write(str(datetime.now().timestamp()))
+    except Exception:
+        pass  # Non-critical, don't fail routing
+
+
+def _get_kublai_idle_minutes():
+    """Return minutes since kublai last received a task. Returns 999 if no record."""
+    try:
+        if not os.path.exists(_KUBLAI_LAST_DISPATCH_FILE):
+            return 999  # No record = consider idle
+        with open(_KUBLAI_LAST_DISPATCH_FILE, 'r') as f:
+            last_ts = float(f.read().strip())
+        idle_seconds = datetime.now().timestamp() - last_ts
+        return idle_seconds / 60
+    except Exception:
+        return 999  # Error = consider idle
+
+
+def should_kublai_self_absorb(title: str) -> bool:
+    """Check if kublai should absorb this task based on queue depth and idle time.
+
+    Returns True if:
+    1. Kublai queue >= KUBLAI_SELF_ABSORB_THRESHOLD (20)
+    2. Kublai idle for >= KUBLAI_SELF_ABSORB_IDLE_MINUTES (30)
+    3. Task title contains self-absorption keywords
+    """
+    kublai_depth = get_queue_depth("kublai")
+    if kublai_depth < KUBLAI_SELF_ABSORB_THRESHOLD:
+        return False
+
+    idle_minutes = _get_kublai_idle_minutes()
+    if idle_minutes < KUBLAI_SELF_ABSORB_IDLE_MINUTES:
+        return False
+
+    title_lower = title.lower()
+    return any(kw in title_lower for kw in KUBLAI_SELF_ABSORB_KEYWORDS)
 
 
 # --- SKILL-AGENT COMPATIBILITY ---
@@ -750,7 +821,7 @@ def can_handle_task(alternate_agent, primary_agent, task_text):
     return False
 
 
-def get_capable_alternates(primary_agent, task_text):
+def get_capable_alternates(primary_agent, task_text, task_domain=None):
     """Get list of alternate agents capable of handling this task.
 
     Includes a domain guard: if the primary agent's keyword score is
@@ -758,17 +829,30 @@ def get_capable_alternates(primary_agent, task_text):
     prevent cross-domain misroutes (e.g., dev task → research agent
     because both match "investigate").
 
+    If task_domain is provided, only agents in DOMAIN_AGENT_COMPATIBILITY[task_domain]
+    will be considered as valid alternates.
+
     Returns list of (agent, depth) tuples sorted by queue depth.
     """
     capabilities = AGENT_CAPABILITY_MATRIX.get(primary_agent, [])
     capable = []
     task_lower = task_text.lower()
 
+    # Determine valid agents based on domain compatibility
+    domain_valid_agents = None
+    if task_domain and task_domain in DOMAIN_AGENT_COMPATIBILITY:
+        domain_valid_agents = set(DOMAIN_AGENT_COMPATIBILITY[task_domain])
+        # Always include primary agent as valid
+        domain_valid_agents.add(primary_agent)
+
     # Score how strongly the task matches the primary agent's domain
     primary_keywords = AGENT_KEYWORDS.get(primary_agent, [])
     primary_score = sum(1 for kw in primary_keywords if _kw_match(kw, task_lower))
 
     for alt_agent, keywords in capabilities:
+        # Domain compatibility filter: skip agents not in the domain's valid set
+        if domain_valid_agents is not None and alt_agent not in domain_valid_agents:
+            continue
         cap_match_count = sum(1 for kw in keywords if _kw_match(kw, task_lower))
         if cap_match_count == 0:
             continue
@@ -798,7 +882,7 @@ def get_capable_alternates(primary_agent, task_text):
     return capable
 
 
-def find_best_agent_by_load(task_text, primary_agent):
+def find_best_agent_by_load(task_text, primary_agent, task_domain=None):
     """Find the best agent considering queue depth and capabilities.
 
     Algorithm:
@@ -808,13 +892,16 @@ def find_best_agent_by_load(task_text, primary_agent):
     4. Otherwise, route to lowest-depth capable alternate
     5. Fall back to primary if no alternates available
 
+    If task_domain is provided, only agents in DOMAIN_AGENT_COMPATIBILITY[task_domain]
+    will be considered as valid alternates.
+
     Returns (agent, reason) tuple.
     """
     primary_depth = get_queue_depth(primary_agent)
 
     # Check if primary agent has a high failure rate — bypass to alternates
     if is_agent_failing(primary_agent):
-        capable_alternates = get_capable_alternates(primary_agent, task_text)
+        capable_alternates = get_capable_alternates(primary_agent, task_text, task_domain)
         # Filter out agents that are also failing
         healthy_alts = [(a, d) for a, d in capable_alternates if not is_agent_failing(a)]
         if healthy_alts:
@@ -827,7 +914,7 @@ def find_best_agent_by_load(task_text, primary_agent):
         return primary_agent, f"primary queue={primary_depth} < threshold={QUEUE_HIGH_THRESHOLD}"
 
     # Find capable alternates sorted by queue depth
-    capable_alternates = get_capable_alternates(primary_agent, task_text)
+    capable_alternates = get_capable_alternates(primary_agent, task_text, task_domain)
 
     # Filter to underutilized agents (queue < QUEUE_LOW_THRESHOLD=2)
     underutilized = [(agent, depth) for agent, depth in capable_alternates
@@ -917,7 +1004,7 @@ def get_agent_scores(text):
 # Agents that should not receive load-balanced overflow tasks
 _NO_OVERFLOW_TARGETS = {"kublai", "tolui"}
 
-def find_best_idle_agent(text, primary_agent):
+def find_best_idle_agent(text, primary_agent, task_domain=None):
     """Find the best agent considering queue depth and idle status.
 
     Uses queue-aware load balancing:
@@ -926,13 +1013,23 @@ def find_best_idle_agent(text, primary_agent):
     3. Use capability matrix (AGENT_CAPABILITY_MATRIX) for cross-training
     4. Fall back to OVERFLOW_MAP by task category, then find_best_agent_by_load()
 
+    CRITICAL FIX: task_domain parameter prevents cross-domain misroutes.
+    When task_domain is provided, only agents in DOMAIN_AGENT_COMPATIBILITY[task_domain]
+    are considered as valid alternates. This prevents implementation tasks (skill_hint=/horde-implement)
+    from being routed to research agents like mongke.
+
+    Args:
+        text: Task title/text
+        primary_agent: Original target agent
+        task_domain: Optional domain string ("implementation", "research", etc.) for filtering
+
     Returns (agent, reason) tuple.
     """
     primary_depth = get_queue_depth(primary_agent)
 
     # Check if primary agent has a high failure rate — bypass to alternates
     if is_agent_failing(primary_agent):
-        capable_alternates = get_capable_alternates(primary_agent, text)
+        capable_alternates = get_capable_alternates(primary_agent, text, task_domain)
         healthy_alts = [(a, d) for a, d in capable_alternates if not is_agent_failing(a)]
         if healthy_alts:
             best_agent, best_depth = healthy_alts[0]
@@ -944,7 +1041,7 @@ def find_best_idle_agent(text, primary_agent):
         return primary_agent, f"primary idle, queue={primary_depth}"
 
     # Try to find an underutilized agent with capability match
-    capable_alternates = get_capable_alternates(primary_agent, text)
+    capable_alternates = get_capable_alternates(primary_agent, text, task_domain)
     underutilized = [(agent, depth) for agent, depth in capable_alternates
                      if depth < QUEUE_LOW_THRESHOLD]
 
@@ -962,7 +1059,7 @@ def find_best_idle_agent(text, primary_agent):
                 return overflow, f"load-balance: {primary_agent} busy, {overflow} idle (overflow-map, {category}, queue={ov_depth})"
 
     # No idle/underutilized agent found - use queue-aware routing
-    return find_best_agent_by_load(text, primary_agent)
+    return find_best_agent_by_load(text, primary_agent, task_domain)
 
 
 def _detect_category(text):
@@ -1037,8 +1134,6 @@ def _log_overflow(original, overflow, title, reason):
 
 MAX_TASK_DEPTH = 3
 
-from kurultai_paths import AGENTS_DIR, LOGS_DIR, agent_tasks_dir
-from kurultai_ledger import append_ledger as _kp_append_ledger
 AGENT_DIR = str(AGENTS_DIR)
 ROUTING_LOG = str(LOGS_DIR / "routing-decisions.jsonl")
 
@@ -1283,7 +1378,8 @@ def create_task(title, body, priority="normal", source="task_intake",
                 depth=0, agent=None, parent_id=None, skip_duplicate_check=False,
                 skill_hint=None, force_claude_code=False,
                 notify_on_complete=False, notify_channel="signal",
-                notify_target="+19194133445", bucket=None):
+                notify_target="+19194133445", bucket=None,
+                origin_type=None, origin_initiator=None, origin_source=None):
     """Create a task through the canonical pipeline.
 
     Args:
@@ -1302,6 +1398,9 @@ def create_task(title, body, priority="normal", source="task_intake",
         notify_target: Notification target phone number
         bucket: Task bucket (CRITICAL/TODAY/WEEK/BACKLOG/BLOCKED/DELEGATED).
                 Auto-assigned from priority if not provided.
+        origin_type: Type of origin ("human" or "agent"). Auto-detected if not provided.
+        origin_initiator: Who initiated the task (phone number or agent name).
+        origin_source: Source channel (signal, reflection, proposal, api, cron).
 
     Returns:
         task_id string on success, None on rejection
@@ -1346,6 +1445,26 @@ def create_task(title, body, priority="normal", source="task_intake",
             agent = correct_agent
         _skill_locked_agent = True  # Prevent load balancing from overriding
 
+    # 2.5.2. Classify domain BEFORE load balancing (prevents domain-incompatible routes)
+    # This ensures DOMAIN_AGENT_COMPATIBILITY is respected when selecting alternates.
+    _task_domain = classify_task_domain(title, skill_hint)
+
+    # 2.5.3. Kublai self-absorption: when router is overloaded but idle, absorb coordination tasks
+    # This fixes the "router cannot route to itself" failure mode where kublai's queue grows
+    # without bound because it never takes tasks for itself.
+    if agent != "kublai" and not mention_agent and not _skill_locked_agent:
+        if should_kublai_self_absorb(title):
+            original_agent = agent
+            agent = "kublai"
+            print(f"KUBLAI_SELF_ABSORB: {original_agent} -> kublai (queue={get_queue_depth('kublai')}, idle={int(_get_kublai_idle_minutes())}min)")
+            _log_routing_decision(
+                title=title,
+                dest="kublai",
+                method="self_absorb",
+                original_agent=original_agent,
+                domain=_task_domain,
+            )
+
     # 2.6. Load balancing — prefer agents with low queue depth
     # Skip for @mentions (user explicitly chose agent), kublai/subagent,
     # and tasks locked to an agent by skill ownership.
@@ -1370,7 +1489,7 @@ def create_task(title, body, priority="normal", source="task_intake",
 
     if load_balance_needed:
         original_agent = agent
-        agent, overflow_reason = find_best_idle_agent(title, agent)
+        agent, overflow_reason = find_best_idle_agent(title, agent, _task_domain)
 
         # Log queue depth for audit
         new_depth = get_queue_depth(agent)
@@ -1486,11 +1605,17 @@ def create_task(title, body, priority="normal", source="task_intake",
             notify_target=notify_target,
             timeout=compute_task_timeout(priority, skill_hint),
             bucket=bucket,
+            origin_type=origin_type,
+            origin_initiator=origin_initiator,
+            origin_source=origin_source,
         )
         if skill_hint:
             print(f"CREATED: {priority} task {task_id} for {agent} (skill: {skill_hint}): {title[:60]}")
         else:
             print(f"CREATED: {priority} task {task_id} for {agent}: {title[:60]}")
+        # Update kublai dispatch timestamp for self-absorption tracking
+        if agent == "kublai":
+            _update_kublai_dispatch_timestamp()
         # Append QUEUED event to task ledger (enables pending time measurement)
         try:
             _kp_append_ledger({
@@ -1514,6 +1639,28 @@ def create_task(title, body, priority="normal", source="task_intake",
         notify_lines = ""
         if notify_on_complete:
             notify_lines = f"notify_on_complete: true\nnotify_channel: {notify_channel}\nnotify_target: {notify_target}\n"
+
+        # Auto-detect origin if not provided
+        if origin_type is None:
+            if origin_initiator and origin_initiator.startswith("+"):
+                origin_type = "human"
+            elif source in ("signal", "api"):
+                origin_type = "human"
+            else:
+                origin_type = "agent"
+        if origin_source is None:
+            origin_source = source
+
+        # Origin metadata for frontmatter
+        origin_lines = ""
+        if origin_type or origin_initiator or origin_source:
+            origin_lines = f"origin:\n  type: {origin_type or 'unknown'}\n"
+            if origin_initiator:
+                origin_lines += f"  initiator: {origin_initiator}\n"
+            if origin_source:
+                origin_lines += f"  source: {origin_source}\n"
+            origin_lines += f"  timestamp: {datetime.now().isoformat()}\n"
+
         timeout = compute_task_timeout(priority, skill_hint)
         # Auto-assign bucket based on priority if not provided
         if bucket is None:
@@ -1532,7 +1679,7 @@ source: {source}
 depth: {depth}
 bucket: {bucket}
 timeout: {timeout}
-{skill_line}{notify_lines}---
+{skill_line}{notify_lines}{origin_lines}---
 
 # Task: {title}
 
@@ -1541,6 +1688,9 @@ timeout: {timeout}
         with open(filepath, 'w') as f:
             f.write(content)
         print(f"CREATED (filesystem-only): {filepath}")
+        # Update kublai dispatch timestamp for self-absorption tracking
+        if agent == "kublai":
+            _update_kublai_dispatch_timestamp()
         # Append QUEUED event to task ledger (filesystem-only fallback path)
         try:
             _kp_append_ledger({

@@ -316,7 +316,8 @@ class TaskTracker:
                          notify_channel="signal", notify_target="+19194133445",
                          timeout=None, bucket=None, domain=None,
                          template_version=None, prompt_template=None,
-                         use_optimization=True):
+                         use_optimization=True, origin_type=None, origin_initiator=None,
+                         origin_source=None):
         """Create task in Neo4j (primary) AND filesystem (backward compat).
 
         Args:
@@ -326,6 +327,9 @@ class TaskTracker:
             prompt_template: Name of prompt template used for this task.
             use_optimization: If True, apply learned prompt optimizations (default True).
                              Set OPTIMIZATION_ENABLED=false env var to disable globally.
+            origin_type: Type of origin ("human" or "agent"). Auto-detected from source if not provided.
+            origin_initiator: Who initiated the task (phone number for human, agent name for agent).
+            origin_source: Source channel (signal, reflection, proposal, api, cron, etc.).
 
         Returns the task_id (uuid).
         """
@@ -390,6 +394,20 @@ class TaskTracker:
                 # Log but don't fail on optimization errors
                 print(f"[task_tracker] Optimization failed: {e}")
 
+        # Auto-detect origin if not provided
+        if origin_type is None:
+            # Detect from source or initiator
+            if origin_initiator and origin_initiator.startswith("+"):
+                origin_type = "human"
+            elif source in ("signal", "api"):
+                origin_type = "human"
+            else:
+                origin_type = "agent"
+
+        # Default origin_source if not provided
+        if origin_source is None:
+            origin_source = source
+
         with self.driver.session() as session:
             session.run("""
                 MERGE (a:Agent {name: $agent})
@@ -410,6 +428,10 @@ class TaskTracker:
                     prompt_template: $prompt_template,
                     prompt_construction: $prompt_construction,
                     task_params: $task_params,
+                    origin_type: $origin_type,
+                    origin_initiator: $origin_initiator,
+                    origin_source: $origin_source,
+                    origin_timestamp: datetime(),
                     status: 'PENDING',
                     created: datetime(),
                     retry_count: 0,
@@ -433,7 +455,10 @@ class TaskTracker:
                 "timeout_seconds": timeout,
                 "skill_hint": skill_hint,
                 "bucket": bucket,
-            }))
+            }),
+            origin_type=origin_type or "unknown",
+            origin_initiator=origin_initiator or "",
+            origin_source=origin_source or "")
 
         # Backward-compatible filesystem write
         base = _AGENTS_BASE
@@ -451,6 +476,17 @@ class TaskTracker:
         notify_lines = ""
         if notify_on_complete:
             notify_lines = f"notify_on_complete: true\nnotify_channel: {notify_channel}\nnotify_target: {notify_target}\n"
+
+        # Origin metadata for frontmatter
+        origin_lines = ""
+        if origin_type or origin_initiator or origin_source:
+            origin_lines = f"origin:\n  type: {origin_type or 'unknown'}\n"
+            if origin_initiator:
+                origin_lines += f"  initiator: {origin_initiator}\n"
+            if origin_source:
+                origin_lines += f"  source: {origin_source}\n"
+            origin_lines += f"  timestamp: {datetime.now().isoformat()}\n"
+
         if timeout is None:
             try:
                 from task_intake import compute_task_timeout
@@ -468,7 +504,7 @@ parent_id: {parent_id or ''}
 bucket: {bucket}
 domain: {domain}
 timeout: {timeout}
-{skill_line}{template_line}{prompt_template_line}{optimization_line}{notify_lines}---
+{skill_line}{template_line}{prompt_template_line}{optimization_line}{notify_lines}{origin_lines}---
 
 # Task: {title}
 

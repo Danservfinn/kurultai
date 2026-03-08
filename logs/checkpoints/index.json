@@ -1,0 +1,18 @@
+{
+  "test-debug-123": {
+    "checkpoint_id": "ckpt-test-deb-20260308152904",
+    "agent": "temujin",
+    "created_at": "2026-03-08T15:29:04.295175",
+    "expires_at": "2026-03-09T15:29:04.295175",
+    "stage": "execution",
+    "size_bytes": 103
+  },
+  "test-debug-789": {
+    "checkpoint_id": "ckpt-test-deb-20260308153449",
+    "agent": "temujin",
+    "created_at": "2026-03-08T15:34:49.413736",
+    "expires_at": "2026-03-09T15:34:49.413736",
+    "stage": "execution",
+    "size_bytes": 103
+  }
+}

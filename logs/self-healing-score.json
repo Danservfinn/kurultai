@@ -1,16 +1,34 @@
 {
-  "ts": "2026-03-08T05:19:26.549103",
+  "ts": "2026-03-08T15:01:55.157378",
   "window_hours": 24,
   "score": {
     "score": 100.0,
-    "auto_resolved": 1,
+    "auto_resolved": 11,
     "escalated": 0,
     "manual": 0,
     "partial": 0,
-    "total_issues": 1,
+    "total_issues": 11,
     "by_type": {
       "gateway_restart": {
-        "auto": 1,
+        "auto": 2,
+        "escalated": 0,
+        "manual": 0,
+        "partial": 0
+      },
+      "memory_bloat": {
+        "auto": 3,
+        "escalated": 0,
+        "manual": 0,
+        "partial": 0
+      },
+      "quality_retry": {
+        "auto": 4,
+        "escalated": 0,
+        "manual": 0,
+        "partial": 0
+      },
+      "queue_rebalanced": {
+        "auto": 2,
         "escalated": 0,
         "manual": 0,
         "partial": 0

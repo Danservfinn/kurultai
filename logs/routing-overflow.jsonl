@@ -4,3 +4,9 @@
 {"ts": "2026-03-06T14:14:19.656995", "from": "mongke", "to": "chagatai", "title": "Research OBLITERATUS GitHub repository", "reason": "mongke busy, research -> chagatai"}
 {"ts": "2026-03-06T14:33:43.212098", "from": "temujin", "to": "jochi", "title": "test message from CLI", "reason": "temujin busy, testing -> jochi"}
 {"ts": "2026-03-07T11:01:52.301993", "from": "jochi", "to": "temujin", "title": "Critical review of jochi agent (past hour)", "reason": "load-balance: jochi busy, temujin idle (overflow-map, code_review, queue=0)"}
+{"ts": "2026-03-08T14:28:56.321517", "from": "jochi", "to": "ogedei", "title": "Audit completed tasks and write missing detailed reports", "reason": "load-balance: jochi busy, ogedei idle (overflow-map, security, queue=10)"}
+{"ts": "2026-03-08T14:52:26.529878", "from": "temujin", "to": "ogedei", "title": "FIX: Install playwright dependency for kurultai-monitor.py", "reason": "broadcast: temujin critical queue=51, routing to ogedei (queue=22)"}
+{"ts": "2026-03-08T15:01:17.875977", "from": "jochi", "to": "temujin", "title": "FIX: Ogedei model configuration - glm-5 failing", "reason": "broadcast: jochi critical queue=31, routing to temujin (queue=50)"}
+{"ts": "2026-03-08T15:12:38.355151", "from": "ogedei", "to": "jochi", "title": "the.kurult.ai failing health checks (8x, 22 minutes)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=28)"}
+{"ts": "2026-03-08T15:15:31.150322", "from": "jochi", "to": "ogedei", "title": "Audit stuck executing tasks (2+ hours)", "reason": "load-balance: jochi busy, ogedei idle (overflow-map, security, queue=24)"}
+{"ts": "2026-03-08T15:19:07.262688", "from": "temujin", "to": "ogedei", "title": "FIX: Parse Agent Services TypeScript errors blocking deployment", "reason": "load-balance: temujin busy, ogedei idle (overflow-map, deploy, queue=24)"}

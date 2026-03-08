@@ -1096,7 +1096,7 @@
     "success": false
   },
   "kublai/normal-1772932150.md": {
-    "executed": "2026-03-07T21:22:37.034670",
+    "executed": "2026-03-08T15:51:06.379604",
     "success": true
   },
   "tolui/high-1772933574.md": {
@@ -1240,7 +1240,7 @@
     "success": true
   },
   "mongke/normal-1772942251.md": {
-    "executed": "2026-03-08T00:00:54.181812",
+    "executed": "2026-03-08T15:38:21.479423",
     "success": true
   },
   "temujin/high-1772942171.md.redistributed.md": {
@@ -1260,7 +1260,7 @@
     "success": true
   },
   "mongke/high-1772944838.md": {
-    "executed": "2026-03-08T00:13:03.075143",
+    "executed": "2026-03-08T15:25:07.431556",
     "success": true
   },
   "chagatai/normal-1772946096.md": {
@@ -1358,5 +1358,417 @@
   "mongke/normal-1772936030.md": {
     "executed": "2026-03-08T00:58:34.511520",
     "success": true
+  },
+  "ogedei/high-1772989339.md": {
+    "executed": "2026-03-08T13:20:33.456920",
+    "success": false
+  },
+  "mongke/high-1772955017.verified.md": {
+    "executed": "2026-03-08T14:07:37.762007",
+    "success": true
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979393089.md": {
+    "executed": "2026-03-08T14:08:14.822972",
+    "success": true
+  },
+  "mongke/high-1772962222.no_output.md": {
+    "executed": "2026-03-08T14:09:52.929669",
+    "success": false
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979393194.verified.md": {
+    "executed": "2026-03-08T14:12:13.095257",
+    "success": true
+  },
+  "ogedei/high-1772984633.md": {
+    "executed": "2026-03-08T14:12:40.976326",
+    "success": false
+  },
+  "kublai/high-1772955046.unverified.md": {
+    "executed": "2026-03-08T14:12:44.794322",
+    "success": true
+  },
+  "mongke/high-1772976018.verified.md": {
+    "executed": "2026-03-08T14:15:39.570834",
+    "success": true
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979533374.verified.md": {
+    "executed": "2026-03-08T14:16:01.182513",
+    "success": true
+  },
+  "chagatai/high-1772986454.md": {
+    "executed": "2026-03-08T14:18:08.840794",
+    "success": false
+  },
+  "kublai/high-1772976019.verified.md": {
+    "executed": "2026-03-08T14:18:23.712107",
+    "success": true
+  },
+  "temujin/high-1772983929.md": {
+    "executed": "2026-03-08T14:19:07.178890",
+    "success": false
+  },
+  "chagatai/high-1772984000-stripe-credentials-parse-deploy.verified.md": {
+    "executed": "2026-03-08T14:20:35.396706",
+    "success": true
+  },
+  "kublai/high-1772985039.md": {
+    "executed": "2026-03-08T14:20:51.153349",
+    "success": false
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979533497.md": {
+    "executed": "2026-03-08T14:21:30.060130",
+    "success": true
+  },
+  "mongke/high-1772984819.md": {
+    "executed": "2026-03-08T14:22:11.581592",
+    "success": true
+  },
+  "chagatai/high-1772976019.verified.md": {
+    "executed": "2026-03-08T14:23:30.449415",
+    "success": false
+  },
+  "ogedei/high-1772928483.no_output.md": {
+    "executed": "2026-03-08T14:26:50.546924",
+    "success": true
+  },
+  "chagatai/high-1772999700-searxng-setup.md": {
+    "executed": "2026-03-08T14:27:37.791439",
+    "success": true
+  },
+  "ogedei/high-1772925598.unverified.unverified.unverified.md": {
+    "executed": "2026-03-08T14:28:39.832717",
+    "success": false
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979533826.verified.md": {
+    "executed": "2026-03-08T14:29:22.149313",
+    "success": true
+  },
+  "chagatai/normal-1772950821.no_output.md": {
+    "executed": "2026-03-08T14:31:02.155056",
+    "success": true
+  },
+  "mongke/high-1772986902.md": {
+    "executed": "2026-03-08T14:32:11.249595",
+    "success": true
+  },
+  "temujin/high-1772984022.md": {
+    "executed": "2026-03-08T14:33:46.697508",
+    "success": false
+  },
+  "mongke/high-1772988231.md": {
+    "executed": "2026-03-08T14:33:46.994598",
+    "success": false
+  },
+  "tolui/high-1772986452.md": {
+    "executed": "2026-03-08T14:33:58.743129",
+    "success": true
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979533935.md": {
+    "executed": "2026-03-08T14:34:06.469050",
+    "success": true
+  },
+  "chagatai/normal-1772954202.no_output.md": {
+    "executed": "2026-03-08T14:34:33.060336",
+    "success": false
+  },
+  "mongke/high-1772983991.no_output.md": {
+    "executed": "2026-03-08T14:35:35.315050",
+    "success": true
+  },
+  "kublai/high-1772985674.no_output.md": {
+    "executed": "2026-03-08T14:37:32.909346",
+    "success": true
+  },
+  "chagatai/high-1772988231.md": {
+    "executed": "2026-03-08T14:38:00.084478",
+    "success": true
+  },
+  "temujin/high-1772984877.md": {
+    "executed": "2026-03-08T14:38:05.325503",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979392658.verified.md": {
+    "executed": "2026-03-08T14:40:03.421982",
+    "success": true
+  },
+  "ogedei/high-1772991598.md": {
+    "executed": "2026-03-08T14:40:37.107351",
+    "success": false
+  },
+  "mongke/high-1772932087.unverified.unverified.md": {
+    "executed": "2026-03-08T14:41:52.403578",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979393329.verified.md": {
+    "executed": "2026-03-08T14:43:41.082029",
+    "success": true
+  },
+  "mongke/high-1772962552.no_output.md": {
+    "executed": "2026-03-08T14:43:41.513817",
+    "success": false
+  },
+  "kublai/high-1772986453.md": {
+    "executed": "2026-03-08T14:46:20.594975",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979393600.verified.md": {
+    "executed": "2026-03-08T14:46:25.251080",
+    "success": true
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979534263.md": {
+    "executed": "2026-03-08T14:46:36.052898",
+    "success": true
+  },
+  "kublai/high-1772987567.md": {
+    "executed": "2026-03-08T14:47:51.337426",
+    "success": false
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979533716.verified.md": {
+    "executed": "2026-03-08T14:48:34.368569",
+    "success": true
+  },
+  "temujin/high-1772985900-fix-gate-race-conditions.md": {
+    "executed": "2026-03-08T14:49:10.477460",
+    "success": true
+  },
+  "ogedei/high-1772994536.md": {
+    "executed": "2026-03-08T14:49:32.273869",
+    "success": false
+  },
+  "mongke/high-1772985900-hardened-gate-bypass-security.md": {
+    "executed": "2026-03-08T14:50:49.200439",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979534155.no_output.md": {
+    "executed": "2026-03-08T14:52:03.666949",
+    "success": true
+  },
+  "ogedei/high-1772962552.no_output.md": {
+    "executed": "2026-03-08T14:53:08.338131",
+    "success": true
+  },
+  "mongke/high-review-implement-completion-gate-core-scripts-1772979534047.md": {
+    "executed": "2026-03-08T14:53:45.058952",
+    "success": true
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979533606.md": {
+    "executed": "2026-03-08T14:54:06.572682",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979534155.rejected-domain.md": {
+    "executed": "2026-03-08T14:54:40.189052",
+    "success": false
+  },
+  "kublai/high-1772987680.md": {
+    "executed": "2026-03-08T14:55:53.901451",
+    "success": true
+  },
+  "mongke/high-1772955734.md": {
+    "executed": "2026-03-08T14:57:30.096609",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979534370.verified.md": {
+    "executed": "2026-03-08T14:58:17.093071",
+    "success": true
+  },
+  "mongke/high-1772957550.md": {
+    "executed": "2026-03-08T15:00:40.512598",
+    "success": true
+  },
+  "tolui/high-1772962464.no_output.md": {
+    "executed": "2026-03-08T15:02:13.718993",
+    "success": true
+  },
+  "jochi/high-1772924585.unverified.verified.md": {
+    "executed": "2026-03-08T15:02:46.203463",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979393600.review-complete.md": {
+    "executed": "2026-03-08T15:02:51.439884",
+    "success": true
+  },
+  "kublai/high-1772993695.md": {
+    "executed": "2026-03-08T15:04:38.045042",
+    "success": false
+  },
+  "mongke/high-1772974245.md": {
+    "executed": "2026-03-08T15:05:01.281162",
+    "success": true
+  },
+  "temujin/high-1772986450.md": {
+    "executed": "2026-03-08T15:05:07.163440",
+    "success": true
+  },
+  "chagatai/normal-1772962552.no_output.md": {
+    "executed": "2026-03-08T15:07:29.619514",
+    "success": false
+  },
+  "jochi/high-1772957701.verified.md": {
+    "executed": "2026-03-08T15:07:31.644046",
+    "success": true
+  },
+  "mongke/high-1772974513.md": {
+    "executed": "2026-03-08T15:08:09.108841",
+    "success": true
+  },
+  "chagatai/normal-reflection-outcome-integration-1772952600.unverified.md": {
+    "executed": "2026-03-08T15:09:14.410648",
+    "success": false
+  },
+  "mongke/high-1772962269.md": {
+    "executed": "2026-03-08T15:10:28.054186",
+    "success": true
+  },
+  "kublai/high-1772987567.no_output.revision-1.md": {
+    "executed": "2026-03-08T15:11:04.785256",
+    "success": true
+  },
+  "jochi/high-1772984377.md": {
+    "executed": "2026-03-08T15:12:35.938936",
+    "success": true
+  },
+  "ogedei/high-1772986139.md": {
+    "executed": "2026-03-08T15:12:53.488888",
+    "success": true
+  },
+  "mongke/high-1772956060.md": {
+    "executed": "2026-03-08T15:13:15.782003",
+    "success": true
+  },
+  "chagatai/normal-1772950631.no_output.md": {
+    "executed": "2026-03-08T15:15:49.032689",
+    "success": true
+  },
+  "ogedei/high-1772955299.md": {
+    "executed": "2026-03-08T15:16:24.270568",
+    "success": true
+  },
+  "jochi/high-1772931999.unverified.unverified.md": {
+    "executed": "2026-03-08T15:17:36.266352",
+    "success": true
+  },
+  "kublai/normal-1772931752.unverified.unverified.md": {
+    "executed": "2026-03-08T15:17:46.938943",
+    "success": true
+  },
+  "mongke/high-1772950894.no_output.failed.revision-1.md": {
+    "executed": "2026-03-08T15:18:12.011994",
+    "success": true
+  },
+  "kublai/normal-1772950918.md": {
+    "executed": "2026-03-08T15:21:02.979178",
+    "success": true
+  },
+  "ogedei/high-review-implement-completion-gate-core-scripts-1772979393454.md": {
+    "executed": "2026-03-08T15:21:19.271290",
+    "success": true
+  },
+  "mongke/high-fix-stall-thresholds.verified.verified.verified.verified.md": {
+    "executed": "2026-03-08T15:22:05.135316",
+    "success": true
+  },
+  "kublai/normal-1772951160.unverified.md": {
+    "executed": "2026-03-08T15:22:28.564142",
+    "success": true
+  },
+  "chagatai/high-1772987945.md": {
+    "executed": "2026-03-08T15:24:44.680897",
+    "success": true
+  },
+  "jochi/high-review-implement-completion-gate-core-scripts-1772979392985.md": {
+    "executed": "2026-03-08T15:26:17.401382",
+    "success": true
+  },
+  "mongke/normal-1772951087.md": {
+    "executed": "2026-03-08T15:27:49.860642",
+    "success": true
+  },
+  "ogedei/high-1772976017.md": {
+    "executed": "2026-03-08T15:28:16.880166",
+    "success": true
+  },
+  "kublai/normal-1772957008.unverified.md": {
+    "executed": "2026-03-08T15:28:29.329367",
+    "success": true
+  },
+  "tolui/high-1772986451.md": {
+    "executed": "2026-03-08T15:31:15.540628",
+    "success": true
+  },
+  "mongke/normal-1772956160.md": {
+    "executed": "2026-03-08T15:31:42.249159",
+    "success": true
+  },
+  "jochi/high-1772954165-khan-avatars-frontend.md": {
+    "executed": "2026-03-08T15:32:44.985451",
+    "success": true
+  },
+  "kublai/high-gate-neo4j-password-hardening-20260308-151000.md": {
+    "executed": "2026-03-08T15:34:28.625571",
+    "success": true
+  },
+  "mongke/normal-1772989692.md": {
+    "executed": "2026-03-08T15:35:27.264875",
+    "success": true
+  },
+  "temujin/high-1772987133.md": {
+    "executed": "2026-03-08T15:36:55.122579",
+    "success": true
+  },
+  "kublai/normal-1772975017.md": {
+    "executed": "2026-03-08T15:37:09.796864",
+    "success": true
+  },
+  "jochi/high-1772983966.md": {
+    "executed": "2026-03-08T15:37:16.613854",
+    "success": true
+  },
+  "chagatai/high-review-implement-completion-gate-core-scripts-1772979392539.verified.md": {
+    "executed": "2026-03-08T15:37:50.320546",
+    "success": true
+  },
+  "jochi/high-1772952700-fix-task-complete-haiku-model.md": {
+    "executed": "2026-03-08T15:40:44.300183",
+    "success": true
+  },
+  "kublai/normal-1772982214.md": {
+    "executed": "2026-03-08T15:42:22.481488",
+    "success": true
+  },
+  "chagatai/normal-taskmetrics-aggregation-1772952500.verified.md": {
+    "executed": "2026-03-08T15:43:37.114000",
+    "success": true
+  },
+  "jochi/high-1772955042.md": {
+    "executed": "2026-03-08T15:44:29.986202",
+    "success": true
+  },
+  "chagatai/normal-1772954959.md": {
+    "executed": "2026-03-08T15:46:08.938826",
+    "success": true
+  },
+  "mongke/normal-alternative-platform-research-1772974516.md": {
+    "executed": "2026-03-08T15:46:57.602123",
+    "success": true
+  },
+  "temujin/high-1772987680.md": {
+    "executed": "2026-03-08T15:53:39.747240",
+    "success": true
+  },
+  "kublai/normal-github-scraper-status-check-1772974519.md": {
+    "executed": "2026-03-08T15:55:25.302161",
+    "success": true
+  },
+  "mongke/normal-openclaw-name-verification-1772974517.md": {
+    "executed": "2026-03-08T15:56:40.591497",
+    "success": true
+  },
+  "ogedei/high-1772995562.md": {
+    "executed": "2026-03-08T15:58:23.527821",
+    "success": false
+  },
+  "kublai/normal-x-access-resolution-check-1772974521.md": {
+    "executed": "2026-03-08T15:59:11.854292",
+    "success": false
   }
 }

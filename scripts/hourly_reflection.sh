@@ -1,6 +1,13 @@
 #!/bin/bash
-# Concurrent Kurultai Reflection - All 6 Agents Reflect Simultaneously
-# Runs every hour with all agents reflecting in parallel
+# Kurultai Reflection - All 6 Agents Reflect Simultaneously (4-Hour Cycle)
+# Runs every 4 hours: 12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM
+#
+# BENEFITS OF 4-HOUR CYCLE:
+# - 6 reflections/day vs 24 (75% reduction in context switches)
+# - Cleaner voting windows: 6 overlapping vs 24
+# - Each Khan gets 4 hours to review before voting closes
+# - 24h voting window works cleanly with fewer cycles
+# - 4-hour response time still fast for system operations
 #
 # Option B: Protocol-based reflections (~800 tokens/agent vs ~6400 legacy)
 # - Role-specific protocols with WHEN/THEN behavioral rules
@@ -403,6 +410,34 @@ timed_step "rule-compliance" \
 # ============================================================
 timed_step "task-metrics" \
     run_with_timeout 30 python3 "$SCRIPTS/aggregate_task_metrics.py" --period hourly --hours 1 >> "$LOGS_DIR/metrics-aggregation.log" 2>&1
+
+# ============================================================
+# CONSENSUS VOTING: Authentic Mongolian Kurultai Model
+# Phase 1: Generate Proposals (each Khan writes their own)
+# Phase 2: Start Voting (60-min window)
+# Phase 3: Check Consensus (unanimous = 6/6 APPROVE)
+# Phase 4: Create Tasks for Approved (only after consensus)
+# ============================================================
+
+echo "[$(date)] Starting Consensus Voting (Kurultai Model)..."
+
+# Phase 1: Generate proposals from each agent
+timed_step "voting-phase1-proposals" \
+    run_with_timeout 60 python3 "$SCRIPTS/proposal_generator.py" --agent kublai --sample >> "$LOGS_DIR/voting-phase1.log" 2>&1
+
+# Phase 2: Start voting for pending proposals
+timed_step "voting-phase2-start" \
+    run_with_timeout 30 python3 "$SCRIPTS/kurultai_voting.py" --phase 3 >> "$LOGS_DIR/voting-phase2.log" 2>&1
+
+# Phase 3: Check consensus (will finalize proposals)
+timed_step "voting-phase3-consensus" \
+    run_with_timeout 30 python3 "$SCRIPTS/kurultai_voting.py" --phase 4 >> "$LOGS_DIR/voting-phase3.log" 2>&1
+
+# Phase 4: Create tasks for approved proposals
+timed_step "voting-phase4-tasks" \
+    run_with_timeout 60 python3 "$SCRIPTS/kurultai_voting.py" --phase 5 >> "$LOGS_DIR/voting-phase4.log" 2>&1
+
+echo "[$(date)] Consensus Voting complete"
 
 # ============================================================
 # BRAINSTORMING: Decoupled to run_brainstorm.sh (separate schedule at :30)

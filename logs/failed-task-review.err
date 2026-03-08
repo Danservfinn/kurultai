@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/kublai/.openclaw/agents/main/scripts/failed-task-review.py", line 576, in <module>
+    main()
+    ~~~~^^
+  File "/Users/kublai/.openclaw/agents/main/scripts/failed-task-review.py", line 532, in main
+    failed_tasks = scan_failed_tasks(max_age_hours=args.max_age)
+  File "/Users/kublai/.openclaw/agents/main/scripts/failed-task-review.py", line 241, in scan_failed_tasks
+    "retry_count": int(meta.get("retry_count", 0)),
+                   ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: '"\\"\\\\\\"0\\\\\\"\\""'
