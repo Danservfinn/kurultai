@@ -1,0 +1,22 @@
+{
+  "original_task": "high-fix-execution-marker-injection-$(uuidgen).pending.executing",
+  "audit_timestamp": "2026-03-08T09:50:17.542581",
+  "audit_version": "1.0",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "temujin",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0
+}

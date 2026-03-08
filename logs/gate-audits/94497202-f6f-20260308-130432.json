@@ -1,0 +1,22 @@
+{
+  "original_task": "94497202-f6f",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "chagatai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T13:04:32.099485",
+  "audit_version": "1.0"
+}

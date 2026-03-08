@@ -1,0 +1,29 @@
+{
+  "original_task": "7f3662d0-0ef",
+  "audit_timestamp": "2026-03-08T10:54:08.509834",
+  "audit_version": "1.0",
+  "completion_percentage": 80,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "ogedei",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "ogedei",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0
+}

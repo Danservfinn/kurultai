@@ -1,0 +1,138 @@
+{
+  "timestamp": "2026-03-08T08:36:56Z",
+  "hour_file": "2026-03-08-04",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 2.011,
+    "depths": {"temujin": 11, "mongke": 0, "chagatai": 0, "jochi": 0, "ogedei": 1},
+    "mean": 2.4,
+    "std": 4.83
+  },
+  "routing": {
+    "total_routed": 14,
+    "overflow_count": 1,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-08T04:36:56.390574",
+  "total_routed": 14,
+  "routing_methods": {
+    "explicit": 13,
+    "redistribution": 1
+  },
+  "destinations": {
+    "temujin": 4,
+    "chagatai": 1,
+    "mongke": 8,
+    "kublai": 1
+  },
+  "by_agent": {
+    "temujin": {
+      "routed": 4,
+      "executed": 2,
+      "succeeded": 2,
+      "failed": 0
+    },
+    "chagatai": {
+      "routed": 1,
+      "executed": 6,
+      "succeeded": 6,
+      "failed": 0
+    },
+    "mongke": {
+      "routed": 8,
+      "executed": 8,
+      "succeeded": 7,
+      "failed": 1
+    },
+    "kublai": {
+      "routed": 1,
+      "executed": 2,
+      "succeeded": 2,
+      "failed": 0
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 2,
+      "executing": 2,
+      "done": 22
+    },
+    "temujin": {
+      "pending": 11,
+      "executing": 2,
+      "done": 9
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 20
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 18
+    },
+    "jochi": {
+      "pending": 0,
+      "executing": 0,
+      "done": 17
+    },
+    "ogedei": {
+      "pending": 1,
+      "executing": 2,
+      "done": 23
+    }
+  },
+  "issues": [
+    "High explicit routing: 13/14 (93%) \u2014 keyword table may be underused",
+    "Workload imbalance: mongke got 8 tasks vs chagatai got 1",
+    "mongke: 1 task(s) failed out of 8 executed",
+    "temujin: 11 tasks pending in queue (backlog)",
+    "Keyword table drift: 9/14 (64%) tasks would route differently via keywords vs actual destination",
+    "RECURRING: 3 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "Overflow routing: 1/14 (7%) \u2014 load balancing active",
+    "Routing methods: explicit=13, redistribution=1"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 9,
+  "kw_misroute_rate": "9/14",
+  "kw_misroute_examples": [
+    "'Update all agent SOUL.md and IDENTITY.md with completion rep' -> kw=mongke actual=chagatai",
+    "'DESIGN: Task Completion Success Metrics via Neo4j for Reflec' -> kw=temujin actual=mongke",
+    "'UPDATE: Add model/agent tracking to Task Success Metrics des' -> kw=temujin actual=mongke",
+    "'UPDATE: Add skills/prompt/task params to Task Success Metric' -> kw=temujin actual=mongke",
+    "'DESIGN: Kublai Task & Prompt Optimization Loop using Success' -> kw=temujin actual=mongke"
+  ],
+  "overflow_count": 1,
+  "skill_hint_coverage": "8/14",
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-08T04:15:08.686085"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "High explicit routing: #/# (#%) \u2014 keyword table may be underused",
+      "consecutive": 22,
+      "first_seen": "2026-03-07T16:03:03.123676"
+    },
+    {
+      "issue_key": "Keyword table drift: #/# (#%) tasks would route differently via keywords vs actual destination",
+      "consecutive": 4,
+      "first_seen": "2026-03-08T00:01:35.014112"
+    },
+    {
+      "issue_key": "temujin: # tasks pending in queue (backlog)",
+      "consecutive": 3,
+      "first_seen": "2026-03-08T03:40:23.399524"
+    }
+  ]
+}
+}

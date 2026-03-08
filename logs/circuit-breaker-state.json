@@ -1,0 +1,48 @@
+{
+  "ts": "2026-03-08T13:09:48.080331",
+  "agents": {
+    "chagatai": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 0,
+      "last_failure_rate": 0.0
+    },
+    "mongke": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 2,
+      "last_failure_rate": 0.0
+    },
+    "tolui": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 0,
+      "last_failure_rate": 0.0
+    },
+    "jochi": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 4,
+      "last_failure_rate": 0.0
+    },
+    "ogedei": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 4,
+      "success_count": 0,
+      "last_failure_rate": 0.6666666666666666
+    },
+    "temujin": {
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 0,
+      "success_count": 19,
+      "last_failure_rate": 0.0
+    }
+  },
+  "redistributions": []
+}

@@ -1641,3 +1641,10 @@ Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest
 [Sun Mar  8 13:05:48 EDT 2026] Spawned chagatai review (running:        2)
 [Sun Mar  8 13:05:48 EDT 2026] [temujin] Starting review with fallback mode...
 [Sun Mar  8 13:05:48 EDT 2026] Spawned temujin review (running:        3)
+[Sun Mar  8 13:07:05 EDT 2026] TIMEOUT: Reflection exceeded 420s, forcing exit
+[Sun Mar  8 13:07:05 EDT 2026] Reflection finished in 421s
+[Sun Mar  8 13:07:05 EDT 2026] Reflection finished in 421s
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Sun Mar  8 13:07:44 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: full)
+[Sun Mar  8 13:07:58 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md

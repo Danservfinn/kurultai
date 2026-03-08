@@ -1,0 +1,20 @@
+{
+  "original_task": "3371fb37-2cf",
+  "audit_timestamp": "2026-03-08T09:55:35.213295",
+  "audit_version": "1.0",
+  "completion_percentage": 95,
+  "can_complete": false,
+  "missing_components": [],
+  "quality_issues": [],
+  "required_followups": [],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "jochi",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0
+}

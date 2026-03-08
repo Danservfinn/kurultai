@@ -1,10 +1,11 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.10
+**Version**: 1.13
 **Last Updated**: 2026-03-08
 **Status**: Active Production System
 **Agent**: Kublai (Squad Lead / Router)
-**Platform**: OpenClaw Gateway (Multi-Gateway Setup)  
+**Platform**: OpenClaw Gateway (Multi-Gateway Setup)
+**GitHub Repository**: https://github.com/danservfinn/kurultai  
 
 ---
 
@@ -1729,6 +1730,22 @@ Week 2-3:
 
 **Files Modified**: `scripts/kurultai-monitor.py` (browser-based), `cron/jobs.json` (new entry)
 
+
+---
+
+### 2026-03-08 - GitHub Repository Configuration (v1.13)
+
+**Change**: Configured GitHub remote repository and saved credentials for version control.
+
+**Scope**:
+
+1. **GitHub Token**: Saved to `.github_credentials` (PAT with repo access)
+2. **Remote URL**: `https://github.com/danservfinn/kurultai.git`
+3. **Architecture Update**: Added repository URL to ARCHITECTURE.md header
+
+**Files Modified**: `ARCHITECTURE.md` (version bump, repo URL added)
+
+**Impact**: All Kurultai codebase changes now tracked in GitHub repository; enables version control, collaboration, and rollback capabilities.
 
 ---
 

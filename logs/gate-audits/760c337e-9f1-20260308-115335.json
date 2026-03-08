@@ -1,0 +1,29 @@
+{
+  "original_task": "760c337e-9f1",
+  "completion_percentage": 80,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "chagatai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "chagatai",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T11:53:35.263769",
+  "audit_version": "1.0"
+}

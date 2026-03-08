@@ -1,0 +1,29 @@
+{
+  "original_task": "gate-race-condition-fix-1772985678",
+  "completion_percentage": 70,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written",
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "kublai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    },
+    {
+      "title": "Insufficient execution output",
+      "agent": "kublai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T12:00:41.094205",
+  "audit_version": "1.0"
+}

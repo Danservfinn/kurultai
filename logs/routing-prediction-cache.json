@@ -1,0 +1,18 @@
+{
+  "738a07719feb5c4cf68e70f7e662a537": {
+    "rankings": {
+      "temujin": 8,
+      "mongke": 0,
+      "chagatai": 0,
+      "jochi": 0,
+      "ogedei": 10,
+      "kublai": 0,
+      "tolui": 0
+    },
+    "optimal_agent": "ogedei",
+    "confidence": 0.5,
+    "reasoning": "Keyword-based fallback (LLM unavailable)",
+    "model": "heuristic",
+    "predicted_at": "2026-03-08T01:40:49.815067"
+  }
+}

@@ -1,9 +1,9 @@
 {
   "last_audit": 1772988992.8597891,
-  "cycles": 6385,
-  "last_cycle": "2026-03-08T13:06:29.142358",
+  "cycles": 6390,
+  "last_cycle": "2026-03-08T13:09:36.101102",
   "watcher_restarts": 11,
-  "stalled_warnings": 284,
+  "stalled_warnings": 287,
   "fakes_detected": 12,
   "malformed_cleaned": 0,
   "audit_result": {
@@ -13,12 +13,12 @@
     "skipped": 7,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772989589.1424189,
+  "last_cycle_epoch": 1772989776.10115,
   "last_issues": [
-    "kublai/high-1772986310.executing.md stalled 3277s",
-    "temujin/high-1772983582.executing.md stalled 6004s",
-    "mongke/high-1772986139.executing.md stalled 3448s",
-    "ogedei/high-1772986452.executing.md stalled 932s"
+    "kublai/high-1772986310.executing.md stalled 3464s",
+    "temujin/high-1772983582.executing.md stalled 6191s",
+    "mongke/high-1772986139.executing.md stalled 3635s",
+    "chagatai/high-1772946600.unverified.executing.md stalled 1050s"
   ],
   "reflection_misses": 0,
   "last_memory_audit": 1772989015.476128,

@@ -1,0 +1,21 @@
+{
+  "ts": "2026-03-08T05:19:26.549103",
+  "window_hours": 24,
+  "score": {
+    "score": 100.0,
+    "auto_resolved": 1,
+    "escalated": 0,
+    "manual": 0,
+    "partial": 0,
+    "total_issues": 1,
+    "by_type": {
+      "gateway_restart": {
+        "auto": 1,
+        "escalated": 0,
+        "manual": 0,
+        "partial": 0
+      }
+    },
+    "trends": []
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "created": 5,
+  "deprecated": 0,
+  "skipped": 7,
+  "errors": [],
+  "learnings": [
+    {
+      "type": "skill_hint",
+      "agent": "jochi",
+      "hint": "/systematic-debugging",
+      "confidence": 0.6,
+      "sample_size": 5
+    },
+    {
+      "type": "skill_hint",
+      "agent": "ogedei",
+      "hint": "/kurultai-health",
+      "confidence": 0.6,
+      "sample_size": 8
+    },
+    {
+      "type": "skill_hint",
+      "agent": "temujin",
+      "hint": "/horde-brainstorming",
+      "confidence": 0.6,
+      "sample_size": 5
+    },
+    {
+      "type": "skill_hint",
+      "agent": "temujin",
+      "hint": "",
+      "confidence": 0.72,
+      "sample_size": 10
+    },
+    {
+      "type": "timeout",
+      "agent": "temujin",
+      "bucket": "very_long",
+      "confidence": 0.7183333333333333,
+      "sample_size": 12
+    }
+  ]
+}

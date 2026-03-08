@@ -1,0 +1,275 @@
+{
+  "timestamp": "2026-03-08T13:53:55Z",
+  "hour_file": "2026-03-08-09",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 1.422,
+    "depths": {"temujin": 11, "mongke": 2, "chagatai": 0, "jochi": 0, "ogedei": 3},
+    "mean": 3.2,
+    "std": 4.55
+  },
+  "routing": {
+    "total_routed": 46,
+    "overflow_count": 20,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-08T09:53:55.174143",
+  "total_routed": 46,
+  "routing_methods": {
+    "explicit": 25,
+    "redistribution": 20
+  },
+  "destinations": {
+    "chagatai": 5,
+    "temujin": 11,
+    "mongke": 10,
+    "ogedei": 6,
+    "kublai": 3,
+    "jochi": 10
+  },
+  "by_agent": {
+    "chagatai": {
+      "routed": 5,
+      "executed": 4,
+      "succeeded": 4,
+      "failed": 0
+    },
+    "temujin": {
+      "routed": 11,
+      "executed": 4,
+      "succeeded": 4,
+      "failed": 0
+    },
+    "mongke": {
+      "routed": 10,
+      "executed": 4,
+      "succeeded": 4,
+      "failed": 0
+    },
+    "ogedei": {
+      "routed": 6,
+      "executed": 3,
+      "succeeded": 3,
+      "failed": 0
+    },
+    "kublai": {
+      "routed": 3,
+      "executed": 3,
+      "succeeded": 2,
+      "failed": 1
+    },
+    "jochi": {
+      "routed": 10,
+      "executed": 3,
+      "succeeded": 3,
+      "failed": 0
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 29
+    },
+    "temujin": {
+      "pending": 11,
+      "executing": 2,
+      "done": 27
+    },
+    "mongke": {
+      "pending": 2,
+      "executing": 2,
+      "done": 27
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 24
+    },
+    "jochi": {
+      "pending": 0,
+      "executing": 2,
+      "done": 27
+    },
+    "ogedei": {
+      "pending": 3,
+      "executing": 2,
+      "done": 36
+    }
+  },
+  "issues": [
+    "High overflow rate: 20/46 (43%) \u2014 agents frequently busy",
+    "Workload imbalance: temujin got 11 tasks vs kublai got 3",
+    "kublai: 1 task(s) failed out of 3 executed",
+    "temujin: 11 tasks pending in queue (backlog)",
+    "Keyword table drift: 28/46 (61%) tasks would route differently via keywords vs actual destination",
+    "Keyword routing drift: 11/17 (65%) disagree with actual routing",
+    "RECURRING: 1 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended",
+    "Missed routing opportunities: 22 tasks routed to busy agents when idle alternatives existed (48% of routed tasks)"
+  ],
+  "suggestions": [
+    "Low skill hint coverage: 21/46 \u2014 consider expanding SKILL_HINTS in task_intake.py",
+    "Routing methods: explicit=25, redistribution=20",
+    "  temujin: 7 missed opportunities \u2014 consider adjusting load balancing thresholds",
+    "  jochi: 6 missed opportunities \u2014 consider adjusting load balancing thresholds",
+    "  mongke: 4 missed opportunities \u2014 consider adjusting load balancing thresholds",
+    "  chagatai: 3 missed opportunities \u2014 consider adjusting load balancing thresholds"
+  ],
+  "kw_disagreements": {
+    "tolui->chagatai": 1
+  },
+  "kw_misroute_count": 28,
+  "kw_misroute_rate": "28/46",
+  "kw_misroute_examples": [
+    "'IMPLEMENT: Task Completion Gate system' -> kw=temujin actual=ogedei",
+    "'Build X/Twitter analytics dashboard for OpenClaw growth trac' -> kw=temujin actual=ogedei",
+    "'Build automated X/Twitter posting system for OpenClaw' -> kw=temujin actual=ogedei",
+    "'Implement Completion Gate Core Scripts' -> kw=temujin actual=ogedei",
+    "'Review: High 1772973517.Done' -> kw=jochi actual=temujin"
+  ],
+  "overflow_count": 20,
+  "skill_hint_coverage": "21/46",
+  "routing_drift": {
+    "total": 17,
+    "mismatches": 11,
+    "drift_pct": 64.7,
+    "top_examples": [
+      {
+        "task": "IMPLEMENT: Task Completion Gate system",
+        "actual": "ogedei",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "Build X/Twitter analytics dashboard for OpenClaw growth tracking",
+        "actual": "ogedei",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "Build automated X/Twitter posting system for OpenClaw",
+        "actual": "ogedei",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "Implement Completion Gate Core Scripts",
+        "actual": "ogedei",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "Refactor: Extract serializeFrontmatter utility",
+        "actual": "jochi",
+        "keyword_would": "temujin"
+      }
+    ],
+    "ts": "2026-03-08T09:48:09.693929"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "Keyword table drift: #/# (#%) tasks would route differently via keywords vs actual destination",
+      "consecutive": 4,
+      "first_seen": "2026-03-08T09:00:06.832782"
+    }
+  ],
+  "missed_opportunities": {
+    "count": 22,
+    "by_agent": {
+      "temujin": 7,
+      "mongke": 4,
+      "chagatai": 3,
+      "ogedei": 1,
+      "kublai": 1,
+      "jochi": 6
+    },
+    "examples": [
+      {
+        "task": "Review Parse monetization blockers and create next implementation task",
+        "routed_to": "temujin",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ],
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-08T09:03:38.652542"
+      },
+      {
+        "task": "Review: High 1772973517.Done",
+        "routed_to": "temujin",
+        "dest_queue": 3,
+        "idle_alternatives": [
+          [
+            "jochi",
+            1
+          ],
+          [
+            "tolui",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-08T09:20:16.866187"
+      },
+      {
+        "task": "Review: High 1772974075.Done",
+        "routed_to": "temujin",
+        "dest_queue": 4,
+        "idle_alternatives": [
+          [
+            "jochi",
+            1
+          ],
+          [
+            "tolui",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-08T09:20:17.228308"
+      },
+      {
+        "task": "Review: High 1772974513.Done",
+        "routed_to": "mongke",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ],
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-08T09:20:17.894842"
+      },
+      {
+        "task": "Review: Completion Gate Documentation 1772950853.Done",
+        "routed_to": "chagatai",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            2
+          ],
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-08T09:20:18.290599"
+      }
+    ]
+  }
+}
+}

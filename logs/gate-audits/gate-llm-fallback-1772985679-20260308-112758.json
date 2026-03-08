@@ -1,0 +1,22 @@
+{
+  "original_task": "gate-llm-fallback-1772985679",
+  "audit_timestamp": "2026-03-08T11:27:58.713209",
+  "audit_version": "1.0",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Incomplete items marked TODO/FIXME in code"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Incomplete items marked TODO/FIXME in code",
+      "agent": "ogedei",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0
+}

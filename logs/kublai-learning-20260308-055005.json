@@ -1,0 +1,13 @@
+{
+  "created": 0,
+  "deprecated": 0,
+  "skipped": 7,
+  "errors": [
+    "skill_hint: {neo4j_code: Neo.ClientError.Statement.TypeError} {message: Property values can only be of primitive types or arrays thereof. Encountered: Map{successful_tasks -> Long(5), avg_quality -> String(\"0.52\"), total_tasks -> Long(5), success_rate -> String(\"1.0\")}.} {gql_status: 22G03} {gql_status_description: error: data exception - invalid value type}",
+    "skill_hint: {neo4j_code: Neo.ClientError.Statement.TypeError} {message: Property values can only be of primitive types or arrays thereof. Encountered: Map{successful_tasks -> Long(8), avg_quality -> String(\"0.49\"), total_tasks -> Long(8), success_rate -> String(\"1.0\")}.} {gql_status: 22G03} {gql_status_description: error: data exception - invalid value type}",
+    "skill_hint: {neo4j_code: Neo.ClientError.Statement.TypeError} {message: Property values can only be of primitive types or arrays thereof. Encountered: Map{successful_tasks -> Long(5), avg_quality -> String(\"0.6\"), total_tasks -> Long(5), success_rate -> String(\"1.0\")}.} {gql_status: 22G03} {gql_status_description: error: data exception - invalid value type}",
+    "skill_hint: {neo4j_code: Neo.ClientError.Statement.TypeError} {message: Property values can only be of primitive types or arrays thereof. Encountered: Map{successful_tasks -> Long(6), avg_quality -> String(\"0.55\"), total_tasks -> Long(10), success_rate -> String(\"0.6\")}.} {gql_status: 22G03} {gql_status_description: error: data exception - invalid value type}",
+    "timeout: {neo4j_code: Neo.ClientError.Statement.TypeError} {message: Property values can only be of primitive types or arrays thereof. Encountered: Map{avg_quality -> String(\"0.59\"), total_tasks -> Long(12), success_rate -> String(\"1.0\"), avg_utilization -> String(\"0.36\")}.} {gql_status: 22G03} {gql_status_description: error: data exception - invalid value type}"
+  ],
+  "learnings": []
+}
