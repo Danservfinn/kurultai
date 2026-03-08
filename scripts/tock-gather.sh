@@ -64,7 +64,7 @@ signal.alarm(30)  # kill after 30 seconds
 results = {"_failed_queries": []}  # Track which queries failed for diagnostics
 
 def run_query(session, query, name):
-    """Run a Neo4j query with graceful degradation - returns [] on failure."""
+    """Task 6.2: Run a Neo4j query with graceful degradation - returns [] on failure."""
     try:
         r = session.run(query)
         return [dict(rec) for rec in r]
@@ -331,6 +331,7 @@ CRON_JOBS=${CRON_JOBS:-'{"calendar_reminder":{"status":"unknown","error_log_exis
 
 # ============================================================
 # 4. Task queue depths (file-based)
+# Task 6.1: oldest_age_s returns 0 for empty queues (not null)
 # ============================================================
 QUEUE_DATA=$(python3 2>/dev/null << 'PYEOF'
 import json, os, glob, time
@@ -342,7 +343,8 @@ for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     task_dir = f"{base}/{agent}/tasks"
     if not os.path.isdir(task_dir):
         queues[agent] = 0
-        oldest_ages[agent] = None
+        # Task 6.1: Return 0 (no tasks) not None (measurement failure) for missing task dir
+        oldest_ages[agent] = 0  # Missing task dir = no tasks, not measurement error
         continue
     pending = 0
     oldest_age_s = 0  # Default: 0 means no pending tasks (distinguishes from measurement failure)

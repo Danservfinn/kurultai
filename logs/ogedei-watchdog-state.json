@@ -1,19 +1,19 @@
 {
-  "last_audit": 1772946490.3078709,
-  "cycles": 6332,
-  "last_cycle": "2026-03-08T00:37:26.982702",
+  "last_audit": 1772948316.5340228,
+  "cycles": 6340,
+  "last_cycle": "2026-03-08T00:42:03.371385",
   "watcher_restarts": 11,
-  "stalled_warnings": 278,
+  "stalled_warnings": 279,
   "fakes_detected": 8,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 50,
-    "fake_found": 10,
-    "requeued": 9,
+    "audited": 57,
+    "fake_found": 1,
+    "requeued": 0,
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772948246.982719,
+  "last_cycle_epoch": 1772948523.371397,
   "last_issues": [
     "reflection-status.json missing"
   ],
