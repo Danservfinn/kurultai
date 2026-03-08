@@ -48,10 +48,13 @@ from kurultai_paths import (AGENTS_DIR as BASE, MAIN_DIR as MAIN, PROPOSALS_DIR,
     BRAINSTORM_COOLDOWN as COOLDOWN_FILE, BRAINSTORM_DOMAIN_ROTATION as DOMAIN_FILE)
 
 # Claude Code — opus for brainstorming (via claude-agent wrapper)
+# Model names must match Claude Code's expected format (claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5-20251001)
 CLAUDE_AGENT_BIN = str(CLAUDE_AGENT_PATH)
-_VALID_MODELS = {"opus", "sonnet", "haiku"}
+_VALID_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"}
+_MODEL_SHORTHAND = {"opus": "claude-opus-4-6", "sonnet": "claude-sonnet-4-6", "haiku": "claude-haiku-4-5-20251001"}
 _env_model = os.getenv("CLAUDE_BRAINSTORM_MODEL", "opus")
-CLAUDE_MODEL = _env_model if _env_model in _VALID_MODELS else "opus"
+# Convert shorthand to full model name
+CLAUDE_MODEL = _MODEL_SHORTHAND.get(_env_model, _env_model) if _env_model in _MODEL_SHORTHAND or _env_model in _VALID_MODELS else "claude-opus-4-6"
 try:
     CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_BRAINSTORM_TIMEOUT", "600"))
 except (ValueError, TypeError):
