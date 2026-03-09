@@ -14,19 +14,20 @@
 # - Commitment tracking across sessions
 # - Tock data replaces redundant CLI calls
 #
-# HARD TIMEOUT: 420s (7 min) — Phase 3b moved to separate :30 launchd job
-# Budget: reflections ~30s + reviews ~120s + downstream ~300s + margin
+# HARD TIMEOUT: 600s (10 min) — Increased from 420s to accommodate all 6 agent reviews
+# Budget: reflections ~30s + reviews ~180s (30s/agent × 6 in 3 batches) + downstream ~300s + margin
+# FIX 2026-03-08: Jochi and Ogedei (Batch 3) were timing out at 420s — now have full 10 min window
 # CHECKPOINT: Emits reflection-status.json after core reflections complete
 # FALLBACK: Exit 0 even if downstream steps fail (content generation succeeded)
 
 SCRIPT_START=$(date +%s)
-TIMEOUT_SECONDS=420
+TIMEOUT_SECONDS=600
 
 # ============================================================
 # CONCURRENCY CONTROL: Semaphore limiting for Claude processes
 # ============================================================
 MAX_CONCURRENT=3  # Reflections: 3 concurrent (fast, ~30s each)
-MAX_CONCURRENT_REVIEW=2  # Reviews: 2 concurrent (horde-review is complex, dispatches multiple agents)
+MAX_CONCURRENT_REVIEW=3  # Reviews: 3 concurrent (FIX 2026-03-08: increased from 2 to reduce batch latency for jochi/ogedei)
 MAX_LOAD=4.0  # Max system load (1-min avg) before blocking new spawns
 
 # Job control for process group management
@@ -378,15 +379,28 @@ review_batch() {
 }
 
 # Batch 1: kublai, mongke
+echo "[$(date)] Starting Batch 1: kublai, mongke"
+BATCH1_START=$(date +%s)
 review_batch "kublai" "mongke"
+BATCH1_END=$(date +%s)
+echo "[$(date)] Batch 1 complete in $((BATCH1_END - BATCH1_START))s"
 
 # Batch 2: chagatai, temujin
+echo "[$(date)] Starting Batch 2: chagatai, temujin"
+BATCH2_START=$(date +%s)
 review_batch "chagatai" "temujin"
+BATCH2_END=$(date +%s)
+echo "[$(date)] Batch 2 complete in $((BATCH2_END - BATCH2_START))s"
 
-# Batch 3: jochi, ogedei
+# Batch 3: jochi, ogedei (FIX 2026-03-08: now have full 600s window)
+echo "[$(date)] Starting Batch 3: jochi, ogedei"
+BATCH3_START=$(date +%s)
 review_batch "jochi" "ogedei"
+BATCH3_END=$(date +%s)
+echo "[$(date)] Batch 3 complete in $((BATCH3_END - BATCH3_START))s"
 
-echo "[$(date)] All agent /horde-review analyses complete"
+TOTAL_REVIEW_TIME=$((BATCH3_END - BATCH1_START))
+echo "[$(date)] All agent /horde-review analyses complete (total: ${TOTAL_REVIEW_TIME}s)"
 echo "================================================================"
 
 # ============================================================
