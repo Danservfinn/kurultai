@@ -139,61 +139,117 @@ active_executions: dict[str, Future] = {}
 active_lock = Lock()
 
 
-def _verify_task_completion(task_file):
+def _verify_task_completion(task_file, max_retries=3):
     """Verify task file has actual execution output before marking as complete.
 
     CRITICAL FIX: This function now requires the presence of an "## Execution Output"
     section to distinguish actual execution results from the original task description.
 
+    RACE CONDITION FIX (2026-03-08): Uses file locking to prevent false positives
+    when the handler is still writing output. If verification fails, retries with
+    exponential backoff to handle slow writes.
+
+    RESOLUTION CHECK (2026-03-09): Substantive completions (>=100 chars) must include
+    a resolution section ("## Resolution" or similar) matching /horde-review PRIORITY_FIX.
+
     Checks:
     - Has "## Execution Output" section (added by _append_output_to_executing)
     - Content AFTER "## Execution Output" has substance (not just empty)
-    - At least 10 non-empty lines of actual execution output
+    - At least 4 non-empty lines of actual execution output
+    - Resolution section present for substantive outputs (>=100 chars)
 
     Returns tuple: (is_valid, reason)
     """
-    try:
-        with open(task_file, 'r') as f:
-            content = f.read()
+    for attempt in range(max_retries):
+        try:
+            # Acquire shared lock to wait for any writer to finish
+            # LOCK_SH (shared) will block if another process has LOCK_EX (exclusive)
+            fd = None
+            try:
+                fd = os.open(task_file, os.O_RDONLY)
+                fcntl.flock(fd, fcntl.LOCK_SH)  # Wait for exclusive lock to release
+            except (FileNotFoundError, OSError):
+                # File might have been renamed between check and open
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+                    continue
+                else:
+                    return False, f"Verification error: file unavailable after {max_retries} retries"
 
-        # CRITICAL: Check for execution output section
-        # This is the separator added by _append_output_to_executing() in agent-task-handler.py
-        execution_marker = '## Execution Output'
+            try:
+                with open(fd, 'r', closefd=False) as f:
+                    content = f.read()
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)  # Release lock
+                os.close(fd)
 
-        if execution_marker not in content:
-            return False, f"No execution output section found (missing '{execution_marker}')"
+            # CRITICAL: Check for execution output section
+            # This is the separator added by _append_output_to_executing() in agent-task-handler.py
+            execution_marker = '## Execution Output'
 
-        # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
-        # which is always the system-controlled marker. This prevents injection
-        # attacks where task descriptions contain the marker.
-        parts = content.rsplit(execution_marker, 1)
-        if len(parts) < 2:
-            return False, "Execution output section exists but has no content"
+            if execution_marker not in content:
+                # If content looks incomplete (too short), retry before failing
+                if len(content) < 1000 and attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                return False, f"No execution output section found (missing '{execution_marker}')"
 
-        execution_output = parts[1].strip()
+            # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
+            # which is always the system-controlled marker. This prevents injection
+            # attacks where task descriptions contain the marker.
+            parts = content.rsplit(execution_marker, 1)
+            if len(parts) < 2:
+                return False, "Execution output section exists but has no content"
 
-        # Count actual execution output lines (non-empty, excluding known metadata patterns)
-        # Only filter lines that are EXACTLY metadata format, not all bold text
-        import re
-        metadata_pattern = re.compile(r'^\*\*(Model|Duration|Status|Timestamp|Session|Agent|Task ID):\*\*')
+            execution_output = parts[1].strip()
 
-        exec_lines = [l for l in execution_output.split('\n')
-                      if l.strip()
-                      and not metadata_pattern.match(l.strip())  # only filter known metadata
-                      and not l.strip() == '---']
+            # Count actual execution output lines (non-empty, excluding known metadata patterns)
+            # Only filter lines that are EXACTLY metadata format, not all bold text
+            metadata_pattern = re.compile(r'^\*\*(Model|Duration|Status|Timestamp|Session|Agent|Task ID):\*\*')
 
-        # Require at least 8 lines of actual output (lowered from 10 to account for markdown formatting)
-        if len(exec_lines) < 8:
-            return False, f"Execution output too short ({len(exec_lines)} lines, need 8+)"
+            exec_lines = [l for l in execution_output.split('\n')
+                          if l.strip()
+                          and not metadata_pattern.match(l.strip())  # only filter known metadata
+                          and not l.strip() == '---']
 
-        # Also check for some substance (not just repeated markers)
-        total_output_chars = sum(len(l) for l in exec_lines)
-        if total_output_chars < 500:
-            return False, f"Execution output too brief ({total_output_chars} chars, need 500+)"
+            # Require at least 4 lines of actual output (lowered to reduce fix-resolution churn)
+            # 4 lines is enough to distinguish real completions from empty/bogus files
+            # while accommodating brief fix-resolution tasks (5-7 lines is common)
+            if len(exec_lines) < 4:
+                # Might be incomplete write - retry if content looks truncated
+                if not execution_output.endswith('```') and attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                return False, f"Execution output too short ({len(exec_lines)} lines, need 4+)"
 
-        return True, "OK"
-    except Exception as e:
-        return False, f"Verification error: {e}"
+            # Also check for some substance (not just repeated markers)
+            total_output_chars = sum(len(l) for l in exec_lines)
+            if total_output_chars < 200:
+                return False, f"Execution output too brief ({total_output_chars} chars, need 200+)"
+
+            # RESOLUTION SECTION CHECK (2026-03-09): Match /horde-review PRIORITY_FIX
+            # Substantive completions (>=100 chars) must include resolution documentation
+            # This catches missing resolutions at verification time, not in later audit
+            if total_output_chars >= 100:
+                has_resolution = (
+                    "## Resolution" in execution_output
+                    or "**Status:** RESOLVED" in execution_output
+                    or "**Status:** COMPLETED" in execution_output
+                    or execution_output.count("##") >= 3  # Has multiple sections (likely includes resolution)
+                )
+                if not has_resolution:
+                    return False, f"Missing resolution section (add '## Resolution' or '**Status:** RESOLVED')"
+
+            return True, "OK"
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.1 * (2 ** attempt))
+                continue
+            return False, f"Verification error: {e}"
+
+    # Shouldn't reach here, but handle edge case
+    return False, "Verification failed: max retries exceeded"
 
 
 def log(msg):
@@ -363,7 +419,12 @@ def list_pending_tasks(agent_dir):
     pending = []
     for f in tasks_dir.glob("*.md"):
         # Skip completed/executing tasks and gate states
-        if any(x in f.name for x in ['.executing', '.completed', '.done', '.pending-gate', '.gate-blocked']):
+        # FIX 2026-03-09: Don't skip .completed.revision-N.md files - those are pending re-work
+        skip_patterns = ['.executing', '.pending-gate', '.gate-blocked']
+        # Only skip .done.md and .completed.done.md, NOT .completed.revision-N.md
+        if any(f.name.endswith(x) for x in ['.done.md', '.completed.done.md']):
+            continue
+        if any(x in f.name for x in skip_patterns):
             continue
         # Skip continuous/recurring tasks (only run when explicitly triggered)
         try:
@@ -1500,7 +1561,7 @@ def _already_completed(executing_file):
     for done_file in parent.iterdir():
         if not done_file.name.endswith('.done.md'):
             continue
-        # Check for .completed.done.md, .failed.done.md, .dup-orphan.done.md (duplicate recovery)
+        # Check for .completed.done.md, .failed.done.md, .dup-orphan.done.md, .deadpid-orphan.done.md (duplicate recovery)
         done_stem = None
         if '.completed.done.md' in done_file.name:
             done_stem = done_file.name.split('.completed.done.md')[0]
@@ -1508,6 +1569,8 @@ def _already_completed(executing_file):
             done_stem = done_file.name.split('.failed.done.md')[0]
         elif '.dup-orphan.done.md' in done_file.name:
             done_stem = done_file.name.split('.dup-orphan.done.md')[0]
+        elif '.deadpid-orphan.done.md' in done_file.name:
+            done_stem = done_file.name.split('.deadpid-orphan.done.md')[0]
 
         if done_stem is None:
             continue
@@ -1608,7 +1671,19 @@ def recover_stale_executions():
         executing_files = []
         for f in tasks_dir.iterdir():
             # Only match .executing.md files, NOT .executing.pid sentinels
-            if f.is_file() and f.name.endswith('.executing.md') and '.done' not in f.name:
+            # Also skip files with completion markers (false positives)
+            if f.is_file() and f.name.endswith('.executing.md'):
+                # Skip completed task patterns
+                if any(f.name.endswith(pattern) for pattern in [
+                    ".verified.done.md.executing.md",
+                    ".completed.done.md.executing.md",
+                    ".no_output.done.md.executing.md",
+                    ".failed.done.md.executing.md",
+                    ".done.md.executing.md",
+                    ".failed.md.executing.md",
+                    ".completed.md.executing.md",
+                ]):
+                    continue
                 try:
                     mtime = f.stat().st_mtime
                     executing_files.append((mtime, f))
@@ -1974,48 +2049,153 @@ def recover_stale_executions():
 
 
 # ==========================================================
+# REVISION LOOP DETECTOR
+# ==========================================================
+
+_last_revision_check = 0
+_REVISION_CHECK_INTERVAL = 600  # 10 minutes
+_MAX_REVISION_DEPTH = 3  # After .revision-3, force escalation or fail
+
+def detect_revision_loops():
+    """Detect and break revision death spirals.
+
+    When a task produces insufficient output, quality gates create
+    .revision-N.md files. If these revisions also produce short output,
+    we get an endless loop that blocks the agent's queue.
+
+    This function:
+    1. Finds tasks with deep revision chains (>= _MAX_REVISION_DEPTH)
+    2. Checks if the latest revision also has .no_output or .failed markers
+    3. Either escalates to kublai or marks as permanently failed
+
+    Returns count of tasks broken out of revision loops.
+    """
+    global _last_revision_check
+
+    now = time.time()
+    if now - _last_revision_check < _REVISION_CHECK_INTERVAL:
+        return 0
+
+    _last_revision_check = now
+    broken_loops = 0
+
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+
+        agent = agent_dir.name
+
+        # Group revision files by base task name
+        revision_groups: dict[str, list[Path]] = {}
+        revision_pattern = re.compile(r'^(.+)\.revision-(\d+)\.(md|executing\.md|done\.md|failed\.done\.md|no_output\.done\.md)$')
+
+        for f in tasks_dir.iterdir():
+            if not f.is_file():
+                continue
+            m = revision_pattern.match(f.name)
+            if m:
+                base = m.group(1)
+                if base not in revision_groups:
+                    revision_groups[base] = []
+                revision_groups[base].append(f)
+
+        # Check for tasks exceeding max revision depth
+        for base, files in revision_groups.items():
+            # Find highest revision number
+            max_rev = 0
+            latest_file = None
+            for f in files:
+                m = revision_pattern.match(f.name)
+                if m:
+                    rev_num = int(m.group(2))
+                    if rev_num > max_rev:
+                        max_rev = rev_num
+                        latest_file = f
+
+            if max_rev >= _MAX_REVISION_DEPTH and latest_file:
+                # Check if this latest revision also failed quality gate
+                is_failing_revision = (
+                    '.no_output.' in latest_file.name or
+                    '.failed.' in latest_file.name or
+                    '.unverified.' in latest_file.name
+                )
+
+                if is_failing_revision:
+                    # Break the loop - escalate to kublai
+                    escalation_path = tasks_dir / f"{base}.revision-loop-escalated.md"
+
+                    if not escalation_path.exists():
+                        try:
+                            # Create escalation task for kublai
+                            escalation_content = f"""---
+priority: high
+created: {datetime.now().isoformat()}
+source: revision-loop-detector
+parent_task: {agent}/{base}
+escalation_type: revision_death_spiral
+agent: temujin
+---
+
+# Revision Loop Escalation: {agent}/{base}
+
+This task has been through {max_rev} revision attempts without producing valid output.
+
+**Latest status:** {latest_file.name}
+
+**Root cause:** The task keeps producing output that fails quality verification (too short or insufficient substance), creating a death spiral.
+
+**Action needed:**
+1. Review the original task requirements
+2. Either: simplify the task scope OR mark as failed with clear reason
+3. Do NOT create another revision - break the loop
+
+**Files involved:**
+{chr(10).join(f"  - {f.name}" for f in files[-5:])}  # Last 5 files
+"""
+                            escalation_path.write_text(escalation_content)
+
+                            # Move the revision file to completed state to stop the loop
+                            failed_path = latest_file.parent / latest_file.name.replace('.executing.md', '.loop-escalated.done').replace('.md', '.loop-escalated.done')
+                            if not failed_path.name.endswith('.done'):
+                                failed_path = latest_file.parent / f"{latest_file.name}.loop-escalated.done"
+
+                            try:
+                                latest_file.rename(failed_path)
+                            except OSError:
+                                pass  # File may have been processed already
+
+                            log(f"[REVISION_LOOP] Escalated {agent}/{base} after {max_rev} revisions")
+                            broken_loops += 1
+
+                            # Log to ledger
+                            task_id = _extract_task_id(escalation_path)
+                            if task_id:
+                                _append_ledger({
+                                    "task_id": task_id,
+                                    "event": "REVISION_LOOP_ESCALATED",
+                                    "ts": datetime.now().isoformat(),
+                                    "agent": agent,
+                                    "base_task": base,
+                                    "revision_depth": max_rev,
+                                    "latest_file": latest_file.name
+                                })
+
+                        except Exception as e:
+                            log(f"[REVISION_LOOP] Failed to escalate {agent}/{base}: {e}")
+
+    return broken_loops
+
+
+# ==========================================================
 # COMPLETION GATE RESOLUTION
 # ==========================================================
 
-_last_gate_resolution = 0
-_GATE_RESOLUTION_INTERVAL = 300  # 5 minutes
-
-
-def check_gates_pending():
-    """Check for gates that can be resolved (follow-ups complete).
-
-    Runs periodically to process pending gates and mark them as passed
-    when all required follow-ups are complete.
-
-    Design: ~/.openclaw/agents/mongke/workspace/completion-gate-design-2026-03-08.md
-    """
-    global _last_gate_resolution
-
-    now = time.time()
-    if now - _last_gate_resolution < _GATE_RESOLUTION_INTERVAL:
-        return 0
-
-    _last_gate_resolution = now
-
-    try:
-        # Import gate resolver
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from completion_gate_resolver import GateResolver
-
-        resolver = GateResolver(dry_run=False)
-        resolved_count = resolver.resolve_pending_gates()
-
-        if resolved_count > 0:
-            log(f"[COMPLETION_GATE] Resolved {resolved_count} gate(s)")
-
-        return resolved_count
-
-    except ImportError:
-        # Gate resolver not available - not critical
-        return 0
-    except Exception as e:
-        log(f"[COMPLETION_GATE] Resolution check failed (non-fatal): {e}")
-        return 0
+# Gate resolution removed - handled by cron job (completion-gate-resolver)
+# Fix for dual-trigger race condition (2026-03-08)
 
 
 _DAEMON_LOCK_FILE = AGENTS_DIR / "main" / "logs" / "task-watcher.lock"
@@ -2121,11 +2301,17 @@ def daemon_loop(poll_interval):
                     log(f"Queue redistribution check error (non-fatal): {e}")
                 last_cleanup = time.time()
 
-            # Check for gates that can be resolved (runs every 5 min)
+            # Gate resolution is handled by cron job (completion-gate-resolver)
+            # Removed dual-trigger to prevent race conditions (fix-2026-03-08)
+            # Cron runs every 5 minutes with proper file locking
+
+            # Check for revision loops (runs every 10 min)
             try:
-                check_gates_pending()
+                loops_broken = detect_revision_loops()
+                if loops_broken > 0:
+                    log(f"[REVISION_LOOP] Broke {loops_broken} revision loop(s)")
             except Exception as e:
-                log(f"Gate resolution check error (non-fatal): {e}")
+                log(f"Revision loop check error (non-fatal): {e}")
 
             # Sleep in small increments to respond to stop_event quickly
             for _ in range(poll_interval):
