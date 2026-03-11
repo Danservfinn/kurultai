@@ -54,6 +54,68 @@ def log(msg, level="INFO"):
         pass
 
 
+# Neo4j support for task creation (fix PENDING_NO_DISPATCH stall)
+_neo4j_driver = None
+
+def _get_neo4j_driver():
+    """Lazy-load Neo4j driver. Returns None if unavailable."""
+    global _neo4j_driver
+    if _neo4j_driver is None:
+        try:
+            from neo4j_task_tracker import get_driver
+            _neo4j_driver = get_driver()
+        except Exception as e:
+            log(f"Neo4j driver init failed (non-fatal): {e}", "WARN")
+            return None
+    return _neo4j_driver
+
+
+def create_neo4j_task(task_id, agent, title, body, priority="normal", source="agent-self-wake"):
+    """Create a minimal task node in Neo4j so task-watcher can claim it.
+
+    This fixes the PENDING_NO_DISPATCH stall where agent-self-wake creates
+    filesystem-only tasks that task-watcher can't find in Neo4j (the source
+    of truth for task claiming).
+    """
+    driver = _get_neo4j_driver()
+    if not driver:
+        log(f"Neo4j unavailable for task {task_id} — filesystem-only", "WARN")
+        return False
+
+    try:
+        with driver.session() as session:
+            session.run("""
+                MERGE (a:Agent {name: $agent})
+                CREATE (t:Task {
+                    task_id: $task_id,
+                    label: $task_id,
+                    agent: $agent,
+                    title: $title,
+                    body: $body,
+                    priority: $priority,
+                    source: $source,
+                    status: 'PENDING',
+                    created: datetime(),
+                    retry_count: 0,
+                    max_retries: 3,
+                    bucket: 'WEEK',
+                    domain: 'implementation',
+                    depth: 0,
+                    skill_hint: '',
+                    template_version: 'unknown',
+                    prompt_template: 'standard',
+                    origin_type: 'agent',
+                    origin_source: $source
+                })
+                CREATE (a)-[:EXECUTED]->(t)
+            """, task_id=task_id, agent=agent, title=title, body=body,
+                 priority=priority, source=source)
+        return True
+    except Exception as e:
+        log(f"Neo4j task creation failed for {task_id}: {e}", "WARN")
+        return False
+
+
 def load_wake_state():
     return locked_json_read(str(WAKE_STATE_FILE), default={
         "last_wakes": {},   # agent -> last wake ISO timestamp
@@ -259,7 +321,16 @@ Do NOT just describe what should be done. Actually do it using your tools.
 """
 
     task_path.write_text(content)
-    log(f"Created wake task: {agent}/{filename} ({len(blocked_items)} items)")
+
+    # CRITICAL FIX: Also create task in Neo4j so task-watcher can claim it
+    # Without this, task-watcher's claim_task_atomic() returns "not_found"
+    # and the task sits in filesystem indefinitely (PENDING_NO_DISPATCH stall)
+    task_id = f"selfwake-{agent}-{ts}"
+    if create_neo4j_task(task_id, agent, "Self-Wake -- Execute Blocked Items", content, "normal", "agent-self-wake"):
+        log(f"Created wake task in Neo4j+filesystem: {agent}/{filename}")
+    else:
+        log(f"Created wake task (filesystem-only): {agent}/{filename}", "WARN")
+
     return str(task_path)
 
 
