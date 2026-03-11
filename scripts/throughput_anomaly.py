@@ -78,6 +78,85 @@ def count_active_claude_processes():
     return 0
 
 
+def get_active_claude_processes_by_agent():
+    """Get count of active claude-agent processes per agent.
+
+    Uses process command line inspection to determine which agent
+    each claude-agent process is working for.
+
+    Returns: dict mapping agent_name -> process_count
+    """
+    agent_counts = {a: 0 for a in DISPATCH_AGENTS}
+
+    try:
+        # Get PIDs of all claude-agent processes (including bash wrappers)
+        result = subprocess.run(
+            ["pgrep", "-f", "claude-agent"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            return agent_counts
+
+        pids = result.stdout.strip().split('\n')
+        pids = [p for p in pids if p]
+
+        # For each PID, check the command line to identify the agent
+        for pid in pids:
+            try:
+                # Get process command line (includes agent directory path)
+                cmd_result = subprocess.run(
+                    ["ps", "-p", pid, "-o", "command="],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                if cmd_result.returncode == 0:
+                    cmd_line = cmd_result.stdout
+                    # Extract agent name from path like:
+                    # ".../agents/ogedei/..." or ".../agents/mongke/..."
+                    for agent in DISPATCH_AGENTS:
+                        if f"/agents/{agent}/" in cmd_line:
+                            agent_counts[agent] += 1
+                            break
+            except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+                pass
+
+        # Also check for claude processes with --workdir flag (direct claude invocation)
+        # This catches processes that might not have "claude-agent" in the name
+        result = subprocess.run(
+            ["pgrep", "-f", "claude.*--workdir.*agents/"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            extra_pids = result.stdout.strip().split('\n')
+            extra_pids = [p for p in extra_pids if p and p not in pids]
+            
+            for pid in extra_pids:
+                try:
+                    cmd_result = subprocess.run(
+                        ["ps", "-p", pid, "-o", "command="],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if cmd_result.returncode == 0:
+                        cmd_line = cmd_result.stdout
+                        for agent in DISPATCH_AGENTS:
+                            if f"/agents/{agent}/" in cmd_line:
+                                agent_counts[agent] += 1
+                                break
+                except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+                    pass
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+    return agent_counts
+
+
 def count_executing_tasks():
     """Count .executing tasks per agent from filesystem.
 
@@ -282,10 +361,20 @@ def get_last_completion_age_hours():
 
 
 def get_failure_rates(hours):
-    """Count FAILED and COMPLETED events per agent in window. Returns (per_agent, fleet) dicts."""
+    """Count FAILED and COMPLETED events per agent in window. Returns (per_agent, fleet) dicts.
+
+    ACP-aware: Excludes failed tasks that are actively being retried via ACP sessions.
+    If an agent has active claude-agent processes, those processes represent tasks
+    being retried after failure. We exclude those from the failure rate to avoid
+    false positives when agents are actively working.
+    """
     events = read_ledger(hours=hours)
     agent_failed = defaultdict(int)
     agent_completed = defaultdict(int)
+
+    # Track task_ids that failed within the window
+    failed_task_ids = defaultdict(set)  # agent -> set of failed task_ids
+
     for e in events:
         agent = e.get("agent")
         if not agent or agent not in DISPATCH_AGENTS:
@@ -293,24 +382,51 @@ def get_failure_rates(hours):
         ev = e.get("event")
         if ev == "FAILED":
             agent_failed[agent] += 1
+            # Track which specific tasks failed
+            task_id = e.get("task_id")
+            if task_id:
+                failed_task_ids[agent].add(task_id)
         elif ev == "COMPLETED":
             agent_completed[agent] += 1
 
+    # ACP-aware adjustment: Exclude failed tasks that are actively retrying
+    # Get active claude processes per agent
+    active_processes = get_active_claude_processes_by_agent()
+
+    # For each agent with active processes, subtract those from failed count
+    # Each active process represents one task being retried after failure
+    adjusted_failed = defaultdict(int)
+    for agent in DISPATCH_AGENTS:
+        raw_failed = agent_failed.get(agent, 0)
+        active_count = active_processes.get(agent, 0)
+
+        # Exclude actively-retrying tasks from failure count
+        # Each active process = one failed task now being retried
+        adjusted_failed[agent] = max(0, raw_failed - active_count)
+
     per_agent = {}
     for agent in set(list(agent_failed) + list(agent_completed)):
-        failed = agent_failed.get(agent, 0)
+        failed = adjusted_failed.get(agent, 0)
         completed = agent_completed.get(agent, 0)
         total = failed + completed
         per_agent[agent] = {
-            "failed": failed, "completed": completed, "total": total,
+            "failed": failed,
+            "completed": completed,
+            "total": total,
+            "raw_failed": agent_failed.get(agent, 0),  # Include raw count for debugging
+            "active_processes": active_processes.get(agent, 0),
             "rate": failed / total if total > 0 else 0,
         }
 
-    fleet_failed = sum(agent_failed.values())
+    fleet_failed = sum(adjusted_failed.values())
     fleet_completed = sum(agent_completed.values())
     fleet_total = fleet_failed + fleet_completed
     fleet = {
-        "failed": fleet_failed, "completed": fleet_completed, "total": fleet_total,
+        "failed": fleet_failed,
+        "completed": fleet_completed,
+        "total": fleet_total,
+        "raw_failed": sum(agent_failed.values()),  # Include raw count for debugging
+        "active_processes_total": sum(active_processes.values()),
         "rate": fleet_failed / fleet_total if fleet_total > 0 else 0,
     }
     return per_agent, fleet
@@ -402,22 +518,44 @@ def detect_anomalies():
 
     # Anomaly 6: High failure rate — systemic failures (e.g. model misconfiguration)
     # Catches issues like wrong model assignment that cause mass task failures
+    # ACP-aware: Suppress alert if active claude processes detected (system is retrying)
     per_agent_rates, fleet_rates = get_failure_rates(FAILURE_RATE_WINDOW_H)
+
+    # Get active processes for ACP-aware suppression
+    active_processes = get_active_claude_processes_by_agent()
+    total_active = sum(active_processes.values())
+
+    # ACP-aware suppression: Don't flag HIGH_FAILURE_RATE if work is actively happening
+    # Work is "actively happening" if:
+    # 1. There are active claude-agent processes (ACP sessions executing tasks)
+    # 2. OR there are pending tasks with matching active processes (tasks being claimed/executed)
+    has_active_work = total_active > 0
 
     if fleet_rates["total"] >= MIN_TASKS_FOR_FAILURE_RATE:
         if fleet_rates["rate"] >= FLEET_FAILURE_RATE_THRESHOLD:
-            warnings.append(
-                f"THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — "
-                f"Fleet-wide failure rate {fleet_rates['rate']:.0%} "
-                f"({fleet_rates['failed']}/{fleet_rates['total']} tasks) "
-                f"in last {FAILURE_RATE_WINDOW_H}h. "
-                f"Possible model misconfiguration, API outage, or systemic error."
-            )
+            # ACP-aware: Suppress alert if work is actively happening
+            # This prevents false positives when:
+            # - ACP sessions are executing tasks (no .executing.md files)
+            # - Tasks have failed historically but are being retried now
+            # - System is in normal operation with some failures but active progress
+            if not has_active_work:
+                warnings.append(
+                    f"THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — "
+                    f"Fleet-wide failure rate {fleet_rates['rate']:.0%} "
+                    f"({fleet_rates['failed']}/{fleet_rates['total']} tasks) "
+                    f"in last {FAILURE_RATE_WINDOW_H}h. "
+                    f"Possible model misconfiguration, API outage, or systemic error."
+                )
+            # else: Work is actively happening via ACP sessions - suppress false positive
 
     # Per-agent failure rate (only if fleet-wide didn't fire, to avoid noise)
+    # ACP-aware: Also suppress per-agent alerts if that agent has active processes
     if fleet_rates["rate"] < FLEET_FAILURE_RATE_THRESHOLD:
         failing_agents = []
         for agent, stats in per_agent_rates.items():
+            # Skip if this agent has active processes (work in progress)
+            if active_processes.get(agent, 0) > 0:
+                continue
             if (stats["total"] >= 3 and
                     stats["rate"] >= AGENT_FAILURE_RATE_THRESHOLD):
                 failing_agents.append(
