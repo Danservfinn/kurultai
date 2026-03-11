@@ -1,32 +1,31 @@
-# Kurultai Status — 2026-03-07 15:08
+# Kurultai Status — 2026-03-11 06:11
 
 ## Activity (last 2h)
-- jochi: 4 completed, 0 failed (neo4j; not in ledger — reconciliation delta=4)
-- temujin, mongke, chagatai, ogedei, kublai: idle (0 completions in ledger)
+All agents: idle (0 completed in last 2h)
 
-> Note: task-ledger.jsonl has no recent entries — neo4j is authoritative source above.
-
-## Pending Queue (3 total)
-| Agent   | Pending | Next task |
-|---------|---------|-----------|
-| temujin | 3       | Review: Ogedei agent stalled — model config + queue failure analysis |
-| temujin | —       | Build visual frontend calendar for Danny (monthly events) |
-| temujin | —       | 3-hour review: the.kurult.ai |
-| others  | 0       | — |
-
-Note: temujin also has 1 executing (`high-1772910533`).
+## Pending Queue (7 total)
+| Agent    | Pending | Next task |
+|----------|---------|-----------|
+| kublai   | 1       | Review routing decisions and optimize agent load balancing |
+| temujin  | 2       | Self-Wake -- Execute Blocked Items |
+| mongke   | 1       | Self-Wake -- Execute Blocked Items |
+| chagatai | 1       | (self-task queued) |
+| jochi    | 2       | Investigate stalled task: ogedei idle task; Investigate mongke low performance |
+| ogedei   | 0       | — |
 
 ## Kublai's Next Steps
-**Initiative:** Review and process pending task queue backlog (heuristic fallback — local LLM at port 1234 unreachable)
+**Initiative:** Review routing decisions and optimize agent load balancing
 **Assigned to:** kublai
-**Rationale:** Tasks queued but not being processed
-**Status:** In cooldown since 15:03; kublai-actions found no pending feedback to act on
+**Rationale:** Rotating proactive initiative (System efficiency - improve task distribution across fleet)
+**Mode:** Heuristic fallback (LLM unavailable: localhost:1234 connection refused)
 
 ## System Health
-Neo4j: up | Redis: up | Tick: degraded | Total queued: 3 (tock reports 2)
-Idle agents: kublai, mongke, chagatai, jochi, ogedei
-Cron: 14/18 healthy, 0 erroring
+Neo4j: up | Redis: up | Tick: degraded | Total queued: 7
 
-⚠️  Session model mismatch on 5/6 agents (mongke=glm-5, chagatai=qwen3.5-plus, temujin=lukey03/qwen3.5-9b, jochi=kimi-k2.5, ogedei=qwen3-coder-next) — model guards active, config resolves to claude-opus-4-6
-⚠️  Ledger/neo4j reconciliation gap: jochi 4 neo4j completions not in ledger
-⚠️  Local LLM (port 1234) down — kublai-initiative using heuristic fallback
+**Issues:**
+- 5 cron jobs erroring (Daily Goal Progress Summary, 4 skipped)
+- Backup stale (last: 2026-03-09)
+- Zombie process detected: kublai handler (pid 26332, investigate)
+- Oldest pending: jochi task (17,787s / ~5h)
+
+**Load:** 0.095 (stable, threshold 0.8) | Routing accuracy: 87% | Overflow: 2

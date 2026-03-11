@@ -83,6 +83,48 @@ except ImportError:
         return events
 
 
+# Import task_utils for extracting task_id
+try:
+    from task_utils import extract_task_id
+except ImportError:
+    def extract_task_id(filepath: str):
+        """Fallback task_id extraction."""
+        import re
+        from pathlib import Path
+        filepath = Path(filepath)
+        # Check filename for UUID pattern
+        uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', filepath.name, re.I)
+        if uuid_match:
+            return uuid_match.group(1).lower()
+        return None
+
+# Neo4j sync helper
+def _update_neo4j_task_agent(task_id: str, new_agent: str) -> bool:
+    """Update task agent in Neo4j after redistribution.
+
+    Note: Uses the singleton driver from get_driver(). The driver is NOT
+    closed here - it's a shared singleton managed by neo4j_task_tracker.
+    """
+    if not task_id:
+        return False
+    try:
+        from neo4j_task_tracker import get_driver
+        driver = get_driver()
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                SET t.agent = $new_agent,
+                    t.updated = datetime(),
+                    t.redistributed = true
+                RETURN t.task_id AS updated
+            """, task_id=task_id, new_agent=new_agent)
+            return result.single() is not None
+        # Note: driver is singleton, do NOT close here
+    except Exception as e:
+        print(f"[CircuitBreaker] Neo4j sync failed for {task_id}: {e}")
+        return False
+
+
 AgentState = Literal["CLOSED", "OPEN", "HALF_OPEN"]
 
 
@@ -353,6 +395,14 @@ class AgentCircuitBreaker:
 
                 # Touch mtime so watcher picks it up
                 new_path.touch()
+
+                # Sync to Neo4j
+                task_id = extract_task_id(str(task_path))
+                if task_id:
+                    if _update_neo4j_task_agent(task_id, target):
+                        self.log(f"Synced Neo4j: {task_id[:8]}... -> {target}")
+                    else:
+                        self.log(f"WARNING: Neo4j sync failed for {task_id[:8]}...", "WARN")
 
                 moved += 1
                 self.log(f"Redistributed {task_path.name} from {failed_agent} to {target}")

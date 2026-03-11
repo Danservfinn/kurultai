@@ -20,11 +20,16 @@ Usage:
 import json
 import os
 import sys
+import fcntl
 from collections import defaultdict
 from datetime import datetime, timedelta
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kurultai_ledger import append_ledger as _kp_append_ledger, read_ledger
+from kurultai_ledger import append_ledger as _kp_append_ledger, read_ledger, TASK_LEDGER
+
+# Lock file for preventing concurrent scoring
+SCORE_LOCK_FILE = TASK_LEDGER.parent / ".score_lock"
 
 # Domain keywords for domain_match validation
 # Single source of truth: task_intake.py:AGENT_KEYWORDS
@@ -184,18 +189,39 @@ def detect_self_route_flag(task_events):
 
 
 def score_all_tasks(hours=None):
-    """Score all unscored tasks and append SCORED events."""
+    """Score all unscored tasks and append SCORED events.
+
+    IDEMPOTENCY: Checks both ledger AND Neo4j for existing SCORED events
+    to prevent duplicate scoring across runs.
+    """
     events = read_ledger(hours)
     tasks = group_by_task_id(events)
 
-    # Find already-scored task_ids
-    scored_ids = {e["task_id"] for e in events if e.get("event") == "SCORED"}
+    # Find already-scored task_ids in ledger
+    scored_ids = {e["task_id"] for e in events if e.get("event") == "SCORED" and e.get("task_id")}
+
+    # Also check Neo4j for already-scored tasks (additional idempotency guard)
+    try:
+        from neo4j_task_tracker import get_driver
+        driver = get_driver()
+        with driver.session() as session:
+            result = session.run("MATCH (t:Task) WHERE t.scored = true RETURN t.task_id as task_id")
+            for record in result:
+                if record["task_id"]:
+                    scored_ids.add(record["task_id"])
+    except Exception as e:
+        print(f"[score_tasks] Neo4j check failed (non-fatal): {e}", file=sys.stderr)
 
     results = []
     new_scores = 0
 
     for task_id, task_events in tasks.items():
+        # Skip if already scored (ledger or Neo4j)
         if task_id in scored_ids:
+            continue
+
+        # Skip invalid task_ids
+        if not task_id or task_id == "unknown":
             continue
 
         # Only score tasks that have reached COMPLETED or FAILED
@@ -227,6 +253,25 @@ def score_all_tasks(hours=None):
         # Append to ledger
         _kp_append_ledger(score_entry)
         new_scores += 1
+
+        # Write scores to Neo4j
+        try:
+            from neo4j_task_tracker import TaskTracker
+            tracker = TaskTracker()
+            tracker.update_task_scores(
+                task_id=task_id,
+                delegation_score=delegation,
+                domain_match_score=domain_match,
+                substantive_score=substantive,
+                pending_time_score=pending_time,
+                total_score=total,
+                self_route_flag=self_route,
+                scored_agent=task_events[0].get("agent", "unknown")
+            )
+            tracker.close()
+        except Exception as e:
+            print(f"[score_tasks] Neo4j write failed (non-fatal): {e}", file=sys.stderr)
+        scored_ids.add(task_id)  # Track for this run
 
         results.append(score_entry)
 

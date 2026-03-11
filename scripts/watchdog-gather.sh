@@ -12,6 +12,23 @@
 #   - watchdog.log   (append, one-liner per tick)
 #
 # Exit codes: 0=healthy 1=degraded 2=down(restarted) 3=down(restart failed)
+#
+# STALE TASK DETECTION PRE-FILTER (ogedei-watchdog.py)
+# =====================================================
+# The watchdog stale detection in ogedei-watchdog.py includes a pre-filter
+# to prevent false-positive escalations of completed tasks:
+#
+#   - Tasks with .verified.done.md suffix (already verified)
+#   - Tasks with grade: [A-F] in frontmatter (graded completion)
+#   - Tasks with resolved: true in frontmatter (escalations resolved)
+#
+# This pre-filter eliminates $0.03-0.12 per false positive incident.
+# See: mongke/workspace/stale-task-escalation-cost-analysis-2026-03-09.md
+#
+# Implementation: is_task_already_completed() in ogedei-watchdog.py
+#   - Checks file suffixes (.verified.done.md, .resolved.md, etc.)
+#   - Checks frontmatter content (grade: A-F, resolved: true)
+#   - Called before Tier 3 escalation (check_stalled_tasks function)
 
 set -o pipefail
 
@@ -54,12 +71,43 @@ WATCHDOG_LOG="$LOGDIR/watchdog.log"
 OPENCLAW_LOG="$HOME/.openclaw/logs/openclaw.log"
 AGENT_BASE="$HOME/.openclaw/agents"
 SCRIPTS="$BASE/scripts"
+LAST_TICK_FILE="$LOGDIR/.last_tick_epoch"
 
 TS=$(date '+%Y-%m-%d %H:%M:%S')
 TS_ISO=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 EPOCH=$(date '+%s')
 
 mkdir -p "$LOGDIR"
+
+# ============================================================
+# MODEL DETECTION: Get the model used for LLM triage
+# ============================================================
+# Read from main agent's .claude/settings.json (watchdog/main uses main agent config)
+MODEL=$(python3 "$SCRIPTS/get_model.py" --agent main 2>/dev/null || echo "unknown")
+
+# ============================================================
+# SECTION 0a: Execution Gap Detection
+# ============================================================
+# Detect if we missed scheduled runs (should run every 5min)
+# Alert if gap exceeds 8 minutes (allows for some jitter + sleep/wake)
+GAP_ALERT_THRESHOLD=480  # 8 minutes in seconds
+LAST_EPOCH=0
+GAP_DETECTED=0
+GAP_MINUTES=0
+
+if [ -f "$LAST_TICK_FILE" ]; then
+    LAST_EPOCH=$(cat "$LAST_TICK_FILE" 2>/dev/null || echo "0")
+    if [ "$LAST_EPOCH" -gt 0 ]; then
+        GAP_SECONDS=$((EPOCH - LAST_EPOCH))
+        if [ "$GAP_SECONDS" -gt "$GAP_ALERT_THRESHOLD" ]; then
+            GAP_MINUTES=$((GAP_SECONDS / 60))
+            GAP_DETECTED=1
+            echo "[$TS] GAP_DETECTED | missed=$((GAP_SECONDS / 300)) ticks | gap=${GAP_MINUTES}m | last_run_ts=$(date -r "$LAST_EPOCH" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')" >> "$WATCHDOG_LOG"
+        fi
+    fi
+fi
+# Record current epoch for next run
+echo "$EPOCH" > "$LAST_TICK_FILE"
 
 # ============================================================
 # SECTION 0: Gateway Instance Deduplication + Health Check
@@ -163,22 +211,106 @@ fi
 # ============================================================
 # SECTION 4: Dependent Services
 # ============================================================
+SCRIPTS_DIR="$(dirname "$0")"
 NEO4J_STATUS=$(python3 -c "
 import signal, sys
 signal.alarm(8)  # kill after 8 seconds
-from neo4j import GraphDatabase
+sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_task_tracker import get_driver, close_driver
 try:
-    import os as _os; d=GraphDatabase.driver(_os.getenv('NEO4J_URI','bolt://localhost:7687'),auth=(_os.getenv('NEO4J_USER','neo4j'),_os.getenv('NEO4J_PASSWORD','myStrongPassword123')),connection_timeout=3,max_transaction_retry_time=3)
-    d.verify_connectivity(); print('up'); d.close()
-except: print('down')
+    d = get_driver()
+    d.verify_connectivity(); print('up'); close_driver()
+except Exception: print('down')
 " 2>/dev/null || echo "down")
 
 REDIS_STATUS=$(redis-cli ping 2>/dev/null | grep -q "PONG" && echo "up" || echo "down")
 
 # ============================================================
+# SECTION 4a: Neo4j Auto-Recovery
+# ============================================================
+# Attempt to restart Neo4j if down (prevents EXECUTING_NO_OUTPUT cascade)
+# Auto-recovery reduces mean time to recovery from minutes to seconds
+NEO4J_RECOVERY_ATTEMPTED=0
+NEO4J_RECOVERY_RESULT=""
+if [ "$NEO4J_STATUS" = "down" ]; then
+    # Check if we have a recent recovery attempt (avoid thrashing - wait 5 min between attempts)
+    RECOVERY_COOLDOWN_FILE="$LOGDIR/.neo4j_recovery_last"
+    MAY_RECOVER=1
+    if [ -f "$RECOVERY_COOLDOWN_FILE" ]; then
+        LAST_RECOVERY=$(cat "$RECOVERY_COOLDOWN_FILE" 2>/dev/null || echo "0")
+        RECOVERY_AGE_S=$((EPOCH - LAST_RECOVERY))
+        if [ "$RECOVERY_AGE_S" -lt 300 ]; then  # 5 min cooldown
+            MAY_RECOVER=0
+        fi
+    fi
+
+    if [ "$MAY_RECOVER" = "1" ]; then
+        NEO4J_RECOVERY_ATTEMPTED=1
+        echo "[$TS] NEO4J_RECOVERY | attempting restart (neo4j detected down)" >> "$WATCHDOG_LOG"
+
+        # Try brew services restart first (standard macOS install)
+        # Run synchronously to ensure restart completes before verification
+        if command -v brew >/dev/null 2>&1; then
+            brew services restart neo4j >/dev/null 2>&1
+        else
+            # Fallback: direct neo4j command
+            neo4j start >/dev/null 2>&1
+        fi
+
+        # Wait for Neo4j to start with retries (can take 5-30 seconds for cold start)
+        NEO4J_STATUS_AFTER="down"
+        for retry in {1..15}; do
+            sleep 2
+            NEO4J_STATUS_AFTER=$(python3 -c "
+import signal, sys
+signal.alarm(5)
+sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_task_tracker import get_driver, close_driver
+try:
+    d = get_driver()
+    d.verify_connectivity(); print('up'); close_driver()
+except Exception: print('down')
+" 2>/dev/null || echo "down")
+
+            if [ "$NEO4J_STATUS_AFTER" = "up" ]; then
+                break
+            fi
+        done
+
+        if [ "$NEO4J_STATUS_AFTER" = "up" ]; then
+            NEO4J_RECOVERY_RESULT="success"
+            NEO4J_STATUS="up"  # Update for rest of script
+            echo "[$TS] NEO4J_RECOVERY | success | neo4j back online" >> "$WATCHDOG_LOG"
+        else
+            NEO4J_RECOVERY_RESULT="failed"
+            echo "[$TS] NEO4J_RECOVERY | failed | escalation required" >> "$WATCHDOG_LOG"
+        fi
+
+        # Record recovery attempt time
+        echo "$EPOCH" > "$RECOVERY_COOLDOWN_FILE"
+    else
+        echo "[$TS] NEO4J_RECOVERY | skipped | cooldown active (${RECOVERY_AGE_S}s since last)" >> "$WATCHDOG_LOG"
+    fi
+fi
+
+# ============================================================
+# SECTION 4b: Credential Health Check (fleet API tokens)
+# ============================================================
+# Validates ANTHROPIC_AUTH_TOKEN for all agents (must start with sk-ant-)
+# Fleet-wide credential crisis detection (DashScope tokens = invalid)
+# FIX: Capture output even when exit code 2 (crisis) is returned
+# Exit codes: 0=healthy, 1=degraded, 2=crisis — all are valid outputs
+# Use { ...; } to run in subshell and capture output before exit code propagates
+CRED_HEALTH_OUTPUT=$({ python3 "$SCRIPTS/credential-health-monitor.py" 2>&1 || true; } | tail -1)
+CRED_HEALTH_FLEET=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fleet_health','unknown'))" 2>/dev/null || echo "unknown")
+CRED_HEALTH_VALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('valid',0))" 2>/dev/null || echo "0")
+CRED_HEALTH_INVALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('invalid',0))" 2>/dev/null || echo "0")
+CRED_HEALTH_MISSING=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('missing',0))" 2>/dev/null || echo "0")
+
+# ============================================================
 # SECTION 5: Task Queue Status + Push Forward
 # ============================================================
-AGENTS=("temujin" "mongke" "chagatai" "jochi" "ogedei" "main")
+AGENTS=("kublai" "temujin" "mongke" "chagatai" "jochi" "ogedei" "tolui")
 TASKS_DISPATCHED=0
 TASKS_PENDING_TOTAL=0
 TASK_QUEUE_STATUS=""
@@ -198,22 +330,26 @@ COMPLETION_AUDIT_LLM_DECISION=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "im
 COMPLETION_AUDIT_LLM_CONFIDENCE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_confidence',0))" 2>/dev/null || echo "0")
 
 # ============================================================
-# SECTION 5c: Sync agent votes to Neo4j
+# SECTION 5c: Vote Sync (DISABLED - migrated to voting_manager.py)
 # ============================================================
-# Sync vote files from each agent's votes/ directory to Neo4j
-# This enables agents to vote by writing markdown files during reflection
+# NOTE: vote_manager.py was archived 2026-03-08. Voting now uses
+# voting_manager.py with proposals/voting/ directory. Vote sync
+# is handled by kurultai_voting.py during reflection, not tick.
+# VOTE_SYNC_COUNT=0
+# VOTE_SYNC_ERRORS=0
+# for agent in kublai temujin mongke chagatai jochi ogedei tolui; do
+#     SYNC_RESULT=$(python3 "$SCRIPTS/vote_manager.py" sync --agent "$agent" 2>&1 || echo "error")
+#     if echo "$SYNC_RESULT" | grep -q "Synced [1-9]"; then
+#         SYNCED=$(echo "$SYNC_RESULT" | grep -o 'Synced [0-9]*' | grep -o '[0-9]*' || echo "0")
+#         VOTE_SYNC_COUNT=$((VOTE_SYNC_COUNT + SYNCED))
+#     fi
+#     if echo "$SYNC_RESULT" | grep -q "error"; then
+#         VOTE_SYNC_ERRORS=$((VOTE_SYNC_ERRORS + 1))
+#     fi
+# done
+# Set defaults for tick summary output
 VOTE_SYNC_COUNT=0
 VOTE_SYNC_ERRORS=0
-for agent in kublai temujin mongke chagatai jochi ogedei; do
-    SYNC_RESULT=$(python3 "$SCRIPTS/vote_manager.py" sync --agent "$agent" 2>&1 || echo "error")
-    if echo "$SYNC_RESULT" | grep -q "Synced [1-9]"; then
-        SYNCED=$(echo "$SYNC_RESULT" | grep -o 'Synced [0-9]*' | grep -o '[0-9]*' || echo "0")
-        VOTE_SYNC_COUNT=$((VOTE_SYNC_COUNT + SYNCED))
-    fi
-    if echo "$SYNC_RESULT" | grep -q "error"; then
-        VOTE_SYNC_ERRORS=$((VOTE_SYNC_ERRORS + 1))
-    fi
-done
 
 # ============================================================
 # SECTION 5d: Subprocess Audit (claude-agent process correlation)
@@ -229,18 +365,29 @@ SUBPROCESS_ZOMBIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,js
 SUBPROCESS_ORPHANED=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='orphaned_executing'))" 2>/dev/null || echo "0")
 SUBPROCESS_ANOMALIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('anomaly_count',0))" 2>/dev/null || echo "0")
 
+# ============================================================
+# SECTION 5e: Resolution Compliance Audit (task completion quality)
+# ============================================================
+# Audit task reports for missing ## Resolution sections (horde-review PRIORITY_FIX)
+# Tracks whether agents are properly documenting their fix outcomes
+# < 90% compliance triggers escalation to jochi (quality assurance)
+RESOLUTION_AUDIT_OUTPUT=$(python3 "$SCRIPTS/audit_missing_resolutions.py" --recent 24 --json 2>/dev/null || echo '{"completion_rate_percent":0}')
+RESOLUTION_COMPLIANCE=$(echo "$RESOLUTION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('completion_rate_percent',0))" 2>/dev/null || echo "0")
+RESOLUTION_WITH=$(echo "$RESOLUTION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('with_resolution',0))" 2>/dev/null || echo "0")
+RESOLUTION_WITHOUT=$(echo "$RESOLUTION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('without_resolution',0))" 2>/dev/null || echo "0")
+
 for agent in "${AGENTS[@]}"; do
     TASK_DIR="$AGENT_BASE/$agent/tasks"
     if [ ! -d "$TASK_DIR" ]; then
         continue
     fi
 
-    # Count pending tasks — match ALL .md files, exclude done/executing/completed/stale
+    # Count pending tasks — match ALL .md files, exclude terminal states (done/executing/completed/stale/resolved)
     PENDING=0
     shopt -s nullglob
     for f in "$TASK_DIR"/*.md; do
         case "$f" in
-            *.done*|*.executing*|*.completed*|*.stale*|*.failed*|*.obsolete*|*.cancelled*) continue ;;
+            *.done*|*.executing*|*.completed*|*.stale*|*.failed*|*.obsolete*|*.cancelled*|*.resolved*) continue ;;
             *) PENDING=$((PENDING + 1)) ;;
         esac
     done
@@ -262,7 +409,7 @@ try:
     d=json.load(open('$BASE/logs/spawn-pending.json'))
     ready=[s for s in d.get('spawns',[]) if s.get('status')=='ready']
     print(len(ready))
-except: print(0)
+except Exception: print(0)
 " 2>/dev/null || echo "0")
 else
     SPAWN_COUNT=0
@@ -281,7 +428,7 @@ for line in sys.stdin:
     line = line.strip()
     if line:
         try: ticks.append(json.loads(line))
-        except: pass
+        except Exception: pass
 if not ticks:
     print('100.0 0.0 0 0 stable 0')
     sys.exit(0)
@@ -343,7 +490,7 @@ fi
 if [ "$ROUTING_BALANCE_IDX" = "0" ]; then
     ROUTING_BALANCE_IDX=$(python3 -c "
 import statistics, os, glob
-agents = ['temujin', 'mongke', 'chagatai', 'jochi', 'ogedei']
+agents = ['kublai', 'temujin', 'mongke', 'chagatai', 'jochi', 'ogedei', 'tolui']
 base = '$AGENT_BASE'
 depths = []
 for agent in agents:
@@ -351,7 +498,7 @@ for agent in agents:
     if os.path.isdir(task_dir):
         pending = 0
         for f in glob.glob(f'{task_dir}/*.md'):
-            if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed', '.obsolete', '.cancelled']):
+            if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed', '.obsolete', '.cancelled', '.resolved']):
                 continue
             pending += 1
         depths.append(pending)
@@ -373,7 +520,10 @@ THROUGHPUT_CONSECUTIVE=0
 THROUGHPUT_OUTPUT=$(python3 "$SCRIPTS/throughput_anomaly.py" 2>/dev/null)
 if [ -n "$THROUGHPUT_OUTPUT" ]; then
     # Extract anomaly type for decision logic
-    if echo "$THROUGHPUT_OUTPUT" | grep -q "PENDING_NO_DISPATCH"; then
+    # Order matters: check highest priority first (matches throughput_anomaly.py priority)
+    if echo "$THROUGHPUT_OUTPUT" | grep -q "HIGH_FAILURE_RATE"; then
+        THROUGHPUT_ANOMALY_TYPE="HIGH_FAILURE_RATE"
+    elif echo "$THROUGHPUT_OUTPUT" | grep -q "PENDING_NO_DISPATCH"; then
         THROUGHPUT_ANOMALY_TYPE="PENDING_NO_DISPATCH"
     elif echo "$THROUGHPUT_OUTPUT" | grep -q "EXECUTING_NO_OUTPUT"; then
         THROUGHPUT_ANOMALY_TYPE="EXECUTING_NO_OUTPUT"
@@ -441,6 +591,11 @@ elif [ "$NEO4J_STATUS" = "down" ] || [ "$REDIS_STATUS" = "down" ]; then
     STATUS="degraded"; ACTION="warn"
     REASON="services down: $([ "$NEO4J_STATUS" = "down" ] && echo neo4j)$([ "$REDIS_STATUS" = "down" ] && echo ${NEO4J_STATUS:+,}redis)"
     EXIT_CODE=1
+# Resolution compliance: task completion quality tracking (horde-review PRIORITY_FIX)
+elif [ "$RESOLUTION_COMPLIANCE" -lt 90 ] 2>/dev/null; then
+    STATUS="degraded"; ACTION="warn"
+    REASON="resolution compliance ${RESOLUTION_COMPLIANCE}% < 90% threshold: ${RESOLUTION_WITHOUT} reports missing ## Resolution section"
+    EXIT_CODE=1
 fi
 
 # Safety-net: cross-validate decision vs error thresholds
@@ -499,6 +654,55 @@ if [ "${SUBPROCESS_ORPHANED:-0}" -gt 0 ] || [ "${SUBPROCESS_STALE:-0}" -gt 0 ]; 
     touch "$BASE/logs/subprocess-recovery-needed.flag"
 fi
 
+# ============================================================
+# SECTION 5e: Automatic Zombie Process Cleanup
+# ============================================================
+# Kill zombie handler processes immediately instead of waiting for task-watcher
+# Prevents resource waste and false-positive "executing" status in telemetry
+#
+# FALSE-POSITIVE PREVENTION (2026-03-09):
+# The subprocess-audit.py now filters out handlers with recent .done.md files
+# (within 60 seconds) to avoid killing legitimate handlers during normal shutdown.
+# See: docs/zombie-handler-research-2026-03-09.md for full analysis.
+#
+if [ "${SUBPROCESS_ZOMBIES:-0}" -gt 0 ]; then
+    # Extract zombie PIDs from audit output
+    ZOMBIE_PIDS=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for a in data.get('anomalies', []):
+        if a.get('type') == 'zombie_process' and a.get('pid'):
+            print(a.get('pid'))
+except Exception: pass
+" 2>/dev/null || echo "")
+
+    if [ -n "$ZOMBIE_PIDS" ]; then
+        ZOMBIES_KILLED=0
+        for zombie_pid in $ZOMBIE_PIDS; do
+            # Double-check this is actually a handler process (safety)
+            if [ -n "$zombie_pid" ] && ps -p "$zombie_pid" -o command= 2>/dev/null | grep -q "agent-task-handler"; then
+                # Graceful kill first
+                kill "$zombie_pid" 2>/dev/null
+                sleep 0.5
+                # Force kill if still running
+                if kill -0 "$zombie_pid" 2>/dev/null; then
+                    kill -9 "$zombie_pid" 2>/dev/null
+                fi
+                # Verify termination
+                if ! kill -0 "$zombie_pid" 2>/dev/null; then
+                    ZOMBIES_KILLED=$((ZOMBIES_KILLED + 1))
+                    echo "[$TS] ZOMBIE_CLEANUP | killed zombie handler pid=$zombie_pid" >> "$WATCHDOG_LOG"
+                fi
+            fi
+        done
+
+        if [ "$ZOMBIES_KILLED" -gt 0 ]; then
+            echo "[$TS] ZOMBIE_CLEANUP | killed $ZOMBIES_KILLED zombie process(es)" >> "$WATCHDOG_LOG"
+        fi
+    fi
+fi
+
 # Disk space check
 AVAIL_KB=$(df -k "$LOGDIR" 2>/dev/null | awk 'NR==2{print $4}')
 if [ "${AVAIL_KB:-0}" -lt 524288 ] 2>/dev/null; then  # < 512MB
@@ -506,6 +710,22 @@ if [ "${AVAIL_KB:-0}" -lt 524288 ] 2>/dev/null; then  # < 512MB
     REASON="low disk: $((AVAIL_KB / 1024))MB available"
     EXIT_CODE=1
 fi
+
+# Disk usage growth monitoring
+OPENCLAW_SIZE_FILE="$LOGDIR/.openclaw_size_prev"
+OPENCLAW_SIZE_CURRENT=$(du -sk "$HOME/.openclaw" 2>/dev/null | awk '{print $1}')
+if [ -f "$OPENCLAW_SIZE_FILE" ] && [ -n "$OPENCLAW_SIZE_CURRENT" ]; then
+    OPENCLAW_SIZE_PREV=$(cat "$OPENCLAW_SIZE_FILE" 2>/dev/null || echo 0)
+    # Growth in KB (over ~5 minutes between ticks)
+    OPENCLAW_GROWTH=$((OPENCLAW_SIZE_CURRENT - OPENCLAW_SIZE_PREV))
+    # Alert on >500MB growth per tick (rapid accumulation)
+    if [ "$OPENCLAW_GROWTH" -gt 512000 ] 2>/dev/null; then
+        GROWTH_MB=$((OPENCLAW_GROWTH / 1024))
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TICK | WARN: rapid disk growth ${GROWTH_MB}MB/5min" >> "$WATCHDOG_LOG"
+        # Don't degrade status but log warning
+    fi
+fi
+echo "$OPENCLAW_SIZE_CURRENT" > "$OPENCLAW_SIZE_FILE"
 
 # Human-readable uptime
 if [ "$UPTIME_S" -gt 86400 ]; then
@@ -520,14 +740,17 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s"},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
-    "$TS_ISO" "$EPOCH" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
+printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_minutes":%s,"last_epoch":%s},"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s","recovery":{"neo4j":{"attempted":%s,"result":"%s"}}},"credentials":{"fleet_health":"%s","valid":%s,"invalid":%s,"missing":%s},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"resolution":{"compliance_pct":%s,"with":%s,"without":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+    "$TS_ISO" "$EPOCH" "$MODEL" "$GAP_DETECTED" "${GAP_MINUTES:-0}" "$LAST_EPOCH" \
+    "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
-    "$NEO4J_STATUS" "$REDIS_STATUS" \
+    "$NEO4J_STATUS" "$REDIS_STATUS" "${NEO4J_RECOVERY_ATTEMPTED:-0}" "${NEO4J_RECOVERY_RESULT:-}" \
+    "$CRED_HEALTH_FLEET" "$CRED_HEALTH_VALID" "$CRED_HEALTH_INVALID" "$CRED_HEALTH_MISSING" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "${SPAWN_COUNT:-0}" "$TASK_QUEUE_STATUS" \
     "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" "$VOTE_SYNC_COUNT" \
     "$SUBPROCESS_EXECUTING" "$SUBPROCESS_ALIVE" "$SUBPROCESS_DEAD" "$SUBPROCESS_STALE" "$SUBPROCESS_ZOMBIES" "$SUBPROCESS_ORPHANED" "$SUBPROCESS_ANOMALIES" \
+    "$RESOLUTION_COMPLIANCE" "$RESOLUTION_WITH" "$RESOLUTION_WITHOUT" \
     "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$ROUTING_ACCURACY" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$AVG_LAT_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" >> "$TICKS"
@@ -535,15 +758,19 @@ printf '{"ts":"%s","epoch":%s,"gateway":{"status":"%s","pid":"%s","http":%s,"lat
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nSUBPROC: executing=%s alive=%s dead=%s stale=%s zombies=%s orphaned=%s anomalies=%s\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
-    "$TS" "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" "${GW_COUNT:-1}" \
+printf 'TICK %s\nMODEL: %s (LLM triage)\nHEARTBEAT: gap_detected=%s gap_minutes=%s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nRECOVERY: neo4j_attempted=%s neo4j_result=%s\nCREDENTIALS: fleet_health=%s valid=%s invalid=%s missing=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nSUBPROC: executing=%s alive=%s dead=%s stale=%s zombies=%s orphaned=%s anomalies=%s\nRESOLUTION: compliance=%s%% (with=%s without=%s)\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+    "$TS" "$MODEL" "$GAP_DETECTED" "${GAP_MINUTES:-0}" \
+    "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
     "$NEO4J_STATUS" "$REDIS_STATUS" \
+    "${NEO4J_RECOVERY_ATTEMPTED:-0}" "${NEO4J_RECOVERY_RESULT:--}" \
+    "$CRED_HEALTH_FLEET" "$CRED_HEALTH_VALID" "$CRED_HEALTH_INVALID" "$CRED_HEALTH_MISSING" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "$SPAWN_COUNT" "$TASK_QUEUE_STATUS" \
     "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" \
     "$VOTE_SYNC_COUNT" "$VOTE_SYNC_ERRORS" \
     "$SUBPROCESS_EXECUTING" "$SUBPROCESS_ALIVE" "$SUBPROCESS_DEAD" "$SUBPROCESS_STALE" "$SUBPROCESS_ZOMBIES" "$SUBPROCESS_ORPHANED" "$SUBPROCESS_ANOMALIES" \
+    "$RESOLUTION_COMPLIANCE" "$RESOLUTION_WITH" "$RESOLUTION_WITHOUT" \
     "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$(python3 -c "print(int($ROUTING_ACCURACY*100))" 2>/dev/null || echo "87")" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
     "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
@@ -552,6 +779,14 @@ printf 'TICK %s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\
 STALL_OUTPUT=$(python3 "$SCRIPTS/stall_detector.py" 2>/dev/null)
 if [ -n "$STALL_OUTPUT" ]; then
     echo "$STALL_OUTPUT" >> "$SUMMARY"
+fi
+
+# Check and clear orphaned agent subprocesses
+SUBPROCESS_OUTPUT=$(python3 "$SCRIPTS/subprocess_health_check.py" 2>/dev/null)
+if [ -n "$SUBPROCESS_OUTPUT" ]; then
+    echo "$SUBPROCESS_OUTPUT" >> "$SUMMARY"
+    # Also log to watchdog for tracking
+    echo "[$TS] $SUBPROCESS_OUTPUT" >> "$WATCHDOG_LOG"
 fi
 
 # Append THROUGHPUT_ANOMALYs for fleet-wide throughput issues (reuse Section 6b result)
@@ -572,7 +807,7 @@ fi
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
-echo "[$TS] TICK | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | subprocess_exec=$SUBPROCESS_EXECUTING | subprocess_alive=$SUBPROCESS_ALIVE | subprocess_dead=$SUBPROCESS_DEAD | subprocess_stale=$SUBPROCESS_STALE | subprocess_anomalies=$SUBPROCESS_ANOMALIES | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
+echo "[$TS] TICK | gap_detected=$GAP_DETECTED | gap_minutes=${GAP_MINUTES:-0} | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | credentials=$CRED_HEALTH_FLEET valid=$CRED_HEALTH_VALID invalid=$CRED_HEALTH_INVALID | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | subprocess_exec=$SUBPROCESS_EXECUTING | subprocess_alive=$SUBPROCESS_ALIVE | subprocess_dead=$SUBPROCESS_DEAD | subprocess_stale=$SUBPROCESS_STALE | subprocess_anomalies=$SUBPROCESS_ANOMALIES | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
 
 # ============================================================
 # SECTION 8: LLM Triage (local ollama — decide if Kublai should act)
@@ -606,6 +841,13 @@ prompt = f"""You are a watchdog for a 6-agent AI system (Kurultai). Review this 
 
 {summary}{trend_ctx}
 
+CRITICAL RULES:
+1. ONLY flag technical issues visible in the tick data (gateway down, neo4j/redis failures, task queue stalls, subprocess anomalies, credential failures, routing failures)
+2. NEVER make psychological/mental health assessments about agents (no mentions of stress, irritability, paranoia, mental health, HR, etc.)
+3. NEVER hallucinate problems not present in the data
+4. If all systems show healthy/ok/up with no anomalies, respond ACTION_NEEDED: no
+5. Resolution compliance warnings are formatting issues, not emergencies
+
 Respond in EXACTLY this format (no extra text):
 ACTION_NEEDED: yes|no
 SEVERITY: LOW|MEDIUM|HIGH|CRITICAL
@@ -620,7 +862,7 @@ try:
             json={
                 "model": "hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
                 "messages": [
-                    {"role": "system", "content": "You are a concise operations watchdog. Only flag things that genuinely need human/lead-agent attention. Healthy systems with no anomalies should get ACTION_NEEDED: no."},
+                    {"role": "system", "content": "You are a concise operations watchdog. Only flag TECHNICAL issues visible in tick data. NEVER make psychological/mental health assessments. Healthy systems = ACTION_NEEDED: no. If you mention stress/paranoia/HR/mental health, you are hallucinating and must respond ACTION_NEEDED: no instead."},
                     {"role": "user", "content": prompt}
                 ],
                 "stream": False,
@@ -659,6 +901,59 @@ if echo "$LLM_TRIAGE" | grep -q "ACTION_NEEDED:"; then
     LLM_SEVERITY=$(echo "$LLM_TRIAGE" | grep "^SEVERITY:" | head -1 | cut -d: -f2 | tr -d ' ' | tr '[:lower:]' '[:upper:]')
     LLM_REASON=$(echo "$LLM_TRIAGE" | grep "^REASON:" | head -1 | sed 's/^REASON: *//')
     LLM_SUGGESTED=$(echo "$LLM_TRIAGE" | grep "^SUGGESTED_ACTION:" | head -1 | sed 's/^SUGGESTED_ACTION: *//')
+fi
+
+# HALLUCINATION FILTER: Reject psychological/mental health assessments (LLM hallucination)
+if echo "$LLM_REASON $LLM_SUGGESTED" | grep -qiE "psychological|mental.health|stress|irritability|paranoia|HR|human.resources|therapy|counseling|burnout"; then
+    echo "[$TS] LLM_HALLUCINATION_FILTERED | original_reason=$LLM_REASON | forced_action=no" >> "$WATCHDOG_LOG"
+    LLM_ACTION_NEEDED="no"
+    LLM_SEVERITY="LOW"
+    LLM_REASON="LLM hallucination filtered (psychological assessment not permitted)"
+    LLM_SUGGESTED="none"
+fi
+
+# DATA-VERIFICATION FILTER: Cross-check LLM assertions against actual tick data
+# Prevents false alerts when LLM claims system X is down but tick summary shows X=up
+# 2026-03-11: mongke research showed LLM hallucinating "Neo4j disconnected" when neo4j=up
+if [ "$LLM_ACTION_NEEDED" = "yes" ]; then
+    # Extract actual states from tick summary
+    TICK_DATA=$(cat "$SUMMARY" 2>/dev/null)
+    NEO4J_STATE=$(echo "$TICK_DATA" | grep -oE "neo4j=\S+" | cut -d= -f2)
+    REDIS_STATE=$(echo "$TICK_DATA" | grep -oE "redis=\S+" | cut -d= -f2)
+    GATEWAY_STATE=$(echo "$TICK_DATA" | grep -oE "gateway=\S+" | cut -d= -f2)
+
+    # Check if LLM asserts Neo4j issue but data shows neo4j=up
+    if echo "$LLM_REASON" | grep -qiE "neo4j|graph.*database|graph.*db"; then
+        if [ "$NEO4J_STATE" = "up" ]; then
+            echo "[$TS] LLM_DATA_VERIFICATION_FILTERED | assertion=Neo4j_down | actual_state=neo4j=up | original_reason=$LLM_REASON | forced_action=no" >> "$WATCHDOG_LOG"
+            LLM_ACTION_NEEDED="no"
+            LLM_SEVERITY="LOW"
+            LLM_REASON="Filtered: LLM claimed Neo4j issue but tick data shows neo4j=up"
+            LLM_SUGGESTED="none"
+        fi
+    fi
+
+    # Check if LLM asserts Redis issue but data shows redis=up
+    if echo "$LLM_REASON" | grep -qiE "redis"; then
+        if [ "$REDIS_STATE" = "up" ]; then
+            echo "[$TS] LLM_DATA_VERIFICATION_FILTERED | assertion=Redis_down | actual_state=redis=up | original_reason=$LLM_REASON | forced_action=no" >> "$WATCHDOG_LOG"
+            LLM_ACTION_NEEDED="no"
+            LLM_SEVERITY="LOW"
+            LLM_REASON="Filtered: LLM claimed Redis issue but tick data shows redis=up"
+            LLM_SUGGESTED="none"
+        fi
+    fi
+
+    # Check if LLM asserts gateway issue but data shows gateway=up
+    if echo "$LLM_REASON" | grep -qiE "gateway|down.*system|system.*down"; then
+        if [ "$GATEWAY_STATE" = "up" ]; then
+            echo "[$TS] LLM_DATA_VERIFICATION_FILTERED | assertion=gateway_down | actual_state=gateway=up | original_reason=$LLM_REASON | forced_action=no" >> "$WATCHDOG_LOG"
+            LLM_ACTION_NEEDED="no"
+            LLM_SEVERITY="LOW"
+            LLM_REASON="Filtered: LLM claimed gateway issue but tick data shows gateway=up"
+            LLM_SUGGESTED="none"
+        fi
+    fi
 fi
 
 # Log LLM triage result
@@ -713,6 +1008,7 @@ $TICK_SUMMARY
 
 ## Required Action
 This anomaly has persisted too long for LLM triage to handle. Investigate root cause:
+- If HIGH_FAILURE_RATE: Check for model misconfiguration, API outage, or credential issues
 - If EXECUTING_NO_OUTPUT: Check if executing tasks are zombie processes (stale PIDs)
 - If PENDING_NO_DISPATCH: Check task-watcher is running and dispatching
 - If QUEUE_IMBALANCE: Redistribute overloaded agent queues to idle agents
@@ -727,6 +1023,229 @@ This anomaly has persisted too long for LLM triage to handle. Investigate root c
 fi
 
 # ============================================================
+# CREDENTIAL_CRISIS: Immediate escalation when ALL agents have invalid tokens
+# Implements fleet-wide credential guard (2026-03-09) — escalates BEFORE error spikes
+# Bypasses LLM triage — ALL agents broken is a deterministic crisis requiring human action
+# ============================================================
+CREDENTIAL_CRISIS_LAST_ESCALATION="$LOGDIR/.credential-crisis-last-escalation"
+CREDENTIAL_CRISIS_SHOULD_ESCALATE=0
+
+# Only escalate if ALL agents have invalid credentials AND cooldown has elapsed
+if [ "$CRED_HEALTH_FLEET" = "crisis" ] && [ "$CRED_HEALTH_INVALID" -ge 7 ]; then
+    # Check cooldown: only escalate if last escalation was > 60 minutes ago
+    if [ -f "$CREDENTIAL_CRISIS_LAST_ESCALATION" ]; then
+        LAST_ESCALATION_EPOCH=$(cat "$CREDENTIAL_CRISIS_LAST_ESCALATION" 2>/dev/null || echo "0")
+        CURRENT_EPOCH=$(date '+%s')
+        ESCALATION_AGE_SECONDS=$((CURRENT_EPOCH - LAST_ESCALATION_EPOCH))
+        if [ "$ESCALATION_AGE_SECONDS" -gt 3600 ]; then  # 60 minutes = 3600 seconds
+            CREDENTIAL_CRISIS_SHOULD_ESCALATE=1
+        fi
+    else
+        # No previous escalation recorded
+        CREDENTIAL_CRISIS_SHOULD_ESCALATE=1
+    fi
+fi
+
+if [ "$CREDENTIAL_CRISIS_SHOULD_ESCALATE" -eq 1 ]; then
+    # Record escalation time
+    date '+%s' > "$CREDENTIAL_CRISIS_LAST_ESCALATION"
+
+    TICK_SUMMARY=$(cat "$SUMMARY")
+    CREDENTIAL_CRISIS_MSG="## CRITICAL: Fleet-Wide Credential Crisis
+
+**Status:** ALL 7 agents have invalid API credentials
+**Valid:** ${CRED_HEALTH_VALID} | **Invalid:** ${CRED_HEALTH_INVALID} | **Missing:** ${CRED_HEALTH_MISSING}
+
+## Required Action (HUMAN INTERVENTION REQUIRED)
+
+The fleet is DEADLOCKED — no agent can execute tasks until credentials are fixed.
+
+1. **Obtain valid Anthropic API keys** (sk-ant- prefix) from https://console.anthropic.com/
+2. **Update each agent's settings.json:**
+   \`for agent in kublai temujin mongke chagatai jochi ogedei tolui; do
+     vim ~/.openclaw/agents/\$agent/.claude/settings.json
+   done\`
+3. **Set ANTHROPIC_AUTH_TOKEN to valid sk-ant- key** (NOT DashScope sk-sp-*)
+4. **Reset sessions:** \`echo '{}' > ~/.openclaw/agents/main/sessions/sessions.json\`
+5. **Verify:** \`python3 scripts/credential-health-monitor.py\`
+
+## Current Tick Summary
+\`\`\`
+$TICK_SUMMARY
+\`\`\`
+
+Route to: ogedei (for coordination, but requires human to fix credentials)"
+
+    echo "[$TS] CREDENTIAL_CRISIS | fleet=$CRED_HEALTH_FLEET valid=$CRED_HEALTH_VALID invalid=$CRED_HEALTH_INVALID | dispatching main" >> "$WATCHDOG_LOG"
+    /opt/homebrew/bin/openclaw agent --agent main \
+        --message "$CREDENTIAL_CRISIS_MSG" \
+        --thinking high \
+        >> "$LOGDIR/tick-credential-crisis-escalate.log" 2>&1 &
+    echo "CREDENTIAL_CRISIS: Dispatched main (pid=$!) — ALL agents invalid, human intervention required"
+fi
+
+# ============================================================
+# ERROR_RATE_ESCALATION: Auto-escalate when errors exceed threshold with rising trend
+# Implements WHEN/THEN rule #2: auto-trigger when errors/hour > 100 with rising trend
+# Bypasses LLM triage — persistent error spikes require deterministic escalation to ogedei
+# ============================================================
+ERROR_RATE_SHOULD_ESCALATE=0
+ERROR_RATE_LAST_ESCALATION="$LOGDIR/.error-rate-last-escalation"
+
+# Only escalate if errors_1h > 100 AND trend is rising
+if [ "$ERRORS_1H" -gt 100 ] && [ "$ERR_DIRECTION" = "rising" ]; then
+    # Check cooldown: only escalate if last escalation was > 30 minutes ago
+    if [ -f "$ERROR_RATE_LAST_ESCALATION" ]; then
+        LAST_ESCALATION_EPOCH=$(cat "$ERROR_RATE_LAST_ESCALATION" 2>/dev/null || echo "0")
+        CURRENT_EPOCH=$(date '+%s')
+        ESCALATION_AGE_SECONDS=$((CURRENT_EPOCH - LAST_ESCALATION_EPOCH))
+        if [ "$ESCALATION_AGE_SECONDS" -gt 1800 ]; then  # 30 minutes = 1800 seconds
+            ERROR_RATE_SHOULD_ESCALATE=1
+        fi
+    else
+        # No previous escalation recorded
+        ERROR_RATE_SHOULD_ESCALATE=1
+    fi
+fi
+
+if [ "$ERROR_RATE_SHOULD_ESCALATE" -eq 1 ]; then
+    # Record escalation time
+    date '+%s' > "$ERROR_RATE_LAST_ESCALATION"
+
+    TICK_SUMMARY=$(cat "$SUMMARY")
+    ERROR_RATE_MSG="## Critical Error Rate Escalation — ERRORS_1H=${ERRORS_1H} Rising Trend
+
+**Error Count:** ${ERRORS_1H} errors in last hour
+**Trend:** Rising (getting worse)
+**5-Minute Rate:** ${ERRORS_5M} errors (current spike)
+**Rolling Average:** ${ERR_AVG_5M} errors/5min
+
+## Current Tick Summary
+\`\`\`
+$TICK_SUMMARY
+\`\`\`
+
+## Required Action
+This error rate spike is worsening and requires immediate intervention:
+
+1. **Check credentials** — High error rates often indicate invalid/expired API tokens
+2. **Review logs** — Check ${OPENCLAW_LOG} for error patterns (auth, timeout, etc.)
+3. **Fleet health** — Verify all agents have valid credentials via credential-health-monitor.py
+4. **Scale back** — If load-related, consider pausing non-critical tasks
+
+Route to: ogedei (for credential/system health investigation)"
+
+    echo "[$TS] ERROR_RATE_ESCALATION | errors_1h=$ERRORS_1H err_dir=$ERR_DIRECTION | dispatching main" >> "$WATCHDOG_LOG"
+    /opt/homebrew/bin/openclaw agent --agent main \
+        --message "$ERROR_RATE_MSG" \
+        --thinking high \
+        >> "$LOGDIR/tick-error-rate-escalate.log" 2>&1 &
+    echo "ERROR_RATE_ESCALATION: Dispatched main (pid=$!) — errors_1h=$ERRORS_1H trend=$ERR_DIRECTION"
+fi
+
+# ============================================================
+# GAP_ESCALATION: Auto-escalate when monitoring gaps detected
+# Implements Rule O4: WHEN kurultai-monitor log shows >10min gap, investigate cron/launchd reliability
+# Bypasses LLM triage — monitoring blackouts are deterministic failures requiring escalation
+# ============================================================
+GAP_ESCALATION_SHOULD_DISPATCH=0
+GAP_ESCALATION_LAST_ESCALATION="$LOGDIR/.gap-escalation-last-escalation"
+GAP_ESCALATION_THRESHOLD_MINUTES=10  # Rule O4 threshold
+
+# Check if gap detected and exceeds threshold
+if [ "$GAP_DETECTED" -eq 1 ] && [ "${GAP_MINUTES:-0}" -gt "$GAP_ESCALATION_THRESHOLD_MINUTES" ]; then
+    # Determine severity based on gap size
+    if [ "$GAP_MINUTES" -gt 60 ]; then
+        GAP_SEVERITY="CRITICAL"
+    elif [ "$GAP_MINUTES" -gt 30 ]; then
+        GAP_SEVERITY="HIGH"
+    elif [ "$GAP_MINUTES" -gt 15 ]; then
+        GAP_SEVERITY="MEDIUM"
+    else
+        GAP_SEVERITY="LOW"
+    fi
+
+    # Check cooldown: only escalate if last escalation was > 15 minutes ago
+    # (shorter than other escalations because gaps indicate infrastructure failure)
+    if [ -f "$GAP_ESCALATION_LAST_ESCALATION" ]; then
+        LAST_ESCALATION_EPOCH=$(cat "$GAP_ESCALATION_LAST_ESCALATION" 2>/dev/null || echo "0")
+        CURRENT_EPOCH=$(date '+%s')
+        ESCALATION_AGE_SECONDS=$((CURRENT_EPOCH - LAST_ESCALATION_EPOCH))
+        if [ "$ESCALATION_AGE_SECONDS" -gt 900 ]; then  # 15 minutes = 900 seconds
+            GAP_ESCALATION_SHOULD_DISPATCH=1
+        fi
+    else
+        # No previous escalation recorded
+        GAP_ESCALATION_SHOULD_DISPATCH=1
+    fi
+fi
+
+if [ "$GAP_ESCALATION_SHOULD_DISPATCH" -eq 1 ]; then
+    # Record escalation time
+    date '+%s' > "$GAP_ESCALATION_LAST_ESCALATION"
+
+    TICK_SUMMARY=$(cat "$SUMMARY")
+    GAP_MSG="## Monitoring Gap Detected — $GAP_SEVERITY
+
+**Gap Duration:** ${GAP_MINUTES} minutes (${GAP_MINUTES}m gap = ~$((GAP_MINUTES / 5)) missed ticks)
+**Last Tick Epoch:** ${LAST_EPOCH} ($(date -r "$LAST_EPOCH" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown'))
+**Threshold:** >${GAP_ESCALATION_THRESHOLD_MINUTES} minutes triggers investigation
+
+## Required Action
+
+A ${GAP_MINUTES}-minute gap in watchdog execution indicates infrastructure failure:
+
+1. **Check cron/launchd** — Verify watchdog-gather.sh is scheduled every 5 minutes
+   - \`launchctl list | grep watchdog\`
+   - \`crontab -l | grep watchdog\`
+2. **Check for crashes** — Review system logs for watchdog crashes
+   - \`log show --predicate 'process == "watchdog"' --last 1h\`
+3. **Check lock file** — Verify /tmp/watchdog-gather.lock isn't stale
+   - \`ls -la /tmp/watchdog-gather.lock\`
+4. **Check system sleep/wake** — Mac Mini may have slept, delaying cron execution
+5. **Verify OpenClaw cron** — Check if OpenClaw's local LLM scheduler is running
+
+## Current Tick Summary
+\`\`\`
+$TICK_SUMMARY
+\`\`\`
+
+Route to: ogedei (for infrastructure investigation)"
+
+    echo "[$TS] GAP_ESCALATION | gap_minutes=${GAP_MINUTES} severity=$GAP_SEVERITY last_epoch=$LAST_EPOCH | dispatching main" >> "$WATCHDOG_LOG"
+    /opt/homebrew/bin/openclaw agent --agent main \
+        --message "$GAP_MSG" \
+        --thinking high \
+        >> "$LOGDIR/tick-gap-escalate.log" 2>&1 &
+    echo "GAP_ESCALATION: Dispatched main (pid=$!) — gap=${GAP_MINUTES}m severity=$GAP_SEVERITY"
+fi
+
+# ============================================================
+# AUTO-REDISTRIBUTE: Execute task redistribution on QUEUE_IMBALANCE
+# Bypasses manual kublai intervention — direct action for fleet balance
+# ============================================================
+if [ "$THROUGHPUT_ANOMALY_TYPE" = "QUEUE_IMBALANCE" ]; then
+    echo "[$TS] AUTO_REDISTRIBUTE | Triggering task-redistribute.py for QUEUE_IMBALANCE" >> "$WATCHDOG_LOG"
+    REDISTRIBUTE_OUTPUT=$(python3 "$SCRIPTS/task-redistribute.py" --auto --max-move 5 2>&1)
+    REDISTRIBUTE_RC=$?
+
+    # Extract tasks moved count (rc 0 or 1 both mean script ran - 1 just means no tasks moved)
+    TASKS_MOVED=$(echo "$REDISTRIBUTE_OUTPUT" | sed -nE 's/Total tasks (that would be )?moved: ([0-9]+).*/\2/p' | head -1)
+    TASKS_MOVED=${TASKS_MOVED:-0}
+
+    if [ $REDISTRIBUTE_RC -le 1 ]; then
+        if [ "$TASKS_MOVED" -gt 0 ]; then
+            echo "[$TS] AUTO_REDISTRIBUTE | Success — moved $TASKS_MOVED tasks from overloaded to idle agents" >> "$WATCHDOG_LOG"
+            echo "AUTO_REDISTRIBUTE: Moved $TASKS_MOVED tasks (QUEUE_IMBALANCE resolved)"
+        else
+            echo "[$TS] AUTO_REDISTRIBUTE | No-op — no movable tasks found or no underutilized agents available" >> "$WATCHDOG_LOG"
+        fi
+    else
+        echo "[$TS] AUTO_REDISTRIBUTE | Failed — rc=$REDISTRIBUTE_RC — $REDISTRIBUTE_OUTPUT" >> "$WATCHDOG_LOG"
+        echo "AUTO_REDISTRIBUTE: Failed (rc=$REDISTRIBUTE_RC)"
+    fi
+fi
+
 # ============================================================
 # STALE LOCK CLEANUP: Remove orphaned session lock files
 # Runs every 5 minutes to prevent "session file locked" errors
@@ -741,6 +1260,56 @@ python3 "$SCRIPTS/kublai-actions.py" --trigger tick >> "$LOGDIR/kublai-actions.l
 # SELF-WAKE: Rule T7 — wake idle agents with blocked items (backgrounded)
 # ============================================================
 python3 "$SCRIPTS/agent-self-wake.py" >> "$LOGDIR/self-wake.log" 2>&1 &
+
+# ============================================================
+# MONGKE SELF-TASK: Generate research tasks when mongke queue is empty
+# Runs every tick (5min) with internal 2h cooldown to prevent flooding
+# Finds stale knowledge in Neo4j and generates refresh research tasks
+# ============================================================
+python3 "$SCRIPTS/mongke_self_task.py" --exec >> "$LOGDIR/mongke-self-task.log" 2>&1 &
+
+# ============================================================
+# GATE TIMEOUT CHECK: Monitor for stuck completion gates
+# Runs every tick (5min) to check for gates stuck > 24h
+# ============================================================
+GATE_TIMEOUT_OUTPUT=$(python3 "$SCRIPTS/gate-timeout-watchdog.py" --json 2>/dev/null || echo '{"stuck_count":0}')
+GATE_TIMEOUT_COUNT=$(echo "$GATE_TIMEOUT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('stuck_count',0))" 2>/dev/null || echo "0")
+GATE_TIMEOUT_ESCALATED=$(echo "$GATE_TIMEOUT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('escalated_count',0))" 2>/dev/null || echo "0")
+
+# Log timeout events
+if [ "$GATE_TIMEOUT_COUNT" -gt 0 ]; then
+    echo "[$TS] GATE_TIMEOUT | stuck=$GATE_TIMEOUT_COUNT | escalated=$GATE_TIMEOUT_ESCALATED" >> "$WATCHDOG_LOG"
+fi
+
+# Auto-escalate if gates are critically stuck (no escalation in last hour)
+# This prevents indefinite gating while avoiding spam escalation
+if [ "$GATE_TIMEOUT_COUNT" -gt 0 ]; then
+    GATE_TIMEOUT_LAST_ESCALATION="$LOGDIR/.gate-timeout-last-escalation"
+    SHOULD_ESCALATE=0
+
+    if [ -f "$GATE_TIMEOUT_LAST_ESCALATION" ]; then
+        LAST_ESCALATION_EPOCH=$(cat "$GATE_TIMEOUT_LAST_ESCALATION" 2>/dev/null || echo "0")
+        CURRENT_EPOCH=$(date '+%s')
+        ESCALATION_AGE_SECONDS=$((CURRENT_EPOCH - LAST_ESCALATION_EPOCH))
+        # Only escalate if last escalation was > 1 hour ago
+        if [ "$ESCALATION_AGE_SECONDS" -gt 3600 ]; then
+            SHOULD_ESCALATE=1
+        fi
+    else
+        # No previous escalation recorded
+        SHOULD_ESCALATE=1
+    fi
+
+    if [ "$SHOULD_ESCALATE" -eq 1 ]; then
+        # Record escalation time
+        date '+%s' > "$GATE_TIMEOUT_LAST_ESCALATION"
+
+        # Run escalation
+        python3 "$SCRIPTS/gate-timeout-watchdog.py" --escalate >> "$LOGDIR/gate-timeout-escalate.log" 2>&1 &
+
+        echo "[$TS] GATE_TIMEOUT_ESCALATE | triggered | stuck_count=$GATE_TIMEOUT_COUNT" >> "$WATCHDOG_LOG"
+    fi
+fi
 
 # ============================================================
 # WRITE 4: Consolidated WATCHDOG_LLM line (replaces LLM manual logging)

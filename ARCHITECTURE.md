@@ -1,7 +1,7 @@
 # KUBLAI ARCHITECTURE - OpenClaw Agent System
 
-**Version**: 1.13
-**Last Updated**: 2026-03-08
+**Version**: 1.14
+**Last Updated**: 2026-03-09
 **Status**: Active Production System
 **Agent**: Kublai (Squad Lead / Router)
 **Platform**: OpenClaw Gateway (Multi-Gateway Setup)
@@ -598,6 +598,22 @@ Agent A executing task
 | Ogedei | claude-opus-4-6 | Gateway + task execution |
 | Tolui | claude-opus-4-6 | Dedicated gateway (port 18792) |
 
+**Multi-Tier Fallback Chain** (configured 2026-03-09):
+| Tier | Provider | Model | Base URL | Status |
+|------|----------|-------|----------|--------|
+| 0 | Anthropic (Primary) | claude-sonnet-4-6 | Default API | Active |
+| 1 | Z.AI Fallback | glm-5 | https://api.z.ai/api/anthropic | Active |
+| 2 | Alibaba Fallback | qwen3.5-plus | https://coding-intl.dashscope.aliyuncs.com/apps/anthropic | Active |
+
+**Fallback Behavior**:
+- Rate limit (429) on Tier 0 → Retry with Tier 1 (Z.AI glm-5)
+- Rate limit (429) on Tier 1 → Retry with Tier 2 (Alibaba qwen3.5-plus)
+- Non-rate-limit errors → Fail immediately with original exit code
+- All providers exhausted → Exit with code 429
+
+**Configuration Location**: `~/.local/bin/claude-agent` (wrapper script)
+**Note**: Multi-tier fallback enabled per user preference (2026-03-09). Ensures task continuity during API rate limits or outages.
+
 ---
 
 ### 5. Quality Assurance (ogedei-watchdog daemon)
@@ -915,6 +931,30 @@ Agent Reflection → Kublai Heartbeat Detects New File
 ---
 
 ## Change Log
+
+### 2026-03-09 - Multi-Tier Model Fallback Configuration (v1.14)
+
+**Change**: Added comprehensive multi-tier fallback chain for Claude Code task execution.
+
+**Scope**:
+1. **Fallback Chain Implementation**:
+   - **Tier 0**: Anthropic (Primary) - claude-sonnet-4-6
+   - **Tier 1**: Z.AI Fallback - glm-5 (https://api.z.ai/api/anthropic)
+   - **Tier 2**: Alibaba Fallback - qwen3.5-plus (https://coding-intl.dashscope.aliyuncs.com/apps/anthropic)
+   - **Behavior**: Automatic failover on rate limit (429); non-rate-limit errors fail immediately
+   - **Configuration**: `~/.local/bin/claude-agent` wrapper script
+   - **Status**: Active (enabled 2026-03-09 per user preference)
+
+2. **Documentation Updates**:
+   - Added fallback chain table to Agent Model Configuration section
+   - Documented fallback behavior and error handling
+   - Updated version to 1.14
+
+**Files Modified**:
+- `~/.openclaw/agents/main/ARCHITECTURE.md` (this file)
+- `~/.local/bin/claude-agent` (fallback chain configuration)
+
+---
 
 ### 2026-03-08 - System Stability Fixes (v1.10)
 

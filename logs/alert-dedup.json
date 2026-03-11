@@ -1,0 +1,9 @@
+{
+  "ogedei:system health alert": {
+    "strikes": 1,
+    "last_seen": "2026-03-10T02:36:13.315510",
+    "last_title": "System Health Alert (1 issue)",
+    "last_source": "system-health-check",
+    "last_task_id": "80dd9694-d59"
+  }
+}

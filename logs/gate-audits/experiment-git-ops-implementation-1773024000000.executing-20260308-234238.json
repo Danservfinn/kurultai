@@ -1,0 +1,31 @@
+{
+  "original_task": "experiment-git-ops-implementation-1773024000000.executing",
+  "completion_percentage": 80,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [
+    "Add documentation"
+  ],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "ogedei",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [
+    {
+      "title": "Add documentation",
+      "agent": "ogedei",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T23:42:38.729348",
+  "audit_version": "1.0"
+}

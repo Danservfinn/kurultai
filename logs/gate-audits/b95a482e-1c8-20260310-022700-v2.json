@@ -1,0 +1,19 @@
+{
+  "original_task": "b95a482e-1c8",
+  "audit_timestamp": "2026-03-10T02:27:00.619495",
+  "audit_version": "2.0",
+  "completion_percentage": 100,
+  "can_complete": true,
+  "missing_components": [],
+  "quality_issues": [],
+  "required_followups": [],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_tier": "template",
+  "validation_errors": [
+    "No API credentials found"
+  ],
+  "retries_performed": 0,
+  "audit_fallback": false
+}

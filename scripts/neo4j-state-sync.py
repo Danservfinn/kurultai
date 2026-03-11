@@ -2,6 +2,29 @@
 """
 neo4j-state-sync.py — Reconcile filesystem task state with Neo4j.
 
+================================================================================
+DEPRECATED (2026-03-09)
+================================================================================
+This script is no longer needed as Neo4j is now the SINGLE SOURCE OF TRUTH
+for task state. All state transitions happen in Neo4j first, then the
+filesystem is updated as a materialized view.
+
+Migration completed: 2026-03-09 (Phase 2 of Kurultai Task System Overhaul)
+
+New architecture:
+- Task creation: Neo4j first, filesystem second
+- Task discovery: Query Neo4j for PENDING tasks
+- State transitions: Atomic CAS in Neo4j, then filesystem update
+- Filesystem is a cache/backward-compat layer
+
+Kept for:
+- Emergency reconciliation if drift detected
+- One-time migration of legacy tasks
+- Manual repair operations
+
+Replacement: Use neo4j-backfill-filesystem.py to rebuild filesystem from Neo4j.
+================================================================================
+
 Problem: task-watcher.py executes tasks and renames files (.executing, .completed.done,
 .failed.done) but NEVER updates Neo4j. This causes Neo4j task nodes to stay at
 PENDING/ready forever while the filesystem shows completion.
@@ -30,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from neo4j_task_tracker import get_driver
 from kurultai_paths import AGENTS_DIR
-AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
 
 
 def derive_status_from_filename(filename):
@@ -235,7 +258,7 @@ def sync(apply=False, verbose=False):
 
         # Check for status drift
         # Normalize Neo4j status for comparison
-        neo_status = neo_entry['status'].upper()
+        neo_status = (neo_entry['status'] or 'PENDING').upper()
         fs_status = task['file_status']
 
         if neo_status == fs_status:

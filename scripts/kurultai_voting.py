@@ -114,25 +114,9 @@ def phase1_generate_proposals() -> Dict[str, List[str]]:
             proposals_created[agent] = [p.stem for p in existing]
             continue
 
-        # Generate sample proposals for each agent
-        rc, stdout, stderr = run_script(
-            "proposal_generator.py",
-            ["--agent", agent, "--sample"]
-        )
-
-        if rc == 0:
-            # Parse created proposals from output
-            created = []
-            for line in stdout.strip().split("\n"):
-                if "Created proposal:" in line:
-                    proposal_id = line.split("/")[-1].replace(".md", "")
-                    created.append(proposal_id)
-
-            proposals_created[agent] = created
-            log_phase(1, f"  {agent} created {len(created)} proposals", {"proposals": created})
-        else:
-            log_phase(1, f"  {agent} failed to create proposals", {"error": stderr})
-            proposals_created[agent] = []
+        # CHANGE: Skip sample generation - only use real proposals from kurultai-reflect
+        log_phase(1, f"  {agent}: No pending proposals (reflection may not have run)")
+        proposals_created[agent] = []
 
     total = sum(len(p) for p in proposals_created.values())
     log_phase(1, f"Proposal generation complete: {total} total proposals")
@@ -263,6 +247,46 @@ def phase3_simulate_voting() -> Dict[str, dict]:
                 votes_cast[proposal_id][agent] = f"failed: {stderr}"
 
     return votes_cast
+
+
+def diagnose_voting_issues() -> List[str]:
+    """
+    Diagnose why votes may not be cast.
+
+    Returns a list of diagnostic messages explaining potential issues.
+    """
+    issues = []
+
+    # Check if pending directory has proposals
+    pending_proposals = list(PENDING_DIR.glob("*.md"))
+    if not pending_proposals:
+        issues.append("No proposals in pending directory - kurultai-reflect may not have run")
+
+    # Check if voting directory has proposals
+    voting_proposals = [f for f in VOTING_DIR.glob("*.md") if "-votes.json" not in f.name]
+    if not voting_proposals:
+        issues.append("No proposals in voting directory - phase3_start_voting may not have run")
+    else:
+        issues.append(f"Found {len(voting_proposals)} proposals in voting directory")
+
+    # Check if votes files exist for voting proposals
+    for p in voting_proposals:
+        votes_file = VOTING_DIR / f"{p.stem}-votes.json"
+        if not votes_file.exists():
+            issues.append(f"No votes file for {p.stem} - simulate_voting may not have been called")
+        else:
+            try:
+                with open(votes_file, 'r') as f:
+                    votes_data = json.load(f)
+                    vote_count = len(votes_data.get("votes", {}))
+                    if vote_count == 0:
+                        issues.append(f"Empty votes file for {p.stem}")
+                    else:
+                        issues.append(f"Votes file for {p.stem} has {vote_count} votes")
+            except Exception as e:
+                issues.append(f"Could not read votes file for {p.stem}: {e}")
+
+    return issues
 
 
 # ============================================================================
@@ -515,6 +539,24 @@ def get_status() -> dict:
     return status
 
 
+def run_diagnostics() -> None:
+    """Run voting diagnostics and print results."""
+    ensure_directories()
+    print("\nKurultai Voting Diagnostics")
+    print("=" * 40)
+
+    issues = diagnose_voting_issues()
+    for issue in issues:
+        print(f"  - {issue}")
+
+    status = get_status()
+    print(f"\nCurrent Status:")
+    print(f"  Pending:  {status['pending']}")
+    print(f"  Voting:   {status['voting']}")
+    print(f"  Approved: {status['approved']}")
+    print(f"  Rejected: {status['rejected']}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Kurultai consensus-based voting orchestration"
@@ -527,12 +569,17 @@ def main():
                        help="Simulate voting for testing")
     parser.add_argument("--status", action="store_true",
                        help="Show current status")
+    parser.add_argument("--diagnose", action="store_true",
+                       help="Run voting diagnostics to understand why votes may be 0/6")
 
     args = parser.parse_args()
 
     ensure_directories()
 
-    if args.status:
+    if args.diagnose:
+        run_diagnostics()
+
+    elif args.status:
         status = get_status()
         print(f"\nKurultai Voting Status")
         print(f"=====================")

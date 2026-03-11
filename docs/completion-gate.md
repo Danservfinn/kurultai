@@ -865,6 +865,78 @@ All bypasses are logged immutably and reviewed.
 
 ---
 
+## Gate Timeouts
+
+The completion gate includes timeout mechanisms to prevent tasks from being stuck indefinitely.
+
+### Timeout Configuration
+
+Default timeouts (configurable via environment variables):
+
+| Timeout | Default | Environment Variable | Description |
+|---------|---------|---------------------|-------------|
+| Pending Gate | 24 hours | `GATE_PENDING_TIMEOUT_HOURS` | Max time in `.pending-gate.md` before escalation |
+| Audit Call | 5 minutes | `GATE_AUDIT_TIMEOUT_SECONDS` | Max time for LLM audit API call |
+| Follow-up Task | 7 days | `GATE_FOLLOWUP_TIMEOUT_DAYS` | Max age before follow-up alert |
+
+### Pending Gate Timeout
+
+When a task remains in `.pending-gate.md` state beyond 24 hours:
+
+1. **Detection**: Watchdog checks every 5 minutes (via `watchdog-gather.sh`)
+2. **Escalation**: Auto-creates kublai task with stuck gate details
+3. **Rate limiting**: Only escalates once per hour to avoid spam
+
+**Check manually:**
+```bash
+python3 ~/.openclaw/agents/main/scripts/gate_timeouts.py --check-pending
+```
+
+**Escalate manually:**
+```bash
+python3 ~/.openclaw/agents/main/scripts/gate_timeouts.py --escalate
+```
+
+### Audit Timeout
+
+LLM audit calls are wrapped with a 5-minute timeout:
+
+- If timeout exceeded → Falls back to template-based audit
+- Timeout event logged to `~/.openclaw/agents/main/logs/gate-timeouts/`
+- Template audit uses heuristic pattern matching
+
+### Follow-up Task Timeout
+
+Follow-up tasks older than 7 days are flagged:
+
+```bash
+python3 ~/.openclaw/agents/main/scripts/gate_timeouts.py --check-followups
+```
+
+This helps identify:
+- Forgotten follow-up tasks
+- Blocked work that needs attention
+- Tasks that may need to be bypassed
+
+### Timeout Logs
+
+All timeout events are logged to:
+- `~/.openclaw/agents/main/logs/gate-timeouts/timeouts-YYYY-MM-DD.jsonl`
+
+Log entry format:
+```json
+{
+  "timestamp": "2026-03-08T12:34:56",
+  "event_type": "pending_timeout_check",
+  "details": {
+    "count": 2,
+    "stuck_gates": [...]
+  }
+}
+```
+
+---
+
 ## Related Documentation
 
 - **Design Document:** `~/.openclaw/agents/mongke/workspace/completion-gate-design-2026-03-08.md`

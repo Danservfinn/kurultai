@@ -1,0 +1,162 @@
+{
+  "rules": {
+    "kublai:kublai-01": {
+      "rule_id": "kublai-01",
+      "agent": "kublai",
+      "when": "task contains \"model error\"",
+      "then": "route to ogedei for immediate fix",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.007957",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-02": {
+      "rule_id": "kublai-02",
+      "agent": "kublai",
+      "when": "queue depth > HIGH_THRESHOLD AND agent has < LOW_THRESHOLD",
+      "then": "redistribute to underutilized agent",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.007988",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-03": {
+      "rule_id": "kublai-03",
+      "agent": "kublai",
+      "when": "task classification ambiguous AND multiple agents capable",
+      "then": "use predictive routing based on historical completion times",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.007995",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-04": {
+      "rule_id": "kublai-04",
+      "agent": "kublai",
+      "when": "skill_hint present in task",
+      "then": "prioritize agent with that skill",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.008000",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-05": {
+      "rule_id": "kublai-05",
+      "agent": "kublai",
+      "when": "task explicitly mentions code review",
+      "then": "route to jochi regardless of other keywords",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.008005",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-06": {
+      "rule_id": "kublai-06",
+      "agent": "kublai",
+      "when": "task mentions architecture/design AND code",
+      "then": "route to temujin (development domain includes architecture)",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.008009",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-07": {
+      "rule_id": "kublai-07",
+      "agent": "kublai",
+      "when": "model configuration drift detected",
+      "then": "auto-correct and alert",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.008014",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-08": {
+      "rule_id": "kublai-08",
+      "agent": "kublai",
+      "when": "fake completion detected in audit",
+      "then": "trigger pipeline fix investigation",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.008018",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "kublai:kublai-09": {
+      "rule_id": "kublai-09",
+      "agent": "kublai",
+      "when": "agent queue age > 1800s (30min)",
+      "then": "trigger redistribution alert",
+      "status": "proposed",
+      "created_at": "2026-03-09T03:37:15.008023",
+      "last_verified": null,
+      "source_file": "/Users/kublai/.openclaw/agents/main/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "ogedei:O1": {
+      "rule_id": "O1",
+      "agent": "ogedei",
+      "when": "idle >15min AND blocked items exist",
+      "then": "self-dispatch on oldest blocked item",
+      "status": "active",
+      "created_at": "2026-03-09T03:37:15.015867",
+      "last_verified": "2026-03-09T03:37:20.795502",
+      "source_file": "/Users/kublai/.openclaw/agents/ogedei/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "ogedei:O2": {
+      "rule_id": "O2",
+      "agent": "ogedei",
+      "when": "infrastructure pulse shows stalled queue AND CPU spiking",
+      "then": "verify actual task files",
+      "status": "active",
+      "created_at": "2026-03-09T03:37:15.015887",
+      "last_verified": "2026-03-09T03:37:20.845958",
+      "source_file": "/Users/kublai/.openclaw/agents/ogedei/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "ogedei:O3": {
+      "rule_id": "O3",
+      "agent": "ogedei",
+      "when": "gateway_health_check detects failure",
+      "then": "auto-restart gateway AND log incident",
+      "status": "active",
+      "created_at": "2026-03-09T03:37:15.015893",
+      "last_verified": "2026-03-09T03:37:20.892645",
+      "source_file": "/Users/kublai/.openclaw/agents/ogedei/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    },
+    "ogedei:O4": {
+      "rule_id": "O4",
+      "agent": "ogedei",
+      "when": "agent has high failure rate AND \"BLOCKED non-Anthropic\" in logs",
+      "then": "check agent-task-handler.py allowed_proxy_endpoints",
+      "status": "active",
+      "created_at": "2026-03-09T03:37:15.015898",
+      "last_verified": "2026-03-09T03:37:20.933576",
+      "source_file": "/Users/kublai/.openclaw/agents/ogedei/memory/MEMORY.md",
+      "category": "memory",
+      "deprecation_reason": null
+    }
+  },
+  "last_updated": "2026-03-09T03:37:20.933710",
+  "total_count": 13
+}

@@ -1,0 +1,33 @@
+{
+  "export_date": "2026-03-08T16:56:08.038087",
+  "phone_number": "+15550199",
+  "profile": {
+    "conversations": [],
+    "profile_id": "hp-+15550199",
+    "human_id": "+15550199",
+    "what_to_call": "Unknown",
+    "timezone": "Unknown",
+    "pronouns": "Not"
+  },
+  "conversations": [],
+  "archived_conversations": [],
+  "statistics": {
+    "total": 12,
+    "channels": {
+      "signal": 12
+    },
+    "contexts": {
+      "calendar": 4,
+      "task": 4,
+      "general": 4
+    },
+    "sentiments": {
+      "positive": 0,
+      "negative": 0,
+      "neutral": 12
+    },
+    "first_conversation": "2026-03-08T16:36:39.465199",
+    "last_conversation": "2026-03-08T16:38:37.416291"
+  },
+  "file_location": "/Users/kublai/.openclaw/agents/main/memory/humans/15550199.md"
+}

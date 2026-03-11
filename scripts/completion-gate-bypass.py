@@ -23,6 +23,7 @@ Security Review: ~/.openclaw/agents/mongke/workspace/completion-gate-critical-re
 """
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -64,6 +65,7 @@ except ImportError:
         UNAUTHORIZED_BYPASS_ATTEMPT = "UNAUTHORIZED_BYPASS_ATTEMPT"
         RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
         MULTI_PARTY_APPROVAL = "MULTI_PARTY_APPROVAL"
+        FORCE_BYPASS_USED = "FORCE_BYPASS_USED"
 
     class Severity(Enum):
         CRITICAL = "critical"
@@ -247,6 +249,39 @@ def validate_reason(reason: str) -> tuple[bool, str]:
     return True, ""
 
 
+def validate_force_justification(justification: str) -> tuple[bool, str]:
+    """
+    Validate that the force justification provides specific context.
+
+    Secondary authorization for --force flag to prevent rate limit bypass abuse.
+
+    Args:
+        justification: Justification for using --force flag
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not justification or not justification.strip():
+        return False, "Force justification cannot be empty when --force is used"
+
+    justification = justification.strip()
+
+    # Minimum length - same as reason
+    if len(justification) < 20:
+        return False, f"Force justification must be at least 20 characters (got {len(justification)})"
+
+    # Maximum length (prevent abuse)
+    if len(justification) > 1000:
+        return False, f"Force justification too long (max 1000 characters, got {len(justification)})"
+
+    # Check for generic patterns
+    is_generic, error_msg = is_generic_reason(justification)
+    if is_generic:
+        return False, f"Force justification {error_msg.lower()}"
+
+    return True, ""
+
+
 def check_multi_party_requirement(
     task_file: Path,
     allowlist: Dict[str, Any]
@@ -319,9 +354,14 @@ def log_bypass(
         "task_agent": frontmatter.get("agent", "unknown")
     }
 
-    # Write to legacy log
+    # Write to legacy log with file locking to prevent race conditions
     with open(BYPASS_LOG, 'a') as f:
-        f.write(json.dumps(entry) + '\n')
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Exclusive lock
+        try:
+            f.write(json.dumps(entry) + '\n')
+            f.flush()
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Release lock
 
     # Log to security event logger if available
     if SECURITY_LOGGER_AVAILABLE and EventType and Severity and log_security_event:
@@ -349,7 +389,8 @@ def bypass_gate(
     approver: str,
     reason: str,
     dry_run: bool = False,
-    force: bool = False
+    force: bool = False,
+    force_justification: str = ""
 ) -> bool:
     """
     Bypass the completion gate for a task with security checks.
@@ -359,7 +400,8 @@ def bypass_gate(
         approver: Authorizing approver (must be on allowlist)
         reason: Specific reason for bypass (min 20 chars, not generic)
         dry_run: Show what would happen without doing it
-        force: Skip rate limit checks (emergency only)
+        force: Skip rate limit checks (emergency only, requires force_justification)
+        force_justification: Mandatory justification when using --force (min 20 chars)
 
     Returns:
         True if bypass successful, False otherwise
@@ -389,6 +431,30 @@ def bypass_gate(
     if not reason_valid:
         print(f"Reason validation FAILED: {reason_error}")
         return False
+
+    # Secondary authorization for --force flag
+    if force:
+        force_valid, force_error = validate_force_justification(force_justification)
+        if not force_valid:
+            print(f"Force justification FAILED: {force_error}")
+            print("ERROR: --force requires --force-justification (min 20 chars, specific)")
+            return False
+
+        # Log force bypass usage
+        if SECURITY_LOGGER_AVAILABLE and EventType and Severity:
+            log_security_event(
+                event_type=EventType.FORCE_BYPASS_USED if hasattr(EventType, 'FORCE_BYPASS_USED') else EventType.GATE_BYPASS,
+                severity=Severity.HIGH,
+                details={
+                    "task_id": task_id,
+                    "approver": approver,
+                    "force_justification": force_justification,
+                    "reason": reason
+                },
+                send_alert=True
+            )
+        print(f"[FORCE BYPASS] Rate limit bypass authorized")
+        print(f"  Justification: {force_justification}")
 
     # VULN-1 FIX: Rate limiting
     if not force:
@@ -590,11 +656,12 @@ def main():
         description="Bypass completion gate (emergency only, hardened)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Security Requirements (v2.0):
-  --approver REQUIRED    Must be on allowlist (agents NOT allowed)
-  --reason REQUIRED      Min 20 chars, specific (no generic words)
-  Rate limiting          Max 10/day, 3/hour per approver
-  Multi-party approval   Required for critical/high priority tasks
+Security Requirements (v2.1):
+  --approver REQUIRED            Must be on allowlist (agents NOT allowed)
+  --reason REQUIRED              Min 20 chars, specific (no generic words)
+  --force-justification REQUIRED When using --force (min 20 chars, specific)
+  Rate limiting                  Max 10/day, 3/hour per approver
+  Multi-party approval           Required for critical/high priority tasks
 
 Examples:
   python3 completion-gate-bypass.py --task high-12345678 --approver kublai \\
@@ -602,8 +669,12 @@ Examples:
   python3 completion-gate-bypass.py --log
   python3 completion-gate-bypass.py --task high-12345678 --approver kublai \\
       --reason "Test" --dry-run
+  python3 completion-gate-bypass.py --task high-12345678 --approver kublai \\
+      --reason "Critical production outage" --force \\
+      --force-justification "Rate limit exhausted due to cascading failures - 3 independent hotfixes required in last hour"
 
 WARNING: All bypasses are logged immutably. Signal alerts sent for all bypass events.
+Use of --force is logged separately with FORCE_BYPASS_USED event.
         """
     )
     parser.add_argument("--task", help="Task ID to bypass")
@@ -612,7 +683,9 @@ WARNING: All bypasses are logged immutably. Signal alerts sent for all bypass ev
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would happen without doing it")
     parser.add_argument("--force", action="store_true",
-                        help="Skip rate limit checks (emergency only)")
+                        help="Skip rate limit checks (emergency only, requires --force-justification)")
+    parser.add_argument("--force-justification",
+                        help="Mandatory justification for --force (min 20 chars, specific)")
     parser.add_argument("--log", action="store_true",
                         help="Show bypass log")
     parser.add_argument("--log-count", type=int, default=20,
@@ -634,12 +707,17 @@ WARNING: All bypasses are logged immutably. Signal alerts sent for all bypass ev
     if not args.reason:
         parser.error("--reason is required for bypass (min 20 chars, specific)")
 
+    # Secondary authorization: --force requires --force-justification
+    if args.force and not args.force_justification:
+        parser.error("--force-justification is REQUIRED when using --force (min 20 chars, specific)")
+
     result = bypass_gate(
         args.task,
         args.approver,
         args.reason,
         args.dry_run,
-        args.force
+        args.force,
+        args.force_justification or ""
     )
     return 0 if result else 1
 

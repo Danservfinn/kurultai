@@ -41,10 +41,16 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 
+# Import from canonical source
+sys.path.insert(0, str(Path(__file__).parent))
+from kurultai_paths import AGENTS_DIR, VALID_AGENTS as VALID_AGENTS_SET
+
+# Configuration - convert frozenset to list for compatibility
+VALID_AGENTS = list(VALID_AGENTS_SET)
+
 # Configuration
-AGENTS_DIR = Path.home() / ".openclaw" / "agents"
-VALID_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
 STALE_EXECUTING_AGE_SECONDS = 7200  # 2 hours
+ZOMBIE_GRACE_PERIOD_SECONDS = 60  # 1 minute: allow handlers to exit gracefully after task completion
 
 # Process patterns for detection
 HANDLER_PATTERN = "agent-task-handler"
@@ -248,6 +254,28 @@ def find_running_claude_processes() -> Dict[int, Dict[str, Any]]:
     return processes
 
 
+def has_recent_completion(agent: str) -> bool:
+    """Check if this agent has a very recent .done.md file.
+
+    This indicates the handler likely just completed a task and is in the process
+    of exiting (normal shutdown transition). Returns True if a .done.md file
+    was modified within ZOMBIE_GRACE_PERIOD_SECONDS.
+    """
+    task_dir = AGENTS_DIR / agent / "tasks"
+    if not task_dir.exists():
+        return False
+
+    now = time.time()
+    for done_file in task_dir.glob("*.done.md"):
+        try:
+            mtime = done_file.stat().st_mtime
+            if (now - mtime) < ZOMBIE_GRACE_PERIOD_SECONDS:
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def detect_anomalies(
     executing_tasks: List[ExecutingTask],
     running_handlers: Dict[int, Dict[str, Any]],
@@ -294,6 +322,7 @@ def detect_anomalies(
             ))
 
     # 4. Zombie processes: handler running but no matching .executing.md
+    #    Filter out false positives: handlers with recent .done.md files (normal shutdown)
     for pid, info in running_handlers.items():
         if pid not in executing_pids:
             # Check if this is an agent-task-handler for one of our agents
@@ -305,12 +334,19 @@ def detect_anomalies(
                     break
 
             if matched_agent:
+                # NEW: Check for recent completion to avoid false positives
+                # If there's a .done.md file modified within grace period, this handler
+                # is likely exiting normally and should NOT be flagged as a zombie
+                if has_recent_completion(matched_agent):
+                    # This is a normal shutdown transition, skip zombie detection
+                    continue
+
                 anomalies.append(Anomaly(
                     type="zombie_process",
                     agent=matched_agent,
                     task_id=None,
                     pid=pid,
-                    details=f"Handler process running but no .executing.md file found",
+                    details=f"Handler process running but no .executing.md file found (no recent .done.md within {ZOMBIE_GRACE_PERIOD_SECONDS}s)",
                     action="investigate"
                 ))
 

@@ -1,0 +1,507 @@
+{
+  "timestamp": "2026-03-08T20:16:43-0400",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": true
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "config.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 25,
+    "healthy": 20,
+    "erroring": 4,
+    "jobs": [
+      {
+        "name": "Self-Awareness Architecture Verification - 3hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 143402,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 267861,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 29375,
+        "enabled": true
+      },
+      {
+        "name": "Kurultai Reflection (4-hour cycle)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 533433,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 58573,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 49767,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 21607,
+        "enabled": true
+      },
+      {
+        "name": "signal-calendar-listener",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 101669,
+        "enabled": true
+      },
+      {
+        "name": "Weekly the.kurult.ai review + implement",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 44116,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai 3-hour review",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 29519,
+        "enabled": true
+      },
+      {
+        "name": "Failed Task Review - Hourly",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 108287,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai uptime monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120208,
+        "enabled": true
+      },
+      {
+        "name": "working-memory-cleanup",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 4612,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Routing Metrics",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 124206,
+        "enabled": true
+      },
+      {
+        "name": "kublai-learning-weekly",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 5883,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-research-runner",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "proposal-expiration-check",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "proposal-vote-aggregation",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "System Health Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 5243,
+        "enabled": true
+      },
+      {
+        "name": "OpenClaw X Daily Status (8 AM)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 6576,
+        "enabled": true
+      },
+      {
+        "name": "OpenClaw X Build Public (4 PM)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120224,
+        "enabled": true
+      },
+      {
+        "name": "OpenClaw X Weekly Review (Friday)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 6100,
+        "enabled": true
+      },
+      {
+        "name": "X/Twitter Analytics Daily Collection",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "Storage Monitoring - Weekly Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 10912,
+        "enabled": true
+      }
+    ]
+  },
+  "cron_jobs": {
+    "calendar_reminder": {
+      "status": "stale",
+      "last_run": "2026-03-08T00:33:00.072995",
+      "ran_last_5min": false,
+      "error_log_exists": true,
+      "error_log_lines_24h": 70
+    },
+    "backup": {
+      "status": "no_backup",
+      "last_backup": null,
+      "ran_last_24h": false,
+      "backup_file_exists": false,
+      "latest_backup_size": null
+    }
+  },
+  "completion_gate": {
+    "pending_gates": 0,
+    "blocked_gates": 0,
+    "pass_rate_24h": 0.0,
+    "avg_completion_24h": 0.0,
+    "avg_followups": 0.0,
+    "recent_audits": 0,
+    "error": "'GateResolver' object has no attribute 'get_gate_metrics'"
+  },
+  "queues": {
+    "total_pending": 0,
+    "by_agent": {
+      "queues": {
+        "kublai": 3,
+        "mongke": 9,
+        "chagatai": 7,
+        "temujin": 8,
+        "jochi": 7,
+        "ogedei": 1
+      },
+      "oldest_age_s": {
+        "kublai": 1761,
+        "mongke": 7148,
+        "chagatai": 5847,
+        "temujin": 18569,
+        "jochi": 3412,
+        "ogedei": 344
+      }
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [],
+    "count_30m": 0
+  },
+  "errors": {
+    "clusters": []
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 371,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 46,
+    "double_suffix_fixed": 0
+  },
+  "ledger_reconciliation": {
+    "neo4j_total_completed": 0,
+    "ledger_total_completed": 13,
+    "delta": -13,
+    "mismatches": [
+      {
+        "agent": "kublai",
+        "neo4j_completed": 0,
+        "ledger_completed": 3,
+        "neo4j_failed": 0,
+        "ledger_failed": 4
+      },
+      {
+        "agent": "mongke",
+        "neo4j_completed": 0,
+        "ledger_completed": 4,
+        "neo4j_failed": 0,
+        "ledger_failed": 6
+      },
+      {
+        "agent": "chagatai",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 0,
+        "ledger_failed": 10
+      },
+      {
+        "agent": "temujin",
+        "neo4j_completed": 0,
+        "ledger_completed": 3,
+        "neo4j_failed": 0,
+        "ledger_failed": 3
+      },
+      {
+        "agent": "jochi",
+        "neo4j_completed": 0,
+        "ledger_completed": 3,
+        "neo4j_failed": 0,
+        "ledger_failed": 7
+      },
+      {
+        "agent": "ogedei",
+        "neo4j_completed": 0,
+        "ledger_completed": 0,
+        "neo4j_failed": 0,
+        "ledger_failed": 8
+      }
+    ],
+    "reconciled": false
+  },
+  "stale_locks": {
+    "total": 0,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0,
+      "tolui": 0
+    },
+    "details": []
+  },
+  "routing": {
+    "queue_balance_index": 0.928,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95": 420,
+    "total_routed": 0,
+    "overflow_count": 0,
+    "queue_depths": {
+      "temujin": 30,
+      "mongke": 9,
+      "chagatai": 5,
+      "jochi": 3,
+      "ogedei": 11
+    },
+    "source": "computed"
+  },
+  "redistribution": {
+    "cycles_run_30m": 0,
+    "tasks_moved_30m": 0,
+    "moves_by_agent": {},
+    "triggers": {},
+    "last_cycle": null
+  },
+  "load_monitoring": {
+    "current_load_factor": 1.0,
+    "trend": "stable",
+    "prediction": "Insufficient data",
+    "sample_count": 9,
+    "overload_predicted": false,
+    "load_history_available": true,
+    "error": null
+  },
+  "subprocess": {
+    "executing": 4,
+    "alive": 4,
+    "dead": 0,
+    "stale": 0,
+    "zombies": 0,
+    "orphaned": 0,
+    "anomaly_count": 1,
+    "anomalies": [
+      {
+        "type": "zombie_process",
+        "agent": "kublai",
+        "task_id": null,
+        "pid": 12586,
+        "details": "Handler process running but no .executing.md file found",
+        "action": "investigate"
+      }
+    ]
+  },
+  "llm_assessment": {
+    "model": "heuristic-fallback",
+    "workload_balance": "",
+    "bottleneck": "4 cron jobs erroring",
+    "coordination_gap": "",
+    "recommended_action": "none needed",
+    "severity": "MEDIUM"
+  }
+}

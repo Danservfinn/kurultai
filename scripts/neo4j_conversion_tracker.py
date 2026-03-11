@@ -28,6 +28,7 @@ from typing import Optional, List, Dict, Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_driver
+from neo4j_utils import parse_json_field, parse_json_fields
 
 
 # Subscription status enum
@@ -172,12 +173,7 @@ class ConversionTracker:
             context = dict(record)
 
             # Parse JSON fields
-            for field in ["pricing_view_dates", "checkout_abort_reasons", "plan_preferences"]:
-                if context.get(field) and isinstance(context[field], str):
-                    try:
-                        context[field] = json.loads(context[field])
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+            parse_json_fields(context, ["pricing_view_dates", "checkout_abort_reasons", "plan_preferences"])
 
             return context
 
@@ -222,12 +218,7 @@ class ConversionTracker:
             context = dict(record)
 
             # Parse JSON fields
-            for field in ["pricing_view_dates", "checkout_abort_reasons", "plan_preferences"]:
-                if context.get(field) and isinstance(context[field], str):
-                    try:
-                        context[field] = json.loads(context[field])
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+            parse_json_fields(context, ["pricing_view_dates", "checkout_abort_reasons", "plan_preferences"])
 
             return context
 
@@ -435,11 +426,7 @@ class ConversionTracker:
                 return None
 
             event = dict(record)
-            if event.get("metadata") and isinstance(event["metadata"], str):
-                try:
-                    event["metadata"] = json.loads(event["metadata"])
-                except (json.JSONDecodeError, TypeError):
-                    pass
+            event["metadata"] = parse_json_field(event.get("metadata"), default={})
 
             return event
 

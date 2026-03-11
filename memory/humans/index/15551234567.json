@@ -1,0 +1,25 @@
+[
+  {
+    "date": "2026-03-08T16:30:01.267511",
+    "channel": "signal",
+    "direction": "inbound",
+    "content": "This is awesome! Thanks for the great work on this feature.",
+    "context": "task",
+    "topics": [
+      {
+        "topic": "Thanks",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.3
+      }
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "positive",
+      "emotion": "excited",
+      "urgency": "low",
+      "intensity": 0.36,
+      "politeness": "casual"
+    }
+  }
+]

@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""
+task-retry — CLI wrapper for task retry operations.
+
+This is the main entry point for the task retry functionality.
+For full usage, see: task_retry_service.py
+
+Examples:
+    task-retry list                    # List all failed tasks
+    task-retry list --agent temujin    # List failed tasks for agent
+    task-retry retry temujin high-123.failed.done.md    # Retry a task
+    task-retry retry-agent temujin     # Retry all failed for agent
+    task-retry retry-all               # Retry all failed tasks
+"""
+
+import sys
+import os
+
+# Add scripts directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from task_retry_service import main
+
+if __name__ == "__main__":
+    main()

@@ -34,8 +34,8 @@ FAILURE_RATE_CRITICAL = 0.7       # 70% failure rate triggers critical
 # Cascade detection log
 CASCADE_LOG = LOGS_DIR / "cascade-detections.jsonl"
 
-# Agents to monitor
-AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+# Agents to monitor (7 agents including tolui)
+AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
 
 
 class CascadePattern:

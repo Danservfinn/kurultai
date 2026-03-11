@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-03-11T00:32:29.711570",
+  "scanned_agents": [
+    "kublai",
+    "temujin",
+    "mongke",
+    "chagatai",
+    "jochi",
+    "ogedei"
+  ],
+  "found": 1,
+  "created": 1,
+  "tasks": [
+    {
+      "path": "/Users/kublai/.openclaw/agents/ogedei/tasks/ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done.md",
+      "filename": "ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done.md",
+      "task_id": "ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done",
+      "title": "Unknown",
+      "priority": "critical",
+      "original_agent": "ogedei",
+      "missing_since": "2026-03-09T01:41:00.682731"
+    }
+  ],
+  "created_tasks": [
+    "/Users/kublai/.openclaw/agents/ogedei/tasks/critical-fix-resolution-ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done-79cbff96.md"
+  ]
+}

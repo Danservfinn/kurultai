@@ -2,8 +2,8 @@
 
 **Task:** Task mongke-routing-cron-001
 **Task ID:** mongke-routing-cron-001
-**Agent:** ogedei
-**Status:** ✅ Completed
+**Agent:** chagatai
+**Status:** ❌ Failed
 **Priority:** normal
 **Source:** unknown
 **Skill:** none
@@ -11,34 +11,34 @@
 **Timeout:** 7200s
 **Efficiency:** 0% (est: 120m, actual: 0m)
 **Retry Count:** 0
-**Completed:** 2026-03-08 03:40:48
+**Completed:** 2026-03-08 19:34:03
 
 ## Executive Summary
 
-Task executed by ogedei agent. 40 file(s) created/modified. 2262 lines added.
+Task executed by chagatai agent. 59 file(s) created/modified. 4484 lines added.
 
 ## What Was Done
 
 - Executed task: Task mongke-routing-cron-001
-- Agent: ogedei
+- Agent: chagatai
 - Duration: 0 minutes
-- Status: completed
+- Status: failed
 - Skill used: none
 
 ## Deliverables
 
 | File | Type | Size | Lines | Modified |
 |------|------|------|-------|----------|
-| `~/ogedei/workspace/gateway-alert-tolui-20260308-014337.md` | .md | 0.6 KB | 27 | 01:43:37 |
-| `~/ogedei/workspace/fake-completion-investigation-2026-03-08.md` | .md | 5.4 KB | 158 | 01:45:39 |
-| `~/ogedei/workspace/gateway-alert-tolui-20260308-031857.md` | .md | 0.5 KB | 26 | 03:18:57 |
-| `~/ogedei/workspace/gateway-alert-tolui-20260308-033403.md` | .md | 0.5 KB | 26 | 03:34:03 |
-| `~/ogedei/workspace/task-1772955421.md` | .md | 1.3 KB | 39 | 03:37:01 |
-| `~/ogedei/workspace/task-1772953921.md` | .md | 1.0 KB | 39 | 03:12:01 |
-| `~/ogedei/workspace/task-1772953106.md` | .md | 0.6 KB | 28 | 01:58:26 |
-| `~/ogedei/workspace/operational-workflow-optimization-analysis-2026-03-08.md` | .md | 9.4 KB | 313 | 03:00:08 |
-| `~/ogedei/workspace/gateway-alert-tolui-20260308-015343.md` | .md | 0.5 KB | 26 | 01:53:43 |
-| `~/ogedei/workspace/gateway-alert-main-20260308-014335.md` | .md | 0.6 KB | 26 | 01:43:35 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/calendar/page.ts` | .ts | 3.4 KB | 80 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/layout.ts` | .ts | 3.4 KB | 80 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/api/calendar/people/route.ts` | .ts | 8.3 KB | 344 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/api/calendar/events/route.ts` | .ts | 8.3 KB | 344 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/api/calendar/events/[event_id]/notifications/preset/route.ts` | .ts | 8.4 KB | 344 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/api/calendar/events/[event_id]/notifications/route.ts` | .ts | 8.4 KB | 344 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/app/api/calendar/notifications/route.ts` | .ts | 8.3 KB | 344 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/types/package.json` | .json | 0.0 KB | 1 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/trace` |  | 1.8 KB | 0 | 19:04:04 |
+| `~/chagatai/workspace/kurultai-calendar/.next/cache/webpack/server-production/index.pack` | .pack | 8669.0 KB | 0 | 19:04:04 |
 
 ## Token Usage
 
@@ -47,7 +47,7 @@ Task executed by ogedei agent. 40 file(s) created/modified. 2262 lines added.
 | Input Tokens | 0 |
 | Output Tokens | 0 |
 | Total Tokens | 0 |
-| Model | zai-coding/glm-5 |
+| Model | unknown |
 | Temperature | None |
 | Context Window | 0.0% |
 
@@ -55,9 +55,9 @@ Task executed by ogedei agent. 40 file(s) created/modified. 2262 lines added.
 
 | Metric | Value |
 |--------|-------|
-| Queue Depth | 0 |
+| Queue Depth | 3 |
 | Pending Tasks | 0 |
-| Executing Tasks | 0 |
+| Executing Tasks | 1 |
 | Memory (peak) | 0 MB |
 | Health Flags |  |
 
@@ -77,13 +77,13 @@ Task executed by ogedei agent. 40 file(s) created/modified. 2262 lines added.
 | Files Changed | 0 |
 | Lines Added | 0 |
 | Lines Removed | 0 |
-| Functions | 0 |
-| Classes | 0 |
+| Functions | 621 |
+| Classes | 93 |
 | Tests | 0 |
-| Documentation | 40 |
+| Documentation | 14 |
 
 ### Files by Type
-40 .md
+7 .ts, 18 .json, 1 , 3 .pack, 16 .js, 14 .md
 
 ## Error Analysis
 
@@ -98,11 +98,8 @@ Task executed by ogedei agent. 40 file(s) created/modified. 2262 lines added.
 
 ## Related Tasks (Same Agent, Today)
 
-- [ce7e78eb-3a3] CREDENTIAL_FIX_REQUIRED: temujin - 97% failure rate (/kurultai-health)
-- [d13db800-aca] Plan: Consolidate cron jobs thoughtfully [REDISTRIBUTED from (/kurultai-health)
-- [7e4a488d-66b] Investigate task queue: 7 fake completions detected (/kurultai-health)
-- [483d86e6-af9] Implement cron consolidation plan (/kurultai-health)
-- [4b2cd4a7-292] Investigate task queue: 10 fake completions detected (/kurultai-health)
+- [95bdc95a-0bc] Convert all frontend timestamps to EST timezone display (/horde-implement)
+- [a4aa8972-7be] Add task origin indicator to kanban board (human vs agent in (/horde-implement)
 
 ## Files Changed (Git)
 
@@ -115,7 +112,7 @@ No git changes detected
 - **Source:** unknown
 - **Skill hint:** none
 - **Priority:** normal
-- **Agent workspace:** `~/ogedei/workspace/`
+- **Agent workspace:** `~/chagatai/workspace/`
 
 ## Notes
 
@@ -127,5 +124,5 @@ No git changes detected
 
 ---
 
-*Generated by task-report-hook at 2026-03-08T03:40:48.705928*
+*Generated by task-report-hook at 2026-03-08T19:34:03.682792*
 *Report ID: mongke-routing-cron-001*

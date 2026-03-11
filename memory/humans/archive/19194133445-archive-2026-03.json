@@ -1,0 +1,1674 @@
+[
+  {
+    "date": "2026-03-08T16:56:24.454463",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation integration\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is a test task to verify conversation logging works",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "integration",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "e621f513-f50"
+    ],
+    "metadata": {
+      "task_id": "e621f513-f50",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:56:25.236175",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis task will have its status updated",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "4063934b-1bd"
+    ],
+    "metadata": {
+      "task_id": "4063934b-1bd",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:56:25.273947",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task for status update' (4063934b-1bd) status updated to completed",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "completed",
+      "agent:temujin"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "4063934b-1bd"
+    ],
+    "metadata": {
+      "task_id": "4063934b-1bd",
+      "status": "completed",
+      "agent": "temujin",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T16:56:25.590604",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 1 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 1",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "b0811601-59c"
+    ],
+    "metadata": {
+      "task_id": "b0811601-59c",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:56:25.889558",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 2 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 2",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "64966204-c00"
+    ],
+    "metadata": {
+      "task_id": "64966204-c00",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:56:26.041364",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 3 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 3",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "bd83f627-24f"
+    ],
+    "metadata": {
+      "task_id": "bd83f627-24f",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:57:17.949738",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation integration\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is a test task to verify conversation logging works",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "integration",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "65ef92d3-04c"
+    ],
+    "metadata": {
+      "task_id": "65ef92d3-04c",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:57:19.272321",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis task will have its status updated",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "3591f131-026"
+    ],
+    "metadata": {
+      "task_id": "3591f131-026",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:57:19.429887",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task for status update' (3591f131-026) status updated to completed",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "completed",
+      "agent:temujin"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "3591f131-026"
+    ],
+    "metadata": {
+      "task_id": "3591f131-026",
+      "status": "completed",
+      "agent": "temujin",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T16:57:19.683668",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 1 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 1",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "f7686601-a84"
+    ],
+    "metadata": {
+      "task_id": "f7686601-a84",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:57:20.263186",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 2 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 2",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "6467737e-ea6"
+    ],
+    "metadata": {
+      "task_id": "6467737e-ea6",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:57:20.872250",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 3 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 3",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "41f1314d-f52"
+    ],
+    "metadata": {
+      "task_id": "41f1314d-f52",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:58:34.008687",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Fix authentication bug in login flow\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nUsers reporting 500 errors when logging in with Google OAuth. Check logs and fix the issue.",
+    "context": "task_created",
+    "topics": [
+      "authentication",
+      "login",
+      "flow",
+      "priority:high",
+      "agent:temujin",
+      "task",
+      "fix"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "negative",
+      "emotion": "frustrated",
+      "urgency": "low",
+      "intensity": 0.13,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "44543e93-295"
+    ],
+    "metadata": {
+      "task_id": "44543e93-295",
+      "agent": "temujin",
+      "priority": "high",
+      "source": "signal"
+    }
+  },
+  {
+    "date": "2026-03-08T16:58:34.681559",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Fix authentication bug in login flow' (44543e93-295) status updated to in_progress",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "in_progress",
+      "agent:temujin"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "44543e93-295"
+    ],
+    "metadata": {
+      "task_id": "44543e93-295",
+      "status": "in_progress",
+      "agent": "temujin",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T16:58:34.911092",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Fix authentication bug in login flow' (44543e93-295) status updated to completed",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "completed",
+      "agent:temujin"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "44543e93-295"
+    ],
+    "metadata": {
+      "task_id": "44543e93-295",
+      "status": "completed",
+      "agent": "temujin",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T16:59:19.516909",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation integration\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is a test task to verify conversation logging works",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "integration",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "2fcb8ad0-e83"
+    ],
+    "metadata": {
+      "task_id": "2fcb8ad0-e83",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:59:20.373314",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis task will have its status updated",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "38b4f3c2-414"
+    ],
+    "metadata": {
+      "task_id": "38b4f3c2-414",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:59:20.418712",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task for status update' (38b4f3c2-414) status updated to completed",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "completed",
+      "agent:temujin"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "38b4f3c2-414"
+    ],
+    "metadata": {
+      "task_id": "38b4f3c2-414",
+      "status": "completed",
+      "agent": "temujin",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T16:59:21.111247",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 1 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 1",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "ae40b3bc-ccd"
+    ],
+    "metadata": {
+      "task_id": "ae40b3bc-ccd",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:59:21.547053",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 2 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 2",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "40c0d165-a38"
+    ],
+    "metadata": {
+      "task_id": "40c0d165-a38",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T16:59:22.188781",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 3 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 3",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "c879dc5b-cea"
+    ],
+    "metadata": {
+      "task_id": "c879dc5b-cea",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:05:40.777313",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation integration\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is a test task to verify conversation logging works",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "integration",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "be9d2cae-124"
+    ],
+    "metadata": {
+      "task_id": "be9d2cae-124",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:05:40.938719",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis task will have its status updated",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "9b82439a-ade"
+    ],
+    "metadata": {
+      "task_id": "9b82439a-ade",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:05:40.956647",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task for status update' (9b82439a-ade) status updated to completed",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "completed",
+      "agent:temujin"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "9b82439a-ade"
+    ],
+    "metadata": {
+      "task_id": "9b82439a-ade",
+      "status": "completed",
+      "agent": "temujin",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T17:05:41.097231",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 1 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 1",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "36cc1eef-bdb"
+    ],
+    "metadata": {
+      "task_id": "36cc1eef-bdb",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:05:41.317309",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 2 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 2",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "cc0b0aba-271"
+    ],
+    "metadata": {
+      "task_id": "cc0b0aba-271",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:05:41.529098",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task 3 for bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nThis is test task number 3",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "981a3b58-b17"
+    ],
+    "metadata": {
+      "task_id": "981a3b58-b17",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:40.785557",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation link\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify task creates conversation link",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "link",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "cf940248-52a"
+    ],
+    "metadata": {
+      "task_id": "cf940248-52a",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test_comprehensive"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:42.069829",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update logging\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify status update logs conversation",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "logging",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "53b61873-000"
+    ],
+    "metadata": {
+      "task_id": "53b61873-000",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:42.101713",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task for status update logging' (53b61873-000) status updated to in_progress",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "in_progress",
+      "agent:jochi"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "53b61873-000"
+    ],
+    "metadata": {
+      "task_id": "53b61873-000",
+      "status": "in_progress",
+      "agent": "jochi",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:42.679615",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task that will fail\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify error logging",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "that",
+      "will",
+      "fail",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "negative",
+      "emotion": "frustrated",
+      "urgency": "low",
+      "intensity": 0.25,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "16f7cdc8-781"
+    ],
+    "metadata": {
+      "task_id": "16f7cdc8-781",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:42.830575",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task that will fail' (16f7cdc8-781) status updated to failed\nError: Test error: Connection timeout after 30s",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "failed",
+      "agent:jochi"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "negative",
+      "emotion": "frustrated",
+      "urgency": "low",
+      "intensity": 0.22,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "16f7cdc8-781"
+    ],
+    "metadata": {
+      "task_id": "16f7cdc8-781",
+      "status": "failed",
+      "agent": "jochi",
+      "error": "Test error: Connection timeout after 30s"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:43.535245",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify bidirectional links",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "013c19f1-1b5"
+    ],
+    "metadata": {
+      "task_id": "013c19f1-1b5",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:44.096093",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 1\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "e7cacb40-92b"
+    ],
+    "metadata": {
+      "task_id": "e7cacb40-92b",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:44.600722",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 2\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "0536ef68-7dd"
+    ],
+    "metadata": {
+      "task_id": "0536ef68-7dd",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:45.288458",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 3\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "e9295ba7-9b7"
+    ],
+    "metadata": {
+      "task_id": "e9295ba7-9b7",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:46.004907",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 4\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "cb21d6a5-551"
+    ],
+    "metadata": {
+      "task_id": "cb21d6a5-551",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:07:46.905679",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 5\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "c49d86c7-ee1"
+    ],
+    "metadata": {
+      "task_id": "c49d86c7-ee1",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:44.461043",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation link\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify task creates conversation link",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "link",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "ddb3f476-751"
+    ],
+    "metadata": {
+      "task_id": "ddb3f476-751",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test_comprehensive"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:44.752826",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update logging\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify status update logs conversation",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "logging",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "9c6ca7ca-a1b"
+    ],
+    "metadata": {
+      "task_id": "9c6ca7ca-a1b",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:44.762480",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task for status update logging' (9c6ca7ca-a1b) status updated to in_progress",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "in_progress",
+      "agent:jochi"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "9c6ca7ca-a1b"
+    ],
+    "metadata": {
+      "task_id": "9c6ca7ca-a1b",
+      "status": "in_progress",
+      "agent": "jochi",
+      "error": null
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:44.895073",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task that will fail\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify error logging",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "that",
+      "will",
+      "fail",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "negative",
+      "emotion": "frustrated",
+      "urgency": "low",
+      "intensity": 0.25,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "3f5aa8cb-74f"
+    ],
+    "metadata": {
+      "task_id": "3f5aa8cb-74f",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:44.904081",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task 'Test task that will fail' (3f5aa8cb-74f) status updated to failed\nError: Test error: Connection timeout after 30s",
+    "context": "task_update",
+    "topics": [
+      "task",
+      "update",
+      "failed",
+      "agent:jochi"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "negative",
+      "emotion": "frustrated",
+      "urgency": "low",
+      "intensity": 0.22,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "3f5aa8cb-74f"
+    ],
+    "metadata": {
+      "task_id": "3f5aa8cb-74f",
+      "status": "failed",
+      "agent": "jochi",
+      "error": "Test error: Connection timeout after 30s"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:44.997511",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test bidirectional linking\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify bidirectional links",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "bidirectional",
+      "linking",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "a040877a-972"
+    ],
+    "metadata": {
+      "task_id": "a040877a-972",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:45.104168",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 1\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "bde073e4-338"
+    ],
+    "metadata": {
+      "task_id": "bde073e4-338",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:45.192173",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 2\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "7abe09df-d69"
+    ],
+    "metadata": {
+      "task_id": "7abe09df-d69",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:45.294984",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 3\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "d04f4026-c33"
+    ],
+    "metadata": {
+      "task_id": "d04f4026-c33",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:45.380328",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 4\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "5e97a637-c51"
+    ],
+    "metadata": {
+      "task_id": "5e97a637-c51",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:08:45.522760",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Perf test task 5\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nPerformance test",
+    "context": "task_created",
+    "topics": [
+      "perf",
+      "test",
+      "task",
+      "priority:low",
+      "agent:jochi",
+      "task",
+      "test"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "f88e5c46-f5d"
+    ],
+    "metadata": {
+      "task_id": "f88e5c46-f5d",
+      "agent": "jochi",
+      "priority": "low",
+      "source": "perf_test"
+    }
+  },
+  {
+    "date": "2026-03-08T17:31:15.750590",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for conversation link\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify task creates conversation link",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "conversation",
+      "link",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "c8d585fd-53b"
+    ],
+    "metadata": {
+      "task_id": "c8d585fd-53b",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test_comprehensive"
+    }
+  },
+  {
+    "date": "2026-03-08T17:31:16.616960",
+    "channel": "system",
+    "direction": "inbound",
+    "content": "Task created: Test task for status update logging\n**WARNING: Agent model misconfiguration detected (glm-5).**\n\nVerify status update logs conversation",
+    "context": "task_created",
+    "topics": [
+      "test",
+      "task",
+      "status",
+      "update",
+      "logging",
+      "priority:normal",
+      "agent:jochi",
+      "task"
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "8d2f954f-e38"
+    ],
+    "metadata": {
+      "task_id": "8d2f954f-e38",
+      "agent": "jochi",
+      "priority": "normal",
+      "source": "test"
+    }
+  }
+]

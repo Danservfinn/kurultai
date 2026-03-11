@@ -27,9 +27,13 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from calendar_handler import handle_message
 
+# Conversation logging for inbound and outbound messages
+from conversation_logger import log_inbound, log_outbound
+
 # Configuration
 SIGNAL_ACCOUNT = os.getenv("SIGNAL_ACCOUNT", "+15165643945")
 SIGNAL_API_URL = os.getenv("SIGNAL_API_URL", "http://127.0.0.1:8080")
+SIGNAL_RPC_URL = f"{SIGNAL_API_URL}/api/v1/rpc"
 GROUP_ID = os.getenv("SIGNAL_GROUP_ID", "BROemHVncLgSz8tReUKBz6V3BeDhDB0EXaJd+sRp6oA=")
 POLL_INTERVAL = int(os.getenv("CALENDAR_POLL_INTERVAL", "10"))
 LOG_FILE = os.path.expanduser("~/.openclaw/logs/signal_calendar_listener.log")
@@ -51,25 +55,118 @@ def log(message: str, level: str = "INFO"):
     print(log_line.strip())
 
 
+def signal_rpc(method: str, params: dict = None) -> dict:
+    """Call signal-cli JSON-RPC API.
+
+    Note: signal-cli v0.13+ requires account parameter in multi-account mode.
+    The account must be included in the params dict for methods that need context.
+    """
+    # Add account to params for methods that need account context
+    # Note: 'receive' does NOT accept account parameter (only maxMessages, timeout)
+    if params is None:
+        params = {}
+    if "account" not in params and method in ("send", "listGroups"):
+        params["account"] = SIGNAL_ACCOUNT
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params
+    }
+    try:
+        response = requests.post(
+            SIGNAL_RPC_URL,
+            json=payload,
+            timeout=30
+        )
+        if response.status_code == 200:
+            result = response.json()
+            if "error" in result:
+                log(f"RPC error: {result['error']}", "WARNING")
+                return None
+            return result.get("result")
+        else:
+            log(f"API error: {response.status_code} - {response.text}", "WARNING")
+            return None
+    except Exception as e:
+        log(f"RPC call failed: {e}", "ERROR")
+        return None
+
+
 def get_messages() -> list:
     """Poll signal-cli HTTP API for new messages."""
     try:
-        # Get messages from the daemon
-        response = requests.get(f"{SIGNAL_API_URL}/v1/receive/{SIGNAL_ACCOUNT}", timeout=30)
-
-        if response.status_code != 200:
-            log(f"API error: {response.status_code} - {response.text[:100]}", "WARNING")
+        # Use JSON-RPC receive method
+        result = signal_rpc("receive")
+        if result is None:
             return []
 
-        messages = response.json()
-        return messages if isinstance(messages, list) else []
-
-    except requests.exceptions.ConnectionError:
-        # Daemon not running or not reachable
+        # Result might be a list of messages or empty
+        if isinstance(result, list):
+            return result
         return []
+
     except Exception as e:
         log(f"Error getting messages: {e}", "ERROR")
         return []
+
+
+def extract_event_names(message_content: str) -> list:
+    """
+    Extract potential event names from message content.
+
+    Looks for:
+    - Quoted strings: "Weekly Standup"
+    - Title case phrases (excluding common verbs): Team Meeting
+    - Common event patterns
+    """
+    import re
+    events = []
+
+    # Extract quoted strings
+    quoted = re.findall(r'"([^"]+)"', message_content)
+    events.extend(quoted)
+
+    # Extract single-quoted strings
+    single_quoted = re.findall(r"'([^']+)'", message_content)
+    events.extend(single_quoted)
+
+    # Extract title case phrases (2-4 words, each starting with capital)
+    title_case = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', message_content)
+    # Filter out common words that appear title-case but aren't events
+    exclusions = {
+        "I'm", "I'll", "I'd", "We're", "You're", "They're", "That's", "It's",
+        "Schedule", "Create", "Add", "Let's", "Can", "Will", "Need"
+    }
+    for phrase in title_case:
+        if phrase not in exclusions and len(phrase) > 3:
+            events.append(phrase)
+
+    return list(set(events))  # Remove duplicates
+
+
+def extract_task_ids(message_content: str) -> list:
+    """
+    Extract task IDs from message content.
+
+    Looks for patterns like:
+    - #123 (2+ digits)
+    - task-123
+    - TASK-123
+    """
+    import re
+    task_ids = []
+
+    # GitHub/issue style: #123 (2+ digits)
+    github_style = re.findall(r'#(\d{2,})', message_content)
+    task_ids.extend([f"#{tid}" for tid in github_style])
+
+    # Task prefix style: task-123, TASK-123 (preserve case)
+    task_prefix = re.findall(r'((?:task|TASK)-\d+)', message_content)
+    task_ids.extend(task_prefix)
+
+    return list(set(task_ids))  # Remove duplicates
 
 
 def extract_group_messages(raw_messages: list) -> list:
@@ -115,39 +212,71 @@ def extract_group_messages(raw_messages: list) -> list:
 
 
 def process_calendar_message(raw_msg: dict) -> bool:
-    """Process a single message through calendar handler."""
+    """Process a single message through calendar handler with conversation logging."""
+    sender_phone = raw_msg.get("sender", "")
+    message_content = raw_msg.get("message", "")
+
+    # Step 1: Log inbound message with context
+    try:
+        if sender_phone and message_content:
+            # Extract event/task context from message
+            related_events = extract_event_names(message_content)
+            related_tasks = extract_task_ids(message_content)
+
+            # Log inbound conversation
+            log_inbound(
+                phone_number=sender_phone,
+                content=message_content,
+                channel="signal",
+                message_id=str(raw_msg.get("message_id", "")),
+                related_events=related_events,
+                related_tasks=related_tasks
+            )
+    except Exception as e:
+        # Log error but don't fail message processing
+        print(f"Warning: Failed to log inbound conversation: {e}", file=sys.stderr)
+
+    # Step 2: Process through calendar handler
     try:
         response = handle_message(raw_msg)
-
-        if response:
-            # Send response back to group
-            send_response(response, raw_msg.get("group_id", GROUP_ID))
-            return True
-
-        return False
-
     except Exception as e:
         log(f"Error processing message: {e}", "ERROR")
         return False
 
+    # Step 3: Send response and log outbound
+    if response:
+        send_response(response, raw_msg.get("group_id", GROUP_ID))
+
+        # Log outbound conversation
+        try:
+            if sender_phone:
+                log_outbound(
+                    phone_number=sender_phone,
+                    content=response,
+                    channel="signal",
+                    message_id=str(raw_msg.get("message_id", ""))
+                )
+        except Exception as e:
+            # Log error but don't fail message processing
+            print(f"Warning: Failed to log outbound conversation: {e}", file=sys.stderr)
+
+        return True
+
+    return False
+
 
 def send_response(text: str, group_id: str):
-    """Send a response message to the group via API."""
+    """Send a response message to the group via JSON-RPC API."""
     try:
-        payload = {
+        result = signal_rpc("send", {
             "message": text,
             "groupId": group_id
-        }
-        response = requests.post(
-            f"{SIGNAL_API_URL}/v1/send/{SIGNAL_ACCOUNT}",
-            json=payload,
-            timeout=10
-        )
+        })
 
-        if response.status_code == 200:
+        if result:
             log(f"Sent response to group")
         else:
-            log(f"Failed to send response: {response.status_code} - {response.text[:100]}", "WARNING")
+            log(f"Failed to send response", "WARNING")
 
     except Exception as e:
         log(f"Error sending response: {e}", "ERROR")

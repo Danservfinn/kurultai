@@ -1,110 +1,94 @@
 {
-  "last_audit": 1772998334.595098,
-  "cycles": 6660,
-  "last_cycle": "2026-03-08T15:59:10.814369",
-  "watcher_restarts": 14,
-  "stalled_warnings": 321,
-  "fakes_detected": 12,
+  "last_audit": 1773223888.641397,
+  "cycles": 14329,
+  "last_cycle": "2026-03-11T06:21:14.667882",
+  "watcher_restarts": 74,
+  "stalled_warnings": 495,
+  "fakes_detected": 15,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 159,
-    "fake_found": 1,
-    "requeued": 1,
-    "skipped": 5,
+    "audited": 57,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 8,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1772999950.814382,
-  "last_issues": [
-    "temujin/high-1772988683.executing.md stalled 10125s (escalated)",
-    "mongke/normal-github-data-update-1772974522.executing.md stalled 6229s (escalated)",
-    "chagatai/normal-1772932865.unverified.executing.md stalled 5155s (escalated)",
-    "jochi/high-review-implement-completion-gate-core-scripts-1772979392765.verified.executing.md stalled 8969s (escalated)"
-  ],
+  "last_cycle_epoch": 1773224474.667892,
+  "last_issues": [],
   "reflection_misses": 0,
-  "last_memory_audit": 1772998347.386375,
+  "last_memory_audit": 1773223888.881697,
   "memory_audit_result": {
-    "total": 11,
+    "total": 4,
     "critical": 0,
-    "warning": 11,
-    "ts": "2026-03-08T15:32:27.656648"
+    "warning": 4,
+    "ts": "2026-03-11T06:11:28.912607"
   },
-  "last_routing_drift_check": 1772998347.712183,
+  "last_routing_drift_check": 1773223888.931247,
   "routing_drift": {
-    "total": 2,
-    "mismatches": 1,
-    "drift_pct": 50.0,
+    "total": 5,
+    "mismatches": 2,
+    "drift_pct": 40.0,
     "top_examples": [
       {
-        "task": "FIX: Ogedei model configuration - glm-5 failing",
+        "task": "Investigate temujin low performance (score 3/10)",
+        "actual": "mongke",
+        "keyword_would": "jochi"
+      },
+      {
+        "task": "Investigate temujin task failures (1 in last 1h)",
         "actual": "temujin",
-        "keyword_would": "ogedei"
+        "keyword_would": "jochi"
       }
     ],
-    "ts": "2026-03-08T15:32:27.735326"
+    "ts": "2026-03-11T06:11:28.957528"
   },
-  "memory_fixes": 49,
-  "last_failure_rate_check": 1772999887.152043,
+  "memory_fixes": 426,
+  "last_failure_rate_check": 1773224266.3777878,
   "agent_failure_flags": {},
-  "cycle_start_time": 1772999950.7408051,
-  "last_queue_balance_check": 1772999887.18397,
+  "cycle_start_time": 1773224474.6033258,
+  "last_queue_balance_check": 1773224266.3846478,
   "queue_depths": {
-    "kublai": 2,
-    "temujin": 26,
-    "mongke": 9,
-    "chagatai": 1,
-    "jochi": 6,
-    "ogedei": 15
+    "kublai": 0,
+    "temujin": 0,
+    "mongke": 0,
+    "chagatai": 0,
+    "jochi": 0,
+    "ogedei": 0,
+    "tolui": 0
   },
-  "last_cascade_check": 1772999694.961013,
+  "last_cascade_check": 1773223888.957846,
   "cascade_risk": "low",
   "cascade_metrics": {
-    "events_analyzed": 1,
-    "patterns_detected": 0,
-    "agents_failing": 1,
-    "failures_by_agent": {
-      "kublai": 1
-    },
-    "lookback_minutes": 30
+    "events_analyzed": 0
   },
-  "last_quality_gate_check": 1772999918.911798,
-  "quality_gate_checked": 5,
+  "last_quality_gate_check": 1773224405.002086,
+  "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1772996515.15454,
-  "self_healing_score": 100.0,
+  "last_self_healing_score_check": 1773224266.38898,
+  "self_healing_score": 67.9,
   "self_healing_metrics": {
-    "auto_resolved": 11,
-    "escalated": 0,
+    "auto_resolved": 36,
+    "escalated": 17,
     "manual": 0,
-    "total": 11
+    "total": 53
   },
   "circuit_half_open_agents": [
     "ogedei",
-    "jochi"
+    "jochi",
+    "temujin"
   ],
   "circuit_report": {
-    "ts": "2026-03-08T15:59:10.813616",
+    "ts": "2026-03-11T06:21:14.667556",
     "agents": {
-      "mongke": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
-      "ogedei": {
-        "state": "HALF_OPEN",
-        "available": true,
-        "reason": "probation",
-        "detail": "Testing recovery, 0 trial(s)"
-      },
-      "tolui": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
       "chagatai": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "jochi": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -116,28 +100,63 @@
         "reason": "normal",
         "detail": null
       },
-      "jochi": {
-        "state": "HALF_OPEN",
+      "ogedei": {
+        "state": "CLOSED",
         "available": true,
-        "reason": "probation",
-        "detail": "Testing recovery, 0 trial(s)"
+        "reason": "normal",
+        "detail": null
+      },
+      "mongke": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "tolui": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
       }
     },
     "summary": {
-      "closed": 4,
+      "closed": 6,
       "open": 0,
-      "half_open": 2
+      "half_open": 0
     }
   },
   "circuit_summary": {
-    "closed": 4,
+    "closed": 6,
     "open": 0,
-    "half_open": 2
+    "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.073516845703125,
-  "state_file_size": 3672,
-  "tasks_recovered": 22,
-  "slow_cycles": 1,
-  "queue_balance_moves": 40
+  "last_cycle_duration": 0.06451201438903809,
+  "state_file_size": 4030,
+  "tasks_recovered": 161,
+  "slow_cycles": 15,
+  "queue_balance_moves": 180,
+  "circuit_open_agents": [
+    "jochi"
+  ],
+  "last_cred_failure_check": 1773224404.995807,
+  "last_git_operation_check": 1773224266.41698,
+  "git_metrics": {
+    "autonomous_commits_24h": 0,
+    "autonomous_commits_1h": 0,
+    "autonomous_branches_active": 0,
+    "autonomous_branches_stale": 0,
+    "autonomous_prs_open": 0,
+    "anomaly_count": 0,
+    "blocked_operations_24h": 0
+  },
+  "stall_escalated": 157,
+  "stall_escalations": {
+    "kublai/high-1773204033.retry-1.executing.md_escalation": 1773221809.38153,
+    "chagatai/normal-1773208986.retry-1.executing.md_escalation": 1773221809.38153,
+    "jochi/high-1773204235.retry-1.executing.md_escalation": 1773221809.38153,
+    "ogedei/high-1773203780.retry-1.executing.md_escalation": 1773221809.38153
+  },
+  "stall_skips_completed": 2,
+  "stall_cleaned_artifacts": 2
 }

@@ -7,6 +7,7 @@ Kublai intelligently routes tasks to appropriate agents based on:
 - Agent capabilities
 - Current workload
 - Priority
+- Paused status (tasks marked as paused in Neo4j are not routed)
 
 Usage:
     python3 kublai-route.py "Research prompt injection sandbox"
@@ -17,6 +18,73 @@ import json
 from datetime import datetime
 
 sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+
+from kurultai_paths import AGENT_KEYWORDS
+
+# Paused task patterns (tasks that should not be routed)
+PAUSED_TASK_PATTERNS = [
+    "llm.survivor",
+    "llmsurvivor",
+    "LLM Survivor",
+    "llm-survivor"
+]
+
+# Paused agents (no tasks will be routed to these agents)
+PAUSED_AGENTS = []
+
+# Neo4j paused status check
+def is_task_paused_in_neo4j(task_id):
+    """Check if task is marked as PAUSED in Neo4j."""
+    try:
+        from neo4j_atomic_transitions import get_driver
+        driver = get_driver()
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                RETURN t.status as status
+            """, task_id=task_id)
+            record = result.single()
+            if record:
+                status = record.get("status")
+                return status == "PAUSED"
+    except Exception:
+        pass
+    return False
+
+
+def mark_task_paused_in_neo4j(task_id, agent, reason):
+    """Mark a task as PAUSED in Neo4j."""
+    try:
+        from neo4j_atomic_transitions import get_driver
+        driver = get_driver()
+        with driver.session() as session:
+            session.run("""
+                MERGE (t:Task {task_id: $task_id})
+                SET t.status = 'PAUSED',
+                    t.paused_reason = $reason,
+                    t.paused_at = datetime(),
+                    t.agent = $agent
+            """, task_id=task_id, reason=reason, agent=agent)
+            return True
+    except Exception as e:
+        print(f"Warning: Could not mark task as paused in Neo4j: {e}", file=sys.stderr)
+    return False
+
+
+def should_pause_task(task_text, task_id=None):
+    """Check if task should be paused based on content patterns."""
+    task_lower = task_text.lower()
+    
+    # Check for paused patterns
+    for pattern in PAUSED_TASK_PATTERNS:
+        if pattern.lower() in task_lower:
+            return True, f"Matches paused pattern: {pattern}"
+    
+    # Check Neo4j if task_id provided
+    if task_id and is_task_paused_in_neo4j(task_id):
+        return True, "Task marked as PAUSED in Neo4j"
+    
+    return False, None
 
 # Agent capabilities
 AGENT_CAPABILITIES = {
@@ -52,26 +120,62 @@ AGENT_CAPABILITIES = {
     }
 }
 
-# Task type indicators
-TASK_INDICATORS = {
-    "temujin": ["code", "build", "implement", "fix", "bug", "feature", "deploy", "api", "database", "typescript", "python", "script", "infrastructure", "sandbox", "llm", "integration"],
-    "mongke": ["research", "analyze", "investigate", "discover", "competitor", "market", "trend", "data", "intelligence", "survey", "how to", "explore", "study"],
-    "chagatai": ["write", "document", "blog", "post", "content", "article", "creative", "copy", "marketing", "social", "twitter", "thread", "description"],
-    "jochi": ["test", "security", "audit", "review", "verify", "validate", "pattern", "scan", "vulnerability", "check", "prompt injection", "safety"],
-    "ogedei": ["monitor", "health", "alert", "failover", "ops", "uptime", "status", "dashboard", "cron", "watch", "track"]
-}
+# Task type indicators — imported from canonical source to prevent drift
+# Previously had a local copy that diverged from kurultai_paths.AGENT_KEYWORDS
+TASK_INDICATORS = {k: v for k, v in AGENT_KEYWORDS.items() if k not in ("kublai", "tolui")}
 
-def kublai_route_task(task_text, priority="normal"):
+def kublai_route_task(task_text, priority="normal", task_id=None):
     """
     Kublai intelligently routes task to best agent.
     
     Decision factors:
-    1. Keyword matching (base score)
-    2. Task complexity (simple → subagent, complex → full agent)
-    3. Agent specialization
-    4. Priority (high priority → most capable agent)
+    1. Check if task is paused (skip routing)
+    2. Keyword matching (base score)
+    3. Task complexity (simple → subagent, complex → full agent)
+    4. Agent specialization
+    5. Priority (high priority → most capable agent)
     """
     task_lower = task_text.lower()
+    
+    # RULE: Check if task should be paused
+    should_pause, pause_reason = should_pause_task(task_text, task_id)
+    if should_pause:
+        # Mark as paused in Neo4j if task_id provided
+        if task_id:
+            mark_task_paused_in_neo4j(task_id, "NONE", pause_reason)
+        
+        return {
+            "task": task_text[:100],
+            "routed_by": "kublai",
+            "destination": "PAUSED",
+            "best_agent": "NONE",
+            "best_score": 0,
+            "complexity": "N/A",
+            "scores": {},
+            "reasoning": f"Task PAUSED: {pause_reason}",
+            "priority": priority,
+            "routed_at": datetime.now().isoformat(),
+            "paused": True,
+            "pause_reason": pause_reason
+        }
+    
+    # RULE: Check if destination agent is paused
+    for agent in PAUSED_AGENTS:
+        if agent in task_lower:
+            return {
+                "task": task_text[:100],
+                "routed_by": "kublai",
+                "destination": "PAUSED",
+                "best_agent": agent,
+                "best_score": 0,
+                "complexity": "N/A",
+                "scores": {},
+                "reasoning": f"Task PAUSED: Agent {agent} is currently paused",
+                "priority": priority,
+                "routed_at": datetime.now().isoformat(),
+                "paused": True,
+                "pause_reason": f"Agent {agent} paused"
+            }
     
     # Score each agent
     scores = {}
@@ -136,19 +240,115 @@ def kublai_route_task(task_text, priority="normal"):
         "routed_at": datetime.now().isoformat()
     }
 
+def pause_task_by_id(task_id, reason="Manual pause"):
+    """Mark a task as paused by ID."""
+    return mark_task_paused_in_neo4j(task_id, "NONE", reason)
+
+
+def unpause_task_by_id(task_id):
+    """Unpause a task by setting status back to PENDING."""
+    try:
+        from neo4j_atomic_transitions import get_driver
+        driver = get_driver()
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                WHERE t.status = 'PAUSED'
+                SET t.status = 'PENDING',
+                    t.unpaused_at = datetime()
+                REMOVE t.paused_reason, t.paused_at
+                RETURN count(t) as count
+            """, task_id=task_id)
+            record = result.single()
+            return record.get("count", 0) > 0
+    except Exception as e:
+        print(f"Error unpausing task: {e}", file=sys.stderr)
+    return False
+
+
+def list_paused_tasks():
+    """List all paused tasks in Neo4j."""
+    try:
+        from neo4j_atomic_transitions import get_driver
+        driver = get_driver()
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.status = 'PAUSED'
+                RETURN t.task_id as task_id, t.paused_reason as reason, 
+                       t.paused_at as paused_at, t.agent as agent
+                ORDER BY t.paused_at DESC
+            """)
+            paused = []
+            for record in result:
+                paused.append({
+                    "task_id": record.get("task_id"),
+                    "reason": record.get("reason"),
+                    "paused_at": str(record.get("paused_at")),
+                    "agent": record.get("agent")
+                })
+            return paused
+    except Exception as e:
+        print(f"Error listing paused tasks: {e}", file=sys.stderr)
+    return []
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 kublai-route.py <task>")
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Kublai Task Router")
+    parser.add_argument("task", nargs="?", help="Task text to route")
+    parser.add_argument("--pause", metavar="TASK_ID", help="Pause a task by ID")
+    parser.add_argument("--unpause", metavar="TASK_ID", help="Unpause a task by ID")
+    parser.add_argument("--list-paused", action="store_true", help="List all paused tasks")
+    parser.add_argument("--task-id", help="Task ID for routing (to check Neo4j pause status)")
+    
+    args = parser.parse_args()
+    
+    # Handle pause/unpause commands
+    if args.pause:
+        if pause_task_by_id(args.pause):
+            print(f"Task {args.pause} marked as PAUSED")
+        else:
+            print(f"Failed to pause task {args.pause}")
+        return
+    
+    if args.unpause:
+        if unpause_task_by_id(args.unpause):
+            print(f"Task {args.unpause} unpaused")
+        else:
+            print(f"Task {args.unpause} not found or not paused")
+        return
+    
+    if args.list_paused:
+        paused = list_paused_tasks()
+        if paused:
+            print("=== Paused Tasks ===")
+            for t in paused:
+                print(f"  {t['task_id']}: {t['reason']} (paused at {t['paused_at']})")
+        else:
+            print("No paused tasks")
+        return
+    
+    # Route task
+    if not args.task:
+        parser.print_help()
         sys.exit(1)
     
-    task = " ".join(sys.argv[1:])
+    task = args.task
     
     print("=== Kublai Task Router ===")
     print(f"Task: {task[:80]}...")
     print()
     
     # Kublai routes the task
-    routing = kublai_route_task(task)
+    routing = kublai_route_task(task, task_id=args.task_id)
+    
+    # Check if task was paused
+    if routing.get("paused"):
+        print("🚫 TASK PAUSED - Not routing")
+        print(f"  Reason: {routing['pause_reason']}")
+        print()
     
     print(f"Kublai's Decision:")
     print(f"  Destination: {routing['destination']}")

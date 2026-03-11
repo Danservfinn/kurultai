@@ -1,0 +1,124 @@
+{
+  "timestamp": "2026-03-09T11:13:06Z",
+  "hour_file": "2026-03-09-07",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 1.0,
+    "depths": {"temujin": 2, "mongke": 0, "chagatai": 0, "jochi": 1, "ogedei": 2},
+    "mean": 1,
+    "std": 1.0
+  },
+  "routing": {
+    "total_routed": 10,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-09T07:13:06.568792",
+  "total_routed": 10,
+  "routing_methods": {
+    "explicit": 10
+  },
+  "destinations": {
+    "ogedei": 10
+  },
+  "by_agent": {
+    "ogedei": {
+      "routed": 10,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 3,
+      "executing": 0,
+      "done": 179
+    },
+    "temujin": {
+      "pending": 2,
+      "executing": 0,
+      "done": 124
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 116
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 95
+    },
+    "jochi": {
+      "pending": 1,
+      "executing": 0,
+      "done": 95
+    },
+    "ogedei": {
+      "pending": 2,
+      "executing": 0,
+      "done": 104
+    }
+  },
+  "issues": [
+    "High explicit routing: 10/10 (100%) \u2014 keyword table may be underused",
+    "ogedei: 10 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "Keyword routing drift: 7/8 (88%) disagree with actual routing",
+    "RECURRING: 1 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "ogedei received 10/10 (100%) of all tasks \u2014 check if task descriptions are too narrow or if other agents need broader keywords",
+    "Routing methods: explicit=10"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 0,
+  "kw_misroute_rate": "0/10",
+  "overflow_count": 0,
+  "skill_hint_coverage": "10/10",
+  "routing_drift": {
+    "total": 8,
+    "mismatches": 7,
+    "drift_pct": 87.5,
+    "top_examples": [
+      {
+        "task": "System Health Alert (1 issue)",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "URGENT: Fix temujin API credentials",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "Fix Watchdog Stale Detection Logic",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "critical-fleet-credential-crisis-temujin-chagatai-100-percent-failure-1773032400",
+        "actual": "tolui",
+        "keyword_would": "jochi"
+      },
+      {
+        "task": "System Health Alert (1 issue)",
+        "actual": "tolui",
+        "keyword_would": "ogedei"
+      }
+    ],
+    "ts": "2026-03-09T06:43:15.367897"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "Keyword routing drift: #/# (#%) disagree with actual routing",
+      "consecutive": 5,
+      "first_seen": "2026-03-09T00:08:00.061235"
+    }
+  ]
+}
+}

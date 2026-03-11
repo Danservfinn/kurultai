@@ -1,7 +1,7 @@
 # Heartbeat Pipeline — Operational Reference
 
-**Version:** 2.1
-**Date:** 2026-03-07
+**Version:** 2.2
+**Date:** 2026-03-08
 **Author:** Chagatai (Kurultai Content Specialist)
 **Companion to:** [architecture.md](architecture.md) Section "Heartbeat System (Cron)"
 
@@ -66,16 +66,118 @@ All three tiers use **directory-based locks** with stale PID recovery:
 **Script:** `scripts/watchdog-gather.sh`
 **Lock:** `/tmp/watchdog-gather.lock` (directory-based, stale PID recovery)
 
-### Data Collection (Sections 1-6)
+### Data Collection (Sections 0-6)
 
 | Section | What It Collects | Source |
 |---------|-----------------|--------|
+| 0. Gateway Deduplication | Kills duplicate gateway instances, keeps oldest | `pgrep -x openclaw-gateway` |
 | 1. Gateway Process | PID, CPU%, MEM%, RSS, threads, uptime | `pgrep -f openclaw` + `ps` |
 | 2. Health Endpoint | HTTP status, latency (ms) | `curl http://127.0.0.1:18789/health` (5s timeout) |
 | 3. Error Counts | errors_5m, errors_1h, fatal_5m | `count_errors.py` on `~/.openclaw/logs/openclaw.log` |
 | 4. Dependent Services | Neo4j up/down, Redis up/down | Python neo4j driver (8s timeout) + `redis-cli ping` |
 | 5. Task Queue Status | Per-agent pending counts | Filesystem scan of `agents/*/tasks/*.md` |
+| 5b. Completion Audit | Verified/fake_found/requeued counts | `completion-audit.py --json` |
+| 5c. Vote Sync | Number of votes synced to Neo4j | `vote_manager.py sync` per agent |
+| 5d. Subprocess Audit | executing/alive/dead/stale/zombies/orphaned counts | `subprocess-audit.py --json` |
 | 6. 1-Hour Trends | uptime%, avg CPU, avg latency, error trend, restarts | Last 12 entries from `ticks.jsonl` |
+| 6b. Routing Metrics | queue_balance_index, missed_opportunities, accuracy | `routing-metrics-*.json` (fresh <2h) |
+| 6c. Throughput Anomaly | PENDING_NO_DISPATCH, EXECUTING_NO_OUTPUT, etc. | `throughput_anomaly.py` |
+
+### Section 0: Gateway Instance Deduplication
+
+**Purpose:** Prevents resource waste and false health readings from duplicate gateway processes.
+
+**Logic:**
+1. Count gateway PIDs via `pgrep -x openclaw-gateway`
+2. If count > 1, keep oldest PID, kill rest
+3. Log `GATEWAY_HEALTH: Found N instances, reduced to 1`
+4. Triggers `degraded` status if duplicates were found (safety-net)
+
+**Recovery:** Auto-fixes; logs incident for root cause investigation.
+
+### Section 5b: Completion Audit
+
+**Purpose:** Continuous verification of task completions to catch "fake completions" (no output section).
+
+**Outputs included in tick:**
+- `verified`: Number of legitimately completed tasks
+- `fake_found`: Tasks with no execution output section
+- `requeued`: Fake completions re-created for retry
+- `llm_decision`: IGNORE, RETRY, ESCALATE
+- `llm_confidence`: 0-100 confidence score
+
+**Integration:** Results written to `ticks.jsonl` + `tick-summary.txt` for historical analysis.
+
+### Section 5c: Vote Sync
+
+**Purpose:** Sync agent vote files from `agents/{agent}/votes/` to Neo4j for consensus tracking.
+
+**Metrics:**
+- `vote_sync_count`: Total votes synced this tick
+- `vote_sync_errors`: Number of agents with sync errors
+
+**Implementation:** Calls `vote_manager.py sync --agent {agent}` for each of 6 agents.
+
+### Section 5d: Subprocess Audit
+
+**Purpose:** Correlate active `claude-agent` processes with executing task files to detect:
+- **Zombie processes**: Handler still running but task done
+- **Orphaned executions**: `.executing` file exists but no handler process
+- **Stale executions**: Executing > HARD_MAX_EXECUTING_AGE (7200s)
+- **Dead processes**: Handler PID exists but process not running
+
+**Metrics in tick:**
+- `subprocess_executing`: Total executing tasks
+- `subprocess_alive`: Handlers with live process
+- `subprocess_dead`: Handlers with dead PID
+- `subprocess_stale`: Executions > 2 hours old
+- `subprocess_zombies`: Zombie process count
+- `subprocess_orphaned`: Orphaned .executing file count
+- `subprocess_anomalies`: Total anomaly count
+
+**Recovery:** Creates `logs/subprocess-recovery-needed.flag` to trigger task-watcher recovery.
+
+### Section 5e: Automatic Zombie Process Cleanup
+
+**Purpose:** Immediately kill zombie handler processes instead of waiting for task-watcher.
+
+**Logic:**
+1. Extract zombie PIDs from subprocess-audit.py output
+2. Verify each PID is actually an `agent-task-handler` process
+3. Graceful kill (SIGTERM), wait 0.5s, force kill (SIGKILL) if needed
+4. Log each killed zombie with PID
+
+**Impact:** Prevents resource waste and false-positive "executing" status in telemetry.
+
+### Section 6b: Routing Metrics
+
+**Purpose:** Track routing quality for load balancing decisions.
+
+**Sources (in order of priority):**
+1. Fresh `routing-metrics-*.json` file (< 2 hours old)
+2. Real-time queue balance calculation from filesystem (fallback)
+
+**Metrics:**
+- `queue_balance_index`: Std dev / mean of queue depths (lower = more balanced)
+- `missed_opportunities`: Tasks that could have been rerouted
+- `routing_accuracy`: % correct routing decisions
+- `time_to_start_p95`: 95th percentile time from queued to executing
+- `total_routed`: Total tasks routed in measurement window
+
+### Section 6c: Throughput Anomaly Detection
+
+**Purpose:** Pre-decision anomaly check that feeds into both decision logic and LLM triage.
+
+**Anomaly Types:**
+- `PENDING_NO_DISPATCH`: Tasks queued but none dispatched
+- `EXECUTING_NO_OUTPUT`: Agents busy, 0 completions in 2h
+- `LOW_YIELD`: Low completion rate relative to executions
+- `QUEUE_IMBALANCE`: Significant queue depth variance
+- `FLEET_IDLE`: All agents idle with no work
+
+**Severity Levels:** MEDIUM, HIGH, CRITICAL (tracked consecutive ticks)
+
+**Escalation:** HIGH/CRITICAL bypasses LLM triage for deterministic response (see SUSTAINED ANOMALY ESCALATION below).
 
 ### Decision Thresholds (Section 7)
 
@@ -106,6 +208,33 @@ All three tiers use **directory-based locks** with stale PID recovery:
 - **Output format:** `ACTION_NEEDED: yes|no`, `SEVERITY: LOW|MEDIUM|HIGH|CRITICAL`, `REASON:`, `SUGGESTED_ACTION:`
 - **On action_needed=yes:** Dispatches Kublai immediately via `openclaw agent --agent main --message ...`
 - **Fallback:** If Ollama unavailable or LLM lock busy, outputs `FALLBACK` (no dispatch)
+
+### SUSTAINED ANOMALY ESCALATION (Section 9)
+
+**Purpose:** Deterministic escalation for persistent throughput anomalies that bypasses LLM triage.
+
+**Trigger Conditions:**
+- `THROUGHPUT_SEVERITY = HIGH` or `CRITICAL`
+- Anomaly persisted for multiple consecutive ticks (e.g., 3+ ticks = 15+ minutes)
+
+**Bypass Logic:**
+- Runs AFTER LLM triage
+- Overrides `LLM_ACTION_NEEDED=no` if severity is HIGH/CRITICAL
+- Provides deterministic response when LLM triage is unreliable or unavailable
+
+**Dispatch Message:**
+```
+## Sustained Throughput Anomaly — {SEVERITY}
+**Anomaly:** {TYPE} persisting for {N} consecutive ticks ({minutes} minutes)
+**Severity:** {SEVERITY} (auto-escalated, LLM triage bypassed)
+**Action:** {ACTION} — {REASON}
+```
+
+**Anomaly-Specific Guidance:**
+- `EXECUTING_NO_OUTPUT`: Check zombie processes, stale PIDs
+- `PENDING_NO_DISPATCH`: Check task-watcher running, dispatching
+- `QUEUE_IMBALANCE`: Redistribute overloaded queues to idle agents
+- `LOW_YIELD`: Check model execution failures, timeout patterns
 
 ### Output Files
 
@@ -453,7 +582,7 @@ Closes the WHEN/THEN rule feedback loop. Reflections ask agents "did you follow 
 |--------|-------|--------|---------|
 | `kublai-actions.py --trigger kurultai` | Reflection data, tock, capability scores | Task files in agent queues | 60s |
 | `kublai-initiative.py` | Queue depths, system state | Task files, initiative cooldown | 60s |
-| `/kurultai-report` (Haiku) | Various system state | Signal message, log | 120s |
+| `/kurultai-report` | Various system state | Signal message, log | 30s |
 | `generate_hourly_report.py` | Reviews, proposals, Neo4j, tock, step timing, skill stats | `logs/hourly-reports/YYYY-MM-DD-HHMM-reflection-report.md`, Signal message | 60s |
 
 ---
@@ -564,6 +693,30 @@ Tock data is stale (>45 min) or missing. Check:
 - `launchctl list | grep tock` — is tock-gather scheduled?
 - Run manually: `bash scripts/tock-gather.sh`
 
+### Reviews show "Degraded Mode"
+
+**Symptom:** Review output includes `**Note:** Full horde-review unavailable. Using degraded analysis.`
+
+**What it means:** The full `/horde-review` skill failed to load or execute. The system falls back to a metrics-only analysis that:
+- Counts completed tasks and calculates quality rate
+- Lacks multi-disciplinary analysis (security, performance, UX, etc.)
+- Cannot identify specific weaknesses or provide PRIORITY_FIX recommendations
+
+**Common causes:**
+1. **Skill not installed:** The `/horde-review` skill is missing from the skills directory
+2. **Skill loading error:** The skill definition file has syntax errors or missing dependencies
+3. **Model unavailability:** The skill's required LLM model is unavailable or rate-limited
+4. **Timeout:** Full review exceeded 120s timeout, system fell back to metrics
+
+**Troubleshooting steps:**
+1. Check skill exists: `ls -la ~/.claude/skills/horde-review/` or `ls -la ~/.claude/plugins/*/skills/horde-review/`
+2. Check for skill errors: `grep -i "horde-review" logs/horde-review-error.log | tail -20`
+3. Verify skill loads: `claude-agent --model haiku "Skill tool list" | grep -i review`
+4. Check API status: If using remote API, verify credentials and rate limits
+5. Consider increasing timeout: Edit `REVIEW_TIMEOUT` in `hourly_reflection.sh` (default 120s)
+
+**Impact:** Degraded reviews still provide basic metrics but miss critical insights. Full reviews should be restored for complete reflection quality.
+
 ### Reviews all show "unavailable"
 
 - `claude-agent` binary missing or not in PATH: check `~/.local/bin/claude-agent`
@@ -650,6 +803,7 @@ The watchdog kills everything at 420s. Common causes:
 
 | Version | Date | Change |
 |---------|------|--------|
+| 2.2 | 2026-03-08 | Added Tier 1 (tick) sections 0, 5b, 5c, 5d, 5e, 6b, 6c: Gateway deduplication, completion audit, vote sync, subprocess audit, zombie cleanup, routing metrics, throughput anomaly detection. Added SUSTAINED ANOMALY ESCALATION documentation (deterministic bypass of LLM triage). |
 | 2.1 | 2026-03-07 | Added Phase 2.5 documentation: `reflection_anomaly_scanner.py` (post-review escalation) and `parse_rule_compliance.py` (WHEN/THEN rule feedback loop). Updated pipeline diagram, timeout budget, data dependency graph, and key constants table. |
 | 2.0 | 2026-03-07 | Expanded to full heartbeat pipeline reference: added Tier 1 (tick) and Tier 2 (tock) operational docs with decision thresholds, companion scripts, output files. Added cross-tier overview, data flow diagram, concurrency control, and incident runbook. Renamed from "Reflection Pipeline" to "Heartbeat Pipeline". |
 | 1.0 | 2026-03-06 | Initial release: Tier 3 (kurultai) script inventory, I/O contracts, data flow, troubleshooting |

@@ -1,9 +1,11 @@
 # Kurultai Architecture Documentation
 
-**Version:** 2.0
-**Date:** 2026-03-07  
-**Author:** Chagatai (Kurultai Content Specialist)  
+**Version:** 2.3
+**Date:** 2026-03-11
+**Author:** Chagatai (Kurultai Content Specialist)
 **Status:** Production Documentation
+
+**Migration Note:** Neo4j-First Architecture (Phase 2 of Kurultai Task System Overhaul completed 2026-03-09). Task ID canonical format implemented 2026-03-10.
 
 ---
 
@@ -469,16 +471,45 @@ Product-specific files (design docs, source code, marketing content, research) h
 
 ## Task Lifecycle
 
+> **Detailed Reference:** For state machine diagrams, failure modes, and operational details, see [task-dispatch-reference.md](task-dispatch-reference.md).
+
+### 0. Task ID Format (Canonical)
+
+All task identifiers follow the canonical format:
+
+```
+{priority}-{timestamp}-{uuid8}
+```
+
+**Where:**
+- **priority**: `critical`, `high`, `normal`, or `low` (lowercase)
+- **timestamp**: Unix timestamp (10 digits, seconds since epoch)
+- **uuid8**: First 8 characters of UUID4 (lowercase hex)
+
+**Examples:**
+
+| Priority | Example ID |
+|----------|------------|
+| critical | `critical-1773121500-a1b2c3d4` |
+| high | `high-1773121555-5e6f7g8h` |
+| normal | `normal-1773121600-1a2b3c4d` |
+| low | `low-1773121650-9z8y7x1a` |
+
+**State Tracking:** Neo4j is the single source of truth for task state. File extensions (`.done`, `.failed`, `.retry.md`) are **DEPRECATED** — check Neo4j `status` property instead.
+
+> **Full Specification:** See `/agents/main/specs/TASK_ID_FORMAT.md` for validation regex, Neo4j schema, and migration guide.
+
 ### 1. Task Creation
 
 Tasks are created as markdown files in agent task directories:
 
 ```
-/agents/{agent}/tasks/{priority}-{id}.md
+/agents/{agent}/tasks/{priority}-{timestamp}-{uuid8}.md
 ```
 
 **Priority Prefixes:**
-- `high-*` — Critical, immediate execution
+- `critical-*` — Urgent, immediate execution
+- `high-*` — Important, high priority
 - `normal-*` — Standard priority
 - `low-*` — Background tasks
 
@@ -486,10 +517,10 @@ Tasks are created as markdown files in agent task directories:
 
 ```markdown
 ---
-task_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+task_id: high-1773121555-5e6f7g8h
 agent: temujin
 priority: high
-created: 2026-03-05T09:00:00
+created: 2026-03-10T09:00:00
 source: task_router
 skill_hint: /horde-brainstorming
 ---
@@ -511,7 +542,7 @@ skill_hint: /horde-brainstorming
 
 ### 1.5. Task Tracking (Unified Ledger)
 
-Every task gets a UUID4 `task_id` assigned at classification time. This ID correlates all lifecycle events in a single append-only log:
+Every task gets a canonical `task_id` in format `{priority}-{timestamp}-{uuid8}` at classification time. This ID correlates all lifecycle events in a single append-only log:
 
 **Ledger file:** `/Users/kublai/.openclaw/tasks/task-ledger.jsonl`
 
@@ -777,7 +808,7 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 | 2. Performance Review | `claude-agent --model haiku /horde-review` | **Parallel** (all 6 agents, 120s timeout each) | Critical analysis of each agent's hourly performance |
 | 3. Downstream Tier 1 | `memory_audit.py`, `cross_agent_rules.py`, `route_quality_tracker.py`, `routing_audit_action.py`, `score_skills.py`, `action_scorer.py` | **Parallel** (independent) | Memory hygiene, capability scoring, skill stats |
 | 3. Downstream Tier 2 | `update_skill_stats.py` | **Sequential** (depends on score-skills) | Aggregate skill statistics |
-| 3. Downstream Tier 3 | `kublai-actions.py --trigger kurultai`, `kublai-initiative.py`, `/kurultai-report` (Haiku), `generate_hourly_report.py` | **Sequential** (depends on all above) | Task creation, initiative, reporting |
+| 3. Downstream Tier 3 | `kublai-actions.py --trigger kurultai`, `kublai-initiative.py`, `/kurultai-report`, `generate_hourly_report.py` | **Sequential** (depends on all above) | Task creation, initiative, reporting |
 
 **Brainstorming:** Decoupled to `run_brainstorm.sh` (separate cron job at :30, not part of this pipeline).
 
@@ -1250,6 +1281,8 @@ Temüjin handles all code review via Claude Code ACP sessions.
 
 ## Troubleshooting Guide
 
+> **Task-specific issues:** For task dispatch failures, stale tasks, queue imbalance, and circuit breaker issues, see [task-dispatch-reference.md > Common Failure Modes](task-dispatch-reference.md#common-failure-modes).
+
 ### Common Issues
 
 | Issue | Diagnosis | Solution |
@@ -1465,6 +1498,9 @@ python scripts/research_storage.py --create-test
 | 1.8 | 2026-03-06 | Behavioral Observability System: (1) `executor: claude-code` field added to all execution ledger events — every Claude Code task completion is now explicitly trackable. (2) New ledger events: EXECUTION_TRACE (tool usage), SKILL_INVOCATION (transcript parser), SKILL_OUTCOME, SKILL_AGGREGATE, ACTION_SCORED, ARCH_UPDATE_CHECK, REFLECT_SUMMARY. (3) New scripts: score_skills.py, update_skill_stats.py, action_scorer.py, skill_tracker_hook.py. (4) PostToolUse hook captures real-time Skill invocations. (5) prepare_reflection_context.py: removed token budget system, added skill telemetry + action quality blocks. (6) hourly_reflection.sh: added score-skills, update-skill-stats, action-scorer steps + kurultai-reflect Phase 3b (parallel for all 6 agents). (7) architecture.md auto-update check on task completion (ARCH_UPDATE_CHECK event). |
 | 1.10 | 2026-03-06 | Added cross-reference to new `reflection-pipeline-reference.md` operational guide (complete script I/O contracts, shared module docs, data dependency graph, troubleshooting). |
 | 2.0 | 2026-03-07 | Model standardization: Updated all agent models from third-party (qwen, kimi, MiniMax, glm-5) to `claude-opus-4-6`. Added Tolui (7th agent, truth-teller) with dedicated gateway on port 18792. Updated routing references, agent count, ASCII diagrams. |
+| 2.1 | 2026-03-09 | Neo4j-First Architecture: Task ID canonical format implemented. Kurultai Task System Overhaul Phase 2 completed. |
+| 2.2 | 2026-03-10 | Rule persistence system: Structured `rules.json` store with follow/violate telemetry, `deprecation_bypass` protection for critical rules, rule lifecycle management across memory rotation. |
+| 2.3 | 2026-03-11 | Idle-crisis recovery: (1) Restored r021 (idle rule) and r022 (self-maintenance rule) after incorrect auto-deprecation by memory_audit. (2) Added `deprecation_bypass` flag to prevent critical rule removal. (3) Created `/scripts/idle-watchdog.sh` for cron-based self-task generation after 120min idle. (4) Fixed rule evaluation tracking — rules showed 0 follow/0 violate but were actively evaluated in reflections. |
 
 ---
 

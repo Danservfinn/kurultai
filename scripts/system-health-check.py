@@ -2,6 +2,27 @@
 """
 System Health Check — Unified 5-minute health monitoring
 
+HEALTH CHECK HIERARCHY:
+======================
+┌─────────────────────────────────────────────────────────────────┐
+│ system-health-check.py (this file)                              │
+│   - Unified 5-minute health monitoring                          │
+│   - Gateway health: PID check + HTTP endpoint (localhost:18789) │
+│   - Service health: Neo4j + Redis                               │
+│   - Website health: HTTP checks for key properties              │
+│   - Lock cleanup: Calls stale-lock-cleanup.py                   │
+├─────────────────────────────────────────────────────────────────┤
+│ Related health scripts:                                         │
+│   - gateway-health-check.py (specialized for gateway incidents) │
+│   - health_dashboard.py (dashboard interface)                   │
+│   - ogedei-watchdog.py (quality assurance daemon, 5-min)        │
+│   - task-watcher.py (task execution daemon, continuous)         │
+│   - kurultai-monitor.py (deep browser checks, 1-min)            │
+├─────────────────────────────────────────────────────────────────┤
+│ Deprecated:                                                     │
+│   - heartbeat-watchdog (superseded by watchdog-gather.sh)       │
+└─────────────────────────────────────────────────────────────────┘
+
 Merges three health checks into one:
 1. Gateway health: PID check + HTTP endpoint (localhost:18789)
 2. Service health: Neo4j + Redis
@@ -25,15 +46,16 @@ LOG_FILE = LOG_DIR / "system-health.log"
 
 # Service endpoints
 GATEWAY_ENDPOINT = "http://127.0.0.1:18789/health"
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "myStrongPassword123")
 
 # Websites to check (simplified HTTP checks - kurultai-monitor.py does deep browser checks)
+# Note: llmsurvivor.kurult.ai custom domain is broken (Cloudflare DNS issue)
+# Workaround: Use direct Railway URL until domain is fixed
+# IMPORTANT: Use GET, not HEAD - FastAPI health endpoints return 405 for HEAD
+# PAUSED 2026-03-09: LLM Survivor monitoring disabled per user request
 WEBSITES = [
     ("https://the.kurult.ai", "the.kurult.ai"),
-    ("https://parsethe.media", "parsethe.media"),
-    ("https://llmsurvivor.com", "llmsurvivor.com"),
+    ("https://www.parsethe.media", "parsethe.media"),  # www required - non-www returns 405 for HEAD
+    # ("https://llm-survivor-production.up.railway.app/health", "llmsurvivor.kurult.ai"),  # PAUSED
 ]
 
 # Thresholds
@@ -85,9 +107,13 @@ def check_gateway() -> tuple[bool, str, dict]:
             "latency_ms": latency_ms,
         }
 
-        # Health logic
-        if pid_count == 0:
-            return False, "No gateway process running", metrics
+        # Health logic: HTTP is the authoritative check; pgrep can transiently fail
+        if pid_count == 0 and http_status != 200:
+            return False, "No gateway process running and HTTP unreachable", metrics
+        if pid_count == 0 and http_status == 200:
+            # pgrep transient failure — gateway is actually running
+            log("Gateway pgrep returned 0 PIDs but HTTP is healthy (transient pgrep miss)", "WARN")
+            return True, "OK (pgrep miss, HTTP healthy)", metrics
         if http_status != 200:
             return False, f"Gateway HTTP {http_status}", metrics
         if pid_count > 1:
@@ -106,19 +132,19 @@ def check_neo4j() -> tuple[bool, str, dict]:
     Returns: (is_healthy, reason, metrics)
     """
     try:
-        from neo4j import GraphDatabase
+        from neo4j_task_tracker import get_driver, close_driver, get_pool_metrics
 
-        driver = GraphDatabase.driver(
-            NEO4J_URI,
-            auth=(NEO4J_USER, NEO4J_PASSWORD),
-            connection_timeout=NEO4J_TIMEOUT,
-            max_transaction_retry_time=NEO4J_TIMEOUT
-        )
+        driver = get_driver()
         driver.verify_connectivity()
-        driver.close()
-        return True, "OK", {"status": "up"}
+        metrics = get_pool_metrics()
+        return True, "OK", {"status": "up", **metrics}
     except Exception as e:
         return False, str(e)[:100], {"status": "down"}
+    finally:
+        try:
+            close_driver()
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 def check_redis() -> tuple[bool, str, dict]:
@@ -146,7 +172,11 @@ def check_redis() -> tuple[bool, str, dict]:
 
 def check_websites() -> list[dict]:
     """
-    Check website availability via HTTP HEAD.
+    Check website availability via HTTP GET.
+
+    Note: Using GET instead of HEAD because:
+    - FastAPI health endpoints return 405 for HEAD requests
+    - Some servers (e.g., parsethe.media) don't support HEAD on root
 
     Returns: List of results for each site
     """
@@ -159,7 +189,7 @@ def check_websites() -> list[dict]:
 
     for url, name in WEBSITES:
         try:
-            response = requests.head(url, timeout=HTTP_TIMEOUT, allow_redirects=True)
+            response = requests.get(url, timeout=HTTP_TIMEOUT, allow_redirects=True)
             results.append({
                 "name": name,
                 "url": url,
@@ -220,6 +250,62 @@ def cleanup_stale_locks() -> tuple[bool, str]:
         return False, "timeout"
     except Exception as e:
         return False, str(e)[:100]
+
+
+def check_git_operations() -> tuple[bool, str, dict]:
+    """
+    Check git operations by autonomous agents.
+
+    Returns: (is_healthy, reason, metrics)
+    """
+    git_monitor_script = BASE_DIR / "scripts" / "git-operation-monitor.py"
+
+    if not git_monitor_script.exists():
+        return True, "git-operation-monitor.py not found (skipping)", {"status": "unavailable"}
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(git_monitor_script), "--metrics"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode != 0:
+            return False, f"git monitor failed: {result.returncode}", {"status": "error"}
+
+        try:
+            metrics = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return False, "invalid JSON from git monitor", {"status": "parse_error"}
+
+        # Check for anomalies
+        anomaly_count = metrics.get("anomaly_count", 0)
+        stale_branches = metrics.get("autonomous_branches_stale", 0)
+        blocked_ops = metrics.get("blocked_operations_24h", 0)
+
+        issues = []
+        if anomaly_count > 0:
+            issues.append(f"{anomaly_count} anomalies")
+        if stale_branches > 0:
+            issues.append(f"{stale_branches} stale branches")
+        if blocked_ops > 0:
+            issues.append(f"{blocked_ops} blocked ops")
+
+        if issues:
+            return False, ", ".join(issues), metrics
+
+        return True, "OK", {
+            "commits_24h": metrics.get("autonomous_commits_24h", 0),
+            "branches_active": metrics.get("autonomous_branches_active", 0),
+            "prs_open": metrics.get("autonomous_prs_open", 0),
+            "status": "healthy",
+        }
+
+    except subprocess.TimeoutExpired:
+        return False, "timeout", {"status": "timeout"}
+    except Exception as e:
+        return False, str(e)[:100], {"status": "error"}
 
 
 def create_notification(issues: list[str], severity: str = "MEDIUM"):
@@ -313,6 +399,14 @@ def main():
     cleanup_ok, cleanup_summary = cleanup_stale_locks()
     metrics["lock_cleanup"] = {"success": cleanup_ok, "summary": cleanup_summary}
     log(f"Lock cleanup: {'OK' if cleanup_ok else 'FAIL'} - {cleanup_summary}")
+
+    # 6. Git operation health
+    git_healthy, git_reason, git_metrics = check_git_operations()
+    metrics["git_operations"] = git_metrics
+    if not git_healthy:
+        all_healthy = False
+        issues.append(f"Git: {git_reason}")
+    log(f"Git operations: {'OK' if git_healthy else 'FAIL'} - {git_reason}")
 
     # Summary
     log(f"=== Summary: {'HEALTHY' if all_healthy else 'ISSUES DETECTED'} ===")

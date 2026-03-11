@@ -1,0 +1,7 @@
+{"timestamp": "2026-03-11T00:56:03-04:00", "agent": "kublai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T00:56:03-04:00", "agent": "mongke", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T00:56:03-04:00", "agent": "chagatai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T00:56:03-04:00", "agent": "temujin", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T00:56:03-04:00", "agent": "jochi", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T00:56:03-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T01:02:33-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}

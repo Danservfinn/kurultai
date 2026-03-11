@@ -1,0 +1,172 @@
+[
+  {
+    "date": "2026-03-08T16:38:54.984939",
+    "channel": "signal",
+    "direction": "inbound",
+    "content": "Can you help me with task-1234? I'm stuck on the authentication module.",
+    "context": "task",
+    "topics": [
+      {
+        "topic": "authentication",
+        "type": "keyword",
+        "domain": "technical",
+        "score": 1.0
+      }
+    ],
+    "action_items": [
+      {
+        "action": "help me with task-1234",
+        "assignee": "other",
+        "priority": "low",
+        "deadline": null,
+        "source_pattern": "commitment"
+      }
+    ],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "frustrated",
+      "urgency": "low",
+      "intensity": 0.17,
+      "politeness": "terse"
+    },
+    "related_tasks": [
+      "task-1234"
+    ]
+  },
+  {
+    "date": "2026-03-08T16:38:54.991028",
+    "channel": "signal",
+    "direction": "outbound",
+    "content": "Sure! Let's discuss it in \"Team Standup\" tomorrow at 10am.",
+    "context": "calendar",
+    "topics": [
+      {
+        "topic": "Sure",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.3
+      },
+      {
+        "topic": "Team Standup",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.3
+      }
+    ],
+    "action_items": [
+      {
+        "action": "discuss it in \"Team Standup\" tomorrow at 10am",
+        "assignee": "shared",
+        "priority": "low",
+        "deadline": "tomorrow",
+        "source_pattern": "commitment"
+      }
+    ],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_events": [
+      "Team Standup"
+    ]
+  },
+  {
+    "date": "2026-03-08T16:38:54.998995",
+    "channel": "signal",
+    "direction": "inbound",
+    "content": "Great! Also, please review #5678 before the Sprint Review meeting.",
+    "context": "calendar",
+    "topics": [
+      {
+        "topic": "#5678",
+        "type": "hashtag",
+        "domain": "technology",
+        "score": 1.4
+      },
+      {
+        "topic": "Sprint Review",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.3
+      },
+      {
+        "topic": "Great",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.3
+      },
+      {
+        "topic": "review",
+        "type": "keyword",
+        "domain": "technical",
+        "score": 1.0
+      },
+      {
+        "topic": "pr",
+        "type": "keyword",
+        "domain": "technical",
+        "score": 1.0
+      }
+    ],
+    "action_items": [
+      {
+        "action": "review #5678 before the Sprint Review meeting",
+        "assignee": "other",
+        "priority": "low",
+        "deadline": null,
+        "source_pattern": "commitment"
+      }
+    ],
+    "sentiment": {
+      "polarity": "positive",
+      "emotion": "excited",
+      "urgency": "low",
+      "intensity": 0.2,
+      "politeness": "formal"
+    },
+    "related_events": [
+      "Sprint Review meeting",
+      "please review",
+      "Sprint Review"
+    ],
+    "related_tasks": [
+      "task-5678"
+    ]
+  },
+  {
+    "date": "2026-03-08T16:38:55.003575",
+    "channel": "signal",
+    "direction": "outbound",
+    "content": "Don't forget about Team Standup today!",
+    "context": "general",
+    "topics": [
+      {
+        "topic": "Team Standup",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.4000000000000001
+      },
+      {
+        "topic": "Don",
+        "type": "entity",
+        "domain": "project",
+        "score": 1.3
+      }
+    ],
+    "action_items": [],
+    "sentiment": {
+      "polarity": "neutral",
+      "emotion": "neutral",
+      "urgency": "low",
+      "intensity": 0.0,
+      "politeness": "terse"
+    },
+    "related_events": [
+      "about Team standup",
+      "Team Standup"
+    ]
+  }
+]

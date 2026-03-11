@@ -4,13 +4,17 @@ Structured Heartbeat Logger
 Logs agent heartbeat data to Neo4j for Kurultai analysis
 """
 
-from neo4j import GraphDatabase
 import os
+import sys
 from datetime import datetime
+
+# Use centralized Neo4j driver with connection pooling
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from neo4j_task_tracker import get_driver, close_driver
 
 class HeartbeatLogger:
     def __init__(self):
-        self.driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "neo4j"))
+        self.driver = get_driver()
     
     def log_heartbeat(self, agent, completed_tasks, current_task, progress, 
                      blockers, next_action, self_directed=True, assigned_by=None):
@@ -83,7 +87,7 @@ class HeartbeatLogger:
             return result.single()
     
     def close(self):
-        self.driver.close()
+        close_driver()
 
 
 if __name__ == '__main__':

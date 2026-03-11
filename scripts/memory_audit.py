@@ -590,11 +590,52 @@ def fix_intraday_bloat(results: list) -> int:
     return fixed
 
 
+def _compact_section_items(section: str, max_items: int) -> tuple[str, int]:
+    """Compact a section by keeping only the last max_items entries.
+
+    Returns (compacted_text, trimmed_count). Entries start with '- **'.
+    """
+    lines = section.split("\n")
+    header_lines = []
+    items = []  # each item is a list of lines (item + continuation)
+    current_item = []
+
+    for line in lines:
+        if re.match(r"^- \*\*", line):
+            if current_item:
+                items.append(current_item)
+            current_item = [line]
+        elif current_item:
+            current_item.append(line)
+        else:
+            header_lines.append(line)
+
+    if current_item:
+        items.append(current_item)
+
+    # Keep only the most recent items
+    kept_items = items[:max_items]
+    trimmed = len(items) - len(kept_items)
+
+    rebuilt = "\n".join(header_lines)
+    if trimmed > 0:
+        rebuilt += f"\n*(compacted: {trimmed} older entries removed by memory_audit.py)*\n"
+    for item in kept_items:
+        rebuilt += "\n".join(item) + "\n"
+
+    return rebuilt, trimmed
+
+
+# Max entries to keep in "Current Task" section (typically longer entries)
+CURRENT_TASK_MAX_ITEMS = 3
+
+
 def fix_context_bloat(results: list) -> int:
     """Compact oversized context.md by trimming old work history entries.
 
-    Preserves: header (role/model/capabilities), Current Task, Notes sections.
-    Trims: Latest Work / Recent Work to only the last CONTEXT_MAX_RECENT_ITEMS entries.
+    Preserves: header (role/model/capabilities), Notes sections.
+    Trims: Current Task / Latest Work / Recent Work to only recent entries.
+    Also deduplicates repeated section headers (e.g. two '## Latest Work').
     """
     fixed = 0
     for r in results:
@@ -608,39 +649,24 @@ def fix_context_bloat(results: list) -> int:
         sections = re.split(r"(?=^## )", content, flags=re.MULTILINE)
 
         new_sections = []
+        seen_headers = set()
         for section in sections:
-            header_match = re.match(r"^## (Latest Work|Recent Work)\b", section)
+            header_match = re.match(r"^## (Latest Work|Recent Work|Current Task)\b", section)
             if header_match:
-                # Keep only the last N list items (lines starting with "- **")
-                lines = section.split("\n")
-                header_lines = []
-                items = []  # each item is a list of lines (item + continuation)
-                current_item = []
+                header_name = header_match.group(1)
+                # Skip duplicate section headers (keep only the first occurrence)
+                if header_name in seen_headers:
+                    continue
+                seen_headers.add(header_name)
 
-                for line in lines:
-                    if re.match(r"^- \*\*", line):
-                        if current_item:
-                            items.append(current_item)
-                        current_item = [line]
-                    elif current_item:
-                        current_item.append(line)
-                    else:
-                        header_lines.append(line)
+                # Current Task keeps fewer items (they tend to be longer)
+                if header_name == "Current Task":
+                    max_items = CURRENT_TASK_MAX_ITEMS
+                else:
+                    max_items = CONTEXT_MAX_RECENT_ITEMS
 
-                if current_item:
-                    items.append(current_item)
-
-                # Keep only the most recent items
-                kept_items = items[:CONTEXT_MAX_RECENT_ITEMS]
-                trimmed = len(items) - len(kept_items)
-
-                rebuilt = "\n".join(header_lines)
-                if trimmed > 0:
-                    rebuilt += f"\n*(compacted: {trimmed} older entries removed by memory_audit.py)*\n"
-                for item in kept_items:
-                    rebuilt += "\n".join(item) + "\n"
-
-                new_sections.append(rebuilt)
+                compacted_section, _ = _compact_section_items(section, max_items)
+                new_sections.append(compacted_section)
             else:
                 new_sections.append(section)
 

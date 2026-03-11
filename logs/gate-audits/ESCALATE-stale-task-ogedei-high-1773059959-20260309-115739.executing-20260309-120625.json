@@ -1,0 +1,13 @@
+{
+  "original_task": "ESCALATE-stale-task-ogedei-high-1773059959-20260309-115739.executing",
+  "completion_percentage": 100,
+  "can_complete": true,
+  "missing_components": [],
+  "quality_issues": [],
+  "required_followups": [],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-09T12:06:25.084165",
+  "audit_version": "1.0"
+}

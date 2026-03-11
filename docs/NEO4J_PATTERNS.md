@@ -515,3 +515,153 @@ export async function pruneOrphanedNodes(): Promise<number> {
 | **Stale data cleanup** | Old, unused connections automatically pruned |
 | **Better routing** | Agent assignments based on historical success |
 | **Faster search** | High-weight edges prioritized in traversal |
+
+---
+
+## 🧠 Schema Enhancements (v1.0 - 2026-03-08)
+
+**Purpose:** Enable intelligent routing, self-improvement, observability, and knowledge management.
+
+### New Node Types (17)
+
+#### Routing Intelligence
+| Node | Purpose | Key Properties |
+|------|---------|----------------|
+| **SkillAffinity** | Track agent skill proficiency | agent, skill, success_rate, avg_duration |
+| **AgentCapacity** | Real-time workload metrics | queue_depth, throughput_1h, availability_score |
+| **RoutingDecision** | Record routing choices | task_id, from_agent, to_agent, reason, confidence |
+| **TaskComplexity** | Estimate task difficulty | estimated_effort, actual_effort, complexity_factors |
+
+#### Self-Improvement
+| Node | Purpose | Key Properties |
+|------|---------|----------------|
+| **ReflectionInsight** | Hourly reflection insights | insight_type, description, impact_score |
+| **FailurePattern** | Cluster similar failures | error_signature, root_cause, resolution |
+| **SkillEvolution** | Track skill improvement | proficiency_level, current_performance |
+| **LearningEvent** | Discrete learning moments | event_type, lesson, confidence |
+
+#### Observability
+| Node | Purpose | Key Properties |
+|------|---------|----------------|
+| **PerformanceMetric** | Time-series metrics (hourly) | metric_name, value, trend, hour |
+| **DependencyGraph** | Component relationships | health_status, latency_ms |
+| **Bottleneck** | Detected bottlenecks | location, cause, impact_score, resolved |
+| **SystemEvent** | Non-pipeline events | type, severity, message, resolved |
+
+#### Knowledge & Quality
+| Node | Purpose | Key Properties |
+|------|---------|----------------|
+| **KnowledgeArtifact** | Reusable knowledge | content_hash, freshness_score, usage_count |
+| **ContextChain** | Session context chains | session_id, decision_points, outcomes_summary |
+| **LessonLearned** | Cross-agent learning | situation, action_taken, generalization |
+| **QualityGate** | Verification checkpoints | checkpoint_name, passed, reviewer |
+| **TechnicalDebt** | Debt tracking | location, impact, priority, resolved |
+
+### New Relationships (24)
+
+```cypher
+// Routing Intelligence
+(a:Agent)-[:HAS_SKILL_AFFINITY]->(s:SkillAffinity)
+(a:Agent)-[:HAS_CAPACITY]->(c:AgentCapacity)
+(t:Task)-[:ROUTED_BY]->(r:RoutingDecision)
+(r:RoutingDecision)-[:ROUTED_TO]->(a:Agent)
+(t:Task)-[:HAS_COMPLEXITY]->(c:TaskComplexity)
+
+// Self-Improvement
+(a:Agent)-[:HAS_INSIGHT]->(r:ReflectionInsight)
+(r:ReflectionInsight)-[:GENERATED_RULE]->(ru:Rule)
+(f:FailurePattern)-[:MATCHES]->(t:Task)
+(a:Agent)-[:HAS_SKILL_EVO]->(s:SkillEvolution)
+(l:LearningEvent)-[:DERIVED_FROM]->(t:Task)
+(l:LearningEvent)-[:VALIDATED_BY]->(a:Agent)
+
+// Observability
+(a:Agent)-[:HAS_METRIC]->(m:PerformanceMetric)
+(m:PerformanceMetric)-[:PRECEDES]->(m2:PerformanceMetric)
+(d:DependencyGraph)-[:AFFECTS]->(a:Agent)
+(b:Bottleneck)-[:LOCATED_AT]->(d:DependencyGraph)
+(b:Bottleneck)-[:AFFECTS_AGENT]->(a:Agent)
+(e:SystemEvent)-[:TRIGGERED_BY]->(d:DependencyGraph)
+
+// Knowledge & Quality
+(a:Agent)-[:CREATED_ARTIFACT]->(k:KnowledgeArtifact)
+(k:KnowledgeArtifact)-[:USED_IN]->(t:Task)
+(c:ContextChain)-[:INCLUDES]->(t:Task)
+(l:LessonLearned)-[:APPLIES_TO]->(a:Agent)
+(q:QualityGate)-[:VALIDATES]->(t:Task)
+(t:TechnicalDebt)-[:CREATED_BY]->(t2:Task)
+```
+
+### Key Queries
+
+#### Best Agent for Skill (Routing Intelligence)
+```cypher
+MATCH (a:Agent)-[:HAS_SKILL_AFFINITY]->(s:SkillAffinity {skill: $skill})
+MATCH (c:AgentCapacity {agent: a.name})
+WHERE s.success_rate > 0.5 AND c.availability_score > 0.3
+RETURN a.name, s.success_rate, c.availability_score,
+       s.success_rate * c.availability_score AS routing_score
+ORDER BY routing_score DESC LIMIT 3
+```
+
+#### Active Bottlenecks
+```cypher
+MATCH (b:Bottleneck)
+WHERE b.resolved = false
+RETURN b.location, b.cause, b.impact_score, b.affected_agents
+ORDER BY b.impact_score DESC LIMIT 9
+```
+
+#### Unapplied High-Impact Insights
+```cypher
+MATCH (r:ReflectionInsight)
+WHERE r.applied = false AND r.impact_score >= 7
+RETURN r.agent, r.insight_type, r.description, r.impact_score
+ORDER BY r.impact_score DESC, r.timestamp DESC LIMIT 9
+```
+
+#### Search Knowledge Artifacts
+```cypher
+CALL db.index.fulltext.queryNodes('knowledge_search', $query)
+YIELD node, score
+WHERE node.freshness_score > 0.3
+RETURN node.type, node.content, node.keywords, score
+ORDER BY score * node.freshness_score DESC LIMIT 9
+```
+
+### Integration Points
+
+| Telemetry | Nodes | Frequency |
+|-----------|-------|-----------|
+| task-ledger.jsonl | Task, RoutingDecision, TaskComplexity | Per-task |
+| watchdog-gather.sh | AgentCapacity, DependencyGraph, SystemEvent | 5 min |
+| tock-gather.sh | PerformanceMetric | 30 min (hour boundary) |
+| meta_reflection.py | ReflectionInsight, LessonLearned | Hourly |
+| throughput_anomaly.py | Bottleneck | On anomaly |
+
+### Lifecycle Management
+
+```cypher
+// Prune old metrics (30 days)
+MATCH (m:PerformanceMetric)
+WHERE m.created < datetime() - duration({days: 30})
+DELETE m
+
+// Decay knowledge freshness
+MATCH (k:KnowledgeArtifact)
+WHERE k.freshness_score > 0.1
+SET k.freshness_score = k.freshness_score * 0.95
+
+// Detect zombie tasks (2+ hours stuck)
+MATCH (t:Task)
+WHERE t.status IN ['EXECUTING', 'running']
+  AND t.started < datetime() - duration({hours: 2})
+SET t.status = 'TIMEOUT', t.zombie_detected = true
+```
+
+### Files
+
+- **Schema:** `/agents/temujin/workspace/neo4j-schema-enhancements.cypher`
+- **Queries:** `/agents/temujin/workspace/neo4j-schema-queries.md`
+- **Integration:** `/agents/temujin/workspace/neo4j_schema_integration.py`
+- **Design:** `/agents/temujin/workspace/neo4j-schema-brainstorm-report.md`

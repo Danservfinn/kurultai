@@ -3,16 +3,55 @@
 # Extracted from hourly_reflection.sh Phase 3b to relieve timing budget pressure
 
 SCRIPT_START=$(date +%s)
-TIMEOUT_SECONDS=300   # 5 minute ceiling for the entire script
+TIMEOUT_SECONDS=720   # 12 minute ceiling for the entire script (increased from 300s)
 LOGS_DIR="/Users/kublai/.openclaw/agents/main/logs"
 AGENTS=("kublai" "mongke" "chagatai" "temujin" "jochi" "ogedei")
 CLAUDE_AGENT_BIN="/Users/kublai/.local/bin/claude-agent"
 
 # Use gtimeout (GNU coreutils on macOS) or fallback to built-in timeout
 TIMEOUT_CMD=$(command -v gtimeout 2>/dev/null || command -v timeout 2>/dev/null || echo "")
+# Per-agent timeout: 240s (increased from 180s to allow full kurultai-reflect execution)
+PER_AGENT_TIMEOUT=240
 
 _exit_code=0
 _failed_count=0
+
+# ============================================================
+# AUTH HEALTH CHECK: Skip reflection when authentication unavailable
+# Prevents wasted reflection runs when claude session expires
+# ============================================================
+check_auth_status() {
+    # Quick check if claude-agent binary exists and is executable
+    if [ ! -x "$CLAUDE_AGENT_BIN" ]; then
+        echo "[$(date)] AUTH CHECK FAILED: claude-agent not found or not executable"
+        return 1
+    fi
+
+    # Try a minimal API call to verify authentication
+    local output
+    output=$("$CLAUDE_AGENT_BIN" -p "Say 'auth_ok'" 2>&1)
+    local rc=$?
+
+    if [ $rc -ne 0 ]; then
+        echo "[$(date)] AUTH CHECK FAILED: claude-agent returned exit code $rc"
+        echo "[$(date)] Output: $output"
+        return 1
+    fi
+
+    if echo "$output" | grep -qi "not logged in"; then
+        echo "[$(date)] AUTH CHECK FAILED: Not logged in"
+        return 1
+    fi
+
+    echo "[$(date)] AUTH CHECK PASSED: claude-agent authenticated"
+    return 0
+}
+
+# Call auth check at start
+if ! check_auth_status; then
+    echo "[$(date)] Skipping reflection - authentication unavailable"
+    exit 0
+fi
 
 # Timeout watchdog
 (sleep $TIMEOUT_SECONDS && kill -TERM -$$ 2>/dev/null) &
@@ -30,11 +69,11 @@ for agent in "${AGENTS[@]}"; do
     echo "--- $(date) ---" >> "$LOG_FILE"
     if [ -n "$TIMEOUT_CMD" ]; then
         # Use gtimeout/timeout if available
-        "$TIMEOUT_CMD" --foreground --kill-after=10s 180 "$CLAUDE_AGENT_BIN" --model opus \
+        "$TIMEOUT_CMD" --foreground --kill-after=10s $PER_AGENT_TIMEOUT "$CLAUDE_AGENT_BIN" --model opus \
             -p "Run the kurultai-reflect skill for agent: ${agent}. Window: last 2 hours. Execute all 7 phases completely. Read SKILL.md at ~/.openclaw/agents/main/skills/kurultai-reflect/SKILL.md first." \
             >> "$LOG_FILE" 2>&1 &
     else
-        # Fallback: run without timeout (watchdog will still kill after 5min)
+        # Fallback: run without timeout (watchdog will still kill after 12min)
         "$CLAUDE_AGENT_BIN" --model opus \
             -p "Run the kurultai-reflect skill for agent: ${agent}. Window: last 2 hours. Execute all 7 phases completely. Read SKILL.md at ~/.openclaw/agents/main/skills/kurultai-reflect/SKILL.md first." \
             >> "$LOG_FILE" 2>&1 &

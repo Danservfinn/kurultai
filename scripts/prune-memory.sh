@@ -13,8 +13,14 @@ set -e
 echo "=== Memory Pruning — $(date) ==="
 echo ""
 
+# Load Neo4j credentials
+SCRIPTS_DIR="$(dirname "$0")"
+source "$HOME/.openclaw/credentials/neo4j.env"
+: "${NEO4J_USER:?NEO4J_USER not set}"
+: "${NEO4J_PASSWORD:?NEO4J_PASSWORD not set}"
+
 # Configuration
-NEO4J_URI="bolt://localhost:7687"
+NEO4J_URI="${NEO4J_URI:-bolt://localhost:7687}"
 MEMORY_DIR="/Users/kublai/.openclaw/agents/main/memory"
 ARCHIVE_DIR="/Users/kublai/.openclaw/agents/main/memory/archive"
 DAYS_BEFORE_DECAY=14
@@ -36,7 +42,7 @@ RETURN count(r) as weakened_edges
 
 # Run via cypher-shell or neo4j-cypher
 if command -v cypher-shell &> /dev/null; then
-    result=$(cypher-shell -u neo4j -p password "$cypher_decay" 2>/dev/null || echo "Neo4j not available")
+    result=$(cypher-shell -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" "$cypher_decay" 2>/dev/null || echo "Neo4j not available")
     echo "Result: $result"
 else
     echo "Skipping: cypher-shell not found"
@@ -56,7 +62,7 @@ RETURN count(n) as pruned_nodes
 "
 
 if command -v cypher-shell &> /dev/null; then
-    result=$(cypher-shell -u neo4j -p password "$cypher_prune" 2>/dev/null || echo "Neo4j not available")
+    result=$(cypher-shell -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" "$cypher_prune" 2>/dev/null || echo "Neo4j not available")
     echo "Result: $result"
 else
     echo "Skipping: cypher-shell not found"

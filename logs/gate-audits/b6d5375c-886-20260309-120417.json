@@ -1,0 +1,22 @@
+{
+  "original_task": "b6d5375c-886",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "ogedei",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-09T12:04:17.897119",
+  "audit_version": "1.0"
+}

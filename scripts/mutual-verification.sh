@@ -5,6 +5,7 @@
 set -e
 
 WORKSPACE="/Users/kublai/.openclaw/agents/main"
+SCRIPTS_DIR="$(dirname "$0")"
 TIMESTAMP=$(date -Iseconds)
 
 echo "=== MUTUAL VERIFICATION: HOURLY REFLECTION ↔ HEARTBEAT ==="
@@ -54,12 +55,14 @@ fi
 echo ""
 echo "CHECK 3: Neo4j Health Check Logging"
 python3 << 'PYEOF'
-from neo4j import GraphDatabase
+import sys
+sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+from neo4j_task_tracker import get_driver, close_driver
 from datetime import datetime, timedelta
 
 try:
-    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
-    
+    driver = get_driver()
+
     with driver.session() as session:
         # Check for recent health check logs
         result = session.run("""
@@ -68,37 +71,40 @@ try:
             RETURN count(h) as count, avg(h.health_score) as avg_score
         """)
         record = result.single()
-        
+
         if record and record['count'] > 0:
             print(f"  ✅ Neo4j logging: {record['count']} health checks in last 2 hours")
             print(f"      Average health score: {record['avg_score']:.1f}%")
-            
+
             if record['avg_score'] < 80:
                 print(f"  ⚠️  WARNING: Health score below 80%")
         else:
             print("  ❌ Neo4j logging: No health checks in last 2 hours")
             print("      Task for Temüjin: Fix Neo4j health check logging")
-    
-    driver.close()
+
 except Exception as e:
     print(f"  ❌ Neo4j logging: Connection failed - {e}")
     print("      Task for Temüjin: Fix Neo4j connection for health checks")
+finally:
+    close_driver()
 PYEOF
 
 # Check 4: Health check trends
 echo ""
 echo "CHECK 4: Health Check Trends (Last 24 Hours)"
 python3 << 'PYEOF'
-from neo4j import GraphDatabase
+import sys
+sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+from neo4j_task_tracker import get_driver, close_driver
 
 try:
-    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
-    
+    driver = get_driver()
+
     with driver.session() as session:
         result = session.run("""
             MATCH (h:AgentHarnessHealthCheck)
             WHERE h.timestamp > datetime() - duration('P1D')
-            RETURN 
+            RETURN
               count(h) as total_checks,
               avg(h.health_score) as avg_score,
               min(h.health_score) as min_score,
@@ -106,20 +112,21 @@ try:
               sum(CASE WHEN h.health_score < 80 THEN 1 ELSE 0 END) as low_score_count
         """)
         record = result.single()
-        
+
         print(f"  Total health checks (24h): {record['total_checks']}")
         print(f"  Average health score: {record['avg_score']:.1f}%")
         print(f"  Min/Max score: {record['min_score']:.1f}% / {record['max_score']:.1f}%")
-        
+
         if record['low_score_count'] > 0:
             print(f"  ⚠️  Low score occurrences (<80%): {record['low_score_count']}")
             print("      Task for Temüjin: Investigate and fix recurring issues")
         else:
             print(f"  ✅ No low score occurrences")
-    
-    driver.close()
+
 except Exception as e:
     print(f"  ❌ Trend analysis failed: {e}")
+finally:
+    close_driver()
 PYEOF
 
 echo ""
@@ -134,12 +141,14 @@ echo ""
 # Check 1: Hourly reflections are running
 echo "CHECK 1: Hourly Reflections Running"
 python3 << 'PYEOF'
-from neo4j import GraphDatabase
+import sys
+sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+from neo4j_task_tracker import get_driver, close_driver
 from datetime import datetime, timedelta
 
 try:
-    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
-    
+    driver = get_driver()
+
     with driver.session() as session:
         # Check for recent TaskCompletion nodes from hourly reflections
         result = session.run("""
@@ -149,19 +158,20 @@ try:
             RETURN count(t) as count
         """)
         record = result.single()
-        
+
         if record and record['count'] >= 2:
             print(f"  ✅ Hourly reflections: {record['count']} in last 2 hours")
         elif record and record['count'] == 1:
             print(f"  ⚠️  Hourly reflections: Only {record['count']} in last 2 hours (expected 2)")
             print("      Task for Temüjin: Check hourly_reflection.sh cron/schedule")
-        else
+        else:
             print(f"  ❌ Hourly reflections: NONE in last 2 hours")
             print("      Task for Temüjin: Fix hourly_reflection.sh execution")
-    
-    driver.close()
+
 except Exception as e:
     print(f"  ❌ Hourly reflection check failed: {e}")
+finally:
+    close_driver()
 PYEOF
 
 # Check 2: Agent harness components are documented
@@ -193,11 +203,13 @@ fi
 echo ""
 echo "CHECK 3: Hook Execution"
 python3 << 'PYEOF'
-from neo4j import GraphDatabase
+import sys
+sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+from neo4j_task_tracker import get_driver, close_driver
 
 try:
-    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
-    
+    driver = get_driver()
+
     with driver.session() as session:
         # Check for health check logs (indicates hooks are being called)
         result = session.run("""
@@ -206,17 +218,18 @@ try:
             RETURN count(h) as count, avg(h.health_score) as avg_score
         """)
         record = result.single()
-        
+
         if record and record['count'] > 0:
             print(f"  ✅ Health checks executed: {record['count']} in last 6 hours")
             print(f"      Average health: {record['avg_score']:.1f}%")
         else:
             print(f"  ❌ No health checks in last 6 hours")
             print("      Task for Temüjin: Verify hourly_reflection.sh is running")
-    
-    driver.close()
+
 except Exception as e:
     print(f"  ❌ Hook execution check failed: {e}")
+finally:
+    close_driver()
 PYEOF
 
 # Check 4: Spec templates are being used
@@ -308,12 +321,14 @@ echo "=== MUTUAL VERIFICATION COMPLETE ==="
 echo ""
 
 # Log verification results to Neo4j
-python3 << PYEOF
-from neo4j import GraphDatabase
+python3 << 'PYEOF'
+import sys
+sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
+from neo4j_task_tracker import get_driver, close_driver
 
 try:
-    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
-    
+    driver = get_driver()
+
     with driver.session() as session:
         session.run("""
             CREATE (v:MutualVerification {
@@ -327,12 +342,13 @@ try:
         issues=$ISSUES_FOUND,
         tasks=${#TEMUJIN_TASKS[@]}
         )
-        
+
         print("✅ Verification results logged to Neo4j")
-    
-    driver.close()
+
 except Exception as e:
     print(f"⚠️  Neo4j logging failed: {e}")
+finally:
+    close_driver()
 PYEOF
 
 echo ""
@@ -342,8 +358,3 @@ if [ $ISSUES_FOUND -gt 0 ]; then
 else
     exit 0
 fi
-EOF
-
-chmod +x /Users/kublai/.openclaw/agents/main/scripts/mutual-verification.sh
-
-echo "✅ Mutual verification script created: scripts/mutual-verification.sh"

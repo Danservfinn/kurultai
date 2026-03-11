@@ -1,0 +1,22 @@
+{
+  "original_task": "$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '\\n')",
+  "completion_percentage": 95,
+  "can_complete": false,
+  "missing_components": [],
+  "quality_issues": [
+    "Add error handling"
+  ],
+  "required_followups": [],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "temujin",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-09T00:20:16.106859",
+  "audit_version": "1.0"
+}

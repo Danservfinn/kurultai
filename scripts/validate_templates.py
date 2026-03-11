@@ -24,6 +24,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
 
+# Import from canonical source
+sys.path.insert(0, str(Path(__file__).parent))
+from kurultai_paths import VALID_AGENTS as _VALID_AGENTS
 
 # Configuration
 TEMPLATE_PATH = Path.home() / ".openclaw" / "agents" / "main" / "data" / "prompt_templates.json"
@@ -35,7 +38,7 @@ REQUIRED_TEMPLATE_FIELDS = [
     "avg_quality", "sample_size", "recommended_for"
 ]
 VALID_STATUSES = ["active", "deprecated", "experimental"]
-VALID_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui", "kublai", "all"]
+VALID_AGENTS = list(_VALID_AGENTS) + ["all"]  # Add "all" for templates that apply to all agents
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 

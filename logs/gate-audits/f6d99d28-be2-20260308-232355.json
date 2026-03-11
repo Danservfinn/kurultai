@@ -1,0 +1,22 @@
+{
+  "original_task": "f6d99d28-be2",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "kublai",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T23:23:55.988194",
+  "audit_version": "1.0"
+}

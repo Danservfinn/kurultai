@@ -312,9 +312,9 @@ def _task_patterns():
             continue
         try:
             all_files = list(task_dir.glob("*.md"))
-            done = [f for f in all_files if ".done" in f.name]
-            executing = [f for f in all_files if ".executing" in f.name and ".done" not in f.name]
-            pending = [f for f in all_files if not any(x in f.name for x in [".executing", ".completed", ".done"])]
+            done = [f for f in all_files if f.name.endswith(".done.md")]
+            executing = [f for f in all_files if f.name.endswith(".executing.md")]
+            pending = [f for f in all_files if not any(f.name.endswith(x) for x in [".executing.md", ".completed.md", ".done.md"])]
             if pending or executing or done:
                 summaries.append(
                     f"  {agent}: pending={len(pending)} executing={len(executing)} done={len(done)}"
@@ -501,8 +501,17 @@ def gather_context(agent):
             tock = json.load(f)
         system = tock.get("system", {})
         all_agents = tock.get("agents", {})
+        # Neo4j health: prefer neo4j_reachable over neo4j_status (fixes contradictory tock data)
+        neo4j_status = system.get("neo4j_status", "unknown")
+        neo4j_reachable = system.get("neo4j_reachable", False)
+        # If status is "down" but reachable says true, trust reachable (tock data bug workaround)
+        if neo4j_status == "down" and neo4j_reachable:
+            neo4j_status = "up"
+        elif neo4j_status in (None, "unknown", ""):
+            neo4j_status = "up" if neo4j_reachable else "unknown"
+
         context["system_health"] = {
-            "neo4j": system.get("neo4j_status") or ("up" if system.get("neo4j_reachable") else "unknown"),
+            "neo4j": neo4j_status,
             "redis": system.get("redis_status", "unknown"),
             "total_queued": sum(
                 a.get("tasks", {}).get("queue_depth", 0)
@@ -928,7 +937,11 @@ PROPOSAL_TEMPLATE = """# Proposal: {title}
 def write_proposal_file(agent, proposal, output_dir=None):
     """Write a structured proposal markdown file for kublai review."""
     try:
-        out_dir = Path(output_dir) if output_dir else PROPOSALS_DIR
+        # CHANGE: Default to pending directory for voting integration
+        if output_dir is None:
+            out_dir = PROPOSALS_DIR / "pending"
+        else:
+            out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         ts = datetime.now()

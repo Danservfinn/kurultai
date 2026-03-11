@@ -29,6 +29,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_driver
+from neo4j_utils import parse_json_fields
 
 
 # Default communication style template
@@ -89,8 +90,13 @@ class HumanProfileStore:
         self.driver = get_driver()
 
     def close(self):
-        """Close the Neo4j driver."""
-        self.driver.close()
+        """Release driver reference. Does NOT close the singleton driver.
+
+        The singleton driver is managed by get_driver()/close_driver() and
+        should only be closed via close_driver() when the entire process
+        is done with Neo4j.
+        """
+        self.driver = None  # Release reference only
 
     # ==========================================================================
     # Schema Initialization
@@ -304,12 +310,7 @@ class HumanProfileStore:
             profile = dict(record)
 
             # Parse JSON fields
-            for field in ["communication_style", "preferences", "personal_context", "projects"]:
-                if profile.get(field):
-                    try:
-                        profile[field] = json.loads(profile[field])
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+            parse_json_fields(profile, ["communication_style", "preferences", "personal_context", "projects"])
 
             return profile
 

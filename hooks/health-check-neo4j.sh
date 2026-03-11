@@ -1,12 +1,42 @@
 #!/bin/bash
 # Agent Harness Health Check - Neo4j Logging
 # Logs health check results to Neo4j for tracking over time
+# Auto-restarts Neo4j if down
 
 set -e
 
 WORKSPACE="/Users/kublai/.openclaw/agents/main"
 TIMESTAMP=$(date -Iseconds)
 
+echo "=== NEO4J HEALTH CHECK & AUTO-RESTART ==="
+echo ""
+
+# Check if Neo4j is running, restart if not
+if ! curl -s http://localhost:7474 > /dev/null 2>&1; then
+    echo "⚠️  Neo4j is DOWN - attempting restart..."
+    brew services restart neo4j > /dev/null 2>&1 || {
+        echo "❌ Failed to restart Neo4j via brew services"
+        exit 1
+    }
+    # Wait for Neo4j to start
+    echo "⏳ Waiting for Neo4j to start..."
+    for i in {1..30}; do
+        if curl -s http://localhost:7474 > /dev/null 2>&1; then
+            echo "✅ Neo4j is UP"
+            break
+        fi
+        sleep 1
+    done
+    # Verify Bolt connection
+    if ! curl -s http://localhost:7474 > /dev/null 2>&1; then
+        echo "❌ Neo4j failed to start after 30 seconds"
+        exit 1
+    fi
+else
+    echo "✅ Neo4j is UP"
+fi
+
+echo ""
 echo "=== LOGGING HEALTH CHECK TO NEO4J ==="
 echo ""
 
@@ -81,8 +111,20 @@ if os.path.isfile(readme_path):
     checks['readme_exists'] = 1
 
 # Check 7: Neo4j logging working
+# Load credentials from centralized env file
+_neo4j_env = os.path.expanduser("~/.openclaw/credentials/neo4j.env")
+_neo4j_user = "neo4j"
+_neo4j_password = "neo4j"  # fallback
+if os.path.exists(_neo4j_env):
+    with open(_neo4j_env) as f:
+        for line in f:
+            if line.startswith("NEO4J_USER="):
+                _neo4j_user = line.strip().split("=", 1)[1]
+            elif line.startswith("NEO4J_PASSWORD="):
+                _neo4j_password = line.strip().split("=", 1)[1]
+
 try:
-    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
+    driver = GraphDatabase.driver('bolt://localhost:7687', auth=(_neo4j_user, _neo4j_password))
     with driver.session() as session:
         result = session.run("""
             MATCH (t:TaskCompletion)
@@ -119,8 +161,8 @@ passed_checks = (
 
 health_score = (passed_checks / total_checks) * 100
 
-# Log to Neo4j
-driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'neo4j'))
+# Log to Neo4j (using credentials loaded above)
+driver = GraphDatabase.driver('bolt://localhost:7687', auth=(_neo4j_user, _neo4j_password))
 
 with driver.session() as session:
     session.run("""

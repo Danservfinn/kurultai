@@ -39,11 +39,29 @@ def get_active_tasks(agent):
     if not tasks_dir.exists():
         return []
 
+    # Terminal task state patterns - tasks in these states are complete and should not trigger escalations
+    # Patterns include: .done.md, .completed.done.md, .failed.done.md, .gate-passed.done.md,
+    #                   .bypass.done.md, .resolved.done.md, .resolved.md, .cancelled.md, .obsolete.md
+    # FIX 2026-03-11: Revision states checked separately via ".revision-" substring match below
+    TERMINAL_PATTERNS = (
+        ".done.md",           # All done states
+        ".resolved.md",       # Resolved tasks
+        ".cancelled.md",      # Cancelled tasks
+        ".obsolete.md",       # Obsolete tasks
+    )
+
     active = []
     for f in tasks_dir.iterdir():
         name = f.name
-        # Active = not done, not archived
-        if ".done" in name or name.startswith("."):
+        # Active = not in terminal state, not archived
+        if name.startswith("."):
+            continue
+        # Check for terminal state patterns (end matches)
+        if any(name.endswith(pattern) for pattern in TERMINAL_PATTERNS):
+            continue
+        # FIX 2026-03-11: Check for revision states (middle matches)
+        # Revision files like .revision-1.md are in terminal state
+        if ".revision-" in name:
             continue
         if not name.endswith(".md"):
             continue

@@ -19,11 +19,33 @@ import sys
 import json
 import uuid
 import glob
+import logging
+import threading
+from contextlib import contextmanager
 from datetime import datetime
 from neo4j import GraphDatabase
+from neo4j.exceptions import (
+    ServiceUnavailable,
+    SessionExpired,
+    TransientError,
+    AuthError,
+    ClientError
+)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
+from kurultai_ledger import generate_task_id, validate_task_id
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+# Thread safety lock for singleton driver
+_lock = threading.Lock()
+
+# Custom exception for connection errors
+class Neo4jConnectionError(Exception):
+    """Raised when Neo4j connection fails."""
+    pass
 
 _AGENTS_BASE = str(_AGENTS_DIR)
 
@@ -43,25 +65,186 @@ def _load_neo4j_env():
                         os.environ[key.strip()] = value.strip()
 
 
+# Singleton driver with connection pooling
+_cached_driver = None
+_driver_refcount = 0
+
 def get_driver():
     """Get a Neo4j driver using centralized credentials.
 
     This is the SOLE connection factory. All scripts should use this
     instead of creating their own GraphDatabase.driver() calls.
+
+    Returns a singleton driver with connection pooling enabled.
+    Call close_driver() when done to properly release connections.
+
+    Thread-safe: Uses lock to protect singleton initialization.
     """
-    _load_neo4j_env()
-    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "myStrongPassword123")
-    return GraphDatabase.driver(uri, auth=(user, password))
+    global _cached_driver, _driver_refcount
+
+    _lock.acquire()
+    try:
+        if _cached_driver is not None:
+            _driver_refcount += 1
+            return _cached_driver
+
+        _load_neo4j_env()
+        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        user = os.getenv("NEO4J_USER", "neo4j")
+        password = os.getenv("NEO4J_PASSWORD")
+        if not password:
+            raise Neo4jConnectionError(
+                "NEO4J_PASSWORD not set. Configure it in ~/.openclaw/credentials/neo4j.env"
+            )
+
+        logger.info(f"Creating Neo4j driver connection to {uri}")
+
+        try:
+            # Connection pooling configuration with differentiated timeouts
+            _cached_driver = GraphDatabase.driver(
+                uri,
+                auth=(user, password),
+                max_connection_pool_size=50,
+                connection_timeout=10,           # Initial connection (reduced from 30)
+                connection_acquisition_timeout=60,  # Wait for pool slot
+                max_transaction_retry_time=30,
+                max_connection_lifetime=3600     # 1 hour max connection age
+            )
+            _driver_refcount = 1
+            logger.info("Neo4j driver created successfully")
+        except AuthError as e:
+            logger.error(f"Neo4j authentication failed: {e}")
+            raise Neo4jConnectionError(f"Authentication failed: {e}")
+        except ServiceUnavailable as e:
+            logger.error(f"Neo4j service unavailable: {e}")
+            raise Neo4jConnectionError(f"Neo4j service unavailable: {e}")
+        except Exception as e:
+            logger.error(f"Neo4j connection failed: {e}")
+            raise Neo4jConnectionError(f"Failed to connect to Neo4j: {e}")
+
+        # Register cleanup on exit
+        import atexit
+        atexit.register(close_driver)
+
+        return _cached_driver
+    finally:
+        _lock.release()
+
+
+def close_driver():
+    """Decrement refcount and close driver only when it reaches zero.
+
+    Call this when your script is done with Neo4j to properly
+    release connection pool resources.
+
+    Thread-safe: Uses lock to protect refcount operations.
+    """
+    global _cached_driver, _driver_refcount
+
+    _lock.acquire()
+    try:
+        if _driver_refcount > 0:
+            _driver_refcount -= 1
+
+        if _driver_refcount == 0 and _cached_driver is not None:
+            try:
+                _cached_driver.close()
+                logger.info("Neo4j driver closed (refcount reached 0)")
+            except Exception as e:
+                logger.warning(f"Error closing Neo4j driver: {e}")
+            finally:
+                _cached_driver = None
+    finally:
+        _lock.release()
+
+
+def get_pool_metrics() -> dict:
+    """Return connection pool metrics for monitoring.
+
+    Thread-safe: Uses lock to access global state.
+    """
+    global _cached_driver, _driver_refcount, _lock
+
+    _lock.acquire()
+    try:
+        if _cached_driver is None:
+            return {
+                "status": "not_initialized",
+                "refcount": _driver_refcount,
+                "pool_size": 0
+            }
+
+        return {
+            "status": "active",
+            "refcount": _driver_refcount,
+            "pool_size": 50,
+            "connection_timeout": 10,
+            "acquisition_timeout": 60,
+            "max_lifetime": 3600
+        }
+    finally:
+        _lock.release()
+
+
+@contextmanager
+def neo4j_session():
+    """Context manager for Neo4j sessions with automatic cleanup.
+
+    Usage:
+        with neo4j_session() as session:
+            result = session.run("MATCH (n) RETURN n LIMIT 1")
+    """
+    driver = get_driver()
+    session = None
+    try:
+        session = driver.session()
+        yield session
+    finally:
+        if session:
+            session.close()
+        close_driver()
+
+
+def consume_result(result) -> list:
+    """Fully consume a Neo4j result to release connection.
+
+    Args:
+        result: Neo4j Result object
+
+    Returns:
+        List of records as dictionaries
+    """
+    try:
+        records = [dict(record) for record in result]
+        return records
+    finally:
+        try:
+            result.consume()
+        except Exception:
+            pass  # Consume even on error, ignore failures
 
 
 class TaskTracker:
     def __init__(self):
         self.driver = get_driver()
-        
+
     def close(self):
-        self.driver.close()
+        """Release driver reference using centralized cleanup.
+
+        Calls close_driver() to properly decrement refcount.
+        """
+        if self.driver is not None:
+            close_driver()
+            self.driver = None
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - cleanup resources."""
+        self.close()
+        return False  # Don't suppress exceptions
     
     def create_task(self, label, agent, task_desc, priority="normal", 
                     mode="run", continuous=False, source="chat"):
@@ -169,7 +352,7 @@ class TaskTracker:
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (t:Task)
-                WHERE t.created > datetime() - duration('PT' + $hours + 'H')
+                WHERE t.created > datetime() - duration({hours: $hours})
                   AND toUpper(t.status) IN ['COMPLETED', 'FAILED']
                 WITH
                     count(t) AS total,
@@ -331,9 +514,15 @@ class TaskTracker:
             origin_initiator: Who initiated the task (phone number for human, agent name for agent).
             origin_source: Source channel (signal, reflection, proposal, api, cron, etc.).
 
-        Returns the task_id (uuid).
+        Returns the task_id in canonical format: {priority}-{timestamp}-{uuid8}
         """
-        task_id = str(uuid.uuid4())[:12]
+        # Generate task_id in canonical format
+        task_id = generate_task_id(priority)
+
+        # Validate before writing
+        if not validate_task_id(task_id):
+            logger.warning(f"Generated invalid task_id: {task_id}")
+
         label = f"{agent}-{task_id}"
 
         # Track optimization metadata
@@ -493,6 +682,19 @@ class TaskTracker:
                 timeout = compute_task_timeout(priority, skill_hint)
             except Exception:
                 timeout = 7200
+
+        # R008: Prominent skill invocation instruction (fixes EXECUTING_NO_OUTPUT)
+        # When skill_hint is present, prepend a MUST-DO instruction to the task body
+        skill_instruction = ""
+        if skill_hint:
+            skill_instruction = f"""---
+**IMPORTANT:** This task has a skill hint. You MUST invoke the Skill tool with `{skill_hint}` before starting work.
+
+This is a R008 requirement — skill hints are not optional suggestions, they are mandatory invocation instructions.
+---
+
+"""
+
         content = f"""---
 agent: {agent}
 priority: {priority}
@@ -508,7 +710,7 @@ timeout: {timeout}
 
 # Task: {title}
 
-{body}
+{skill_instruction}{body}
 """
         with open(filepath, 'w') as f:
             f.write(content)
@@ -746,7 +948,8 @@ timeout: {timeout}
                         t.updated = datetime(),
                         t.reconciled = true,
                         t.reconciled_at = datetime(),
-                        t.completed = CASE WHEN $is_terminal THEN datetime() ELSE t.completed END
+                        t.completed = CASE WHEN $is_terminal THEN datetime() ELSE t.completed END,
+                        t.session_key = CASE WHEN $is_terminal THEN null ELSE t.session_key END
                 """, task_id=task_id, file_status=file_status, is_terminal=is_terminal)
                 fixed += 1
 
@@ -940,8 +1143,8 @@ timeout: {timeout}
                 agent=agent or "", status=status,
                 latency_ms=latency_ms, error=error,
                 payload=json.dumps(payload) if payload else None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to emit pipeline event {event_type}: {e}")
         return event_id
 
     def get_pipeline_events(self, event_type=None, hours=1, limit=50):
@@ -1212,14 +1415,18 @@ timeout: {timeout}
         """Detect circular dependencies in follow-up chains.
 
         Args:
-            max_depth: Maximum depth to traverse
+            max_depth: Maximum depth to traverse (1-10, validated)
 
         Returns:
             List of cycles found (each cycle is a list of task_ids)
         """
+        # Validate max_depth to prevent injection (must be integer 1-10)
+        if not isinstance(max_depth, int) or max_depth < 1 or max_depth > 10:
+            raise ValueError("max_depth must be an integer between 1 and 10")
+
         with self.driver.session() as session:
             # Neo4j 5 doesn't allow parameters in relationship pattern length
-            # Build query with literal depth
+            # Build query with validated literal depth (safe after validation)
             result = session.run(f"""
                 MATCH path = (start:Task)-[:HAS_FOLLOWUP*..{max_depth}]->(start)
                 WITH [node in nodes(path) | node.task_id] as cycle
@@ -1227,6 +1434,66 @@ timeout: {timeout}
                 LIMIT 10
             """)
             return [record["cycle"] for record in result]
+
+    def update_task_scores(self, task_id, delegation_score, domain_match_score,
+                          substantive_score, pending_time_score, total_score,
+                          self_route_flag, scored_agent):
+        """Update task quality scores in Neo4j.
+
+        Args:
+            task_id: Task label/identifier
+            delegation_score: 0-2 (routed to specialist vs self-routed)
+            domain_match_score: 0-3 (keyword match quality)
+            substantive_score: 0-3 (output substance)
+            pending_time_score: 0-2 (pickup speed)
+            total_score: 0-10 (sum of above)
+            self_route_flag: True if kublai self-routed specialist work
+            scored_agent: Agent that executed the task
+        """
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (t:Task)
+                WHERE t.task_id = $task_id OR t.label = $task_id OR t.label ENDS WITH $task_id
+                SET t.scored = true,
+                    t.delegation_score = $delegation_score,
+                    t.domain_match_score = $domain_match_score,
+                    t.substantive_score = $substantive_score,
+                    t.pending_time_score = $pending_time_score,
+                    t.total_score = $total_score,
+                    t.self_route_flag = $self_route_flag,
+                    t.scored_agent = $scored_agent,
+                    t.scored_at = datetime()
+            """,
+            task_id=task_id,
+            delegation_score=delegation_score,
+            domain_match_score=domain_match_score,
+            substantive_score=substantive_score,
+            pending_time_score=pending_time_score,
+            total_score=total_score,
+            self_route_flag=self_route_flag,
+            scored_agent=scored_agent)
+
+    def get_low_quality_tasks(self, threshold=7, hours=24):
+        """Find completed tasks with quality below threshold.
+
+        Args:
+            threshold: Maximum total_score to include (default 7)
+            hours: Look back period in hours (default 24)
+
+        Returns:
+            List of dicts with task label, agent, and scores
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.status = 'COMPLETED'
+                  AND t.total_score < $threshold
+                  AND t.completed > datetime() - duration({hours: $hours})
+                RETURN t.label, t.agent, t.total_score, t.delegation_score, t.substantive_score
+                ORDER BY t.total_score ASC
+                LIMIT 50
+            """, threshold=threshold, hours=hours)
+            return [dict(r) for r in result]
 
 
 # Singleton instance

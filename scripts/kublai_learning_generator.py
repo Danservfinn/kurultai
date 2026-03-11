@@ -115,7 +115,11 @@ class KublaiLearningGenerator:
         - Clear performance differences from baseline
         """
         results = []
-        patterns = self.queries.get_agent_prompt_patterns(agent)
+        try:
+            patterns = self.queries.get_agent_prompt_patterns(agent)
+        except Exception as e:
+            self.stats['errors'].append(f"prompt_pattern: {e}")
+            return results
 
         for pattern in patterns:
             try:
@@ -210,7 +214,11 @@ class KublaiLearningGenerator:
         Creates KublaiLearning nodes for skill hints with high success rates.
         """
         results = []
-        skills = self.queries.get_skill_hint_effectiveness(agent)
+        try:
+            skills = self.queries.get_skill_hint_effectiveness(agent)
+        except Exception as e:
+            self.stats['errors'].append(f"skill_hint: {e}")
+            return results
 
         for skill in skills:
             try:
@@ -293,7 +301,11 @@ class KublaiLearningGenerator:
         quality and efficiency.
         """
         results = []
-        timeouts = self.queries.get_timeout_analysis(agent)
+        try:
+            timeouts = self.queries.get_timeout_analysis(agent)
+        except Exception as e:
+            self.stats['errors'].append(f"timeout: {e}")
+            return results
 
         for timeout_data in timeouts:
             try:
@@ -383,7 +395,11 @@ class KublaiLearningGenerator:
         with high-quality outcomes.
         """
         results = []
-        contexts = self.queries.get_context_source_value()
+        try:
+            contexts = self.queries.get_context_source_value()
+        except Exception as e:
+            self.stats['errors'].append(f"context: {e}")
+            return results
 
         for context in contexts:
             try:
@@ -460,7 +476,11 @@ class KublaiLearningGenerator:
         for specific agents or task types.
         """
         results = []
-        models = self.queries.get_model_performance(agent)
+        try:
+            models = self.queries.get_model_performance(agent)
+        except Exception as e:
+            self.stats['errors'].append(f"model: {e}")
+            return results
 
         for model_data in models:
             try:
@@ -542,7 +562,11 @@ class KublaiLearningGenerator:
         at specific task domains.
         """
         results = []
-        domains = self.queries.get_domain_performance(agent)
+        try:
+            domains = self.queries.get_domain_performance(agent)
+        except Exception as e:
+            self.stats['errors'].append(f"domain: {e}")
+            return results
 
         for domain_data in domains:
             try:

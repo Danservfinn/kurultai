@@ -1,14 +1,14 @@
 {
-  "last_audit": 1772999839.263937,
-  "audits_run": 54,
+  "last_audit": 1773082129.7841332,
+  "audits_run": 354,
   "last_totals": {
-    "audited": 1,
+    "audited": 0,
     "fake_found": 0,
     "requeued": 0,
-    "skipped": 1,
-    "verified": 1,
-    "poor_reports": 1,
-    "missing_report_standard": 1
+    "skipped": 0,
+    "verified": 0,
+    "poor_reports": 0,
+    "missing_report_standard": 0
   },
-  "last_ts": "2026-03-08T15:57:19.267092"
+  "last_ts": "2026-03-09T14:48:49.791908"
 }

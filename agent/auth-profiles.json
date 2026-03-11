@@ -14,9 +14,9 @@
     "google-gemini-cli:d@kurult.ai": {
       "type": "oauth",
       "provider": "google-gemini-cli",
-      "access": "ya29.a0ATkoCc6Fye4feJ9jOfzptO2OgaoEIyMZMBin7dhEJhK_xzVcCzbdfCwikBi6ZOApcwBEt1ybXlm9kl_Vgrdtz5wFqNiPoqZK38dbQfxWoj6voAF1k02Kqo8CMosi59IpamqZPfHaGgZpgl6VHmkWcy06nhCXV_aB2vZZKIP0JFDu7PUhiLP3Jyc45G8kxADlixKOk1KrhWwCfwaCgYKAZISARASFQHGX2Miax0iS67vILJpDF3pdsmxjQ0213",
+      "access": "ya29.a0ATkoCc4w1nBZd5gpfLHTDxbrNrgSFT-zyL_Tz3Ez8tHGcRWzi2tcYFPxR2QA4CkcaYdCKtiva7x531yPyqF4MiFhlRXM7FCyUVKTFBG1UEoXnXAS7v5wSvGXvxXDqmNoZAJu0S4-SoBsWO5b4vhydDgOqBNkfZj0K53bz35SxcWoA2A7KXaoxZ8pcICobMKrZPxccdnphT-6vQaCgYKARcSARASFQHGX2MiwggPgmBK0cRX8pyyoFjXpw0213",
       "refresh": "1//01F_0aksOUf-yCgYIARAAGAESNwF-L9IrVv2TfMUCOmhaZZy905guLYp5Qms_Mts0moOZvy0hV3uJhcXEu5gqlUvw6rIPR1FI2nU",
-      "expires": 1772849313583,
+      "expires": 1773192784929,
       "email": "d@kurult.ai",
       "projectId": "lunar-rhino-wj8c5"
     },

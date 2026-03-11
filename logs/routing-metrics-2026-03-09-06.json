@@ -1,0 +1,207 @@
+{
+  "timestamp": "2026-03-09T10:04:40Z",
+  "hour_file": "2026-03-09-06",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 1.296,
+    "depths": {"temujin": 1, "mongke": 0, "chagatai": 0, "jochi": 5, "ogedei": 2},
+    "mean": 1.6,
+    "std": 2.07
+  },
+  "routing": {
+    "total_routed": 24,
+    "overflow_count": 4,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-09T06:04:42.687558",
+  "total_routed": 24,
+  "routing_methods": {
+    "explicit": 19,
+    "redistribution": 4
+  },
+  "destinations": {
+    "ogedei": 14,
+    "kublai": 2,
+    "jochi": 6,
+    "temujin": 1
+  },
+  "by_agent": {
+    "ogedei": {
+      "routed": 14,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "kublai": {
+      "routed": 2,
+      "executed": 2,
+      "succeeded": 0,
+      "failed": 2
+    },
+    "jochi": {
+      "routed": 6,
+      "executed": 1,
+      "succeeded": 0,
+      "failed": 1
+    },
+    "temujin": {
+      "routed": 1,
+      "executed": 1,
+      "succeeded": 0,
+      "failed": 1
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 3,
+      "executing": 0,
+      "done": 177
+    },
+    "temujin": {
+      "pending": 1,
+      "executing": 0,
+      "done": 124
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 116
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 95
+    },
+    "jochi": {
+      "pending": 5,
+      "executing": 0,
+      "done": 93
+    },
+    "ogedei": {
+      "pending": 2,
+      "executing": 0,
+      "done": 102
+    }
+  },
+  "issues": [
+    "Workload imbalance: ogedei got 14 tasks vs temujin got 1",
+    "kublai: 2 task(s) failed out of 2 executed",
+    "jochi: 1 task(s) failed out of 1 executed",
+    "temujin: 1 task(s) failed out of 1 executed",
+    "ogedei: 14 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "Keyword routing drift: 3/4 (75%) disagree with actual routing",
+    "RECURRING: 2 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "Overflow routing: 4/24 (17%) \u2014 load balancing active",
+    "Keyword divergence: 7/24 (29%) \u2014 consider adding disambiguation rules",
+    "Routing methods: explicit=19, redistribution=4",
+    "Missed opportunities: 3 task(s) could have been routed to idle agents"
+  ],
+  "kw_disagreements": {
+    "ogedei->temujin": 1
+  },
+  "kw_misroute_count": 7,
+  "kw_misroute_rate": "7/24",
+  "kw_misroute_examples": [
+    "'Completion Audit Escalation: 0 fake completions' -> kw=tolui actual=kublai",
+    "'Tock assessment: HIGH \u2014 ' -> kw=kublai actual=jochi",
+    "'URGENT: Fix the.kurult.ai CSS MIME type error' -> kw=ogedei actual=temujin",
+    "'System Health Alert (1 issue)' -> kw=ogedei actual=jochi",
+    "'URGENT: Fix temujin API credentials' -> kw=ogedei actual=jochi"
+  ],
+  "overflow_count": 4,
+  "skill_hint_coverage": "13/24",
+  "routing_drift": {
+    "total": 4,
+    "mismatches": 3,
+    "drift_pct": 75.0,
+    "top_examples": [
+      {
+        "task": "System Health Alert (1 issue)",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "URGENT: Fix temujin API credentials",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "Fix Watchdog Stale Detection Logic",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      }
+    ],
+    "ts": "2026-03-09T05:42:33.392204"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "kublai: # task(s) failed out of # executed",
+      "consecutive": 4,
+      "first_seen": "2026-03-09T00:08:00.061235"
+    },
+    {
+      "issue_key": "Keyword routing drift: #/# (#%) disagree with actual routing",
+      "consecutive": 4,
+      "first_seen": "2026-03-09T00:08:00.061235"
+    }
+  ],
+  "missed_opportunities": {
+    "count": 3,
+    "by_agent": {
+      "kublai": 1,
+      "ogedei": 2
+    },
+    "examples": [
+      {
+        "task": "Completion Audit Escalation: 0 fake completions",
+        "routed_to": "kublai",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            2
+          ],
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-09T05:10:02.120794"
+      },
+      {
+        "task": "URGENT: Fix temujin API credentials",
+        "routed_to": "ogedei",
+        "dest_queue": 4,
+        "idle_alternatives": [
+          [
+            "temujin",
+            2
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-09T05:33:54.140370"
+      },
+      {
+        "task": "URGENT: Fix chagatai API credentials",
+        "routed_to": "ogedei",
+        "dest_queue": 5,
+        "idle_alternatives": [
+          [
+            "temujin",
+            2
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-09T05:33:58.187048"
+      }
+    ]
+  }
+}
+}

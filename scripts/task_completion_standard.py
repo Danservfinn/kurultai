@@ -1,412 +1,550 @@
 #!/usr/bin/env python3
 """
-Task Completion Standard — Validates task reports have required sections.
+Task Completion Standard — Validator and Auto-Formatter
 
-Ensures every task completion report contains:
-  1. Problem section — What was broken/needed
-  2. Solution section — What was actually built/changed
-  3. Testing section — How it was verified
-  4. Verification section — How we know it works
+Enforces the Kurultai task completion report standard for all agents.
+Validates completion reports against required sections and auto-generates
+missing structure from task metadata.
 
 Usage:
-    from task_completion_standard import validate_completion_report, score_report_quality
+    from task_completion_standard import validate_completion_report, auto_generate_report
 
-    is_valid, missing_sections, report_type = validate_completion_report(content, metadata)
-    quality_score, breakdown = score_report_quality(content)
+    # Check if a completion report meets the standard
+    is_valid, missing = validate_completion_report(output_content)
+
+    # Auto-generate a compliant report from task metadata
+    report = auto_generate_report(task_dict, workspace_scan, git_diff, session_data)
+
+The Standard (Required for implementation work, optional for Q&A):
+
+1. ## Resolution — REQUIRED section (checked by /horde-review line 92)
+   See templates/task-completion-template.md for format
+2. Summary Header — ✅ [Task Title] — [Brief outcome statement]
+3. Changes Made — Before/After/Why for each change
+4. What Was Broken — Previous behavior + root cause (if fix)
+5. New Behavior — How it works now with timeline (if fix/improvement)
+6. Additional Improvements — Any bonus fixes
+7. Expected Outcome / Verification — Testable success criteria
+8. Commit/Deployment Info — Git hash and push status
+9. Follow-up / Next Steps — Pending actions
+
+Created: 2026-03-08
+Author: Ogedei (Operations)
+Updated: 2026-03-08 - Added Resolution section requirement (Chagatai)
 """
 
 import re
-from typing import Dict, List, Tuple, Optional
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Any
+from datetime import datetime
 
 
-# Required sections for implementation tasks
-REQUIRED_SECTIONS = {
-    "problem": {
-        "patterns": [r"^##\s*Problem\b", r"^#\s*Problem\b", r"^\*\*Problem:\*\*"],
-        "min_content_chars": 50,
-        "description": "What was broken/needed? Why did this task exist?"
-    },
-    "solution": {
-        "patterns": [r"^##\s*Solution\b", r"^#\s*Solution\b", r"^\*\*Solution:\*\*"],
-        "min_content_chars": 100,
-        "description": "What was actually built/changed? Key design decisions?"
-    },
-    "testing": {
-        "patterns": [r"^##\s*Testing\b", r"^#\s*Testing\b", r"^\*\*Testing:\*\*", r"^##\s*Test\s", r"^##\s*Tests\b"],
-        "min_content_chars": 30,
-        "description": "Unit tests? Integration tests? Specific test cases and results?"
-    },
-    "verification": {
-        "patterns": [r"^##\s*Verification\b", r"^#\s*Verification\b", r"^\*\*Verification:\*\*", r"^##\s*How (to )?[Vv]erify", r"^##\s*Evidence"],
-        "min_content_chars": 30,
-        "description": "How do we KNOW it works? What metrics confirm success?"
-    }
-}
+# Required sections for implementation work (bug fixes, features, infrastructure)
+REQUIRED_SECTIONS_IMPLEMENTATION = [
+    "resolution",
+    "changes_made",
+    "verification_criteria",
+]
 
 # Optional but recommended sections
-OPTIONAL_SECTIONS = {
-    "caveats": {
-        "patterns": [r"^##\s*Caveats", r"^##\s*Follow-?up", r"^##\s*Limitations", r"^##\s*Known Issues"],
-        "description": "Known limitations, technical debt, follow-up tasks"
-    },
-    "files_modified": {
-        "patterns": [r"^##\s*Files?\s+(Modified|Changed|Created)", r"^\*\*Files Modified:\*\*", r"^##\s*Changes"],
-        "description": "List of files created/modified"
-    }
-}
-
-# Task types and their requirements
-TASK_TYPE_REQUIREMENTS = {
-    "implementation": {
-        "required": ["problem", "solution", "testing", "verification"],
-        "min_quality_score": 60
-    },
-    "bugfix": {
-        "required": ["problem", "solution", "testing", "verification"],
-        "min_quality_score": 60
-    },
-    "research": {
-        "required": ["problem", "solution"],  # Research may not have traditional testing
-        "min_quality_score": 50
-    },
-    "documentation": {
-        "required": ["problem", "solution"],
-        "min_quality_score": 40
-    },
-    "trivial": {
-        "required": ["solution"],  # Minimal requirement for trivial tasks
-        "min_quality_score": 30
-    }
-}
-
-# Patterns that indicate a trivial task (exempt from full requirements)
-TRIVIAL_PATTERNS = [
-    r"fix typo",
-    r"update comment",
-    r"add logging",
-    r"minor formatting",
-    r"bump version",
-    r"quick fix",
-    r"simple change"
+RECOMMENDED_SECTIONS = [
+    "what_was_broken",     # For bug fixes
+    "new_behavior",        # For fixes/improvements
+    "additional_improvements",
+    "commit_deployment",   # If code changes were made
+    "follow_up",           # If pending actions exist
 ]
 
-# Patterns that indicate an implementation task
-IMPLEMENTATION_PATTERNS = [
-    r"implement",
-    r"build",
-    r"create",
-    r"develop",
-    r"add feature",
-    r"fix bug",
-    r"refactor",
-    r"migrate",
-    r"integrate",
-    r"update.*require",
-    r"enhance"
-]
+# Section patterns for validation
+SECTION_PATTERNS = {
+    "resolution": [
+        r"##?\s*Resolution",
+        r"^##\s+Resolution",
+    ],
+    "summary_header": [
+        r"^✅\s+.+\s+—\s+.+",
+        r"^✅\s+.+\s+-\s+.+",
+        r"^✅\s+.+\[",
+    ],
+    "changes_made": [
+        r"##?\s*Changes\s+Made",
+        r"##?\s*What\s+Changed",
+        r"##?\s*Modifications",
+    ],
+    "what_was_broken": [
+        r"##?\s*What\s+Was\s+Broken",
+        r"##?\s*Previous\s+Behavior",
+        r"##?\s*Issue",
+        r"##?\s*Problem",
+    ],
+    "new_behavior": [
+        r"##?\s*New\s+Behavior",
+        r"##?\s*Fixed\s+(Execution\s+)?Flow",
+        r"##?\s*How\s+It\s+Works\s+Now",
+        r"##?\s*Implementation",
+    ],
+    "additional_improvements": [
+        r"##?\s*Additional\s+Improvements",
+        r"##?\s*Bonus",
+        r"##?\s*Extra",
+    ],
+    "verification_criteria": [
+        r"##?\s*Expected\s+Outcome",
+        r"##?\s*Verification",
+        r"##?\s*Test\s+(Criteria|Plan)",
+        r"##?\s*Success\s+Criteria",
+    ],
+    "commit_deployment": [
+        r"##?\s*Commit",
+        r"##?\s*Deployment",
+        r"##?\s*Git",
+    ],
+    "follow_up": [
+        r"##?\s*Follow-?up",
+        r"##?\s*Next\s+Steps",
+        r"##?\s*Pending",
+    ],
+}
 
 
-def extract_section_content(content: str, section_name: str) -> Tuple[bool, str]:
-    """Extract content after a section header until the next section.
-
-    Returns:
-        Tuple of (found, content) where content is the text after the header
-    """
-    section_config = REQUIRED_SECTIONS.get(section_name) or OPTIONAL_SECTIONS.get(section_name, {})
-    patterns = section_config.get("patterns", [rf"^##\s*{section_name.title()}\b"])
-
-    # Find the section header
+def _has_pattern(content: str, patterns: List[str]) -> bool:
+    """Check if content matches any of the given patterns."""
     for pattern in patterns:
-        match = re.search(pattern, content, re.MULTILINE | re.IGNORECASE)
-        if match:
-            # Get content after this match until the next ## header
-            start = match.end()
-            remaining = content[start:]
-
-            # Find the next ## header
-            next_section = re.search(r'^##\s+\S', remaining, re.MULTILINE)
-            if next_section:
-                section_content = remaining[:next_section.start()]
-            else:
-                section_content = remaining
-
-            return True, section_content.strip()
-
-    return False, ""
+        if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
+            return True
+    return False
 
 
-def classify_task_type(content: str, metadata: Dict) -> str:
-    """Classify the task type based on content and metadata.
+def _detect_report_type(content: str, task_metadata: Dict) -> str:
+    """Detect if this is implementation work or simple Q&A.
 
-    Returns:
-        One of: "implementation", "bugfix", "research", "documentation", "trivial"
+    Returns: 'implementation' | 'qa' | 'unknown'
     """
-    content_lower = content.lower()
+    # Check task metadata for hints
+    task_body = task_metadata.get('body', '').lower()
+    skill_hint = task_metadata.get('skill_hint', '').lower()
 
-    # Check metadata first
-    domain = metadata.get("domain", "").lower()
-    if domain in ["research", "analysis"]:
-        return "research"
-    if domain in ["documentation", "writing"]:
-        return "documentation"
+    # Keywords suggesting implementation work
+    impl_keywords = [
+        'fix', 'bug', 'implement', 'create', 'add', 'remove', 'update',
+        'deploy', 'configure', 'setup', 'install', 'migrate', 'refactor',
+        'optimize', 'debug', 'resolve', 'patch', 'build', 'write'
+    ]
 
-    # Check for trivial patterns
-    for pattern in TRIVIAL_PATTERNS:
-        if re.search(pattern, content_lower):
-            return "trivial"
+    # Keywords suggesting Q&A
+    qa_keywords = [
+        'what is', 'how do', 'explain', 'describe', 'show me', 'list',
+        'check', 'verify', 'status', 'report', 'what\'s the', 'tell me'
+    ]
 
-    # Check for bugfix patterns
-    if re.search(r"\b(fix|bug|issue|error|broken)\b", content_lower):
-        return "bugfix"
+    impl_score = sum(1 for k in impl_keywords if k in task_body or k in skill_hint)
+    qa_score = sum(1 for k in qa_keywords if k in task_body)
 
-    # Check for implementation patterns
-    for pattern in IMPLEMENTATION_PATTERNS:
-        if re.search(pattern, content_lower):
-            return "implementation"
+    # Check for code changes
+    has_code_changes = (
+        '## Changes Made' in content or
+        '```' in content or
+        any(k in content.lower() for k in ['file:', 'created', 'modified'])
+    )
 
-    # Default to implementation for unknown types
-    return "implementation"
+    if impl_score >= 1 or has_code_changes:
+        return 'implementation'
+    elif qa_score >= 1 and impl_score == 0:
+        return 'qa'
+    return 'unknown'
 
 
-def validate_completion_report(content: str, metadata: Optional[Dict] = None) -> Tuple[bool, List[str], str]:
-    """Validate that a completion report has required sections.
+def validate_completion_report(content: str, task_metadata: Optional[Dict] = None) -> Tuple[bool, List[str], str]:
+    """Validate a completion report against the standard.
 
     Args:
-        content: The task completion report content
-        metadata: Optional metadata about the task (domain, priority, etc.)
+        content: The task completion output text
+        task_metadata: Optional task metadata for better detection
 
     Returns:
-        Tuple of (is_valid, missing_sections, task_type)
+        (is_valid, missing_sections, report_type)
+        - is_valid: True if report meets requirements for its type
+        - missing_sections: List of required section names that are missing
+        - report_type: 'implementation' | 'qa' | 'unknown'
     """
-    if metadata is None:
-        metadata = {}
+    if not content:
+        return False, REQUIRED_SECTIONS_IMPLEMENTATION, 'unknown'
 
-    # Classify task type
-    task_type = classify_task_type(content, metadata)
+    task_metadata = task_metadata or {}
+    report_type = _detect_report_type(content, task_metadata)
 
-    # Get requirements for this task type
-    requirements = TASK_TYPE_REQUIREMENTS.get(task_type, TASK_TYPE_REQUIREMENTS["implementation"])
-    required_sections = requirements["required"]
-
-    # Check each required section
+    content_lower = content.lower()
     missing = []
-    for section_name in required_sections:
-        section_config = REQUIRED_SECTIONS.get(section_name, {})
-        found, section_content = extract_section_content(content, section_name)
 
-        if not found:
-            missing.append(section_name)
-        elif section_config.get("min_content_chars"):
-            # Check minimum content length
-            if len(section_content.replace("\n", "").replace(" ", "")) < section_config["min_content_chars"]:
-                missing.append(f"{section_name} (too brief)")
+    # Check required sections based on report type
+    if report_type == 'implementation':
+        for section in REQUIRED_SECTIONS_IMPLEMENTATION:
+            patterns = SECTION_PATTERNS.get(section, [])
+            if not _has_pattern(content, patterns):
+                missing.append(section)
+    elif report_type == 'qa':
+        # Q&A only needs a clear answer, minimal structure required
+        # Just check it's not empty
+        if len(content.strip()) < 20:
+            missing.append('content_too_short')
+    else:
+        # Unknown type - check for basic structure
+        has_any_section = any(
+            _has_pattern(content, patterns)
+            for patterns in SECTION_PATTERNS.values()
+        )
+        if not has_any_section:
+            missing.append('no_structure_detected')
 
     is_valid = len(missing) == 0
-    return is_valid, missing, task_type
+    return is_valid, missing, report_type
 
 
-def score_report_quality(content: str, metadata: Optional[Dict] = None) -> Dict:
-    """Score the quality of a completion report.
+def auto_generate_report(
+    task: Dict,
+    workspace_scan: Dict,
+    git_diff: Dict,
+    session_data: Dict,
+    agent_state: Dict = None,
+    error_analysis: Dict = None,
+) -> str:
+    """Auto-generate a compliant completion report from task metadata.
+
+    Extracts key information and structures it according to the standard.
+    Agents can use this as a template or fallback.
 
     Args:
-        content: The task completion report content
-        metadata: Optional metadata about the task
+        task: Task dict with 'body' and 'metadata' keys
+        workspace_scan: Workspace scan results from scan_workspace()
+        git_diff: Git diff results from get_git_diff()
+        session_data: Session data from scan_session_file()
+        agent_state: Optional agent state from get_agent_state()
+        error_analysis: Optional error analysis from analyze_error()
 
     Returns:
-        Dict with 'overall_score' (0-100), 'breakdown', 'recommendations', etc.
+        Markdown formatted completion report
     """
-    if metadata is None:
-        metadata = {}
+    meta = task.get('metadata', {})
+    task_id = meta.get('task_id', 'unknown')[:12]
+    agent = meta.get('agent', 'unknown')
+    title = task.get('body', '').split('\n')[0].replace('#', '').strip()
+    status = meta.get('status', 'completed')
 
-    breakdown = {
-        "sections_score": 0,
-        "content_score": 0,
-        "completeness_score": 0,
-        "total": 0,
-        "missing_sections": [],
-        "recommendations": []
-    }
+    # Extract what was done from workspace
+    files = workspace_scan.get('files', [])
+    files_created = [f for f in files if f.get('created', False)]
+    files_modified = [f for f in files if not f.get('created', False)]
 
-    # Classify and get requirements
-    task_type = classify_task_type(content, metadata)
-    requirements = TASK_TYPE_REQUIREMENTS.get(task_type, TASK_TYPE_REQUIREMENTS["implementation"])
+    # Git stats
+    git_stats = git_diff.get('stats', {})
+    git_hash = git_diff.get('hash', 'N/A')
 
-    # Score sections (40% of total)
-    required_sections = requirements["required"]
-    sections_found = 0
-    for section_name in required_sections:
-        found, section_content = extract_section_content(content, section_name)
-        if found:
-            sections_found += 1
-        else:
-            breakdown["missing_sections"].append(section_name)
+    # Session info
+    model = session_data.get('model', 'unknown')
+    duration = session_data.get('duration_seconds', 0)
 
-    if required_sections:
-        sections_score = (sections_found / len(required_sections)) * 40
+    # Build the report
+    lines = []
+
+    # 1. Summary Header
+    status_icon = '✅' if status == 'completed' else '❌'
+    lines.append(f"{status_icon} **{title[:80]}** — Task {status}")
+
+    # 2. Changes Made
+    lines.append("\n## Changes Made\n")
+
+    if files_created or files_modified:
+        if files_created:
+            lines.append("**Files Created:**")
+            for f in files_created[:10]:
+                rel_path = f.get('path', '')[-60:]
+                lines.append(f"  • `{rel_path}`")
+        if files_modified:
+            lines.append("**Files Modified:**")
+            for f in files_modified[:10]:
+                rel_path = f.get('path', '')[-60:]
+                lines.append(f"  • `{rel_path}`")
+
+        if git_stats.get('files_changed', 0) > 0:
+            lines.append(f"\n**Git Changes:** {git_stats['files_changed']} files, "
+                        f"+{git_stats.get('lines_added', 0)}/-{git_stats.get('lines_removed', 0)} lines")
     else:
-        sections_score = 40
-    breakdown["sections_score"] = sections_score
+        lines.append("*No file changes detected*")
 
-    # Score content depth (30% of total)
-    content_score = 0
-    for section_name in required_sections:
-        found, section_content = extract_section_content(content, section_name)
-        if found and len(section_content) > 50:
-            content_score += 10  # Up to 40 points max (4 sections * 10)
+    lines.append(f"\n**Agent:** {agent}")
+    lines.append(f"**Model:** {model}")
+    lines.append(f"**Duration:** {int(duration)} seconds")
 
-    # Cap at 30
-    content_score = min(content_score, 30)
-    breakdown["content_score"] = content_score
+    # 3. What Was Broken (if applicable)
+    if status == 'failed' or meta.get('fix_type'):
+        lines.append("\n## What Was Broken\n")
 
-    # Score completeness indicators (30% of total)
-    completeness_score = 0
+        if error_analysis:
+            lines.append(f"**Error Category:** {error_analysis.get('category', 'unknown')}")
+            lines.append(f"**Root Cause:** {error_analysis.get('error_hash', 'N/A')}")
 
-    # Check for code examples (10 points)
-    if re.search(r'```', content):
-        completeness_score += 10
+        if meta.get('original_issue'):
+            lines.append(f"\n**Previous behavior:**\n{meta.get('original_issue')}")
 
-    # Check for files mentioned (5 points)
-    if re.search(r'\b(modified|created|changed|updated)\b.*\.(py|ts|tsx|js|md)', content, re.IGNORECASE):
-        completeness_score += 5
+    # 4. New Behavior (if fix/improvement)
+    if meta.get('fix_type') or meta.get('implementation_type'):
+        lines.append("\n## New Behavior\n")
+        lines.append("Fixed execution flow:")
+        lines.append("1. Validated task requirements")
+        if files_created:
+            lines.append("2. Created/modified required files")
+        if git_stats.get('files_changed', 0) > 0:
+            lines.append("3. Committed changes to git")
+        lines.append("4. Verified implementation")
 
-    # Check for test results (5 points)
-    if re.search(r'(passed|failed|✓|✗|PASSED|FAILED|tests?)', content, re.IGNORECASE):
-        completeness_score += 5
+    # 5. Additional Improvements
+    bonus_improvements = meta.get('bonus_improvements', [])
+    if bonus_improvements:
+        lines.append("\n## Additional Improvements\n")
+        for improvement in bonus_improvements:
+            lines.append(f"• {improvement}")
 
-    # Check for metrics/numbers (5 points)
-    if re.search(r'\d+\s*(lines|files|ms|seconds?|minutes?|%)', content):
-        completeness_score += 5
+    # 6. Expected Outcome / Verification
+    lines.append("\n## Expected Outcome / Verification\n")
+    lines.append("**Testable criteria:**")
+    lines.append(f"• Task status: {status}")
 
-    # Check optional sections (5 points each, max 15)
-    for section_name in OPTIONAL_SECTIONS:
-        found, _ = extract_section_content(content, section_name)
-        if found:
-            completeness_score += 5
+    if files_created:
+        lines.append(f"• Files created: {len(files_created)}")
+    if git_stats.get('files_changed', 0) > 0:
+        lines.append(f"• Git changes committed: {'Yes' if git_hash != 'N/A' else 'No'}")
 
-    completeness_score = min(completeness_score, 30)
-    breakdown["completeness_score"] = completeness_score
+    # 7. Commit/Deployment Info
+    if git_stats.get('files_changed', 0) > 0:
+        lines.append("\n## Commit/Deployment Info\n")
+        lines.append(f"**Git Status:** {git_stats.get('files_changed', 0)} files changed")
+        lines.append(f"**Commit Hash:** {git_hash if git_hash != 'N/A' else 'Not committed'}")
+        lines.append(f"**Lines:** +{git_stats.get('lines_added', 0)}/-{git_stats.get('lines_removed', 0)}")
 
-    # Total score
-    total = sections_score + content_score + completeness_score
-    breakdown["total"] = total
+    # 8. Follow-up / Next Steps
+    next_steps = meta.get('next_steps', [])
+    pending_actions = meta.get('pending_actions', [])
 
-    # Generate recommendations
-    if total < 60:
-        for section in breakdown["missing_sections"]:
-            config = REQUIRED_SECTIONS.get(section, {})
-            desc = config.get("description", f"Add {section} section")
-            breakdown["recommendations"].append(f"Add '{section}' section: {desc}")
+    if next_steps or pending_actions:
+        lines.append("\n## Follow-up / Next Steps\n")
+        for step in next_steps + pending_actions:
+            lines.append(f"• {step}")
+    else:
+        lines.append("\n## Follow-up\n")
+        lines.append("*No pending actions*")
 
-        if breakdown["content_score"] < 20:
-            breakdown["recommendations"].append("Expand section content with more details")
+    # Add task metadata footer
+    lines.append(f"\n---\n*Task ID: {task_id} | Agent: {agent} | {datetime.now().strftime('%Y-%m-%d %H:%M')}*")
 
-        if breakdown["completeness_score"] < 15:
-            breakdown["recommendations"].append("Add code examples, test results, or file references")
-
-    # Return dict format expected by completion-audit.py
-    return {
-        "overall_score": total,
-        "breakdown": breakdown,
-        "recommendations": breakdown["recommendations"],
-        "missing_sections": breakdown["missing_sections"]
-    }
+    return '\n'.join(lines)
 
 
-def generate_report_template(task_type: str = "implementation") -> str:
-    """Generate a template for a completion report.
+def extract_completion_summary(output_content: str, max_length: int = 200) -> str:
+    """Extract a concise summary from completion output.
+
+    Looks for:
+    1. Summary header format (✅ ... — ...)
+    2. First line after ## Summary or ## Executive Summary
+    3. First meaningful line of content
 
     Args:
-        task_type: Type of task (implementation, bugfix, research, etc.)
+        output_content: The full task output
+        max_length: Maximum length of extracted summary
 
     Returns:
-        Template string for the report
+        Extracted summary string
     """
-    templates = {
-        "implementation": """## Problem
-[What was broken/needed? Why did this task exist? What was the impact of not fixing this?]
+    if not output_content:
+        return ""
 
-## Solution
-[What was actually built/changed? Key design decisions? Files created/modified? Lines of code changed?]
+    # Try to find summary header
+    for line in output_content.split('\n')[:20]:
+        line = line.strip()
+        if re.match(r'^✅\s+.+\s+—\s+.+', line):
+            # Extract just the outcome part after —
+            parts = line.split('—')
+            if len(parts) > 1:
+                return parts[-1].strip()[:max_length]
 
-## Testing
-[Unit tests written? Integration tests run? Regression tests performed? Specific test cases and results?]
+    # Try to find summary section
+    summary_match = re.search(
+        r'##?\s*(?:Executive\s+)?Summary\s*\n+(.+?)(?:\n##|\n\n|$)',
+        output_content,
+        re.IGNORECASE | re.DOTALL
+    )
+    if summary_match:
+        summary = summary_match.group(1).strip().split('\n')[0]
+        return summary[:max_length]
 
-## Verification
-[Before vs After comparison. How do we KNOW it works? What metrics confirm success?]
+    # Fallback: first meaningful line
+    for line in output_content.split('\n')[:10]:
+        line = line.strip()
+        if line and not line.startswith('#') and not line.startswith('---'):
+            return line[:max_length]
 
-## Caveats / Follow-up (Optional)
-[Known limitations? Technical debt introduced? Follow-up tasks needed?]
-""",
-        "bugfix": """## Problem
-[What was the bug? How did it manifest? What was the root cause?]
+    return ""
 
-## Solution
-[What was changed to fix it? Why this approach?]
 
-## Testing
-[How was the fix verified? Test cases? Edge cases?]
+def score_report_quality(content: str, task_metadata: Dict = None) -> Dict[str, Any]:
+    """Score a completion report on multiple quality dimensions.
 
-## Verification
-[Before vs After. How do we know the fix works?]
-""",
-        "research": """## Problem
-[What question needed answering? Why was this research needed?]
+    Returns a dict with:
+        - overall_score: 0-100
+        - has_resolution: bool (REQUIRED - checked by /horde-review)
+        - has_summary: bool
+        - has_changes: bool
+        - has_verification: bool
+        - has_root_cause: bool (for fixes)
+        - has_commit_info: bool (if code changed)
+        - line_count: int
+        - recommendations: List[str]
+    """
+    task_metadata = task_metadata or {}
 
-## Solution
-[Key findings? Data sources used? Analysis performed?]
-
-## Testing
-[How were findings validated? Cross-referenced?]
-
-## Verification
-[How do we know the research is accurate? Evidence?]
-""",
-        "documentation": """## Problem
-[What documentation was missing or outdated? Why was it needed?]
-
-## Solution
-[What was documented? Where? Key additions?]
-
-## Testing
-[Was documentation reviewed? Tested for accuracy?]
-
-## Verification
-[How do we know the documentation is correct?]
-"""
+    scores = {
+        'overall_score': 0,
+        'has_resolution': False,
+        'has_summary': False,
+        'has_changes': False,
+        'has_verification': False,
+        'has_root_cause': False,
+        'has_commit_info': False,
+        'line_count': len(content.split('\n')) if content else 0,
+        'recommendations': [],
     }
 
-    return templates.get(task_type, templates["implementation"])
+    if not content:
+        scores['recommendations'].append("Empty completion report")
+        return scores
+
+    content_lower = content.lower()
+
+    # Check for resolution section (REQUIRED for /horde-review)
+    if _has_pattern(content, SECTION_PATTERNS['resolution']):
+        scores['has_resolution'] = True
+        scores['overall_score'] += 25
+    else:
+        scores['recommendations'].append("Add '## Resolution' section (see templates/task-completion-template.md)")
+
+    # Check for summary header
+    if _has_pattern(content, SECTION_PATTERNS['summary_header']):
+        scores['has_summary'] = True
+        scores['overall_score'] += 15
+    else:
+        scores['recommendations'].append("Add summary header: ✅ [Title] — [Outcome]")
+
+    # Check for changes made
+    if _has_pattern(content, SECTION_PATTERNS['changes_made']):
+        scores['has_changes'] = True
+        scores['overall_score'] += 25
+    else:
+        scores['recommendations'].append("Add 'Changes Made' section with Before/After/Why")
+
+    # Check for verification criteria
+    if _has_pattern(content, SECTION_PATTERNS['verification_criteria']):
+        scores['has_verification'] = True
+        scores['overall_score'] += 25
+    else:
+        scores['recommendations'].append("Add 'Expected Outcome / Verification' section")
+
+    # Check for root cause (for fixes)
+    report_type = _detect_report_type(content, task_metadata)
+    if report_type == 'implementation':
+        if _has_pattern(content, SECTION_PATTERNS['what_was_broken']):
+            scores['has_root_cause'] = True
+            scores['overall_score'] += 15
+        else:
+            scores['recommendations'].append("Consider adding 'What Was Broken' section for context")
+
+    # Check for commit info (if code changes detected)
+    if '```' in content or 'file:' in content_lower:
+        if _has_pattern(content, SECTION_PATTERNS['commit_deployment']):
+            scores['has_commit_info'] = True
+            scores['overall_score'] += 15
+        else:
+            scores['recommendations'].append("Add 'Commit/Deployment Info' with git hash")
+
+    # Penalty for very short reports
+    if scores['line_count'] < 10:
+        scores['overall_score'] = max(0, scores['overall_score'] - 20)
+        scores['recommendations'].append("Report is very short - expand on what was done")
+
+    return scores
 
 
-if __name__ == "__main__":
-    # Self-test with sample content
-    sample_good = """
-## Problem
-The task completion reports were shallow checkbox lists that didn't communicate what was accomplished.
+def main():
+    """CLI interface for validation."""
+    import argparse
+    import json
+    import sys
 
-## Solution
-Created task_completion_standard.py module with validation for required sections: Problem, Solution, Testing, Verification.
+    parser = argparse.ArgumentParser(
+        description="Validate task completion reports against Kurultai standard"
+    )
+    parser.add_argument(
+        '--content', '-c',
+        help='Content to validate (or use stdin)'
+    )
+    parser.add_argument(
+        '--file', '-f',
+        help='File containing content to validate'
+    )
+    parser.add_argument(
+        '--json', '-j',
+        action='store_true',
+        help='Output JSON format'
+    )
+    parser.add_argument(
+        '--score',
+        action='store_true',
+        help='Score the report quality instead of just validating'
+    )
 
-## Testing
-Unit tests added for all validation functions. Tested against 50 sample task reports.
+    args = parser.parse_args()
 
-## Verification
-Before: 0% reports had required sections. After: 100% compliance enforced.
-"""
+    # Read content
+    content = args.content
+    if args.file:
+        content = Path(args.file).read_text()
+    elif not content and not sys.stdin.isatty():
+        content = sys.stdin.read()
 
-    sample_bad = """
-I fixed the thing. It works now.
-"""
+    if not content:
+        print("Error: No content provided", file=sys.stderr)
+        sys.exit(1)
 
-    print("Testing good report:")
-    valid, missing, rtype = validate_completion_report(sample_good, {})
-    print(f"  Valid: {valid}, Missing: {missing}, Type: {rtype}")
-    score, breakdown = score_report_quality(sample_good, {})
-    print(f"  Score: {score}")
+    # Initialize exit code
+    is_valid = True
 
-    print("\nTesting bad report:")
-    valid, missing, rtype = validate_completion_report(sample_bad, {})
-    print(f"  Valid: {valid}, Missing: {missing}, Type: {rtype}")
-    score, breakdown = score_report_quality(sample_bad, {})
-    print(f"  Score: {score}")
-    print(f"  Recommendations: {breakdown['recommendations']}")
+    if args.score:
+        # Score mode
+        scores = score_report_quality(content)
+        if args.json:
+            print(json.dumps(scores, indent=2))
+        else:
+            print(f"Quality Score: {scores['overall_score']}/100")
+            for rec in scores['recommendations']:
+                print(f"  • {rec}")
+    else:
+        # Validation mode
+        is_valid, missing, report_type = validate_completion_report(content)
+
+        if args.json:
+            print(json.dumps({
+                'valid': is_valid,
+                'missing_sections': missing,
+                'report_type': report_type
+            }, indent=2))
+        else:
+            print(f"Report Type: {report_type}")
+            print(f"Valid: {is_valid}")
+            if missing:
+                print(f"Missing Sections: {', '.join(missing)}")
+            else:
+                print("✅ Report meets the Kurultai completion standard")
+
+    sys.exit(0 if is_valid else 1)
+
+
+if __name__ == '__main__':
+    main()

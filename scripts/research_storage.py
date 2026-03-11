@@ -51,27 +51,7 @@ from neo4j import GraphDatabase
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import shared connection factory
-try:
-    from neo4j_task_tracker import get_driver as get_neo4j_driver
-except ImportError:
-    # Fallback if neo4j_task_tracker not available
-    def get_neo4j_driver():
-        """Fallback driver factory"""
-        from neo4j import GraphDatabase
-        neo4j_env = os.path.expanduser("~/.openclaw/credentials/neo4j.env")
-        if os.path.exists(neo4j_env):
-            with open(neo4j_env) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, _, value = line.partition('=')
-                        if key.strip() not in os.environ:
-                            os.environ[key.strip()] = value.strip()
-
-        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        user = os.getenv("NEO4J_USER", "neo4j")
-        password = os.getenv("NEO4J_PASSWORD", "myStrongPassword123")
-        return GraphDatabase.driver(uri, auth=(user, password))
+from neo4j_task_tracker import get_driver as get_neo4j_driver
 
 
 # Valid categories for research

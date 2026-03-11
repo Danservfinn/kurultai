@@ -2,6 +2,23 @@
 
 Operational procedures for handling experiment system failures and alerts.
 
+**Last updated:** 2026-03-08
+**Implementation status:** FULLY OPERATIONAL
+
+---
+
+## Quick Reference
+
+| Tool | Path | Purpose |
+|------|------|---------|
+| Health Monitor | `scripts/experiment_health_monitor.py` | System health checks |
+| Experiment Manager | `scripts/experiment_manager.py` | Create/list/cleanup experiments |
+| Experiment Pool | `scripts/experiment-pool.py` | Concurrent experiment daemon |
+| Pool Status | `scripts/experiment-pool-status.py` | Query pool metrics |
+| Lock Manager | `scripts/experiment_lock.py` | File-level locking |
+| Ledger | `experiments/experiment-ledger.tsv` | Experiment records |
+| Lock Dir | `/tmp/kurultai-experiment-locks/` | Active lock files |
+
 ---
 
 ## Alert Response Matrix
@@ -13,6 +30,7 @@ Operational procedures for handling experiment system failures and alerts.
 | Bad Merge to Production | CRITICAL | 5 minutes | Emergency rollback |
 | High Cost Alert ($5+/hr) | MEDIUM | 30 minutes | Throttle experiments |
 | Stale Experiments (>2h) | MEDIUM | 30 minutes | Check for deadlocks |
+| High Active Count (>5) | MEDIUM | 30 minutes | Review pool capacity |
 
 ---
 
@@ -22,52 +40,52 @@ Operational procedures for handling experiment system failures and alerts.
 
 ### Investigation Steps
 
-1. **Check agent logs**
+1. **Check health monitor for crash sequence**
+   ```bash
+   cd ~/.openclaw/agents/main
+   python3 scripts/experiment_health_monitor.py
+   ```
+
+2. **Check agent logs**
    ```bash
    tail -100 ~/.openclaw/agents/<agent>/memory/session.log
+   tail -100 ~/.openclaw/agents/main/logs/experiment-pool.log
    ```
 
-2. **Check for OOM (Out of Memory)**
+3. **Check for OOM (Out of Memory)**
    ```bash
-   dmesg | grep -i oom
-   # Or on macOS
+   # On macOS
    log show --predicate 'eventMessage contains "memor"' --last 1h
-   ```
 
-3. **Verify dependencies**
-   ```bash
-   pip install -r requirements.txt --dry-run
-   ```
-
-4. **Check resource limits**
-   ```bash
-   # Current memory usage
+   # Check memory usage
    ps aux | grep -E "(python|claude)" | head -20
+   ```
 
-   # Available disk space
-   df -h ~/.openclaw
+4. **Check lock files**
+   ```bash
+   python3 scripts/experiment_lock.py list
    ```
 
 ### Resolution
 
 | Root Cause | Action |
 |------------|--------|
-| Dependency issue | Fix requirements.txt, retry experiment |
-| Resource issue | Reduce experiment batch size, add memory |
+| Stale lock | `python3 scripts/experiment_lock.py clear` |
+| Resource issue | Reduce pool size, see "Throttle Experiments" |
 | Code bug in experiment | Fix manually, pause experiments for that agent |
 | Agent health issue | Restart agent session |
 
 ### Pause/Resume Experiments
 
 ```bash
-# Pause all experiments
-touch ~/.openclaw/experiments/.pause
+# Pause experiment pool (stops accepting new experiments)
+touch ~/.openclaw/agents/main/.experiment-pool/.pause
 
 # Resume experiments
-rm ~/.openclaw/experiments/.pause
+rm ~/.openclaw/agents/main/.experiment-pool/.pause
 
-# Pause specific agent
-touch ~/.openclaw/agents/<agent>/.pause-experiments
+# Kill stuck pool daemon
+pkill -f experiment-pool.py
 ```
 
 ---
@@ -78,53 +96,43 @@ touch ~/.openclaw/agents/<agent>/.pause-experiments
 
 ### Investigation Steps
 
-1. **Review recent experiments**
+1. **Check health monitor output**
    ```bash
-   python3 scripts/experiment_dashboard.py --today | grep -A10 "FAILED\|DISCARDED"
+   cd ~/.openclaw/agents/main
+   python3 scripts/experiment_health_monitor.py
    ```
 
-2. **Check hypothesis quality**
+2. **Review recent experiments in ledger**
    ```bash
-   # Review hypothesis descriptions in ledger
-   cat ~/.openclaw/experiments/ledger.tsv | grep discard | tail -10
+   # Show discarded experiments
+   cat ~/.openclaw/experiments/experiment-ledger.tsv | grep -E "discarded|crashed" | tail -10
+
+   # Show merged experiments
+   cat ~/.openclaw/experiments/experiment-ledger.tsv | grep merged | tail -10
    ```
 
-3. **Verify baseline metrics**
+3. **Check experiment details**
    ```bash
-   # Check current baseline in Neo4j
-   python3 -c "
-   from neo4j import GraphDatabase
-   driver = GraphDatabase.driver('bolt://localhost:7687')
-   with driver.session() as s:
-       result = s.run('MATCH (b:BaselineMetric) RETURN b')
-       for r in result:
-           print(r)
-   "
-   ```
-
-4. **Review successful experiments**
-   ```bash
-   # What's working?
-   cat ~/.openclaw/experiments/ledger.tsv | grep merge | tail -10
+   python3 scripts/experiment_manager.py status --experiment-id exp-20260308-001
    ```
 
 ### Resolution
 
 | Issue | Action |
 |-------|--------|
-| Poor hypothesis quality | Improve hypothesis generation prompt |
+| Poor hypothesis quality | Review hypothesis generation prompts |
 | Incorrect baseline | Recalibrate baseline metrics |
-| Too aggressive changes | Reduce change magnitude thresholds |
-| Metric miscalculation | Debug metric collection code |
+| Too aggressive changes | Reduce improvement threshold |
 
 ### Adjust Thresholds
 
-Edit `~/.openclaw/config/experiment_thresholds.yaml`:
+Edit the evaluation logic in your experiment executor:
 
-```yaml
-improvement_threshold_pct: 5.0    # Lower to accept smaller improvements
-regression_threshold_pct: 5.0     # Higher to tolerate more regression
-min_experiment_duration_s: 300    # Longer experiments for more data
+```python
+# Current thresholds (default)
+IMPROVEMENT_THRESHOLD_PCT = 5.0     # Merge if improvement > 5%
+REGRESSION_THRESHOLD_PCT = 5.0      # Discard if regression > 5%
+MIN_EXPERIMENT_DURATION_S = 300     # Minimum 5 minutes
 ```
 
 ---
@@ -136,14 +144,17 @@ min_experiment_duration_s: 300    # Longer experiments for more data
 ### Immediate Action
 
 ```bash
-# Emergency rollback to known-good commit
-python3 scripts/rollback_manager.py --emergency --commit <bad-commit-hash>
+# View recent experiments to identify problematic merge
+cd ~/.openclaw/agents/main
+python3 scripts/experiment_manager.py list
 
-# Or manual rollback
+# Rollback specific commit (manual procedure)
 cd ~/.openclaw
 git revert --no-commit <bad-commit-hash>
 git commit -m "EMERGENCY ROLLBACK: Reverts <bad-commit-hash>"
-git push origin main --force-with-lease
+
+# Delete experiment branch
+git branch -D experiment/<agent>/<exp-id>/<slug>
 ```
 
 ### Verification Steps
@@ -151,42 +162,25 @@ git push origin main --force-with-lease
 1. **Confirm rollback executed**
    ```bash
    git log -1 --oneline
-   # Should show rollback commit
    ```
 
-2. **Check error rate normalized**
+2. **Check experiment status**
    ```bash
-   # Monitor task error rate
-   python3 scripts/monitor_error_rate.py --watch
+   python3 scripts/experiment_health_monitor.py
    ```
 
-3. **Verify rollback logged to Neo4j**
-   ```cypher
-   MATCH (r:RollbackEvent)
-   WHERE r.timestamp > datetime() - duration('PT1H')
-   RETURN r
-   ORDER BY r.timestamp DESC
-   LIMIT 5
+3. **Verify experiment marked in ledger**
+   ```bash
+   grep <exp-id> ~/.openclaw/experiments/experiment-ledger.tsv
    ```
-
-4. **Confirm Signal alert sent**
-   - Check Signal message received at +15165643945
-   - Alert should contain commit hash and reason
 
 ### Post-Incident
 
-1. **Document incident** within 24 hours
-   - Root cause
-   - Time to detect (TTD)
-   - Time to resolve (TTR)
-   - Prevention measures
-
+1. **Document incident** in `logs/experiment-incidents.log`
 2. **Review experiment that caused issue**
    ```bash
-   cat ~/.openclaw/experiments/ledger.tsv | grep <exp-id>
+   cat ~/.openclaw/experiments/experiment-ledger.tsv | grep <exp-id>
    ```
-
-3. **Consider adding human approval gate** for similar changes
 
 ---
 
@@ -198,47 +192,39 @@ git push origin main --force-with-lease
 
 1. **Check active experiments**
    ```bash
-   python3 scripts/experiment_dashboard.py --today | grep -A5 "ACTIVE"
+   cd ~/.openclaw/agents/main
+   python3 scripts/experiment_health_monitor.py
    ```
 
-2. **Identify expensive experiments**
+2. **Check pool status**
    ```bash
-   # Sort ledger by cost
-   cat ~/.openclaw/experiments/ledger.tsv | sort -t$'\t' -k6 -rn | head -10
+   python3 scripts/experiment-pool-status.py --json
    ```
 
-3. **Check for runaway experiments**
+3. **Identify expensive experiments**
    ```bash
-   # Experiments running > 1 hour
-   python3 -c "
-   import time
-   from pathlib import Path
-   for lock in Path('/tmp').glob('kurultai-exp-*.lock'):
-       import json
-       with open(lock) as f:
-           data = json.load(f)
-       age_hours = (time.time() - data['acquired_at']) / 3600
-       if age_hours > 1:
-           print(f'{lock}: {age_hours:.1f} hours old')
-   "
+   # Sort ledger by cost (column 5)
+   sort -t$'\t' -k5 -rn ~/.openclaw/experiments/experiment-ledger.tsv | head -10
    ```
 
 ### Resolution
 
 | Issue | Action |
 |-------|--------|
-| Runaway experiment | Kill and release lock |
-| Too many concurrent experiments | Reduce max_concurrent in config |
+| Runaway experiment | Kill experiment, release lock |
+| Too many concurrent experiments | Reduce MAX_CONCURRENT in pool config |
 | Expensive model calls | Add cost limits to experiment config |
 
 ### Throttle Experiments
 
 ```bash
-# Reduce concurrent experiments
-echo '{"max_concurrent": 2}' > ~/.openclaw/config/experiment_throttle.json
+# Kill pool daemon (stops all new experiments)
+pkill -f experiment-pool.py
 
-# Or pause non-critical experiments
-touch ~/.openclaw/experiments/.pause-low-priority
+# Restart with reduced capacity
+cd ~/.openclaw/agents/main
+# Edit MAX_CONCURRENT in scripts/experiment-pool.py before restarting
+python3 scripts/experiment-pool.py &
 ```
 
 ---
@@ -249,37 +235,40 @@ touch ~/.openclaw/experiments/.pause-low-priority
 
 ### Investigation Steps
 
-1. **List stale experiments**
+1. **Check health monitor for stale experiments**
    ```bash
-   python3 scripts/experiment_health_monitor.py | grep -A10 "stale"
+   cd ~/.openclaw/agents/main
+   python3 scripts/experiment_health_monitor.py
    ```
 
 2. **Check lock files**
    ```bash
-   ls -la /tmp/kurultai-exp-*.lock
+   python3 scripts/experiment_lock.py list
+   ls -la /tmp/kurultai-experiment-locks/
    ```
 
-3. **Check agent process status**
+3. **Check pool state**
    ```bash
-   ps aux | grep claude
+   cat ~/.openclaw/agents/main/.experiment-pool/state.json
    ```
 
 ### Resolution
 
 | Issue | Action |
 |-------|--------|
-| Dead lock | Release lock manually |
+| Dead lock | `python3 scripts/experiment_lock.py clear` |
 | Agent crashed | Restart agent |
-| Network timeout | Check connectivity, retry |
+| Pool daemon crashed | Restart `experiment-pool.py` |
 
 ### Force Release Locks
 
 ```bash
-# Release specific lock
-rm /tmp/kurultai-exp-<experiment-id>.lock
+# Clear all stale locks
+cd ~/.openclaw/agents/main
+python3 scripts/experiment_lock.py clear
 
-# Release all locks (nuclear option)
-rm /tmp/kurultai-exp-*.lock
+# Release specific lock manually
+rm /tmp/kurultai-experiment-locks/<agent>.lock
 
 # Kill stuck experiment process
 pkill -f "experiment.*<experiment-id>"
@@ -289,34 +278,69 @@ pkill -f "experiment.*<experiment-id>"
 
 ## Manual Procedures
 
-### Manually Trigger Rollback
+### Create Experiment
 
 ```bash
-# Rollback specific commit
-python3 scripts/rollback_manager.py --commit <commit-hash> --reason "Manual rollback: <reason>"
-
-# Rollback last N commits
-python3 scripts/rollback_manager.py --last-n 2 --reason "Manual rollback: batch revert"
+cd ~/.openclaw/agents/main
+python3 scripts/experiment_manager.py create \
+  --agent temujin \
+  --hypothesis "Test router scorer learning rate adjustment" \
+  --files scripts/router_scorer.py \
+  --timeout 600
 ```
 
-### Manually Approve/Discard Experiment
+### List Active Experiments
 
 ```bash
-# Force merge (override decision engine)
-python3 scripts/experiment_manager.py --approve <experiment-id> --force
+# All active experiments
+python3 scripts/experiment_manager.py list
 
-# Force discard
-python3 scripts/experiment_manager.py --discard <experiment-id> --reason "Manual override"
+# Agent-specific
+python3 scripts/experiment_manager.py list --agent temujin
+
+# Via pool status
+python3 scripts/experiment-pool-status.py --json
 ```
 
-### Reset Experiment System
+### Get Experiment Status
 
 ```bash
-# Full reset (CAUTION: clears all state)
-python3 scripts/reset_experiment_system.py --confirm
+python3 scripts/experiment_manager.py status \
+  --experiment-id exp-20260308-001
+```
 
-# Soft reset (keeps ledger, clears active experiments)
-python3 scripts/reset_experiment_system.py --soft
+### Cleanup Experiment
+
+```bash
+python3 scripts/experiment_manager.py cleanup \
+  --experiment-id exp-20260308-001
+```
+
+### Check Lock Status
+
+```bash
+# List all active locks
+python3 scripts/experiment_lock.py list
+
+# Check if specific path is locked
+python3 scripts/experiment_lock.py check --path scripts/router_scorer.py
+
+# Clear stale locks
+python3 scripts/experiment_lock.py clear
+```
+
+### Git Branch Operations
+
+```bash
+# List all experiment branches
+cd ~/.openclaw
+git branch --list "experiment/*"
+
+# Checkout specific experiment branch
+git checkout experiment/temujin/exp-20260308-001/router-scorer-lr-tuning
+
+# Delete experiment branch (cleanup)
+git branch -D experiment/temujin/exp-20260308-001/router-scorer-lr-tuning
 ```
 
 ---
@@ -326,41 +350,158 @@ python3 scripts/reset_experiment_system.py --soft
 ### Quick Health Check
 
 ```bash
-# All-in-one health check
-python3 scripts/experiment_health_monitor.py --quick
+cd ~/.openclaw/agents/main
+python3 scripts/experiment_health_monitor.py
 ```
 
-Expected output:
+**Expected output:**
 ```
-✓ Merge rate (24h): 28.5%
+EXPERIMENT HEALTH CHECK - 2026-03-08 14:30
+
+SUMMARY
+-------
+Active experiments:   2
+Merge rate (24h):     28.5%
+Consecutive crashes:  0
+Cost per hour:        $0.00
+
+STATUS
+------
 ✓ No stale experiments
-✓ No consecutive crashes
+✓ Merge rate healthy
+✓ No crash sequences
 ✓ Cost within budget
-✓ All locks valid
 ```
 
 ### Detailed Status
 
 ```bash
-# Full system status
-python3 scripts/experiment_health_monitor.py --verbose
+# Verbose output
+python3 scripts/experiment_health_monitor.py
+
+# JSON output (for logging)
+python3 scripts/experiment_health_monitor.py --json
+
+# Pool status
+python3 scripts/experiment-pool-status.py --json
 ```
 
 ### Component Checks
 
 ```bash
-# Check Neo4j connectivity
-python3 -c "from neo4j import GraphDatabase; d=GraphDatabase.driver('bolt://localhost:7687'); print('OK')"
-
-# Check git repository status
-cd ~/.openclaw && git status
+# Check ledger file
+tail -5 ~/.openclaw/experiments/experiment-ledger.tsv
 
 # Check lock directory
-ls -la /tmp/kurultai-exp-*.lock 2>/dev/null || echo "No active locks"
+ls -la /tmp/kurultai-experiment-locks/
 
-# Check experiment ledger
-tail -5 ~/.openclaw/experiments/ledger.tsv
+# Check pool state
+cat ~/.openclaw/agents/main/.experiment-pool/state.json
+
+# Check pool logs
+tail -50 ~/.openclaw/agents/main/logs/experiment-pool.log
 ```
+
+### Cron Job Status
+
+```bash
+# Check if health monitor is in cron
+cat ~/.openclaw/cron/jobs.json | grep experiment_health_monitor
+
+# View cron logs
+tail -50 ~/.openclaw/logs/cron.log
+```
+
+---
+
+## Real Troubleshooting Scenarios
+
+### Scenario 1: "Pending experiment never starts"
+
+**Symptoms:**
+- Experiment shows status "pending" for > 10 minutes
+- No errors in logs
+
+**Diagnosis:**
+```bash
+# Check if pool is running
+ps aux | grep experiment-pool
+
+# Check queue
+cat ~/.openclaw/agents/main/.experiment-pool/queue.json
+
+# Check for file conflicts
+python3 scripts/experiment_lock.py list
+```
+
+**Resolution:**
+- If pool not running: `python3 scripts/experiment-pool.py &`
+- If file conflict: Wait for conflicting experiment to complete
+- If queue full: Check MAX_CONCURRENT limit
+
+### Scenario 2: "Experiment marked 'crashed' but code looks fine"
+
+**Symptoms:**
+- Experiment status: "crashed"
+- No obvious code issues
+
+**Diagnosis:**
+```bash
+# Check experiment details
+python3 scripts/experiment_manager.py status --experiment-id <exp-id>
+
+# Check pool logs
+tail -100 ~/.openclaw/agents/main/logs/experiment-pool.log
+```
+
+**Resolution:**
+- Common cause: Timeout exceeded (default 300s)
+- Check EXPERIMENT_TIMEOUT in `experiment-pool.py`
+- Increase timeout if needed
+
+### Scenario 3: "Stale lock blocking new experiments"
+
+**Symptoms:**
+- New experiments can't start
+- Lock file exists but process is dead
+
+**Diagnosis:**
+```bash
+# List locks with PIDs
+python3 scripts/experiment_lock.py list
+
+# Check if PID is alive
+ps -p <pid>
+```
+
+**Resolution:**
+```bash
+# Clear all stale locks
+python3 scripts/experiment_lock.py clear
+
+# Or manually remove specific lock
+rm /tmp/kurultai-experiment-locks/<agent>.lock
+```
+
+### Scenario 4: "Merge rate suddenly dropped to 0%"
+
+**Symptoms:**
+- Recent experiments all discarded
+- No successful merges
+
+**Diagnosis:**
+```bash
+# Review recent discards
+grep discarded ~/.openclaw/experiments/experiment-ledger.tsv | tail -10
+
+# Check baseline metrics
+python3 scripts/experiment_manager.py status --experiment-id <exp-id>
+```
+
+**Resolution:**
+- Common cause: Baseline metric shifted significantly
+- Common cause: Threshold too aggressive
+- Review and adjust thresholds in evaluation code
 
 ---
 
@@ -375,7 +516,8 @@ tail -5 ~/.openclaw/experiments/ledger.tsv
 ### Contact Information
 
 - **Signal**: +15165643945 (automated alerts + manual contact)
-- **GitHub Issues**: github.com/kurultai/kurultai/issues
+- **Logs**: `~/.openclaw/agents/main/logs/`
+- **Experiment ledger**: `~/.openclaw/experiments/experiment-ledger.tsv`
 
 ---
 
@@ -384,6 +526,39 @@ tail -5 ~/.openclaw/experiments/ledger.tsv
 This runbook should be updated:
 - After each incident (add learnings)
 - When new alert types are added
+- After any architecture changes
 - Quarterly review for accuracy
 
-Last updated: 2026-03-08
+### Changelog
+
+| Date | Changes |
+|------|---------|
+| 2026-03-08 | Updated with actual implementation details, verified commands, real troubleshooting scenarios |
+
+---
+
+## Appendix: File Locations
+
+```
+~/.openclaw/
+├── agents/main/
+│   ├── scripts/
+│   │   ├── experiment_health_monitor.py    # Health checks
+│   │   ├── experiment_manager.py           # CRUD operations
+│   │   ├── experiment-pool.py              # Pool daemon
+│   │   ├── experiment-pool-status.py       # Status queries
+│   │   └── experiment_lock.py              # Lock management
+│   ├── .experiment-pool/                   # Pool state
+│   │   ├── queue.json
+│   │   ├── state.json
+│   │   └── .pause                          # Stop flag
+│   └── logs/
+│       └── experiment-pool.log
+├── experiments/
+│   ├── experiment-ledger.tsv               # Master ledger
+│   └── *.yaml                              # Queued experiments
+└── /tmp/kurultai-experiment-locks/         # Lock files
+    ├── temujin.lock
+    ├── mongke.lock
+    └── ...
+```

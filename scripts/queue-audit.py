@@ -185,16 +185,20 @@ def is_fake(result_path, done_path=None):
         content = open(result_path).read()
     except OSError:
         return True
-    if "**Model:** claude-code" in content:
+    # Check for ANY model line (legitimate execution marker)
+    # Accepts all real models: claude-code, claude-opus-4-6, glm-5, qwen3.5-plus, etc.
+    if "**Model:**" in content:
+        # Known fake patterns to exclude
+        if "**Model:** fallback" in content:
+            return True  # fallback marker = no real execution
+        if "**Latency:** 0ms" in content:
+            return True  # zero latency = synthetic/fake
+        # Has a model and isn't a known fake -> legitimate completion
         return False
+    # Delegation without model line might be fake
     if "delegated to" in content.lower() and "spawn queue" in content.lower():
         return True
-    # Note: qwen3.5-plus was removed from fake check - it's a legitimate proxy model
-    # The old check incorrectly flagged real completions that used proxy routing
-    if "**Model:** fallback" in content:
-        return True
-    if "**Latency:** 0ms" in content and "**Model:**" in content:
-        return True
+    # No model line at all -> likely fake
     return False
 
 

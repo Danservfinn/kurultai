@@ -6,6 +6,7 @@ DATE=$(date +%Y-%m-%d)
 TIME=$(date +%H:%M)
 HOUR_AGO=$(date -v-1H '+%Y-%m-%d %H:%M')
 SIX_HOURS_AGO=$(date -v-6H '+%Y-%m-%d %H:%M')
+SCRIPTS_DIR="$(dirname "$0")"
 
 # Output files
 DATA_DIR="/tmp/kurultai-review-${DATE}-${TIME}"
@@ -60,9 +61,10 @@ git log --since="${SIX_HOURS_AGO}" --oneline > "$DATA_DIR/commits.txt" 2>/dev/nu
 # 1.4 Collect Neo4j activity
 echo "  - Collecting Neo4j activity..."
 python3 << PYEOF >> "$DATA_DIR/neo4j.txt" 2>&1
-from neo4j import GraphDatabase
+import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_task_tracker import get_driver, close_driver
 
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "neo4j"))
+driver = get_driver()
 
 with driver.session() as session:
     # Get recent Reflection nodes
@@ -99,10 +101,11 @@ grep "${DATE} ${TIME#*:}" /tmp/kurultai-*.log 2>/dev/null > "$DATA_DIR/logs.txt"
 # 1.6 Collect structured heartbeats from Neo4j
 echo "  - Collecting structured heartbeats from Neo4j..."
 python3 << PYEOF > "$DATA_DIR/heartbeats.txt" 2>&1
-from neo4j import GraphDatabase
+import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_task_tracker import get_driver, close_driver
 from datetime import datetime
 
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "neo4j"))
+driver = get_driver()
 
 with driver.session() as session:
     # Get heartbeats from past 6 hours

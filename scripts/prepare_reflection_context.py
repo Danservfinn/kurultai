@@ -68,6 +68,22 @@ def find_reflection_files(agent):
     return files
 
 
+def get_project_memory_file():
+    """Get the main project MEMORY.md file (shared across all agents).
+
+    This file contains WHEN/THEN rules that should be visible to all agents.
+    """
+    return _CLAUDE_PROJECT_MEMORY / "MEMORY.md"
+
+
+def get_when_then_rules_file():
+    """Get the WHEN/THEN rules registry file.
+
+    Contains full rule texts for rules referenced by ID in MEMORY.md.
+    """
+    return _CLAUDE_PROJECT_MEMORY / "when_then_rules.md"
+
+
 def extract_active_rules(memory_file):
     """Extract WHEN/THEN rules from the memory file.
 
@@ -88,18 +104,29 @@ def extract_active_rules(memory_file):
 
     # Look for explicit ACTIVE RULES section (any heading depth)
     active_section = re.search(
-        r"#{1,4} (?:ACTIVE |Active |YOUR BEHAVIORAL )?RULES.*?\n(.*?)(?=\n#{1,4} |\Z)",
+        r"#{1,4} (?:ACTIVE |Active |YOUR BEHAVIORAL |WHEN/THEN )?RULES.*?\n(.*?)(?=\n#{1,4} |\Z)",
         content,
         re.DOTALL | re.IGNORECASE,
     )
     if active_section:
         for line in active_section.group(1).strip().split("\n"):
             line = line.strip()
+            # Skip markdown headings, empty lines, and template placeholders
+            if not line or line.startswith("#"):
+                continue
             if line and re.search(r"WHEN\b", line, re.IGNORECASE):
                 # Clean up numbering and bold markers
                 cleaned = re.sub(r"^\d+[\.\)]\s*", "", line)
                 cleaned = re.sub(r"^\*{2}\([^)]*\)\*{2}\s*", "", cleaned)
-                rules.append(cleaned)
+                cleaned = re.sub(r"^-\s*", "", cleaned)
+                cleaned = cleaned.strip()
+                # Skip template placeholders
+                if len(cleaned) > 10 and not re.search(
+                    r"\[trigger\]|\[action\]|\[old default\]|\[default\]|\[new WHEN/THEN rule\]|\[none\]|RULE: \[new",
+                    cleaned,
+                    re.IGNORECASE,
+                ):
+                    rules.append(cleaned)
 
     # Scan for WHEN/THEN patterns after NEW RULE headers (standard reflection format)
     if not rules:
@@ -109,8 +136,10 @@ def extract_active_rules(memory_file):
             re.IGNORECASE,
         ):
             rule = match.group(1).strip()
+            # Skip template placeholders
             if len(rule) > 10 and not re.search(
-                r"\[trigger\]|\[action\]|\[old default\]|\[default\]", rule, re.IGNORECASE
+                r"\[trigger\]|\[action\]|\[old default\]|\[default\]|\[new WHEN/THEN rule\]|\[none\]|RULE: \[new",
+                rule, re.IGNORECASE
             ):
                 rules.append(rule)
 
@@ -118,14 +147,18 @@ def extract_active_rules(memory_file):
     if not rules:
         for line in content.split("\n"):
             line = line.strip()
+            # Skip markdown headings and empty lines
+            if not line or line.startswith("#"):
+                continue
             if re.search(r"\bWHEN\b.+\bTHEN\b", line, re.IGNORECASE):
                 # Clean markdown formatting (order matters: list markers first, then bold)
                 cleaned = re.sub(r"^-\s*", "", line)
                 cleaned = re.sub(r"^\d+[\.\)]\s*", "", cleaned)
                 cleaned = re.sub(r"^\*{2,}[^*]+\*{2,}[:\s]*", "", cleaned)
                 cleaned = cleaned.strip()
+                # Skip template placeholders and non-rules
                 if len(cleaned) > 10 and not re.search(
-                    r"\[trigger\]|\[action\]|\[old default\]|\[default\]",
+                    r"\[trigger\]|\[action\]|\[old default\]|\[default\]|\[new WHEN/THEN rule\]|\[none\]|RULE: \[new",
                     cleaned,
                     re.IGNORECASE,
                 ):
@@ -191,6 +224,102 @@ def read_tock_data():
         return None
 
 
+def get_live_session_model(agent):
+    """Read the current session model directly from sessions.json.
+
+    This bypasses the 30-minute tock cache and provides real-time session
+    model detection for reflection accuracy.
+
+    Returns the model string (e.g., "claude-opus-4-6") or "none" if no active session.
+    """
+    session_file = BASE / agent / "sessions" / "sessions.json"
+    if not session_file.exists():
+        return "none"
+
+    try:
+        with open(session_file) as f:
+            sessions = json.load(f)
+
+        # Get the most recent (active) session
+        if not sessions:
+            return "none"
+
+        # sessions.json is a dict {session_id: session_data}
+        # Sort by updated_at or created_at to get most recent
+        sorted_sessions = sorted(
+            sessions.items(),
+            key=lambda x: x[1].get("updated_at", x[1].get("created_at", "")),
+            reverse=True
+        )
+
+        if sorted_sessions:
+            return sorted_sessions[0][1].get("model", "none")
+
+        return "none"
+    except Exception:
+        return "none"
+
+
+def get_agent_config_model(agent):
+    """Read the configured model from agent's config.json.
+
+    This provides the source-of-truth model configuration, bypassing
+    any caching in tock data.
+
+    Returns the model string (e.g., "claude-opus-4-6") or the default
+    from AGENT_MODELS if config is missing or has no model key.
+    """
+    config_file = BASE / agent / "config.json"
+    if config_file.exists():
+        try:
+            with open(config_file) as f:
+                config = json.load(f)
+            # If model key exists, validate it's in the approved model set
+            # Includes Anthropic (primary) + Z.AI (Tier 1) + Alibaba (Tier 2)
+            if "model" in config:
+                model = config["model"]
+                VALID_MODELS = {
+                    # Anthropic (primary)
+                    "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-haiku-4-5-20251001",
+                    # Z.AI (Tier 1 fallback)
+                    "glm-5", "kimi-k2.5", "qkimi-k2.5",
+                    # Alibaba (Tier 2 fallback)
+                    "qwen3.5-plus",
+                }
+                if model in VALID_MODELS:
+                    return model
+                # If invalid model in config, log and use default
+                # (this shouldn't happen with current validation guards)
+        except Exception:
+            pass
+
+    # Fallback to AGENT_MODELS (source of truth for defaults)
+    return AGENT_MODELS.get(agent, "claude-opus-4-6")
+
+
+def get_settings_model(agent):
+    """Read ANTHROPIC_MODEL from agent's settings.json.
+
+    This detects model drift at the CONFIG level, before a session is even spawned.
+    Drift here means new sessions will inherit the wrong model.
+
+    Returns the model string (e.g., "claude-opus-4-6") or None if settings file
+    doesn't exist or has no ANTHROPIC_MODEL configured.
+    """
+    settings_file = BASE / agent / ".claude" / "settings.json"
+    if not settings_file.exists():
+        return None
+
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+        # ANTHROPIC_MODEL is in the "env" section
+        env = settings.get("env", {})
+        return env.get("ANTHROPIC_MODEL")
+    except Exception:
+        return None
+
+
 def get_failure_patterns(agent, days=7):
     """Query Neo4j for the agent's recurring failure patterns over N days."""
     try:
@@ -234,6 +363,7 @@ def format_tock_agent_summary(tock_data, agent):
 
     t = agent_data.get("tasks", {})
     s = agent_data.get("session", {})
+    cm = agent_data.get("config_model", {})
     sr = agent_data.get("success_rate")
     sr_str = f"{sr}%" if sr is not None else "N/A"
 
@@ -246,6 +376,32 @@ def format_tock_agent_summary(tock_data, agent):
         f"Session: {s.get('pct_used',0)}% ctx used",
         f"System: {queues.get('total_pending',0)} total queued | {delegations.get('count_30m',0)} delegations(30m)",
     ]
+
+    # Session model vs config model comparison (LIVE data from sessions.json)
+    # Critical: Use live session model and live config model, not tock cache
+    live_session_model = get_live_session_model(agent)
+    live_config_model = get_agent_config_model(agent)
+    live_settings_model = get_settings_model(agent)
+    expected_model = AGENT_MODELS.get(agent, "claude-opus-4-6")
+
+    # NOTE: Model drift evaluation DISABLED (2026-03-09) - Multi-tier fallback chain
+    # now handles model selection automatically. Agents use Anthropic -> Z.AI -> Alibaba
+    # fallback tiers. Configured models are managed by claude-agent wrapper.
+    #
+    # Compare settings model to expected (catches drift BEFORE session spawn)
+    # DISABLED: if live_settings_model and live_settings_model != expected_model:
+    #     lines.append(
+    #         f"⚠️ CONFIG DRIFT: settings.json has {live_settings_model} ≠ expected {expected_model}"
+    #     )
+    #
+    # Compare live session model to config model
+    # DISABLED: if live_session_model != 'none' and live_session_model != live_config_model:
+    #     lines.append(
+    #         f"⚠️ CRITICAL: session={live_session_model} ≠ config={live_config_model} (RESTART SESSION)"
+    #     )
+    #     lines.append(
+    #         f"  → PRIORITY_FIX: Kill drifted session before next task execution"
+    #     )
 
     # LLM assessment if available
     assessment = tock_data.get("llm_assessment", {})
@@ -594,6 +750,18 @@ def generate_context(agent, hours=1):
             if active_rules:
                 break
 
+    # Fallback 3: WHEN/THEN rules registry (when_then_rules.md)
+    if not active_rules:
+        rules_file = get_when_then_rules_file()
+        if rules_file.exists():
+            active_rules = extract_active_rules(rules_file)
+
+    # Fallback 4: Project-level MEMORY.md (contains condensed rule references)
+    if not active_rules:
+        project_memory = get_project_memory_file()
+        if project_memory.exists():
+            active_rules = extract_active_rules(project_memory)
+
     _sources["rules"] = "ok" if active_rules else "empty"
 
     last_commitment = extract_last_commitment(memory_file)
@@ -852,7 +1020,14 @@ def generate_context(agent, hours=1):
     except Exception:
         pass
 
-    return "\n".join(lines)
+    # Truncate to stay under Alibaba DashScope embedding limit (260KB)
+    # Leave 10KB buffer for safety
+    MAX_CONTEXT_CHARS = 250000
+    result = "\n".join(lines)
+    if len(result) > MAX_CONTEXT_CHARS:
+        result = result[:MAX_CONTEXT_CHARS]
+        result += "\n\n[CONTEXT TRUNCATED - exceeded embedding limit]"
+    return result
 
 
 def main():

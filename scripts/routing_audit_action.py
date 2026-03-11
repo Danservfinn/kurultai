@@ -109,17 +109,20 @@ Priority: Focus on execution failures and stalled dispatch first. Workload imbal
     # Create task via canonical pipeline
     from task_intake import create_task
 
+    # Routing audit creates IMPLEMENTATION tasks → route to temujin, not kublai
+    # kublai is the router, not the implementer. Fixes the SELF_ROUTE violation pattern.
     task_id = create_task(
         title="Review routing audit findings and implement improvements",
         body=body,
         priority="normal",
         source="routing_audit",
-        agent="kublai",
+        agent="temujin",  # Implementation work goes to dev, not router
+        skill_hint="/horde-implement",  # Guide temujin to use implementation skill
     )
 
     if task_id:
         _update_cooldown()
-        print(f"Routing audit: created kublai task {task_id} ({len(issues)} issues)")
+        print(f"Routing audit: created temujin task {task_id} ({len(issues)} issues)")
     else:
         print("Routing audit: task creation skipped (duplicate or depth limit)")
 

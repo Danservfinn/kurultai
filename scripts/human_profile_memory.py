@@ -39,6 +39,7 @@ Usage:
 import os
 import re
 import json
+import stat
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -63,8 +64,16 @@ class HumanProfileMemory:
         self._ensure_dir()
 
     def _ensure_dir(self) -> None:
-        """Ensure the memory directory exists."""
+        """Ensure the memory directory exists with proper permissions."""
         self.memory_dir.mkdir(parents=True, exist_ok=True)
+
+        # Set directory permissions to 700 (owner only)
+        os.chmod(self.memory_dir, stat.S_IRWXU)  # 700
+
+        # Verify permissions were set correctly
+        actual_mode = oct(self.memory_dir.stat().st_mode)[-3:]
+        if actual_mode != "700":
+            print(f"Warning: Could not set secure permissions on {self.memory_dir}. Current: {actual_mode}, Expected: 700")
 
     def _normalize_id(self, human_id: str) -> str:
         """
@@ -77,6 +86,34 @@ class HumanProfileMemory:
     def _denormalize_id(self, filename: str) -> str:
         """Convert filename back to phone number format."""
         return "+" + filename.replace(".md", "").replace("_", "/")
+
+    def _verify_and_set_permissions(self, path: Path, is_dir: bool = True) -> bool:
+        """
+        Verify and set correct permissions on a file or directory.
+
+        Args:
+            path: Path to verify/set permissions on
+            is_dir: True if path is a directory, False if file
+
+        Returns:
+            True if permissions are correct, False otherwise
+        """
+        if not path.exists():
+            return False
+
+        try:
+            if is_dir:
+                os.chmod(path, stat.S_IRWXU)  # 700 - owner read/write/execute only
+                expected_mode = "700"
+            else:
+                os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)  # 600 - owner read/write only
+                expected_mode = "600"
+
+            actual_mode = oct(path.stat().st_mode)[-3:]
+            return actual_mode == expected_mode
+        except (OSError, PermissionError) as e:
+            print(f"Warning: Could not set permissions on {path}: {e}")
+            return False
 
     def _get_file_path(self, human_id: str) -> Path:
         """Get the file path for a human profile."""
@@ -369,6 +406,10 @@ class HumanProfileMemory:
 """
 
         file_path.write_text(content, encoding="utf-8")
+
+        # Ensure secure file permissions (600 - owner read/write only)
+        self._verify_and_set_permissions(file_path, is_dir=False)
+
         return file_path
 
     def read_profile(self, human_id: str) -> Optional[Dict[str, Any]]:

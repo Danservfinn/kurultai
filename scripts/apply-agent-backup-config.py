@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Apply Backup Agent Configuration
+Apply Standard Agent Configuration
 
-Applies a standardized backup configuration to all agent .claude/settings.json files.
-This ensures all agents have a known-good fallback configuration when primary models fail.
+Applies a standardized configuration to all agent .claude/settings.json files.
+This ensures all agents use claude-opus-4-6 via the Anthropic API.
+
+⚠️ DO NOT USE DashScope proxy or glm-5 model - they cause fleet-wide failures.
 
 Usage:
     python3 apply-agent-backup-config.py [--dry-run]
@@ -16,16 +18,17 @@ from datetime import datetime
 from pathlib import Path
 
 AGENTS_DIR = Path.home() / ".openclaw" / "agents"
-AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"]
+AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai", "tolui"]
 
 BACKUP_CONFIG = {
     "permissions": {
         "defaultMode": "default"
     },
     "env": {
-        "ANTHROPIC_AUTH_TOKEN": "sk-sp-4f752341a4514a9c9fa9946ba2b29f35",
-        "ANTHROPIC_BASE_URL": "https://coding-intl.dashscope.aliyuncs.com/apps/anthropic",
-        "ANTHROPIC_MODEL": "glm-5"
+        "ANTHROPIC_AUTH_TOKEN": "d6ff69bb5ad74bb29b297d1681cc648c.KtP5x1d8kkFXgM21",
+        "ANTHROPIC_MODEL": "claude-opus-4-6",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6"
     },
     "enabledPlugins": {
         "claude-mem@thedotmack": True,
@@ -94,7 +97,7 @@ def apply_config(agent, dry_run=False):
         with open(settings_path, 'w') as f:
             json.dump(BACKUP_CONFIG, f, indent=1)
         
-        print(f"  {agent}: ✅ Applied backup config (glm-5 + DashScope)")
+        print(f"  {agent}: ✅ Applied Anthropic config (claude-opus-4-6)")
         return True
         
     except Exception as e:
@@ -111,7 +114,7 @@ def main():
     print(f"BACKUP CONFIGURATION APPLICATOR")
     print(f"{'='*60}")
     print(f"\nTarget: All 6 Kurultai agents")
-    print(f"Config: glm-5 via DashScope (coding-intl.dashscope.aliyuncs.com)")
+    print(f"Config: claude-opus-4-6 via Anthropic API (NOT DashScope)")
     print(f"{'='*60}\n")
     
     if args.dry_run:

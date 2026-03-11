@@ -42,7 +42,7 @@ from calendar_parser import (
 from profile_handler import apply_profile_hints, get_context_for_conversation, format_context_for_agent
 
 # Conversation logging
-from conversation_logger import log_inbound, log_outbound
+from conversation_logger import log_inbound, log_outbound, ConversationLogger
 
 from neo4j_calendar import (
     create_event,
@@ -117,7 +117,7 @@ def get_buffer(group_id: str) -> MessageBuffer:
 # Signal I/O
 # =============================================================================
 
-def send_signal_message(recipient: str, message: str, is_group: bool = True):
+def send_signal_message(recipient: str, message: str, is_group: bool = True, log_conversation: bool = True):
     """Send a message via signal-cli."""
     cmd = [
         "signal-cli",
@@ -138,9 +138,20 @@ def send_signal_message(recipient: str, message: str, is_group: bool = True):
             text=True,
             timeout=10
         )
-        if result.returncode != 0:
+        success = result.returncode == 0
+
+        if not success:
             print(f"Signal send error: {result.stderr}")
-        return result.returncode == 0
+
+        # Log outbound message (non-blocking)
+        if log_conversation and success and not is_group:
+            try:
+                from conversation_logger import log_outbound
+                log_outbound(recipient, message, channel="signal")
+            except Exception:
+                pass  # Never fail message sending for logging
+
+        return success
     except subprocess.TimeoutExpired:
         print("Signal send timeout")
         return False
@@ -151,12 +162,13 @@ def send_signal_message(recipient: str, message: str, is_group: bool = True):
 
 def send_group_message(message: str):
     """Send a message to the group."""
-    return send_signal_message(GROUP_ID, message, is_group=True)
+    # Group messages are logged separately in process_calendar_message
+    return send_signal_message(GROUP_ID, message, is_group=True, log_conversation=False)
 
 
 def send_dm(phone: str, message: str):
     """Send a direct message."""
-    return send_signal_message(phone, message, is_group=False)
+    return send_signal_message(phone, message, is_group=False, log_conversation=True)
 
 
 # =============================================================================
@@ -252,7 +264,7 @@ def _finalize_event_create(
 
     # High-confidence auto-confirm, otherwise ask
     if (parsed and parsed.confidence >= 0.8 and not getattr(parsed, 'ambiguities', [])):
-        create_event(
+        created_event = create_event(
             name=event.name,
             start_datetime=event.start_datetime,
             end_datetime=event.end_datetime,
@@ -261,6 +273,11 @@ def _finalize_event_create(
             location_name=event.location,
             source_message=event.source_message,
         )
+
+        # Link event to conversation
+        conversation_date = datetime.now().isoformat()
+        link_conversation_to_event(sender_phone, event.name, conversation_date)
+
         return format_confirmed_event(event)
 
     set_pending_confirmation(sender_phone, event)
@@ -452,6 +469,10 @@ def handle_rsvp(
     result = rsvp_to_event(sender_phone, event_query, rsvp_status)
 
     if result:
+        # Log RSVP as conversation update
+        change_summary = f"RSVP changed to '{rsvp_status}' for {result['event_name']}"
+        log_event_update(sender_phone, result['event_name'], change_summary, context="calendar_rsvp")
+
         # Get attendee count
         attendees = get_event_attendees(event_query)
         going = [a for a in attendees if a.get("rsvp") == "going"]
@@ -475,6 +496,10 @@ def handle_add_person(
     result = add_person_to_event(sender_phone, target_name, event_query)
 
     if result:
+        # Log attendee addition as conversation update
+        change_summary = f"Added {result['added']} to {result['event_name']}"
+        log_event_update(sender_phone, result['event_name'], change_summary, context="calendar_attendee")
+
         return f"[Calendar] Added {result['added']} to: {result['event_name']}"
 
     return f"[Calendar] Could not add {target_name} - make sure they're in the group"
@@ -494,6 +519,10 @@ def handle_cancel(
     result = cancel_event(sender_phone, event_query)
 
     if result:
+        # Log cancellation as conversation update
+        change_summary = f"Cancelled {result['event_name']}"
+        log_event_update(sender_phone, result['event_name'], change_summary, context="calendar_cancellation")
+
         return f"[Calendar] Cancelled: {result['event_name']} ({result['starts'].strftime('%a %I:%M %p')})"
 
     return "[Calendar] Could not cancel - only the creator can cancel an event"
@@ -630,6 +659,116 @@ def handle_person_query(person_name: str) -> Optional[str]:
 
 
 # =============================================================================
+# Calendar-Conversation Integration
+# =============================================================================
+
+def extract_event_topics(event: ResolvedEvent) -> List[str]:
+    """Extract topics from calendar event for conversation logging.
+
+    Args:
+        event: ResolvedEvent object
+
+    Returns:
+        List of topic strings
+    """
+    topics = []
+
+    # Event name as primary topic
+    if event.name:
+        topics.append(event.name)
+
+    # Calendar-related topics
+    topics.extend(["calendar", "event"])
+
+    # Location-based topics
+    if event.location:
+        topics.append(event.location)
+
+    # Participant-based topics (entities)
+    if event.participants:
+        topics.extend([p for p in event.participants[:3]])  # Limit to 3
+
+    return topics
+
+
+def extract_event_entities(event: ResolvedEvent) -> List[str]:
+    """Extract entities (attendees) from calendar event.
+
+    Args:
+        event: ResolvedEvent object
+
+    Returns:
+        List of entity names
+    """
+    entities = []
+
+    # Add participants as entities
+    if event.participants:
+        entities.extend(event.participants)
+
+    # Add location as entity if present
+    if event.location:
+        entities.append(event.location)
+
+    # Add creator as entity
+    if event.created_by:
+        entities.append(event.created_by)
+
+    return list(set(entities))  # Deduplicate
+
+
+def link_conversation_to_event(
+    sender_phone: str,
+    event_name: str,
+    conversation_date: str
+) -> None:
+    """Link a conversation to a calendar event (bidirectional).
+
+    Args:
+        sender_phone: Phone number of user
+        event_name: Name of the event
+        conversation_date: ISO timestamp of conversation
+    """
+    try:
+        logger = ConversationLogger()
+        logger._link_conversation_to_events(
+            phone_number=sender_phone,
+            conversation_date=conversation_date,
+            event_names=[event_name]
+        )
+    except Exception as e:
+        # Never block message processing for linking
+        print(f"Warning: Failed to link conversation to event: {e}")
+
+
+def log_event_update(
+    sender_phone: str,
+    event_name: str,
+    change_summary: str,
+    context: str = "calendar_update"
+) -> None:
+    """Log an event update as a conversation.
+
+    Args:
+        sender_phone: Phone number of user
+        event_name: Name of the event
+        change_summary: Summary of changes made
+        context: Context string for the log
+    """
+    try:
+        log_inbound(
+            sender_phone,
+            f"Updated event: {change_summary}",
+            channel="signal",
+            metadata={"context": context},
+            related_events=[event_name]
+        )
+    except Exception as e:
+        # Never block message processing for logging
+        print(f"Warning: Failed to log event update: {e}")
+
+
+# =============================================================================
 # Main Handler
 # =============================================================================
 
@@ -701,11 +840,18 @@ def handle_message(
 
     # Log inbound conversation (fire and forget)
     try:
+        # Extract potential event names from message for context
+        from conversation_logger import ConversationLogger
+        temp_logger = ConversationLogger()
+        event_mentions = temp_logger._extract_event_mentions(message)
+
         log_inbound(
             sender_phone,
             message,
             channel="signal",
-            message_id=str(raw_msg.get("message_id", ""))
+            message_id=str(raw_msg.get("message_id", "")),
+            metadata={"context": "calendar"},
+            related_events=event_mentions if event_mentions else None
         )
     except Exception:
         pass  # Never block message processing for logging
@@ -732,6 +878,11 @@ def handle_message(
                 location_name=event.location,
                 source_message=event.source_message,
             )
+
+            # Link event to conversation
+            conversation_date = datetime.now().isoformat()
+            link_conversation_to_event(sender_phone, event.name, conversation_date)
+
             clear_pending_confirmation(sender_phone)
             return format_confirmed_event(event)
 

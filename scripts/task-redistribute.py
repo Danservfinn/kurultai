@@ -3,17 +3,21 @@
 task-redistribute.py — Move pending tasks from overloaded agents to underutilized ones.
 
 Usage:
-    python3 scripts/task-redistribute.py [--dry-run] [--max-move N]
+    python3 scripts/task-redistribute.py [--dry-run] [--max-move N] [--auto] [--log PATH]
 
 Options:
     --dry-run     Show what would be moved without moving
-    --max-move N  Maximum tasks to move per run (default: 10)
+    --max-move N  Maximum tasks to move per run (default: 10, auto mode: 5)
+    --auto        Only run if trigger conditions are met (for cron use)
+    --log PATH    Path to log file for redistribution report (JSONL)
 
 This utility implements overflow routing for the Kurultai agent system:
 1. Check queue depth for all agents
-2. Identify overloaded agents (queue > 20) and underutilized agents (queue < 5)
+2. Identify overloaded agents (queue > QUEUE_HIGH_THRESHOLD) and underutilized agents (queue < QUEUE_LOW_THRESHOLD)
 3. For each overloaded agent, find movable tasks that match underutilized agent capabilities
 4. Move tasks from overloaded to underutilized agents
+
+Auto mode (--auto) uses should_trigger_redistribution() to decide whether to run.
 """
 
 import os
@@ -41,8 +45,62 @@ from task_intake import (
     DOMAIN_AGENT_COMPATIBILITY,
     classify_task_domain,
     is_domain_compatible,
+    should_trigger_redistribution,
+    REDISTRIBUTION_TRIGGERS,
 )
 from kurultai_paths import AGENTS_DIR
+
+
+# Lock file for preventing concurrent redistribution runs
+REDISTRIBUTE_LOCK_FILE = "/tmp/redistribute.lock"
+REDISTRIBUTE_LOG_FILE = "/Users/kublai/.openclaw/logs/redistribution.jsonl"
+
+
+def acquire_lock(lock_file=REDISTRIBUTE_LOCK_FILE, timeout_s=0):
+    """Acquire exclusive lock using mkdir (atomic on POSIX).
+
+    Returns (success: bool, lock_fd or None).
+    If timeout_s > 0, will wait for lock to become available.
+    """
+    import fcntl
+    import time
+
+    try:
+        os.makedirs(lock_file, exist_ok=False)
+        # Create pid file
+        with open(f"{lock_file}/pid", "w") as f:
+            f.write(str(os.getpid()))
+        return True, None
+    except FileExistsError:
+        # Lock exists - check if stale
+        pid_file = f"{lock_file}/pid"
+        try:
+            if os.path.exists(pid_file):
+                with open(pid_file) as f:
+                    old_pid = int(f.read().strip())
+                # Check if process still exists
+                try:
+                    os.kill(old_pid, 0)
+                    return False, None  # Process still running
+                except OSError:
+                    # Stale lock - remove and retry
+                    os.rmdir(lock_file)
+                    return acquire_lock(lock_file, timeout_s)
+        except (ValueError, FileNotFoundError):
+            pass
+        return False, None
+    except Exception:
+        return False, None
+
+
+def release_lock(lock_file=REDISTRIBUTE_LOCK_FILE):
+    """Release the lock by removing the lock directory."""
+    try:
+        if os.path.exists(lock_file):
+            os.remove(f"{lock_file}/pid")
+            os.rmdir(lock_file)
+    except Exception:
+        pass
 
 
 def get_pending_tasks(agent):
@@ -144,6 +202,17 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
     Domain compatibility is checked first (if domain field exists in frontmatter).
     Falls back to keyword-based capability matching for tasks without domain.
 
+    EXEMPTIONS (tasks NOT moved):
+    - HIGH priority tasks: require primary agent's attention
+    - ops tasks on ogedei: ogedei is PRIMARY for ops domain
+    - escalation tasks: critical coordination requiring assigned agent
+    - tasks at MAX_RETRY_COUNT: already failed max times, don't redistribute
+
+    IMPORTANT: The MAX_RETRY_COUNT exemption prevents routing audit issues
+    where tasks appear as "routed but 0 executed". Tasks at max retries will
+    be immediately marked as .failed.done.md by task-watcher's cleanup code
+    without execution, causing this discrepancy.
+
     Returns list of (task_path, task_title, dest_agent) tuples.
     """
     pending = get_pending_tasks(overloaded_agent)
@@ -156,14 +225,47 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
         if len(movable) >= max_tasks:
             break
 
-        # 1. Check domain compatibility first (explicit domain field in frontmatter)
-        domain_compatible_agents = [
-            agent for agent in underutilized_names
-            if is_domain_compatible(domain, agent)
-        ]
+        # EXEMPTION 1: Skip HIGH priority tasks
+        priority_match = re.search(r'^priority:\s*(\w+)$', content, re.MULTILINE)
+        task_priority = priority_match.group(1).lower() if priority_match else "normal"
+        if task_priority == "high":
+            continue
+
+        # EXEMPTION 2: ops tasks stay with ogedei (primary agent for ops domain)
+        if domain == "ops" and overloaded_agent == "ogedei":
+            continue
+
+        # EXEMPTION 3: escalation tasks require assigned agent (critical coordination)
+        if domain == "escalation":
+            continue
+
+        # EXEMPTION 4: Skip tasks that have already reached MAX_RETRY_COUNT (2)
+        # These tasks have already failed the maximum number of times and
+        # redistribution will only cause them to be immediately marked as
+        # .failed.done.md by the task-watcher's cleanup code, wasting resources.
+        retry_match = re.search(r'^retry_count:\s*(\d+)$', content, re.MULTILINE)
+        retry_count = int(retry_match.group(1)) if retry_match else 0
+        MAX_RETRY_COUNT = 2  # Must match task-watcher.py MAX_RETRY_COUNT
+        if retry_count >= MAX_RETRY_COUNT:
+            continue
+
+        # 1. Check domain compatibility first, prioritized by DOMAIN_AGENT_COMPATIBILITY order
+        if domain in DOMAIN_AGENT_COMPATIBILITY:
+            # Get agents in domain priority order, then filter to underutilized
+            priority_order = DOMAIN_AGENT_COMPATIBILITY[domain]
+            domain_compatible_agents = [
+                agent for agent in priority_order
+                if agent in underutilized_names
+            ]
+        else:
+            # Fallback: filter underutilized by compatibility
+            domain_compatible_agents = [
+                agent for agent in underutilized_names
+                if is_domain_compatible(domain, agent)
+            ]
 
         if domain_compatible_agents:
-            # Use the first domain-compatible underutilized agent
+            # Use the first domain-compatible underutilized agent (now in priority order!)
             dest_agent = domain_compatible_agents[0]
             movable.append((fpath, title, dest_agent))
             continue
@@ -193,8 +295,10 @@ def redistribute_tasks(dry_run=False, max_move=10, log_file=None):
     depths = get_all_agent_queue_depths()
 
     # Find overloaded and underutilized agents
-    overloaded = [(a, d) for a, d in depths.items() if d > QUEUE_HIGH_THRESHOLD and a != 'kublai']
-    underutilized = find_underutilized_agents(exclude={'kublai', 'tolui'})
+    # Include kublai as overloaded source (coordination tasks can be redistributed)
+    # Include tolui as potential destination (tolui can handle implementation/ops/docs)
+    overloaded = [(a, d) for a, d in depths.items() if d > QUEUE_HIGH_THRESHOLD]
+    underutilized = find_underutilized_agents(exclude={'kublai'})
 
     report = {
         'timestamp': datetime.now().isoformat(),
@@ -268,37 +372,93 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be moved without moving")
     parser.add_argument("--max-move", type=int, default=10,
-                        help="Maximum tasks to move per run (default: 10)")
+                        help="Maximum tasks to move per run (default: 10, auto mode: 5)")
+    parser.add_argument("--auto", action="store_true",
+                        help="Only run if trigger conditions are met (for cron use)")
     parser.add_argument("--log", type=str, default=None,
-                        help="Path to log file for redistribution report")
+                        help="Path to log file for redistribution report (default: {})".format(REDISTRIBUTE_LOG_FILE))
     args = parser.parse_args()
 
-    print("=" * 60)
-    print("Task Redistribution Utility")
-    print("=" * 60)
-    print()
+    # Auto mode: use trigger check and defaults
+    if args.auto:
+        # Try to acquire lock - exit silently if another instance is running
+        lock_acquired, _ = acquire_lock()
+        if not lock_acquired:
+            # Another instance is running, exit silently
+            return 0
 
-    # Show current queue depths
-    depths = get_all_agent_queue_depths()
-    print("Current Queue Depths:")
-    for agent, depth in sorted(depths.items(), key=lambda x: -x[1]):
-        status = "🔴 OVER" if depth > QUEUE_HIGH_THRESHOLD else "🟡 IDLE" if depth < QUEUE_LOW_THRESHOLD else "🟢 OK"
-        print(f"  {agent:12s}: {depth:3d} {status}")
-    print()
+        try:
+            # Check trigger conditions
+            should_trigger, reason = should_trigger_redistribution()
+            if not should_trigger:
+                # No trigger met - exit silently
+                return 0
 
-    # Run redistribution
-    if args.dry_run:
-        print("DRY RUN MODE - No tasks will be moved")
+            # Auto mode defaults
+            max_move = args.max_move if args.max_move != 10 else REDISTRIBUTION_TRIGGERS['max_move_per_cycle']
+            log_file = args.log if args.log else REDISTRIBUTE_LOG_FILE
+        finally:
+            # Always release lock
+            release_lock()
+    else:
+        max_move = args.max_move
+        log_file = args.log
+        lock_acquired, _ = acquire_lock()
+        if not lock_acquired:
+            print("ERROR: Another redistribution is already running (lock file exists)")
+            print(f"Lock file: {REDISTRIBUTE_LOCK_FILE}")
+            print("If this is stale, remove it manually:")
+            print(f"  rm -rf {REDISTRIBUTE_LOCK_FILE}")
+            return 1
+
+    try:
+        print("=" * 60)
+        print("Task Redistribution Utility")
+        if args.auto:
+            print("AUTO MODE (triggered: {})".format(reason))
+        print("=" * 60)
         print()
 
-    moved, report = redistribute_tasks(
-        dry_run=args.dry_run,
-        max_move=args.max_move,
-        log_file=args.log
-    )
+        # Show current queue depths
+        depths = get_all_agent_queue_depths()
+        print("Current Queue Depths:")
+        for agent, depth in sorted(depths.items(), key=lambda x: -x[1]):
+            status = "🔴 OVER" if depth > QUEUE_HIGH_THRESHOLD else "🟡 IDLE" if depth < QUEUE_LOW_THRESHOLD else "🟢 OK"
+            print(f"  {agent:12s}: {depth:3d} {status}")
+        print()
 
-    print()
-    print(f"Total tasks {'that would be ' if args.dry_run else ''}moved: {moved}")
+        # Run redistribution
+        if args.dry_run:
+            print("DRY RUN MODE - No tasks will be moved")
+            print()
+
+        moved, report = redistribute_tasks(
+            dry_run=args.dry_run,
+            max_move=max_move,
+            log_file=log_file
+        )
+
+        print()
+        print(f"Total tasks {'that would be ' if args.dry_run else ''}moved: {moved}")
+
+        if report.get('message'):
+            print(f"Status: {report['message']}")
+
+        # Save report if log file specified
+        if log_file:
+            import json
+            try:
+                log_path = Path(log_file)
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, 'a') as f:
+                    f.write(json.dumps(report) + '\n')
+                print(f"Report saved to: {log_file}")
+            except Exception as e:
+                print(f"Failed to save report: {e}")
+
+        return 0 if moved > 0 or not report.get('overloaded') else 1
+    finally:
+        release_lock()
 
     if report.get('message'):
         print(f"Status: {report['message']}")

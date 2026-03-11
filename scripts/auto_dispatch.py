@@ -124,7 +124,7 @@ def list_executing_tasks(agent):
 
     executing = []
     for f in tasks_dir.iterdir():
-        if ".executing" in f.name and f.is_file():
+        if f.name.endswith(".executing.md") and f.is_file():
             executing.append(f)
     return executing
 
@@ -164,8 +164,8 @@ def check_completed_dispatches(agent):
         tasks_dir = AGENTS_BASE / agent / "tasks"
         dispatch_log = AGENTS_BASE / "main/logs" / f"dispatch-{agent}.log"
         for f in tasks_dir.iterdir():
-            if ".executing" in f.name and f.is_file():
-                base_name = f.name.replace(".executing", "")
+            if f.name.endswith(".executing.md") and f.is_file():
+                base_name = f.name.replace(".executing.md", "")
                 if base_name == task_name or task_name in f.name:
                     # Check dispatch log for completion evidence
                     has_output = False

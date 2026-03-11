@@ -212,6 +212,8 @@ def bottleneck_index(hours=1):
         rate = completions / max(hours, 1)
 
         # Count pending tasks from filesystem
+        # Terminal state markers: .done, .failed, .resolved, .completed, .cancelled, .false-positive
+        skip_patterns = ['.done', '.failed', '.resolved', '.completed', '.cancelled', '.false-positive']
         pending = 0
         executing = 0
         recovering = 0
@@ -219,13 +221,17 @@ def bottleneck_index(hours=1):
         if task_dir.exists():
             try:
                 for fname in os.listdir(str(task_dir)):
-                    if fname.endswith(".md") and ".done" not in fname:
-                        if ".recovering" in fname:
-                            recovering += 1
-                        elif ".executing" in fname:
-                            executing += 1
-                        else:
-                            pending += 1
+                    if not fname.endswith(".md"):
+                        continue
+                    # Skip terminal state files (including .done-{uuid}.md patterns)
+                    if any(pattern in fname for pattern in skip_patterns):
+                        continue
+                    if ".recovering" in fname:
+                        recovering += 1
+                    elif fname.endswith(".executing.md"):
+                        executing += 1
+                    else:
+                        pending += 1
             except Exception:
                 pass
 

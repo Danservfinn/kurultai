@@ -25,7 +25,7 @@ sys_path_insert = os.path.dirname(os.path.abspath(__file__))
 if sys_path_insert not in sys.path:
     sys.path.insert(0, sys_path_insert)
 
-from kurultai_paths import AGENTS_DIR
+from kurultai_paths import AGENTS_DIR, VALID_AGENTS
 
 # Try to import ledger function
 try:
@@ -66,9 +66,6 @@ SUFFIX_PENDING_GATE = ".pending-gate.md"
 SUFFIX_GATE_PASSED = ".gate-passed.done.md"
 SUFFIX_GATE_BYPASSED = ".gate-bypassed.done.md"
 SUFFIX_GATE_BLOCKED = ".gate-blocked.md"
-
-# Valid agents for lookups
-VALID_AGENTS = {'kublai', 'temujin', 'mongke', 'chagatai', 'jochi', 'ogedei', 'tolui'}
 
 
 def extract_yaml_frontmatter(content: str) -> dict:

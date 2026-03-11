@@ -286,6 +286,31 @@ def enhance_task_prompt(
     # Build the full prompt with optimized task
     prompt_parts = []
 
+    # R008 FIX: Skill hint as MANDATORY FIRST ACTION (not just a suggestion at the end)
+    # This ensures agents cannot miss the skill requirement
+    if skill_hint:
+        skill_name = skill_hint.lstrip('/')
+        prompt_parts.append(f"""
+⚠️ ═══════════════════════════════════════════════════════════════════════════════
+🚨 R008 RULE ENFORCEMENT: MANDATORY SKILL INVOCATION
+══════════════════════════════════════════════════════════════════════════════ ⚠️
+
+This task REQUIRES you to invoke the {skill_hint} skill.
+
+YOUR FIRST ACTION MUST BE:
+    Skill(skill="{skill_name}")
+
+DO NOT:
+- Skip this step
+- Do other work first
+- Only reference the skill without invoking it
+
+If you do not invoke this skill, your task will be marked as FAILED with R008_VIOLATION.
+
+═════════════════════════════════════════════════════════════════════════════════
+
+""")
+
     # Context history (cross-agent clarity)
     if context_history:
         prompt_parts.append(context_history)
@@ -307,10 +332,6 @@ def enhance_task_prompt(
     # Rules section
     if rules:
         prompt_parts.append(rules)
-
-    # Skill invocation hint
-    if skill_hint:
-        prompt_parts.append(f"\n\nIMPORTANT: Start this task by invoking {skill_hint} — it is the correct skill for this work.")
 
     # Execution instruction
     prompt_parts.append("\n\nExecute this task completely using your tools. Read files, write code, run commands, verify your work. For simple questions, a direct answer is fine.")

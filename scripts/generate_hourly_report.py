@@ -43,6 +43,21 @@ from kurultai_paths import (
     AGENTS_DIR, LOGS_DIR, MAIN_DIR, PROPOSALS_DIR,
 )
 
+# Model detection - get default model for report generation
+def get_model():
+    """Get the default model from main agent config."""
+    try:
+        settings_file = AGENTS_DIR / "main" / ".claude" / "settings.json"
+        if settings_file.exists():
+            with open(settings_file) as f:
+                config = json.load(f)
+            return config.get("env", {}).get("ANTHROPIC_MODEL", "unknown")
+    except Exception:
+        pass
+    return "unknown"
+
+MODEL = get_model()
+
 REPORTS_DIR = LOGS_DIR / "hourly-reports"
 SKILLS_LOG = LOGS_DIR / "skills-invoked.json"
 REVIEWS_DIR = LOGS_DIR / "reviews"
@@ -353,6 +368,8 @@ def generate_full_report(reflections, reviews, proposals, decisions, tasks_creat
 
     lines.append(f"# Hourly Kurultai Reflection Report -- {time_display}")
     lines.append("")
+    lines.append(f"**Model:** {MODEL}")
+    lines.append("")
 
     # Pipeline timing
     if timing:
@@ -489,6 +506,7 @@ def generate_signal_message(reflections, reviews, proposals, decisions, tasks_cr
     lines = []
 
     lines.append(f"Hourly Kurultai Report -- {time_display}")
+    lines.append(f"Model: {MODEL}")
     lines.append("")
 
     # Agent reflections (one-liner each)

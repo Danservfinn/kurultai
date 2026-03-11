@@ -1,0 +1,22 @@
+{
+  "original_task": "fix-resolution-5b82a9f6-1a9-routed-9012d922",
+  "completion_percentage": 85,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "mongke",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-09T13:34:16.051392",
+  "audit_version": "1.0"
+}

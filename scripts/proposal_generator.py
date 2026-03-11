@@ -21,7 +21,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -146,7 +146,9 @@ def generate_proposal_id(agent: str) -> str:
 def calculate_voting_deadline(hours: int = 1) -> str:
     """Calculate voting deadline (default 1 hour from now)."""
     deadline = datetime.now().replace(minute=0, second=0, microsecond=0)
-    deadline = deadline.replace(hour=deadline.hour + hours)
+    # FIX: Use timedelta to handle day boundary correctly
+    # (deadline.hour + hours) can exceed 23, causing ValueError
+    deadline = deadline + timedelta(hours=hours)
     return deadline.isoformat()
 
 

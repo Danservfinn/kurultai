@@ -21,8 +21,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-AGENTS_DIR = Path.home() / ".openclaw" / "agents"
-VALID_AGENTS = {"temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kurultai_paths import AGENTS_DIR, VALID_AGENTS as _VALID_AGENTS
+
+# Note: task-status.py excludes 'tolui' intentionally for legacy compatibility
+VALID_AGENTS = set(_VALID_AGENTS) - {"tolui"}
 
 
 def is_pid_alive(pid):

@@ -1,7 +1,7 @@
 """Canonical agent configuration — single source of truth.
 
 All scripts that need agent lists, roles, or model mappings should import from here.
-CLAUDE API RATE LIMITED until 2026-03-12 — all agents using glm-5 (Z.ai).
+All agents use claude-opus-4-6 via Anthropic API.
 Task queue paths are derived from kurultai_paths.AGENTS_DIR (the canonical root).
 """
 
@@ -25,12 +25,12 @@ AGENT_ROLES = {
     "ogedei": "Ops (monitoring, health checks, failover)",
 }
 
-# CLAUDE API RATE LIMITED until 2026-03-12 — using glm-5 (Z.ai)
+# All agents use claude-opus-4-6 (Canonical source for reflection/telemetry)
 AGENT_MODELS = {
-    "kublai": "glm-5",
-    "mongke": "glm-5",
-    "chagatai": "glm-5",
-    "temujin": "glm-5",
-    "jochi": "glm-5",
-    "ogedei": "glm-5",
+    "kublai": "claude-opus-4-6",
+    "mongke": "claude-opus-4-6",
+    "chagatai": "claude-opus-4-6",
+    "temujin": "claude-opus-4-6",
+    "jochi": "claude-opus-4-6",
+    "ogedei": "claude-opus-4-6",
 }

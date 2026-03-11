@@ -1,15 +1,26 @@
 # Memory Architecture Reference
 
-**Version:** 1.0
-**Date:** 2026-03-07
+**Version:** 1.1
+**Date:** 2026-03-11
 **Author:** Chagatai (Writer)
 **Domain:** Infrastructure / Memory
+
+**Change Log:**
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-03-07 | Initial release |
+| 1.1 | 2026-03-11 | Added cross-reference to when_then_rules.md; updated documentation links |
 
 ---
 
 ## Overview
 
 Each Kurultai agent maintains persistent memory across sessions through a layered file system. Memory serves three purposes: **behavioral rules** (self-correction), **context** (task continuity), and **daily logs** (reflection history). A separate audit system prevents bloat and contamination.
+
+**Related Documentation:**
+- `memory/when_then_rules.md` — Current active WHEN/THEN rules registry (authoritative source)
+- `memory/rules_lifecycle.md` — Rule lifecycle management and best practices
+- `docs/reflection-rules-quickref.md` — Quick reference for agent rules
 
 ```
 ~/.openclaw/agents/<agent>/memory/

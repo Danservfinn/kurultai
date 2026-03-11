@@ -56,63 +56,16 @@
 
 ## WHEN/THEN Rules
 
-### Routing Accuracy Rules
-- **WHEN** task contains "model error" **THEN** route to ogedei for immediate fix
-- **WHEN** queue depth > HIGH_THRESHOLD AND agent has < LOW_THRESHOLD **THEN** redistribute to underutilized agent
-- **WHEN** task classification ambiguous AND multiple agents capable **THEN** use predictive routing based on historical completion times
+**Canonical registry:** `memory/when_then_rules.md` (7 active rules, R001-R007)
+**Rule lifecycle docs:** `memory/rules_lifecycle.md`
 
-### Delegation Rules
-- **WHEN** skill_hint present in task **THEN** prioritize agent with that skill
-- **WHEN** task explicitly mentions code review **THEN** route to jochi regardless of other keywords
-- **WHEN** task mentions architecture/design AND code **THEN** route to temujin (development domain includes architecture)
+> Do NOT define rules here. All rules live in the canonical registry above.
 
-### System Health Rules
-- **WHEN** model configuration drift detected **THEN** auto-correct and alert
-- **WHEN** fake completion detected in audit **THEN** trigger pipeline fix investigation
-- **WHEN** agent queue age > 1800s (30min) **THEN** trigger redistribution alert
+## Memory Maintenance
 
-## Future Improvements
-
-### Short Term (1-2 weeks)
-- Implement configuration validation system
-- Fix fake completion root cause
-- Improve routing disambiguation rules
-
-### Medium Term (1 month)
-- Implement predictive routing
-- Add agent capability monitoring
-- Create routing performance dashboard
-
-### Long Term (3 months)
-- Machine learning-based task routing
-- Dynamic agent capability scaling
-- Cross-agent optimization algorithms
-
-## Coordination Patterns
-
-### Weekly Synchronization
-- Every Monday: Review routing effectiveness metrics
-- Every Wednesday: Audit agent workload distribution
-- Every Friday: Analyze failure patterns and adjust rules
-
-### Alert System
-- Critical failures: Immediate notification to all agents
-- Configuration drift: Auto-correct with human oversight
-- Queue imbalances: Proactive redistribution before threshold breach
-
-## Performance Benchmarks
-
-### Current Targets
-- Task completion success rate: >90%
-- Average task completion time: <1 hour
-- Queue redistribution accuracy: >95%
-- Model configuration accuracy: 100%
-
-### Improvement Goals
-- Success rate: 95%+
-- Completion time: <45 minutes
-- Redistribution accuracy: >98%
-- Zero configuration failures
+- **Pruning:** `scripts/memory_pruner.py` — consolidates daily files >3 days old into weekly summaries
+- Run: `python3 scripts/memory_pruner.py [--dry-run]`
+- Targets ~90% line reduction while preserving key learnings and rules
 
 ## Code Reference
 
@@ -126,3 +79,12 @@
 - Queue thresholds: HIGH=3, CRITICAL=8, LOW=2
 - Failure bypass: 80% failure rate threshold
 - Model validation: Real-time checking against canonical config
+
+### Mongke Research Self-Tasking (2026-03-11)
+**Improvement:** Added proactive implicit research opportunity detection
+**File:** `scripts/mongke_self_task.py` - `_find_implicit_research_opportunities()`
+**Purpose:** Detects research demand not explicitly flagged:
+- Routing decisions with research keywords that went to other agents
+- Recent proposals needing competitive/market analysis
+- Aggregates missed opportunities into actionable research tasks
+**Impact:** Shifts mongke from reactive to proactive research, increasing throughput without waiting for explicit requests

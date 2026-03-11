@@ -1,0 +1,31 @@
+{
+  "original_task": "fix-resolution-93bdcf68-1f0-ff6891a3",
+  "completion_percentage": 80,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output"
+  ],
+  "quality_issues": [
+    "Add error handling"
+  ],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "mongke",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "mongke",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T19:42:04.925105",
+  "audit_version": "1.0"
+}

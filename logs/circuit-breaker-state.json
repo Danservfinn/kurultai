@@ -1,19 +1,19 @@
 {
-  "ts": "2026-03-08T15:59:11.300759",
+  "ts": "2026-03-11T06:13:59.285628",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 4,
+      "failure_count": 2,
+      "success_count": 23,
       "last_failure_rate": 0.0
     },
     "mongke": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 6,
-      "last_failure_rate": 0.0
+      "failure_count": 3,
+      "success_count": 18,
+      "last_failure_rate": 0.5
     },
     "tolui": {
       "state": "CLOSED",
@@ -25,29 +25,29 @@
     "jochi": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 6,
-      "last_failure_rate": 0.8
+      "failure_count": 3,
+      "success_count": 18,
+      "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 2,
-      "last_failure_rate": 0.8333333333333334
+      "failure_count": 11,
+      "success_count": 29,
+      "last_failure_rate": 0.0
     },
     "temujin": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 22,
+      "failure_count": 1,
+      "success_count": 45,
       "last_failure_rate": 0.0
     },
     "kublai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 5,
+      "failure_count": 4,
+      "success_count": 64,
       "last_failure_rate": 0.0
     }
   },
@@ -171,6 +171,72 @@
       "to": "mongke",
       "task": "normal-1772987707.md",
       "ts": "2026-03-08T13:16:25.687466"
+    },
+    {
+      "from": "temujin",
+      "to": "mongke",
+      "task": "selfwake-redistribution-1772982962703.md",
+      "ts": "2026-03-08T22:17:14.706940"
+    },
+    {
+      "from": "temujin",
+      "to": "chagatai",
+      "task": "selfwake-redistribution-1772982962706.md",
+      "ts": "2026-03-08T22:17:14.708070"
+    },
+    {
+      "from": "temujin",
+      "to": "jochi",
+      "task": "completion-gate-monitoring-1772950852.verified.md",
+      "ts": "2026-03-08T22:17:14.709802"
+    },
+    {
+      "from": "temujin",
+      "to": "ogedei",
+      "task": "completion-gate-documentation-1772980125.verified.md",
+      "ts": "2026-03-08T22:17:14.711663"
+    },
+    {
+      "from": "temujin",
+      "to": "tolui",
+      "task": "kublai-learning-cron-1772992004.verified.md",
+      "ts": "2026-03-08T22:17:14.713476"
+    },
+    {
+      "from": "temujin",
+      "to": "mongke",
+      "task": "proposal-voting-python-scripts.verified.md",
+      "ts": "2026-03-08T22:17:14.715181"
+    },
+    {
+      "from": "temujin",
+      "to": "chagatai",
+      "task": "experiment-git-ops-implementation-1773024000000.md",
+      "ts": "2026-03-08T22:17:14.716857"
+    },
+    {
+      "from": "temujin",
+      "to": "jochi",
+      "task": "experiment-pool-implementation-1773024000001.md",
+      "ts": "2026-03-08T22:17:14.718106"
+    },
+    {
+      "from": "temujin",
+      "to": "ogedei",
+      "task": "rollback-manager-implementation-1773024000002.md",
+      "ts": "2026-03-08T22:17:14.719732"
+    },
+    {
+      "from": "temujin",
+      "to": "tolui",
+      "task": "setup-git-repos-for-autoresearch-1772992010.md",
+      "ts": "2026-03-08T22:17:14.721102"
+    },
+    {
+      "from": "temujin",
+      "to": "mongke",
+      "task": "ESCALATE-stale-task-kublai-EMERGENCY-fleet-credential-fix-1773020654-20260308-235435.false-positive.resolved.revision-1.md",
+      "ts": "2026-03-09T04:04:39.804965"
     }
   ]
 }

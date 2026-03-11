@@ -17,6 +17,7 @@
 | **Priority** | LOW |
 | **Added** | 2026-03-04 |
 | **Status** | Monitoring |
+| **Last Verified** | 2026-03-10 |
 
 **What It Is:**
 Training neural networks directly on Apple's Neural Engine (ANE) using reverse-engineered private APIs (`_ANEClient`, `_ANECompiler`).
@@ -29,6 +30,12 @@ Training neural networks directly on Apple's Neural Engine (ANE) using reverse-e
 | Model Size Limit | ~200M params |
 | Training Speed | 91-110 ms/step (Stories110M) |
 | License | MIT |
+
+**Recent Updates (March 2026):**
+- ✅ **INT8 W8A8 Support**: New quantization with **1.88x throughput improvement** (Mar 10)
+- ✅ **Multi-Model Dashboard**: Added with GQA (Grouped Query Attention) support (Mar 7)
+- ✅ **Qwen3-0.6B Support**: New model support added (Mar 6)
+- ✅ **Active Development**: Latest commit Mar 10, 2026
 
 **Current Limitations:**
 - Research project, NOT production-ready
@@ -67,6 +74,7 @@ Training neural networks directly on Apple's Neural Engine (ANE) using reverse-e
 | **Priority** | HIGH |
 | **Added** | 2026-03-04 |
 | **Status** | **INTEGRATED** |
+| **Current Version** | v0.4.2 (Mar 8, 2026) |
 
 **What It Is:**
 Adaptive web scraping framework with anti-bot bypass and MCP server support.
@@ -75,6 +83,13 @@ Adaptive web scraping framework with anti-bot bypass and MCP server support.
 - ✅ Phase 1: Installation + skill library
 - ✅ Phase 2: Agent tasks + cron jobs
 - ✅ Phase 3: MCP server for Claude Code
+
+**v0.4.2 Updates (March 8, 2026):**
+- ✅ **Spider Framework Integration**: New scraping capabilities
+- ✅ **Proxy Rotation**: Built-in proxy rotation support
+- ✅ **Cloudflare Solver**: 2x faster bypass
+- ✅ **MCP Schema Improvements**: Enhanced Model Context Protocol integration
+- ✅ **Documentation Updates**: March 10 docs refresh
 
 **Cron Jobs:**
 - Competitor Monitoring (every 6 hours)
@@ -107,4 +122,4 @@ Adaptive web scraping framework with anti-bot bypass and MCP server support.
 
 ---
 
-*Last updated: 2026-03-04*
+*Last updated: 2026-03-10*

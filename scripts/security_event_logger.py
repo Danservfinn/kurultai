@@ -68,6 +68,7 @@ class EventType(Enum):
     AUDIT_TAMPER_ATTEMPT = "AUDIT_TAMPER_ATTEMPT"
     AUTH_FAILURE = "AUTH_FAILURE"
     MULTI_PARTY_APPROVAL = "MULTI_PARTY_APPROVAL"
+    FORCE_BYPASS_USED = "FORCE_BYPASS_USED"
 
 
 def _generate_event_hash(event_data: Dict[str, Any]) -> str:
@@ -91,16 +92,14 @@ def _log_to_neo4j(event: Dict[str, Any]) -> bool:
         return False
 
     try:
-        # Neo4j connection from environment - no hardcoded defaults for credentials
-        uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-        user = os.environ.get("NEO4J_USER", "neo4j")
-        password = os.environ.get("NEO4J_PASSWORD")
-
-        if not password:
-            print("[WARN] NEO4J_PASSWORD not set - skipping Neo4j security logging")
+        # Neo4j connection - use centralized driver with connection pooling
+        try:
+            from neo4j_task_tracker import get_driver
+        except ImportError:
+            print("[WARN] neo4j_task_tracker not available - skipping Neo4j security logging")
             return False
 
-        driver = GraphDatabase.driver(uri, auth=(user, password))
+        driver = get_driver()
 
         with driver.session() as session:
             # Create immutable SecurityEvent node
@@ -283,8 +282,8 @@ def check_rate_limits(
             for line in f:
                 try:
                     events.append(json.loads(line.strip()))
-                except:
-                    pass
+                except (json.JSONDecodeError, ValueError):
+                    pass  # Skip malformed lines
 
     # Filter events for this identifier
     now = datetime.now()
@@ -353,10 +352,10 @@ def get_recent_bypasses(hours: int = 24) -> List[Dict[str, Any]]:
                         event_time = datetime.fromisoformat(event.get("timestamp", ""))
                         if event_time.timestamp() > cutoff:
                             bypasses.append(event)
-                    except:
+                    except (ValueError, TypeError):
                         # If timestamp parse fails, include anyway
                         bypasses.append(event)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 pass
 
     return bypasses
@@ -406,7 +405,7 @@ def main():
     if args.type and args.details:
         try:
             details = json.loads(args.details)
-        except:
+        except json.JSONDecodeError:
             print("Error: --details must be valid JSON")
             return 1
 

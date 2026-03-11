@@ -254,13 +254,11 @@ def main():
     parser.add_argument('--status', default='COMPLETED', help='Task status to filter (default: COMPLETED)')
     args = parser.parse_args()
 
-    # Neo4j connection
-    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "myStrongPassword123")
+    # Neo4j connection - use centralized driver
+    from neo4j_task_tracker import get_driver
 
-    print(f"Connecting to Neo4j at {uri}...")
-    driver = GraphDatabase.driver(uri, auth=(user, password), connection_timeout=10)
+    print("Connecting to Neo4j...")
+    driver = get_driver()
 
     try:
         with driver.session() as session:

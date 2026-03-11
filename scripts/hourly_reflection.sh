@@ -21,7 +21,12 @@
 # FALLBACK: Exit 0 even if downstream steps fail (content generation succeeded)
 
 SCRIPT_START=$(date +%s)
-TIMEOUT_SECONDS=600
+TIMEOUT_SECONDS=7200  # 2 hours
+
+# ============================================================
+# MODEL DETECTION: Get default model for reflection pipeline
+# ============================================================
+MODEL=$(python3 "$SCRIPTS/get_model.py" --agent main 2>/dev/null || echo "unknown")
 
 # ============================================================
 # CONCURRENCY CONTROL: Semaphore limiting for Claude processes
@@ -195,7 +200,7 @@ SCRIPTS="/Users/kublai/.openclaw/agents/main/scripts"
 STEP_TIMING_FILE="$LOGS_DIR/reflection-step-timing.json"
 REVIEWS_DIR="$LOGS_DIR/reviews"
 CLAUDE_AGENT_BIN="/Users/kublai/.local/bin/claude-agent"
-REVIEW_TIMEOUT=300  # 5 minutes - horde-review dispatches multiple parallel agents, needs more time
+REVIEW_TIMEOUT=3600  # 1 hour - horde-review dispatches multiple parallel agents, needs more time
 
 mkdir -p "$REVIEWS_DIR"
 
@@ -257,6 +262,67 @@ EOTIMING
     rm -rf "$_STEP_TIMING_DIR"
 }
 
+# ============================================================
+# AUTH HEALTH PREFLIGHT: Check if claude-agent can authenticate
+# Prevents 15-hour reflection blackouts from auth failures
+# ============================================================
+AUTH_FAILURES_LOG="$LOGS_DIR/auth-failures.jsonl"
+
+log_auth_failure() {
+    local agent="$1"
+    local reason="${2:-unknown}"
+    local timestamp="$(date -Iseconds)"
+
+    {
+        echo "{\"timestamp\": \"$timestamp\", \"agent\": \"$agent\", \"script\": \"hourly_reflection.sh\", \"reason\": \"$reason\"}"
+    } >> "$AUTH_FAILURES_LOG"
+
+    # Also log to ticks for visibility
+    echo "[$timestamp] AUTH_FAILURE: $agent failed preflight (reason: $reason)" >> "$LOGS_DIR/ticks.jsonl"
+}
+
+auth_health_preflight() {
+    local agent="${1:-kublai}"
+    local timeout="${2:-15}"
+    local max_retries=3  # Exponential backoff: 0s, 2s, 4s delays
+    local attempt=0
+
+    # Quick test: Can claude-agent complete a minimal request?
+    # NOTE: claude-agent wrapper doesn't support --agent flag
+    # We run from the agent's directory to ensure correct context
+    local agent_dir="/Users/kublai/.openclaw/agents/$agent"
+    if [ ! -d "$agent_dir" ]; then
+        return 1  # Agent directory doesn't exist
+    fi
+
+    while [ $attempt -lt $max_retries ]; do
+        (
+            cd "$agent_dir" || exit 1
+            timeout ${timeout}s "$CLAUDE_AGENT_BIN" \
+                "Respond with exactly: OK" \
+                >/dev/null 2>&1
+        )
+        local rc=$?
+
+        if [ $rc -eq 0 ]; then
+            return 0  # Success - no need to retry
+        fi
+
+        attempt=$((attempt + 1))
+
+        # Exponential backoff: 2^attempt seconds (2s, 4s, 8s)
+        if [ $attempt -lt $max_retries ]; then
+            local backoff=$((2 ** attempt))
+            echo "[$(date)] [$agent] Auth preflight attempt $attempt failed, retrying in ${backoff}s..." >&2
+            sleep $backoff
+        fi
+    done
+
+    # All retries exhausted
+    echo "[$(date)] [$agent] Auth preflight failed after $max_retries attempts" >&2
+    return 1
+}
+
 # Function to run reflection for a single agent
 run_agent_reflection() {
     local AGENT="$1"
@@ -265,7 +331,17 @@ run_agent_reflection() {
     local DATE=$(date +%Y-%m-%d)
     local TIME=$(date +%H:%M)
 
-    echo "[$(date)] [$AGENT] Starting protocol reflection..."
+    # ============================================================
+    # AUTH PREFLIGHT: Check before attempting reflection
+    # Skip gracefully if auth fails (don't fail the entire cron job)
+    # ============================================================
+    if ! auth_health_preflight "$AGENT" 15; then
+        echo "[$(date)] [$AGENT] SKIP: Auth preflight failed - skipping reflection"
+        log_auth_failure "$AGENT" "preflight_timeout_or_auth_error"
+        return 0  # Exit gracefully, not as error
+    fi
+
+    echo "[$(date)] [$AGENT] Auth confirmed - Starting protocol reflection..."
 
     # Ensure memory directory exists
     mkdir -p "$MEMORY_DIR"
@@ -436,8 +512,9 @@ timed_step "task-metrics" \
 echo "[$(date)] Starting Consensus Voting (Kurultai Model)..."
 
 # Phase 1: Generate proposals from each agent
+# CHANGE: Removed --sample flag - only use real reflection proposals
 timed_step "voting-phase1-proposals" \
-    run_with_timeout 60 python3 "$SCRIPTS/proposal_generator.py" --agent kublai --sample >> "$LOGS_DIR/voting-phase1.log" 2>&1
+    run_with_timeout 60 python3 "$SCRIPTS/proposal_generator.py" --agent kublai >> "$LOGS_DIR/voting-phase1.log" 2>&1
 
 # Phase 2: Start voting for pending proposals
 timed_step "voting-phase2-start" \
@@ -487,9 +564,15 @@ _bg_timed_step() {
 
 echo "[$(date)] Starting Tier 1 (independent steps) with semaphore..."
 
-for step_name in "memory-audit-fix" "cross-agent-rules" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis"; do
+for step_name in "reflection-research-persist" "session-drift-detect" "memory-audit-fix" "cross-agent-rules" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis"; do
     wait_for_semaphore
     case "$step_name" in
+        reflection-research-persist)
+            _bg_timed_step "$step_name" run_with_timeout 15 python3 "$SCRIPTS/persist_research.py" --persist-reflection --agent mongke >> "$LOGS_DIR/reflection-research-persist.log" 2>&1 &
+            ;;
+        session-drift-detect)
+            _bg_timed_step "$step_name" run_with_timeout 15 python3 "$SCRIPTS/session_model_drift_detector.py" >> "$LOGS_DIR/session-drift.log" 2>&1 &
+            ;;
         memory-audit-fix)
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/memory_audit.py" --fix >> "$LOGS_DIR/memory-audit.log" 2>&1 &
             ;;
@@ -532,7 +615,7 @@ timed_step "kublai-initiative" \
     run_with_timeout 60 python3 "$SCRIPTS/kublai-initiative.py" >> "$LOGS_DIR/kublai-initiative.log" 2>&1
 
 timed_step "kurultai-report" \
-    run_with_timeout 120 "$CLAUDE_AGENT_BIN" --model sonnet /kurultai-report >> "$LOGS_DIR/kurultai-report.log" 2>&1
+    run_with_timeout 30 "$CLAUDE_AGENT_BIN" /kurultai-report >> "$LOGS_DIR/kurultai-report.log" 2>&1
 
 timed_step "hourly-report" \
     run_with_timeout 60 python3 "$SCRIPTS/generate_hourly_report.py" >> "$LOGS_DIR/hourly-report.log" 2>&1

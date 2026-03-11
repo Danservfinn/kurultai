@@ -10,3 +10,19 @@
 {"ts": "2026-03-08T15:12:38.355151", "from": "ogedei", "to": "jochi", "title": "the.kurult.ai failing health checks (8x, 22 minutes)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=28)"}
 {"ts": "2026-03-08T15:15:31.150322", "from": "jochi", "to": "ogedei", "title": "Audit stuck executing tasks (2+ hours)", "reason": "load-balance: jochi busy, ogedei idle (overflow-map, security, queue=24)"}
 {"ts": "2026-03-08T15:19:07.262688", "from": "temujin", "to": "ogedei", "title": "FIX: Parse Agent Services TypeScript errors blocking deployment", "reason": "load-balance: temujin busy, ogedei idle (overflow-map, deploy, queue=24)"}
+{"ts": "2026-03-08T16:04:20.024738", "from": "ogedei", "to": "jochi", "title": "the.kurult.ai failing health checks (6x, 19 minutes)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=14)"}
+{"ts": "2026-03-08T16:05:08.877897", "from": "ogedei", "to": "jochi", "title": "the.kurult.ai failing health checks (7x, 20 minutes)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=14)"}
+{"ts": "2026-03-08T16:07:08.842682", "from": "ogedei", "to": "jochi", "title": "the.kurult.ai failing health checks (8x, 22 minutes)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=14)"}
+{"ts": "2026-03-08T16:07:14.089372", "from": "ogedei", "to": "jochi", "title": "the.kurult.ai failing health checks (9x, 22 minutes)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=14)"}
+{"ts": "2026-03-08T16:55:29.178222", "from": "temujin", "to": "jochi", "title": "Test task for status update", "reason": "broadcast: temujin critical queue=37, routing to jochi (queue=12)"}
+{"ts": "2026-03-08T16:56:25.102326", "from": "temujin", "to": "jochi", "title": "Test task for status update", "reason": "broadcast: temujin critical queue=37, routing to jochi (queue=16)"}
+{"ts": "2026-03-08T16:57:19.097130", "from": "temujin", "to": "jochi", "title": "Test task for status update", "reason": "broadcast: temujin critical queue=37, routing to jochi (queue=18)"}
+{"ts": "2026-03-08T16:59:20.316129", "from": "temujin", "to": "jochi", "title": "Test task for status update", "reason": "broadcast: temujin critical queue=38, routing to jochi (queue=11)"}
+{"ts": "2026-03-08T17:05:40.870243", "from": "temujin", "to": "jochi", "title": "Test task for status update", "reason": "broadcast: temujin critical queue=38, routing to jochi (queue=14)"}
+{"ts": "2026-03-08T18:19:46.715141", "from": "temujin", "to": "jochi", "title": "3-hour review: the.kurult.ai", "reason": "load-balance: temujin busy, jochi idle (overflow-map, code_review, queue=16)"}
+{"ts": "2026-03-08T19:29:25.501940", "from": "ogedei", "to": "jochi", "title": "System Health Alert (2 issues)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=13)"}
+{"ts": "2026-03-08T19:29:29.505274", "from": "ogedei", "to": "jochi", "title": "System Health Alert (2 issues)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=14)"}
+{"ts": "2026-03-08T19:29:33.294019", "from": "ogedei", "to": "jochi", "title": "System Health Alert (2 issues)", "reason": "load-balance: ogedei busy, jochi idle (overflow-map, monitoring, queue=14)"}
+{"ts": "2026-03-08T21:38:58.651876", "from": "temujin", "to": "jochi", "title": "3-hour review: the.kurult.ai", "reason": "load-balance: temujin busy, jochi idle (overflow-map, code_review, queue=5)"}
+{"ts": "2026-03-11T02:01:26.528247", "from": "temujin", "to": "jochi", "title": "test routing: implement new feature", "reason": "equal-queue-tiebreak: temujin (queue=4) -> jochi (queue=4, priority 2 < 3)"}
+{"ts": "2026-03-11T02:06:43.340323", "from": "temujin", "to": "jochi", "title": "test override2: build new api", "reason": "equal-queue-tiebreak: temujin (queue=4) -> jochi (queue=4, priority 2 < 3)"}

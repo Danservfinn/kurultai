@@ -1,0 +1,166 @@
+{
+  "timestamp": "2026-03-09T09:05:04Z",
+  "hour_file": "2026-03-09-05",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 2.236,
+    "depths": {"temujin": 0, "mongke": 0, "chagatai": 0, "jochi": 0, "ogedei": 4},
+    "mean": 0.8,
+    "std": 1.79
+  },
+  "routing": {
+    "total_routed": 13,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-09T05:05:04.451471",
+  "total_routed": 13,
+  "routing_methods": {
+    "explicit": 13
+  },
+  "destinations": {
+    "ogedei": 10,
+    "kublai": 3
+  },
+  "by_agent": {
+    "ogedei": {
+      "routed": 10,
+      "executed": 4,
+      "succeeded": 1,
+      "failed": 3
+    },
+    "kublai": {
+      "routed": 3,
+      "executed": 8,
+      "succeeded": 1,
+      "failed": 7
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 0,
+      "executing": 2,
+      "done": 177
+    },
+    "temujin": {
+      "pending": 0,
+      "executing": 0,
+      "done": 124
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 116
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 95
+    },
+    "jochi": {
+      "pending": 0,
+      "executing": 0,
+      "done": 90
+    },
+    "ogedei": {
+      "pending": 4,
+      "executing": 0,
+      "done": 100
+    }
+  },
+  "issues": [
+    "High explicit routing: 13/13 (100%) \u2014 keyword table may be underused",
+    "Workload imbalance: ogedei got 10 tasks vs kublai got 3",
+    "ogedei: 3 task(s) failed out of 4 executed",
+    "kublai: 7 task(s) failed out of 8 executed",
+    "Keyword routing drift: 7/8 (88%) disagree with actual routing",
+    "RECURRING: 2 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "Keyword divergence: 3/13 (23%) \u2014 consider adding disambiguation rules",
+    "ogedei received 10/13 (77%) of all tasks \u2014 check if task descriptions are too narrow or if other agents need broader keywords",
+    "Routing methods: explicit=13",
+    "Missed opportunities: 1 task(s) could have been routed to idle agents"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 3,
+  "kw_misroute_rate": "3/13",
+  "kw_misroute_examples": [
+    "'Investigate stalled task: jochi has idle task with no worksp' -> kw=jochi actual=kublai",
+    "'Completion Audit Escalation: 0 fake completions' -> kw=tolui actual=kublai",
+    "'Completion Audit Escalation: 0 fake completions' -> kw=tolui actual=kublai"
+  ],
+  "overflow_count": 0,
+  "skill_hint_coverage": "10/13",
+  "routing_drift": {
+    "total": 8,
+    "mismatches": 7,
+    "drift_pct": 87.5,
+    "top_examples": [
+      {
+        "task": "ACP verification test",
+        "actual": "mongke",
+        "keyword_would": "jochi"
+      },
+      {
+        "task": "Stuck executing tasks cleanup",
+        "actual": "temujin",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "Investigate task queue: 5 fake completions detected",
+        "actual": "temujin",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "Investigate task queue: 4 fake completions detected",
+        "actual": "temujin",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "Investigate task queue: 5 fake completions detected",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      }
+    ],
+    "ts": "2026-03-09T04:41:27.102085"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "kublai: # task(s) failed out of # executed",
+      "consecutive": 3,
+      "first_seen": "2026-03-09T00:08:00.061235"
+    },
+    {
+      "issue_key": "Keyword routing drift: #/# (#%) disagree with actual routing",
+      "consecutive": 3,
+      "first_seen": "2026-03-09T00:08:00.061235"
+    }
+  ],
+  "missed_opportunities": {
+    "count": 1,
+    "by_agent": {
+      "kublai": 1
+    },
+    "examples": [
+      {
+        "task": "Investigate stalled task: jochi has idle task with no workspace output",
+        "routed_to": "kublai",
+        "dest_queue": 3,
+        "idle_alternatives": [
+          [
+            "jochi",
+            2
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-09T04:39:41.469876"
+      }
+    ]
+  }
+}
+}

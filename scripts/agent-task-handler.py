@@ -27,6 +27,37 @@ from json_state import locked_json_update
 from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER, CLAUDE_AGENT as _CLAUDE_AGENT
 from kurultai_ledger import append_ledger as _kp_append_ledger
 
+# LEDGER RELOAD FIX: Force reload of kurultai_ledger to pick up schema updates
+# This prevents "invalid event type" errors when the ledger schema is updated
+# but the Python process has cached the old module
+import importlib
+try:
+    import kurultai_ledger as _ledger_module
+    _kp_append_ledger = _ledger_module.append_ledger
+except ImportError:
+    _ledger_module = None
+
+def _reload_ledger_module():
+    """Reload kurultai_ledger module to pick up schema updates.
+
+    Call this when the ledger schema has been updated but the running
+    process has cached the old VALID_EVENTS set.
+    """
+    global _kp_append_ledger, _ledger_module
+    if _ledger_module is None:
+        try:
+            import kurultai_ledger as _ledger_module
+        except ImportError:
+            return False
+    try:
+        importlib.reload(_ledger_module)
+        _kp_append_ledger = _ledger_module.append_ledger
+        print("[LEDGER] Module reloaded to pick up schema updates")
+        return True
+    except Exception as e:
+        print(f"[LEDGER] Module reload failed: {e}")
+        return False
+
 # Prompt optimization integration
 try:
     from prompt_optimizer import enhance_task_prompt, load_optimizer_config
@@ -78,12 +109,142 @@ SLOW_SKILLS = {
     '/horde-gate-testing': 0,
     '/horde-plan': 0,
 }
+
+
+# =============================================================================
+# Centralized Credential Vault
+# =============================================================================
+
+def load_vault_credentials() -> dict:
+    """Load credentials from centralized vault as fallback."""
+    vault_path = Path.home() / '.openclaw' / 'credentials' / 'provider.env'
+    if not vault_path.exists():
+        return {}
+
+    creds = {}
+    try:
+        with open(vault_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    creds[key] = value.strip('"\'')
+    except Exception as e:
+        print(f"[vault] Error loading credentials: {e}")
+    return creds
+
+
+# =============================================================================
+# Prompt Injection Protection (Security)
+# =============================================================================
+
+# Patterns that indicate potential prompt injection attempts
+INJECTION_PATTERNS = [
+    # Instruction override attempts
+    (r"ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|rules?|directives?)", "[INSTRUCTION_OVERRIDE]"),
+    (r"disregard\s+(all\s+)?(previous|above|prior)", "[INSTRUCTION_OVERRIDE]"),
+    (r"forget\s+(all\s+)?(previous|above|your\s+instructions?)", "[INSTRUCTION_OVERRIDE]"),
+    (r"you\s+are\s+now\s+", "[ROLE_CHANGE]"),
+    (r"new\s+instructions?:", "[NEW_INSTRUCTION]"),
+    # System token simulation
+    (r"<\|.*?\|>", "[SPECIAL_TOKEN]"),
+    (r"\[SYSTEM\]", "[SYSTEM_TOKEN]"),
+    (r"\[/SYSTEM\]", "[SYSTEM_TOKEN]"),
+    (r"<<.*?>>", "[DELIMITER_INJECTION]"),
+    # Common jailbreak patterns
+    (r"developer\s+mode", "[DEVELOPER_MODE]"),
+    (r"debug\s+mode", "[DEBUG_MODE]"),
+    (r"admin\s+mode", "[ADMIN_MODE]"),
+    (r"override\s+safety", "[SAFETY_OVERRIDE]"),
+]
+
+
+def sanitize_task_content(content: str, verbose: bool = False) -> str:
+    """Sanitize task content to prevent prompt injection attacks.
+
+    Removes or neutralizes common prompt injection patterns that could
+    manipulate the LLM's behavior.
+
+    Args:
+        content: The task content to sanitize
+        verbose: If True, log what was filtered
+
+    Returns:
+        Sanitized content with injection patterns replaced
+    """
+    import re
+
+    if not content:
+        return content
+
+    sanitized = content
+    for pattern, replacement in INJECTION_PATTERNS:
+        matches = re.findall(pattern, sanitized, re.IGNORECASE)
+        if matches and verbose:
+            print(f"  [SANITIZE] Filtered {len(matches)} instance(s) of {replacement}")
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+
+    return sanitized
+
+
+def build_safe_prompt(system_context: str, task_content: str, skill_hint: str = None) -> str:
+    """Build a prompt with clear section delimiters and sanitized content.
+
+    Uses clear delimiters to separate system context from user content,
+    preventing the model from confusing user input with instructions.
+
+    Args:
+        system_context: Agent identity and rules (trusted)
+        task_content: User-provided task content (untrusted, will be sanitized)
+        skill_hint: Optional skill hint for execution
+
+    Returns:
+        Formatted prompt with clear sections
+    """
+    # Sanitize user-provided content
+    safe_task = sanitize_task_content(task_content)
+
+    # Build prompt with clear delimiters
+    sections = [
+        "=" * 60,
+        "SYSTEM CONTEXT (Agent Identity)",
+        "=" * 60,
+        system_context,
+        "",
+        "=" * 60,
+        "USER TASK (Execute This)",
+        "=" * 60,
+        safe_task,
+    ]
+
+    if skill_hint:
+        sections.extend([
+            "",
+            "=" * 60,
+            f"EXECUTION HINT: {skill_hint}",
+            "=" * 60,
+        ])
+
+    sections.extend([
+        "",
+        "=" * 60,
+        "END OF TASK - Execute the above task using available tools",
+        "=" * 60,
+    ])
+
+    return "\n".join(sections)
+
+
 MAX_TASK_DEPTH = 3
 HAIKU_TIMEOUT = 120  # Max seconds for /task-complete haiku notification (increased from 60 due to cold start delays)
 
 # Proxy health check configuration
 PROXY_HEALTH_CHECK_TIMEOUT = 5  # seconds
-PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+# Approved proxy endpoints for multi-tier fallback (Anthropic -> Z.AI -> Alibaba)
+# All agents use this single source of truth - DO NOT add local duplicates
+PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
 
 
 def check_proxy_health(proxy_url: str) -> bool:
@@ -102,10 +263,20 @@ def check_proxy_health(proxy_url: str) -> bool:
         return False
 
     try:
-        # Create SSL context that doesn't verify certificates (for proxy endpoints)
+        # Use proper SSL verification - only skip for localhost/private networks
+        # This is a security fix to prevent MITM attacks
         ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+
+        # Allow self-signed certs only for localhost/private endpoints
+        if any(host in proxy_url for host in ['localhost', '127.0.0.1', '192.168.', '10.', '172.']):
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            # Log the security trade-off
+            print(f"  [Security] SSL verification disabled for private endpoint: {proxy_url[:50]}...")
+        else:
+            # Full SSL verification for external endpoints
+            ssl_context.check_hostname = True
+            ssl_context.verify_mode = ssl.CERT_REQUIRED
 
         # Try a simple HEAD request to the proxy endpoint
         req = urllib.request.Request(proxy_url, method='HEAD')
@@ -528,7 +699,10 @@ O_OEXCL = os.O_EXCL if hasattr(os, 'O_EXCL') else 0x800
 
 
 def _already_completed(source_path):
-    """Check if a .completed.done.md or .failed.done.md already exists for this task.
+    """Check if a .done.md file (any terminal state) already exists for this task.
+
+    Terminal states include: .completed.done.md, .failed.done.md, .no_output.done.md,
+    .credential_failed.done.md (added 2026-03-09).
 
     This prevents the rename race condition where recover_stale_executions() tries to
     recover a task that mark_task_completed() already finished. Returns True if
@@ -549,14 +723,20 @@ def _already_completed(source_path):
     for done_file in parent.iterdir():
         if not done_file.name.endswith('.done.md'):
             continue
-        # Check for .completed.done.md, .failed.done.md, .dup-orphan.done.md (duplicate recovery)
+        # Check for all terminal states: .completed.done.md, .failed.done.md, .no_output.done.md,
+        # .dup-orphan.done.md, .deadpid-orphan.done.md (duplicate recovery)
+        # .no_output.done.md added 2026-03-09 to prevent false-positive escalations
         done_stem = None
         if '.completed.done.md' in done_file.name:
             done_stem = done_file.name.split('.completed.done.md')[0]
         elif '.failed.done.md' in done_file.name:
             done_stem = done_file.name.split('.failed.done.md')[0]
+        elif '.no_output.done.md' in done_file.name:
+            done_stem = done_file.name.split('.no_output.done.md')[0]
         elif '.dup-orphan.done.md' in done_file.name:
             done_stem = done_file.name.split('.dup-orphan.done.md')[0]
+        elif '.deadpid-orphan.done.md' in done_file.name:
+            done_stem = done_file.name.split('.deadpid-orphan.done.md')[0]
 
         if done_stem is None:
             continue
@@ -646,61 +826,173 @@ def _safe_rename_with_lock(source_path, target_path, agent="unknown"):
             pass
 
 
-def _verify_task_completion(task_file):
+def _verify_task_completion(task_file, max_retries=3):
     """Verify task file has actual execution output before marking as complete.
 
     CRITICAL FIX: This function now requires the presence of an "## Execution Output"
     section to distinguish actual execution results from the original task description.
 
+    RACE CONDITION FIX (2026-03-08): Uses file locking to prevent false positives
+    when the handler is still writing output. If verification fails, retries with
+    exponential backoff to handle slow writes.
+
+    RESOLUTION CHECK (2026-03-09): Substantive completions (>=100 chars) must include
+    a resolution section ("## Resolution" or similar) matching /horde-review PRIORITY_FIX.
+
+    R008 SKILL CHECK (2026-03-11): When skill_hint is present, verify the skill was
+    actually invoked by checking for evidence in the execution output.
+
     Checks:
     - Has "## Execution Output" section (added by _append_output_to_executing)
     - Content AFTER "## Execution Output" has substance (not just empty)
-    - At least 10 non-empty lines of actual execution output
+    - At least 4 non-empty lines of actual execution output
+    - Resolution section present for substantive outputs (>=100 chars)
+    - Skill invocation evidence when skill_hint is present (R008)
 
     Returns tuple: (is_valid, reason)
     """
+    import fcntl
+    import re as re_module
+
+    # Extract skill_hint from frontmatter for R008 check
+    skill_hint = None
     try:
         with open(task_file, 'r') as f:
-            content = f.read()
+            frontmatter = f.read(1000)
+            match = re_module.search(r'^skill_hint:\s*(\S+)', frontmatter, re_module.MULTILINE)
+            if match:
+                skill_hint = match.group(1)
+    except Exception:
+        pass
 
-        # CRITICAL: Check for execution output section
-        # This is the separator added by _append_output_to_executing()
-        execution_marker = '## Execution Output'
+    for attempt in range(max_retries):
+        try:
+            # Acquire shared lock to wait for any writer to finish
+            fd = None
+            try:
+                fd = os.open(task_file, os.O_RDONLY)
+                fcntl.flock(fd, fcntl.LOCK_SH)  # Wait for exclusive lock to release
+            except (FileNotFoundError, OSError):
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+                    continue
+                else:
+                    return False, f"Verification error: file unavailable after {max_retries} retries"
 
-        if execution_marker not in content:
-            return False, f"No execution output section found (missing '{execution_marker}')"
+            try:
+                with open(fd, 'r', closefd=False) as f:
+                    content = f.read()
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)  # Release lock
+                os.close(fd)
 
-        # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
-        # which is always the system-controlled marker. This prevents injection
-        # attacks where task descriptions contain the marker.
-        parts = content.rsplit(execution_marker, 1)
-        if len(parts) < 2:
-            return False, "Execution output section exists but has no content"
+            # CRITICAL: Check for execution output section
+            # This is the separator added by _append_output_to_executing()
+            execution_marker = '## Execution Output'
 
-        execution_output = parts[1].strip()
+            if execution_marker not in content:
+                # If content looks incomplete (too short), retry before failing
+                if len(content) < 1000 and attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                return False, f"No execution output section found (missing '{execution_marker}')"
 
-        # Count actual execution output lines (non-empty, excluding known metadata patterns)
-        # Only filter lines that are EXACTLY metadata format, not all bold text
-        import re
-        metadata_pattern = re.compile(r'^\*\*(Model|Duration|Status|Timestamp|Session|Agent|Task ID):\*\*')
+            # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
+            # which is always the system-controlled marker. This prevents injection
+            # attacks where task descriptions contain the marker.
+            parts = content.rsplit(execution_marker, 1)
+            if len(parts) < 2:
+                return False, "Execution output section exists but has no content"
 
-        exec_lines = [l for l in execution_output.split('\n')
-                      if l.strip()
-                      and not metadata_pattern.match(l.strip())  # only filter known metadata
-                      and not l.strip() == '---']
+            execution_output = parts[1].strip()
 
-        # Require at least 8 lines of actual output (lowered from 10 to account for markdown formatting)
-        if len(exec_lines) < 8:
-            return False, f"Execution output too short ({len(exec_lines)} lines, need 8+)"
+            # Count actual execution output lines (non-empty, excluding known metadata patterns)
+            # Only filter lines that are EXACTLY metadata format, not all bold text
+            metadata_pattern = re_module.compile(r'^\*\*(Model|Duration|Status|Timestamp|Session|Agent|Task ID):\*\*')
 
-        # Also check for some substance (not just repeated markers)
-        total_output_chars = sum(len(l) for l in exec_lines)
-        if total_output_chars < 500:
-            return False, f"Execution output too brief ({total_output_chars} chars, need 500+)"
+            exec_lines = [l for l in execution_output.split('\n')
+                          if l.strip()
+                          and not metadata_pattern.match(l.strip())  # only filter known metadata
+                          and not l.strip() == '---']
 
-        return True, "OK"
-    except Exception as e:
-        return False, f"Verification error: {e}"
+            # Require at least 4 lines of actual output (lowered to reduce fix-resolution churn)
+            # 4 lines is enough to distinguish real completions from empty/bogus files
+            # while accommodating brief fix-resolution tasks (5-7 lines is common)
+            if len(exec_lines) < 4:
+                # Might be incomplete write - retry if content looks truncated
+                if not execution_output.endswith('```') and attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                return False, f"Execution output too short ({len(exec_lines)} lines, need 4+)"
+
+            # Also check for some substance (not just repeated markers)
+            total_output_chars = sum(len(l) for l in exec_lines)
+            if total_output_chars < 200:
+                return False, f"Execution output too brief ({total_output_chars} chars, need 200+)"
+
+            # RESOLUTION SECTION CHECK (2026-03-09): Match /horde-review PRIORITY_FIX
+            # Substantive completions (>=100 chars) must include resolution documentation
+            # This catches missing resolutions at verification time, not in later audit
+            # FIXED: Case-insensitive check (2026-03-09) to fix false positives from agent output
+            if total_output_chars >= 100:
+                output_upper = execution_output.upper()
+                has_resolution = (
+                    "## RESOLUTION" in output_upper
+                    or "**STATUS:** RESOLVED" in output_upper
+                    or "**STATUS:** COMPLETED" in output_upper
+                    or execution_output.count("##") >= 3  # Has multiple sections (likely includes resolution)
+                )
+                if not has_resolution:
+                    return False, f"Missing resolution section (add '## Resolution' or '**Status:** RESOLVED/Completed')"
+
+            # R008 SKILL INVOCATION CHECK (2026-03-11): Verify required skill was invoked
+            # This prevents agents from ignoring skill_hint instructions
+            if skill_hint:
+                skill_name = skill_hint.lstrip('/').replace('-', ' ')
+                output_lower = execution_output.lower()
+
+                # Evidence patterns for different skills
+                skill_evidence = {
+                    '/horde-learn': ['search', 'source', 'research', 'citation', 'finding', 'web'],
+                    '/horde-brainstorming': ['proposal', 'brainstorm', 'option', 'approach', 'explore'],
+                    '/horde-implement': ['implement', 'code', 'file', 'write', 'create'],
+                    '/horde-review': ['review', 'analysis', 'strength', 'weakness', 'finding'],
+                    '/horde-debug': ['debug', 'error', 'fix', 'issue', 'problem'],
+                    '/systematic-debugging': ['debug', 'error', 'fix', 'issue', 'problem'],
+                    '/content-research-writer': ['content', 'article', 'writing', 'draft'],
+                    '/code-reviewer': ['review', 'code', 'security', 'vulnerability'],
+                    '/scrapling-research': ['scrap', 'crawl', 'fetch', 'extract'],
+                }
+
+                # Check for evidence of skill usage
+                has_evidence = False
+                for keyword in skill_evidence.get(skill_hint, [skill_name]):
+                    if keyword in output_lower:
+                        has_evidence = True
+                        break
+
+                # Also check for explicit skill invocation patterns
+                skill_patterns = [
+                    f'{skill_hint.lower()}',
+                    'skill invoked',
+                    'using skill',
+                    'skill response',
+                ]
+                if any(p in output_lower for p in skill_patterns):
+                    has_evidence = True
+
+                if not has_evidence:
+                    return False, f"R008_VIOLATION: Required skill '{skill_hint}' was not invoked. Invoke Skill('{skill_name}') as the first action."
+
+            return True, "OK"
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.1 * (2 ** attempt))
+                continue
+            return False, f"Verification error: {e}"
+
+    return False, "Verification failed: max retries exceeded"
 
 
 def _append_output_to_executing(executing_file, content, model, duration_s, success=True):
@@ -710,6 +1002,9 @@ def _append_output_to_executing(executing_file, content, model, duration_s, succ
     checks the .executing.md file for substantial output, so we must append
     the actual execution results BEFORE marking as done.
 
+    RACE CONDITION FIX (2026-03-08): Uses exclusive file locking to ensure
+    atomic write and prevent race conditions with verification reads.
+
     Args:
         executing_file: Path to .executing.md file
         content: Execution output content (stdout result or error)
@@ -717,20 +1012,32 @@ def _append_output_to_executing(executing_file, content, model, duration_s, succ
         duration_s: Execution duration in seconds
         success: True if successful execution, False if failed
     """
+    import fcntl
+
     if not os.path.exists(executing_file):
-        return
+        print(f"  ⚠ Executing file missing during output append: {executing_file}")
+        return False
 
     try:
+        # Open for append with exclusive lock to ensure atomic write
         with open(executing_file, 'a') as f:
-            f.write(f"\n\n## Execution Output\n\n")
-            f.write(f"**Model:** {model}\n")
-            f.write(f"**Duration:** {duration_s}s\n")
-            f.write(f"**Status:** {'Completed' if success else 'Failed'}\n")
-            f.write(f"\n---\n\n")
-            f.write(content)
-            f.write(f"\n")
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Exclusive lock
+            try:
+                f.write(f"\n\n## Execution Output\n\n")
+                f.write(f"**Model:** {model}\n")
+                f.write(f"**Duration:** {duration_s}s\n")
+                f.write(f"**Status:** {'Completed' if success else 'Failed'}\n")
+                f.write(f"\n---\n\n")
+                f.write(content)
+                f.write(f"\n")
+                f.flush()  # Ensure data is written to disk
+                os.fsync(f.fileno())  # Force sync to disk
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Release lock
+        return True
     except Exception as e:
         print(f"  ⚠ Failed to append output to executing file: {e}")
+        return False
 
 
 def mark_task_executing(task_file):
@@ -750,7 +1057,8 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
 
     Args:
         task_file: Original task file path (before .executing rename).
-        status: 'completed', 'failed', or 'no_output'.
+        status: 'completed', 'failed', 'no_output', or 'credential_failed'.
+                'credential_failed' is a terminal state that bypasses revision loops.
         executing_file: Actual .executing.md path if known (preferred).
     """
     # Extract agent name from task file path for circuit breaker + safe rename lock
@@ -919,33 +1227,25 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
             if gate_enabled:
                 print("[COMPLETION_GATE] Running audit...")
 
-                # Import audit module (try v2 first, fallback to v1)
+                # Import audit module (consolidated v2 in completion_gate_audit.py)
                 try:
                     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-                    try:
-                        from completion_gate_audit_v2 import completion_gate_audit_v2, extract_frontmatter, save_audit_log_v2, create_followup_tasks_v2
-                        use_v2 = True
-                        print("[COMPLETION_GATE] Using v2 audit (three-tier fallback)")
-                    except ImportError:
-                        from completion_gate_audit import completion_gate_audit, extract_frontmatter, save_audit_result, create_followup_tasks
-                        use_v2 = False
-                        print("[COMPLETION_GATE] Using v1 audit")
+                    from completion_gate_audit import completion_gate_audit_v2, save_audit_log_v2, create_followup_tasks_v2
+                    use_v2 = True
+                    print("[COMPLETION_GATE] Using v2 audit (three-tier fallback)")
 
                     # Extract agent from path
                     path_parts = Path(executing_file).parts
                     agent = path_parts[path_parts.index('agents') + 1] if 'agents' in path_parts else 'temujin'
 
                     # Run the audit
-                    if use_v2:
-                        gate_result = completion_gate_audit_v2(Path(executing_file), agent)
-                    else:
-                        gate_result = completion_gate_audit(Path(executing_file), agent)
+                    gate_result = completion_gate_audit_v2(Path(executing_file), agent)
 
                     print(f"[COMPLETION_GATE] Completion: {gate_result.completion_percentage}%")
                     print(f"[COMPLETION_GATE] Can complete: {gate_result.can_complete}")
 
                     # v2-specific logging
-                    if use_v2 and hasattr(gate_result, 'audit_tier'):
+                    if hasattr(gate_result, 'audit_tier'):
                         print(f"[COMPLETION_GATE] Audit Tier: {gate_result.audit_tier}")
                         if hasattr(gate_result, 'retries_performed') and gate_result.retries_performed > 0:
                             print(f"[COMPLETION_GATE] Retries: {gate_result.retries_performed}")
@@ -953,10 +1253,7 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
                             print(f"[COMPLETION_GATE] ⚠️ WARNING: Permissive fallback used - manual review recommended")
 
                     # Save audit result
-                    if use_v2:
-                        audit_path = save_audit_log_v2(gate_result, Path(executing_file))
-                    else:
-                        audit_path = save_audit_result(gate_result, gate_result.original_task)
+                    audit_path = save_audit_log_v2(gate_result, Path(executing_file))
                     print(f"[COMPLETION_GATE] Audit saved to: {audit_path}")
 
                     # Check gate result
@@ -1038,6 +1335,14 @@ def mark_task_completed(task_file, status='completed', executing_file=None):
         success, action, detail = _safe_rename_with_lock(executing_file, completed_file, agent)
         if success:
             _cleanup_pid_file(executing_file)
+            
+            # Clear Neo4j session_key to prevent stale claim accumulation
+            try:
+                from clear_neo4j_session_key import clear_session_key_for_task
+                clear_session_key_for_task(executing_file)
+            except Exception as e:
+                print(f"[mark_task_completed] Failed to clear session_key (non-fatal): {e}")
+            
             print(f"✓ Task {status}: {completed_file}")
             return True
         elif action == "skip" and detail in ("source_not_found", "source_gone_during_lock_wait", "target_already_exists"):
@@ -1864,11 +2169,19 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
     if _stripped_anthropic:
         print(f"  ENV_SANITIZE: stripped inherited {', '.join(_stripped_anthropic)} for {agent_name}")
 
+    # Load credentials from centralized vault as base layer
+    # This provides DEFAULT_MODEL and fallback provider credentials
+    vault_creds = load_vault_credentials()
+    for key, value in vault_creds.items():
+        if key not in env or not env.get(key):  # Don't override if already set
+            env[key] = value
+    if vault_creds:
+        print(f"  VAULT_LOADED: {len(vault_creds)} credentials from provider.env")
+
     # Load agent-specific environment from .claude/settings.json
     # This provides ANTHROPIC_MODEL (and optionally ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
-    # CLAUDE API RATE LIMITED until 2026-03-12 — using Z.ai models
-    VALID_MODELS = {'glm-5', 'kimi-k2.5', 'qwen3.5-plus'}
-    ALLOWED_PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+    VALID_CLAUDE_MODELS = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'}
+    # NOTE: Uses module-level PROXY_ENDPOINTS for single source of truth (2026-03-09)
     try:
         settings_path = f"{agent_root}/.claude/settings.json"
         with open(settings_path, 'r') as _sf:
@@ -1880,24 +2193,29 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
         # Allow proxy models (kimi-k2.5, etc.) when using approved proxy endpoints
         env_model = env.get('ANTHROPIC_MODEL')
         base_url = env.get('ANTHROPIC_BASE_URL', '')
-        is_using_proxy = any(endpoint in base_url for endpoint in ALLOWED_PROXY_ENDPOINTS)
+        is_using_proxy = any(endpoint in base_url for endpoint in PROXY_ENDPOINTS)
         debug_msg = f"DEBUG: agent={agent_name}, env_model={env_model}, base_url={base_url[:50] if base_url else 'NONE'}..., is_using_proxy={is_using_proxy}\n"
-        with open('/tmp/agent_handler_debug.log', 'a') as f:
+        DEBUG_LOG_PATH = Path.home() / '.openclaw' / 'logs' / 'debug' / 'agent_handler.log'
+        DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if not DEBUG_LOG_PATH.exists():
+            DEBUG_LOG_PATH.touch(mode=0o600)
+        with open(DEBUG_LOG_PATH, 'a') as f:
             f.write(debug_msg)
         print(f"  {debug_msg.strip()}")
-        # CLAUDE API RATE LIMITED until 2026-03-12 — accept Z.ai models
-        if env_model and env_model not in VALID_MODELS and not is_using_proxy:
-            print(f"  ⚠ Model '{env_model}' not in VALID_MODELS — using glm-5")
-            env['ANTHROPIC_MODEL'] = 'glm-5'
+        # Validate ANTHROPIC_MODEL — only accept Claude models when using official Anthropic API
+        # Proxy endpoints can use other models, but official API must use Claude models
+        if env_model and env_model not in VALID_CLAUDE_MODELS and not is_using_proxy:
+            print(f"  ⚠ Model '{env_model}' not in VALID_CLAUDE_MODELS — using claude-opus-4-6")
+            env['ANTHROPIC_MODEL'] = 'claude-opus-4-6'
         else:
             print(f"  ✓ ACCEPTED model '{env_model}' for {agent_name} (proxy={is_using_proxy})")
     except (FileNotFoundError, json.JSONDecodeError):
         pass  # Use system environment if no agent settings
 
     # Validate ANTHROPIC_BASE_URL — allow Anthropic and approved proxy endpoints
+    # Uses module-level PROXY_ENDPOINTS for single source of truth (2026-03-09)
     base_url = env.get('ANTHROPIC_BASE_URL', '')
-    allowed_proxy_endpoints = ['dashscope.aliyuncs.com', 'openrouter.ai']
-    is_allowed_proxy = any(endpoint in base_url for endpoint in allowed_proxy_endpoints)
+    is_allowed_proxy = any(endpoint in base_url for endpoint in PROXY_ENDPOINTS)
     if base_url and 'anthropic.com' not in base_url and not is_allowed_proxy:
         print(f"  !! BLOCKED non-Anthropic BASE_URL for {agent_name}: {base_url}")
         print(f"  !! Removing ANTHROPIC_BASE_URL — will use official Anthropic API")
@@ -1907,10 +2225,63 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
     auth_token = env.get('ANTHROPIC_AUTH_TOKEN', '')
     # Anthropic tokens start with sk-ant-, but proxy services may use different prefixes
     is_anthropic_token = auth_token.startswith('sk-ant-')
-    is_proxy_token = (base_url and is_allowed_proxy and auth_token.startswith('sk-'))
-    if auth_token and not is_anthropic_token and not is_proxy_token:
+    # DashScope tokens (sk-sp-*) NEVER work with Anthropic API - reject explicitly
+    is_dashscope_token = auth_token.startswith('sk-sp-')
+    # Z.AI proxy tokens use format like: d6ff69bb5ad74bb29b297d1681cc648c.KtP5x1d8kkFXgM21
+    # (32-char hex prefix, dot, then suffix - but NOT starting with sk-)
+    is_zai_token = (
+        '.' in auth_token and
+        len(auth_token.split('.')[0]) == 32 and
+        not auth_token.startswith('sk-') and
+        all(c in '0123456789abcdefABCDEF' for c in auth_token.split('.')[0])
+    )
+
+    # Track credential validation failures for immediate return
+    credential_error = None
+
+    if is_dashscope_token and not (base_url and is_allowed_proxy):
+        # DashScope tokens (sk-sp-*) are allowed when using approved proxy endpoints
+        # This enables Alibaba fallback tier in claude-agent wrapper (2026-03-09)
+        print(f"  !! BLOCKED DashScope auth token for {agent_name} (prefix: {auth_token[:6]}...)")
+        print(f"  !! DashScope tokens (sk-sp-*) require an approved proxy endpoint")
+        print(f"  !! Get Anthropic API key from https://console.anthropic.com/")
+        env.pop('ANTHROPIC_AUTH_TOKEN', None)
+        credential_error = "DashScope token (sk-sp-*) is incompatible with Anthropic API. Get valid Anthropic API key from https://console.anthropic.com/"
+    elif is_zai_token and not base_url:
+        # Z.AI token without Z.AI base URL - will fail at Anthropic API
+        print(f"  !! BLOCKED Z.AI proxy token for {agent_name} (format: {auth_token[:10]}...) - no BASE_URL set")
+        print(f"  !! Z.AI tokens require ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic")
+        print(f"  !! Removing token - will use system default or fail explicitly")
+        env.pop('ANTHROPIC_AUTH_TOKEN', None)
+        credential_error = "Z.AI proxy token without BASE_URL set. Either add ANTHROPIC_BASE_URL or use valid Anthropic API key (sk-ant-*)"
+    elif auth_token and not is_anthropic_token and not is_zai_token and not (base_url and is_allowed_proxy and auth_token.startswith('sk-')):
         print(f"  !! BLOCKED non-Anthropic AUTH_TOKEN for {agent_name} (prefix: {auth_token[:6]}...)")
         env.pop('ANTHROPIC_AUTH_TOKEN', None)
+        credential_error = f"Invalid credential format (prefix: {auth_token[:6]}...). Use valid Anthropic API key (sk-ant-*)"
+
+    # CREDENTIAL_ERROR_LOG: Log credential issues but allow fallback chain execution.
+    # The claude-agent wrapper has a multi-tier fallback system (Anthropic -> Z.AI -> Alibaba).
+    # By sanitizing invalid credentials and continuing, we allow claude-agent to use its
+    # own fallback chain instead of blocking execution here.
+    # 2026-03-09: Removed short-circuit to enable fallback chain execution
+    if credential_error:
+        # Check if there's a valid token remaining after sanitization
+        # Allow sk-sp-* tokens (Alibaba/DashScope) when using approved proxy endpoints
+        remaining_token = env.get('ANTHROPIC_AUTH_TOKEN', '')
+        is_valid_proxy_token = remaining_token.startswith('sk-sp-') and base_url and is_allowed_proxy
+        has_valid_token = remaining_token and (remaining_token.startswith('sk-ant-') or is_valid_proxy_token)
+        
+        if not has_valid_token:
+            print(f"  ⚠ CREDENTIAL_WARNING: No valid Anthropic API key after sanitization")
+            print(f"  ⚠ Allowing claude-agent to use fallback chain: {credential_error}")
+            _append_ledger({
+                "event": "CREDENTIAL_WARNING_FALLBACK",
+                "ts": datetime.now().isoformat(),
+                "agent": agent_name,
+                "warning": credential_error,
+                "note": "Proceeding with claude-agent fallback chain",
+            })
+            # Continue to execution - claude-agent will handle fallback tiers
 
     effective_timeout = timeout or CLAUDE_TIMEOUT
 
@@ -2144,9 +2515,37 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
 
     # Build prompt with rules FIRST (C16: rules must be at line 1 for agent compliance)
     # When rules exist, prepend mandatory first action to ensure they're loaded
+    # R008 FIX: Also include skill_hint as MANDATORY if present
     rules_first_section = ""
+    skill_hint_first_section = ""
     if active_rules:
         rules_first_section = "\n\n## MANDATORY FIRST ACTION\nBefore any other work, read ~/.openclaw/agents/{}/memory/rules.json and output 'RULES LOADED: [rule IDs]' at the start of your response.\n\n".format(agent_name)
+
+    # R008 FIX: Make skill_hint a MANDATORY action at prompt start, not just a suggestion at the end
+    # This ensures agents cannot miss the skill requirement
+    if skill_hint:
+        skill_name = skill_hint.lstrip('/')
+        skill_hint_first_section = f"""
+
+⚠️ ═══════════════════════════════════════════════════════════════════════════════
+🚨 R008 RULE ENFORCEMENT: MANDATORY SKILL INVOCATION
+══════════════════════════════════════════════════════════════════════════════ ⚠️
+
+This task REQUIRES you to invoke the {skill_hint} skill.
+
+YOUR FIRST ACTION MUST BE:
+    Skill(skill="{skill_name}")
+
+DO NOT:
+- Skip this step
+- Do other work first
+- Only reference the skill without invoking it
+
+If you do not invoke this skill, your task will be marked as FAILED with R008_VIOLATION.
+
+═════════════════════════════════════════════════════════════════════════════════
+
+"""
 
     # Try to use prompt optimizer for enhanced prompts
     prompt = None
@@ -2165,8 +2564,10 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
                     rules=rules_section if rules_section else None,
                 )
                 # Prepend rules first section if present (must be at line 1)
-                if rules_first_section:
-                    prompt = rules_first_section + prompt
+                # R008 FIX: Also prepend skill_hint as mandatory first action
+                mandatory_prefix = rules_first_section + skill_hint_first_section
+                if mandatory_prefix:
+                    prompt = mandatory_prefix + prompt
                 # Log optimization result
                 if optimization_metadata:
                     print(f"  PROMPT_OPTIMIZED: cached={optimization_metadata.get('cached', False)}, "
@@ -2178,6 +2579,7 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
     if prompt is None:
         prompt = (
             f"{rules_first_section}"
+            f"{skill_hint_first_section}"
             f"{context_history_section}"
             f"{task_text}"
             f"{memory_section}"
@@ -2197,7 +2599,7 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
 
     # Check if we should retry with fallback model
     if not result.get('success') and acp_fallback['enabled']:
-        error_msg = result.get('error', '')
+        error_msg = result.get('error') or ''  # Handle explicit None values
         output_content = result.get('content', '')
 
         # Check for stall timeout (also trigger fallback if configured)
@@ -2215,40 +2617,52 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
             fallback_reason = "stall_timeout_detected"
 
         if should_fallback:
-            # Use fallback model for retry
-            fallback_model = acp_fallback['fallback_model']
-            print(f"  ⚠ {fallback_reason.replace('_', ' ').title()}, retrying with fallback model: {fallback_model}")
-
-            if acp_fallback['log_events']:
+            # CONSTRAINT: Tolui must ONLY use the abliterated model - no fallbacks allowed
+            if agent_name == 'tolui':
+                print(f"  ⚠ Tolui constraint: skipping fallback (must use abliterated model only)")
                 _append_ledger({
-                    "event": "MODEL_FALLBACK",
+                    "event": "MODEL_FALLBACK_BLOCKED",
                     "ts": datetime.now().isoformat(),
                     "agent": agent_name,
-                    "original_model": model or "claude-opus-4-6",
-                    "fallback_model": fallback_model,
-                    "reason": fallback_reason,
-                    "error_preview": error_msg[:200],
+                    "reason": "tolui_abliterated_constraint",
+                    "original_error": (error_msg or 'Unknown error')[:200],  # Safe slicing
                 })
+                # Do not proceed with fallback - return the original failure
+                should_fallback = False
+            else:
+                # Use fallback model for retry
+                fallback_model = acp_fallback['fallback_model']
+                print(f"  ⚠ {fallback_reason.replace('_', ' ').title()}, retrying with fallback model: {fallback_model}")
 
-            result = _call_claude_code(agent_name, prompt, config, skill_hint, timeout, fallback_model, priority)
-
-            # Annotate result to indicate fallback was used
-            if result.get('success'):
-                result['model'] = f"{fallback_model} (fallback)"
-                print(f"  ✓ Fallback successful: {fallback_model}")
                 if acp_fallback['log_events']:
                     _append_ledger({
-                        "event": "MODEL_FALLBACK_SUCCESS",
+                        "event": "MODEL_FALLBACK",
                         "ts": datetime.now().isoformat(),
                         "agent": agent_name,
+                        "original_model": model or "claude-opus-4-6",
                         "fallback_model": fallback_model,
+                        "reason": fallback_reason,
+                        "error_preview": (error_msg or 'Unknown error')[:200],  # Safe slicing
                     })
-            else:
-                # Preserve original error but note fallback attempt
-                result['error'] = f"[Fallback to {fallback_model} also failed] {result.get('error', 'Unknown error')}"
-                result['output_content'] = output_content  # Preserve full output for error analysis
-                print(f"  ✗ Fallback also failed: {fallback_model}")
-                if acp_fallback['log_events']:
+
+                result = _call_claude_code(agent_name, prompt, config, skill_hint, timeout, fallback_model, priority)
+
+                # Annotate result to indicate fallback was used
+                if result.get('success'):
+                    result['model'] = f"{fallback_model} (fallback)"
+                    print(f"  ✓ Fallback successful: {fallback_model}")
+                    if acp_fallback['log_events']:
+                        _append_ledger({
+                            "event": "MODEL_FALLBACK_SUCCESS",
+                            "ts": datetime.now().isoformat(),
+                            "agent": agent_name,
+                            "fallback_model": fallback_model,
+                        })
+                else:
+                    # Preserve original error but note fallback attempt
+                    result['error'] = f"[Fallback to {fallback_model} also failed] {result.get('error', 'Unknown error')}"
+                    result['output_content'] = output_content  # Preserve full output for error analysis
+                    print(f"  ✗ Fallback also failed: {fallback_model}")
                     # Categorize error and save full content before truncation
                     error_type = categorize_error(result['error'], output_content)
                     error_file = None
@@ -2262,7 +2676,7 @@ def execute_task_with_llm(agent_name, task_text, config, skill_hint=None, timeou
                         "ts": datetime.now().isoformat(),
                         "agent": agent_name,
                         "fallback_model": fallback_model,
-                        "error": result.get('error', 'Unknown error')[:500],  # Increased from 200
+                        "error": (result.get('error') or 'Unknown error')[:500],  # Increased from 200
                         "error_type": error_type,  # NEW: structured error category
                         "error_file": error_file,  # NEW: path to full error content
                     })
@@ -2389,11 +2803,11 @@ def process_task(agent_name, task):
         # Claude Code with full tool access
         print(f"  🤖 Executing via Claude Code...{f' (skill: {skill_hint})' if skill_hint else ''} (timeout: {timeout}s)")
         start_time = time.time()
-        VALID_MODELS = {
+        VALID_CLAUDE_MODELS = {
             # Only Claude models are valid for Claude Code executor
-            'glm-5', 'kimi-k2.5', 'qwen3.5-plus',  # CLAUDE API RATE LIMITED until 2026-03-12
+            'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5',
         }
-        PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai']
+        # NOTE: Uses module-level PROXY_ENDPOINTS (includes Z.AI, Alibaba as of 2026-03-09)
         model = config.get('model')
         # Fallback: check .claude/settings.json if config.json has no model
         if not model:
@@ -2420,10 +2834,9 @@ def process_task(agent_name, task):
         except (FileNotFoundError, json.JSONDecodeError):
             pass
         is_using_proxy = any(endpoint in proxy_url for endpoint in PROXY_ENDPOINTS) if proxy_url else False
-        # Validate model - allow proxy models when using proxy
-        if model and model not in VALID_MODELS and not is_using_proxy:
-            # CLAUDE API RATE LIMITED until 2026-03-12 — using glm-5
-            print(f"  ⚠ Model '{model}' not available — using glm-5")
+        # Validate model - only Claude models allowed when not using proxy
+        if model and model not in VALID_CLAUDE_MODELS and not is_using_proxy:
+            print(f"  ⚠ Model '{model}' not available — using claude-opus-4-6")
             model = None
         # Capture env_model for fallback before potentially clearing model
         env_model = None
@@ -2435,12 +2848,11 @@ def process_task(agent_name, task):
                 env_model = settings.get('env', {}).get('ANTHROPIC_MODEL')
             except (FileNotFoundError, json.JSONDecodeError):
                 pass
-        # If using proxy with a proxy model, don't pass --model (let env var handle it)
-        if is_using_proxy and model and model not in VALID_MODELS:
+        # If using proxy with a non-Claude model, don't pass --model (let env var handle it)
+        if is_using_proxy and model and model not in VALID_CLAUDE_MODELS:
             print(f"  ✓ Using proxy model '{model}' via ANTHROPIC_MODEL env var")
             model = None  # Don't pass --model, let env var handle it
-        # CLAUDE API RATE LIMITED until 2026-03-12 — default to glm-5
-        selected_model = model or env_model or 'glm-5'
+        selected_model = model or env_model or 'claude-opus-4-6'
         debug_msg = f"MODEL_SELECT: model={model}, selected_model={selected_model}, is_using_proxy={is_using_proxy}\n"
         with open('/tmp/agent_handler_debug.log', 'a') as f:
             f.write(debug_msg)
@@ -2486,8 +2898,60 @@ def process_task(agent_name, task):
             executor_name = "claude-code"
 
     # Extract skill invocations from Claude Code session transcript (only for claude-code)
+    # Rule R008: Enforce skill_hint invocation — if skill_hint present, must be invoked
+    skills_invoked = []
+    r008_violation = False
     if task_id and executor == 'claude-code':
-        _extract_skills_from_transcript(agent_name, start_time, task_id, skill_hint)
+        skills_invoked = _extract_skills_from_transcript(agent_name, start_time, task_id, skill_hint)
+
+        # Rule R008 Enforcement: Check if required skill_hint was actually invoked
+        # This prevents EXECUTING_NO_OUTPUT pattern where agents ignore skill hints
+        if skill_hint:
+            # Normalize hint for matching (remove leading slash if present)
+            hint_normalized = skill_hint.lstrip('/')
+            # Check if any invoked skill matches the hint
+            hint_matched = any(
+                hint_normalized in skill.lstrip('/') or skill.lstrip('/') in hint_normalized
+                for skill in skills_invoked
+            )
+            if not hint_matched:
+                r008_violation = True
+                print(f"  ⚠ R008_VIOLATION: skill_hint='{skill_hint}' was not invoked (invoked: {skills_invoked})")
+                print(f"  → Marking as no_output (agent must invoke required skill)")
+
+                # LEDGER RELOAD: Ensure R008_VIOLATION is in VALID_EVENTS before logging
+                # This prevents "invalid event type" errors when the Python process has cached old schema
+                _reload_ledger_module()
+
+                # Log to ledger for tracking (with graceful fallback if validation still fails)
+                try:
+                    _append_ledger({
+                        "task_id": task_id,
+                        "event": "R008_VIOLATION",
+                        "ts": datetime.now().isoformat(),
+                        "agent": agent_name,
+                        "skill_hint": skill_hint,
+                        "skills_invoked": skills_invoked,
+                        "enforcer": "agent-task-handler.py"
+                    })
+                except Exception as ledger_err:
+                    # Non-fatal: R008 enforcement still works even if ledger logging fails
+                    if "invalid event type" in str(ledger_err).lower():
+                        print(f"  [LEDGER] Schema update pending, R008_VIOLATION event skipped: {ledger_err}")
+                    else:
+                        print(f"  [LEDGER] Failed to log R008_VIOLATION: {ledger_err}")
+                # Force failure to trigger revision loop
+                result['success'] = False
+                result['content'] = f"[R008_VIOLATION] Required skill '{skill_hint}' was not invoked. Agent invoked: {skills_invoked}. Please invoke the required skill first."
+
+    # SKILL TELEMETRY: Track skill_hint → skill_invocation correlation
+    # This enables analysis of how often agents follow skill recommendations
+    if task_id and skill_hint:
+        try:
+            _track_skill_telemetry(task_id, agent_name, skill_hint, skills_invoked, r008_violation)
+        except NameError:
+            # _track_skill_telemetry not defined - skip telemetry (non-fatal)
+            pass
 
     # Analyze tool usage from stdout and append EXECUTION_TRACE (only for claude-code)
     output_for_trace = result.get('content', '') or result.get('error', '') or ''
@@ -2521,10 +2985,15 @@ def process_task(agent_name, task):
         # CRITICAL: Append execution output to .executing.md BEFORE completion verification
         # This prevents fake completions - verification checks the file has substantial output
         output_content = result.get('content', '')
-        _append_output_to_executing(executing_file, output_content, result.get('model', executor_name), elapsed_s, success=True)
+        append_success = _append_output_to_executing(executing_file, output_content, result.get('model', executor_name), elapsed_s, success=True)
 
-        mark_task_completed(task['file'], 'completed', executing_file=executing_file)
-        print(f"  ✓ Task completed via {executor_name} ({elapsed_s}s)")
+        # If output append failed, mark as no_output instead of completed
+        completion_status = 'completed' if append_success else 'no_output'
+        if not append_success:
+            print(f"  ⚠ Output append failed, marking as no_output")
+
+        mark_task_completed(task['file'], completion_status, executing_file=executing_file)
+        print(f"  ✓ Task {completion_status} via {executor_name} ({elapsed_s}s)")
 
         # Emit execution metadata to ledger
         if task_id:
@@ -2656,15 +3125,28 @@ def process_task(agent_name, task):
 
         return True
     else:
-        error_msg = result.get('error', 'Unknown error')
+        error_msg = result.get('error') or 'Unknown error'
         output_content = result.get('content', '') or result.get('error', '')
-        print(f"  ✗ {executor_name} failed: {error_msg[:200]}")
+        # Safe string slicing with None check
+        error_display = (error_msg or 'Unknown error')[:200] if error_msg else 'Unknown error'
+        print(f"  ✗ {executor_name} failed: {error_display}")
+
+        # CREDENTIAL_ERROR handling: Use 'credential_failed' status to bypass revision loops
+        # This prevents endless .revision-N.md creation when agents have invalid credentials
+        is_credential_error = result.get('credential_error', False) or 'CREDENTIAL_ERROR' in error_msg
+        completion_status = 'credential_failed' if is_credential_error else 'failed'
 
         # CRITICAL: Append error output to .executing.md so task file has execution trace
         # This ensures the task file reflects what actually happened during execution
-        _append_output_to_executing(executing_file, output_content[:10000], result.get('model', executor_name), elapsed_s, success=False)
+        append_success = _append_output_to_executing(executing_file, output_content[:10000], result.get('model', executor_name), elapsed_s, success=False)
+        if not append_success:
+            print(f"  ⚠ Failed to append error output to task file")
 
-        mark_task_completed(task['file'], 'failed', executing_file=executing_file)
+        if is_credential_error:
+            print(f"  🔐 CREDENTIAL ERROR: Task permanently failed (no revision)")
+            print(f"  🔐 ACTION REQUIRED: Update Anthropic API key in ~/.openclaw/agents/{agent_name}/.claude/settings.json")
+
+        mark_task_completed(task['file'], completion_status, executing_file=executing_file)
 
         if task_id:
             # Categorize error and save full content before truncation
@@ -2678,7 +3160,7 @@ def process_task(agent_name, task):
                 "ts": datetime.now().isoformat(),
                 "agent": agent_name,
                 "execution_time_s": elapsed_s,
-                "error": error_msg[:500],
+                "error": (error_msg or 'Unknown error')[:500],  # Safe slicing
                 "error_type": error_type,  # NEW: structured error category
                 "error_file": error_file,  # NEW: path to full error content
                 "success": False,
@@ -2690,7 +3172,7 @@ def process_task(agent_name, task):
             from neo4j_task_tracker import get_tracker
             get_tracker().emit_pipeline_event(
                 "FAILURE_ALERT", agent=agent_name,
-                payload={"task_id": task_id, "error": error_msg[:200], "error_type": error_type},
+                payload={"task_id": task_id, "error": (error_msg or 'Unknown error')[:200], "error_type": error_type},
             )
         except Exception:
             pass

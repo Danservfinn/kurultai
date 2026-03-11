@@ -1,0 +1,124 @@
+{
+  "timestamp": "2026-03-09T14:11:07Z",
+  "hour_file": "2026-03-09-10",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 1.296,
+    "depths": {"temujin": 2, "mongke": 0, "chagatai": 0, "jochi": 1, "ogedei": 5},
+    "mean": 1.6,
+    "std": 2.07
+  },
+  "routing": {
+    "total_routed": 10,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-09T10:11:07.506227",
+  "total_routed": 10,
+  "routing_methods": {
+    "explicit": 10
+  },
+  "destinations": {
+    "kublai": 1,
+    "temujin": 1,
+    "ogedei": 8
+  },
+  "by_agent": {
+    "kublai": {
+      "routed": 1,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "temujin": {
+      "routed": 1,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "ogedei": {
+      "routed": 8,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 3,
+      "executing": 0,
+      "done": 185
+    },
+    "temujin": {
+      "pending": 2,
+      "executing": 0,
+      "done": 124
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 116
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 95
+    },
+    "jochi": {
+      "pending": 1,
+      "executing": 0,
+      "done": 101
+    },
+    "ogedei": {
+      "pending": 5,
+      "executing": 0,
+      "done": 110
+    }
+  },
+  "issues": [
+    "High explicit routing: 10/10 (100%) \u2014 keyword table may be underused",
+    "Workload imbalance: ogedei got 8 tasks vs kublai got 1",
+    "kublai: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "temujin: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "ogedei: 8 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "RECURRING: 2 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "Keyword divergence: 3/10 (30%) \u2014 consider adding disambiguation rules",
+    "ogedei received 8/10 (80%) of all tasks \u2014 check if task descriptions are too narrow or if other agents need broader keywords",
+    "Routing methods: explicit=10"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 3,
+  "kw_misroute_rate": "3/10",
+  "kw_misroute_examples": [
+    "'Completion Audit Escalation: 0 fake completions' -> kw=tolui actual=kublai",
+    "'3-hour review: the.kurult.ai' -> kw=jochi actual=temujin",
+    "'the.kurult.ai recovered after 3 minutes downtime' -> kw=temujin actual=ogedei"
+  ],
+  "overflow_count": 0,
+  "skill_hint_coverage": "7/10",
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-09T09:45:44.865824"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "ogedei: # task(s) routed but # executed \u2014 dispatch may be stalled",
+      "consecutive": 5,
+      "first_seen": "2026-03-09T06:04:42.687558"
+    },
+    {
+      "issue_key": "High explicit routing: #/# (#%) \u2014 keyword table may be underused",
+      "consecutive": 4,
+      "first_seen": "2026-03-09T07:13:06.568792"
+    }
+  ]
+}
+}

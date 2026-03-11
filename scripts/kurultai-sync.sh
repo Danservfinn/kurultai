@@ -119,12 +119,14 @@ echo "" >> "$SYNC_FILE"
 # Log to Neo4j
 export SYNC_DATE="$DATE"
 export SYNC_TIME="$TIME"
+SCRIPTS_DIR="$(dirname "$0")"
 
 python3 << PYEOF
-from neo4j import GraphDatabase
+import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_task_tracker import get_driver, close_driver
 import os
 
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "neo4j"))
+driver = get_driver()
 
 sync_date = os.environ.get('SYNC_DATE')
 sync_time = os.environ.get('SYNC_TIME')

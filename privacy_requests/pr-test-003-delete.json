@@ -1,0 +1,17 @@
+{
+  "request_id": "pr-test-003-delete",
+  "phone_number": "+15551234567",
+  "type": "delete",
+  "status": "completed",
+  "created_at": "2026-03-07T10:00:00",
+  "created_by": "test",
+  "completed_at": "2026-03-08T16:55:24.359388",
+  "deletion_result": {
+    "success": true,
+    "phone_number": "+15551234567",
+    "conversations_deleted": 0,
+    "archived_deleted": 0,
+    "file_deleted": "/Users/kublai/.openclaw/agents/main/memory/humans/15551234567.md",
+    "deleted_at": "2026-03-08T16:55:24.359364"
+  }
+}

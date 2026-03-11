@@ -1,0 +1,29 @@
+{
+  "original_task": "fail-b2c3d4e5",
+  "completion_percentage": 70,
+  "can_complete": false,
+  "missing_components": [
+    "Insufficient execution output",
+    "Missing ## Resolution section - add ## Resolution heading with What Was Done subsection"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Insufficient execution output",
+      "agent": "temujin",
+      "priority": "high",
+      "reason": "Auto-detected"
+    },
+    {
+      "title": "Missing ## Resolution section - add ## Resolution heading with What Was Done subsection",
+      "agent": "temujin",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-08T22:05:50.181213",
+  "audit_version": "1.0"
+}

@@ -18,6 +18,15 @@ Runs every 30 seconds between tock cycles. Fourteen checks per cycle:
  13. update_self_healing_score()   — track and report self-healing metrics every hour
  14. check_watchdog_health()       — internal watchdog health check
 
+False Positive Prevention:
+  The escalation system skips tasks with terminal state patterns in their filenames:
+  - .gate-passed.      — Gate audit passed, task is done
+  - .resolved.         — Task was resolved
+  - .false-positive    — Previously marked as false positive
+  - .completed.done.md — Fully completed
+  - .verified.done.md  — Verified completion
+  - .bypass.done.md    — Bypassed gate
+
 Usage:
     python3 ogedei-watchdog.py --once    # single cycle
     python3 ogedei-watchdog.py --daemon  # persistent mode (30s poll)
@@ -37,6 +46,83 @@ from threading import Event
 sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
 from kurultai_paths import AGENTS_DIR, LOGS_DIR
+
+
+def check_agent_credentials(agent: str) -> tuple[bool, str | None]:
+    """Check if agent has valid API credentials.
+
+    Returns (is_valid, error_message) tuple:
+    - is_valid: True if credentials are valid
+    - error_message: Description of issue if invalid, None if valid
+
+    Credential model (2026-03-09):
+    1. OAuth for Anthropic (no stored token) — check credentials.json
+    2. Centralized vault (provider.env) for fallbacks
+    3. Per-agent tokens in settings.json (legacy, being phased out)
+
+    Prevents escalation to agents with invalid credentials (credential crisis guard).
+    """
+    try:
+        # 1. Check OAuth status (primary auth method for Anthropic)
+        _claude_creds_path = Path.home() / ".claude" / "credentials.json"
+        if _claude_creds_path.exists():
+            try:
+                with open(_claude_creds_path, 'r') as f:
+                    _creds = json.load(f)
+                if _creds.get('loggedIn') and _creds.get('authMethod') == 'oauth_token':
+                    # OAuth is active — credentials are valid
+                    return True, None
+            except (json.JSONDecodeError, IOError):
+                pass  # Fall through to vault check
+
+        # 2. Check centralized vault for fallback credentials
+        _vault_path = Path.home() / ".openclaw" / "credentials" / "provider.env"
+        if _vault_path.exists():
+            try:
+                with open(_vault_path, 'r') as f:
+                    _vault_content = f.read()
+                # Check for Z.AI or Alibaba fallback tokens
+                _has_zai = 'ZAI_AUTH_TOKEN=' in _vault_content and 'b5b1f953' in _vault_content
+                _has_alibaba = 'ALIBABA_AUTH_TOKEN=' in _vault_content and 'sk-sp-' in _vault_content
+                if _has_zai or _has_alibaba:
+                    return True, None  # Vault has valid fallback credentials
+            except IOError:
+                pass  # Fall through to legacy check
+
+        # 3. Legacy: Check for per-agent token in settings.json
+        agent_root = AGENTS_DIR / agent
+        settings_path = agent_root / ".claude" / "settings.json"
+
+        if not settings_path.exists():
+            return False, f"No settings.json found for {agent}"
+
+        with open(settings_path, 'r') as f:
+            settings = json.load(f)
+
+        # Check for ANTHROPIC_AUTH_TOKEN in env (Claude Code format)
+        auth_token = None
+        if 'env' in settings:
+            auth_token = settings['env'].get('ANTHROPIC_AUTH_TOKEN')
+
+        # Also check direct apiKey field
+        if not auth_token:
+            auth_token = settings.get('apiKey')
+
+        if not auth_token:
+            return False, f"No ANTHROPIC_AUTH_TOKEN found"
+
+        # Validate token format - accept Anthropic, Z.AI, or Alibaba tokens
+        _is_anthropic = auth_token.startswith('sk-ant-')
+        _is_zai = len(auth_token.split('.')) == 2 and len(auth_token.split('.')[0]) == 32
+        _is_alibaba = auth_token.startswith('sk-sp-') or auth_token.startswith('sk-')
+
+        if not (_is_anthropic or _is_zai or _is_alibaba):
+            return False, f"Invalid token: {auth_token[:10]}... (expected sk-ant-*, Z.AI, or Alibaba)"
+
+        return True, None
+
+    except Exception as e:
+        return False, f"Credential check error: {e}"
 
 # Force unbuffered output for launchd
 sys.stdout.reconfigure(line_buffering=True)
@@ -69,17 +155,31 @@ REFLECTION_STEP_TIMING = LOGS_DIR / "reflection-step-timing.json"
 # ============================================================
 # Tier 1 (900s):  Log warning, check process liveness
 # Tier 2 (1800s): Verify PID dead → clear lock → requeue
-# Tier 3 (3600s): Escalate to Kublai with diagnostic bundle
+# Tier 3 (3600s): Verify PID dead + check completion → escalate if truly stuck
 TIER_WARN_S = 900          # 15 minutes - warn only
 TIER_RECOVER_S = 1800      # 30 minutes - auto-recover if PID dead
-TIER_ESCALATE_S = 3600     # 60 minutes - escalate to Kublai
+TIER_ESCALATE_S = 3600     # 60 minutes - escalate only if PID dead
 
 # Recovery tracking to prevent thrashing
 _recovery_cooldowns: dict[str, float] = {}  # task_path -> last recovery time
 REFLECTION_STATUS = LOGS_DIR / "reflection-status.json"
 REFLECTION_STEP_TIMING = LOGS_DIR / "reflection-step-timing.json"
 
-AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
+# ============================================================
+# False Positive Prevention: Skip patterns for escalation
+# ============================================================
+# Tasks matching these patterns are already resolved and should NOT be escalated.
+# This prevents circular escalation chains where completed tasks get flagged as stale.
+SKIP_PATTERNS = [
+    '.gate-passed.',      # Gate audit passed, task is done
+    '.resolved.',         # Task was resolved
+    '.false-positive',    # Previously marked as false positive
+    '.completed.done.md', # Fully completed
+    '.verified.done.md',  # Verified completion
+    '.bypass.done.md',    # Bypassed gate
+]
+
+AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
 
 stop_event = Event()
 # Track last warning time per stalled file to avoid spamming
@@ -103,6 +203,7 @@ def load_state():
         "fakes_detected": 0,
         "malformed_cleaned": 0,
         "audit_result": {},
+        "stall_escalations": {},  # Persist escalation timestamps to prevent re-escalation after watchdog restart
     })
 
 
@@ -222,12 +323,97 @@ def recover_task(task_path: Path, agent: str, age_s: int, state: dict) -> bool:
 
 
 def escalate_to_kublai(task_path: Path, agent: str, age_s: int) -> bool:
-    """Create high-priority task for Kublai investigation."""
+    """Create high-priority task for Kublai investigation.
+
+    SAFETY CHECKS (prevents escalation loops):
+    - Skip tasks with terminal state patterns (.gate-passed., .resolved., .false-positive, etc.)
+    - Skip .resolved tasks (already resolved)
+    - Skip escalation tasks (ESCALATE-*, quality-escalate-*)
+    - Check escalation depth (max 2 levels)
+    - Skip recently modified files (< 5 min old)
+    - Check if task already has a verified completion
+    - Credential crisis guard (check kublai can execute)
+    """
     try:
         workspace = Path("/Users/kublai/.openclaw/agents/kublai/tasks")
         workspace.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         task_name = task_path.name.replace(".executing.md", "")
+
+        # SAFETY CHECK 0: Skip tasks with terminal state patterns
+        # This prevents false positive escalations of already-completed tasks
+        # where the completion state is embedded in the filename itself
+        for pattern in SKIP_PATTERNS:
+            if pattern in task_name:
+                log(f"SKIP: {agent}/{task_name} - matches pattern '{pattern}' (not escalating)", "INFO")
+                # Clean up stale .executing.md artifact
+                try:
+                    task_path.unlink()
+                    pid_file = task_path.with_suffix(".pid")
+                    if pid_file.exists():
+                        pid_file.unlink()
+                    log(f"CLEANED: stale artifact {agent}/{task_path.name}")
+                except Exception as e:
+                    log(f"Cleanup failed for {agent}/{task_path.name}: {e}", "ERROR")
+                return False
+
+        # SAFETY CHECK 1: Skip .resolved tasks (already resolved)
+        if ".resolved." in task_name or task_name.endswith(".resolved"):
+            log(f"SKIP: {agent}/{task_name} - contains .resolved (not escalating)", "INFO")
+            return False
+
+        # SAFETY CHECK 2: Skip escalation tasks (prevent meta-escalations)
+        # This includes both stale-task escalations and quality gate escalations
+        if task_name.startswith("ESCALATE-stale-task-") or task_name.startswith("quality-escalate-"):
+            log(f"SKIP: {agent}/{task_name} - is an escalation task (not escalating)", "INFO")
+            return False
+
+        # SAFETY CHECK 3: Escalation depth limit (max 2 levels)
+        # Count how many times "escalate" appears in the task name (case-insensitive)
+        escalation_count = task_name.lower().count("escalate")
+        if escalation_count >= 2:
+            log(f"SKIP: {agent}/{task_name} - escalation depth {escalation_count} >= 2 (not escalating)", "INFO")
+            return False
+
+        # SAFETY CHECK 4: Skip recently modified files (< 5 min = 300 seconds)
+        # The age_s parameter is how long the task has been "stale", not file mtime
+        # Check the actual file modification time
+        file_age = time.time() - task_path.stat().st_mtime
+        if file_age < 300:
+            log(f"SKIP: {agent}/{task_name} - modified {file_age:.0f}s ago < 300s threshold (not escalating)", "INFO")
+            return False
+
+        # SAFETY CHECK 5: Skip administrative fix-up tasks
+        # Tasks like "critical-fix-resolution-*" are one-time cleanup operations
+        # that should never be escalated, as they create false-positive cascades
+        if task_name.startswith("critical-fix-resolution-") or task_name.startswith("fix-resolution-"):
+            log(f"SKIP: {agent}/{task_name} - is an administrative fix-up task (not escalating)", "INFO")
+            return False
+
+        # SAFETY CHECK 6: Check if task already has a verified completion
+        # This prevents false positive escalations of completed tasks
+        completion_check = is_task_already_completed(task_path, agent)
+        if completion_check:
+            log(f"SKIP: {agent}/{task_name} - already completed (not escalating)", "INFO")
+            # Clean up stale .executing.md artifact
+            try:
+                task_path.unlink()
+                pid_file = task_path.with_suffix(".pid")
+                if pid_file.exists():
+                    pid_file.unlink()
+                log(f"CLEANED: stale artifact {agent}/{task_path.name}")
+            except Exception as e:
+                log(f"Cleanup failed for {agent}/{task_path.name}: {e}", "ERROR")
+            return False
+
+        # SAFETY CHECK 6: Credential crisis guard — check if escalation target (kublai) has valid credentials
+        # Prevents piling up escalation tasks when kublai cannot execute them
+        kublai_creds_valid, creds_error = check_agent_credentials("kublai")
+        if not kublai_creds_valid:
+            log(f"SKIP_ESCALATION: kublai has invalid credentials ({creds_error}) — NOT escalating {agent}/{task_name}", "WARN")
+            log(f"  Reason: Escalation would create a task kublai cannot execute (credential crisis guard)", "INFO")
+            return False
+
         escalation_file = workspace / f"ESCALATE-stale-task-{agent}-{task_name}-{timestamp}.md"
         task_content = task_path.read_text()[:500] if task_path.exists() else "(file not found)"
         escalation_content = f"""---
@@ -256,19 +442,232 @@ Threshold: {TIER_ESCALATE_S}s
         return False
 
 
+def _check_task_frontmatter_for_completion(task_file: Path) -> bool:
+    """Check task file frontmatter for completion indicators.
+
+    Prevents false-positive escalations by checking if a task is already
+    verified, graded, or resolved based on frontmatter content.
+
+    Args:
+        task_file: Path to the task file (.executing.md or base task)
+
+    Returns:
+        True if task has completion markers (grade A-F or resolved: true)
+    """
+    try:
+        content = task_file.read_text()
+    except (OSError, UnicodeDecodeError):
+        return False
+
+    # Extract frontmatter (between --- markers)
+    frontmatter_match = content.split('---', 2)
+    if len(frontmatter_match) < 3:
+        return False
+
+    frontmatter = frontmatter_match[1].lower()
+
+    # Check for grade: A-F (indicates verified completion)
+    # Pattern: "grade: a" through "grade: f" (case-insensitive)
+    import re
+    if re.search(r'^grade:\s*[a-f]', frontmatter, re.MULTILINE):
+        return True
+
+    # Check for resolved: true
+    if re.search(r'^resolved:\s*true', frontmatter, re.MULTILINE):
+        return True
+
+    return False
+
+
+def _extract_task_timeout(task_file: Path) -> int:
+    """Extract the timeout value from a task file's frontmatter.
+
+    Args:
+        task_file: Path to the task file (.executing.md or base task)
+
+    Returns:
+        Timeout value in seconds. Defaults to 7200s (2 hours) if not specified.
+    """
+    try:
+        content = task_file.read_text()
+    except (OSError, UnicodeDecodeError):
+        return 7200  # Default timeout
+
+    # Extract frontmatter (between --- markers)
+    frontmatter_match = content.split('---', 2)
+    if len(frontmatter_match) < 3:
+        return 7200  # Default timeout
+
+    frontmatter = frontmatter_match[1]
+
+    # Check for timeout: value (case-insensitive)
+    import re
+    timeout_match = re.search(r'^timeout:\s*(\d+)', frontmatter, re.MULTILINE | re.IGNORECASE)
+    if timeout_match:
+        try:
+            return int(timeout_match.group(1))
+        except ValueError:
+            return 7200  # Default timeout on parse error
+
+    return 7200  # Default timeout
+
+
+def is_task_already_completed(executing_file: Path, agent: str) -> bool:
+    """Check if a task has a corresponding .done.md completion marker.
+
+    For a file like 'task-name.executing.md', checks if any variant
+    ending with '.done.md' exists in the same directory.
+
+    This prevents false positive escalations when .executing.md files
+    are left as stale artifacts after task completion.
+
+    IMPORTANT: Handles nested escalation filenames by stripping all
+    ESCALATE-stale-task-{agent}- prefixes before checking for completions.
+    This prevents false positives when escalation tasks themselves go stale.
+
+    Args:
+        executing_file: Path to the .executing.md file
+        agent: Agent name (e.g., 'mongke', 'temujin')
+
+    Returns:
+        True if a corresponding .done.md file exists, False otherwise
+    """
+    if not executing_file.name.endswith(".executing.md"):
+        return False
+
+    # Get the base task name without .executing.md
+    # e.g., 'tock-qmd-merge-123.verified' from 'tock-qmd-merge-123.verified.executing.md'
+    base_name = executing_file.name[:-len(".executing.md")]
+
+    # Strip all nested escalation prefixes to get the actual task ID
+    # Example: "ESCALATE-stale-task-mongke-ESCALATE-stale-task-kublai-task-123"
+    # becomes "task-123" after stripping all ESCALATE-stale-task-{agent}- prefixes
+    # Also strip timestamps added by escalation: "-20260308-175342"
+    import re
+    original_base = base_name
+    while True:
+        new_base = re.sub(r'^ESCALATE-stale-task-[a-z]+-', '', base_name, flags=re.IGNORECASE)
+        if new_base == base_name:  # No more prefixes to strip
+            break
+        base_name = new_base
+
+    # Strip timestamp suffix added by escalation (format: -YYYYMMDD-HHMMSS)
+    # Example: "task-123.verified-20260308-175342" -> "task-123.verified"
+    base_name = re.sub(r'-\d{8}-\d{6}$', '', base_name)
+
+    # EARLY RETURN: If base_name already ends with a completion marker, task is done
+    # This handles cases like "task.completed.done.md.executing.md" where stripping
+    # .executing.md leaves "task.completed.done.md" - already a completed state
+    COMPLETION_SUFFIXES = (
+        '.done.md',
+        '.completed.done.md',
+        '.verified.done.md',
+        '.failed.done.md',
+        '.no_output.done.md',
+        '.gate-passed.done.md',
+        '.bypass.done.md',
+        '.resolved.done.md',
+        '.resolved.md',
+        '.false-positive.resolved.md',
+        '.false-positive.done.md',
+        '.unverified.done.md',
+        '.cancelled.md',
+        '.obsolete.md',
+    )
+    if base_name.endswith(COMPLETION_SUFFIXES):
+        log(f"SKIP: {executing_file.name} already has completion suffix '{base_name}' (not escalating)", "DEBUG")
+        return True
+
+    tasks_dir = executing_file.parent
+
+    # CONTENT-BASED PRE-FILTER: Check frontmatter of executing file itself
+    # This prevents false-positive escalations when tasks have completion markers
+    # in their frontmatter (grade: A-F, resolved: true) even if a .done.md file
+    # hasn't been created yet. See: mongke/workspace/stale-task-escalation-cost-analysis-2026-03-09.md
+    if _check_task_frontmatter_for_completion(executing_file):
+        log(f"SKIP: {executing_file.name} has completion markers in frontmatter (grade/resolved)", "DEBUG")
+        return True
+
+    # Check for any .done.md variant of this task
+    # Patterns to check:
+    # - base_name.done.md
+    # - base_name.verified.done.md
+    # - base_name.verified.verified.done.md
+    # - base_name.completed.done.md
+    # - base_name.no_output.done.md
+    # - base_name.failed.done.md
+    # - base_name.gate-passed.done.md
+    # - base_name.bypass.done.md
+    # - base_name.resolved.done.md
+    # - base_name.unverified.done.md (chagatai pattern)
+    # - base_name.unverified.unverified.done.md (double-unverified)
+    completion_patterns = [
+        f"{base_name}.done.md",
+        f"{base_name}.verified.done.md",
+        f"{base_name}.verified.verified.done.md",
+        f"{base_name}.completed.done.md",
+        f"{base_name}.no_output.done.md",
+        f"{base_name}.failed.done.md",
+        # Gate completion states
+        f"{base_name}.gate-passed.done.md",
+        f"{base_name}.bypass.done.md",
+        f"{base_name}.resolved.done.md",
+        # Terminal states for resolved escalation tasks (k010)
+        f"{base_name}.resolved.md",
+        f"{base_name}.resolved.executing.md",
+        f"{base_name}.false-positive.resolved.md",
+        f"{base_name}.false-positive.done.md",  # Fix: false-positive escalations marked as .done.md not .resolved.md
+        # Chagatai unverified patterns (fix for mongke cost-analysis-2026-03-09)
+        f"{base_name}.unverified.done.md",
+        f"{base_name}.unverified.unverified.done.md",
+    ]
+
+    for pattern in completion_patterns:
+        candidate = tasks_dir / pattern
+        if candidate.exists() and candidate.is_file():
+            return True
+
+    return False
+
 
 # ============================================================
 # Original check_stalled_tasks below (updated with tiered recovery)
 # ============================================================
 def check_stalled_tasks(state):
     """Find and recover .executing.md files based on tiered policy.
-    
+
+    FAST-TRACK (60s+): 0 bytes + dead PID -> immediate recovery (no wait)
     Tier 1 (900s):  Log warning with cooldown
-    Tier 2 (1800s): Verify PID dead -> clear lock -> requeue
-    Tier 3 (3600s): Escalate to Kublai with diagnostic bundle
+    Tier 2 (1800s to escalate_threshold): Verify PID dead -> clear lock -> requeue
+    Tier 3 (escalate_threshold+): Verify PID dead + check completion -> escalate
+
+    IMPORTANT: Escalation threshold is TIMEOUT-AWARE:
+    - Extracts task timeout from frontmatter (defaults to 7200s)
+    - Escalate threshold = task_timeout * 1.5 (150% of configured timeout)
+    - Example: task with timeout=7200s escalates at 10800s (3 hours)
+
+    Before escalating (Tier 3):
+    1. Checks if PID is still alive - skips escalation if active (prevents false positives)
+    2. Checks if a corresponding .done.md file exists - cleans up stale artifact if present
+    Only escalates if PID is dead AND no completion marker exists.
     """
     issues = []
     now = time.time()
+
+    # Load persisted escalation timestamps to prevent re-escalation after watchdog restart
+    persisted_escalations = state.get("stall_escalations", {})
+    if persisted_escalations:
+        log(f"Loaded {len(persisted_escalations)} persisted escalation cooldown(s)", "INFO")
+    # Prune old entries (>24h) and merge into in-memory cooldowns
+    pruned = 0
+    for key, ts in list(persisted_escalations.items()):
+        if now - ts > 86400:  # Remove entries older than 24 hours
+            del persisted_escalations[key]
+            pruned += 1
+        else:
+            _recovery_cooldowns[key] = ts
+    if pruned:
+        log(f"Pruned {pruned} stale escalation cooldown(s) (>24h)", "INFO")
 
     for agent in AGENTS:
         tasks_dir = AGENTS_DIR / agent / "tasks"
@@ -278,7 +677,39 @@ def check_stalled_tasks(state):
             name = f.name
             if not name.endswith(".executing.md"):
                 continue
-            if ".completed" in name or ".done" in name or ".failed" in name:
+            # Skip files with completion status markers - these are not actually stalled
+            # Patterns: .verified.done.md.executing.md, .completed.done.md.executing.md,
+            #           .no_output.done.md.executing.md, .failed.done.md.executing.md,
+            #           .done.md.executing.md, .failed.md.executing.md, .completed.md.executing.md,
+            #           .resolved.md.executing.md (resolved escalation tasks)
+            #           .gate-passed.done.md.executing.md, .bypass.done.md.executing.md
+            # IMPORTANT: Never escalate escalation tasks - prevents infinite loops
+            # This includes both stale-task escalations (ESCALATE-stale-task-*) and quality escalations (quality-escalate-*)
+            if name.startswith("ESCALATE-") or name.startswith("quality-escalate-"):
+                continue
+            # IMPORTANT: Never escalate administrative fix-up tasks - prevents false-positive cascades
+            # These are one-time cleanup operations (critical-fix-resolution-*, fix-resolution-*)
+            if name.startswith("critical-fix-resolution-") or name.startswith("fix-resolution-"):
+                continue
+            # EARLY SKIP: Check for terminal state patterns anywhere in filename (not just suffix)
+            # This catches tasks like "task.gate-passed.done.md.executing.md" where the pattern
+            # is embedded in the middle of the filename
+            if any(pattern in name for pattern in SKIP_PATTERNS):
+                continue
+            if any(name.endswith(pattern) for pattern in [
+                ".verified.done.md.executing.md",
+                ".completed.done.md.executing.md",
+                ".no_output.done.md.executing.md",
+                ".failed.done.md.executing.md",
+                ".done.md.executing.md",
+                ".failed.md.executing.md",
+                ".completed.md.executing.md",
+                ".resolved.md.executing.md",  # Prevent false positive escalations on resolved tasks
+                ".gate-passed.done.md.executing.md",  # Gate passed tasks
+                ".bypass.done.md.executing.md",  # Bypassed tasks
+                ".unverified.done.md.executing.md",  # Chagatai unverified tasks (fix mongke-2026-03-09)
+                ".unverified.unverified.done.md.executing.md",  # Double-unverified
+            ]):
                 continue
             if not f.is_file():
                 continue
@@ -293,43 +724,92 @@ def check_stalled_tasks(state):
             key = f"{agent}/{name}"
             task_path = f
 
+            # FAST-TRACK: Empty output with dead PID = immediate recovery
+            # Tasks that produce 0 bytes with a dead process are clear failures
+            # Don't wait for age thresholds - recover immediately to reduce queue blockage
+            try:
+                file_size = f.stat().st_size
+                if file_size == 0 and age >= 60:  # At least 1 min old + 0 bytes = dead
+                    if verify_process_dead(task_path):
+                        log(f"FAST-TRACK RECOVER: {key} - 0 bytes, PID dead, age={age:.0f}s", "WARN")
+                        if recover_task(task_path, agent, age, state):
+                            issues.append(f"{key} fast-track recovered (0 bytes)")
+                            state["fast_track_recovered"] = state.get("fast_track_recovered", 0) + 1
+                            continue  # Skip normal tier processing
+                        else:
+                            issues.append(f"{key} fast-track recovery failed")
+            except OSError:
+                pass
+
+            # Extract task timeout for timeout-aware escalation
+            # Default to 7200s (2 hours) if not specified in frontmatter
+            task_timeout = _extract_task_timeout(task_path)
+            escalate_threshold = int(task_timeout * 1.5)  # 150% of configured timeout
+
             # Tier 1 (900-1800s): Warning only
             if age < TIER_RECOVER_S:
                 last_warned = _stall_warned_at.get(key, 0)
                 if (now - last_warned) >= STALL_WARN_COOLDOWN:
-                    log(f"STALLED: {key} - {age:.0f}s old (Tier 1)", "WARN")
+                    log(f"STALLED: {key} - {age:.0f}s old (Tier 1, timeout={task_timeout}s)", "WARN")
                     _stall_warned_at[key] = now
                     state["stalled_warnings"] = state.get("stalled_warnings", 0) + 1
                 issues.append(f"{key} stalled {age:.0f}s")
 
-            # Tier 2 (1800-3600s): Attempt recovery if PID dead
-            elif age < TIER_ESCALATE_S:
+            # Tier 2 (1800s to escalate_threshold): Attempt recovery if PID dead
+            elif age < escalate_threshold:
                 last_recovery = _recovery_cooldowns.get(key, 0)
                 if (now - last_recovery) < STALL_WARN_COOLDOWN:
                     issues.append(f"{key} stalled {age:.0f}s (cooldown)")
                     continue
 
                 if verify_process_dead(task_path):
-                    log(f"RECOVERING: {key} - {age:.0f}s old (Tier 2)", "WARN")
+                    log(f"RECOVERING: {key} - {age:.0f}s old (Tier 2, timeout={task_timeout}s)", "WARN")
                     if recover_task(task_path, agent, age, state):
                         issues.append(f"{key} recovered after {age:.0f}s")
                         _stall_warned_at.pop(key, None)
                     else:
                         issues.append(f"{key} recovery failed")
                 else:
-                    log(f"STALLED: {key} - {age:.0f}s old (Tier 2: PID alive)", "WARN")
+                    log(f"STALLED: {key} - {age:.0f}s old (Tier 2: PID alive, timeout={task_timeout}s)", "WARN")
                     issues.append(f"{key} stalled {age:.0f}s (alive)")
 
-            # Tier 3 (3600s+): Escalate to Kublai
+            # Tier 3 (escalate_threshold+): Escalate to Kublai
+            # Only triggers after 150% of task's configured timeout
             else:
                 last_esc = _recovery_cooldowns.get(f"{key}_escalation", 0)
                 if (now - last_esc) < 3600:
                     issues.append(f"{key} stalled {age:.0f}s (escalated)")
                     continue
 
-                log(f"ESCALATING: {key} - {age:.0f}s old (Tier 3)", "ERROR")
+                # PID ALIVENESS CHECK: Skip escalation if process is still running
+                # This prevents false positive escalations for actively executing tasks
+                if not verify_process_dead(task_path):
+                    log(f"SKIP: {key} - {age:.0f}s old (Tier 3: PID alive, not escalating)", "INFO")
+                    state["stall_skips_alive"] = state.get("stall_skips_alive", 0) + 1
+                    issues.append(f"{key} stalled {age:.0f}s (alive)")
+                    continue
+
+                # Check if task is already completed before escalating
+                # This prevents false positive escalations for tasks with .done.md markers
+                if is_task_already_completed(task_path, agent):
+                    log(f"SKIP: {key} - already has .done.md marker (not escalating)", "INFO")
+                    state["stall_skips_completed"] = state.get("stall_skips_completed", 0) + 1
+                    # Optionally clean up the stale .executing.md file
+                    try:
+                        task_path.unlink()
+                        log(f"CLEANED: stale .executing.md for completed task: {key}", "INFO")
+                        state["stall_cleaned_artifacts"] = state.get("stall_cleaned_artifacts", 0) + 1
+                    except OSError:
+                        pass
+                    continue
+
+                log(f"ESCALATING: {key} - {age:.0f}s old (Tier 3, timeout={task_timeout}s, threshold={escalate_threshold}s)", "ERROR")
                 if escalate_to_kublai(task_path, agent, age):
-                    _recovery_cooldowns[f"{key}_escalation"] = now
+                    escalation_key = f"{key}_escalation"
+                    _recovery_cooldowns[escalation_key] = now
+                    # Persist to state to survive watchdog restarts
+                    state.setdefault("stall_escalations", {})[escalation_key] = now
+                    state["stall_escalated"] = state.get("stall_escalated", 0) + 1
                     issues.append(f"{key} escalated")
                 else:
                     issues.append(f"{key} escalation failed")
@@ -653,6 +1133,12 @@ FAILURE_RATE_THRESHOLD = 0.5   # warn if >50% failure rate
 FAILURE_RATE_MIN_TASKS = 3     # minimum tasks before flagging
 AGENT_HEALTH_FLAGS_FILE = LOGS_DIR / "agent-health-flags.json"
 
+# Check 9b: Credential failure monitoring (CRITICAL for DashScope incidents)
+CRED_FAILURE_INTERVAL = 180    # 3 minutes between credential checks
+CRED_FAILURE_LOOKBACK_M = 30   # 30-minute lookback for credential failures
+CRED_FAILURE_THRESHOLD = 2     # Alert after 2+ credential failures in lookback
+CRED_ALERT_FILE = LOGS_DIR / "credential-alerts.json"
+
 # Check 13: Auto queue balancing
 QUEUE_BALANCE_INTERVAL = 300   # 5 minutes between balance checks
 QUEUE_MAX_DEPTH = 8            # Trigger if agent has >8 tasks
@@ -671,6 +1157,12 @@ QUALITY_LOOKBACK_MINUTES = 15  # Check completions from last 15 minutes
 # Check 13: Self-healing score
 SELF_HEALING_SCORE_INTERVAL = 3600  # 1 hour between score updates
 SELF_HEALING_SCORE_HOURS = 24       # Calculate score over 24h window
+
+# Check 16: Git operation monitoring
+GIT_OPERATION_INTERVAL = 300        # 5 minutes between git operation checks
+GIT_SPIKE_THRESHOLD = 5             # commits per hour to trigger alert
+GIT_STALE_BRANCH_DAYS = 7           # days before branch is considered stale
+GIT_LARGE_DELETION_THRESHOLD = 100  # files deleted in single commit to alert
 
 
 def check_routing_drift(state):
@@ -788,7 +1280,8 @@ def check_agent_failure_rates(state):
         state["last_failure_rate_check"] = now
         return issues
 
-    events = read_ledger(hours=FAILURE_RATE_LOOKBACK_H)
+    # Read only valid events (filter out events with validation errors)
+    events = read_ledger(hours=FAILURE_RATE_LOOKBACK_H, valid_only=True)
     if not events:
         state["last_failure_rate_check"] = now
         return issues
@@ -855,6 +1348,92 @@ def check_agent_failure_rates(state):
 
 
 # ============================================================
+# Check 9b: Credential failure monitoring (CRITICAL)
+# ============================================================
+def check_credential_failures(state):
+    """Detect AUTH/PROXY_AUTH failures that require human credential intervention.
+
+    Reads ledger events for error_type="AUTH" or "PROXY_AUTH" from the last 30 minutes.
+    Writes credential-alerts.json with per-agent credential failure counts and
+    actionable remediation instructions.
+
+    This is CRITICAL for DashScope incidents where agents have wrong credentials
+    and 100% task failure rate. Faster detection = faster human intervention.
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_cred_failure_check", 0)
+
+    if (now - last_check) < CRED_FAILURE_INTERVAL:
+        return issues
+
+    try:
+        from kurultai_ledger import read_ledger
+    except Exception as e:
+        log(f"Cannot import kurultai_ledger for credential check: {e}", "ERROR")
+        state["last_cred_failure_check"] = now
+        return issues
+
+    # Read only valid events (filter out events with validation errors)
+    events = read_ledger(hours=CRED_FAILURE_LOOKBACK_M / 60.0, valid_only=True)
+    if not events:
+        state["last_cred_failure_check"] = now
+        return issues
+
+    # Count credential failures per agent
+    agent_cred_failures = {}
+    # Keywords that indicate credential/auth problems (match categorize_error logic)
+    cred_keywords = [
+        "unauthorized", "authentication", "invalid token", "invalid api key",
+        "sk-sp-", "credential", "permission denied", "401", "403",
+        "dashscope", "auth failed", "api key invalid"
+    ]
+
+    for ev in events:
+        agent = ev.get("agent")
+        if not agent:
+            continue
+        # Check both error_type field AND error message for credential issues
+        error_type = ev.get("error_type", "")
+        error_msg = (ev.get("error") or "").lower()
+
+        is_cred_error = (
+            error_type in ("AUTH", "PROXY_AUTH") or
+            any(kw in error_msg for kw in cred_keywords)
+        )
+        if is_cred_error:
+            agent_cred_failures[agent] = agent_cred_failures.get(agent, 0) + 1
+
+    # Flag agents exceeding threshold
+    alerts = {}
+    for agent, count in agent_cred_failures.items():
+        if count >= CRED_FAILURE_THRESHOLD:
+            alerts[agent] = {
+                "credential_failure_count": count,
+                "lookback_minutes": CRED_FAILURE_LOOKBACK_M,
+                "last_check": datetime.now().isoformat(),
+                "remediation": f"Check ~/.openclaw/agents/{agent}/.claude/settings.json for ANTHROPIC_AUTH_TOKEN and ANTHROPIC_BASE_URL",
+                "suspected_cause": "DashScope credentials (sk-sp-*) or wrong API endpoint",
+                "action": "Get valid Anthropic API key (sk-ant-*) from https://console.anthropic.com/",
+            }
+            log(f"CREDENTIAL FAILURE ALERT: {agent} — {count} AUTH/PROXY_AUTH failures in last {CRED_FAILURE_LOOKBACK_M}m", "ERROR")
+            issues.append(f"{agent} has {count} credential failures — requires API key update")
+
+    # Write credential alerts file for human intervention
+    if alerts:
+        try:
+            CRED_ALERT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(str(CRED_ALERT_FILE), "w") as f:
+                json.dump({"ts": datetime.now().isoformat(), "alerts": alerts}, f, indent=2)
+            log(f"Wrote credential alerts to {CRED_ALERT_FILE.name}", "WARN")
+        except Exception as e:
+            log(f"Failed to write credential alerts: {e}", "ERROR")
+
+    state["last_cred_failure_check"] = now
+    return issues
+
+
+# ============================================================
 # Check 13: Auto queue balancing
 # ============================================================
 def check_queue_balance(state):
@@ -890,7 +1469,7 @@ def check_queue_balance(state):
 
         # Subtract executing and done tasks (they may match the patterns above)
         for f in tasks_dir.glob("*"):
-            if ".executing" in f.name or ".done" in f.name or ".failed" in f.name:
+            if f.name.endswith(".executing.md") or f.name.endswith(".done.md") or f.name.endswith(".failed.md"):
                 pending -= 1
 
         depths[agent] = max(0, pending)
@@ -942,7 +1521,7 @@ def check_queue_balance(state):
         # Filter to actual pending tasks (exclude executing, done, failed)
         source_tasks = [
             t for t in source_tasks
-            if ".executing" not in t.name and ".done" not in t.name and ".failed" not in t.name
+            if not t.name.endswith(".executing.md") and not t.name.endswith(".done.md") and not t.name.endswith(".failed.md")
         ]
 
         # Sort by modification time (oldest first for fairness)
@@ -1100,6 +1679,19 @@ def check_quality_gate(state):
 
             for f in tasks_dir.glob("*.done.md"):
                 if not f.is_file():
+                    continue
+
+                # Skip tasks already in terminal states (verified, resolved, etc.)
+                # These have already passed quality checks and should NOT be re-checked
+                # This prevents false positive escalations of completed tasks
+                # Use substring matching to handle suffixes like .revision-1.md
+                if any(pattern in f.name for pattern in (
+                    ".verified.done.",           # Already verified - Grade A, B, C, etc.
+                    ".verified.completed.done.",  # Verified completion
+                    ".verified.failed.done.",    # Verified failure
+                    ".resolved.",                # Escalations that were resolved
+                    ".orphan-resolved.",         # Orphan tasks that were resolved
+                )):
                     continue
 
                 try:
@@ -1308,6 +1900,93 @@ def check_watchdog_health(state):
 
 
 # ============================================================
+# Check 16: Git operation monitoring for autonomous agents
+# ============================================================
+def check_git_operations(state):
+    """Monitor git operations by autonomous agents for anomalies.
+
+    Checks for:
+    - Commit spike detection (>5/hour per agent)
+    - Large deletions (>100 files in single commit)
+    - Critical file modifications (CLAUDE.md, config/)
+    - Stale autonomous branches (>7 days old)
+    - Unauthorized direct main merges
+
+    Also collects metrics for dashboard display.
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_git_operation_check", 0)
+
+    # Only check every GIT_OPERATION_INTERVAL
+    if (now - last_check) < GIT_OPERATION_INTERVAL:
+        return issues
+        return issues
+
+    log("Checking git operations")
+
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "git_operation_monitor", str(SCRIPTS_DIR / "git-operation-monitor.py")
+        )
+        gom = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gom)
+
+        # Gather metrics
+        metrics = gom.gather_metrics()
+
+        state["last_git_operation_check"] = now
+        state["git_metrics"] = {
+            "autonomous_commits_24h": metrics["autonomous_commits_24h"],
+            "autonomous_commits_1h": metrics["autonomous_commits_1h"],
+            "autonomous_branches_active": metrics["autonomous_branches_active"],
+            "autonomous_branches_stale": metrics["autonomous_branches_stale"],
+            "autonomous_prs_open": metrics["autonomous_prs_open"],
+            "anomaly_count": metrics["anomaly_count"],
+            "blocked_operations_24h": metrics["blocked_operations_24h"],
+        }
+
+        # Check for anomalies
+        if metrics["anomalies"]:
+            for anomaly in metrics["anomalies"][:5]:
+                severity = anomaly.get("severity", "unknown")
+                msg = anomaly.get("message", "Unknown issue")
+                log(f"GIT ANOMALY [{severity.upper()}]: {msg}", "WARN" if severity != "critical" else "ERROR")
+                issues.append(f"git_anomaly: {anomaly.get('type', 'unknown')}")
+
+            # Create alert task for critical/high anomalies
+            critical_high = [a for a in metrics["anomalies"] if a.get("severity") in ["critical", "high"]]
+            if critical_high:
+                gom.create_alert_task(critical_high)
+
+        # Check for stale branches
+        if metrics["autonomous_branches_stale"] > 0:
+            log(f"STALE AUTONOMOUS BRANCHES: {metrics['autonomous_branches_stale']} branches older than {GIT_STALE_BRANCH_DAYS} days", "WARN")
+            issues.append(f"stale_branches: {metrics['autonomous_branches_stale']}")
+
+        # Check for blocked operations
+        if metrics["blocked_operations_24h"] > 0:
+            log(f"BLOCKED OPERATIONS: {metrics['blocked_operations_24h']} unauthorized merges detected", "WARN")
+            issues.append(f"blocked_operations: {metrics['blocked_operations_24h']}")
+
+        # Store metrics in Neo4j for trend analysis
+        if gom.store_metrics_neo4j(metrics):
+            log("Git metrics stored in Neo4j")
+
+        # Save metrics to file for dashboard
+        gom.save_metrics(metrics)
+
+    except FileNotFoundError:
+        log("git-operation-monitor.py not found — skipping git check", "WARN")
+    except Exception as e:
+        log(f"Git operation check failed: {e}", "ERROR")
+        issues.append(f"git_check_error: {e}")
+
+    return issues
+
+
+# ============================================================
 # Main cycle
 # ============================================================
 def run_cycle():
@@ -1326,6 +2005,7 @@ def run_cycle():
     all_issues.extend(check_memory_health(state))
     all_issues.extend(check_routing_drift(state))
     all_issues.extend(check_agent_failure_rates(state))
+    all_issues.extend(check_credential_failures(state))
     all_issues.extend(check_queue_balance(state))
 
     # P2 enhancement checks
@@ -1334,6 +2014,7 @@ def run_cycle():
     all_issues.extend(update_self_healing_score(state))
     all_issues.extend(check_circuit_breaker_health(state))
     all_issues.extend(check_watchdog_health(state))
+    all_issues.extend(check_git_operations(state))
 
     state["cycles"] = state.get("cycles", 0) + 1
     state["last_cycle"] = datetime.now().isoformat()
@@ -1348,10 +2029,17 @@ def run_cycle():
 
 
 def daemon_loop():
-    """Main daemon loop — runs cycle every POLL_INTERVAL seconds."""
+    """Main daemon loop — runs cycle every POLL_INTERVAL seconds.
+
+    Self-reload: If this script file is modified, the daemon automatically restarts
+    to pick up changes. This is critical for ops — bug fixes take effect immediately.
+    """
+    _script_path = Path(__file__).resolve()
+    _last_mtime = _script_path.stat().st_mtime
     log(f"Ogedei Watchdog starting (poll interval: {POLL_INTERVAL}s)")
     log(f"State: {STATE_FILE}")
     log(f"Log: {LOG_FILE}")
+    log(f"Script: {_script_path} (mtime: {_last_mtime})")
 
     while not stop_event.is_set():
         try:
@@ -1363,6 +2051,20 @@ def daemon_loop():
             if stop_event.is_set():
                 break
             time.sleep(1)
+
+        # Self-reload check: restart if script file has been modified
+        # This ensures bug fixes (like credential guards) take effect immediately
+        try:
+            _current_mtime = _script_path.stat().st_mtime
+            if _current_mtime > _last_mtime:
+                log(f"SCRIPT MODIFIED: {_script_path}")
+                log(f"  Old mtime: {_last_mtime}, New mtime: {_current_mtime}")
+                log(f"  RESTARTING to pick up code changes...")
+                # Exec ourself to replace the current process
+                # This preserves PID but reloads all code
+                os.execv(sys.executable, [sys.executable, str(_script_path), "--daemon"])
+        except Exception as e:
+            log(f"Self-reload check failed: {e}", "ERROR")
 
     log("Ogedei Watchdog stopped")
 

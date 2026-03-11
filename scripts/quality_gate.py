@@ -21,6 +21,83 @@ from typing import Literal
 sys.path.insert(0, str(Path(__file__).parent))
 from kurultai_paths import AGENTS_DIR, LOGS_DIR
 
+
+def check_agent_credentials(agent: str) -> tuple[bool, str | None]:
+    """Check if agent has valid API credentials.
+
+    Returns (is_valid, error_message) tuple:
+    - is_valid: True if credentials are valid
+    - error_message: Description of issue if invalid, None if valid
+
+    Credential model (2026-03-09):
+    1. OAuth for Anthropic (no stored token) — check credentials.json
+    2. Centralized vault (provider.env) for fallbacks
+    3. Per-agent tokens in settings.json (legacy, being phased out)
+
+    Prevents escalation to agents with invalid credentials (credential crisis guard).
+    """
+    try:
+        # 1. Check OAuth status (primary auth method for Anthropic)
+        _claude_creds_path = Path.home() / ".claude" / "credentials.json"
+        if _claude_creds_path.exists():
+            try:
+                with open(_claude_creds_path, 'r') as f:
+                    _creds = json.load(f)
+                if _creds.get('loggedIn') and _creds.get('authMethod') == 'oauth_token':
+                    # OAuth is active — credentials are valid
+                    return True, None
+            except (json.JSONDecodeError, IOError):
+                pass  # Fall through to vault check
+
+        # 2. Check centralized vault for fallback credentials
+        _vault_path = Path.home() / ".openclaw" / "credentials" / "provider.env"
+        if _vault_path.exists():
+            try:
+                with open(_vault_path, 'r') as f:
+                    _vault_content = f.read()
+                # Check for Z.AI or Alibaba fallback tokens
+                _has_zai = 'ZAI_AUTH_TOKEN=' in _vault_content and 'b5b1f953' in _vault_content
+                _has_alibaba = 'ALIBABA_AUTH_TOKEN=' in _vault_content and 'sk-sp-' in _vault_content
+                if _has_zai or _has_alibaba:
+                    return True, None  # Vault has valid fallback credentials
+            except IOError:
+                pass  # Fall through to legacy check
+
+        # 3. Legacy: Check for per-agent token in settings.json
+        agent_root = AGENTS_DIR / agent
+        settings_path = agent_root / ".claude" / "settings.json"
+
+        if not settings_path.exists():
+            return False, f"No settings.json found for {agent}"
+
+        with open(settings_path, 'r') as f:
+            settings = json.load(f)
+
+        # Check for ANTHROPIC_AUTH_TOKEN in env (Claude Code format)
+        auth_token = None
+        if 'env' in settings:
+            auth_token = settings['env'].get('ANTHROPIC_AUTH_TOKEN')
+
+        # Also check direct apiKey field
+        if not auth_token:
+            auth_token = settings.get('apiKey')
+
+        if not auth_token:
+            return False, f"No ANTHROPIC_AUTH_TOKEN found"
+
+        # Validate token format - accept Anthropic, Z.AI, or Alibaba tokens
+        _is_anthropic = auth_token.startswith('sk-ant-')
+        _is_zai = len(auth_token.split('.')) == 2 and len(auth_token.split('.')[0]) == 32
+        _is_alibaba = auth_token.startswith('sk-sp-') or auth_token.startswith('sk-')
+
+        if not (_is_anthropic or _is_zai or _is_alibaba):
+            return False, f"Invalid token: {auth_token[:10]}... (expected sk-ant-*, Z.AI, or Alibaba)"
+
+        return True, None
+
+    except Exception as e:
+        return False, f"Credential check error: {e}"
+
 # Quality thresholds
 QUALITY_THRESHOLDS = {
     "min_chars": 500,
@@ -239,10 +316,47 @@ class CompletionQualityGate:
         """Create escalation task for Kublai review.
 
         Creates a new high-priority task in kublai's queue.
+
+        SAFETY CHECKS (prevents escalation loops):
+        - Skip tasks ending in .done.md (already complete)
+        - Skip tasks containing .resolved (already resolved)
+        - Skip tasks that are themselves escalations (quality-escalate- or ESCALATE-stale-task-)
+        - Check escalation depth (max 2 levels)
+        - Skip recently modified files (< 5 min old)
         """
         # Extract agent and task info
         agent = task_file.parent.parent.name
         task_name = task_file.stem
+        filename = task_file.name
+
+        # SAFETY CHECK 1: Skip .done.md files (already complete)
+        if filename.endswith(".done.md"):
+            self._log_info(f"SKIP: {filename} - already has .done.md suffix (not escalating)")
+            return
+
+        # SAFETY CHECK 2: Skip .resolved files (already resolved)
+        if ".resolved." in filename or filename.endswith(".resolved.md"):
+            self._log_info(f"SKIP: {filename} - contains .resolved (not escalating)")
+            return
+
+        # SAFETY CHECK 3: Skip escalation tasks (prevent meta-escalations)
+        if filename.startswith("quality-escalate-") or filename.startswith("ESCALATE-stale-task-"):
+            self._log_info(f"SKIP: {filename} - is an escalation task (not escalating)")
+            return
+
+        # SAFETY CHECK 4: Escalation depth limit (max 2 levels)
+        # Count how many times "escalate" appears in the filename (case-insensitive)
+        escalation_count = filename.lower().count("escalate")
+        if escalation_count >= 2:
+            self._log_info(f"SKIP: {filename} - escalation depth {escalation_count} >= 2 (not escalating)")
+            return
+
+        # SAFETY CHECK 5: Skip recently modified files (< 5 min = 300 seconds)
+        import time
+        file_age = time.time() - task_file.stat().st_mtime
+        if file_age < 300:
+            self._log_info(f"SKIP: {filename} - modified {file_age:.0f}s ago < 300s threshold (not escalating)")
+            return
 
         # Create escalation task
         escalation_content = f"""---
@@ -275,6 +389,14 @@ Review the task output and determine:
 
 Generated by quality-gate.py at {datetime.now().isoformat()}
 """
+
+        # SAFETY CHECK 6: Credential crisis guard — check if escalation target (kublai) has valid credentials
+        # Prevents piling up escalation tasks when kublai cannot execute them
+        kublai_creds_valid, creds_error = check_agent_credentials("kublai")
+        if not kublai_creds_valid:
+            self._log_info(f"SKIP_ESCALATION: kublai has invalid credentials ({creds_error}) — NOT escalating {agent}/{task_name}")
+            self._log_info("  Reason: Escalation would create a task kublai cannot execute (credential crisis guard)")
+            return
 
         # Write to kublai's queue
         kublai_tasks = AGENTS_DIR / "kublai" / "tasks"

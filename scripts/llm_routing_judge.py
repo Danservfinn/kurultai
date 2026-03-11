@@ -28,11 +28,12 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from kurultai_paths import LOGS_DIR
+    from kurultai_paths import LOGS_DIR, VALID_AGENTS as _VALID_AGENTS
     from kurultai_ledger import append_ledger
 except ImportError:
     LOGS_DIR = Path("/Users/kublai/.openclaw/agents/main/logs")
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    _VALID_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai", "tolui"]
 
     def append_ledger(entry):
         # Fallback for standalone testing
@@ -42,8 +43,8 @@ except ImportError:
 PREDICTION_CACHE_FILE = LOGS_DIR / "routing-prediction-cache.json"
 PREDICTION_CACHE_TTL_S = 3600  # 1 hour
 
-# Valid agents (must match task_intake.py)
-VALID_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai", "tolui"]
+# Valid agents (imported from kurultai_paths, converted to list)
+VALID_AGENTS = list(_VALID_AGENTS)
 
 # Agent domain descriptions for prompt
 AGENT_DESCRIPTIONS = {

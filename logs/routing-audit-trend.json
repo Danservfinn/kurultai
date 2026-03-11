@@ -1,25 +1,20 @@
 {
   "issue_streaks": {
-    "High explicit routing: #/# (#%) \u2014 keyword table may be underused": {
-      "consecutive": 19,
-      "first_seen": "2026-03-07T16:03:03.123676",
-      "last_seen": "2026-03-08T00:01:35.014112"
-    },
-    "Workload imbalance: jochi got # tasks vs temujin got #": {
-      "consecutive": 1,
-      "first_seen": "2026-03-08T00:01:35.014112",
-      "last_seen": "2026-03-08T00:01:35.014112"
-    },
     "Keyword table drift: #/# (#%) tasks would route differently via keywords vs actual destination": {
       "consecutive": 1,
-      "first_seen": "2026-03-08T00:01:35.014112",
-      "last_seen": "2026-03-08T00:01:35.014112"
+      "first_seen": "2026-03-11T06:11:34.293476",
+      "last_seen": "2026-03-11T06:11:34.293476"
     },
-    "temujin: # task(s) routed but # executed \u2014 dispatch may be stalled": {
+    "High overflow rate: #/# (#%) \u2014 agents frequently busy": {
       "consecutive": 1,
-      "first_seen": "2026-03-08T00:01:35.014112",
-      "last_seen": "2026-03-08T00:01:35.014112"
+      "first_seen": "2026-03-11T06:11:34.293476",
+      "last_seen": "2026-03-11T06:11:34.293476"
+    },
+    "Keyword routing drift: #/# (#%) disagree with actual routing": {
+      "consecutive": 1,
+      "first_seen": "2026-03-11T06:11:34.293476",
+      "last_seen": "2026-03-11T06:11:34.293476"
     }
   },
-  "last_run": "2026-03-08T00:01:35.014112"
+  "last_run": "2026-03-11T06:11:34.293476"
 }

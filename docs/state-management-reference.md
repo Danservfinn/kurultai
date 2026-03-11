@@ -96,6 +96,16 @@ success   failure
         retry_count, error, session_key, started, updated})
 (:Agent)-[:EXECUTED]->(:Task)
 (:Task)-[:RETRIED]->(:Task)
+
+# Experimentation nodes (Store 1B)
+(:Hypothesis {id, agent, description, target_files, expected_impact,
+              baseline_metric, confidence, learning_id, variable_type,
+              control_value, treatment_value, created, status})
+
+# Feedback nodes (Store 1C)
+(:AgentFeedback {id, agent, feedback, priority, proposals,
+                submitted, status})
+(:Agent)-[:SUBMITTED]->(:AgentFeedback)
 ```
 
 ### Status Values
@@ -124,6 +134,92 @@ python3 neo4j-state-sync.py --verbose # Show all scanned files
 **Rule:** Filesystem is source of truth for execution state. Neo4j is updated to match, never the reverse.
 
 **When to run:** After any incident involving stuck tasks, after model failures that produce bulk failed tasks, or routinely via tock (every 30min).
+
+---
+
+## Store 1B: Neo4j Hypothesis Nodes
+
+**Purpose:** Track autoresearch experiments generated from KublaiLearning patterns
+**Source:** `hypothesis_generator.py` creates nodes, `neo4j_task_tracker.validate_hypotheses()` updates status
+**Lifecycle:** pending → testing → validated/rejected
+
+### Hypothesis Node Schema
+
+```cypher
+(:Hypothesis {
+    id: "hyp-<uuid8>",           # Unique identifier
+    agent: "temujin",              # Target agent (or "all")
+    description: "Using skill hint /horde-implement...",  # Human-readable hypothesis
+    target_files: ["scripts/task_intake.py"],  # Files this would modify
+    expected_impact: "success_rate:+5%",  # Metric and direction
+    baseline_metric: 0.75,         # Current value
+    confidence: 0.85,              # 0.0-1.0 based on evidence
+    learning_id: "kl-abc123",      # Source KublaiLearning node (optional)
+    variable_type: "skill_hint",   # model, prompt_template, timeout, etc.
+    control_value: "none",         # Current value
+    treatment_value: "horde-implement",  # Proposed new value
+    created: datetime(),
+    status: "pending"              # pending, testing, validated, rejected, expired
+})
+```
+
+### Validation Logic (`neo4j_task_tracker.validate_hypotheses()`)
+
+| Condition | Action |
+|-----------|--------|
+| Hypothesis age > 2h AND matching completed task exists | Mark `validated` |
+| Hypothesis age > 24h AND no match found | Mark `expired` |
+| Otherwise | Keep `pending` |
+
+### Generation Sources
+
+1. **KublaiLearning nodes** (`_generate_from_learnings`) - Active patterns with confidence > 0.5
+2. **Failure patterns** (`_generate_from_failures`) - Recurring error types with 3+ occurrences
+3. **Duration outliers** (`_generate_from_durations`) - Tasks with p95 > 3× p50
+4. **Reflection feedback** (`_generate_from_reflections`) - Agent complaints about context/tools/timeout
+
+---
+
+## Store 1C: Neo4j AgentFeedback Nodes
+
+**Purpose:** Capture structured proposals/feedback from agents during kurultai reflection
+**Source:** `meta_reflection.py` creates nodes when agents submit proposals
+**Status Flow:** pending_review → reviewed → implemented/dismissed
+
+### AgentFeedback Node Schema
+
+```cypher
+(:AgentFeedback {
+    id: "af-<uuid8>",           # Unique identifier
+    agent: "chagatai",            # Submitting agent
+    feedback: "Summary of proposed improvement",  # Human-readable feedback
+    priority: "high",             # low, medium, high, critical
+    proposals: ["prop1", "prop2"],# Array of proposal references
+    submitted: datetime(),
+    status: "pending_review"      # pending_review, reviewed, implemented, dismissed
+})
+
+(:Agent {name: "chagatai"})-[:SUBMITTED]->(:AgentFeedback)
+```
+
+### Query Examples
+
+```cypher
+# Get pending feedback for review
+MATCH (f:AgentFeedback {status: 'pending_review'})
+RETURN f ORDER BY
+    CASE f.priority
+        WHEN 'critical' THEN 1
+        WHEN 'high' THEN 2
+        WHEN 'medium' THEN 3
+        ELSE 4
+    END, f.submitted DESC
+
+# Mark feedback as reviewed
+MATCH (f:AgentFeedback {id: 'af-abc123'})
+SET f.status = 'reviewed',
+    f.reviewed_at = datetime()
+```
 
 ---
 
@@ -187,6 +283,9 @@ These files are written by single scripts so locking is unnecessary, but concurr
 | Execution starts | `task-watcher.py` renames `.executing` | - | `task-watcher-state.json` |
 | Execution completes | `task-watcher.py` renames `.completed.done` | **NOT UPDATED** | `task-watcher-state.json` |
 | Execution fails | `task-watcher.py` renames `.failed.done` | **NOT UPDATED** | `task-watcher-state.json` |
+| Hypothesis created | - | `hypothesis_generator.py` creates Hypothesis node | - |
+| Hypothesis validated | - | `neo4j_task_tracker.validate_hypotheses()` updates status | - |
+| Agent feedback | - | `meta_reflection.py` creates AgentFeedback node | - |
 | Reconciliation | (source of truth) | `neo4j-state-sync.py --apply` | - |
 
 ### Known Failure Modes

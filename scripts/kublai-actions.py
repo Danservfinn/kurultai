@@ -20,7 +20,22 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_read, locked_json_update
-from kurultai_paths import AGENTS_DIR, MAIN_DIR, LOGS_DIR
+from kurultai_paths import AGENTS_DIR, MAIN_DIR, LOGS_DIR, VALID_AGENTS
+
+# Model detection
+def get_model():
+    """Get the default model from main agent config."""
+    try:
+        settings_file = MAIN_DIR / ".claude" / "settings.json"
+        if settings_file.exists():
+            with open(settings_file) as f:
+                config = json.load(f)
+            return config.get("env", {}).get("ANTHROPIC_MODEL", "unknown")
+    except Exception:
+        pass
+    return "unknown"
+
+MODEL = get_model()
 
 BASE = str(MAIN_DIR)
 AGENT_DIR = str(AGENTS_DIR)
@@ -45,6 +60,7 @@ COOLDOWNS = {
     "task_stall": 3600,        # 1 hour (time-to-first-action)
     "feedback_review": 7200,   # 2 hours
     "queue_audit": 1800,       # 30 min
+    "resolution_compliance": 3600,  # 1 hour (2026-03-11)
 }
 
 MAX_ACTIONS_PER_CYCLE = 3
@@ -79,8 +95,18 @@ def has_pending_task(agent, title_prefix):
     task_dir = f"{AGENT_DIR}/{agent}/tasks"
     if not os.path.exists(task_dir):
         return False
+
+    # Terminal task state patterns - tasks in these states are complete
+    TERMINAL_PATTERNS = (
+        ".done.md",           # All done states
+        ".resolved.md",       # Resolved tasks
+        ".cancelled.md",      # Cancelled tasks
+        ".obsolete.md",       # Obsolete tasks
+    )
+
     for fname in os.listdir(task_dir):
-        if fname.endswith('.done') or fname.endswith('.done.md'):
+        # Skip terminal states
+        if any(fname.endswith(pattern) for pattern in TERMINAL_PATTERNS):
             continue
         fpath = os.path.join(task_dir, fname)
         try:
@@ -305,19 +331,38 @@ OpenClaw gateway RSS is {rss_mb:.0f}MB (threshold: 900MB).
             from stall_detector import detect_stalls
             stall_warnings = detect_stalls()
             for warning in stall_warnings:
-                # Parse agent name from "STALL_WARNING: <agent> idle ..."
+                # Parse agent and task filename from "STALL_WARNING: <agent> idle <minutes>m on "<title>" (file: <task_filename>)"
+                # Example: STALL_WARNING: temujin idle 65m on "Fix authentication bug" (file: high-1234567890-abcd1234.md)
                 parts = warning.split()
-                if len(parts) >= 2:
-                    stalled_agent = parts[1]
-                else:
+                if len(parts) < 2:
                     continue
-                cooldown_key = f"task_stall:{stalled_agent}"
+                stalled_agent = parts[1]
+
+                # Extract task filename for task-specific cooldown (prevents escalation loops)
+                # Format: (file: <filename>) at the end
+                task_filename = None
+                if "(file:" in warning:
+                    start_idx = warning.index("(file:") + 6
+                    end_idx = warning.rindex(")")
+                    if end_idx > start_idx:
+                        task_filename = warning[start_idx:end_idx].strip()
+
+                # Use task-specific cooldown key to prevent repeated escalations for same stalled task
+                # Falls back to agent-level if filename extraction fails
+                cooldown_key = f"task_stall:{stalled_agent}:{task_filename}" if task_filename else f"task_stall:{stalled_agent}"
+
                 # Route investigation away from the stalled agent
                 target = "kublai" if stalled_agent == "jochi" else "jochi"
-                if not is_cooled_down(cooldown_key) and not has_pending_task(target, f"Investigate stalled task:") and actions_created < MAX_ACTIONS_PER_CYCLE:
+
+                # Check: not in cooldown, no existing investigation for THIS specific stalled task
+                pending_title = f"Investigate stalled task: {stalled_agent}"
+                if task_filename:
+                    pending_title += f" {task_filename[:20]}"  # Unique per stalled task
+
+                if not is_cooled_down(cooldown_key) and not has_pending_task(target, pending_title) and actions_created < MAX_ACTIONS_PER_CYCLE:
                     create_task(
                         target, "normal",
-                        f"Investigate stalled task: {stalled_agent} has idle task with no workspace output",
+                        f"Investigate stalled task: {stalled_agent}{' ' + task_filename if task_filename else ''}",
                         f"""## Context
 {warning}
 
@@ -339,6 +384,35 @@ This likely indicates a stuck execution, a task that was never picked up, or a s
             pass  # stall_detector not available
         except Exception as e:
             log(f"TICK: stall detection error: {e}")
+
+    # Rule 7: Low resolution compliance — trigger fix-missing-resolutions
+    # FIX 2026-03-11: System detected 0% compliance but created no tasks
+    resolution = tick.get("resolution", {})
+    compliance_pct = resolution.get("compliance_pct", 100)
+    without_count = resolution.get("without", 0)
+
+    if (compliance_pct < 90 and without_count > 0
+        and not is_cooled_down("resolution_compliance")
+        and not has_pending_task("ogedei", "Fix missing resolution sections")):
+        create_task(
+            "ogedei", "normal",
+            f"Fix missing resolution sections: {without_count} tasks at {compliance_pct}% compliance",
+            f"""## Context
+Resolution compliance is at {compliance_pct}% (threshold: 90%).
+{without_count} task(s) are missing resolution sections.
+
+## Action Required
+Run: `python3 scripts/fix-missing-resolutions.py --all-agents --execute`
+
+This will:
+1. Scan all agent task directories for incomplete reports
+2. Create follow-up tasks to add resolution sections
+3. Improve task completion quality metrics
+""",
+            source="tick-resolution-gate",
+        )
+        mark_fired("resolution_compliance")
+        actions_created += 1
 
     if actions_created >= MAX_ACTIONS_PER_CYCLE:
         log(f"TICK: hit MAX_ACTIONS_PER_CYCLE={MAX_ACTIONS_PER_CYCLE}, stopping early")
@@ -384,12 +458,18 @@ def tock_actions():
         log("TOCK: WARNING — LLM assessment unavailable, using heuristic fallback")
 
     # Rule 1: Cron jobs erroring repeatedly
+    # Cron fix tasks route to ogedei via /kurultai-health skill hint (ops domain)
+    # This prevents "fix" keyword from routing to temujin (implementation domain)
     for job in cron.get("jobs", []):
         consec = job.get("consecutive_errors", 0)
         name = job.get("name", "?")
-        if consec >= 3 and not is_cooled_down(f"cron_fix:{name}") and not has_pending_task("temujin", f"Fix cron job: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
-            create_task(
-                "temujin", "high",
+        if consec >= 3 and not is_cooled_down(f"cron_fix:{name}"):
+            # Check any agent for pending task (not just temujin)
+            has_pending = any(has_pending_task(agent, f"Fix cron job: {name}") for agent in VALID_AGENTS)
+            if not has_pending and actions_created < MAX_ACTIONS_PER_CYCLE:
+                # Force ops domain via skill_hint (fixes "fix"→implementation routing)
+                create_task(
+                    None, "high",  # None = auto-route via task_intake
                 f"Fix cron job: {name} ({consec} consecutive errors)",
                 f"""## Context
 Cron job "{name}" has failed {consec} consecutive times.
@@ -401,8 +481,9 @@ Last duration: {job.get('last_duration_ms', 0)}ms
 2. Try running it manually: `openclaw cron run <job-id>`
 3. Check logs for the error
 4. Fix the underlying issue (timeout, script error, etc.)
-"""
-            )
+""",
+                    skill_hint="/kurultai-health",  # Force ops domain (cron=ogedei, not temujin)
+                )
             mark_fired(f"cron_fix:{name}")
             actions_created += 1
 
@@ -451,12 +532,23 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
         running = t.get("running", 0)
         if queue_depth > 0 and completed == 0 and running == 0:
             # Filesystem cross-validation: tock queue_depth can be stale (from Neo4j).
-            # Count actual pending .md files (not .done, not .executing) before alerting.
+            # Count actual pending .md files (not terminal states, not .executing) before alerting.
             fs_pending = 0
             agent_task_dir = f"{AGENT_DIR}/{name}/tasks"
             if os.path.exists(agent_task_dir):
                 for fname in os.listdir(agent_task_dir):
-                    if '.done' in fname or fname.startswith('.') or '.executing' in fname:
+                    # Skip terminal states and executing files
+                    if fname.startswith('.'):
+                        continue
+                    # Check for terminal state patterns
+                    if any(fname.endswith(pattern) for pattern in (
+                        ".done.md",           # All done states
+                        ".resolved.md",       # Resolved tasks
+                        ".cancelled.md",      # Cancelled tasks
+                        ".obsolete.md",       # Obsolete tasks
+                    )):
+                        continue
+                    if '.executing' in fname:
                         continue
                     if fname.endswith('.md'):
                         fs_pending += 1

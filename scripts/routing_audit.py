@@ -76,9 +76,9 @@ def get_current_queue_state():
 
         pending = executing = done = 0
         for fname in os.listdir(task_dir):
-            if ".done" in fname:
+            if fname.endswith(".done.md"):
                 done += 1
-            elif ".executing" in fname:
+            elif fname.endswith(".executing.md"):
                 executing += 1
             elif fname.endswith(".md"):
                 pending += 1
@@ -162,11 +162,16 @@ def generate_audit(hours=1):
                     kw_disagree_examples.append(d.get("task", "")[:80])
 
         # Also test current keyword router against logged tasks
+        # Only compare keyword-routed tasks (explicit tasks bypass keyword routing by design)
         kw_misroutes = 0
         kw_misroute_examples = []
         for d in decisions:
             # Skip diagnostic entries (misroute warnings, skill reroutes)
             if d.get("method", "") in _DIAGNOSTIC_METHODS:
+                continue
+            # Skip explicitly-routed tasks — keyword comparison is irrelevant
+            # for tasks that were intentionally sent to a specific agent
+            if d.get("method") == "explicit":
                 continue
             task_text = d.get("task", "")
             dest = d.get("dest", "unknown")
@@ -199,16 +204,67 @@ def generate_audit(hours=1):
     report["skill_hint_coverage"] = f"{skill_hint_count}/{total}" if total > 0 else "0/0"
 
     # Issue: High explicit routing ratio (bypasses keyword routing — may mask routing table gaps)
+    # Enhanced (2026-03-10): Distinguish system-generated tasks (explicit is expected)
+    # from human-originated tasks (explicit may indicate keyword gaps).
+    # System sources: watchdog, tick, tock, reflection, routing_audit, kublai-actions, task-watcher
+    _SYSTEM_SOURCES = {
+        "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
+        "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
+        "cascade_detector", "throughput_anomaly", "stall_detector",
+        "action_resolution", "signal_calendar", "redistribution",
+        "system-health-check", "task_intake", "queue-audit",
+    }
+    # Task text patterns that indicate system-generated tasks (for entries missing source field)
+    _SYSTEM_TASK_PATTERNS = (
+        "RETRY:", "System Health Alert", "ESCALATE", "TEST TASK:",
+        "Restart neo4j", "FIX:", "REQUEUE:", "BACKFILL:",
+        "3-hour review", "test-3-hour-review",  # Test tasks for systematic-debugging
+    )
     explicit_count = report["routing_methods"].get("explicit", 0)
     keyword_count = report["routing_methods"].get("keyword", 0)
     mention_count = report["routing_methods"].get("mention", 0)
+
+    # Count explicit routing from non-system sources (human/manual tasks)
+    # Fix (2026-03-10): Entries without a source field are likely system-generated.
+    # Use task text pattern matching as fallback when source is missing.
+    def _is_system_task(d):
+        source = d.get("source", "")
+        if source and source in _SYSTEM_SOURCES:
+            return True
+        # No source logged — check task text for system patterns
+        task_text = d.get("task", "")
+        if any(task_text.startswith(p) for p in _SYSTEM_TASK_PATTERNS):
+            return True
+        # No source and no pattern match — only flag as human if source is
+        # explicitly set to a non-system value (not just missing)
+        if source and source not in _SYSTEM_SOURCES:
+            return False
+        # Missing source entirely — treat as unknown, not human
+        return True
+
+    human_explicit = sum(
+        1 for d in decisions
+        if d.get("method") == "explicit"
+        and not _is_system_task(d)
+        and d.get("method") not in _DIAGNOSTIC_METHODS
+    )
+    system_explicit = explicit_count - human_explicit
+
     if total > 3 and explicit_count > 0:
         explicit_pct = explicit_count / total * 100
         if explicit_pct > 80:
-            report["issues"].append(
-                f"High explicit routing: {explicit_count}/{total} ({explicit_pct:.0f}%) — "
-                f"keyword table may be underused"
-            )
+            if human_explicit > 0:
+                # Only flag as issue if human tasks are being explicitly routed
+                report["issues"].append(
+                    f"High explicit routing: {explicit_count}/{total} ({explicit_pct:.0f}%) — "
+                    f"{human_explicit} from non-system sources, keyword table may be underused"
+                )
+            else:
+                # All explicit routing is from system sources — expected behavior
+                report["suggestions"].append(
+                    f"Explicit routing: {explicit_count}/{total} ({explicit_pct:.0f}%) — "
+                    f"all from system sources (expected)"
+                )
 
     # Issue: Overflow routing frequency
     if total > 0 and overflow_count > 0:
@@ -223,21 +279,59 @@ def generate_audit(hours=1):
             )
 
     # Issue: Agent imbalance
+    # Only flag when keyword-routed tasks are imbalanced (system tasks target specific agents by design)
     agent_loads = {a: d["routed"] for a, d in report["by_agent"].items() if d["routed"] > 0}
     if len(agent_loads) >= 2:
         max_agent = max(agent_loads, key=agent_loads.get)
         min_agent = min(agent_loads, key=agent_loads.get)
         if agent_loads[max_agent] > 3 * max(agent_loads[min_agent], 1):
-            report["issues"].append(
-                f"Workload imbalance: {max_agent} got {agent_loads[max_agent]} tasks vs {min_agent} got {agent_loads[min_agent]}"
-            )
+            # Check if imbalance is from system sources (expected) or keyword routing (problem)
+            keyword_by_agent = defaultdict(int)
+            for d in decisions:
+                if d.get("method") == "keyword":
+                    keyword_by_agent[d.get("dest", "")] += 1
+            kw_max = max(keyword_by_agent.values()) if keyword_by_agent else 0
+            kw_min = min(keyword_by_agent.values()) if keyword_by_agent else 0
 
-    # Issue: Execution failures
+            if keyword_by_agent and kw_max > 3 * max(kw_min, 1):
+                # Keyword-routed tasks are also imbalanced — real routing problem
+                report["issues"].append(
+                    f"Workload imbalance: {max_agent} got {agent_loads[max_agent]} tasks vs {min_agent} got {agent_loads[min_agent]}"
+                )
+            else:
+                # Imbalance is from explicit/system routing — expected
+                report["suggestions"].append(
+                    f"Workload skew: {max_agent} got {agent_loads[max_agent]} tasks vs {min_agent} got {agent_loads[min_agent]} "
+                    f"(system-generated, expected)"
+                )
+
+    # Execution failures — classified as downstream issues (not routing problems)
+    # Only flag as routing issue if failure rate suggests misrouting (>80% failure + high volume)
+    # Also feeds back into health flags so the router can divert away from failing agents
+    high_failure_agents = {}
     for agent, stats in report["by_agent"].items():
         if stats["failed"] > 0:
-            report["issues"].append(
-                f"{agent}: {stats['failed']} task(s) failed out of {stats['executed']} executed"
-            )
+            fail_rate = stats["failed"] / max(stats["executed"], 1)
+            if fail_rate >= 0.8 and stats["executed"] >= 3:
+                # High failure rate with volume — could indicate routing to broken agent
+                report["issues"].append(
+                    f"{agent}: {stats['failed']}/{stats['executed']} tasks failed ({fail_rate*100:.0f}%) — "
+                    f"check if agent is healthy before routing more tasks"
+                )
+                high_failure_agents[agent] = {
+                    "fail_rate": fail_rate,
+                    "failed": stats["failed"],
+                    "total": stats["executed"],
+                }
+            else:
+                # Normal failure rate — downstream issue, not routing
+                report["suggestions"].append(
+                    f"{agent}: {stats['failed']} task(s) failed out of {stats['executed']} executed (downstream)"
+                )
+
+    # Feed high-failure agents into health flags so route_quality_tracker.should_divert() can act
+    if high_failure_agents:
+        _update_health_flags_from_audit(high_failure_agents)
 
     # Issue: Queue buildup
     for agent, qs in queue_state.items():
@@ -405,6 +499,51 @@ def generate_audit(hours=1):
 
 
     return report
+
+
+# --- Health flags feedback from audit ---
+AGENT_HEALTH_FLAGS_FILE = str(LOGS_DIR / "agent-health-flags.json")
+
+
+def _update_health_flags_from_audit(high_failure_agents):
+    """Merge audit-detected high-failure agents into agent-health-flags.json.
+
+    The watchdog writes health flags from task-ledger events, but may miss
+    failures visible in the task-watcher execution outcomes. This function
+    closes the gap: when the routing audit detects >=80% failure rate with
+    3+ tasks, it flags the agent so route_quality_tracker.should_divert()
+    can divert tasks away.
+    """
+    try:
+        existing = {}
+        if os.path.exists(AGENT_HEALTH_FLAGS_FILE):
+            with open(AGENT_HEALTH_FLAGS_FILE) as f:
+                existing = json.load(f)
+
+        agents_data = existing.get("agents", {})
+
+        for agent, info in high_failure_agents.items():
+            entry = agents_data.get(agent, {})
+            # Only upgrade flagged status — don't clear flags the watchdog set
+            if not entry.get("flagged"):
+                agents_data[agent] = {
+                    "completed_1h": info["total"] - info["failed"],
+                    "failed_1h": info["failed"],
+                    "total_1h": info["total"],
+                    "fail_rate_1h": info["fail_rate"],
+                    "flagged": True,
+                    "flagged_by": "routing_audit",
+                }
+
+        existing["agents"] = agents_data
+        existing["ts"] = datetime.now().isoformat()
+        existing["window_hours"] = existing.get("window_hours", 1)
+
+        os.makedirs(os.path.dirname(AGENT_HEALTH_FLAGS_FILE), exist_ok=True)
+        with open(AGENT_HEALTH_FLAGS_FILE, "w") as f:
+            json.dump(existing, f, indent=2)
+    except Exception:
+        pass  # Best-effort — don't break the audit if flag write fails
 
 
 # --- Trend state management ---

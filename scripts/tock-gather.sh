@@ -9,6 +9,7 @@
 #   - tock.log                 (one-liner per tock)
 
 set -o pipefail
+SCRIPTS_DIR="$(dirname "$0")"
 
 # Single-instance lock — prevents concurrent tocks (e.g., after sleep/wake catch-up)
 LOCK_DIR="/tmp/tock-gather.lock"
@@ -55,6 +56,11 @@ LATEST="$TOCK_DIR/latest.json"
 mkdir -p "$OUTDIR"
 
 # ============================================================
+# 0b. MODEL DETECTION: Get default model for tock gathering
+# ============================================================
+MODEL=$(python3 "$BASE/scripts/get_model.py" --agent main 2>/dev/null || echo "unknown")
+
+# ============================================================
 # 1. Neo4j: Per-agent task metrics + delegations + errors
 # ============================================================
 NEO4J_DATA=$(python3 2>/dev/null << 'PYEOF'
@@ -74,13 +80,9 @@ def run_query(session, query, name):
         return []
 
 try:
-    from neo4j import GraphDatabase
-    import os as _os
-    driver = GraphDatabase.driver(
-        _os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-        auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123")),
-        connection_timeout=5, max_transaction_retry_time=5
-    )
+    import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+    from neo4j_task_tracker import get_driver, close_driver
+    driver = get_driver()
     with driver.session() as session:
         # Per-agent tasks (30m)
         results["agent_tasks"] = run_query(session, """
@@ -371,8 +373,16 @@ QUEUE_DATA=${QUEUE_DATA:-'{}'}
 CONFIG_MODELS=$(python3 2>/dev/null << 'PYEOF'
 import json, os
 base = "/Users/kublai/.openclaw/agents"
-VALID_MODELS = {'glm-5', 'kimi-k2.5', 'qwen3.5-plus'}  # Claude API rate limited until 2026-03-12
-DEFAULT_MODEL = 'glm-5'
+# All valid models across the multi-tier fallback chain (Claude + Z.AI + Alibaba)
+VALID_MODELS = {
+    # Anthropic (primary)
+    'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5',
+    # Z.AI (Tier 1 fallback)
+    'glm-5', 'kimi-k2.5', 'qkimi-k2.5',
+    # Alibaba (Tier 2 fallback)
+    'qwen3.5-plus'
+}
+DEFAULT_MODEL = 'claude-opus-4-6'
 result = {}
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     model = None
@@ -629,10 +639,191 @@ PYEOF
 ROUTING_METRICS=${ROUTING_METRICS:-'{"queue_balance_index":0,"missed_opportunities":0,"routing_accuracy":0.87,"time_to_start_p95":420}'}
 
 # ============================================================
-# 4e. Subprocess Audit (claude-agent process correlation)
+# 4e. Redistribution Telemetry (Dynamic Queue Balancing - Phase 2)
+# ============================================================
+# Collect redistribution events from the last 30 minutes
+REDISTRIBUTION_DATA=$(python3 2>/dev/null << 'PYEOF'
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+
+log_path = Path.home() / ".openclaw" / "logs" / "redistribution.jsonl"
+cutoff = datetime.now() - timedelta(minutes=30)
+
+stats = {
+    "cycles_run": 0,
+    "tasks_moved": 0,
+    "moves_by_agent": {},
+    "triggers": {},
+    "last_cycle": None
+}
+
+if log_path.exists():
+    try:
+        with open(log_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    # Parse timestamp
+                    ts_str = data.get("timestamp", "")
+                    if ts_str:
+                        try:
+                            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00").replace("+00:00", ""))
+                            if ts.tzinfo is not None:
+                                ts = ts.replace(tzinfo=None)
+                            if ts < cutoff:
+                                continue
+                        except (ValueError, TypeError):
+                            continue
+
+                    stats["cycles_run"] += 1
+                    stats["tasks_moved"] += len(data.get("moved", []))
+
+                    # Track moves by source agent
+                    for move in data.get("moved", []):
+                        src = move.get("from", "unknown")
+                        stats["moves_by_agent"][src] = stats["moves_by_agent"].get(src, 0) + 1
+
+                    # Track triggers (from message or detect from queue state)
+                    if stats["last_cycle"] is None:
+                        stats["last_cycle"] = ts_str
+
+                    # Detect trigger type from queue depths
+                    depths = data.get("queue_depths", {})
+                    if depths:
+                        max_d = max(depths.values()) if depths else 0
+                        min_d = min(depths.values()) if depths else 0
+                        if max_d >= 5 and min_d > 0:
+                            ratio = max_d / min_d
+                            if ratio >= 2.0:
+                                trigger = "imbalance"
+                            else:
+                                trigger = "unknown"
+                        else:
+                            trigger = "unknown"
+                        stats["triggers"][trigger] = stats["triggers"].get(trigger, 0) + 1
+
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        pass
+
+print(json.dumps(stats))
+PYEOF
+)
+REDISTRIBUTION_DATA=${REDISTRIBUTION_DATA:-'{"cycles_run":0,"tasks_moved":0,"moves_by_agent":{},"triggers":{},"last_cycle":null}'}
+
+# ============================================================
+# 4f. Load Monitoring (Dynamic Queue Balancing - Phase 3)
+# ============================================================
+# Record current load sample and get trend/prediction data
+LOAD_MONITOR_DATA=$(python3 2>/dev/null << 'PYEOF'
+import json, sys, os
+from pathlib import Path
+
+# Add scripts dir to path
+sys.path.insert(0, "/Users/kublai/.openclaw/agents/main/scripts")
+
+result = {
+    "current_load_factor": 0.0,
+    "trend": "unknown",
+    "prediction": "No data",
+    "sample_count": 0,
+    "overload_predicted": False,
+    "load_history_available": False
+}
+
+try:
+    from load_monitor import LoadMonitor
+
+    monitor = LoadMonitor()
+    monitor.record_sample()
+
+    summary = monitor.get_summary()
+    result.update({
+        "current_load_factor": summary.get("current_load_factor", 0.0),
+        "trend": summary.get("trend", "unknown"),
+        "prediction": summary.get("prediction", "No data"),
+        "sample_count": summary.get("sample_count", 0),
+        "overload_predicted": summary.get("overload_predicted", False),
+        "load_history_available": summary.get("sample_count", 0) > 0
+    })
+except ImportError:
+    result["error"] = "load_monitor module not available"
+except Exception as e:
+    result["error"] = str(e)[:200]
+
+print(json.dumps(result))
+PYEOF
+)
+LOAD_MONITOR_DATA=${LOAD_MONITOR_DATA:-'{"current_load_factor":0,"trend":"unknown","prediction":"No data","sample_count":0,"overload_predicted":false}'}
+
+# ============================================================
+# 4g. Subprocess Audit (claude-agent process correlation)
 # ============================================================
 # Audit active claude-agent processes and correlate with executing tasks
 SUBPROCESS_AUDIT=$(python3 "$BASE/scripts/subprocess-audit.py" --json 2>/dev/null || echo '{}')
+
+# ============================================================
+# 4h. Experiment Metrics (from experiment-pool-status.py)
+# ============================================================
+# Collect experiment pool status, git branch count, and rollback history
+EXPERIMENT_DATA=$(python3 "$BASE/scripts/experiment-pool-status.py" 2>/dev/null || echo '{}')
+EXPERIMENT_DATA=${EXPERIMENT_DATA:-'{"running":0,"queued":0,"completed":0,"max_concurrent":3,"branch_count":0,"rollbacks_last_hour":0,"source":"error"}'}
+
+# ============================================================
+# 4i. Action Resolution Tracking (jochi 2026-03-09)
+# ============================================================
+# Measures whether TICK actions actually resolve issues
+# Tracks: AUTO_REDISTRIBUTE, THROUGHPUT_ESCALATION, TICK_LLM_dispatch
+# Outputs: logs/action-resolution.jsonl (append-only)
+ACTION_RESOLUTION_DATA=$(python3 2>/dev/null << 'PYEOF'
+import json
+from pathlib import Path
+
+state_file = Path("/Users/kublai/.openclaw/agents/main/logs/action-resolution-state.json")
+stats = {"pending": 0, "resolved_last_100": 0, "avg_resolution_seconds": 0, "success_rate": 0.0, "source": "no_state"}
+
+if state_file.exists():
+    try:
+        state = json.loads(state_file.read_text())
+        pending = state.get("pending_actions", [])
+        resolved = state.get("resolved_actions", [])
+        resolved_list = [r for r in resolved if r.get("status") == "resolved"]
+
+        avg_time = 0
+        if resolved_list:
+            avg_time = sum(r.get("resolution_seconds", 0) for r in resolved_list) / len(resolved_list)
+
+        stats = {
+            "pending": len(pending),
+            "resolved_last_100": len(resolved),
+            "avg_resolution_seconds": round(avg_time, 1),
+            "success_rate": round(100.0 * len(resolved_list) / len(resolved), 1) if resolved else 0.0,
+            "source": "action_resolution_tracker"
+        }
+    except Exception as e:
+        stats["error"] = str(e)[:100]
+
+print(json.dumps(stats))
+PYEOF
+)
+ACTION_RESOLUTION_DATA=${ACTION_RESOLUTION_DATA:-'{"pending":0,"resolved_last_100":0,"avg_resolution_seconds":0,"success_rate":0.0,"source":"error"}'}
+
+# ============================================================
+# 4e. Temp directory for JSON assembly
+# ============================================================
+# Create early so action resolution tracker can write to it
+TOCK_TMP=$(mktemp -d)
+
+echo "$ACTION_RESOLUTION_DATA" > "$TOCK_TMP/action_resolution.json"
+
+# Run async tracker for continued monitoring
+ACTION_RESOLUTION_LOG="$BASE/logs/action-resolution-tracker.log"
+python3 "$BASE/scripts/action-resolution-tracker.py" >> "$ACTION_RESOLUTION_LOG" 2>&1 &
 
 # ============================================================
 # 4f. Queue Cleanup — Remove obsolete tasks/escalations (every tock)
@@ -659,7 +850,7 @@ TICK_REDIS=${TICK_REDIS:-unknown}
 # ============================================================
 # 6. Assemble full JSON (via temp files to avoid heredoc escaping issues)
 # ============================================================
-TOCK_TMP=$(mktemp -d)
+# TOCK_TMP already created in section 4e
 echo "$NEO4J_DATA" > "$TOCK_TMP/neo4j.json"
 echo "$SESSION_DATA" > "$TOCK_TMP/session.json"
 echo "$CRON_DATA" > "$TOCK_TMP/cron.json"
@@ -668,9 +859,43 @@ echo "$QUEUE_DATA" > "$TOCK_TMP/queues.json"
 echo "$QUEUE_AUDIT" > "$TOCK_TMP/queue_audit.json"
 echo "$LEDGER_DATA" > "$TOCK_TMP/ledger.json"
 echo "$CONFIG_MODELS" > "$TOCK_TMP/config_models.json"
+
+# ============================================================
+# 4b. Live session model reading (direct from sessions.json, not gateway cache)
+# ============================================================
+LIVE_SESSION_MODELS=$(python3 2>/dev/null << 'PYEOF'
+import json, os
+base = "/Users/kublai/.openclaw/agents"
+result = {}
+for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
+    session_file = f"{base}/{agent}/sessions/sessions.json"
+    model = "none"
+    try:
+        with open(session_file) as f:
+            data = json.load(f)
+            # Get the most recent session's model
+            if data and isinstance(data, dict):
+                # Check for active session
+                for session_id, session_data in data.items():
+                    if isinstance(session_data, dict):
+                        m = session_data.get("model")
+                        if m:
+                            model = m
+                            break
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    result[agent] = model
+print(json.dumps(result))
+PYEOF
+)
+echo "$LIVE_SESSION_MODELS" > "$TOCK_TMP/live_session_models.json"
+
 echo "$STALE_LOCKS" > "$TOCK_TMP/stale_locks.json"
 echo "$ROUTING_METRICS" > "$TOCK_TMP/routing.json"
+echo "$REDISTRIBUTION_DATA" > "$TOCK_TMP/redistribution.json"
+echo "$LOAD_MONITOR_DATA" > "$TOCK_TMP/load_monitor.json"
 echo "$SUBPROCESS_AUDIT" > "$TOCK_TMP/subprocess.json"
+echo "$EXPERIMENT_DATA" > "$TOCK_TMP/experiment.json"
 
 ASSEMBLED=$(python3 << PYEOF
 import json, os, sys
@@ -699,14 +924,40 @@ routing = safe_load(f"{tmp}/routing.json", {
     "time_to_start_p95": 420,
     "queue_depths": {}
 })
+redistribution = safe_load(f"{tmp}/redistribution.json", {
+    "cycles_run": 0,
+    "tasks_moved": 0,
+    "moves_by_agent": {},
+    "triggers": {},
+    "last_cycle": None
+})
+load_monitor = safe_load(f"{tmp}/load_monitor.json", {
+    "current_load_factor": 0.0,
+    "trend": "unknown",
+    "prediction": "No data",
+    "sample_count": 0,
+    "overload_predicted": False,
+    "load_history_available": False
+})
 subprocess_audit = safe_load(f"{tmp}/subprocess.json", {
     "summary": {"total_executing": 0, "alive": 0, "dead": 0, "stale": 0, "anomaly_count": 0},
     "anomalies": [],
     "executing_tasks": []
 })
+experiment = safe_load(f"{tmp}/experiment.json", {
+    "running": 0,
+    "queued": 0,
+    "completed": 0,
+    "max_concurrent": 3,
+    "branch_count": 0,
+    "rollbacks_last_hour": 0,
+    "source": "unknown"
+})
 
 # Parse session data
 session = safe_load(f"{tmp}/session.json", {})
+# Parse live session models (direct from sessions.json, not gateway cache)
+live_session_models = safe_load(f"{tmp}/live_session_models.json", {})
 
 agent_names = ["kublai","mongke","chagatai","temujin","jochi","ogedei"]
 
@@ -721,10 +972,12 @@ if "sessions" in session:
     for a in session.get("sessions",{}).get("byAgent",[]):
         aid = a.get("agentId","")
         recent = a.get("recent",[{}])[0] if a.get("recent") else {}
+        # Use live session model instead of gateway cached value
+        live_model = live_session_models.get(aid, "unknown")
         session_by_agent[aid] = {
             "count": a.get("count",0),
             "pct_used": recent.get("percentUsed",0),
-            "model": recent.get("model","unknown")
+            "model": live_model  # LIVE model from sessions.json, not gateway cache
         }
 
 agents = {}
@@ -734,7 +987,8 @@ for name in agent_names:
     total = t.get("total", 0)
     completed = t.get("completed", 0)
     cm = config_models.get(name, {})
-    session_model = s.get("model", "none") if s else "none"
+    # session_model already uses live data now (via session_by_agent)
+    session_model = s.get("model", "none") if s else live_session_models.get(name, "none")
     config_resolved = cm.get("resolved", "claude-opus-4-6")
     model_match = session_model == "none" or session_model == config_resolved
     agents[name] = {
@@ -786,7 +1040,7 @@ def _gather_gate_metrics():
                 "avg_followups": metrics.get("total_followups", 0) / max(metrics.get("recent_audits", 1), 1),
                 "recent_audits": metrics.get("recent_audits_24h", 0)
             }
-        except ImportError:
+        except (ImportError, AttributeError):
             pass
 
         # Method 2: Scan filesystem for pending gates
@@ -876,6 +1130,7 @@ def _build_ledger_recon(neo4j_data, ledger_data):
 
 output = {
     "timestamp": "$TS_ISO",
+    "model": "$MODEL",
     "agents": agents,
     "cron": cron if "error" not in cron else {"total_jobs":0,"healthy":0,"erroring":0,"jobs":[]},
     "cron_jobs": cron_jobs,
@@ -911,6 +1166,22 @@ output = {
         "queue_depths": routing.get("queue_depths", {}),
         "source": routing.get("source", "unknown")
     },
+    "redistribution": {
+        "cycles_run_30m": redistribution.get("cycles_run", 0),
+        "tasks_moved_30m": redistribution.get("tasks_moved", 0),
+        "moves_by_agent": redistribution.get("moves_by_agent", {}),
+        "triggers": redistribution.get("triggers", {}),
+        "last_cycle": redistribution.get("last_cycle", None)
+    },
+    "load_monitoring": {
+        "current_load_factor": load_monitor.get("current_load_factor", 0.0),
+        "trend": load_monitor.get("trend", "unknown"),
+        "prediction": load_monitor.get("prediction", "No data"),
+        "sample_count": load_monitor.get("sample_count", 0),
+        "overload_predicted": load_monitor.get("overload_predicted", False),
+        "load_history_available": load_monitor.get("load_history_available", False),
+        "error": load_monitor.get("error", None)
+    },
     "subprocess": {
         "executing": subprocess_audit.get("summary", {}).get("total_executing", 0),
         "alive": subprocess_audit.get("summary", {}).get("alive", 0),
@@ -920,7 +1191,22 @@ output = {
         "orphaned": subprocess_audit.get("summary", {}).get("orphaned", 0),
         "anomaly_count": subprocess_audit.get("summary", {}).get("anomaly_count", 0),
         "anomalies": subprocess_audit.get("anomalies", [])
-    }
+    },
+    "experiments": {
+        "running": experiment.get("running", 0),
+        "queued": experiment.get("queued", 0),
+        "completed": experiment.get("completed", 0),
+        "max_concurrent": experiment.get("max_concurrent", 3),
+        "branch_count": experiment.get("branch_count", 0),
+        "rollbacks_last_hour": experiment.get("rollbacks_last_hour", 0),
+        "source": experiment.get("source", "unknown")
+    },
+    "action_resolution": safe_load(f"{tmp}/action_resolution.json", {
+        "pending": 0,
+        "resolved_last_100": 0,
+        "avg_resolution_seconds": 0,
+        "success_rate": 0.0
+    })
 }
 
 print(json.dumps(output, indent=2, default=str))
@@ -1001,6 +1287,11 @@ if not lr.get("reconciled", True):
 # Routing metrics (from routing-metrics.sh)
 r = data.get("routing", {})
 lines.append(f"ROUTING: balance_idx={r.get('queue_balance_index',0):.2f} missed={r.get('missed_opportunities',0)} accuracy={r.get('routing_accuracy',0):.0%} p95={r.get('time_to_start_p95',0)}s routed={r.get('total_routed',0)}")
+# Redistribution telemetry (Dynamic Queue Balancing)
+rd = data.get("redistribution", {})
+if rd.get("cycles_run_30m", 0) > 0:
+    moves_by_str = ",".join([f"{k}={v}" for k,v in rd.get("moves_by_agent", {}).items()])
+    lines.append(f"REDISTRIBUTE: cycles={rd.get('cycles_run_30m',0)} moved={rd.get('tasks_moved_30m',0)} ({moves_by_str})")
 # Subprocess audit (claude-agent process correlation)
 sp = data.get("subprocess", {})
 sp_anomalies = sp.get("anomaly_count", 0)
@@ -1010,6 +1301,17 @@ if sp_anomalies > 0:
         lines.append(f"  {a.get('type','?')}: agent={a.get('agent','?')} task={a.get('task_id','?')[:30]} action={a.get('action','?')}")
 else:
     lines.append(f"SUBPROCESS: {sp.get('executing',0)} executing (alive={sp.get('alive',0)} dead={sp.get('dead',0)} stale={sp.get('stale',0)}) all healthy")
+# Experiment metrics (pool status, branches, rollbacks)
+exp = data.get("experiments", {})
+exp_running = exp.get("running", 0)
+exp_queued = exp.get("queued", 0)
+exp_completed = exp.get("completed", 0)
+exp_branches = exp.get("branch_count", 0)
+exp_rollbacks = exp.get("rollbacks_last_hour", 0)
+if exp_running > 0 or exp_queued > 0 or exp_branches > 0:
+    lines.append(f"EXPERIMENTS: running={exp_running}/{exp.get('max_concurrent',3)} queued={exp_queued} completed={exp_completed} branches={exp_branches} rollbacks_1h={exp_rollbacks}")
+else:
+    lines.append(f"EXPERIMENTS: idle (completed={exp_completed}, rollbacks_1h={exp_rollbacks})")
 print("\n".join(lines))
 PYEOF
 )
@@ -1149,13 +1451,9 @@ AGENTS_DIR = os.path.expanduser("~/.openclaw/agents")
 def check_existing_remediation_task(agent_name, mismatch_type):
     """Check Neo4j for existing pending remediation task to prevent duplicates."""
     try:
-        from neo4j import GraphDatabase
-        import os as _os
-        driver = GraphDatabase.driver(
-            _os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-            auth=(_os.getenv("NEO4J_USER", "neo4j"), _os.getenv("NEO4J_PASSWORD", "myStrongPassword123")),
-            connection_timeout=5, max_transaction_retry_time=5
-        )
+        import sys; sys.path.insert(0, '$SCRIPTS_DIR')
+        from neo4j_task_tracker import get_driver, close_driver
+        driver = get_driver()
         with driver.session() as session:
             # Check for existing Task nodes with same idempotency key
             result = session.run("""
@@ -1256,6 +1554,90 @@ tags: [model-mismatch, configuration, idempotent]
 PYEND
 
 
+# ============================================================
+# FALLBACK CHAIN VALIDATION: Check claude-agent fallback tiers
+# ============================================================
+# Validates the 3-tier fallback system: Anthropic -> Z.AI -> Alibaba
+FALLBACK_VALIDATION=$("$BASE/scripts/validate-fallback-chain.sh" 2>/dev/null)
+FALLBACK_STATUS=$(echo "$FALLBACK_VALIDATION" | cut -d'|' -f1)
+FALLBACK_REASON=$(echo "$FALLBACK_VALIDATION" | cut -d'|' -f2)
+
+if [ "$FALLBACK_STATUS" != "valid" ]; then
+    # Log detailed failure
+    echo "[$TS] FALLBACK_CHAIN: INVALID - $FALLBACK_REASON" >> "$TOCK_LOG"
+    # Create escalation task for ogedei if not already exists
+    python3 << 'PYEOF'
+import json, os, hashlib, time
+from datetime import datetime
+
+validation_log = os.path.expanduser("~/.openclaw/logs/fallback-chain-validation.log")
+fallback_status = os.environ.get("FALLBACK_STATUS", "unknown")
+fallback_reason = os.environ.get("FALLBACK_REASON", "")
+
+# Only create task if this is a new failure (check last 4 hours)
+task_dir = os.path.expanduser("~/.openclaw/agents/ogedei/tasks")
+os.makedirs(task_dir, exist_ok=True)
+
+# Check for recent escalation task
+recent_task = None
+cutoff = time.time() - (4 * 3600)  # 4 hours ago
+if os.path.exists(task_dir):
+    for f in os.listdir(task_dir):
+        if f.startswith("high-") and "fallback" in f.lower() and f.endswith(".md"):
+            task_path = os.path.join(task_dir, f)
+            if os.path.getmtime(task_path) > cutoff:
+                recent_task = f
+                break
+
+if not recent_task:
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    task_file = f"high-{timestamp}-fallback-chain-invalid.md"
+    task_path = os.path.join(task_dir, task_file)
+
+    task_content = f"""---
+task_id: auto-fallback-chain-{timestamp}
+agent: ogedei
+priority: high
+created_at: {datetime.now().isoformat()}
+source: tock-gather-fallback-validation
+tags: [fallback-chain, infrastructure, validation]
+---
+
+# Fallback Chain Validation Failed
+
+**Status:** {fallback_status.upper()}
+**Reason:** {fallback_reason}
+
+## Issue
+The claude-agent wrapper script fallback chain is misconfigured or unreachable.
+
+## Expected Configuration
+- Tier 0: claude-sonnet-4-6 (Anthropic default)
+- Tier 1: glm-5 via https://api.z.ai/api/anthropic
+- Tier 2: qwen3.5-plus via https://coding-intl.dashscope.aliyuncs.com/apps/anthropic
+
+## Actions
+1. Check ~/.local/bin/claude-agent exists and is executable
+2. Verify fallback tiers are configured (grep for ZAI_ENV, ALIBABA_ENV)
+3. Test proxy endpoint connectivity:
+   - curl -I https://api.z.ai/api/anthropic
+   - curl -I https://coding-intl.dashscope.aliyuncs.com/apps/anthropic
+4. Restore fallback chain from backup if needed
+5. Verify task execution can fall back correctly
+
+## Logs
+See: {validation_log}
+"""
+    try:
+        with open(task_path, "w") as f:
+            f.write(task_content)
+        print(f"Created escalation task: {task_file}")
+    except Exception as e:
+        print(f"Failed to create escalation task: {e}")
+PYEOF
+fi
+
+
 # One-liner to tock.log
 SEVERITY=$(python3 -c "import json; print(json.loads('''$LLM_JSON''').get('severity','?'))" 2>/dev/null || echo "?")
 BOTTLENECK=$(python3 -c "import json; print(json.loads('''$LLM_JSON''').get('bottleneck','?')[:80])" 2>/dev/null || echo "?")
@@ -1273,7 +1655,7 @@ if [ "$LEDGER_DELTA" != "0" ]; then
     LEDGER_NOTE=" | ledger_delta=$LEDGER_DELTA"
 fi
 
-echo "[$TS] TOCK | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | calendar_reminder=$CAL_STATUS | backup=$BACKUP_STATUS | severity=$SEVERITY | cleanup_removed=${QUEUE_CLEANUP_REMOVED:-0} | cleanup_kept=${QUEUE_CLEANUP_KEPT:-0}${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
+echo "[$TS] TOCK | model=$MODEL | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAIL | queue=$Q_TOTAL | cron_err=$CRON_ERR | calendar_reminder=$CAL_STATUS | backup=$BACKUP_STATUS | fallback_chain=${FALLBACK_STATUS:-unknown} | severity=$SEVERITY | cleanup_removed=${QUEUE_CLEANUP_REMOVED:-0} | cleanup_kept=${QUEUE_CLEANUP_KEPT:-0}${LEDGER_NOTE} | note=\"$BOTTLENECK\"" >> "$TOCK_LOG"
 
 # ============================================================
 # NEO4J STATE SYNC: Reconcile filesystem task state with Neo4j (safety net)
@@ -1284,6 +1666,13 @@ python3 "$BASE/scripts/neo4j-state-sync.py" --apply >> "$BASE/logs/neo4j-state-s
 # KUBLAI ACTIONS: Create tasks based on tock findings
 # ============================================================
 python3 "$BASE/scripts/kublai-actions.py" --trigger tock >> "$BASE/logs/kublai-actions.log" 2>&1 &
+
+# ============================================================
+# FIX MISSING RESOLUTIONS: Auto-create fix-up tasks for incomplete completions
+# ============================================================
+# Runs in background to avoid blocking tock; creates tasks for .no_output/.unverified files
+# missing resolution sections (addresses /horde-review PRIORITY_FIX)
+python3 "$BASE/scripts/fix-missing-resolutions.py" --all-agents --execute >> "$BASE/logs/fix-missing-resolutions.log" 2>&1 &
 
 # Cleanup temp file
 rm -f "$TOCK_ASSEMBLED_TMP"

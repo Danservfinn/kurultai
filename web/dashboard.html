@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kurultai Task Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+        h1 {
+            color: #00d4aa;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            background: #16213e;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: #0f3460;
+        }
+        .tab.active {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+        .task-list {
+            display: grid;
+            gap: 10px;
+        }
+        .task-item {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #00d4aa;
+        }
+        .task-item.failed {
+            border-left-color: #e74c3c;
+        }
+        .task-item.pending {
+            border-left-color: #f39c12;
+        }
+        .task-item.executing {
+            border-left-color: #3498db;
+        }
+        .task-info {
+            flex: 1;
+        }
+        .task-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .task-meta {
+            font-size: 0.85em;
+            color: #888;
+        }
+        .task-actions {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .btn-retry {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+        .btn-retry:hover {
+            background: #00b894;
+        }
+        .btn-view {
+            background: #3498db;
+            color: white;
+        }
+        .btn-view:hover {
+            background: #2980b9;
+        }
+        .btn-archive {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-archive:hover {
+            background: #c0392b;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4aa;
+        }
+        .stat-label {
+            color: #888;
+            margin-top: 5px;
+        }
+        .bulk-actions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #16213e;
+            border-radius: 8px;
+        }
+        .bulk-actions button {
+            margin-right: 10px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        .agent-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            margin-right: 5px;
+        }
+        .agent-kublai { background: #e74c3c; }
+        .agent-temujin { background: #3498db; }
+        .agent-mongke { background: #9b59b6; }
+        .agent-chagatai { background: #1abc9c; }
+        .agent-jochi { background: #f39c12; }
+        .agent-ogedei { background: #34495e; }
+        .agent-tolui { background: #e67e22; }
+    </style>
+</head>
+<body>
+    <h1>Kurultai Task Dashboard</h1>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-pending">0</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-executing">0</div>
+            <div class="stat-label">Executing</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-failed">0</div>
+            <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-done">0</div>
+            <div class="stat-label">Completed</div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('all')">All Tasks</div>
+        <div class="tab" onclick="showTab('pending')">Pending</div>
+        <div class="tab" onclick="showTab('executing')">Executing</div>
+        <div class="tab" onclick="showTab('failed')">Failed Decrees</div>
+        <div class="tab" onclick="showTab('done')">Completed</div>
+    </div>
+
+    <div id="bulk-actions" class="bulk-actions" style="display: none;">
+        <button class="btn-retry" onclick="retryAllFailed()">Retry All Failed</button>
+        <button class="btn-archive" onclick="archiveAllFailed()">Archive All Failed</button>
+    </div>
+
+    <div id="task-container" class="task-list">
+        <div class="empty-state">Loading tasks...</div>
+    </div>
+
+    <script>
+        const AGENTS = ['kublai', 'temujin', 'mongke', 'chagatai', 'jochi', 'ogedei', 'tolui'];
+        let currentTab = 'all';
+        let tasks = [];
+
+        async function loadTasks() {
+            try {
+                const response = await fetch('/api/tasks');
+                tasks = await response.json();
+                updateStats();
+                renderTasks();
+            } catch (error) {
+                document.getElementById('task-container').innerHTML = 
+                    '<div class="empty-state">Error loading tasks: ' + error.message + '</div>';
+            }
+        }
+
+        function updateStats() {
+            const counts = {
+                pending: tasks.filter(t => t.status === 'pending').length,
+                executing: tasks.filter(t => t.status === 'executing').length,
+                failed: tasks.filter(t => t.status === 'failed').length,
+                done: tasks.filter(t => t.status === 'done').length
+            };
+            
+            document.getElementById('stat-pending').textContent = counts.pending;
+            document.getElementById('stat-executing').textContent = counts.executing;
+            document.getElementById('stat-failed').textContent = counts.failed;
+            document.getElementById('stat-done').textContent = counts.done;
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('task-container');
+            const bulkActions = document.getElementById('bulk-actions');
+            
+            let filteredTasks = tasks;
+            if (currentTab !== 'all') {
+                filteredTasks = tasks.filter(t => t.status === currentTab);
+            }
+
+            // Show bulk actions for failed tab
+            if (currentTab === 'failed') {
+                bulkActions.style.display = 'block';
+            } else {
+                bulkActions.style.display = 'none';
+            }
+
+            if (filteredTasks.length === 0) {
+                container.innerHTML = '<div class="empty-state">No tasks found</div>';
+                return;
+            }
+
+            container.innerHTML = filteredTasks.map(task => `
+                <div class="task-item ${task.status}">
+                    <div class="task-info">
+                        <div class="task-title">
+                            <span class="agent-badge agent-${task.agent}">${task.agent}</span>
+                            ${task.title}
+                        </div>
+                        <div class="task-meta">
+                            ID: ${task.id} | Priority: ${task.priority} | 
+                            ${task.timestamp ? 'Created: ' + new Date(task.timestamp).toLocaleString() : ''}
+                            ${task.error ? '| Error: ' + task.error.substring(0, 50) + '...' : ''}
+                        </div>
+                    </div>
+                    <div class="task-actions">
+                        ${task.status === 'failed' ? `
+                            <button class="btn-retry" onclick="retryTask('${task.agent}', '${task.id}')">Retry</button>
+                        ` : ''}
+                        <button class="btn-view" onclick="viewTask('${task.agent}', '${task.id}')">View</button>
+                        ${task.status === 'failed' ? `
+                            <button class="btn-archive" onclick="archiveTask('${task.agent}', '${task.id}')">Archive</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderTasks();
+        }
+
+        async function retryTask(agent, taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${agent}/${taskId}/retry`, { method: 'POST' });
+                if (response.ok) {
+                    alert('Task queued for retry');
+                    loadTasks();
+                } else {
+                    alert('Failed to retry task');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function retryAllFailed() {
+            try {
+                const response = await fetch('/api/tasks/retry-all-failed', { method: 'POST' });
+                if (response.ok) {
+                    alert('All failed tasks queued for retry');
+                    loadTasks();
+                } else {
+                    alert('Failed to retry tasks');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function archiveTask(agent, taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${agent}/${taskId}/archive`, { method: 'POST' });
+                if (response.ok) {
+                    alert('Task archived');
+                    loadTasks();
+                } else {
+                    alert('Failed to archive task');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function archiveAllFailed() {
+            if (!confirm('Archive all failed tasks?')) return;
+            try {
+                const response = await fetch('/api/tasks/archive-all-failed', { method: 'POST' });
+                if (response.ok) {
+                    alert('All failed tasks archived');
+                    loadTasks();
+                } else {
+                    alert('Failed to archive tasks');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function viewTask(agent, taskId) {
+            window.open(`/api/tasks/${agent}/${taskId}/view`, '_blank');
+        }
+
+        // Load tasks on page load
+        loadTasks();
+        
+        // Refresh every 10 seconds
+        setInterval(loadTasks, 10000);
+    </script>
+</body>
+</html>

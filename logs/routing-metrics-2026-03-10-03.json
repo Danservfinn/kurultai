@@ -1,0 +1,188 @@
+{
+  "timestamp": "2026-03-10T07:01:14Z",
+  "hour_file": "2026-03-10-03",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 0,
+    "depths": {"temujin": 0, "mongke": 0, "chagatai": 0, "jochi": 0, "ogedei": 0},
+    "mean": 0,
+    "std": 0
+  },
+  "routing": {
+    "total_routed": 31,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-10T03:01:15.073082",
+  "total_routed": 31,
+  "routing_methods": {
+    "explicit": 27
+  },
+  "destinations": {
+    "ogedei": 17,
+    "kublai": 3,
+    "temujin": 3,
+    "jochi": 2,
+    "mongke": 1,
+    "chagatai": 1
+  },
+  "by_agent": {
+    "ogedei": {
+      "routed": 17,
+      "executed": 11,
+      "succeeded": 3,
+      "failed": 8
+    },
+    "kublai": {
+      "routed": 3,
+      "executed": 4,
+      "succeeded": 1,
+      "failed": 3
+    },
+    "temujin": {
+      "routed": 3,
+      "executed": 4,
+      "succeeded": 1,
+      "failed": 3
+    },
+    "jochi": {
+      "routed": 2,
+      "executed": 2,
+      "succeeded": 1,
+      "failed": 1
+    },
+    "mongke": {
+      "routed": 1,
+      "executed": 1,
+      "succeeded": 1,
+      "failed": 0
+    },
+    "chagatai": {
+      "routed": 1,
+      "executed": 1,
+      "succeeded": 1,
+      "failed": 0
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 55
+    },
+    "temujin": {
+      "pending": 1,
+      "executing": 1,
+      "done": 32
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 14
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 11
+    },
+    "jochi": {
+      "pending": 0,
+      "executing": 0,
+      "done": 19
+    },
+    "ogedei": {
+      "pending": 0,
+      "executing": 0,
+      "done": 47
+    }
+  },
+  "issues": [],
+  "suggestions": [
+    "Explicit routing: 27/31 (87%) \u2014 all from system sources (expected)",
+    "Workload skew: ogedei got 17 tasks vs mongke got 1 (system-generated, expected)",
+    "ogedei: 8 task(s) failed out of 11 executed (downstream)",
+    "kublai: 3 task(s) failed out of 4 executed (downstream)",
+    "temujin: 3 task(s) failed out of 4 executed (downstream)",
+    "jochi: 1 task(s) failed out of 2 executed (downstream)",
+    "Low skill hint coverage: 8/31 \u2014 consider expanding SKILL_HINTS in task_intake.py",
+    "Routing methods: explicit=27",
+    "Missed opportunities: 3 task(s) could have been routed to idle agents"
+  ],
+  "kw_disagreements": {
+    "jochi->temujin": 1,
+    "jochi->mongke": 1,
+    "jochi->chagatai": 1,
+    "jochi->ogedei": 1
+  },
+  "kw_misroute_count": 0,
+  "kw_misroute_rate": "0/31",
+  "overflow_count": 0,
+  "skill_hint_coverage": "8/31",
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-10T02:54:45.047095"
+  },
+  "missed_opportunities": {
+    "count": 3,
+    "by_agent": {
+      "temujin": 2,
+      "ogedei": 1
+    },
+    "examples": [
+      {
+        "task": "Review Parse monetization blockers and create next implementation task",
+        "routed_to": "temujin",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ],
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-10T02:03:26.298945"
+      },
+      {
+        "task": "TEST TASK: Verify agent execution",
+        "routed_to": "temujin",
+        "dest_queue": 2,
+        "idle_alternatives": [
+          [
+            "jochi",
+            2
+          ],
+          [
+            "tolui",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-10T02:25:27.134132"
+      },
+      {
+        "task": "TEST TASK: Verify agent execution",
+        "routed_to": "ogedei",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-10T02:25:28.062020"
+      }
+    ]
+  }
+}
+}

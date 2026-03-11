@@ -45,7 +45,7 @@ def get_queue_depths():
         pending = 0
         for pattern in ["high-*.md", "normal-*.md", "low-*.md"]:
             for f in glob.glob(f"{task_dir}/{pattern}"):
-                if ".executing" not in f and ".done" not in f:
+                if not f.endswith(".executing.md") and not f.endswith(".done.md"):
                     pending += 1
         queues[agent] = pending
     return queues

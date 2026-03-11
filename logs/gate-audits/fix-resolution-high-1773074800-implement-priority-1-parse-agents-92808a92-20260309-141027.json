@@ -1,0 +1,22 @@
+{
+  "original_task": "fix-resolution-high-1773074800-implement-priority-1-parse-agents-92808a92",
+  "completion_percentage": 95,
+  "can_complete": false,
+  "missing_components": [],
+  "quality_issues": [
+    "Add error handling"
+  ],
+  "required_followups": [],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "temujin",
+      "priority": "normal",
+      "reason": "Auto-suggested"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-09T14:10:27.464612",
+  "audit_version": "1.0"
+}

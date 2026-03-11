@@ -48,9 +48,24 @@ def log(msg, verbose=True):
 
 
 def extract_task_id(filename):
-    """Extract task ID from filename."""
-    # Match patterns like: high-1772987680, normal-1772950631, ESCALATE-stale-task-xxx-high-1772987680
-    match = re.search(r'(?:high|normal|low|critical)[_-](\d+[a-z-]*)', filename, re.IGNORECASE)
+    """Extract task ID from filename.
+
+    Task IDs are numeric (epoch-based) or UUIDs. We extract just the core ID
+    without any suffixes like timestamps or status markers.
+
+    Patterns handled:
+    - high-1772987680.md -> 1772987680
+    - high-1772987680.no_output.done.md -> 1772987680
+    - ESCALATE-stale-task-xxx-high-1772987680-20260308-161904.md -> 1772987680
+    - normal-abc123-def456.md -> abc123 (alphanumeric task IDs)
+    """
+    # Match pattern: priority-taskId where taskId is digits or alphanumeric
+    # Stop at dash followed by YYYYMMDD (timestamp pattern) or . (extension/status)
+    match = re.search(r'(?:high|normal|low|critical)[_-](\d+)', filename, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    # Try alphanumeric task ID (for non-epoch IDs)
+    match = re.search(r'(?:high|normal|low|critical)[_-]([a-z0-9]+)(?:[-.]|\Z)', filename, re.IGNORECASE)
     if match:
         return match.group(1)
     # Try UUID pattern
@@ -61,7 +76,17 @@ def extract_task_id(filename):
 
 
 def is_task_completed(task_id, agent_dir):
-    """Check if a task has a .done.md file."""
+    """Check if a task has a .done.md file.
+
+    Recognizes completion patterns:
+    - .verified.done.md
+    - .completed.done.md
+    - .no_output.done.md
+    - .failed.done.md
+    - .done.md
+    - .failed.md
+    - .completed.md
+    """
     if not task_id:
         return False
     tasks_dir = agent_dir / "tasks"
@@ -70,6 +95,13 @@ def is_task_completed(task_id, agent_dir):
     # Search for .done.md files containing the task ID
     for f in tasks_dir.glob(f"*{task_id}*.done.md"):
         if f.is_file():
+            return True
+    # Also check for .failed.md and .completed.md (without .done)
+    for f in tasks_dir.glob(f"*{task_id}*.failed.md"):
+        if f.is_file() and '.executing' not in f.name:
+            return True
+    for f in tasks_dir.glob(f"*{task_id}*.completed.md"):
+        if f.is_file() and '.executing' not in f.name:
             return True
     return False
 
@@ -85,22 +117,34 @@ def get_file_age_hours(filepath):
 
 
 def cleanup_escalations(dry_run=False, verbose=True):
-    """Remove ESCALATE files for completed tasks."""
+    """Remove ESCALATE files for completed tasks.
+
+    Checks both regular ESCALATE*.md and ESCALATE*.executing.md files.
+    This prevents cascading escalations where:
+    1. Original task completes
+    2. Escalation gets dispatched → becomes .executing.md
+    3. Cleanup skips .executing.md → not cleaned
+    4. Escalation itself times out → creates another escalation
+    """
     removed = 0
     kept = 0
-    
+
     if not KUBLAI_TASKS.exists():
         log("Kublai tasks directory not found", verbose)
         return 0, 0
-    
-    # Group escalations by task ID
+
+    # Group escalations by task ID - include both .md and .executing.md files
     escalations_by_task = {}
-    for f in KUBLAI_TASKS.glob("ESCALATE*.md"):
-        task_id = extract_task_id(f.name)
-        if task_id:
-            if task_id not in escalations_by_task:
-                escalations_by_task[task_id] = []
-            escalations_by_task[task_id].append(f)
+    for pattern in ["ESCALATE*.md", "ESCALATE*.executing.md"]:
+        for f in KUBLAI_TASKS.glob(pattern):
+            # Skip .pid files
+            if f.suffix == ".pid":
+                continue
+            task_id = extract_task_id(f.name)
+            if task_id:
+                if task_id not in escalations_by_task:
+                    escalations_by_task[task_id] = []
+                escalations_by_task[task_id].append(f)
     
     # Process each group
     for task_id, files in escalations_by_task.items():
@@ -121,6 +165,12 @@ def cleanup_escalations(dry_run=False, verbose=True):
                             f.unlink()
                             removed += 1
                             log(f"REMOVED (completed): {f.name}", verbose)
+                            # Also remove associated .pid file for .executing.md files
+                            if ".executing.md" in f.name:
+                                pid_file = f.with_suffix(".pid")
+                                if pid_file.exists():
+                                    pid_file.unlink()
+                                    log(f"REMOVED (pid): {pid_file.name}", verbose)
                         except Exception as e:
                             log(f"ERROR removing {f.name}: {e}", verbose)
                     else:
@@ -158,16 +208,24 @@ def cleanup_escalations(dry_run=False, verbose=True):
 def cleanup_old_no_output(dry_run=False, verbose=True):
     """Remove old .no_output tasks across all agents."""
     removed = 0
-    
+
     for agent in ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"]:
         tasks_dir = AGENTS_DIR / agent / "tasks"
         if not tasks_dir.exists():
             continue
-        
+
         for f in tasks_dir.glob("*.no_output.md"):
-            if ".executing.md" in f.name or ".done.md" in f.name:
-                continue  # Skip executing and done files
-            
+            # Skip executing and done files
+            if ".executing.md" in f.name:
+                continue
+            # Skip if it's a completion pattern
+            if any(f.name.endswith(pattern) for pattern in [
+                ".no_output.done.md",
+                ".no_output.failed.md",
+                ".no_output.completed.md",
+            ]):
+                continue
+
             age_hours = get_file_age_hours(f)
             if age_hours > NO_OUTPUT_MAX_AGE_HOURS:
                 if not dry_run:
@@ -180,23 +238,31 @@ def cleanup_old_no_output(dry_run=False, verbose=True):
                 else:
                     log(f"DRY-RUN REMOVE ({agent}): {f.name}", verbose)
                     removed += 1
-    
+
     return removed
 
 
 def cleanup_old_unverified(dry_run=False, verbose=True):
     """Remove old .unverified tasks that are stuck (>72 hours)."""
     removed = 0
-    
+
     for agent in ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"]:
         tasks_dir = AGENTS_DIR / agent / "tasks"
         if not tasks_dir.exists():
             continue
-        
+
         for f in tasks_dir.glob("*.unverified.md"):
-            if ".executing.md" in f.name or ".done.md" in f.name:
+            # Skip executing and done files
+            if ".executing.md" in f.name:
                 continue
-            
+            # Skip if it's a completion pattern
+            if any(f.name.endswith(pattern) for pattern in [
+                ".unverified.done.md",
+                ".unverified.failed.md",
+                ".unverified.completed.md",
+            ]):
+                continue
+
             age_hours = get_file_age_hours(f)
             if age_hours > 72:  # 72 hours = 3 days
                 if not dry_run:
@@ -209,7 +275,7 @@ def cleanup_old_unverified(dry_run=False, verbose=True):
                 else:
                     log(f"DRY-RUN REMOVE ({agent}): {f.name}", verbose)
                     removed += 1
-    
+
     return removed
 
 

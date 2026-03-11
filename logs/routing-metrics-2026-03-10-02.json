@@ -1,0 +1,120 @@
+{
+  "timestamp": "2026-03-10T06:01:33Z",
+  "hour_file": "2026-03-10-02",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 0,
+    "depths": {"temujin": 0, "mongke": 0, "chagatai": 0, "jochi": 0, "ogedei": 0},
+    "mean": 0,
+    "std": 0
+  },
+  "routing": {
+    "total_routed": 9,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-10T02:01:33.511189",
+  "total_routed": 9,
+  "routing_methods": {
+    "explicit": 9
+  },
+  "destinations": {
+    "ogedei": 8,
+    "jochi": 1
+  },
+  "by_agent": {
+    "ogedei": {
+      "routed": 8,
+      "executed": 5,
+      "succeeded": 0,
+      "failed": 5
+    },
+    "jochi": {
+      "routed": 1,
+      "executed": 1,
+      "succeeded": 0,
+      "failed": 1
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 50
+    },
+    "temujin": {
+      "pending": 0,
+      "executing": 1,
+      "done": 29
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 10
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 7
+    },
+    "jochi": {
+      "pending": 0,
+      "executing": 0,
+      "done": 14
+    },
+    "ogedei": {
+      "pending": 0,
+      "executing": 0,
+      "done": 53
+    }
+  },
+  "issues": [
+    "High explicit routing: 9/9 (100%) \u2014 keyword table may be underused",
+    "Workload imbalance: ogedei got 8 tasks vs jochi got 1",
+    "ogedei: 5 task(s) failed out of 5 executed",
+    "jochi: 1 task(s) failed out of 1 executed",
+    "RECURRING: 4 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "ogedei received 8/9 (89%) of all tasks \u2014 check if task descriptions are too narrow or if other agents need broader keywords",
+    "Routing methods: explicit=9"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 0,
+  "kw_misroute_rate": "0/9",
+  "overflow_count": 0,
+  "skill_hint_coverage": "8/9",
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-10T01:53:52.841362"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "jochi: # task(s) failed out of # executed",
+      "consecutive": 4,
+      "first_seen": "2026-03-09T16:03:09.737749"
+    },
+    {
+      "issue_key": "ogedei: # task(s) failed out of # executed",
+      "consecutive": 3,
+      "first_seen": "2026-03-10T01:59:44.509898"
+    },
+    {
+      "issue_key": "High explicit routing: #/# (#%) \u2014 keyword table may be underused",
+      "consecutive": 3,
+      "first_seen": "2026-03-10T01:59:44.509898"
+    },
+    {
+      "issue_key": "Workload imbalance: ogedei got # tasks vs jochi got #",
+      "consecutive": 3,
+      "first_seen": "2026-03-10T01:59:44.509898"
+    }
+  ]
+}
+}

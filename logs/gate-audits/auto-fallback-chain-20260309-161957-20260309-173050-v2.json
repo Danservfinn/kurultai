@@ -1,0 +1,35 @@
+{
+  "original_task": "auto-fallback-chain-20260309-161957",
+  "audit_timestamp": "2026-03-09T17:30:50.991916",
+  "audit_version": "2.0",
+  "completion_percentage": 80,
+  "can_complete": false,
+  "missing_components": [
+    "Tests not written"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Tests not written",
+      "agent": "ogedei",
+      "priority": "high",
+      "reason": "Auto-detected: Tests not written"
+    }
+  ],
+  "optional_improvements": [
+    {
+      "title": "Add error handling",
+      "agent": "ogedei",
+      "priority": "normal",
+      "reason": "Auto-suggested: Add error handling"
+    }
+  ],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_tier": "template",
+  "validation_errors": [
+    "No API credentials found"
+  ],
+  "retries_performed": 0,
+  "audit_fallback": false
+}

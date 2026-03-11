@@ -41,6 +41,7 @@ from human_profile_memory import HumanProfileMemory
 # Configuration
 MEMORY_DIR = Path.home() / ".openclaw" / "agents" / "main" / "memory" / "humans"
 ARCHIVE_DIR = MEMORY_DIR / "archive"
+CONVERSATION_INDEX_DIR = MEMORY_DIR / "index"
 MAX_CONVERSATIONS_IN_FILE = 50
 MAX_ARCHIVE_FILES = 12  # Keep up to 12 monthly archives
 
@@ -53,64 +54,604 @@ class ConversationLogger:
         self.memory = HumanProfileMemory(agent_name)
         self._ensure_directories()
 
+    def _get_index_file(self, phone_number: str) -> Path:
+        """Get the JSON index file path for a user's conversations."""
+        normalized = self.memory._normalize_id(phone_number)
+        return CONVERSATION_INDEX_DIR / f"{normalized}.json"
+
     def _ensure_directories(self) -> None:
-        """Create directories with proper permissions."""
+        """Create directories with proper permissions and verify them."""
         # Main memory dir
         self.memory.memory_dir.mkdir(parents=True, exist_ok=True)
 
         # Archive dir
         ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Set directory permissions to 700 (owner only)
-        os.chmod(self.memory.memory_dir, stat.S_IRWXU)
-        os.chmod(ARCHIVE_DIR, stat.S_IRWXU)
+        # Index dir
+        CONVERSATION_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Set directory permissions to 700 (owner only) and verify
+        self._verify_and_set_permissions(self.memory.memory_dir, is_dir=True)
+        self._verify_and_set_permissions(ARCHIVE_DIR, is_dir=True)
+        self._verify_and_set_permissions(CONVERSATION_INDEX_DIR, is_dir=True)
+
+    def _verify_and_set_permissions(self, path: Path, is_dir: bool = True) -> bool:
+        """
+        Verify and set correct permissions on a file or directory.
+
+        Args:
+            path: Path to verify/set permissions on
+            is_dir: True if path is a directory, False if file
+
+        Returns:
+            True if permissions are correct, False otherwise
+        """
+        if not path.exists():
+            return False
+
+        try:
+            if is_dir:
+                os.chmod(path, stat.S_IRWXU)  # 700 - owner read/write/execute only
+                expected_mode = "700"
+            else:
+                os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)  # 600 - owner read/write only
+                expected_mode = "600"
+
+            actual_mode = oct(path.stat().st_mode)[-3:]
+            if actual_mode != expected_mode:
+                print(f"Warning: Incorrect permissions on {path}. Current: {actual_mode}, Expected: {expected_mode}")
+                return False
+            return True
+        except (OSError, PermissionError) as e:
+            print(f"Warning: Could not set permissions on {path}: {e}")
+            return False
+
+    def _get_index_file(self, phone_number: str) -> Path:
+        """Get the JSON index file path for a user's conversations."""
+        normalized = self.memory._normalize_id(phone_number)
+        return CONVERSATION_INDEX_DIR / f"{normalized}.json"
+
+    def _load_conversation_index(self, phone_number: str) -> List[Dict[str, Any]]:
+        """Load conversations from JSON index."""
+        index_file = self._get_index_file(phone_number)
+        if index_file.exists():
+            try:
+                return json.loads(index_file.read_text())
+            except (json.JSONDecodeError, Exception):
+                return []
+        return []
 
     def _set_file_permissions(self, file_path: Path) -> None:
         """Set file permissions to 600 (owner read/write only)."""
         if file_path.exists():
             os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR)
 
-    def _extract_topics(self, content: str) -> List[str]:
-        """Extract key topics from message content."""
+    def _extract_topics(self, content: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+        """
+        Extract key topics from message content with scoring.
+
+        Args:
+            content: Message content to analyze
+            conversation_history: Optional list of past conversations for frequency weighting
+
+        Returns:
+            List of topic dicts with keys: topic, type, domain, score
+        """
         topics = []
 
-        # Technical keywords
-        tech_keywords = [
-            "authentication", "security", "deploy", "bug", "feature",
-            "database", "api", "frontend", "backend", "performance",
-            "test", "review", "merge", "release", "config"
-        ]
-
-        # Action keywords
-        action_keywords = [
-            "create", "update", "delete", "fix", "build", "implement",
-            "schedule", "cancel", "remind", "notify"
-        ]
+        # 1. Domain-specific keyword lists
+        domain_keywords = {
+            "technical": [
+                "authentication", "deployment", "database", "api", "frontend", "backend",
+                "performance", "testing", "security", "infrastructure", "microservices",
+                "container", "orchestration", "monitoring", "scaling", "load balancing",
+                "caching", "cdn", "websocket", "graphql", "rest", "grpc",
+                "deploy", "bug", "feature", "test", "review", "merge", "release", "config",
+                "code", "function", "class", "pr", "commit", "build", "implement"
+            ],
+            "business": [
+                "revenue", "customer", "sales", "pricing", "subscription", "metrics",
+                "growth", "churn", "retention", "acquisition", "conversion", "funnel",
+                "lifecycle", "upsell", "cross-sell", "discount", "promotion",
+                "user", "business", "product", "service", "market", "competition"
+            ],
+            "personal": [
+                "coffee", "lunch", "break", "vacation", "weekend", "family",
+                "health", "exercise", "gym", "doctor", "appointment", "birthday",
+                "holiday", "dinner", "movie", "trip"
+            ]
+        }
 
         content_lower = content.lower()
 
-        for keyword in tech_keywords + action_keywords:
-            if keyword in content_lower:
-                topics.append(keyword)
+        # Extract single-word keywords
+        for domain, keywords in domain_keywords.items():
+            for keyword in keywords:
+                if keyword in content_lower:
+                    topics.append({
+                        "topic": keyword,
+                        "type": "keyword",
+                        "domain": domain,
+                        "score": 1.0
+                    })
 
-        return topics[:5]  # Limit to 5 topics
+        # 2. Phrase extraction (2-3 word phrases)
+        # Extract bigrams (2-word phrases)
+        words = content.lower().split()
+        bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
 
-    def _extract_action_items(self, content: str) -> List[str]:
-        """Extract potential action items from message."""
-        action_items = []
+        # Extract trigrams (3-word phrases)
+        trigrams = [f"{words[i]} {words[i+1]} {words[i+2]}" for i in range(len(words)-2)]
 
-        # Patterns for action items
-        patterns = [
-            r"(?:need to|should|must|have to)\s+([^.!?]+)",
-            r"(?:todo|task|action):\s*([^.!?]+)",
+        # Meaningful technical phrases
+        technical_phrases = [
+            "database migration", "api authentication", "user onboarding",
+            "performance optimization", "security audit", "feature deployment",
+            "customer feedback", "subscription model", "growth metrics",
+            "a/b testing", "continuous deployment", "load testing",
+            "rate limiting", "data pipeline", "error handling",
+            "user authentication", "access control", "data encryption"
+        ]
+
+        # Check bigrams and trigrams against meaningful phrases
+        for phrase in technical_phrases:
+            phrase_lower = phrase.lower()
+            if phrase_lower in content_lower:
+                # Check if it's a bigram or trigram match
+                word_count = len(phrase.split())
+                topics.append({
+                    "topic": phrase,
+                    "type": f"{word_count}-word phrase",
+                    "domain": "technical",
+                    "score": 1.5 if word_count == 2 else 2.0  # Trigrams worth more
+                })
+
+        # 3. Named entity recognition (regex-based)
+        # Capitalized words (project names, companies)
+        entities = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b', content)
+        common_exclusions = {
+            "The", "This", "That", "I", "You", "We", "They", "It", "He", "She",
+            "And", "But", "Or", "For", "With", "From", "Let", "Need", "Can", "Will",
+            "Just", "Also", "Then", "When", "What", "How", "Where", "Why", "Who"
+        }
+
+        for entity in set(entities):
+            if len(entity) > 2 and entity not in common_exclusions:
+                # Clean up leading "The" from multi-word entities
+                clean_entity = entity
+                if clean_entity.startswith("The "):
+                    clean_entity = clean_entity[4:]
+
+                # Determine if it's likely a project name (appears capitalized mid-sentence)
+                topics.append({
+                    "topic": clean_entity,
+                    "type": "entity",
+                    "domain": "project",
+                    "score": 1.3
+                })
+
+        # Extract @mentions (companies/users)
+        mentions = re.findall(r'@(\w+)', content)
+        for mention in set(mentions):
+            topics.append({
+                "topic": f"@{mention}",
+                "type": "mention",
+                "domain": "company",
+                "score": 1.2
+            })
+
+        # Extract #hashtags (technologies/categories)
+        hashtags = re.findall(r'#(\w+)', content)
+        for tag in set(hashtags):
+            topics.append({
+                "topic": f"#{tag}",
+                "type": "hashtag",
+                "domain": "technology",
+                "score": 1.4
+            })
+
+        # 4. Topic frequency weighting
+        if conversation_history:
+            topic_counts = {}
+            for conv in conversation_history[-20:]:  # Last 20 conversations
+                conv_topics = conv.get("topics", [])
+                for topic in conv_topics:
+                    # Handle both string format (old) and dict format (new)
+                    if isinstance(topic, str):
+                        topic_name = topic
+                    elif isinstance(topic, dict):
+                        topic_name = topic.get("topic", "")
+                    else:
+                        continue
+
+                    if topic_name:
+                        topic_counts[topic_name] = topic_counts.get(topic_name, 0) + 1
+
+            # Boost recurring topics
+            for topic in topics:
+                topic_name = topic["topic"]
+                if topic_name in topic_counts:
+                    frequency_boost = min(topic_counts[topic_name] * 0.1, 0.5)
+                    topic["score"] += frequency_boost
+
+        # Sort by score and return top 10
+        topics.sort(key=lambda t: t["score"], reverse=True)
+
+        # Remove duplicates (keep highest scoring version)
+        seen_topics = {}
+        for topic in topics:
+            topic_name = topic["topic"]
+            if topic_name not in seen_topics:
+                seen_topics[topic_name] = topic
+            elif topic["score"] > seen_topics[topic_name]["score"]:
+                seen_topics[topic_name] = topic
+
+        # Return top 10 unique topics
+        unique_topics = list(seen_topics.values())
+        unique_topics.sort(key=lambda t: t["score"], reverse=True)
+
+        return unique_topics[:10]
+
+    def _normalize_topics(self, topics: List[Any]) -> List[str]:
+        """
+        Normalize topics to string format for backward compatibility.
+
+        Args:
+            topics: List of topics (strings or dicts)
+
+        Returns:
+            List of topic strings
+        """
+        normalized = []
+        for topic in topics:
+            if isinstance(topic, str):
+                normalized.append(topic)
+            elif isinstance(topic, dict):
+                normalized.append(topic.get("topic", str(topic)))
+            else:
+                normalized.append(str(topic))
+        return normalized
+
+    def _extract_action_items(self, content: str) -> List[Dict[str, Any]]:
+        """
+        Extract action items with metadata including assignee, priority, and deadlines.
+
+        Returns structured action items with:
+        - action: the action text
+        - assignee: who committed to the action (self, other, shared, unassigned)
+        - priority: high, medium, or low
+        - deadline: extracted deadline category (if any)
+        - source_pattern: how the action was detected
+        """
+        items = []
+
+        # 1. Commitment patterns with assignee detection
+        commitment_patterns = [
+            # Self-commitments
+            (r"(?:I will|I'll|I shall)\s+([^.!?]+)", "self"),
+            (r"(?:Let me|I'll handle)\s+([^.!?]+)", "self"),
+            (r"(?:Send|Get|Give)\s+(?:me|us)\s+([^.!?]+)", "self"),
+
+            # Shared commitments
+            (r"(?:We will|We'll)\s+([^.!?]+)", "shared"),
+            (r"(?:Let's|Lets)\s+([^.!?]+)", "shared"),
+
+            # Other-directed (delegation)
+            (r"Can you\s+([^.!?]+)", "other"),
+            (r"Could you\s+([^.!?]+)", "other"),
+            (r"(?:Please|kindly)\s+([^.!?]+)", "other"),
+            (r"(?:I need you to|You need to)\s+([^.!?]+)", "other"),
+
+            # General obligation
+            (r"(?:need to|should|must|have to)\s+([^.!?]+)", "unassigned"),
+            (r"(?:has to|have got to)\s+([^.!?]+)", "unassigned"),
+        ]
+
+        for pattern, assignee in commitment_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for match in matches:
+                action = match.strip().strip(".,!?")
+                if len(action) > 3:
+                    items.append({
+                        "action": action,
+                        "assignee": assignee,
+                        "priority": self._detect_priority(action + " " + content),
+                        "deadline": self._extract_deadline(action + " " + content),
+                        "source_pattern": "commitment"
+                    })
+
+        # 2. Task/delegation patterns (explicit markers)
+        task_patterns = [
+            r"todo:\s*([^.!?]+)",
+            r"task:\s*([^.!?]+)",
+            r"action item:\s*([^.!?]+)",
             r"\[([^\]]+)\]",  # [bracketed items]
         ]
 
-        for pattern in patterns:
+        for pattern in task_patterns:
             matches = re.findall(pattern, content, re.IGNORECASE)
-            action_items.extend(matches[:3])
+            for match in matches:
+                action = match.strip()
+                if len(action) > 3:
+                    items.append({
+                        "action": action,
+                        "assignee": "unassigned",
+                        "priority": self._detect_priority(action + " " + content),
+                        "deadline": self._extract_deadline(action + " " + content),
+                        "source_pattern": "task"
+                    })
 
-        return action_items[:5]
+        # 3. Deduplicate by action text (case-insensitive)
+        seen = set()
+        unique_items = []
+        for item in items:
+            action_lower = item["action"].lower()
+            if action_lower not in seen:
+                seen.add(action_lower)
+                unique_items.append(item)
+
+        # Return top 5 action items
+        return unique_items[:5]
+
+    def _detect_priority(self, text: str) -> str:
+        """
+        Detect priority level from text.
+
+        Returns:
+            'high' for urgent/critical items
+            'medium' for important/priority items
+            'low' for normal items
+        """
+        text_lower = text.lower()
+
+        # Urgent keywords
+        urgent_words = ["asap", "urgent", "urgently", "immediately", "right now",
+                       "emergency", "critical", "priority", "high priority",
+                       "as soon as possible", "deadline", "overdue"]
+
+        # Important keywords
+        important_words = ["important", "significant", "essential", "must",
+                          "key", "crucial", "vital", "necessary"]
+
+        if any(word in text_lower for word in urgent_words):
+            return "high"
+        elif any(word in text_lower for word in important_words):
+            return "medium"
+        return "low"
+
+    def _extract_deadline(self, text: str) -> Optional[str]:
+        """
+        Extract deadline information from text.
+
+        Returns:
+            Deadline category string (e.g., 'today', 'tomorrow', 'this_week', 'next_week', 'relative')
+            None if no deadline detected
+        """
+        text_lower = text.lower()
+
+        # Deadline patterns with categories
+        deadline_patterns = [
+            # Today (check this first as it's most specific)
+            (r"\b(?:today|tonight|end of day|eod|close of business|cob)\b", "today"),
+            (r"by\s+\d+(?:am|pm)\b", "today"),
+
+            # Tomorrow
+            (r"\btomorrow\b", "tomorrow"),
+
+            # This week - day names
+            (r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", "this_week"),
+            (r"by\s+this week\b", "this_week"),
+            (r"end of week\b", "this_week"),
+
+            # Next week
+            (r"next\s+(?:week|monday|tuesday|wednesday|thursday|friday)\b", "next_week"),
+
+            # Relative time
+            (r"within\s+\d+\s+(?:hours?|hrs?|h|days?|d)\b", "relative"),
+            (r"in\s+\d+\s+(?:hours?|hrs?|h|days?|d)\b", "relative"),
+
+            # Specific dates (return as-is for parsing)
+            (r"by\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}", "specific_date"),
+            (r"by\s+\d{1,2}/\d{1,2}(?:/\d{2,4})?", "specific_date"),
+        ]
+
+        for pattern, category in deadline_patterns:
+            if re.search(pattern, text_lower):
+                return category
+
+        return None
+
+    def _extract_event_mentions(self, content: str) -> List[str]:
+        """
+        Extract calendar event names from message content.
+
+        Args:
+            content: Message content to analyze
+
+        Returns:
+            List of event names (deduplicated, max 5)
+        """
+        events = []
+
+        # Pattern 1: Quoted event names (highest priority)
+        quoted_events = re.findall(r'"([^"]+)"', content)
+        events.extend(quoted_events)
+
+        # Pattern 2: Capitalized phrases with event keywords (more precise)
+        # Match: Capitalized word(s) + event keyword (e.g., "Team Standup", "Project Review")
+        event_keywords = ["meeting", "standup", "review", "call", "sync", "planning", "retro"]
+        content_lower = content.lower()
+
+        for keyword in event_keywords:
+            if keyword in content_lower:
+                # Extract 1-2 capitalized words before the keyword
+                # Pattern: Word(s) + keyword, stop at non-capitalized or end
+                pattern = rf'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+{keyword}\b'
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                for match in matches:
+                    # Reconstruct the full event name with proper capitalization
+                    event_name = f"{match} {keyword}"
+
+                    # Filter out matches that start with articles (case-insensitive)
+                    if not re.match(r'^(?:the|a|an)\s', event_name, re.IGNORECASE):
+                        events.append(event_name)
+
+        # Pattern 3: Common event names (exact match, capitalized)
+        common_events = [
+            "Team Standup", "Sprint Review", "Planning Session",
+            "Retrospective", "Weekly Sync", "Demo Day",
+            "Daily Standup", "Sprint Planning", "Retrospective Meeting"
+        ]
+        for event in common_events:
+            # Use word boundary for exact matching
+            if re.search(rf'\b{re.escape(event)}\b', content, re.IGNORECASE):
+                events.append(event)
+
+        # Deduplicate and clean (case-insensitive)
+        seen = set()
+        cleaned = []
+        for event in events:
+            event_clean = event.strip()
+            if event_clean and event_clean.lower() not in seen:
+                seen.add(event_clean.lower())
+                cleaned.append(event_clean)
+
+        return cleaned[:5]
+
+    def _extract_task_ids(self, content: str) -> List[str]:
+        """
+        Extract task IDs from message content.
+
+        Args:
+            content: Message content to analyze
+
+        Returns:
+            List of task IDs in format "task-XXXX" (deduplicated, max 5)
+        """
+        task_ids = []
+
+        # Pattern 1: task-XXXX
+        task_ids.extend(re.findall(r'task-(\d+)', content, re.IGNORECASE))
+
+        # Pattern 2: #XXXX (4+ digits)
+        task_ids.extend(re.findall(r'#(\d{4,})', content))
+
+        # Pattern 3: issue-XXX
+        task_ids.extend(re.findall(r'issue-(\d+)', content, re.IGNORECASE))
+
+        # Normalize and deduplicate
+        seen = set()
+        normalized = []
+        for task_id in task_ids:
+            if task_id not in seen:
+                seen.add(task_id)
+                normalized.append(f"task-{task_id}")
+
+        return normalized[:5]
+
+    def _link_conversation_to_events(
+        self,
+        phone_number: str,
+        conversation_date: str,
+        event_names: List[str]
+    ) -> None:
+        """
+        Link conversation to calendar events (bidirectional).
+
+        Updates the user's profile JSON index to include event_links that reference
+        conversations mentioning specific events.
+
+        Args:
+            phone_number: User's phone number
+            conversation_date: ISO timestamp of conversation
+            event_names: List of event names to link
+        """
+        if not event_names:
+            return
+
+        # Store event links in a separate JSON file for reliable querying
+        links_file = CONVERSATION_INDEX_DIR / f"{self.memory._normalize_id(phone_number)}_event_links.json"
+
+        # Load existing links
+        if links_file.exists():
+            try:
+                event_links = json.loads(links_file.read_text())
+            except:
+                event_links = {}
+        else:
+            event_links = {}
+
+        # Add conversation to each event
+        for event_name in event_names:
+            if event_name not in event_links:
+                event_links[event_name] = []
+
+            event_links[event_name].append({
+                "conversation_date": conversation_date,
+                "linked_at": datetime.now().isoformat()
+            })
+
+        # Save links
+        links_file.parent.mkdir(parents=True, exist_ok=True)
+        links_file.write_text(json.dumps(event_links, indent=2))
+        self._set_file_permissions(links_file)
+
+    def _link_conversation_to_tasks(
+        self,
+        phone_number: str,
+        conversation_date: str,
+        task_ids: List[str]
+    ) -> None:
+        """
+        Link conversation to tasks (bidirectional).
+
+        Updates the user's profile JSON index to include task_links that reference
+        conversations mentioning specific tasks.
+
+        Args:
+            phone_number: User's phone number
+            conversation_date: ISO timestamp of conversation
+            task_ids: List of task IDs to link
+        """
+        if not task_ids:
+            return
+
+        # Store task links in a separate JSON file for reliable querying
+        links_file = CONVERSATION_INDEX_DIR / f"{self.memory._normalize_id(phone_number)}_task_links.json"
+
+        # Load existing links
+        if links_file.exists():
+            try:
+                task_links = json.loads(links_file.read_text())
+            except:
+                task_links = {}
+        else:
+            task_links = {}
+
+        # Add conversation to each task
+        for task_id in task_ids:
+            if task_id not in task_links:
+                task_links[task_id] = []
+
+            task_links[task_id].append({
+                "conversation_date": conversation_date,
+                "linked_at": datetime.now().isoformat()
+            })
+
+        # Save links
+        links_file.parent.mkdir(parents=True, exist_ok=True)
+        links_file.write_text(json.dumps(task_links, indent=2))
+        self._set_file_permissions(links_file)
+
+    def _set_file_permissions(self, file_path: Path) -> None:
+        """Ensure file has 600 permissions (owner read/write only)."""
+        if file_path.exists():
+            self._verify_and_set_permissions(file_path, is_dir=False)
+
+        # Also ensure parent directory has 700
+        parent = file_path.parent
+        if parent.exists():
+            self._verify_and_set_permissions(parent, is_dir=True)
 
     def _detect_context(self, content: str) -> str:
         """Detect the context type of a message."""
@@ -138,21 +679,96 @@ class ConversationLogger:
 
         return "general"
 
-    def _analyze_sentiment(self, content: str) -> str:
-        """Simple sentiment analysis."""
-        positive_words = ["great", "awesome", "thanks", "love", "perfect", "excellent", "good"]
-        negative_words = ["bad", "broken", "fail", "error", "problem", "issue", "hate", "frustrated"]
+    def _analyze_sentiment(self, content: str) -> Dict[str, Any]:
+        """
+        Enhanced sentiment analysis with emotion, urgency, intensity, and politeness detection.
 
+        Returns:
+            Dict with keys:
+            - polarity: positive/neutral/negative
+            - emotion: excited/frustrated/curious/neutral
+            - urgency: high/medium/low
+            - intensity: 0.0 to 1.0
+            - politeness: formal/casual/terse
+        """
         content_lower = content.lower()
+
+        # 1. Emotion detection
+        emotion_keywords = {
+            "excited": ["great", "awesome", "amazing", "love", "perfect", "excellent",
+                       "fantastic", "wonderful", "brilliant", "yay", "hooray"],
+            "frustrated": ["bad", "broken", "fail", "error", "problem", "issue", "stuck",
+                          "frustrated", "annoying", "terrible", "horrible", "wrong"],
+            "curious": ["wondering", "how", "what", "why", "curious", "question",
+                       "confused", "unsure", "don't understand", "clarify"],
+            "neutral": []  # Default
+        }
+
+        emotion_scores = {}
+        for emotion, keywords in emotion_keywords.items():
+            score = sum(1 for kw in keywords if kw in content_lower)
+            if score > 0:
+                emotion_scores[emotion] = score
+
+        # Determine primary emotion
+        if emotion_scores:
+            primary_emotion = max(emotion_scores, key=emotion_scores.get)
+        else:
+            primary_emotion = "neutral"
+
+        # 2. Sentiment polarity
+        positive_words = ["great", "awesome", "thanks", "love", "perfect", "excellent", "good", "happy"]
+        negative_words = ["bad", "broken", "fail", "error", "problem", "issue", "hate", "frustrated", "sad"]
 
         positive_count = sum(1 for w in positive_words if w in content_lower)
         negative_count = sum(1 for w in negative_words if w in content_lower)
 
         if positive_count > negative_count:
-            return "positive"
+            polarity = "positive"
         elif negative_count > positive_count:
-            return "negative"
-        return "neutral"
+            polarity = "negative"
+        else:
+            polarity = "neutral"
+
+        # 3. Urgency detection
+        high_urgency = ["asap", "urgent", "immediately", "right now", "emergency", "critical"]
+        medium_urgency = ["soon", "quickly", "priority", "important", "essential"]
+
+        if any(word in content_lower for word in high_urgency):
+            urgency = "high"
+        elif any(word in content_lower for word in medium_urgency):
+            urgency = "medium"
+        else:
+            urgency = "low"
+
+        # 4. Politeness level
+        formal_phrases = ["would appreciate", "kindly", "request", "thank you for", "please"]
+        casual_phrases = ["thanks", "cool", "awesome", "gotcha", "sure thing", "no worries"]
+
+        if any(phrase in content_lower for phrase in formal_phrases):
+            politeness = "formal"
+        elif any(phrase in content_lower for phrase in casual_phrases):
+            politeness = "casual"
+        else:
+            politeness = "terse"
+
+        # 5. Intensity score (0.0 to 1.0)
+        total_emotion_words = sum(emotion_scores.values())
+        word_count = len(content.split())
+
+        if word_count > 0:
+            emotion_density = min(total_emotion_words / word_count, 1.0)
+            intensity = min(emotion_density * 2, 1.0)  # Scale up slightly
+        else:
+            intensity = 0.0
+
+        return {
+            "polarity": polarity,
+            "emotion": primary_emotion,
+            "urgency": urgency,
+            "intensity": round(intensity, 2),
+            "politeness": politeness
+        }
 
     def _should_archive(self, phone_number: str) -> bool:
         """Check if profile needs archiving (50+ conversations)."""
@@ -290,6 +906,8 @@ class ConversationLogger:
         """
         Search a human's conversations for a query.
 
+        Reads from JSON index for reliable querying.
+
         Args:
             phone_number: Phone number to search
             query: Search query
@@ -298,18 +916,21 @@ class ConversationLogger:
         Returns:
             List of matching conversations
         """
-        profile = self.memory.read_profile(phone_number)
-        if not profile:
+        conversations = self._load_conversation_index(phone_number)
+        if not conversations:
             return []
 
-        conversations = profile.get("conversations", [])
         query_lower = query.lower()
 
         results = []
         for conv in conversations:
             # Search in content, topics, action items
             content = conv.get("content", "").lower()
-            topics = " ".join(conv.get("topics", [])).lower()
+
+            # Normalize topics to handle both string and dict formats
+            topics_list = self._normalize_topics(conv.get("topics", []))
+            topics = " ".join(topics_list).lower()
+
             action_items = " ".join(conv.get("action_items", [])).lower()
 
             if query_lower in content or query_lower in topics or query_lower in action_items:
@@ -346,11 +967,7 @@ class ConversationLogger:
 
     def get_conversation_stats(self, phone_number: str) -> Dict[str, Any]:
         """Get statistics about a human's conversations."""
-        profile = self.memory.read_profile(phone_number)
-        if not profile:
-            return {"total": 0}
-
-        conversations = profile.get("conversations", [])
+        conversations = self._load_conversation_index(phone_number)
 
         stats = {
             "total": len(conversations),
@@ -370,8 +987,12 @@ class ConversationLogger:
             context = conv.get("context", "unknown")
             stats["contexts"][context] = stats["contexts"].get(context, 0) + 1
 
-            # Count by sentiment
-            sentiment = conv.get("sentiment", "neutral")
+            # Count by sentiment (handle both string and dict formats)
+            sentiment_data = conv.get("sentiment", "neutral")
+            if isinstance(sentiment_data, dict):
+                sentiment = sentiment_data.get("polarity", "neutral")
+            else:
+                sentiment = sentiment_data if sentiment_data else "neutral"
             stats["sentiments"][sentiment] = stats["sentiments"].get(sentiment, 0) + 1
 
         if conversations:
@@ -419,6 +1040,42 @@ class ConversationLogger:
 
         return True
 
+    def get_event_links(self, phone_number: str) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get all event-to-conversation links for a user.
+
+        Args:
+            phone_number: User's phone number
+
+        Returns:
+            Dict mapping event names to lists of conversation references
+        """
+        links_file = CONVERSATION_INDEX_DIR / f"{self.memory._normalize_id(phone_number)}_event_links.json"
+        if links_file.exists():
+            try:
+                return json.loads(links_file.read_text())
+            except:
+                return {}
+        return {}
+
+    def get_task_links(self, phone_number: str) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get all task-to-conversation links for a user.
+
+        Args:
+            phone_number: User's phone number
+
+        Returns:
+            Dict mapping task IDs to lists of conversation references
+        """
+        links_file = CONVERSATION_INDEX_DIR / f"{self.memory._normalize_id(phone_number)}_task_links.json"
+        if links_file.exists():
+            try:
+                return json.loads(links_file.read_text())
+            except:
+                return {}
+        return {}
+
     def log_human_conversation(
         self,
         phone_number: str,
@@ -464,9 +1121,20 @@ class ConversationLogger:
 
         # Use provided values or auto-extract
         detected_context = context or self._detect_context(content)
-        detected_topics = topics if topics is not None else self._extract_topics(content)
+        if topics is not None:
+            detected_topics = topics
+        else:
+            # Load conversation history for frequency weighting
+            conversation_history = self._load_conversation_index(phone_number)
+            detected_topics = self._extract_topics(content, conversation_history)
         detected_action_items = action_items if action_items is not None else self._extract_action_items(content)
         detected_sentiment = sentiment or self._analyze_sentiment(content)
+
+        # Extract event and task mentions if not provided
+        if related_events is None:
+            related_events = self._extract_event_mentions(content)
+        if related_tasks is None:
+            related_tasks = self._extract_task_ids(content)
 
         # Build comprehensive conversation entry
         conversation = {
@@ -492,14 +1160,64 @@ class ConversationLogger:
         if metadata:
             conversation["metadata"] = metadata
 
-        # Add to profile
-        success = self.memory.add_conversation(phone_number, conversation)
+        # Add to profile (Markdown for human readability)
+        self.memory.add_conversation(phone_number, conversation)
+
+        # Save to JSON index for reliable querying
+        self._save_to_index(phone_number, conversation)
+
+        # Create bidirectional links
+        conversation_date = conversation["date"]
+        self._link_conversation_to_events(phone_number, conversation_date, related_events)
+        self._link_conversation_to_tasks(phone_number, conversation_date, related_tasks)
 
         # Ensure proper file permissions
         file_path = self.memory._get_file_path(phone_number)
         self._set_file_permissions(file_path)
 
-        return success
+        return True
+
+    def _save_to_index(self, phone_number: str, conversation: Dict[str, Any]) -> None:
+        """Save conversation to JSON index for reliable querying."""
+        index_file = self._get_index_file(phone_number)
+        index_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing index
+        conversations = self._load_conversation_index(phone_number)
+
+        # Append new conversation
+        conversations.append(conversation)
+
+        # Keep only last 100 in index (archives handle overflow)
+        if len(conversations) > 100:
+            self._archive_old_index_conversations(phone_number, conversations[:-50])
+            conversations = conversations[-50:]
+
+        # Save index
+        index_file.write_text(json.dumps(conversations, indent=2, default=str))
+        self._set_file_permissions(index_file)
+
+    def _archive_old_index_conversations(self, phone_number: str, old_conversations: List[Dict[str, Any]]) -> None:
+        """Archive old conversations from index to JSON archive."""
+        if not old_conversations:
+            return
+
+        normalized_id = self.memory._normalize_id(phone_number)
+        archive_date = datetime.now().strftime("%Y-%m")
+        archive_file = ARCHIVE_DIR / f"{normalized_id}-archive-{archive_date}.json"
+
+        # Load existing archive if any
+        existing = []
+        if archive_file.exists():
+            try:
+                existing = json.loads(archive_file.read_text())
+            except Exception:
+                existing = []
+
+        # Append and save
+        existing.extend(old_conversations)
+        archive_file.write_text(json.dumps(existing, indent=2, default=str))
+        self._set_file_permissions(archive_file)
 
     def get_recent_conversations(
         self,
@@ -511,6 +1229,8 @@ class ConversationLogger:
         """
         Get recent conversations with optional filtering.
 
+        Reads from JSON index for reliable querying.
+
         Args:
             phone_number: Phone number
             limit: Maximum conversations to return
@@ -520,11 +1240,7 @@ class ConversationLogger:
         Returns:
             List of conversation dicts
         """
-        profile = self.memory.read_profile(phone_number)
-        if not profile:
-            return []
-
-        conversations = profile.get("conversations", [])
+        conversations = self._load_conversation_index(phone_number)
 
         # Apply filters
         if context_filter:
@@ -540,6 +1256,8 @@ class ConversationLogger:
         """
         Extract all action items from conversations.
 
+        Reads from JSON index for reliable querying.
+
         Args:
             phone_number: Phone number
             pending_only: Only return items not marked as completed
@@ -547,11 +1265,7 @@ class ConversationLogger:
         Returns:
             List of action item dicts with conversation context
         """
-        profile = self.memory.read_profile(phone_number)
-        if not profile:
-            return []
-
-        conversations = profile.get("conversations", [])
+        conversations = self._load_conversation_index(phone_number)
         all_action_items = []
 
         for conv in conversations:
@@ -624,6 +1338,98 @@ class ConversationLogger:
 
         return False
 
+    def audit_permissions(self) -> Dict[str, Any]:
+        """
+        Audit all file and directory permissions in the conversation storage system.
+
+        Returns:
+            Dict with audit results including status of directories and files
+        """
+        results = {
+            "directories": {},
+            "files": [],
+            "errors": [],
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Audit directories
+        directories = {
+            "memory_dir": self.memory.memory_dir,
+            "archive_dir": ARCHIVE_DIR,
+            "index_dir": CONVERSATION_INDEX_DIR
+        }
+
+        for name, path in directories.items():
+            if path.exists():
+                ok = self._verify_and_set_permissions(path, is_dir=True)
+                results["directories"][name] = {
+                    "path": str(path),
+                    "exists": True,
+                    "permissions_ok": ok,
+                    "mode": oct(path.stat().st_mode)[-3:]
+                }
+                if not ok:
+                    results["errors"].append(f"Directory {name} has incorrect permissions")
+            else:
+                results["directories"][name] = {
+                    "path": str(path),
+                    "exists": False,
+                    "permissions_ok": False
+                }
+
+        # Audit profile files (Markdown files in memory_dir)
+        for profile_file in self.memory.memory_dir.glob("*.md"):
+            ok = self._verify_and_set_permissions(profile_file, is_dir=False)
+            results["files"].append({
+                "type": "profile",
+                "file": profile_file.name,
+                "path": str(profile_file),
+                "permissions_ok": ok,
+                "mode": oct(profile_file.stat().st_mode)[-3:]
+            })
+            if not ok:
+                results["errors"].append(f"Profile file {profile_file.name} has incorrect permissions")
+
+        # Audit index files (JSON files in index_dir)
+        if CONVERSATION_INDEX_DIR.exists():
+            for index_file in CONVERSATION_INDEX_DIR.glob("*.json"):
+                ok = self._verify_and_set_permissions(index_file, is_dir=False)
+                results["files"].append({
+                    "type": "index",
+                    "file": index_file.name,
+                    "path": str(index_file),
+                    "permissions_ok": ok,
+                    "mode": oct(index_file.stat().st_mode)[-3:]
+                })
+                if not ok:
+                    results["errors"].append(f"Index file {index_file.name} has incorrect permissions")
+
+        # Audit archive files
+        if ARCHIVE_DIR.exists():
+            for archive_file in ARCHIVE_DIR.glob("*.json"):
+                ok = self._verify_and_set_permissions(archive_file, is_dir=False)
+                results["files"].append({
+                    "type": "archive",
+                    "file": archive_file.name,
+                    "path": str(archive_file),
+                    "permissions_ok": ok,
+                    "mode": oct(archive_file.stat().st_mode)[-3:]
+                })
+                if not ok:
+                    results["errors"].append(f"Archive file {archive_file.name} has incorrect permissions")
+
+        # Summary
+        total_files = len(results["files"])
+        ok_files = sum(1 for f in results["files"] if f["permissions_ok"])
+        results["summary"] = {
+            "total_files": total_files,
+            "files_with_correct_permissions": ok_files,
+            "files_with_incorrect_permissions": total_files - ok_files,
+            "total_errors": len(results["errors"])
+        }
+
+        return results
+
 
 # Singleton instance for convenience
 _logger_instance: Optional[ConversationLogger] = None
@@ -693,6 +1499,16 @@ def export_conversations(phone_number: str) -> Optional[str]:
 def delete_all_conversations(phone_number: str) -> bool:
     """Delete all conversations (privacy request)."""
     return get_logger().delete_all_conversations(phone_number)
+
+
+def audit_permissions() -> Dict[str, Any]:
+    """
+    Audit all file and directory permissions in the conversation storage system.
+
+    Returns:
+        Dict with audit results including status of directories and files
+    """
+    return get_logger().audit_permissions()
 
 
 def log_human_conversation(

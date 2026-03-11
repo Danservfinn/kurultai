@@ -1,39 +1,44 @@
 {
-  "ts": "2026-03-08T15:01:55.157378",
+  "ts": "2026-03-11T06:17:46.415596",
   "window_hours": 24,
   "score": {
-    "score": 100.0,
-    "auto_resolved": 11,
-    "escalated": 0,
+    "score": 67.9,
+    "auto_resolved": 36,
+    "escalated": 17,
     "manual": 0,
     "partial": 0,
-    "total_issues": 11,
+    "total_issues": 53,
     "by_type": {
-      "gateway_restart": {
-        "auto": 2,
+      "memory_bloat": {
+        "auto": 28,
         "escalated": 0,
         "manual": 0,
         "partial": 0
       },
-      "memory_bloat": {
-        "auto": 3,
+      "gateway_restart": {
+        "auto": 0,
+        "escalated": 17,
+        "manual": 0,
+        "partial": 0
+      },
+      "memory_deprecated_rules": {
+        "auto": 1,
         "escalated": 0,
         "manual": 0,
         "partial": 0
       },
       "quality_retry": {
-        "auto": 4,
-        "escalated": 0,
-        "manual": 0,
-        "partial": 0
-      },
-      "queue_rebalanced": {
-        "auto": 2,
+        "auto": 7,
         "escalated": 0,
         "manual": 0,
         "partial": 0
       }
     },
-    "trends": []
+    "trends": [
+      {
+        "direction": "down",
+        "description": "Issue volume decreased by 72%"
+      }
+    ]
   }
 }

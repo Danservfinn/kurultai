@@ -114,6 +114,10 @@ class TaskReportAggregator:
 
     def _analyze_performance_trends(self, hours: int) -> Dict:
         """Analyze performance trends."""
+        hourly_data = []
+        agent_data = []
+        skill_data = []
+
         with self.reporter.driver.session() as session:
             # Hourly breakdown
             hourly = session.run("""
@@ -128,6 +132,7 @@ class TaskReportAggregator:
                     sum(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
                 ORDER BY hour
             """, hours=hours)
+            hourly_data = [dict(r) for r in hourly]
 
             # Agent comparison
             agent_perf = session.run("""
@@ -138,11 +143,12 @@ class TaskReportAggregator:
                     t.agent AS agent,
                     count(t) AS tasks,
                     avg(t.actual_duration_seconds) AS avg_duration,
-                    percentile90(t.actual_duration_seconds) AS p90_duration,
+                    percentileCont(t.actual_duration_seconds, 0.9) AS p90_duration,
                     avg(t.total_tokens) AS avg_tokens,
                     100.0 * sum(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) / count(t) AS success_rate
                 ORDER BY tasks DESC
             """, hours=hours)
+            agent_data = [dict(r) for r in agent_perf]
 
             # Skill performance
             skill_perf = session.run("""
@@ -158,15 +164,20 @@ class TaskReportAggregator:
                 ORDER BY tasks DESC
                 LIMIT 10
             """, hours=hours)
+            skill_data = [dict(r) for r in skill_perf]
 
         return {
-            "hourly_breakdown": [dict(r) for r in hourly],
-            "by_agent": [dict(r) for r in agent_perf],
-            "by_skill": [dict(r) for r in skill_perf],
+            "hourly_breakdown": hourly_data,
+            "by_agent": agent_data,
+            "by_skill": skill_data,
         }
 
     def _analyze_quality_signals(self, hours: int) -> Dict:
         """Analyze quality signals and verification results."""
+        vq_record = {}
+        rework_record = {}
+        split_record = {}
+
         with self.reporter.driver.session() as session:
             # Verification score distribution
             vq_scores = session.run("""
@@ -178,8 +189,10 @@ class TaskReportAggregator:
                     avg(t.verification_score) AS avg_score,
                     min(t.verification_score) AS min_score,
                     max(t.verification_score) AS max_score,
-                    percentile90(t.verification_score) AS p90_score
+                    percentileCont(t.verification_score, 0.9) AS p90_score
             """, hours=hours)
+            vq_result = vq_scores.single()
+            vq_record = dict(vq_result) if vq_result else {}
 
             # Rework analysis
             rework = session.run("""
@@ -191,6 +204,8 @@ class TaskReportAggregator:
                     avg(t.followup_tasks_created) AS avg_followups,
                     collect(DISTINCT t.rework_reason)[..5] AS reasons
             """, hours=hours)
+            rework_result = rework.single()
+            rework_record = dict(rework_result) if rework_result else {}
 
             # High-quality vs low-quality tasks
             quality_split = session.run("""
@@ -203,10 +218,8 @@ class TaskReportAggregator:
                     sum(CASE WHEN t.verification_score < 50 THEN 1 ELSE 0 END) AS low_quality
                 RETURN high_quality, medium_quality, low_quality
             """, hours=hours)
-
-        vq_record = dict(vq_scores.single()) if vq_scores.single() else {}
-        rework_record = dict(rework.single()) if rework.single() else {}
-        split_record = dict(quality_split.single()) if quality_split.single() else {}
+            split_result = quality_split.single()
+            split_record = dict(split_result) if split_result else {}
 
         return {
             "verification_scores": vq_record,
@@ -408,6 +421,10 @@ class TaskReportAggregator:
 
     def generate_weekly_trends(self, days: int = 30) -> Dict:
         """Generate weekly trend analysis."""
+        daily_data = []
+        weekly_data = []
+        error_data = []
+
         with self.reporter.driver.session() as session:
             # Daily trends
             daily = session.run("""
@@ -424,6 +441,7 @@ class TaskReportAggregator:
                     100.0 * completed / total AS success_rate
                 ORDER BY day DESC
             """, days=days)
+            daily_data = [dict(r) for r in daily]
 
             # Weekly aggregation
             weekly = session.run("""
@@ -440,6 +458,7 @@ class TaskReportAggregator:
                     100.0 * completed / total AS success_rate
                 ORDER BY week_start DESC
             """, days=days)
+            weekly_data = [dict(r) for r in weekly]
 
             # Error trends
             error_trends = session.run("""
@@ -457,13 +476,14 @@ class TaskReportAggregator:
                     errors
                 ORDER BY day DESC, errors DESC
             """, days=days)
+            error_data = [dict(r) for r in error_trends][:50]
 
         return {
             "period_days": days,
             "generated": datetime.now().isoformat(),
-            "daily_trends": [dict(r) for r in daily],
-            "weekly_aggregates": [dict(r) for r in weekly],
-            "error_trends": [dict(r) for r in error_trends][:50],
+            "daily_trends": daily_data,
+            "weekly_aggregates": weekly_data,
+            "error_trends": error_data,
         }
 
     # ============================================================

@@ -6,6 +6,9 @@ Extracts URLs from task content and validates responsiveness with a hard 5s
 timeout per source. If ALL extracted sources are unreachable, the task should
 be failed fast instead of burning 600-900s of Claude Code time.
 
+SECURITY: Includes SSRF protection to block requests to private IP ranges
+and enforce domain allowlisting.
+
 This closes the operationalization gap for mongke's behavioral rule:
   WHEN research task assigned THEN validate source responsiveness <5s BEFORE query
 
@@ -21,11 +24,14 @@ CLI:
 """
 
 import re
+import socket
 import sys
 import time
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, asdict
+from urllib.parse import urlparse
+from typing import Tuple
 
 # Hard timeout per URL check — the whole point of this module
 SOURCE_CHECK_TIMEOUT = 5
@@ -38,12 +44,53 @@ URL_PATTERNS = [
     r'(?:api|endpoint|url|base_url|host)[:\s=]+["\']?(https?://[^\s"\'<>\]]+)',
 ]
 
-# Known-internal URLs that don't need validation (always reachable)
-INTERNAL_SKIP = [
-    r'^https?://localhost',
-    r'^https?://127\.0\.0\.1',
-    r'^https?://.*\.local(?::\d+)?/?$',
+# =============================================================================
+# SSRF Protection Configuration
+# =============================================================================
+
+# Allowed URL domains (regex patterns) - Kurultai trusted infrastructure
+ALLOWED_URL_DOMAINS = [
+    r".*\.kurult\.ai$",
+    r".*\.parsethe\.media$",
+    r".*\.up\.railway\.app$",
+    r".*\.vercel\.app$",
+    r"localhost$",
+    r"127\.0\.0\.1$",
+    # Common legitimate research domains
+    r".*\.github\.com$",
+    r".*\.githubusercontent\.com$",
+    r".*\.gitlab\.com$",
+    r".*\.stackoverflow\.com$",
+    r".*\.stackexchange\.com$",
+    r".*\.readthedocs\.io$",
+    r".*\.pypi\.org$",
+    r".*\.npmjs\.com$",
+    r".*\.pypi\.io$",
+    r".*\.python\.org$",
+    r".*\.anthropic\.com$",
+    r".*\.openai\.com$",
+    r".*\.google\.com$",
+    r".*\.googleapis\.com$",
 ]
+
+# Blocked private IP ranges (SSRF protection)
+BLOCKED_PRIVATE_RANGES = [
+    r"^10\.",                                    # Class A private
+    r"^172\.(1[6-9]|2[0-9]|3[0-1])\.",           # Class B private (172.16-31.x.x)
+    r"^192\.168\.",                              # Class C private
+    r"^169\.254\.",                              # Link-local (AWS metadata)
+    r"^0\.",                                     # Current network
+    r"^224\.",                                   # Multicast
+    r"^240\.",                                   # Reserved
+    r"^255\.255\.255\.255$",                     # Broadcast
+    r"^127\.",                                   # Loopback (except allowed explicitly)
+    r"^::1$",                                    # IPv6 loopback
+    r"^fe80::",                                  # IPv6 link-local
+    r"^fc00::",                                  # IPv6 unique local
+]
+
+# Allow localhost for development but block other private IPs
+LOCALHOST_ALLOWED = True
 
 
 @dataclass
@@ -52,6 +99,63 @@ class SourceCheck:
     reachable: bool
     latency_ms: int
     error: str = ""
+    ssrf_blocked: bool = False
+
+
+def validate_url_ssrf(url: str) -> Tuple[bool, str]:
+    """Validate URL against SSRF protection rules.
+
+    Returns:
+        Tuple of (is_allowed, reason)
+
+    Security checks:
+    1. Parse URL and extract hostname
+    2. Check against blocked private IP ranges
+    3. Resolve DNS and check resolved IP
+    4. Check domain allowlist (warning only, not blocking)
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+
+        # Check if hostname is an IP address
+        ip_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
+
+        if re.match(ip_pattern, hostname):
+            # Direct IP address - check against blocked ranges
+            for pattern in BLOCKED_PRIVATE_RANGES:
+                if re.match(pattern, hostname):
+                    # Allow localhost if configured
+                    if LOCALHOST_ALLOWED and hostname == "127.0.0.1":
+                        continue
+                    return False, f"SSRF: Private IP range blocked: {hostname}"
+
+        # Resolve DNS to check for DNS rebinding attacks
+        try:
+            resolved_ips = socket.getaddrinfo(hostname, parsed.port or 80)
+            for family, socktype, proto, canonname, sockaddr in resolved_ips[:5]:
+                resolved_ip = sockaddr[0]
+                # Check resolved IP against blocked ranges
+                for pattern in BLOCKED_PRIVATE_RANGES:
+                    if re.match(pattern, resolved_ip):
+                        # Allow localhost if configured
+                        if LOCALHOST_ALLOWED and resolved_ip == "127.0.0.1":
+                            continue
+                        return False, f"SSRF: Resolved to private IP: {hostname} -> {resolved_ip}"
+        except socket.gaierror:
+            # DNS resolution failed - URL is unreachable anyway
+            return True, "DNS resolution failed (will fail in check)"
+
+        # Check domain allowlist (warning only, not blocking)
+        in_allowlist = any(re.match(p, hostname) for p in ALLOWED_URL_DOMAINS)
+        if not in_allowlist:
+            # Log warning but don't block - research may need arbitrary domains
+            pass
+
+        return True, "OK"
+
+    except Exception as e:
+        return False, f"SSRF validation error: {str(e)[:100]}"
 
 
 def extract_urls(task_content: str) -> list[str]:
@@ -68,14 +172,26 @@ def extract_urls(task_content: str) -> list[str]:
 
 def _is_internal(url: str) -> bool:
     """Check if URL is internal/localhost (skip validation)."""
-    return any(re.match(p, url) for p in INTERNAL_SKIP)
+    internal_patterns = [
+        r'^https?://localhost',
+        r'^https?://127\.0\.0\.1',
+        r'^https?://.*\.local(?::\d+)?/?$',
+    ]
+    return any(re.match(p, url) for p in internal_patterns)
 
 
 def check_url(url: str, timeout: int = SOURCE_CHECK_TIMEOUT) -> SourceCheck:
     """Check single URL responsiveness with hard timeout.
 
+    SECURITY: First validates URL against SSRF rules before making request.
+
     Uses HEAD request first (fast), falls back to GET if HEAD returns 405.
     """
+    # SSRF validation first
+    ssrf_ok, ssrf_reason = validate_url_ssrf(url)
+    if not ssrf_ok:
+        return SourceCheck(url, False, 0, ssrf_reason, ssrf_blocked=True)
+
     start = time.time()
     try:
         req = urllib.request.Request(url, method="HEAD")

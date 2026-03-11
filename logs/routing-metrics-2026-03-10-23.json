@@ -1,0 +1,181 @@
+{
+  "timestamp": "2026-03-11T03:36:27Z",
+  "hour_file": "2026-03-10-23",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 1.369,
+    "depths": {"temujin": 1, "mongke": 0, "chagatai": 0, "jochi": 1, "ogedei": 0},
+    "mean": 0.4,
+    "std": 0.55
+  },
+  "routing": {
+    "total_routed": 10,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-10T23:36:27.949651",
+  "total_routed": 10,
+  "routing_methods": {
+    "explicit": 7,
+    "keyword": 2
+  },
+  "destinations": {
+    "jochi": 4,
+    "mongke": 2,
+    "ogedei": 2,
+    "temujin": 1
+  },
+  "by_agent": {
+    "jochi": {
+      "routed": 4,
+      "executed": 1,
+      "succeeded": 0,
+      "failed": 1
+    },
+    "mongke": {
+      "routed": 2,
+      "executed": 1,
+      "succeeded": 0,
+      "failed": 1
+    },
+    "ogedei": {
+      "routed": 2,
+      "executed": 2,
+      "succeeded": 0,
+      "failed": 2
+    },
+    "temujin": {
+      "routed": 1,
+      "executed": 1,
+      "succeeded": 1,
+      "failed": 0
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 38
+    },
+    "temujin": {
+      "pending": 2,
+      "executing": 0,
+      "done": 34
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 6
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 3
+    },
+    "jochi": {
+      "pending": 2,
+      "executing": 0,
+      "done": 11
+    },
+    "ogedei": {
+      "pending": 5,
+      "executing": 0,
+      "done": 28
+    }
+  },
+  "issues": [
+    "Missed routing opportunities: 4 tasks routed to busy agents when idle alternatives existed (40% of routed tasks)"
+  ],
+  "suggestions": [
+    "Workload skew: jochi got 4 tasks vs temujin got 1 (system-generated, expected)",
+    "jochi: 1 task(s) failed out of 1 executed (downstream)",
+    "mongke: 1 task(s) failed out of 1 executed (downstream)",
+    "ogedei: 2 task(s) failed out of 2 executed (downstream)",
+    "Routing methods: explicit=7, keyword=2"
+  ],
+  "kw_disagreements": {
+    "jochi->temujin": 1
+  },
+  "kw_misroute_count": 0,
+  "kw_misroute_rate": "0/10",
+  "overflow_count": 0,
+  "skill_hint_coverage": "7/10",
+  "routing_drift": {
+    "total": 0,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "ts": "2026-03-10T23:07:39.507665"
+  },
+  "missed_opportunities": {
+    "count": 4,
+    "by_agent": {
+      "mongke": 1,
+      "ogedei": 1,
+      "jochi": 1,
+      "temujin": 1
+    },
+    "examples": [
+      {
+        "task": "Research sources for content brief: 'Multi-agent orchestration best practices'",
+        "routed_to": "mongke",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "chagatai",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-10T23:16:25.833340"
+      },
+      {
+        "task": "Fix cron job: the.kurult.ai 3-hour review (12 consecutive errors)",
+        "routed_to": "ogedei",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ]
+        ],
+        "method": "keyword",
+        "ts": "2026-03-10T23:26:57.250731"
+      },
+      {
+        "task": "Tock assessment: HIGH \u2014 ",
+        "routed_to": "jochi",
+        "dest_queue": 2,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ],
+          [
+            "kublai",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-10T23:26:57.252643"
+      },
+      {
+        "task": "test-3-hour-review",
+        "routed_to": "temujin",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-10T23:28:53.596909"
+      }
+    ]
+  }
+}
+}

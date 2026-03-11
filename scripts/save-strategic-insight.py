@@ -18,20 +18,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-try:
-    from neo4j import GraphDatabase
-except ImportError:
-    print("Neo4j driver not installed. Install with: pip3 install neo4j")
-    sys.exit(1)
-
-NEO4J_URI = "bolt://localhost:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASS = "neo4j"
-
-
-def get_driver():
-    """Get Neo4j driver."""
-    return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
+from neo4j_task_tracker import get_driver
 
 
 def save_insight(insight_type, name, data, source="manual", tags=None):

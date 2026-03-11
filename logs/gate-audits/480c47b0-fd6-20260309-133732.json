@@ -1,0 +1,29 @@
+{
+  "original_task": "480c47b0-fd6",
+  "completion_percentage": 70,
+  "can_complete": false,
+  "missing_components": [
+    "Incomplete items marked TODO/FIXME in code",
+    "Tests not written"
+  ],
+  "quality_issues": [],
+  "required_followups": [
+    {
+      "title": "Incomplete items marked TODO/FIXME in code",
+      "agent": "jochi",
+      "priority": "high",
+      "reason": "Auto-detected"
+    },
+    {
+      "title": "Tests not written",
+      "agent": "jochi",
+      "priority": "high",
+      "reason": "Auto-detected"
+    }
+  ],
+  "optional_improvements": [],
+  "blockers": [],
+  "gate_cycle": 0,
+  "audit_timestamp": "2026-03-09T13:37:32.188057",
+  "audit_version": "1.0"
+}

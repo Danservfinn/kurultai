@@ -29,6 +29,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import LOGS_DIR, VALID_AGENTS
 from kurultai_ledger import read_ledger
 
+# Model detection
+def get_model():
+    """Get the default model from main agent config."""
+    try:
+        settings_file = LOGS_DIR.parent / "main" / ".claude" / "settings.json"
+        if not settings_file.exists():
+            settings_file = Path.home() / ".openclaw" / "agents" / "main" / ".claude" / "settings.json"
+        if settings_file.exists():
+            with open(settings_file) as f:
+                config = json.load(f)
+            return config.get("env", {}).get("ANTHROPIC_MODEL", "unknown")
+    except Exception:
+        pass
+    return "unknown"
+
+MODEL = get_model()
+
 REVIEWS_DIR = LOGS_DIR / "reviews"
 REFLECTION_LOGS_DIR = LOGS_DIR  # kurultai-reflect-*-{agent}.md files live here
 ESCALATION_COOLDOWN_FILE = LOGS_DIR / "anomaly-escalation-cooldown.json"
@@ -197,7 +214,8 @@ def scan_anomalies(hours=1):
                     f"**Priority Fix (from review):**\n{priority_fix}\n\n"
                     f"**Action required:** Investigate root cause and implement the priority fix. "
                     f"Check if this is a recurring pattern or a one-off issue.\n\n"
-                    f"Source: reflection_anomaly_scanner.py (automated escalation)"
+                    f"Source: reflection_anomaly_scanner.py (automated escalation)\n"
+                    f"Model: {MODEL}"
                 ),
                 "route_to": _escalation_target(agent),
             })
@@ -224,7 +242,8 @@ def scan_anomalies(hours=1):
                         f"**Failed tasks:**\n{fail_summaries}\n\n"
                         f"**Action required:** Determine if failures share a common root cause "
                         f"(timeout, resource, config). Recommend fix or routing adjustment.\n\n"
-                        f"Source: reflection_anomaly_scanner.py (automated escalation)"
+                        f"Source: reflection_anomaly_scanner.py (automated escalation)\n"
+                        f"Model: {MODEL}"
                     ),
                     "route_to": _escalation_target(agent),
                 })
@@ -252,7 +271,8 @@ def scan_anomalies(hours=1):
                     f"**Action required:** Check launchd status, reflection logs at "
                     f"logs/kurultai-reflect-{agent}.log, and hourly_reflection.sh output. "
                     f"Verify the agent's claude-agent process can start.\n\n"
-                    f"Source: reflection_anomaly_scanner.py (automated escalation)"
+                    f"Source: reflection_anomaly_scanner.py (automated escalation)\n"
+                    f"Model: {MODEL}"
                 ),
                 "route_to": "ogedei" if agent != "ogedei" else "jochi",
             })
@@ -306,7 +326,8 @@ def _apply_flood_gate(anomalies):
                 f"**Action required:** Assess whether the low scores reflect a real "
                 f"problem or an expected idle period. Check task intake pipeline "
                 f"and external triggers.\n\n"
-                f"Source: reflection_anomaly_scanner.py (flood gate consolidation)"
+                f"Source: reflection_anomaly_scanner.py (flood gate consolidation)\n"
+                f"Model: {MODEL}"
             ),
             "route_to": "kublai",
         }
@@ -371,6 +392,7 @@ def main():
     args = parser.parse_args()
 
     print(f"[anomaly-scanner] Scanning reviews and ledger (last {args.hours}h)...")
+    print(f"[anomaly-scanner] Model: {MODEL}")
     anomalies = scan_anomalies(hours=args.hours)
 
     if not anomalies:

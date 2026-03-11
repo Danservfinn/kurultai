@@ -1,0 +1,185 @@
+# Model Configuration Fixes — Kurultai Fleet
+
+## Architecture: 3-Layer Model Configuration
+
+The Kurultai uses a 3-layer configuration system for model assignment:
+
+| Layer | Location | Purpose | Current State |
+|-------|----------|---------|---------------|
+| 1 | `~/.local/bin/claude-agent` | Wrapper default + multi-tier fallback | Anthropic → Z.AI → Alibaba |
+| 2 | `~/.openclaw/agents/{agent}/.claude/settings.json` | Per-agent credentials + model override | Per-agent tokens |
+| 3 | `scripts/agents_config.py` | Reporting dict for telemetry | All agents: claude-opus-4-6 |
+
+**Critical:** These three layers must agree for consistent behavior, though Layer 1's fallback system provides resilience.
+
+---
+
+## Current Configuration (2026-03-09)
+
+### Multi-Tier Fallback Chain
+The `claude-agent` wrapper implements automatic fallback:
+
+```bash
+# Tier 0: Anthropic (Primary)
+DEFAULT_MODEL="claude-sonnet-4-6"
+# Uses standard ANTHROPIC_API_KEY from environment
+
+# Tier 1: Z.AI glm-5 (First Fallback)
+ANTHROPIC_AUTH_TOKEN=b5b1f9537dda43198c640b9a3b48f79b.KnBknfXZneVL1cLG
+ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+ANTHROPIC_MODEL=glm-5
+
+# Tier 2: Alibaba qwen3.5-plus (Second Fallback)
+# Note: Currently returns 404, may need URL update
+```
+
+### Per-Agent Credential Status
+
+| Agent | Token Prefix | Provider | Status |
+|-------|-------------|----------|--------|
+| kublai | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
+| temujin | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
+| mongke | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
+| chagatai | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
+| tolui | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
+| jochi | sk-sp-4f75... | Unknown | ⚠️ Needs verification |
+| ogedei | sk-sp-4f75... | Unknown | ⚠️ Needs verification |
+
+**Note:** The `sk-sp-` prefix on jochi/ogedei differs from Anthropic's `sk-ant-` format. Origin uncertain.
+
+### Model Assignments
+
+| Agent | Configured Model | Actual Running |
+|-------|-----------------|----------------|
+| kublai | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) |
+| temujin | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) |
+| mongke | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) |
+| chagatai | claude-opus-4-6 | claude-opus-4-6 ✅ |
+| jochi | claude-opus-4-6 | Unknown |
+| ogedei | claude-opus-4-6 | Unknown |
+
+---
+
+## Fix History
+
+### 2026-03-09: Multi-Tier Fallback Re-Enabled
+**Issue:** Anthropic API rate limiting causing fleet-wide stalls
+**Solution:** Re-enabled 3-tier fallback in `claude-agent` wrapper
+**Result:** Tasks automatically retry with next provider on rate limits
+**Status:** ✅ Operational
+
+### 2026-03-08: Session Reset Protocol
+**Issue:** Stale sessions causing model drift after config changes
+**Solution:** Documented session reset procedure (2 bytes = empty session)
+**Verification:** `ls -la ~/.openclaw/agents/{agent}/sessions/sessions.json`
+**Status:** ✅ Documented
+
+### 2026-03-10: Model Drift Detector + mongke Session Recovery
+**Issue:** mongke stuck on Tier 2 (qwen3.5-plus) causing 0 completions/hour
+**Detection:** /horde-review identified EXECUTING_NO_OUTPUT anomalies
+**Solution:**
+1. Created `scripts/model_drift_detector.py` — diagnostic tool for routing pipeline
+2. Created task `high-1773199900` for ogedei to restart mongke session
+**Status:** 🔄 Pending (task created for ogedei)
+**Tool:** `python3 scripts/model_drift_detector.py --verbose`
+
+### 2026-03-11: Auth Preflight Exponential Backoff
+**Issue:** AUTH_FAILURE cascades causing 15+ minute blackouts (7 events detected)
+**Root Cause:** Single-attempt auth preflight in `hourly_reflection.sh` fails silently on transient network/auth issues
+**Solution:** Added exponential backoff retry (3 attempts: 0s, 2s, 4s delays) to `auth_health_preflight()` function
+**Result:** Transient auth failures recover automatically instead of cascading to full reflection blackout
+**Status:** ✅ Implemented
+**File:** `scripts/hourly_reflection.sh` (lines 284-324)
+
+### 2026-03-07: Claude Code CLI Path Migration
+**Issue:** Agents using different CLAUDE_BIN paths
+**Solution:** Standardized on `/Users/kublai/.local/bin/claude`
+**Status:** ✅ Complete
+
+---
+
+## Verification Commands
+
+### Check Model Alignment
+```bash
+# Verify all agents reporting same model
+grep -A 6 AGENT_MODELS scripts/agents_config.py
+```
+
+### Check Credential Prefix
+```bash
+# Quick audit of token prefixes
+for agent in kublai temujin mongke chagatai jochi ogedei tolui; do
+    echo "=== $agent ==="
+    grep ANTHROPIC_AUTH_TOKEN ~/.openclaw/agents/$agent/.claude/settings.json 2>/dev/null | head -c 50
+    echo
+done
+```
+
+### Verify Session State
+```bash
+# Empty session = 2 bytes (just "{}")
+ls -la ~/.openclaw/agents/*/sessions/sessions.json
+```
+
+### Test Agent Spawn
+```bash
+# Spawn test session to verify model
+~/.local/bin/claude-agent --workdir ~/.openclaw/agents/chagatai "What model are you?"
+```
+
+---
+
+## Known Issues
+
+### 1. Alibaba Tier 2 Returns 404
+**Status:** Open
+**Impact:** Third tier fallback non-functional
+**Workaround:** Z.AI tier handles most load
+**Owner:** ogedei (Ops)
+
+### 2. jochi/ogedei Unknown Token Format
+**Status:** Monitoring
+**Impact:** Unclear if these tokens are valid
+**Action:** Verify with jochi during next reflection cycle
+
+### 3. MEMORY.md Stale "Credential Crisis"
+**Status:** Documentation debt
+**Impact:** Misleading crisis status when system is operational
+**Fix:** Update MEMORY.md to reflect actual working state (2026-03-09)
+
+---
+
+## Recovery Procedures
+
+### Reset Agent Session
+```bash
+# Clear stale session state
+echo "{}" > ~/.openclaw/agents/{agent}/sessions/sessions.json
+```
+
+### Restore Anthropic Primary
+```bash
+# If Anthropic API is available again
+# Update ~/.local/bin/claude-agent DEFAULT_MODEL
+# Verify ANTHROPIC_API_KEY in environment
+```
+
+### Fleet-Wide Model Change
+```bash
+# 1. Update ~/.local/bin/claude-agent wrapper
+# 2. Update scripts/agents_config.py AGENT_MODELS dict
+# 3. Reset all agent sessions
+for agent in kublai temujin mongke chagatai jochi ogedei; do
+    echo "{}" > ~/.openclaw/agents/$agent/sessions/sessions.json
+done
+# 4. Wait for next tick/watchdog cycle to propagate
+```
+
+---
+
+## Related Documentation
+- `MEMORY.md` — Quick reference and routing policies
+- `docs/architecture.md` — Full system architecture
+- `claude-agent` wrapper — Multi-tier fallback implementation
+- `scripts/agents_config.py` — Canonical model assignments

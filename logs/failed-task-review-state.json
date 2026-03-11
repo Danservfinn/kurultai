@@ -1,36 +1,56 @@
 {
-  "last_run": "2026-03-08T15:01:18.516335",
-  "last_count": 6,
+  "last_run": "2026-03-11T06:02:32.581321",
+  "last_count": 10,
   "reported_tasks": [
     {
-      "agent": "ogedei",
-      "filename": "high-1772962334.no_output.failed.done.md",
-      "ts": "2026-03-08T15:01:18.516354"
-    },
-    {
-      "agent": "chagatai",
-      "filename": "high-1772976018.verified.failed.done.md",
-      "ts": "2026-03-08T15:01:18.516358"
-    },
-    {
-      "agent": "jochi",
-      "filename": "high-review-implement-completion-gate-core-scripts-1772979392877.verified.failed.done.md",
-      "ts": "2026-03-08T15:01:18.516360"
-    },
-    {
       "agent": "tolui",
-      "filename": "high-1772960139.verified.failed.done.md",
-      "ts": "2026-03-08T15:01:18.516362"
+      "filename": "_archive-normal-1773039928.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581344"
     },
     {
       "agent": "mongke",
-      "filename": "high-1772936098.unverified.unverified.failed.done.md",
-      "ts": "2026-03-08T15:01:18.516363"
+      "filename": "normal-1773200607.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581348"
     },
     {
       "agent": "temujin",
-      "filename": "high-1772983582.failed.done.md",
-      "ts": "2026-03-08T15:01:18.516365"
+      "filename": "normal-1773183803.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581351"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773180201.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581353"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773176600.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581355"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773173000.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581357"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773169399.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581359"
+    },
+    {
+      "agent": "temujin",
+      "filename": "critical-parse-stripe-setup-001.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581361"
+    },
+    {
+      "agent": "temujin",
+      "filename": "high-1773166103.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581363"
+    },
+    {
+      "agent": "temujin",
+      "filename": "high-1773165834.failed.done.md",
+      "ts": "2026-03-11T06:02:32.581365"
     }
   ]
 }

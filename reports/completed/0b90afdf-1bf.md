@@ -1,44 +1,44 @@
 # Task Completion Report
 
-**Task:** 
+**Task:** Task 0b90afdf-1bf
 **Task ID:** 0b90afdf-1bf
 **Agent:** jochi
 **Status:** ✅ Completed
 **Priority:** normal
-**Source:** gateway-router
-**Skill:** /code-reviewer
-**Duration:** 15 minutes (959s)
+**Source:** unknown
+**Skill:** none
+**Duration:** 0 minutes (0s)
 **Timeout:** 7200s
-**Efficiency:** 800% (est: 120m, actual: 15m)
+**Efficiency:** 0% (est: 120m, actual: 0m)
 **Retry Count:** 0
-**Completed:** 2026-03-08 01:42:40
+**Completed:** 2026-03-08 17:02:41
 
 ## Executive Summary
 
-Task executed by jochi agent. 23 file(s) created/modified. 2867 lines added.
+Task executed by jochi agent. 14 file(s) created/modified. 1797 lines added.
 
 ## What Was Done
 
-- Executed task: 
+- Executed task: Task 0b90afdf-1bf
 - Agent: jochi
-- Duration: 15 minutes
+- Duration: 0 minutes
 - Status: completed
-- Skill used: /code-reviewer
+- Skill used: none
 
 ## Deliverables
 
 | File | Type | Size | Lines | Modified |
 |------|------|------|-------|----------|
-| `~/jochi/workspace/error-spike-investigation-2026-03-08.md` | .md | 1.8 KB | 58 | 01:32:25 |
-| `~/jochi/workspace/task-1772952003.md` | .md | 1.5 KB | 41 | 01:40:03 |
-| `~/jochi/workspace/task-1772952156.md` | .md | 1.7 KB | 52 | 01:42:36 |
-| `~/jochi/workspace/task-completion-reporting-investigation-2026-03-08.md` | .md | 9.7 KB | 328 | 00:50:49 |
-| `~/jochi/workspace/task-1772949748.md` | .md | 1.9 KB | 59 | 01:02:28 |
-| `~/jochi/workspace/task-1772949068.md` | .md | 1.3 KB | 41 | 00:51:08 |
-| `~/jochi/workspace/task-1772949941.md` | .md | 1.1 KB | 35 | 01:05:41 |
-| `~/jochi/workspace/temujin-failure-investigation-2026-03-08.md` | .md | 3.0 KB | 103 | 01:08:41 |
-| `~/jochi/workspace/ogedei-task-failure-investigation-2026-03-08.md` | .md | 2.4 KB | 76 | 01:27:54 |
-| `~/jochi/workspace/kurultai-code-review-2026-03-08.md` | .md | 9.1 KB | 306 | 01:13:28 |
+| `~/jochi/workspace/routing-system-review-verification-2026-03-08.md` | .md | 6.7 KB | 201 | 17:01:52 |
+| `~/jochi/workspace/task-1773003402.md` | .md | 1.4 KB | 41 | 16:56:42 |
+| `~/jochi/workspace/task-1773001995.md` | .md | 1.7 KB | 63 | 16:33:15 |
+| `~/jochi/workspace/horde-review-completion-gate-core-scripts-2026-03-08-final.md` | .md | 0.9 KB | 33 | 16:08:43 |
+| `~/jochi/workspace/gate-prompt-20260308-1-fix-report.md` | .md | 2.1 KB | 59 | 16:40:42 |
+| `~/jochi/workspace/the.kurult.ai-health-check-failure-20260308.md` | .md | 4.1 KB | 153 | 16:32:43 |
+| `~/jochi/workspace/task-1773000473.md` | .md | 1.3 KB | 49 | 16:07:53 |
+| `~/jochi/workspace/task-1773002457.md` | .md | 1.2 KB | 41 | 16:40:57 |
+| `~/jochi/workspace/jochi-validation-review-2026-03-08.md` | .md | 7.4 KB | 200 | 16:07:31 |
+| `~/jochi/workspace/task-1773002896.md` | .md | 5.8 KB | 159 | 16:48:16 |
 
 ## Token Usage
 
@@ -47,7 +47,7 @@ Task executed by jochi agent. 23 file(s) created/modified. 2867 lines added.
 | Input Tokens | 0 |
 | Output Tokens | 0 |
 | Total Tokens | 0 |
-| Model | zai-coding/glm-5 |
+| Model | bailian/qwen3.5-plus |
 | Temperature | None |
 | Context Window | 0.0% |
 
@@ -55,11 +55,11 @@ Task executed by jochi agent. 23 file(s) created/modified. 2867 lines added.
 
 | Metric | Value |
 |--------|-------|
-| Queue Depth | 0 |
-| Pending Tasks | 0 |
+| Queue Depth | 13 |
+| Pending Tasks | 1 |
 | Executing Tasks | 0 |
 | Memory (peak) | 0 MB |
-| Health Flags |  |
+| Health Flags | high_queue_depth |
 
 ## Resource Usage
 
@@ -80,10 +80,10 @@ Task executed by jochi agent. 23 file(s) created/modified. 2867 lines added.
 | Functions | 0 |
 | Classes | 0 |
 | Tests | 0 |
-| Documentation | 23 |
+| Documentation | 14 |
 
 ### Files by Type
-23 .md
+14 .md
 
 ## Error Analysis
 
@@ -98,11 +98,11 @@ Task executed by jochi agent. 23 file(s) created/modified. 2867 lines added.
 
 ## Related Tasks (Same Agent, Today)
 
-- [52dd4fb5-0ee] Triage stalled agent: temujin has 1 queued tasks with 0 comp (/systematic-debugging)
-- [b7db4e56-da3] 3-hour review: the.kurult.ai codebase [REDISTRIBUTED from te (/code-reviewer)
-- [a1b2c3d4-5678-90ab-cdef-123456789012] 3-hour review: the.kurult.ai (None)
-- [90585405-488] Investigate ogedei task failures (2 in last 1h) (/systematic-debugging)
-- [206fcc2d-deb] Investigate error spike: 142 errors in 5m (/systematic-debugging)
+- [c125a906-642] Critical review: mongke agent performance (past hour) (/horde-review)
+- [fc6dad7b-7ed] Test task for conversation integration (/generate-tests)
+- [8a7314e0-196] Test task for status update (/systematic-debugging)
+- [a9966c5d-417] Test task 1 for bidirectional linking (/generate-tests)
+- [06cb227e-749] Test task 2 for bidirectional linking (/generate-tests)
 
 ## Files Changed (Git)
 
@@ -112,8 +112,8 @@ No git changes detected
 
 ## Context
 
-- **Source:** gateway-router
-- **Skill hint:** /code-reviewer
+- **Source:** unknown
+- **Skill hint:** none
 - **Priority:** normal
 - **Agent workspace:** `~/jochi/workspace/`
 
@@ -127,5 +127,5 @@ No git changes detected
 
 ---
 
-*Generated by task-report-hook at 2026-03-08T01:42:40.608411*
+*Generated by task-report-hook at 2026-03-08T17:02:41.744893*
 *Report ID: 0b90afdf-1bf*

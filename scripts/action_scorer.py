@@ -19,12 +19,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, VALID_AGENTS
 from kurultai_ledger import append_ledger as _kp_append_ledger, read_ledger
 
 AGENTS_DIR = _AGENTS_DIR
-
-VALID_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"]
 
 TASK_TYPE_TO_SKILL = {
     "debug": ["/horde-debug", "/systematic-debugging"],

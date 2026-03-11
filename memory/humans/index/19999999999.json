@@ -1,0 +1,36 @@
+[
+  {
+    "date": "2026-03-08T16:12:26.053130",
+    "channel": "test",
+    "direction": "inbound",
+    "content": "Test message for conversation storage system - checking if everything works correctly",
+    "context": "general",
+    "topics": [
+      "test",
+      "system",
+      "verification"
+    ],
+    "action_items": [
+      "Verify system works",
+      "Check permissions"
+    ],
+    "sentiment": "positive"
+  },
+  {
+    "date": "2026-03-08T16:14:49.879104",
+    "channel": "test",
+    "direction": "inbound",
+    "content": "Test message for conversation storage system - checking if everything works correctly",
+    "context": "general",
+    "topics": [
+      "test",
+      "system",
+      "verification"
+    ],
+    "action_items": [
+      "Verify system works",
+      "Check permissions"
+    ],
+    "sentiment": "positive"
+  }
+]

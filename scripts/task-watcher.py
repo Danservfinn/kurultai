@@ -38,8 +38,11 @@ from json_state import locked_json_read, locked_json_update
 from kurultai_paths import (
     AGENTS_DIR, TASK_LEDGER, SPAWN_QUEUE, WATCHER_STATE as STATE_FILE,
     VALID_AGENTS as _VALID_AGENTS, CLAUDE_AGENT as _CLAUDE_AGENT_PATH,
+    agent_sessions_path as _agent_sessions_path,
+    SESSION_BLOAT_THRESHOLD as _SESSION_BLOAT_THRESHOLD,
 )
 from kurultai_ledger import append_ledger as _kp_append_ledger
+from task_verification import verify_task_completion, SLOW_SKILLS
 
 # Circuit breaker for agent health
 try:
@@ -63,6 +66,96 @@ def _get_neo4j_driver():
             log(f"Neo4j driver init failed (non-fatal): {e}")
             return None
     return _neo4j_driver
+
+
+def get_pending_tasks_from_neo4j(agent: str, limit: int = 10) -> list[dict]:
+    """Get pending tasks from Neo4j (single source of truth).
+
+    Queries Neo4j for PENDING tasks assigned to this agent.
+    Returns list of dicts with task_id, title, body, priority, skill_hint.
+
+    Falls back to filesystem scan if Neo4j unavailable.
+    """
+    driver = _get_neo4j_driver()
+    if not driver:
+        return []  # Fallback handled by caller
+
+    try:
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {agent: $agent, status: 'PENDING'})
+                RETURN t.task_id as task_id, t.title as title, t.body as body,
+                       t.priority as priority, t.skill_hint as skill_hint,
+                       t.created as created, t.bucket as bucket
+                ORDER BY
+                    CASE t.priority WHEN 'critical' THEN 0
+                                     WHEN 'high' THEN 1
+                                     WHEN 'normal' THEN 2
+                                     ELSE 3 END,
+                    t.created ASC
+                LIMIT $limit
+            """, agent=agent, limit=limit)
+            return [dict(r) for r in result]
+    except Exception as e:
+        log(f"Neo4j pending task query failed for {agent}: {e}")
+        return []
+
+
+def claim_task_atomic(task_id: str, agent: str) -> tuple[bool, str]:
+    """Atomically claim a task using Neo4j CAS pattern.
+
+    Returns (success, session_key) tuple.
+    session_key is used to verify ownership during execution.
+    """
+    import time
+    try:
+        from neo4j_atomic_transitions import claim_task
+        session_key = f"{agent}-{time.time()}"
+        success, reason = claim_task(task_id, agent, session_key)
+        if not success:
+            # Log the specific reason for failure
+            log(f"SKIP: Task {task_id} - {reason}")
+        return success, session_key if success else ""
+    except Exception as e:
+        log(f"Atomic claim failed for {task_id}: {e}")
+        return False, ""
+
+
+def check_neo4j_task_status(task_id: str) -> dict | None:
+    """Check task status in Neo4j (source of truth).
+
+    Returns dict with status, retry_count, session_key or None if not found.
+    """
+    driver = _get_neo4j_driver()
+    if not driver:
+        return None
+
+    try:
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $task_id})
+                RETURN t.status as status, t.retry_count as retry_count,
+                       t.session_key as session_key, t.claimed_by as claimed_by
+            """, task_id=task_id)
+            record = result.single()
+            return dict(record) if record else None
+    except Exception as e:
+        log(f"Neo4j status check failed for {task_id}: {e}")
+        return None
+
+
+def _extract_task_id(task_file) -> str | None:
+    """Extract task_id from task file frontmatter.
+
+    Returns the task_id or None if not found.
+    """
+    try:
+        content = task_file.read_text(encoding="utf-8", errors="replace")[:2000]
+        match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
+        return match.group(1) if match else None
+    except Exception:
+        return None
+
 
 def _neo4j_update_status(task_id, status, agent=None, error_msg=None):
     """Fire-and-forget Neo4j status update. Never raises."""
@@ -230,15 +323,17 @@ def _verify_task_completion(task_file, max_retries=3):
             # RESOLUTION SECTION CHECK (2026-03-09): Match /horde-review PRIORITY_FIX
             # Substantive completions (>=100 chars) must include resolution documentation
             # This catches missing resolutions at verification time, not in later audit
+            # FIXED: Case-insensitive check (2026-03-10) to match agent-task-handler.py fix
             if total_output_chars >= 100:
+                output_upper = execution_output.upper()
                 has_resolution = (
-                    "## Resolution" in execution_output
-                    or "**Status:** RESOLVED" in execution_output
-                    or "**Status:** COMPLETED" in execution_output
+                    "## RESOLUTION" in output_upper
+                    or "**STATUS:** RESOLVED" in output_upper
+                    or "**STATUS:** COMPLETED" in output_upper
                     or execution_output.count("##") >= 3  # Has multiple sections (likely includes resolution)
                 )
                 if not has_resolution:
-                    return False, f"Missing resolution section (add '## Resolution' or '**Status:** RESOLVED')"
+                    return False, f"Missing resolution section (add '## Resolution' or '**Status:** RESOLVED/Completed')"
 
             return True, "OK"
 
@@ -388,6 +483,87 @@ def _trigger_auto_redistribution(max_move=10):
         log(f"Auto-redistribution error: {e}")
 
 
+# Track last redistribution time to avoid spamming
+_last_redistribution_time = 0
+REDISTRIBUTION_COOLDOWN = 300  # 5 minutes between redistributions
+
+
+def _check_and_fix_queue_stall():
+    """Detect and fix PENDING_NO_DISPATCH stall condition.
+
+    Stall condition: An agent has >=1 pending tasks but 0 tasks executing.
+    This indicates tasks are queueing but not being picked up for execution.
+
+    When detected, triggers redistribution to move tasks to healthier agents.
+
+    Returns: True if stall was detected and fix triggered, False otherwise
+    """
+    global _last_redistribution_time
+
+    now = time.time()
+
+    # Cooldown: Don't redistribute too frequently
+    if now - _last_redistribution_time < REDISTRIBUTION_COOLDOWN:
+        return False
+
+    try:
+        stalled_agents = []
+
+        for agent_dir in AGENTS_DIR.iterdir():
+            if not agent_dir.is_dir() or agent_dir.name == 'main':
+                continue
+
+            agent = agent_dir.name
+            tasks_dir = agent_dir / "tasks"
+
+            if not tasks_dir.exists():
+                continue
+
+            # Count pending tasks (non-terminal state files)
+            pending_count = 0
+            for f in tasks_dir.iterdir():
+                if not f.is_file() or not f.name.endswith('.md'):
+                    continue
+                # Skip terminal states
+                if any(x in f.name for x in ['.done', '.failed', '.completed', '.resolved', '.cancelled', '.executing']):
+                    continue
+                pending_count += 1
+
+            # Check for executing files
+            executing_count = 0
+            for f in tasks_dir.iterdir():
+                if f.is_file() and f.name.endswith('.executing.md') and '.done' not in f.name:
+                    # Verify PID is alive
+                    pid_file = tasks_dir / f.name.replace('.executing.md', '.executing.pid')
+                    if pid_file.exists():
+                        try:
+                            pid = int(pid_file.read_text().strip().split('\n')[0])
+                            os.kill(pid, 0)  # Check if PID is alive
+                            executing_count += 1
+                        except (ValueError, ProcessLookupError, PermissionError, OSError):
+                            pass  # Dead PID, not counted as executing
+
+            # Stall condition: >=1 pending but 0 executing
+            # Lowered from 3 to 1 because queues rarely have 3+ tasks
+            # Any pending with zero executing indicates dispatch failure
+            if pending_count >= 1 and executing_count == 0:
+                stalled_agents.append((agent, pending_count))
+
+        if stalled_agents:
+            stall_report = ", ".join([f"{a}({c})" for a, c in stalled_agents])
+            log(f"QUEUE STALL DETECTED: {stall_report} — triggering redistribution")
+
+            _trigger_auto_redistribution(max_move=10)
+            _last_redistribution_time = now
+            return True
+
+        return False
+
+    except Exception as e:
+        log(f"Queue stall check error: {e}")
+        return False
+
+
 def load_state():
     """Load previously seen tasks from state file."""
     return locked_json_read(str(STATE_FILE), default={})
@@ -418,13 +594,12 @@ def list_pending_tasks(agent_dir):
 
     pending = []
     for f in tasks_dir.glob("*.md"):
-        # Skip completed/executing tasks and gate states
-        # FIX 2026-03-09: Don't skip .completed.revision-N.md files - those are pending re-work
-        skip_patterns = ['.executing', '.pending-gate', '.gate-blocked']
-        # Only skip .done.md and .completed.done.md, NOT .completed.revision-N.md
-        if any(f.name.endswith(x) for x in ['.done.md', '.completed.done.md']):
-            continue
-        if any(x in f.name for x in skip_patterns):
+        # Skip completed/executing/failed/resolved tasks and gate states
+        # FIX 2026-03-10: Check for terminal state markers anywhere in filename
+        skip_patterns = ['.executing', '.pending-gate', '.gate-blocked', '.done', '.failed', '.resolved', '.completed', '.cancelled', '.false-positive']
+        # Skip any file with terminal state markers (before .md extension)
+        name_without_ext = f.name[:-3] if f.name.endswith('.md') else f.name
+        if any(pattern in name_without_ext for pattern in skip_patterns):
             continue
         # Skip continuous/recurring tasks (only run when explicitly triggered)
         try:
@@ -556,6 +731,9 @@ def _send_task_notify(agent, task_label, task_id, success, elapsed_s, notify_met
         f"Result: {result}"
     )
 
+    # SECURITY: Sanitize notification content before sending
+    msg = sanitize_notification(msg)
+
     target = notify_meta.get("notify_target", "+19194133445")
     channel = notify_meta.get("notify_channel", "signal")
 
@@ -585,6 +763,45 @@ def _send_task_notify(agent, task_label, task_id, success, elapsed_s, notify_met
 _HEARTBEAT_SOURCES = {"kublai-actions", "agent-self-wake", "agent-self-wake (rule t7)"}
 # Sources that always notify on completion (kurultai results)
 _KURULTAI_SOURCES = {"hourly-reflection", "kublai-reflection"}
+
+
+# =============================================================================
+# Notification Content Sanitization (Security)
+# =============================================================================
+
+# Patterns for sensitive data redaction in notifications
+SENSITIVE_PATTERNS = [
+    # API keys and tokens
+    (r"api[_-]?key['\"]?\s*[:=]\s*['\"]?[\w\-]{10,}", "[API_KEY_REDACTED]"),
+    (r"bearer\s+['\"]?[\w\-\.]{10,}", "[BEARER_TOKEN_REDACTED]"),
+    (r"token['\"]?\s*[:=]\s*['\"]?[\w\-\.]{10,}", "[TOKEN_REDACTED]"),
+    (r"secret['\"]?\s*[:=]\s*['\"]?[\w\-]{10,}", "[SECRET_REDACTED]"),
+    (r"password['\"]?\s*[:=]\s*['\"]?[\w\-]{4,}", "[PASSWORD_REDACTED]"),
+    # File paths (might contain usernames)
+    (r"/Users/[\w]+/", "/Users/[USER]/"),
+    (r"/home/[\w]+/", "/home/[USER]/"),
+    # Phone numbers
+    (r"\+?\d{1,3}[\s\-]?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{4}", "[PHONE_REDACTED]"),
+    # Email addresses
+    (r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "[EMAIL_REDACTED]"),
+    # Credit card-like numbers
+    (r"\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b", "[CARD_REDACTED]"),
+]
+
+
+def sanitize_notification(text: str) -> str:
+    """Remove sensitive data from notification content.
+
+    Args:
+        text: Notification text to sanitize
+
+    Returns:
+        Sanitized text with sensitive patterns redacted
+    """
+    sanitized = text
+    for pattern, replacement in SENSITIVE_PATTERNS:
+        sanitized = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+    return sanitized
 
 
 def _notify_completion(agent, task_label, success, elapsed_s, source="", result=""):
@@ -918,13 +1135,70 @@ def _append_failure_context(task_file, agent, error_msg, elapsed_s):
         return True  # Treat as permanent fail on error
 
 
+def _check_and_reset_bloated_session(agent: str, task_id: str = "") -> bool:
+    """Check agent session file size and reset if bloated.
+
+    Returns True if session was reset, False otherwise.
+
+    Threshold: SESSION_BLOAT_THRESHOLD (15KB default)
+    Effect: Prevents 66% efficiency loss from 21KB stale sessions
+
+    Called before task execution to ensure clean context.
+    """
+    session_path = _agent_sessions_path(agent)
+
+    if not session_path.exists():
+        return False
+
+    try:
+        size = session_path.stat().st_size
+        if size > _SESSION_BLOAT_THRESHOLD:
+            # Backup bloated session for debugging
+            backup_path = session_path.with_suffix(f".bloated.{int(time.time())}.json")
+            import shutil
+            shutil.copy(session_path, backup_path)
+
+            # Reset to empty session
+            session_path.write_text("{}")
+
+            log(f"SESSION_RESET: {agent} ({size:,}B → 2B, backup={backup_path.name})")
+
+            # Log to ledger for tracking
+            _append_ledger({
+                "event": "SESSION_RESET",
+                "ts": datetime.now().isoformat(),
+                "agent": agent,
+                "task_id": task_id,
+                "size_before": size,
+                "threshold": _SESSION_BLOAT_THRESHOLD,
+            })
+
+            return True
+    except Exception as e:
+        log(f"SESSION_CHECK_ERROR: {agent}: {e}")
+
+    return False
+
+
 def execute_task(task_file, agent, task_key, timeout):
     """Execute a single task file via agent-task-handler.py.
 
     Runs in a thread pool worker. Updates state on completion.
+
+    ATOMIC CLAIM: Uses Neo4j CAS to prevent double-execution when multiple
+    watchers are running. If claim fails, returns early without execution.
     """
     task_id = _extract_task_id(task_file)
     start_time = time.time()
+
+    # ATOMIC CLAIM: Prevent double-execution across multiple watchers
+    # claim_task_atomic now logs the specific failure reason
+    if task_id:
+        claimed, session_key = claim_task_atomic(task_id, agent)
+        if not claimed:
+            return  # Reason already logged by claim_task_atomic
+    else:
+        session_key = ""
 
     # Extract all file-dependent metadata NOW, before agent-task-handler
     # renames the file (.md -> .executing.md -> .completed.done.md).
@@ -932,6 +1206,10 @@ def execute_task(task_file, agent, task_key, timeout):
     notify_meta = _extract_notify_metadata(task_file)
     task_label = _extract_task_label(task_file)
     task_source = _extract_task_source(task_file)
+
+    # Auto-reset bloated sessions BEFORE execution to prevent efficiency loss
+    # 21KB stale session → 66% efficiency loss → 300+ min task times
+    _check_and_reset_bloated_session(agent, task_id or "")
 
     # Emit EXECUTING event
     skill_hint = _extract_skill_hint(task_file)
@@ -944,6 +1222,7 @@ def execute_task(task_file, agent, task_key, timeout):
             "task_file": str(task_file),
             "skill_hint": skill_hint,
             "executor": "claude-code",
+            "session_key": session_key,
         })
         _neo4j_update_status(task_id, "EXECUTING", agent=agent)
 
@@ -1056,7 +1335,16 @@ def execute_task(task_file, agent, task_key, timeout):
     # After failure, append failure context and re-queue (or mark permanent after MAX_RETRY_COUNT)
     is_permanent_fail = False
     if not success:
-        is_permanent_fail = _append_failure_context(task_file, agent, output, elapsed_s)
+        # RACE CONDITION FIX: Check if agent-task-handler already processed the failure
+        # (file renamed to .done.md) before calling _append_failure_context
+        task_dir = task_file.parent
+        stem = task_file.stem.replace('.executing', '').replace('.failed', '').replace('.done', '')
+        done_variants = list(task_dir.glob(f"{stem}*.done.md"))
+        if done_variants:
+            log(f"  Failure already processed by handler: {done_variants[0].name}")
+            is_permanent_fail = True  # Handler already decided terminal state
+        else:
+            is_permanent_fail = _append_failure_context(task_file, agent, output, elapsed_s)
 
     # Notify owner (global error notifications)
     # task_label and task_source were extracted at top of execute_task()
@@ -1087,7 +1375,35 @@ def execute_task(task_file, agent, task_key, timeout):
 
 
 def is_new_task(task_file, agent, state):
-    """Check if a task file is genuinely new (not already executed)."""
+    """Check if a task file is genuinely new (not already executed).
+
+    Uses Neo4j as source of truth when available, falls back to state file.
+    """
+    # First check Neo4j status (single source of truth)
+    task_id = _extract_task_id(task_file)
+    if task_id:
+        neo4j_status = check_neo4j_task_status(task_id)
+        if neo4j_status:
+            status = neo4j_status.get("status", "")
+            status_upper = status.upper()
+            if status_upper in ("COMPLETED", "FAILED", "TIMEOUT", "CANCELLED"):
+                # Check retry count - allow re-execution if under limit
+                retry_count = neo4j_status.get("retry_count") or 0
+                if retry_count >= MAX_RETRY_COUNT:
+                    return False  # Already at max retries, don't re-execute
+                # Check if claimed by another process
+                claimed_by = neo4j_status.get("claimed_by")
+                if claimed_by and claimed_by != agent:
+                    return False  # Claimed by another watcher
+            elif status_upper == "EXECUTING":
+                # Task is being executed - check if stale
+                session_key = neo4j_status.get("session_key")
+                if session_key:
+                    return False  # Active execution
+            # PENDING status means it's new (case-insensitive comparison)
+            return status.upper() == "PENDING"
+
+    # Fallback to state file check
     key = f"{agent}/{task_file.name}"
     if key not in state:
         return True
@@ -1202,6 +1518,12 @@ def launch_spawn_direct(agent, task_text, label):
 
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)
+
+    # Sanitize ALL inherited ANTHROPIC_* env vars to prevent credential leakage
+    for key in list(env.keys()):
+        if key.startswith('ANTHROPIC_'):
+            del env[key]
+
     env['PATH'] = (
         "/Users/kublai/.local/bin:/opt/homebrew/bin:"
         "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -1335,6 +1657,18 @@ def watch_cycle(executor):
     already has a task running, new tasks for that agent wait until
     the current one finishes.
     """
+    now = time.time()  # For consistent timestamping in this cycle
+
+    # PRIORITY FIX: Check for queue stall condition BEFORE normal dispatch
+    # This detects PENDING_NO_DISPATCH anomaly (agent has pending tasks but
+    # zero execution) and triggers redistribution to healthier agents.
+    try:
+        stall_fixed = _check_and_fix_queue_stall()
+        if stall_fixed:
+            log("Queue stall fix triggered — redistribution in progress")
+    except Exception as e:
+        log(f"Queue stall check failed: {e}")
+
     # Process spawn queue first — routes spawns to agent task queues
     try:
         process_spawn_queue()
@@ -1359,16 +1693,66 @@ def watch_cycle(executor):
                 # Future completed but wasn't cleaned up yet
                 active_executions.pop(agent, None)
 
-        # Skip if agent has .executing files on disk (from previous watcher session)
-        # This prevents double-dispatch after watcher restart
+        # Check for .executing files and verify PID liveness before skipping
+        # This prevents dead tasks from blocking the execution slot
         tasks_dir = agent_dir / "tasks"
         if tasks_dir.exists():
-            has_executing = any(
-                f.name.endswith('.executing.md') for f in tasks_dir.iterdir()
-                if f.is_file() and '.done' not in f.name
-            )
-            if has_executing:
-                continue
+            executing_files = [
+                f for f in tasks_dir.iterdir()
+                if f.is_file() and f.name.endswith('.executing.md') and '.done' not in f.name
+            ]
+            if executing_files:
+                # Verify at least one executing task has a live PID
+                has_live_executing = False
+                for exec_file in executing_files:
+                    pid_file = exec_file.parent / exec_file.name.replace('.executing.md', '.executing.pid')
+                    if pid_file.exists():
+                        try:
+                            pid = int(pid_file.read_text().strip().split('\n')[0])
+                            os.kill(pid, 0)  # Check if PID is alive
+                            has_live_executing = True
+                            break
+                        except (ValueError, ProcessLookupError, PermissionError, OSError):
+                            # PID is dead - this executing file is stale, will be recovered below
+                            pass
+                if has_live_executing:
+                    continue
+
+                # If we get here, all .executing files have dead PIDs - recover them now
+                # instead of waiting for recover_stale_executions() to run
+                for exec_file in executing_files:
+                    pid_file = exec_file.parent / exec_file.name.replace('.executing.md', '.executing.pid')
+                    try:
+                        age = int(now - exec_file.stat().st_mtime)
+                    except OSError:
+                        age = 999999
+
+                    if age < 60:  # Grace period for very recent tasks
+                        continue
+
+                    # Recover dead-PID task immediately
+                    retry_count = len(re.findall(r'\.retry-\d+', exec_file.name))
+                    if retry_count >= MAX_RETRY_COUNT:
+                        failed_path = exec_file.parent / exec_file.name.replace('.executing', '.failed.done')
+                        success, action, detail = _safe_rename_if_not_done(exec_file, failed_path, agent)
+                        if success:
+                            log(f"PRE-DISPATCH RECOVER: {agent}/{exec_file.name} → failed.done (dead PID, max retries)")
+                    else:
+                        base_name = exec_file.name.replace('.executing.md', '.md')
+                        if not base_name.endswith('.md'):
+                            base_name += '.md'
+                        retry_name = base_name.replace('.md', f'.retry-{retry_count + 1}.md')
+                        retry_path = exec_file.parent / retry_name
+                        success, action, detail = _safe_rename_if_not_done(exec_file, retry_path, agent)
+                        if success:
+                            log(f"PRE-DISPATCH RECOVER: {agent}/{exec_file.name} → {retry_name} (dead PID recovered)")
+
+                    # Clean up PID file
+                    if pid_file.exists():
+                        try:
+                            pid_file.unlink()
+                        except OSError:
+                            pass
 
         pending = list_pending_tasks(agent_dir)
         new_tasks = [f for f in pending if is_new_task(f, agent, state)]
@@ -1441,6 +1825,352 @@ def cleanup_done_files():
     if removed > 0:
         log(f"Cleaned up {removed} done task file(s)")
     return removed
+
+
+def cleanup_completed_task_files():
+    """Remove .md task files for tasks that are COMPLETED in Neo4j.
+
+    This addresses disk/Neo4j drift where task files remain on disk after
+    Neo4j marks them as completed. Without cleanup, the watcher keeps
+    trying to re-execute completed tasks.
+
+    Returns:
+        Number of files removed
+    """
+    try:
+        from neo4j_atomic_transitions import get_completed_task_ids
+    except ImportError:
+        log("[cleanup] neo4j_atomic_transitions not available")
+        return 0
+
+    removed = 0
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+
+        # Get completed task IDs for this agent
+        agent = agent_dir.name
+        completed_ids = get_completed_task_ids(agent=agent, limit=500)
+
+        if not completed_ids:
+            continue
+
+        # Convert to set for fast lookup
+        completed_set = set(completed_ids)
+
+        for f in tasks_dir.iterdir():
+            if not f.name.endswith('.md'):
+                continue
+            # Skip already processed files
+            if any(x in f.name for x in ['.done', '.executing', '.completed', '.failed']):
+                continue
+
+            # Extract task_id from file
+            task_id = _extract_task_id(f)
+            if not task_id:
+                continue
+
+            # Check if this task is completed in Neo4j
+            if task_id in completed_set:
+                try:
+                    f.unlink()
+                    removed += 1
+                    if removed <= 10:  # Limit logging
+                        log(f"[cleanup] Removed completed task file: {agent}/{f.name[:40]}")
+                except OSError as e:
+                    log(f"[cleanup] Failed to remove {f}: {e}")
+
+    if removed > 0:
+        log(f"[cleanup] Removed {removed} completed task file(s) (Neo4j drift cleanup)")
+    return removed
+
+
+def release_stale_claims():
+    """Release tasks stuck in EXECUTING status for too long.
+
+    Tasks can get stuck in EXECUTING if:
+    - Watcher crashes during execution
+    - Network timeout without proper cleanup
+    - Process killed without shutdown handler
+
+    This releases claims older than STALE_CLAIM_TIMEOUT_MINUTES.
+
+    Returns:
+        Number of claims released
+    """
+    try:
+        from neo4j_atomic_transitions import release_stale_claims as _release_stale
+    except ImportError:
+        log("[stale_claims] neo4j_atomic_transitions not available")
+        return 0
+
+    count, task_ids = _release_stale(timeout_minutes=STALE_CLAIM_TIMEOUT_MINUTES)
+
+    if count > 0:
+        log(f"[stale_claims] Released {count} stale claim(s): {task_ids[:5]}...")
+
+    return count
+
+
+def cleanup_orphan_task_files():
+    """Remove .md task files that don't exist in Neo4j at all.
+
+    These are typically created by bugs or failed intakes that wrote the file
+    but never created the Neo4j entry.
+
+    Returns:
+        Number of orphan files removed
+    """
+    try:
+        from neo4j_atomic_transitions import get_all_tracked_task_ids
+    except ImportError:
+        log("[orphan_cleanup] neo4j_atomic_transitions not available")
+        return 0
+
+    # Get all task IDs from Neo4j
+    tracked_ids = get_all_tracked_task_ids()
+
+    removed = 0
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+
+        for f in tasks_dir.iterdir():
+            if not f.name.endswith('.md'):
+                continue
+            # Skip already processed files
+            if any(x in f.name for x in ['.done', '.executing', '.completed', '.failed']):
+                continue
+
+            task_id = _extract_task_id(f)
+            if not task_id:
+                continue
+
+            # Check if task exists in Neo4j
+            if task_id not in tracked_ids:
+                try:
+                    f.unlink()
+                    removed += 1
+                    if removed <= 10:
+                        log(f"[orphan_cleanup] Removed orphan file: {agent_dir.name}/{f.name[:40]}")
+                except OSError as e:
+                    log(f"[orphan_cleanup] Failed to remove {f}: {e}")
+
+    if removed > 0:
+        log(f"[orphan_cleanup] Removed {removed} orphan task file(s)")
+    return removed
+
+
+# Configuration for stale claim timeout
+STALE_CLAIM_TIMEOUT_MINUTES = 30  # Release claims older than 30 minutes
+
+# Orphan process cleanup configuration
+ORPHAN_PROCESS_MIN_AGE_SECONDS = 300  # 5 minutes - only kill orphans older than this (lowered from 1800s to fix PENDING_NO_DISPATCH stall)
+ORPHAN_SIGTERM_TIMEOUT = 5  # Seconds to wait after SIGTERM before SIGKILL
+
+
+def cleanup_orphan_processes():
+    """Detect and kill orphaned claude-agent processes.
+
+    An orphan process is a claude-agent process that:
+    1. Is currently running (found via ps)
+    2. Has no corresponding .executing.pid file
+    3. Is older than ORPHAN_PROCESS_MIN_AGE_SECONDS (30 minutes)
+
+    This handles the case where the task-watcher loses track of spawned
+    processes due to crashes, restarts, or race conditions.
+
+    Returns:
+        Number of orphan processes killed
+    """
+    killed = 0
+    now = time.time()
+
+    # Step 1: Find all .executing.pid files and their PIDs
+    tracked_pids = {}  # pid -> (agent, pid_file_path, start_time)
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+        agent = agent_dir.name
+        for pid_file in tasks_dir.glob("*.executing.pid"):
+            try:
+                content = pid_file.read_text().strip()
+                lines = content.split('\n', 1)
+                pid = int(lines[0])
+                # Try to get start time from PID file (second line)
+                start_time = None
+                if len(lines) > 1:
+                    try:
+                        start_time = float(lines[1])
+                    except (ValueError, IndexError):
+                        pass
+                tracked_pids[pid] = (agent, str(pid_file), start_time)
+            except (ValueError, OSError):
+                continue
+
+    # Step 2: Find all running claude-agent processes using ps
+    # We look for processes matching "claude-agent" in their command line
+    try:
+        result = subprocess.run(
+            ["ps", "-eo", "pid,etime,args"],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode != 0:
+            log(f"ORPHAN_CLEANUP: ps command failed: {result.stderr}")
+            return 0
+
+        for line in result.stdout.strip().split('\n')[1:]:  # Skip header
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split(None, 2)  # Split into max 3 parts
+            if len(parts) < 3:
+                continue
+
+            try:
+                pid = int(parts[0])
+                etime = parts[1]  # Elapsed time (e.g., "30:45" or "1-02:34:56")
+                args = parts[2]
+            except (ValueError, IndexError):
+                continue
+
+            # Check if this is a claude-agent process
+            if "claude-agent" not in args:
+                continue
+
+            # Check if this PID is tracked
+            if pid in tracked_pids:
+                continue  # This process has a corresponding .executing.pid file
+
+            # Parse elapsed time to seconds
+            age_seconds = _parse_ps_elapsed_time(etime)
+            if age_seconds is None:
+                # If we can't parse the time, be conservative and skip
+                log(f"ORPHAN_CLEANUP: Could not parse elapsed time '{etime}' for PID {pid}")
+                continue
+
+            # Check if process is old enough to be considered an orphan
+            if age_seconds < ORPHAN_PROCESS_MIN_AGE_SECONDS:
+                age_str = _format_age(age_seconds)
+                log(f"ORPHAN_CLEANUP: Skipping PID {pid} - too young ({age_str} < {ORPHAN_PROCESS_MIN_AGE_SECONDS}s)")
+                continue
+
+            # This is an orphan - kill it
+            age_str = _format_age(age_seconds)
+            log(f"ORPHAN_CLEANUP: Found orphan PID {pid} (age: {age_str}, cmd: {args[:80]}...)")
+
+            # Try SIGTERM first
+            try:
+                os.kill(pid, signal.SIGTERM)
+                log(f"ORPHAN_CLEANUP: Sent SIGTERM to PID {pid}")
+            except ProcessLookupError:
+                log(f"ORPHAN_CLEANUP: PID {pid} already gone")
+                continue
+            except PermissionError:
+                log(f"ORPHAN_CLEANUP: No permission to kill PID {pid}")
+                continue
+            except OSError as e:
+                log(f"ORPHAN_CLEANUP: Error sending SIGTERM to PID {pid}: {e}")
+                continue
+
+            # Wait for graceful shutdown
+            time.sleep(ORPHAN_SIGTERM_TIMEOUT)
+
+            # Check if process is still alive
+            try:
+                os.kill(pid, 0)  # Signal 0 = liveness check
+                # Process still alive - send SIGKILL
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    log(f"ORPHAN_CLEANUP: Sent SIGKILL to PID {pid} (SIGTERM timeout)")
+                except (ProcessLookupError, PermissionError, OSError) as e:
+                    log(f"ORPHAN_CLEANUP: SIGKILL failed for PID {pid}: {e}")
+            except ProcessLookupError:
+                # Process exited after SIGTERM - good
+                log(f"ORPHAN_CLEANUP: PID {pid} terminated gracefully after SIGTERM")
+
+            killed += 1
+
+    except subprocess.TimeoutExpired:
+        log("ORPHAN_CLEANUP: ps command timed out")
+    except Exception as e:
+        log(f"ORPHAN_CLEANUP: Error finding processes: {e}")
+
+    if killed > 0:
+        log(f"ORPHAN_CLEANUP: Killed {killed} orphan process(es)")
+
+    return killed
+
+
+def _parse_ps_elapsed_time(etime: str) -> int | None:
+    """Parse ps elapsed time format to seconds.
+
+    Formats handled:
+    - "SS" or "SS.cc" - seconds
+    - "MM:SS" or "MM:SS.cc" - minutes:seconds
+    - "HH:MM:SS" or "HH:MM:SS.cc" - hours:minutes:seconds
+    - "DD-HH:MM:SS" or "DD-HH:MM:SS.cc" - days-hours:minutes:seconds
+
+    Returns:
+        Total seconds as int, or None if parsing fails
+    """
+    try:
+        # Remove fractional seconds if present
+        if '.' in etime:
+            etime = etime.split('.')[0]
+
+        # Check for days component
+        days = 0
+        if '-' in etime:
+            day_part, etime = etime.split('-', 1)
+            days = int(day_part)
+
+        parts = etime.split(':')
+
+        if len(parts) == 1:
+            # Just seconds
+            seconds = int(parts[0])
+            minutes = 0
+            hours = 0
+        elif len(parts) == 2:
+            # MM:SS
+            seconds = int(parts[1])
+            minutes = int(parts[0])
+            hours = 0
+        elif len(parts) == 3:
+            # HH:MM:SS
+            seconds = int(parts[2])
+            minutes = int(parts[1])
+            hours = int(parts[0])
+        else:
+            return None
+
+        total = (days * 86400) + (hours * 3600) + (minutes * 60) + seconds
+        return total
+    except (ValueError, IndexError):
+        return None
+
+
+def _format_age(seconds: int) -> str:
+    """Format age in seconds to human-readable string."""
+    if seconds < 60:
+        return f"{seconds}s"
+    elif seconds < 3600:
+        return f"{seconds // 60}m {seconds % 60}s"
+    else:
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        return f"{hours}h {minutes}m"
 
 
 def recover_stuck_failed_tasks():
@@ -1548,7 +2278,7 @@ def recover_completed_md_files():
 
 
 def _already_completed(executing_file):
-    """Check if a .completed.done.md or .failed.done.md already exists for this task.
+    """Check if a .completed.done.md, .failed.done.md, or .no_output.done.md already exists for this task.
 
     Prevents the rename race condition where recover_stale_executions() tries to
     recover a task that mark_task_completed() already finished. Returns True if
@@ -1561,12 +2291,16 @@ def _already_completed(executing_file):
     for done_file in parent.iterdir():
         if not done_file.name.endswith('.done.md'):
             continue
-        # Check for .completed.done.md, .failed.done.md, .dup-orphan.done.md, .deadpid-orphan.done.md (duplicate recovery)
+        # Check for all terminal states: .completed.done.md, .failed.done.md, .no_output.done.md,
+        # .dup-orphan.done.md, .deadpid-orphan.done.md (duplicate recovery)
+        # .no_output.done.md added 2026-03-09 to prevent false-positive escalations
         done_stem = None
         if '.completed.done.md' in done_file.name:
             done_stem = done_file.name.split('.completed.done.md')[0]
         elif '.failed.done.md' in done_file.name:
             done_stem = done_file.name.split('.failed.done.md')[0]
+        elif '.no_output.done.md' in done_file.name:
+            done_stem = done_file.name.split('.no_output.done.md')[0]
         elif '.dup-orphan.done.md' in done_file.name:
             done_stem = done_file.name.split('.dup-orphan.done.md')[0]
         elif '.deadpid-orphan.done.md' in done_file.name:
@@ -1578,6 +2312,20 @@ def _already_completed(executing_file):
         if done_stem_base == stem_base:
             return True
     return False
+
+
+def _cleanup_escalation_marker(executing_file):
+    """Remove .stuck-escalated marker if it exists.
+
+    Called when a task is recovered/completed to clean up the escalation
+    marker created by Phase 1.75 stuck task detection.
+    """
+    escalation_marker = executing_file.parent / f"{executing_file.name}.stuck-escalated"
+    if escalation_marker.exists():
+        try:
+            escalation_marker.unlink()
+        except OSError:
+            pass
 
 
 def _safe_rename_if_not_done(executing_file, target_path, agent="unknown"):
@@ -1897,6 +2645,103 @@ def recover_stale_executions():
             recovered += 1
             log(f"DEAD_PID: {agent} slot unblocked — next watch_cycle can dispatch new task")
 
+    # Phase 1.75: Stuck-but-alive task escalation (2026-03-11)
+    # Detects tasks >15 minutes old where PID is alive but task may be hung
+    # (e.g., agent stuck waiting for input, network limbo, etc.)
+    # Escalates to kublai for manual intervention instead of waiting 2+ hours
+    STUCK_ESCALATION_AGE = 900  # 15 minutes — faster than STALE_EXECUTING_AGE (2h)
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir() or agent_dir.name == 'main':
+            continue
+        tasks_dir = agent_dir / "tasks"
+        if not tasks_dir.exists():
+            continue
+        agent = agent_dir.name
+        for f in tasks_dir.iterdir():
+            if not f.name.endswith('.executing.md') or '.done' in f.name:
+                continue
+            try:
+                age = now - f.stat().st_mtime
+            except OSError:
+                continue
+            # Only check tasks in the stuck window: 15min to STALE_EXECUTING_AGE
+            if age < STUCK_ESCALATION_AGE:
+                continue
+            if age >= STALE_EXECUTING_AGE:
+                continue  # Will be handled by Phase 2 below
+
+            # Skip if we've already escalated this task
+            escalation_marker = f.parent / f"{f.name}.stuck-escalated"
+            if escalation_marker.exists():
+                continue
+
+            # Check if in-memory future is still running
+            with active_lock:
+                if agent in active_executions and not active_executions[agent].done():
+                    # Task is actively running in current watcher session
+                    continue
+
+            # Check PID liveness
+            pid_file = f.parent / f.name.replace('.executing.md', '.executing.pid')
+            pid_alive = False
+            handler_pid = None
+            if pid_file.exists():
+                try:
+                    pid_content = pid_file.read_text().strip().split('\n')
+                    handler_pid = int(pid_content[0])
+                    os.kill(handler_pid, 0)
+                    pid_alive = True
+                except (ValueError, ProcessLookupError, PermissionError, OSError):
+                    pid_alive = False
+
+            # Even if PID is alive, task may be stuck — escalate for review
+            task_id = _extract_task_id(f)
+            actual_age = f"{age/60:.1f}m" if age < 3600 else f"{age/3600:.1f}h"
+            pid_status = f"PID {handler_pid} alive" if pid_alive else "PID dead"
+
+            # Create escalation task for kublai
+            escalation_path = tasks_dir / f"stuck-{agent}-{int(now)}.md"
+            escalation_content = f"""---
+priority: high
+agent: kublai
+escalated_from: {agent}
+escalation_type: stuck_task_alive
+original_task: {task_id or 'unknown'}
+stuck_age: {actual_age}
+pid_status: {pid_status}
+---
+
+# Stuck Task Escalation: {agent}
+
+**Task:** `{task_id or f.name}`
+**Age:** {actual_age}
+**Status:** {pid_status}
+
+The task has been in EXECUTING state for {actual_age} but may be stuck:
+- PID is {'alive (agent process running)' if pid_alive else 'dead (agent process crashed)'}
+- Task file: `{f.name}`
+- Agent: {agent}
+
+## Action Required
+1. Check if the agent session is responsive
+2. Review task file for progress indicators
+3. Either:
+   - Allow more time if task is genuinely long-running
+   - Kill and retry if agent is hung
+   - Mark as failed if unrecoverable
+
+## Files
+- Task: `~/.openclaw/agents/{agent}/tasks/{f.name}`
+- PID file: `{pid_file}`
+"""
+            try:
+                escalation_path.write_text(escalation_content)
+                # Create marker to prevent duplicate escalations
+                escalation_marker.touch()
+                log(f"STUCK ESCALATE: {agent}/{f.name} → kublai (age={actual_age}, {pid_status})")
+            except OSError as e:
+                log(f"STUCK ERROR: Failed to create escalation for {agent}/{f.name}: {e}")
+
     # Phase 2: Standard age-based stale recovery
     for agent_dir in AGENTS_DIR.iterdir():
         if not agent_dir.is_dir() or agent_dir.name == 'main':
@@ -1970,6 +2815,7 @@ def recover_stale_executions():
             # Race guard: handler may have already completed this task
             if _already_completed(f):
                 log(f"RECOVER SKIP: {agent}/{f.name} — already completed by handler, cleaning up")
+                _cleanup_escalation_marker(f)
                 try:
                     f.unlink()
                 except OSError:
@@ -1984,6 +2830,7 @@ def recover_stale_executions():
                 failed_path = f.parent / f.name.replace('.executing', '.failed.done')
                 success, action, detail = _safe_rename_if_not_done(f, failed_path, agent)
                 if success:
+                    _cleanup_escalation_marker(f)
                     task_id = _extract_task_id(failed_path)
                     log(f"RECOVER: {agent}/{f.name} → failed.done (max retries reached)")
                     if task_id:
@@ -2024,6 +2871,7 @@ def recover_stale_executions():
                 else:
                     success, action, detail = _safe_rename_if_not_done(f, original_path, agent)
                     if success:
+                        _cleanup_escalation_marker(f)
                         log(f"RECOVER: {agent}/{f.name} → {retry_name} (retry {retry_count + 1}/{MAX_RETRY_COUNT})")
                         task_id = _extract_task_id(original_path)
                         if task_id:
@@ -2068,6 +2916,10 @@ def detect_revision_loops():
     2. Checks if the latest revision also has .no_output or .failed markers
     3. Either escalates to kublai or marks as permanently failed
 
+    FIX 2026-03-09: Count ALL .revision- occurrences in filename, not just
+    those matching strict pattern. This catches death spirals like:
+    task.revision-1.failed.revision-1.failed.revision-1.failed...
+
     Returns count of tasks broken out of revision loops.
     """
     global _last_revision_check
@@ -2079,6 +2931,11 @@ def detect_revision_loops():
     _last_revision_check = now
     broken_loops = 0
 
+    # Pattern to find ALL .revision-N occurrences in filename
+    revision_counter = re.compile(r'\.revision-(\d+)')
+    # Pattern to extract base task name (strip all .revision-N.* suffixes)
+    base_extractor = re.compile(r'^(.+?)(\.revision-\d+)+$')
+
     for agent_dir in AGENTS_DIR.iterdir():
         if not agent_dir.is_dir() or agent_dir.name == 'main':
             continue
@@ -2089,42 +2946,35 @@ def detect_revision_loops():
 
         agent = agent_dir.name
 
-        # Group revision files by base task name
-        revision_groups: dict[str, list[Path]] = {}
-        revision_pattern = re.compile(r'^(.+)\.revision-(\d+)\.(md|executing\.md|done\.md|failed\.done\.md|no_output\.done\.md)$')
-
+        # Scan ALL .md files, count .revision-N occurrences
         for f in tasks_dir.iterdir():
-            if not f.is_file():
+            if not f.is_file() or not f.name.endswith('.md'):
                 continue
-            m = revision_pattern.match(f.name)
-            if m:
-                base = m.group(1)
-                if base not in revision_groups:
-                    revision_groups[base] = []
-                revision_groups[base].append(f)
 
-        # Check for tasks exceeding max revision depth
-        for base, files in revision_groups.items():
-            # Find highest revision number
-            max_rev = 0
-            latest_file = None
-            for f in files:
-                m = revision_pattern.match(f.name)
-                if m:
-                    rev_num = int(m.group(2))
-                    if rev_num > max_rev:
-                        max_rev = rev_num
-                        latest_file = f
+            # Skip already-done files
+            if '.done.' in f.name or f.name.endswith('.done.md'):
+                continue
 
-            if max_rev >= _MAX_REVISION_DEPTH and latest_file:
-                # Check if this latest revision also failed quality gate
+            # Count ALL .revision-N occurrences in filename
+            all_matches = revision_counter.findall(f.name)
+            revision_count = len(all_matches)
+
+            if revision_count >= _MAX_REVISION_DEPTH:
+                # Check if this is a failing revision
                 is_failing_revision = (
-                    '.no_output.' in latest_file.name or
-                    '.failed.' in latest_file.name or
-                    '.unverified.' in latest_file.name
+                    '.no_output.' in f.name or
+                    '.failed.' in f.name or
+                    '.unverified.' in f.name
                 )
 
                 if is_failing_revision:
+                    # Extract base task name by stripping ALL .revision-N.* suffixes
+                    base_match = base_extractor.match(f.name)
+                    if base_match:
+                        base = base_match.group(1)
+                    else:
+                        base = f.name  # Fallback
+
                     # Break the loop - escalate to kublai
                     escalation_path = tasks_dir / f"{base}.revision-loop-escalated.md"
 
@@ -2142,9 +2992,9 @@ agent: temujin
 
 # Revision Loop Escalation: {agent}/{base}
 
-This task has been through {max_rev} revision attempts without producing valid output.
+This task has been through {revision_count} revision attempts without producing valid output.
 
-**Latest status:** {latest_file.name}
+**Latest status:** {f.name}
 
 **Root cause:** The task keeps producing output that fails quality verification (too short or insufficient substance), creating a death spiral.
 
@@ -2153,22 +3003,21 @@ This task has been through {max_rev} revision attempts without producing valid o
 2. Either: simplify the task scope OR mark as failed with clear reason
 3. Do NOT create another revision - break the loop
 
-**Files involved:**
-{chr(10).join(f"  - {f.name}" for f in files[-5:])}  # Last 5 files
+**Detected by:** Fixed loop detector 2026-03-09 (counts all .revision- occurrences)
 """
                             escalation_path.write_text(escalation_content)
 
                             # Move the revision file to completed state to stop the loop
-                            failed_path = latest_file.parent / latest_file.name.replace('.executing.md', '.loop-escalated.done').replace('.md', '.loop-escalated.done')
+                            failed_path = f.parent / f.name.replace('.executing.md', '.loop-escalated.done').replace('.md', '.loop-escalated.done')
                             if not failed_path.name.endswith('.done'):
-                                failed_path = latest_file.parent / f"{latest_file.name}.loop-escalated.done"
+                                failed_path = f.parent / f"{f.name}.loop-escalated.done"
 
                             try:
-                                latest_file.rename(failed_path)
+                                f.rename(failed_path)
                             except OSError:
                                 pass  # File may have been processed already
 
-                            log(f"[REVISION_LOOP] Escalated {agent}/{base} after {max_rev} revisions")
+                            log(f"[REVISION_LOOP] Escalated {agent}/{base} after {revision_count} revisions")
                             broken_loops += 1
 
                             # Log to ledger
@@ -2180,8 +3029,8 @@ This task has been through {max_rev} revision attempts without producing valid o
                                     "ts": datetime.now().isoformat(),
                                     "agent": agent,
                                     "base_task": base,
-                                    "revision_depth": max_rev,
-                                    "latest_file": latest_file.name
+                                    "revision_depth": revision_count,
+                                    "latest_file": f.name
                                 })
 
                         except Exception as e:
@@ -2287,6 +3136,12 @@ def daemon_loop(poll_interval):
                     recover_stuck_failed_tasks()
                     recover_completed_md_files()
                     recover_stale_executions()
+                    # NEW: Neo4j/disk drift cleanup
+                    cleanup_completed_task_files()
+                    cleanup_orphan_task_files()
+                    release_stale_claims()
+                    # NEW: Orphan process cleanup (kills untracked claude-agent processes)
+                    cleanup_orphan_processes()
                 except Exception as e:
                     log(f"Cleanup/recovery error: {e}")
                 # Neo4j/filesystem state reconciliation (every cleanup cycle)

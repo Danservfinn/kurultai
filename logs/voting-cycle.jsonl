@@ -1,0 +1,1094 @@
+{"timestamp": "2026-03-09T00:07:58.931814", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T00:07:58.963375", "phase": 3, "message": "  Voting started for 7effb4fd-dfc", "data": {}}
+{"timestamp": "2026-03-09T00:07:58.994061", "phase": 3, "message": "  Voting started for kublai-20260309-000758", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.026162", "phase": 3, "message": "  Voting started for 46e2729b-96a", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.026284", "phase": 3, "message": "Voting started for 3 proposals", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.066536", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.128068", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.188916", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.250176", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.250351", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.290595", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T00:07:59.290860", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.049934", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.087464", "phase": 3, "message": "  Voting started for kublai-20260309-120941", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.087668", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.134111", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.204249", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.275311", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.346263", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.418533", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.418755", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.464459", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T12:09:41.464724", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T15:08:31.688917", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T15:08:31.760822", "phase": 3, "message": "  Voting started for kublai-20260309-150831", "data": {}}
+{"timestamp": "2026-03-09T15:08:31.761202", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T15:08:31.852491", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.002141", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.167003", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.314115", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.460618", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.637501", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.637933", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.739155", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T15:08:32.739775", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.461830", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.515777", "phase": 3, "message": "  Voting started for kublai-20260309-160307", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.516405", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.600736", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.710248", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.828746", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T16:03:07.944561", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T16:03:08.051289", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T16:03:08.160430", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T16:03:08.292693", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T16:03:08.293222", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T16:03:08.392639", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T16:03:08.393160", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T19:03:25.730975", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T19:03:25.778388", "phase": 3, "message": "  Voting started for kublai-20260309-190325", "data": {}}
+{"timestamp": "2026-03-09T19:03:25.778659", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T19:03:25.843903", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T19:03:25.939567", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.035010", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.126917", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.221587", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.319235", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.419391", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.514381", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.514666", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.581169", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T19:03:26.581585", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.109668", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.159640", "phase": 3, "message": "  Voting started for kublai-20260309-200327", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.159923", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.221710", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.317945", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.413856", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.515872", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.616840", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.717728", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.813016", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:27.907926", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:28.008104", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T20:03:28.008490", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T20:03:28.127024", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T20:03:28.127474", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T21:03:28.582881", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T21:03:28.632376", "phase": 3, "message": "  Voting started for kublai-20260309-210328", "data": {}}
+{"timestamp": "2026-03-09T21:03:28.632723", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T21:03:28.740005", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T21:03:28.841426", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:28.934708", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.034303", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.134477", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.230155", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.334898", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.432711", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.564151", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.670531", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.671085", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.745789", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T21:03:29.746202", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.148204", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.195931", "phase": 3, "message": "  Voting started for kublai-20260309-220327", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.196274", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.267410", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.361487", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.468188", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.570846", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.667420", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.766374", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.862654", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:27.959761", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:28.058574", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:28.175364", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:28.271550", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T22:03:28.271847", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T22:03:28.338050", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T22:03:28.338492", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.494059", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.494586", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.559455", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.657240", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.753661", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.848616", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:27.945474", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.044756", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.149084", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.269055", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.371894", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.492403", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.592614", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.593281", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.663558", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-09T23:03:28.663963", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.276874", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.310656", "phase": 3, "message": "  Voting started for kublai-20260310-000318", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.310797", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.353973", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.421608", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.490730", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.561763", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.641527", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.721958", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.818972", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.896438", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:18.974317", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:19.060555", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:19.134554", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:19.201954", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T00:03:19.202134", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T00:03:19.242807", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T00:03:19.243077", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.222469", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.256310", "phase": 3, "message": "  Voting started for kublai-20260310-010320", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.256445", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.297867", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.362513", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.426779", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.491886", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.557925", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.623979", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.690467", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.756197", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.820573", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.884893", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:20.948409", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:21.012785", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:21.077407", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T01:03:21.077598", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T01:03:21.123646", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T01:03:21.123985", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.077271", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.112197", "phase": 3, "message": "  Voting started for kublai-20260310-020322", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.143459", "phase": 3, "message": "  Voting started for kublai-20260310-015952", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.143571", "phase": 3, "message": "Voting started for 2 proposals", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.182980", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.243743", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.337559", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.401290", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.468748", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.529145", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.589942", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.652014", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.712887", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.773477", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.834698", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.894676", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:22.956169", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:23.016635", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:23.078611", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T02:03:23.078760", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T02:03:23.118281", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T02:03:23.118551", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.514772", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.549673", "phase": 3, "message": "  Voting started for kublai-20260310-030721", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.549841", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.594542", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.668604", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.739400", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.808206", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.873524", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:21.939043", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.005251", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.071230", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.138483", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.206026", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.270807", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.337648", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.402661", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.470324", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.536764", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.603135", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.603362", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.648145", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T03:07:22.648459", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T04:08:17.820701", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T04:08:17.851169", "phase": 3, "message": "  Voting started for kublai-20260310-040817", "data": {}}
+{"timestamp": "2026-03-10T04:08:17.851295", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T04:08:17.890703", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T04:08:17.950616", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.010581", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.070418", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.129929", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.190041", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.249978", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.310541", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.369688", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.429308", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.489284", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.549732", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.610920", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.673093", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.734016", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.794861", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.854812", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.854983", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.893761", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T04:08:18.894045", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.656261", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.691474", "phase": 3, "message": "  Voting started for kublai-20260310-050319", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.691630", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.732448", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.794145", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.855317", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.916845", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:19.977967", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.038860", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.102566", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.166041", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.226429", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.288648", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.350085", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.410703", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.471460", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.531196", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.591790", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.652721", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.716527", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.779179", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.779339", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.819678", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T05:03:20.819963", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.056307", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.087967", "phase": 3, "message": "  Voting started for kublai-20260310-060320", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.088094", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.127748", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.188522", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.248756", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.309565", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.370358", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.431017", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.492672", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.555540", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.617192", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.677875", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.738143", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.799059", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.859304", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:20.964472", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.035446", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.103216", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.166779", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.231098", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.291098", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.291267", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.330505", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T06:03:21.330766", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.520672", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.551727", "phase": 3, "message": "  Voting started for kublai-20260310-070317", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.551850", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.590998", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.651509", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.711575", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.771830", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.831875", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.892008", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:17.952586", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.013258", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.073311", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.132980", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.194230", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.253883", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.314946", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.378012", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.439868", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.500412", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.560026", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.620203", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.681688", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.742032", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.742206", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.782206", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T07:03:18.782477", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.505498", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.537054", "phase": 3, "message": "  Voting started for kublai-20260310-080317", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.537191", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.576806", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.636582", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.697667", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.757646", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.817885", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.877704", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.937950", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:17.998292", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.058481", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.118467", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.177977", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.238753", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.297915", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.359496", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.422610", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.485016", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.545271", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.605117", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.664356", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.725624", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.786015", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.786180", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.825638", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T08:03:18.825934", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T09:03:18.805170", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T09:03:18.835821", "phase": 3, "message": "  Voting started for kublai-20260310-090318", "data": {}}
+{"timestamp": "2026-03-10T09:03:18.835955", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T09:03:18.875252", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T09:03:18.935770", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:18.995742", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.055341", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.116046", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.175925", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.236858", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.298331", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.359269", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.419691", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.480627", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.540155", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.600392", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.660030", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.720916", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.780309", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.841110", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.900663", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:19.961584", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:20.020711", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:20.081727", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:20.141764", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T09:03:20.141936", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T09:03:20.180672", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T09:03:20.180973", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.344552", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.376123", "phase": 3, "message": "  Voting started for kublai-20260310-100318", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.376256", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.416350", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.477864", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.538843", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.599599", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.658545", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.718094", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.777807", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.837727", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.897343", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:18.957180", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.017018", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.077472", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.136978", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.197234", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.255794", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.316527", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.376179", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.439004", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.501205", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.560965", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.620640", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.681203", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.740614", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.740792", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.780020", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T10:03:19.780321", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.526140", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.556469", "phase": 3, "message": "  Voting started for kublai-20260310-110319", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.556598", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.595622", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.655600", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.716090", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.775120", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.834527", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.894271", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:19.954055", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.013894", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.073872", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.133797", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.193956", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.253543", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.314415", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.374138", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.434398", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.494242", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.554168", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.614516", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.674164", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.733710", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.793385", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.854380", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.914851", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.976638", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T11:03:20.976877", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T11:03:21.024438", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T11:03:21.024758", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.503630", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.534443", "phase": 3, "message": "  Voting started for kublai-20260310-120321", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.534547", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.573758", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.633889", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.694179", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.755658", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.816034", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.875559", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.936245", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:21.995552", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.056431", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.116299", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.176375", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.235909", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.297137", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.358410", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.418035", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.478187", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.538202", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.599470", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.659167", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.719931", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.779500", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.839010", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.900166", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:22.960655", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:23.020595", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T12:03:23.020766", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T12:03:23.060370", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T12:03:23.060673", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.028749", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.059698", "phase": 3, "message": "  Voting started for kublai-20260310-130320", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.059811", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.099726", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.161676", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.222239", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.283426", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.344058", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.404937", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.465744", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.526264", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.586922", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.646538", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.708258", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.768894", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.830206", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.891534", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:21.952437", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.013215", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.073364", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.134224", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.194826", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.256367", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.316767", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.377508", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.437814", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.498877", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.562299", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.622252", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.622434", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.662466", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T13:03:22.662777", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.508807", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.540233", "phase": 3, "message": "  Voting started for kublai-20260310-140314", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.540386", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.580066", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.640256", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.700608", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.760661", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.820887", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.880970", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:14.940972", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.001205", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.061265", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.121049", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.181386", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.242040", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.301201", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.361087", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.421386", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.481368", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.543512", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.609088", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.671460", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.730759", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.790754", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.850348", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.910596", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:15.970245", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:16.030467", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:16.090004", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:16.149875", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T14:03:16.150037", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T14:03:16.189308", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T14:03:16.189629", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.638988", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.670846", "phase": 3, "message": "  Voting started for kublai-20260310-150314", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.670997", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.710751", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.770694", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.830874", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.891201", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:14.949780", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.009550", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.077537", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.137282", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.197254", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.257003", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.316915", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.376513", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.436418", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.496023", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.556241", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.644655", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.704968", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.765175", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.825270", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.884272", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:15.944511", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.003841", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.075907", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.136025", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.195852", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.256707", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.317046", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.376786", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.376952", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.415939", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T15:03:16.416240", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.283526", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.313786", "phase": 3, "message": "  Voting started for kublai-20260310-160315", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.313925", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.353594", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.413627", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.473132", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.534229", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.599330", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.664864", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.724612", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.784861", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.845567", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.905553", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:15.965698", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.025687", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.086151", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.145608", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.206293", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.266526", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.356164", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.416064", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.476447", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.536774", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.597816", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.662494", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.729347", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.791400", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.853439", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.918080", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:16.981965", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:17.041853", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:17.102082", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T16:03:17.102232", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T16:03:17.141669", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T16:03:17.141983", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.475650", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.506522", "phase": 3, "message": "  Voting started for kublai-20260310-170315", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.506644", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.546802", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.611878", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.680520", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.742255", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.803188", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.864148", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.925712", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:15.986655", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.047037", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.108208", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.169376", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.230249", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.290870", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.350599", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.410694", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.470808", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.530770", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.590714", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.650599", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.710636", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.771012", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.831033", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.893168", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:16.958515", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.023264", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.090577", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.159795", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.227441", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.301446", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.370615", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.370770", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.418401", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T17:03:17.418717", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.412174", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.443800", "phase": 3, "message": "  Voting started for kublai-20260310-180316", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.443930", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.483727", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.545008", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.606228", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.667585", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.728141", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.794845", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.855665", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.916753", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:16.977353", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.037824", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.098137", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.158948", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.220703", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.280947", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.342310", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.402560", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.464378", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.524700", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.585424", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.646541", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.707488", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.768309", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.829373", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.890083", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:17.951402", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.012180", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.073612", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.133546", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.195746", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.255859", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.316607", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.316766", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.356227", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T18:03:18.356516", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.702995", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.734151", "phase": 3, "message": "  Voting started for kublai-20260310-190318", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.734274", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.773514", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.834615", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.895254", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:18.955661", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.016111", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.076501", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.137542", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.197528", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.257992", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.318467", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.378966", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.438888", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.499244", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.560372", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.620302", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.681466", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.741537", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.802862", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.862928", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.923948", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:19.983607", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.044093", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.104724", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.166026", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.226451", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.286302", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.346694", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.407506", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.468403", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.530553", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.590116", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.651365", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.651531", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.690619", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T19:03:20.690924", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.251547", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.282675", "phase": 3, "message": "  Voting started for kublai-20260310-201657", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.282811", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.322389", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.383105", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.443587", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.503817", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.565156", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.625900", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.686181", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.746694", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.806625", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.867197", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.928365", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:57.988779", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.050138", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.109940", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.170388", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.231259", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.292460", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.353548", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.413935", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.474358", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.536635", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.596698", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.658417", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.718744", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.780259", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.840779", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.902479", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:58.962800", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.024355", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.084848", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.147698", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.209559", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.271117", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.271302", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.312227", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T20:16:59.312582", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T21:13:32.930659", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T21:13:32.960836", "phase": 3, "message": "  Voting started for kublai-20260310-211332", "data": {}}
+{"timestamp": "2026-03-10T21:13:32.960980", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.000115", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.059811", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.119772", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.179460", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.239882", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.299325", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.358987", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.419455", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.479836", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.539162", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.599057", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.658817", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.718906", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.778969", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.838944", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.899178", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:33.959451", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.019343", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.080265", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.140429", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.200456", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.260055", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.319891", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.379973", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.440481", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.504323", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.564624", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.624777", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.685052", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.745716", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.805227", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.865504", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.925219", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.984678", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T21:13:34.984850", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T21:13:35.024626", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T21:13:35.024961", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.299934", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.300359", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.340791", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.404099", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.465369", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.526027", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.587656", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.649855", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.710341", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.772320", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.833441", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.894393", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:53.954773", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.016511", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.076666", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.138025", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.199618", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.259766", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.321382", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.382597", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.445333", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.507232", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.569979", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.631389", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.692403", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.753340", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.815205", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.914965", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:54.979587", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.043994", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.105596", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.166851", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.228051", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.289810", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.351164", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.411946", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.412112", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.452583", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-10T23:42:55.452905", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.483999", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.515410", "phase": 3, "message": "  Voting started for kublai-20260311-001324", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.515533", "phase": 3, "message": "Voting started for 1 proposals", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.554689", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.615014", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.674769", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.735105", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.795363", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.855688", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.915583", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:24.975426", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.035196", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.095332", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.155564", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.215410", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.274993", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.334795", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.394863", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.454645", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.514845", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.574794", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.634764", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.695455", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.754916", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.814956", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.875574", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.935429", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:25.995529", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.055320", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.115295", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.175142", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.235455", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.295316", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.355040", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.416534", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.476285", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.538649", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.599942", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.600116", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.640336", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T00:13:26.640688", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.226114", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.226552", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.265470", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.326142", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.385675", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.445989", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.506393", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.567058", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.626624", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.687670", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.748154", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.808557", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.868814", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.929118", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:51.989561", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.049745", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.111558", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.173590", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.234860", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.295969", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.356996", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.418370", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.479848", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.541170", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.602738", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.679910", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.740988", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.801166", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.861775", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.922111", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:52.982938", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.043155", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.103198", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.163301", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.223613", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.284424", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.345212", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.345387", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.385267", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T01:16:53.385591", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.648591", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.648958", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.687384", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.747766", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.808679", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.868623", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.929275", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:37.989647", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.050782", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.110384", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.171757", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.233058", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.293218", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.353221", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.413748", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.474430", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.533908", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.594256", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.655219", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.715578", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.775482", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.834990", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.894728", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:38.954543", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.014349", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.073483", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.133592", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.192923", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.253049", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.312153", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.371845", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.431328", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.491734", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.551320", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.611619", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.671537", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.732417", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.732593", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.771810", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T02:18:39.772116", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T03:11:34.739494", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T03:11:34.740107", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-11T03:11:34.780280", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T03:11:34.845451", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:34.909015", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:34.974041", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.037950", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.101626", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.165370", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.229006", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.293620", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.356935", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.420978", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.484541", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.548402", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.611680", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.675168", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.738698", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.802672", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.866113", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.929804", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:35.993536", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.057251", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.121012", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.185377", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.248622", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.312556", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.377170", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.441183", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.505236", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.568710", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.632259", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.695834", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.759080", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.822662", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.886486", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.950007", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.950181", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.992205", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T03:11:36.992569", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T04:11:44.764522", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T04:11:44.764891", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-11T04:11:44.803302", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T04:11:44.863800", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:44.923460", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:44.984681", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.044883", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.104657", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.164843", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.224362", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.284554", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.345175", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.404620", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.464440", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.524082", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.583896", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.643680", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.704670", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.763836", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.823837", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.883130", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:45.943797", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.005433", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.084796", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.147704", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.212814", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.273454", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.333737", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.395123", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.454988", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.515608", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.575086", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.635407", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.695845", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.755742", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.814924", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.874744", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.874905", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.914234", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T04:11:46.914557", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.674630", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.674978", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.713864", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.773743", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.832765", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.892951", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:11.952229", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.011752", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.071926", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.132042", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.191099", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.251366", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.310822", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.371763", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.430719", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.490649", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.550161", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.609426", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.669064", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.730072", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.789993", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.849417", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.908945", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:12.969416", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.028317", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.088725", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.147991", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.208634", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.268465", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.327159", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.386803", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.446836", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.506938", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.567420", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.626330", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.685871", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.746095", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.746265", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.785993", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T05:11:13.786322", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.706279", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.706643", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.745588", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.805478", "phase": 4, "message": "  kublai-20260310-020322: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.865579", "phase": 4, "message": "  kublai-20260309-190325: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.925219", "phase": 4, "message": "  kublai-20260310-040817: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:30.984641", "phase": 4, "message": "  kublai-20260310-150314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.044403", "phase": 4, "message": "  kublai-20260310-170315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.104049", "phase": 4, "message": "  kublai-20260310-100318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.164133", "phase": 4, "message": "  kublai-20260309-220327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.223978", "phase": 4, "message": "  kublai-20260310-080317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.283844", "phase": 4, "message": "  kublai-20260310-180316: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.343661", "phase": 4, "message": "  kublai-20260310-000318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.403478", "phase": 4, "message": "  kublai-20260309-200327: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.463575", "phase": 4, "message": "  kublai-20260310-130320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.523254", "phase": 4, "message": "  kublai-20260310-010320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.583106", "phase": 4, "message": "  kublai-20260309-160307: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.642914", "phase": 4, "message": "  kublai-20260309-150831: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.702699", "phase": 4, "message": "  kublai-20260309-210328: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.763076", "phase": 4, "message": "  kublai-20260310-090318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.822882", "phase": 4, "message": "  kublai-20260310-211332: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.882454", "phase": 4, "message": "  kublai-20260310-201657: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:31.942771", "phase": 4, "message": "  kublai-20260310-015952: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.002113", "phase": 4, "message": "  kublai-20260310-190318: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.062129", "phase": 4, "message": "  kublai-20260309-120941: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.121507", "phase": 4, "message": "  kublai-20260310-050319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.181437", "phase": 4, "message": "  kublai-20260310-140314: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.241131", "phase": 4, "message": "  kublai-20260310-060320: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.301045", "phase": 4, "message": "  kublai-20260310-160315: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.360608", "phase": 4, "message": "  kublai-20260310-070317: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.419999", "phase": 4, "message": "  7effb4fd-dfc: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.479578", "phase": 4, "message": "  kublai-20260310-120321: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.539424", "phase": 4, "message": "  kublai-20260309-000758: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.599582", "phase": 4, "message": "  46e2729b-96a: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.659191", "phase": 4, "message": "  kublai-20260311-001324: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.718467", "phase": 4, "message": "  kublai-20260310-030721: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.778115", "phase": 4, "message": "  kublai-20260310-110319: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.778289", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.817818", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-11T06:11:32.818150", "phase": 5, "message": "Tally complete: 0 approved, 0 rejected", "data": {}}

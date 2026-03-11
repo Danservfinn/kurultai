@@ -1,0 +1,116 @@
+# 🚨 CRITICAL: jochi Agent Authentication Failure
+
+**Time:** 2026-03-08T21:30:34
+**Severity:** CRITICAL
+**Status:** BLOCKING ALL JOCHI TASKS
+
+## Problem
+
+jochi's credential configuration is invalid. All tasks failing with 401 errors.
+
+**File:** `/Users/kublai/.openclaw/agents/jochi/.claude/settings.json`
+
+**Current (BROKEN):**
+```json
+{
+  "ANTHROPIC_AUTH_TOKEN": "PLACEHOLDER-sk-ant-xxx-replace-with-valid-key",
+  "ANTHROPIC_BASE_URL": "https://coding-intal.dashscope.aliyuncs.com/apps/anthropic",
+  "ANTHROPIC_MODEL": "glm-5"
+}
+```
+
+**Issues:**
+1. Token prefix is `PLACEHOLDER-` not `sk-ant-`
+2. BASE_URL points to Alibaba DashScope (not Anthropic)
+3. Model/BASE_URL mismatch
+
+## Required Action
+
+Replace `PLACEHOLDER-sk-ant-xxx-replace-with-valid-key` with a valid API key.
+
+**Options:**
+- Anthropic: Use `sk-ant-api03-...` token, remove BASE_URL
+- Z.ai: Use Z.ai token, set `BASE_URL: https://api.z.ai/api/anthropic`
+- Bailian: Use Bailian key, keep BASE_URL, change model to `qwen3.5-plus`
+
+## Task Created
+
+ogedei task: `critical-fix-jochi-auth-config-1773021234`
+
+## Blocked Tasks
+
+- `low-requeue-llm-audit-integration-1773020000` (and all future jochi tasks)
+
+---
+*Escalation Rule #2 triggered: Non-Anthropic token prefix detected*
+*kublai (Squad Lead)*
+
+---
+
+# 🚨 CRITICAL: temujin Agent Credential Crisis (Fleet-Wide Bug)
+
+**Time:** 2026-03-10T20:30:00
+**Severity:** CRITICAL
+**Status:** BLOCKING ALL TEMUJIN TASKS (fleet-wide risk)
+
+## Problem
+
+**13 consecutive task failures** since ~14:30 EDT with "Not logged in · Please run /login". Root cause: **vault credential mapping bug** in agent-task-handler.py.
+
+## Root Cause
+
+Vault stores `ZAI_AUTH_TOKEN`, `ZAI_BASE_URL`, `ZAI_MODEL` but Claude Code expects `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`. No mapping layer exists.
+
+**Evidence:**
+- Debug logs: `is_using_proxy=False` for all agents
+- Vault has valid Z.AI credentials (b5b1f9537dda43198c640b9a3b48f79b...)
+- `~/.claude/credentials.json` does NOT exist (OAuth not logged in)
+- 10+ `*.failed.done.md` files in temujin/tasks/
+
+**Code location:** `/Users/kublai/.openclaw/agents/main/scripts/agent-task-handler.py:2087-2094`
+
+## Why CIRCULAR_DEPENDENCY_GUARD Didn't Fire
+
+`check_agent_credentials()` returns `True` because vault exists with ZAI tokens. Bug occurs at execution time, not routing time.
+
+## Fleet-Wide Impact
+
+**ALL 6 agents** show `is_using_proxy=False`. Any agent without ANTHROPIC_* variables in settings.json will fail the same way. This is a systemic bug.
+
+## Required Actions
+
+### Immediate (Human Intervention Required)
+1. Run `claude auth login` for temujin's claude-code session, OR
+2. Update agent-task-handler.py with vault variable mapping (see code below)
+
+### Fix Code (agent-task-handler.py:2087-2094)
+```python
+# Map vault variables to Claude Code format
+VAULT_VAR_MAP = {
+    'ZAI_AUTH_TOKEN': 'ANTHROPIC_AUTH_TOKEN',
+    'ZAI_BASE_URL': 'ANTHROPIC_BASE_URL',
+    'ZAI_MODEL': 'ANTHROPIC_MODEL',
+    'ALIBABA_AUTH_TOKEN': 'ANTHROPIC_AUTH_TOKEN',
+    'ALIBABA_BASE_URL': 'ANTHROPIC_BASE_URL',
+    'ALIBABA_MODEL': 'ANTHROPIC_MODEL',
+}
+
+vault_creds = load_vault_credentials()
+for vault_key, value in vault_creds.items():
+    if vault_key in VAULT_VAR_MAP:
+        env[VAULT_VAR_MAP[vault_key]] = value
+    else:
+        env[vault_key] = value
+```
+
+## Secondary Bug: Metrics Masking
+
+Hourly reports show "0 completed, 0 failed, 0 queued" but tasks are actively failing. `task-metrics` reflection step not counting ledger events correctly.
+
+## Investigation
+
+Full findings: `/Users/kublai/.openclaw/agents/jochi/workspace/temujin-credential-crisis-investigation-20260310.md`
+
+---
+*Investigated by: jochi (systematic-debugging skill)*
+*Source: anomaly-scanner escalation*

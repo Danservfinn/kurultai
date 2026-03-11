@@ -28,6 +28,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_tracker, get_driver
 from agents_config import AGENT_ROLES
 
+# Model detection
+def get_model():
+    """Get the default model from main agent config."""
+    try:
+        agents_dir = Path.home() / ".openclaw" / "agents"
+        settings_file = agents_dir / "main" / ".claude" / "settings.json"
+        if settings_file.exists():
+            with open(settings_file) as f:
+                config = json.load(f)
+            return config.get("env", {}).get("ANTHROPIC_MODEL", "unknown")
+    except Exception:
+        pass
+    return "unknown"
+
+MODEL = get_model()
+
 
 class ReportAnalyzer:
     """Analyze task completion reports for reflection integration."""
@@ -55,6 +71,8 @@ class ReportAnalyzer:
         Returns:
             List of task dicts with report data
         """
+        # Try Neo4j first for task metadata
+        tasks = []
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (t:Task)
@@ -73,25 +91,68 @@ class ReportAnalyzer:
                     t.lines_removed AS lines_removed,
                     t.files_modified AS files_modified,
                     t.files_created AS files_created,
-                    t.tools_used AS tools_used,
-                    t.skills_invoked AS skills_invoked,
-                    t.completed_at AS completed_at,
-                    t.report_text AS report_text
+                    t.completed_at AS completed_at
                 ORDER BY t.completed_at DESC
             """, agent=agent, hours=hours)
 
-            tasks = []
             for record in result:
                 task = dict(record)
-                # Parse tools_used JSON if present
-                if task.get("tools_used"):
-                    try:
-                        task["tools_used"] = json.loads(task["tools_used"])
-                    except (json.JSONDecodeError, TypeError):
-                        task["tools_used"] = {}
                 tasks.append(task)
 
-            return tasks
+        # Enrich with report_text from filesystem (Neo4j doesn't store it)
+        reports_dir = Path("/Users/kublai/.openclaw/agents/main/reports/completed")
+        if reports_dir.exists():
+            cutoff = datetime.now() - timedelta(hours=hours)
+            for report_path in reports_dir.glob("*.md"):
+                if report_path.name.startswith("."):
+                    continue
+
+                # Check if this report belongs to this agent and is within time window
+                try:
+                    content = report_path.read_text(encoding="utf-8", errors="replace")
+                    # Extract agent from content
+                    for line in content.split("\n")[:50]:
+                        if line.startswith("**Agent:**"):
+                            report_agent = line.split("**Agent:**")[1].strip().lower()
+                            if report_agent != agent.lower():
+                                break
+                        elif line.startswith("**Completed:**"):
+                            try:
+                                completed_str = line.split("**Completed:**")[1].strip()
+                                completed_dt = datetime.strptime(completed_str, "%Y-%m-%d %H:%M:%S")
+                                if completed_dt < cutoff:
+                                    break
+                            except ValueError:
+                                pass
+                    else:
+                        # Report matches agent and time - find matching task or add new
+                        task_id = report_path.stem
+                        # Find existing task or create new entry
+                        matched_task = next((t for t in tasks if t.get("task_id", "").startswith(task_id)), None)
+                        if matched_task:
+                            matched_task["report_text"] = content
+                        else:
+                            # Create task from file if not in Neo4j (stale sync)
+                            tasks.append({
+                                "task_id": task_id,
+                                "title": self._extract_title_from_report(content),
+                                "report_text": content,
+                                "completed_at": cutoff,  # Fallback timestamp
+                            })
+                except Exception:
+                    continue
+
+        return tasks
+
+    def _extract_title_from_report(self, content: str) -> str:
+        """Extract task title from report markdown."""
+        for line in content.split("\n")[:20]:
+            line = line.strip()
+            if line.startswith("**Title:**"):
+                return line.split("**Title:**")[1].strip()
+            elif line.startswith("#") and not line.startswith("##"):
+                return line.lstrip("#").strip()
+        return "Unknown task"
 
     def gather_all_completed_tasks(self, hours: int = 1) -> Dict[str, List[Dict]]:
         """Get completed tasks for all agents.
@@ -140,12 +201,13 @@ class ReportAnalyzer:
         - Solution: What was built/done to solve it
         - Testing: What tests were run
         - Verification: How success was verified
+        - Resolution: REQUIRED section for completion (checked by /horde-review)
 
         Args:
             report_text: Raw report markdown text
 
         Returns:
-            Dict with problem, solution, testing, verification fields
+            Dict with problem, solution, testing, verification, resolution fields
         """
         if not report_text:
             return {
@@ -153,6 +215,7 @@ class ReportAnalyzer:
                 "solution": None,
                 "testing": None,
                 "verification": None,
+                "resolution": None,
             }
 
         sections = {
@@ -160,6 +223,7 @@ class ReportAnalyzer:
             "solution": None,
             "testing": None,
             "verification": None,
+            "resolution": None,
         }
 
         # Pattern 1: Standard section headers
@@ -185,6 +249,10 @@ class ReportAnalyzer:
                 r"##\s*Verification\s*\n(.*?)(?=\n##|\Z)",
                 r"##\s*How (?:was )?success verified\s*\n(.*?)(?=\n##|\Z)",
                 r"\*\*Verification:\*\*\s*(.+?)(?=\n\*\*|\n##|\Z)",
+            ],
+            "resolution": [
+                r"##\s*Resolution\s*\n(.*?)(?=\n##|\Z)",
+                r"\*\*Resolution:\*\*\s*(.+?)(?=\n\*\*|\n##|\Z)",
             ],
         }
 
@@ -225,6 +293,7 @@ class ReportAnalyzer:
             - solutions_built: List of solution descriptions
             - testing_performed: List of testing descriptions
             - verification_results: List of verification descriptions
+            - missing_resolution: List of task_ids missing required ## Resolution section
             - patterns: Detected patterns
             - success_rate: Task success rate
             - quality_score: Average quality score
@@ -235,6 +304,7 @@ class ReportAnalyzer:
                 "solutions_built": [],
                 "testing_performed": [],
                 "verification_results": [],
+                "missing_resolution": [],
                 "patterns": [],
                 "success_rate": None,
                 "quality_score": None,
@@ -245,6 +315,7 @@ class ReportAnalyzer:
         solutions = []
         testing = []
         verification = []
+        missing_resolution = []
         quality_scores = []
         durations = []
 
@@ -276,6 +347,13 @@ class ReportAnalyzer:
                     "description": sections["verification"],
                 })
 
+            # Check for REQUIRED resolution section (checked by /horde-review)
+            if not sections.get("resolution"):
+                missing_resolution.append({
+                    "task_id": task.get("task_id", "unknown")[:8],
+                    "title": task.get("title", "Unknown task")[:80],
+                })
+
             # Collect metrics
             if task.get("verification_score"):
                 quality_scores.append(task["verification_score"])
@@ -290,6 +368,7 @@ class ReportAnalyzer:
             "solutions_built": solutions[:5],
             "testing_performed": testing[:5],
             "verification_results": verification[:5],
+            "missing_resolution": missing_resolution,
             "patterns": patterns,
             "success_rate": 100.0,  # All tasks passed (we only query COMPLETED)
             "quality_score": sum(quality_scores) / len(quality_scores) if quality_scores else None,
@@ -376,6 +455,7 @@ class ReportAnalyzer:
         lines = [
             f"## Task Completion Summary (Last {hours}h)",
             f"**Total Completed:** {analysis['total_tasks']}",
+            f"**Model:** {MODEL}",
         ]
 
         if analysis.get("quality_score"):
@@ -385,6 +465,20 @@ class ReportAnalyzer:
             lines.append(f"**Avg Duration:** {analysis['avg_duration']:.0f}s")
 
         lines.append("")
+
+        # CRITICAL: Missing resolution sections (checked by /horde-review)
+        # This is the PRIORITY_FIX from review analysis
+        if analysis.get("missing_resolution"):
+            lines.append("### ⚠️ MISSING RESOLUTION SECTIONS")
+            lines.append(f"**{len(analysis['missing_resolution'])} task(s) missing required ## Resolution section**")
+            lines.append("See `templates/task-completion-template.md` for format")
+            for m in analysis["missing_resolution"][:5]:
+                lines.append(f"- [{m['task_id']}] {m['title']}")
+            if len(analysis["missing_resolution"]) > 5:
+                lines.append(f"... and {len(analysis['missing_resolution']) - 5} more")
+            lines.append("")
+            lines.append("**ACTION REQUIRED:** Add `## Resolution` section to these task reports")
+            lines.append("")
 
         # Problems solved
         if analysis["problems_solved"]:
@@ -439,6 +533,7 @@ class ReportAnalyzer:
         lines = [
             f"## System Task Summary (Last {hours}h)",
             f"**Total Completed:** {total_tasks} tasks across {len(by_agent)} agents",
+            f"**Model:** {MODEL}",
             "",
             "### By Agent",
         ]

@@ -227,6 +227,9 @@ def heuristic_initiative(reflections, goals, system_state):
 
     Scans goals for "Next:" items and system state for bottlenecks,
     and produces the most obvious high-value action.
+
+    ROTATING DEFAULTS: Prevents duplicate task rejection by cycling through
+    varied proactive actions based on hour-of-day.
     """
     # Check if any goals have a clear "Next:" action
     if goals:
@@ -260,13 +263,46 @@ def heuristic_initiative(reflections, goals, system_state):
                     "EXPECTED_OUTCOME: Queue backlog reduced to zero"
                 )
 
-    # Default: advance the top-priority goal
+    # ROTATING DEFAULTS: Varies proactive action by hour to prevent duplicate task rejection
+    # Each hour gets a different high-value action, cycling every 12 hours
+    current_hour = datetime.now().hour
+    hour_mod = current_hour % 12
+
+    ROTATING_TASKS = [
+        ("temujin", "Review Parse monetization blockers and create next implementation task",
+         "Parse SaaS platform - payment integration and subscription flow"),
+        ("mongke", "Research emerging AI agent orchestration patterns and competitive landscape",
+         "Strategic intelligence - understand Kurultai's competitive position"),
+        ("chagatai", "Update stale documentation in shared-context/ or docs/ directories",
+         "Knowledge hygiene - keep documentation current and accurate"),
+        ("ogedei", "Audit and optimize system monitoring and alerting configurations",
+         "Ops excellence - ensure proactive monitoring of all services"),
+        ("temujin", "Review and refactor recently modified code for quality and efficiency",
+         "Code quality - continuous improvement of codebase"),
+        ("jochi", "Analyze recent task failures and identify patterns for prevention",
+         "Quality assurance - learn from failures to prevent recurrence"),
+        ("kublai", "Review routing decisions and optimize agent load balancing",
+         "System efficiency - improve task distribution across fleet"),
+        ("temujin", "Implement test coverage gap identified in recent code changes",
+         "Testing rigor - fill gaps in test coverage"),
+        ("mongke", "Investigate potential research topics from recent team conversations",
+         "Proactive research - surface knowledge needs before requests"),
+        ("chagatai", "Create documentation for recently completed features or improvements",
+         "Documentation - capture knowledge while fresh"),
+        ("ogedei", "Review system health metrics and address any degradation trends",
+         "Preventive maintenance - address issues before they become incidents"),
+        ("kublai", "Audit active rules and proposals for relevance and completion",
+         "Process hygiene - clean up stale rules and proposals"),
+    ]
+
+    agent, action, rationale = ROTATING_TASKS[hour_mod]
+
     return (
-        "ACTION: Review Parse monetization blockers and create next implementation task\n"
-        "AGENT: temujin\n"
-        "PRIORITY: normal\n"
-        "RATIONALE: Default initiative — advance the highest-priority active goal\n"
-        "EXPECTED_OUTCOME: Clear next step identified and task created for Parse progress"
+        f"ACTION: {action}\n"
+        f"AGENT: {agent}\n"
+        f"PRIORITY: normal\n"
+        f"RATIONALE: Rotating proactive initiative ({rationale})\n"
+        f"EXPECTED_OUTCOME: Continuous system improvement across all domains"
     )
 
 
@@ -445,22 +481,29 @@ def main():
 3. If the action requires follow-up, create a new task
 """
 
-    create_task(
+    # Attempt to create task - only mark cooldown on success
+    result = create_task(
         initiative["agent"],
         initiative["priority"],
         initiative["action"][:80],
         task_body,
     )
 
-    log_hypothesis(
-        initiative["action"],
-        initiative.get("expected_outcome", "Unknown"),
-    )
+    if result:
+        # Task was successfully created - log and mark cooldown
+        log_hypothesis(
+            initiative["action"],
+            initiative.get("expected_outcome", "Unknown"),
+        )
 
-    log_initiative_to_memory(initiative)
-    mark_fired()
+        log_initiative_to_memory(initiative)
+        mark_fired()
 
-    print(f"INITIATIVE: {initiative['priority']} task created for {initiative['agent']}: {initiative['action'][:80]}")
+        print(f"INITIATIVE: {initiative['priority']} task created for {initiative['agent']}: {initiative['action'][:80]}")
+    else:
+        # Task creation failed (duplicate, depth limit, etc.) - do NOT mark cooldown
+        log("SKIP: Task creation returned None (duplicate or error) - cooldown NOT set")
+        print("INITIATIVE: Task not created (duplicate or error) - will retry on next check")
 
 
 if __name__ == "__main__":

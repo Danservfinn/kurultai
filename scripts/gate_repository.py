@@ -33,6 +33,7 @@ import sys
 import glob
 import time
 import re
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -42,9 +43,7 @@ from typing import List, Optional, Dict, Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR
-
-# Valid agents for filtering
-VALID_AGENTS = {"mongke", "chagatai", "temujin", "jochi", "ogedei", "kublai"}
+from gate_utils import VALID_AGENTS
 
 
 class GateState(Enum):
@@ -296,6 +295,11 @@ class Neo4jGateRepository(GateRepository):
             t.gate_updated = datetime()
     """
 
+    GET_PRIORITY_QUERY = """
+        MATCH (t:Task {task_id: $task_id})
+        RETURN t.priority as priority
+    """
+
     SYNC_FROM_FS_QUERY = """
         MERGE (t:Task {task_id: $task_id})
         ON CREATE SET
@@ -407,12 +411,46 @@ class Neo4jGateRepository(GateRepository):
         pass
 
     def _get_gate_file_path(self, task_id: str, agent: str) -> Path:
-        """Construct the likely filesystem path for a gate file.
+        """Find the actual filesystem path for a gate file.
 
-        Note: The actual file may not exist at this path if Neo4j data
-        is out of sync with filesystem.
+        First queries Neo4j for task priority, then constructs path.
+        Falls back to filesystem glob if Neo4j query fails.
+
+        Supports all priority prefixes: critical-, high-, normal-, low-.
         """
-        return AGENTS_DIR / agent / "tasks" / f"high-{task_id}.pending-gate.md"
+        tasks_dir = AGENTS_DIR / agent / "tasks"
+
+        # First, try filesystem glob as authoritative source
+        # (file may exist before Neo4j sync)
+        pattern = str(tasks_dir / f"*{task_id}*.pending-gate.md")
+        matches = glob.glob(pattern)
+        if matches:
+            return Path(matches[0])
+
+        # No file found on disk - construct path using Neo4j priority
+        priority = self._get_task_priority(task_id)
+        if priority:
+            return tasks_dir / f"{priority}-{task_id}.pending-gate.md"
+
+        # Final fallback: default to "high" prefix for backward compatibility
+        return tasks_dir / f"high-{task_id}.pending-gate.md"
+
+    def _get_task_priority(self, task_id: str) -> Optional[str]:
+        """Query Neo4j for task priority.
+
+        Returns:
+            Priority string (critical, high, normal, low) or None if not found.
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run(self.GET_PRIORITY_QUERY, task_id=task_id)
+                record = result.single()
+                if record and record.get('priority'):
+                    return record['priority']
+                return None
+        except Exception:
+            # Neo4j unavailable or query failed
+            return None
 
     def _extract_title(self, gate_file: Path) -> str:
         """Extract title from gate file."""
@@ -473,18 +511,20 @@ class CachedGateRepository(GateRepository):
             "data": None,
             "timestamp": 0
         }
+        self._lock = threading.Lock()
 
     def find_pending(self) -> List[GateTask]:
         """Find pending gates with caching."""
         now = time.time()
 
-        # Check cache validity
-        if (self._cache["data"] is not None and
-            (now - self._cache["timestamp"]) < self._ttl):
-            # Cache hit - return cached data
-            return self._cache["data"].copy()
+        # Thread-safe cache check
+        with self._lock:
+            if (self._cache["data"] is not None and
+                (now - self._cache["timestamp"]) < self._ttl):
+                # Cache hit - return copy of cached data
+                return list(self._cache["data"])
 
-        # Cache miss - query base repository
+        # Cache miss - query base repository (outside lock)
         try:
             result = self._base.find_pending()
         except Neo4jUnavailableError:
@@ -493,11 +533,12 @@ class CachedGateRepository(GateRepository):
             fs_repo = FilesystemGateRepository()
             result = fs_repo.find_pending()
 
-        # Update cache
-        self._cache["data"] = result
-        self._cache["timestamp"] = now
+        # Thread-safe cache update
+        with self._lock:
+            self._cache["data"] = result
+            self._cache["timestamp"] = now
 
-        return result.copy()
+        return list(result)
 
     def get_gate_status(self, task_id: str) -> GateState:
         """Get gate status - delegates to base (no cache for single task)."""

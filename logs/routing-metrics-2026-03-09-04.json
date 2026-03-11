@@ -1,0 +1,180 @@
+{
+  "timestamp": "2026-03-09T08:18:53Z",
+  "hour_file": "2026-03-09-04",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 0,
+    "depths": {"temujin": 0, "mongke": 0, "chagatai": 0, "jochi": 0, "ogedei": 0},
+    "mean": 0,
+    "std": 0
+  },
+  "routing": {
+    "total_routed": 9,
+    "overflow_count": 7,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+  "period_hours": 1,
+  "generated_at": "2026-03-09T04:18:53.464657",
+  "total_routed": 9,
+  "routing_methods": {
+    "explicit": 2,
+    "redistribution": 7
+  },
+  "destinations": {
+    "ogedei": 1,
+    "temujin": 4,
+    "jochi": 3,
+    "kublai": 1
+  },
+  "by_agent": {
+    "ogedei": {
+      "routed": 1,
+      "executed": 3,
+      "succeeded": 1,
+      "failed": 2
+    },
+    "temujin": {
+      "routed": 4,
+      "executed": 5,
+      "succeeded": 1,
+      "failed": 4
+    },
+    "jochi": {
+      "routed": 3,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "kublai": {
+      "routed": 1,
+      "executed": 6,
+      "succeeded": 1,
+      "failed": 5
+    }
+  },
+  "queue_state": {
+    "kublai": {
+      "pending": 1,
+      "executing": 1,
+      "done": 174
+    },
+    "temujin": {
+      "pending": 0,
+      "executing": 0,
+      "done": 124
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 116
+    },
+    "chagatai": {
+      "pending": 0,
+      "executing": 0,
+      "done": 95
+    },
+    "jochi": {
+      "pending": 1,
+      "executing": 0,
+      "done": 88
+    },
+    "ogedei": {
+      "pending": 0,
+      "executing": 2,
+      "done": 98
+    }
+  },
+  "issues": [
+    "High overflow rate: 7/9 (78%) \u2014 agents frequently busy",
+    "Workload imbalance: temujin got 4 tasks vs ogedei got 1",
+    "ogedei: 2 task(s) failed out of 3 executed",
+    "temujin: 4 task(s) failed out of 5 executed",
+    "kublai: 5 task(s) failed out of 6 executed",
+    "jochi: 3 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "Keyword table drift: 7/9 (78%) tasks would route differently via keywords vs actual destination",
+    "Keyword routing drift: 30/36 (83%) disagree with actual routing",
+    "RECURRING: 1 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+  ],
+  "suggestions": [
+    "Low skill hint coverage: 0/9 \u2014 consider expanding SKILL_HINTS in task_intake.py",
+    "Routing methods: redistribution=7, explicit=2",
+    "Missed opportunities: 1 task(s) could have been routed to idle agents"
+  ],
+  "kw_disagreements": {},
+  "kw_misroute_count": 7,
+  "kw_misroute_rate": "7/9",
+  "kw_misroute_examples": [
+    "'Stuck executing tasks cleanup' -> kw=ogedei actual=temujin",
+    "'Investigate task queue: 5 fake completions detected' -> kw=ogedei actual=temujin",
+    "'Investigate task queue: 4 fake completions detected' -> kw=ogedei actual=temujin",
+    "'Investigate task queue: 5 fake completions detected' -> kw=ogedei actual=jochi",
+    "'ESCALATE-stale-task-mongke-normal-1773003328.completed.revis' -> kw=temujin actual=jochi"
+  ],
+  "overflow_count": 7,
+  "skill_hint_coverage": "0/9",
+  "routing_drift": {
+    "total": 36,
+    "mismatches": 30,
+    "drift_pct": 83.3,
+    "top_examples": [
+      {
+        "task": "Add Resolution Section to \"Kublai Coordination Layer for Autoresearch\"",
+        "actual": "jochi",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "ESCALATE-stale-task-ogedei-mongke-delegate-working-memory-20260308-203706.resolv",
+        "actual": "jochi",
+        "keyword_would": "ogedei"
+      },
+      {
+        "task": "ESCALATE-stale-task-kublai-ESCALATE-stale-task-ogedei-build-evaluation-engine-17",
+        "actual": "jochi",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772",
+        "actual": "jochi",
+        "keyword_would": "temujin"
+      },
+      {
+        "task": "ESCALATE-stale-task-kublai-calendar-listener-frequency-1772954100000.unverified-",
+        "actual": "jochi",
+        "keyword_would": "temujin"
+      }
+    ],
+    "ts": "2026-03-09T04:11:08.301140"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "Keyword table drift: #/# (#%) tasks would route differently via keywords vs actual destination",
+      "consecutive": 3,
+      "first_seen": "2026-03-08T00:01:35.014112"
+    }
+  ],
+  "missed_opportunities": {
+    "count": 1,
+    "by_agent": {
+      "kublai": 1
+    },
+    "examples": [
+      {
+        "task": "Completion Audit Escalation: 0 fake completions",
+        "routed_to": "kublai",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "tolui",
+            2
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-09T03:57:11.149146"
+      }
+    ]
+  }
+}
+}

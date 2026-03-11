@@ -8,24 +8,17 @@ Based on schema: signal-calendar-neo4j-schema.cypher
 """
 
 import os
+import sys
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from neo4j import Driver, GraphDatabase
-
-
-# Get Neo4j connection from existing task tracker
-def get_driver() -> Driver:
-    """Get Neo4j driver from environment (NEO4J_PASSWORD required)."""
-    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD")
-    if not password:
-        raise ValueError("NEO4J_PASSWORD environment variable not set")
-    return GraphDatabase.driver(uri, auth=(user, password))
+# Use centralized Neo4j driver with connection pooling
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from neo4j_task_tracker import get_driver, close_driver
+from neo4j import Driver
 
 
 class RSVPStatus(str, Enum):
@@ -75,7 +68,8 @@ class CalendarNeo4j:
         self.driver = driver or get_driver()
 
     def close(self):
-        self.driver.close()
+        """Close driver using centralized cleanup."""
+        close_driver()
 
     # =============================================================================
     # SCHEMA SETUP

@@ -1,0 +1,610 @@
+{
+  "timestamp": "2026-03-08T18:12:58-0400",
+  "agents": {
+    "kublai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 0,
+        "pct_used": 0,
+        "model": "none"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": true
+      }
+    },
+    "mongke": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "chagatai": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": true,
+        "session_match": false
+      }
+    },
+    "temujin": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "jochi": {
+      "tasks": {
+        "completed": 12,
+        "failed": 0,
+        "pending": 9,
+        "running": 0,
+        "total": 21,
+        "queue_depth": 0
+      },
+      "success_rate": 57.1,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "config.json",
+        "valid": false,
+        "session_match": false
+      }
+    },
+    "ogedei": {
+      "tasks": {
+        "completed": 0,
+        "failed": 0,
+        "pending": 0,
+        "running": 0,
+        "total": 0,
+        "queue_depth": 0
+      },
+      "success_rate": null,
+      "retries": 0,
+      "session": {
+        "count": 1,
+        "pct_used": null,
+        "model": "qwen3.5-plus"
+      },
+      "config_model": {
+        "resolved": "glm-5",
+        "source": "settings.json",
+        "valid": false,
+        "session_match": false
+      }
+    }
+  },
+  "cron": {
+    "total_jobs": 24,
+    "healthy": 20,
+    "erroring": 4,
+    "jobs": [
+      {
+        "name": "Self-Awareness Architecture Verification - 3hr Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 143402,
+        "enabled": true
+      },
+      {
+        "name": "Daily Goal Progress Summary",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 267861,
+        "enabled": true
+      },
+      {
+        "name": "Parse Conversion Alert Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 20234,
+        "enabled": true
+      },
+      {
+        "name": "Kurultai Reflection (4-hour cycle)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 533433,
+        "enabled": true
+      },
+      {
+        "name": "heartbeat-watchdog",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 362479,
+        "enabled": true
+      },
+      {
+        "name": "tock-gather",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 174315,
+        "enabled": true
+      },
+      {
+        "name": "neo4j-telemetry-prune",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 37022,
+        "enabled": true
+      },
+      {
+        "name": "signal-calendar-listener",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120155,
+        "enabled": true
+      },
+      {
+        "name": "Weekly the.kurult.ai review + implement",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 44116,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai 3-hour review",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 48897,
+        "enabled": true
+      },
+      {
+        "name": "Failed Task Review - Hourly",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 133779,
+        "enabled": true
+      },
+      {
+        "name": "the.kurult.ai uptime monitor",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120050,
+        "enabled": true
+      },
+      {
+        "name": "working-memory-cleanup",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 4612,
+        "enabled": true
+      },
+      {
+        "name": "Hourly Routing Metrics",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 53491,
+        "enabled": true
+      },
+      {
+        "name": "kublai-learning-weekly",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 5883,
+        "enabled": true
+      },
+      {
+        "name": "scrapling-research-runner",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "proposal-expiration-check",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "proposal-vote-aggregation",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "System Health Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 56595,
+        "enabled": true
+      },
+      {
+        "name": "OpenClaw X Daily Status (8 AM)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 6576,
+        "enabled": true
+      },
+      {
+        "name": "OpenClaw X Build Public (4 PM)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 120224,
+        "enabled": true
+      },
+      {
+        "name": "OpenClaw X Weekly Review (Friday)",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 6100,
+        "enabled": true
+      },
+      {
+        "name": "X/Twitter Analytics Daily Collection",
+        "status": "skipped",
+        "consecutive_errors": 0,
+        "last_duration_ms": 0,
+        "enabled": true
+      },
+      {
+        "name": "Storage Monitoring - Weekly Check",
+        "status": "ok",
+        "consecutive_errors": 0,
+        "last_duration_ms": 10912,
+        "enabled": true
+      }
+    ]
+  },
+  "cron_jobs": {
+    "calendar_reminder": {
+      "status": "stale",
+      "last_run": "2026-03-08T00:33:00.072995",
+      "ran_last_5min": false,
+      "error_log_exists": true,
+      "error_log_lines_24h": 62
+    },
+    "backup": {
+      "status": "no_backup",
+      "last_backup": null,
+      "ran_last_24h": false,
+      "backup_file_exists": false,
+      "latest_backup_size": null
+    }
+  },
+  "completion_gate": {
+    "pending_gates": 0,
+    "blocked_gates": 0,
+    "pass_rate_24h": 0.0,
+    "avg_completion_24h": 0.0,
+    "avg_followups": 0.0,
+    "recent_audits": 0,
+    "error": "'GateResolver' object has no attribute 'get_gate_metrics'"
+  },
+  "queues": {
+    "total_pending": 0,
+    "by_agent": {
+      "queues": {
+        "kublai": 6,
+        "mongke": 15,
+        "chagatai": 10,
+        "temujin": 12,
+        "jochi": 9,
+        "ogedei": 11
+      },
+      "oldest_age_s": {
+        "kublai": 18157,
+        "mongke": 3731,
+        "chagatai": 4846,
+        "temujin": 11146,
+        "jochi": 628,
+        "ogedei": 12561
+      }
+    },
+    "spawn_pending": 0
+  },
+  "delegation": {
+    "recent": [
+      {
+        "from_agent": "test_comprehensive",
+        "to_agent": "jochi",
+        "task_label": "jochi-c8df5443-62a"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-ff2345a3-7d0"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-4a12425b-d55"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-802c4954-ef4"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-3470572e-e86"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-63ea6714-94e"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-fd05cfe5-4bb"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-81c9899b-978"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-c8abccf7-257"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-c87effb1-7f5"
+      },
+      {
+        "from_agent": "kublai-routed",
+        "to_agent": "jochi",
+        "task_label": "jochi-ca28214d-d9b"
+      },
+      {
+        "from_agent": "test_comprehensive",
+        "to_agent": "jochi",
+        "task_label": "jochi-57b07d8e-1c9"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-ec6a6667-155"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-70118679-722"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-2f1b2818-f6a"
+      },
+      {
+        "from_agent": "test",
+        "to_agent": "jochi",
+        "task_label": "jochi-bddd694c-d7f"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-380032db-299"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-ad08e931-7bc"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-7893ae82-808"
+      },
+      {
+        "from_agent": "perf_test",
+        "to_agent": "jochi",
+        "task_label": "jochi-84ac5902-e1c"
+      }
+    ],
+    "count_30m": 20
+  },
+  "errors": {
+    "clusters": []
+  },
+  "system": {
+    "neo4j_reachable": true,
+    "tick_status": "healthy",
+    "neo4j_status": "up",
+    "redis_status": "up"
+  },
+  "queue_audit": {
+    "audited": 262,
+    "fake_found": 0,
+    "requeued": 0,
+    "skipped": 27,
+    "double_suffix_fixed": 0
+  },
+  "ledger_reconciliation": {
+    "neo4j_total_completed": 12,
+    "ledger_total_completed": 29,
+    "delta": -17,
+    "mismatches": [
+      {
+        "agent": "kublai",
+        "neo4j_completed": 0,
+        "ledger_completed": 4,
+        "neo4j_failed": 0,
+        "ledger_failed": 4
+      },
+      {
+        "agent": "mongke",
+        "neo4j_completed": 0,
+        "ledger_completed": 7,
+        "neo4j_failed": 0,
+        "ledger_failed": 2
+      },
+      {
+        "agent": "chagatai",
+        "neo4j_completed": 0,
+        "ledger_completed": 3,
+        "neo4j_failed": 0,
+        "ledger_failed": 8
+      },
+      {
+        "agent": "temujin",
+        "neo4j_completed": 0,
+        "ledger_completed": 4,
+        "neo4j_failed": 0,
+        "ledger_failed": 0
+      },
+      {
+        "agent": "jochi",
+        "neo4j_completed": 12,
+        "ledger_completed": 8,
+        "neo4j_failed": 0,
+        "ledger_failed": 1
+      },
+      {
+        "agent": "ogedei",
+        "neo4j_completed": 0,
+        "ledger_completed": 3,
+        "neo4j_failed": 0,
+        "ledger_failed": 0
+      }
+    ],
+    "reconciled": false
+  },
+  "stale_locks": {
+    "total": 0,
+    "by_agent": {
+      "kublai": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "temujin": 0,
+      "jochi": 0,
+      "ogedei": 0,
+      "tolui": 0
+    },
+    "details": []
+  },
+  "routing": {
+    "queue_balance_index": 0.393,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95": 420,
+    "total_routed": 0,
+    "overflow_count": 0,
+    "queue_depths": {
+      "temujin": 34,
+      "mongke": 21,
+      "chagatai": 14,
+      "jochi": 14,
+      "ogedei": 21
+    },
+    "source": "computed"
+  },
+  "redistribution": {
+    "cycles_run_30m": 3,
+    "tasks_moved_30m": 0,
+    "moves_by_agent": {},
+    "triggers": {
+      "imbalance": 3
+    },
+    "last_cycle": "2026-03-08T17:43:12.051975"
+  },
+  "load_monitoring": {
+    "current_load_factor": 1.0,
+    "trend": "stable",
+    "prediction": "Insufficient data",
+    "sample_count": 5,
+    "overload_predicted": false,
+    "load_history_available": true,
+    "error": null
+  },
+  "subprocess": {
+    "executing": 5,
+    "alive": 5,
+    "dead": 0,
+    "stale": 0,
+    "zombies": 0,
+    "orphaned": 0,
+    "anomaly_count": 1,
+    "anomalies": [
+      {
+        "type": "zombie_process",
+        "agent": "kublai",
+        "task_id": null,
+        "pid": 11148,
+        "details": "Handler process running but no .executing.md file found",
+        "action": "investigate"
+      }
+    ]
+  },
+  "llm_assessment": {
+    "model": "heuristic-fallback",
+    "workload_balance": "",
+    "bottleneck": "4 cron jobs erroring",
+    "coordination_gap": "",
+    "recommended_action": "none needed",
+    "severity": "MEDIUM"
+  }
+}

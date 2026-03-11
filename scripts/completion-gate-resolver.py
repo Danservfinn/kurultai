@@ -35,137 +35,6 @@ except ImportError:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR
 
-# File-based locking constants
-LOCK_DIR = Path.home() / ".openclaw" / "agents" / "main" / "locks"
-RESOLVER_PID_FILE = LOCK_DIR / "gate-resolver.pid"
-LOCK_TIMEOUT_SECONDS = 300  # 5 minutes max lock age
-
-# Platform-specific O_EXCL constant
-try:
-    O_OEXCL = os.O_EXCL
-except AttributeError:
-    O_OEXCL = 0  # Fallback for platforms without O_EXCL
-
-
-def _acquire_resolver_lock() -> Tuple[bool, Optional[int], str]:
-    """
-    Acquire exclusive resolver lock to prevent concurrent runs.
-
-    Returns:
-        (success, lock_fd, message)
-    """
-    LOCK_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Check for stale lock
-    if RESOLVER_PID_FILE.exists():
-        try:
-            lock_age = datetime.now().timestamp() - RESOLVER_PID_FILE.stat().st_mtime
-            pid_content = RESOLVER_PID_FILE.read_text().strip()
-
-            # Parse PID from lock file
-            try:
-                lock_pid = int(pid_content.split('\n')[0])
-            except (ValueError, IndexError):
-                lock_pid = None
-
-            # Check if lock is stale (too old OR process dead)
-            is_stale = lock_age > LOCK_TIMEOUT_SECONDS
-            is_dead = False
-
-            if PSUTIL_AVAILABLE and lock_pid:
-                # Use psutil to check if process is alive
-                if psutil.pid_exists(lock_pid):
-                    try:
-                        proc = psutil.Process(lock_pid)
-                        # Check if it's actually our resolver process
-                        if 'completion-gate-resolver' not in ' '.join(proc.cmdline()):
-                            is_dead = True  # PID reused by different process
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        is_dead = True
-                else:
-                    is_dead = True  # PID doesn't exist
-            elif lock_pid:
-                # No psutil - use kill(0) to check if process exists
-                try:
-                    os.kill(lock_pid, 0)  # Signal 0 = check if process exists
-                    # Process exists - we can't verify it's our resolver without psutil
-                except OSError:
-                    is_dead = True  # PID doesn't exist
-
-            if is_stale or is_dead:
-                print(f"[LOCK] Cleaning up stale lock (age={lock_age:.0f}s, dead={is_dead})")
-                RESOLVER_PID_FILE.unlink(missing_ok=True)
-            else:
-                return False, None, f"Lock held by PID {lock_pid}"
-        except Exception as e:
-            print(f"[LOCK] Error checking lock: {e}, proceeding anyway")
-            RESOLVER_PID_FILE.unlink(missing_ok=True)
-
-    # Try to create lock file atomically
-    try:
-        lock_fd = os.open(str(RESOLVER_PID_FILE), os.O_CREAT | O_OEXCL | os.O_WRONLY)
-        # Write our PID
-        os.write(lock_fd, f"{os.getpid()}\n{datetime.now().isoformat()}\n".encode())
-        return True, lock_fd, "Lock acquired"
-    except FileExistsError:
-        return False, None, "Lock acquired by another process (race)"
-    except Exception as e:
-        return False, None, f"Lock error: {e}"
-
-
-def _release_resolver_lock(lock_fd: Optional[int]):
-    """Release resolver lock."""
-    if lock_fd is not None:
-        try:
-            os.close(lock_fd)
-        except Exception:
-            pass
-    RESOLVER_PID_FILE.unlink(missing_ok=True)
-
-
-def _atomic_rename_with_lock(source_path: Path, target_path: Path) -> Tuple[bool, str]:
-    """
-    Atomic rename with per-gate lock to prevent race conditions.
-
-    Returns:
-        (success, message)
-    """
-    if not source_path.exists():
-        return False, "source_not_found"
-
-    # Create per-gate lock
-    stem = source_path.name.replace('.pending-gate.md', '').replace('.md', '')
-    lock_path = LOCK_DIR / f"{stem}.gate-lock"
-
-    lock_fd = None
-    try:
-        lock_fd = os.open(str(lock_path), os.O_CREAT | O_OEXCL | os.O_WRONLY)
-    except FileExistsError:
-        return False, "concurrent_operation"
-    except Exception as e:
-        return False, f"lock_error: {e}"
-
-    try:
-        # Recheck source after lock
-        if not source_path.exists():
-            return False, "source_gone_after_lock"
-
-        # Check target doesn't exist
-        if target_path.exists():
-            return False, "target_already_exists"
-
-        # Atomic rename
-        source_path.rename(target_path)
-        return True, "ok"
-    finally:
-        if lock_fd is not None:
-            try:
-                os.close(lock_fd)
-            except Exception:
-                pass
-        lock_path.unlink(missing_ok=True)
-
-
 # Import shared gate utilities (prevents code duplication)
 from gate_utils import (
     VALID_AGENTS,
@@ -173,8 +42,18 @@ from gate_utils import (
     sanitize_task_id_for_glob,
     extract_frontmatter,
     find_task_file,
-    extract_task_id
+    extract_task_id,
+    atomic_rename_with_lock,
+    acquire_process_lock,
+    release_process_lock,
+    log_gate_event,
+    GATE_AUDITS_DIR,
+    LOCK_DIR
 )
+
+# File-based locking constants (resolver-specific)
+RESOLVER_PID_FILE = LOCK_DIR / "gate-resolver.pid"
+LOCK_TIMEOUT_SECONDS = 300  # 5 minutes max lock age
 
 # Import gate repository for Neo4j-first pending gate discovery
 try:
@@ -189,6 +68,20 @@ try:
 except ImportError:
     GATE_REPOSITORY_AVAILABLE = False
     print("[WARN] gate_repository.py not available, using legacy filesystem scan")
+
+# Import gate timeout configuration and enforcement
+try:
+    from gate_timeouts import (
+        GATE_PENDING_TIMEOUT,
+        check_pending_gate_timeouts,
+        escalate_stuck_gates,
+        log_timeout_event
+    )
+    GATE_TIMEOUTS_AVAILABLE = True
+except ImportError:
+    GATE_TIMEOUTS_AVAILABLE = False
+    print("[WARN] gate_timeouts.py not available, timeout enforcement disabled")
+    GATE_PENDING_TIMEOUT = timedelta(hours=24)  # Fallback default
 
 # Gate audit log directory
 GATE_AUDITS_DIR = Path.home() / ".openclaw" / "agents" / "main" / "logs" / "gate-audits"
@@ -372,7 +265,10 @@ class GateResolver:
 
     def all_followups_complete(self, followup_ids: List[str]) -> bool:
         """
-        Check if all follow-up tasks are complete (.done.md).
+        Check if all follow-up tasks are complete (.done.md) with substantive content.
+
+        Validates both filename AND content to prevent "hollow successes" where
+        tasks are marked done but lack resolution sections or actual output.
 
         Uses filesystem check for speed. Neo4j check available but not required.
         """
@@ -387,7 +283,66 @@ class GateResolver:
             if not task_file.suffix == '.md' or '.done.' not in task_file.name:
                 return False
 
+            # NEW: Verify task has substantive content with resolution
+            # This prevents hollow successes where .done.md files lack actual output
+            if not self._validate_task_content(task_file):
+                print(f"[GATE_RESOLVER] Task {task_id} marked done but lacks resolution content")
+                return False
+
         return True
+
+    def _validate_task_content(self, task_file: Path) -> bool:
+        """
+        Validate that a completed task has substantive content.
+
+        Returns False if task appears "hollow" - marked done but missing
+        actual execution output or resolution section.
+
+        Args:
+            task_file: Path to task file (expected to be .done.md)
+
+        Returns:
+            True if task has substantive content, False otherwise
+        """
+        try:
+            with open(task_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Extract execution output (same logic as completion_gate_audit.py)
+            marker = '## Execution Output'
+            if marker not in content:
+                return False
+
+            parts = content.rsplit(marker, 1)
+            if len(parts) < 2:
+                return False
+
+            execution_output = parts[1].strip()
+
+            # Check for minimum substantive content (>= 100 chars requires resolution)
+            if len(execution_output.strip()) >= 100:
+                # Must have resolution section indicators
+                has_resolution = (
+                    "## Resolution" in execution_output
+                    or "**Status:**" in execution_output
+                    or "## Result" in execution_output
+                    or "## Summary" in execution_output
+                )
+                if not has_resolution:
+                    return False
+
+            # Check for hollow completions (very short or just metadata)
+            output_lines = [l for l in execution_output.split('\n') if l.strip() and not l.strip().startswith('**')]
+            # Threshold: 1 line for short outputs, 2 for longer ones
+            min_lines = 1 if len(execution_output.strip()) < 100 else 2
+            if len(output_lines) < min_lines:
+                return False
+
+            return True
+
+        except Exception as e:
+            print(f"[WARN] Failed to validate content for {task_file.name}: {e}")
+            return False  # Fail closed - if we can't validate, don't treat as complete
 
     def has_blocked_followups(self, followup_ids: List[str]) -> bool:
         """Check if any follow-ups are in a blocked state (.gate-blocked.md or .failed)."""
@@ -469,15 +424,16 @@ class GateResolver:
         """
         task_id = extract_task_id(gate_task)
 
-        # Rename to .gate-passed.done.md
-        done_file = gate_task.with_suffix(".gate-passed.done.md")
+        # Rename to .gate-passed.done.md (use with_name to replace entire filename)
+        stem = gate_task.stem.replace('.pending-gate', '')
+        done_file = gate_task.with_name(f"{stem}.gate-passed.done.md")
 
         if self.dry_run:
             print(f"[DRY_RUN] Would rename {gate_task.name} -> {done_file.name}")
             return
 
         # Use atomic rename with lock
-        success, message = _atomic_rename_with_lock(gate_task, done_file)
+        success, message = atomic_rename_with_lock(gate_task, done_file)
 
         if not success:
             if message in ("concurrent_operation", "source_not_found", "source_gone_after_lock"):
@@ -497,7 +453,7 @@ class GateResolver:
                 print(f"[WARN] Failed to update Neo4j gate status: {e}")
 
         # Log completion
-        self._log_gate_event({
+        log_gate_event({
             "event": "GATE_PASSED",
             "task_id": task_id,
             "timestamp": datetime.now().isoformat(),
@@ -511,14 +467,16 @@ class GateResolver:
         """
         task_id = extract_task_id(gate_task)
 
-        blocked_file = gate_task.with_suffix(".gate-blocked.md")
+        # Rename to .gate-blocked.md (use with_name to replace entire filename)
+        stem = gate_task.stem.replace('.pending-gate', '')
+        blocked_file = gate_task.with_name(f"{stem}.gate-blocked.md")
 
         if self.dry_run:
             print(f"[DRY_RUN] Would mark {gate_task.name} as blocked")
             return
 
         # Use atomic rename with lock
-        success, message = _atomic_rename_with_lock(gate_task, blocked_file)
+        success, message = atomic_rename_with_lock(gate_task, blocked_file)
 
         if not success:
             if message in ("concurrent_operation", "source_not_found", "source_gone_after_lock"):
@@ -537,7 +495,7 @@ class GateResolver:
             except Exception as e:
                 print(f"[WARN] Failed to update Neo4j gate status: {e}")
 
-        self._log_gate_event({
+        log_gate_event({
             "event": "GATE_BLOCKED",
             "task_id": task_id,
             "reason": reason,
@@ -596,16 +554,70 @@ class GateResolver:
             "avg_completion_24h": round(avg_completion, 1)
         }
 
-    def _log_gate_event(self, event: dict):
-        """Log gate event to ledger file."""
-        ledger_path = Path.home() / ".openclaw" / "logs" / "gate-events.log"
-        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    def check_gate_timeouts(self, auto_escalate: bool = False) -> dict:
+        """Check for gates stuck in pending state beyond timeout threshold.
 
-        try:
-            with open(ledger_path, 'a') as f:
-                f.write(json.dumps(event) + '\n')
-        except Exception:
-            pass  # Don't block on logging failure
+        Args:
+            auto_escalate: If True, automatically create kublai tasks for stuck gates
+
+        Returns:
+            Dict with timeout check results:
+            - stuck_count: Number of stuck gates found
+            - escalated_count: Number of gates escalated (if auto_escalate)
+            - stuck_gates: List of stuck gate info
+        """
+        if not GATE_TIMEOUTS_AVAILABLE:
+            # Fallback implementation if gate_timeouts module unavailable
+            stuck_gates = []
+            pending_gates = self.find_pending_gates()
+
+            for gate_file in pending_gates:
+                try:
+                    mtime = datetime.fromtimestamp(gate_file.stat().st_mtime)
+                    age = datetime.now() - mtime
+
+                    if age > GATE_PENDING_TIMEOUT:
+                        task_id = extract_task_id(gate_file)
+                        stuck_gates.append({
+                            "task_id": task_id,
+                            "file_path": str(gate_file),
+                            "age_hours": age.total_seconds() / 3600,
+                            "agent": gate_file.parent.parent.name
+                        })
+                except Exception:
+                    continue
+
+            result = {
+                "stuck_count": len(stuck_gates),
+                "escalated_count": 0,
+                "stuck_gates": stuck_gates
+            }
+        else:
+            # Use gate_timeouts module
+            stuck_gates = check_pending_gate_timeouts()
+            escalated_count = 0
+
+            if auto_escalate and stuck_gates:
+                count, _ = escalate_stuck_gates(stuck_gates, dry_run=self.dry_run)
+                escalated_count = count
+
+            result = {
+                "stuck_count": len(stuck_gates),
+                "escalated_count": escalated_count,
+                "stuck_gates": stuck_gates
+            }
+
+        # Log timeout check event
+        if result["stuck_count"] > 0:
+            log_gate_event({
+                "event": "GATE_TIMEOUT_CHECK",
+                "timestamp": datetime.now().isoformat(),
+                "stuck_count": result["stuck_count"],
+                "escalated_count": result["escalated_count"],
+                "timeout_hours": GATE_PENDING_TIMEOUT.total_seconds() / 3600
+            })
+
+        return result
 
 
 def print_metrics(metrics: dict):
@@ -639,6 +651,10 @@ Examples:
                         help="Check and resolve all pending gates")
     parser.add_argument("--metrics", action="store_true",
                         help="Show gate metrics")
+    parser.add_argument("--check-timeouts", action="store_true",
+                        help="Check for gates stuck beyond timeout threshold")
+    parser.add_argument("--escalate-timeouts", action="store_true",
+                        help="Check and escalate stuck gates to kublai")
     parser.add_argument("--task", help="Check specific task")
     parser.add_argument("--check-only", action="store_true",
                         help="Only check, don't resolve")
@@ -654,9 +670,34 @@ Examples:
         print_metrics(metrics)
         return 0
 
+    elif args.check_timeouts or args.escalate_timeouts:
+        # Check for stuck gates
+        timeout_result = resolver.check_gate_timeouts(
+            auto_escalate=args.escalate_timeouts
+        )
+
+        print()
+        print("=== GATE TIMEOUT CHECK ===")
+        print(f"Timeout Threshold: {GATE_PENDING_TIMEOUT.total_seconds() / 3600}h")
+        print(f"Stuck Gates Found: {timeout_result['stuck_count']}")
+
+        if timeout_result['stuck_count'] > 0:
+            print()
+            print("Stuck Gates:")
+            for gate in timeout_result['stuck_gates']:
+                print(f"  - {gate.get('task_id', 'unknown')}: {gate.get('age_hours', 0):.1f}h ({gate.get('agent', 'unknown')})")
+
+        if args.escalate_timeouts:
+            print()
+            print(f"Escalated to Kublai: {timeout_result['escalated_count']}")
+
+        if timeout_result['stuck_count'] > 0:
+            return 1  # Return error code if stuck gates found
+        return 0
+
     elif args.resolve_all:
         # Acquire process lock to prevent concurrent resolver runs
-        success, lock_fd, message = _acquire_resolver_lock()
+        success, lock_fd, message = acquire_process_lock(RESOLVER_PID_FILE, LOCK_TIMEOUT_SECONDS)
         if not success:
             print(f"[GATE_RESOLVER] {message}, skipping this cycle")
             return 0  # Not an error - another instance is running
@@ -666,7 +707,7 @@ Examples:
             print(f"\n[GATE_RESOLVER] Resolved {resolved} gates")
             return 0
         finally:
-            _release_resolver_lock(lock_fd)
+            release_process_lock(lock_fd, RESOLVER_PID_FILE)
 
     elif args.task:
         # Check specific task
