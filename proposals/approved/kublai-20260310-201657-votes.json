@@ -1,0 +1,38 @@
+{
+  "kublai": {
+    "agent": "kublai",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-11T10:51:18.332838",
+    "reason": null
+  },
+  "temujin": {
+    "agent": "temujin",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-11T10:51:18.362844",
+    "reason": null
+  },
+  "mongke": {
+    "agent": "mongke",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-11T10:51:18.392853",
+    "reason": null
+  },
+  "chagatai": {
+    "agent": "chagatai",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-11T10:51:18.423038",
+    "reason": null
+  },
+  "jochi": {
+    "agent": "jochi",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-11T10:51:18.454003",
+    "reason": null
+  },
+  "ogedei": {
+    "agent": "ogedei",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-11T10:51:18.484510",
+    "reason": null
+  }
+}

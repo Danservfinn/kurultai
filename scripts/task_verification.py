@@ -89,13 +89,16 @@ def verify_task_completion(task_file: str, max_retries: int = 3) -> tuple[bool, 
                     return False, f"Execution output too short ({len(output_lines)} lines, need 4+)"
 
                 # Check for resolution section on substantive outputs
+                # Matches audit_missing_resolutions.py patterns including auto-generated reports
                 if len(output_section) >= 100:
                     resolution_patterns = [
-                        r"## Resolution",
-                        r"## Summary",
-                        r"## Changes Made",
-                        r"## Files (Created|Modified)",
-                        r"## Acceptance Criteria",
+                        r"## Resolution",              # Explicit resolution (preferred)
+                        r"## What Was Done",           # Auto-generated report standard
+                        r"## Summary",                 # Alternative summary header
+                        r"## Changes Made",            # Change-focused summary
+                        r"## Files (Created|Modified)",# File-centric summary
+                        r"## Acceptance Criteria",     # Verification-focused
+                        r"## Deliverables",            # Output-focused (auto-generated)
                     ]
                     has_resolution = any(
                         re.search(p, output_section, re.IGNORECASE)

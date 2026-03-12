@@ -218,12 +218,13 @@ Investigate and fix credentials in affected agents' settings.json.
 
 ## Scripts That Need This Pattern
 
-| Script | Priority | Agent Affected | Notes |
-|--------|----------|----------------|-------|
-| `hourly_reflection.sh` | **HIGH** | All agents | Original issue — 15h blackout |
-| `agent-task-handler.py` | MEDIUM | All agents | Has auth guards, but preflight cleaner |
-| `auto_dispatch.py` | MEDIUM | kublai | Depends on LLM for routing |
-| `kurultai_brainstorm.py` | LOW | temujin | Only runs during kurultai |
+| Script | Priority | Agent Affected | Status | Notes |
+|--------|----------|----------------|--------|-------|
+| `hourly_reflection.sh` | **HIGH** | All agents | ✅ Implemented | Original issue — 15h blackout |
+| `agent-task-handler.py` | **HIGH** | All agents | ✅ Implemented (2026-03-11) | `spawn_subagent()` now checks auth before queueing |
+| `task-watcher.py` | **HIGH** | All agents | ✅ Implemented | `process_spawn_queue()` checks auth for agent_execution |
+| `auto_dispatch.py` | MEDIUM | kublai | ⚠️ Pending | Depends on LLM for routing |
+| `kurultai_brainstorm.py` | LOW | temujin | ⚠️ Pending | Only runs during kurultai |
 
 ---
 
@@ -260,6 +261,7 @@ auth_health_preflight "kublai" 10 || echo "PASS: Auth failed detected"
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-03-11 | Initial pattern documentation | chagatai |
+| 2026-03-11 | Added auth preflight to `spawn_subagent()` in agent-task-handler.py | temujin |
 
 ---
 

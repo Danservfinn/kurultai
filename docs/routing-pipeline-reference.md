@@ -1,7 +1,7 @@
 # Routing Pipeline Reference
 
-**Version:** 1.0
-**Date:** 2026-03-10
+**Version:** 1.2
+**Date:** 2026-03-12
 **Author:** Chagatai (Kurultai Writer)
 **Domain:** routing_pipeline
 **Status:** Reference Documentation
@@ -249,6 +249,23 @@ Checks all 6 dispatch agents (`temujin, mongke, chagatai, jochi, ogedei, tolui`)
 
 **Critical override:** Even for explicitly-routed tasks, if the agent's queue >= adaptive CRITICAL threshold (8), load balancing activates.
 
+### Credential Validation in Load Balancing (2026-03-09)
+
+**Code:** `find_best_idle_agent()` lines 1477-1483
+
+Before routing overflow to an alternate agent, the system validates credentials:
+
+```python
+alt_valid, alt_error = check_agent_credentials(agent)
+if not alt_valid:
+    print(f"LOAD_BALANCE_CREDENTIAL_BLOCK: {agent} has invalid credentials")
+    continue  # Skip this agent, try next
+```
+
+**Impact:** Prevents tasks from routing to agents with expired/invalid API credentials. If all dispatch agents have invalid credentials, the task is rejected and a CRITICAL escalation is created for ogedei to fix fleet-wide credentials.
+
+**Validation method:** `check_agent_credentials()` — checks for valid `sk-ant-` prefix in agent's `settings.json`.
+
 ---
 
 ## Data Structures
@@ -258,6 +275,7 @@ Checks all 6 dispatch agents (`temujin, mongke, chagatai, jochi, ogedei, tolui`)
 Keyword lists used in S2 scoring. Key agents:
 - **temujin:** code, build, implement, fix, deploy, design, architect, brainstorm...
 - **mongke:** research, discover, competitor, market, trend, study, benchmark...
+  - **AI/LLM research (2026-03-11):** llm, gpt, claude, anthropic, openai, alibaba, z.ai, dashscope, model comparison, ai model, language model, embedding, vector, rag, model benchmark, ai pricing, api pricing comparison, provider comparison, model research, ai research, llm evaluation, model capabilities, context window, token limit, rate limit, model features, ai provider
 - **chagatai:** write, document, blog, content, changelog, draft, summarize...
 - **jochi:** test, verify, audit, review, security, debug, scan, vulnerability...
 - **ogedei:** monitor, health, restart, backup, alert, cron, watchdog, cleanup...
@@ -359,7 +377,7 @@ grep "_SKILL_CAPABLE_ALTERNATES" scripts/task_intake.py | head -20
 
 **First-match-wins:** Rules are checked in array order. Earlier rules block later ones.
 
-**Mongke research protection (2026-03-09):** Blocks non-research tasks from routing to mongke:
+**Mongke research protection (2026-03-09, updated 2026-03-11):** Blocks non-research tasks from routing to mongke:
 
 | Rule Pattern | Target | Rationale |
 |--------------|--------|-----------|
@@ -368,6 +386,7 @@ grep "_SKILL_CAPABLE_ALTERNATES" scripts/task_intake.py | head -20
 | `bidirectional linking` | temujin | Dev/testing → dev |
 | `design research competitors/market/trend/pricing` | mongke | Actual market research → mongke |
 | `design research` (generic) | temujin | Design tasks (not market research) → dev |
+| `investigate model capabilities` / `investigate ai model` / `investigate llm` | mongke | AI/LLM model research (2026-03-11) |
 
 **Monitor:**
 ```bash
@@ -390,7 +409,16 @@ python3 scripts/validate_mongke_routing.py
 
 ---
 
-## Source Files
+## Orphaned / Unused Routing Scripts
+
+| File | Status | Notes |
+|------|--------|-------|
+| `scripts/routing_engine.py` | **NOT IN USE** | Abandoned refactoring attempt. Contains TODO placeholders for load balancer and circuit breaker integration. Not imported by any active script. |
+| `scripts/_archived/task-router.py` | Archived | Predecessor to current pipeline. |
+
+**Do NOT use `routing_engine.py` for routing decisions.** It is not integrated with the active pipeline in `task_intake.py`.
+
+## Source Files (Active Pipeline)
 
 | File | Lines | Purpose |
 |------|-------|---------|
@@ -408,5 +436,7 @@ python3 scripts/validate_mongke_routing.py
 **Document Metadata:**
 - Author: Chagatai (Writer)
 - Domain: routing_pipeline
-- Last updated: 2026-03-10
-- Reflection cycle: 2026-03-10 02:00
+- Last updated: 2026-03-12
+- v1.2 changes: Added "Orphaned / Unused Routing Scripts" section to clarify routing_engine.py status
+- v1.1 changes: Added AI/LLM research keywords, credential validation details
+- Reflection cycle: 2026-03-12 03:00

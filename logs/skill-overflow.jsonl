@@ -1,0 +1,1 @@
+{"ts": "2026-03-11T13:10:34.207528", "skill_hint": "/horde-learn", "primary_agent": "mongke", "alternate_agent": "chagatai", "primary_depth": 2, "alternate_depth": 1, "reason": "skill_overflow_bypass: /horde-learn from mongke(q=2) -> chagatai(q=1)"}

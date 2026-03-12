@@ -1,5 +1,36 @@
 # Kublai Agent Memory - Main Project
 
+## Heartbeat System (2026-03-12)
+
+### Overview
+Three-phase monitoring cycle: TICK (5min), TOCK (30min), KURULTAI (60min). See `docs/heartbeat-system.md` for unified documentation.
+
+| Phase | Script | Purpose |
+|-------|--------|---------|
+| TICK | `watchdog-gather.sh` | Infrastructure health, task queues, auth heartbeat |
+| TOCK | `tock-gather.sh` | Agent metrics, completion rates, velocity data |
+| KURULTAI | `hourly_reflection.sh` | Self-reflection, behavioral rules, voting cycle |
+
+### Auth Heartbeat (subset of TICK)
+Real-time credential health monitoring that **tests actual authentication** (not just format validation). Runs every tick (5min) via `auth_heartbeat.py`.
+
+### Key Files
+- `docs/heartbeat-system.md` — **NEW: Unified heartbeat documentation**
+- `docs/auth-heartbeat-reference.md` — Auth heartbeat details
+- `scripts/auth_heartbeat.py` — Auth check script
+- `logs/auth-heartbeat.json` — Auth status cache (5min stale threshold)
+
+### Purpose
+- Prevent auth failures **before** task dispatch (not during execution)
+- Early detection of credential expiry (all agents now on Z.AI provider as of 2026-03-12)
+- 5-minute stale threshold balances freshness vs overhead
+
+### Integration Points
+- `watchdog-gather.sh` SECTION 4c
+- `tick-summary.txt`: `AUTH_HEARTBEAT: failed_checks=N`
+- `ticks.jsonl`: `auth_heartbeat.failed_checks`
+- `watchdog.log`: `auth_heartbeat_failed=N`
+
 ## Recent Critical Issues (2026-03-08)
 
 ### Model Configuration Crisis
@@ -54,12 +85,38 @@
 - Queue audit system effectively identifying fake completions
 - Ledger reconciliation shows -15 delta (Neo4j vs actual ledger)
 
+## State Consistency (Neo4j + filesystem dual-state)
+
+**Problem:** Neo4j unavailable → filesystem-only mode creates orphaned tasks
+**Solution:** `scripts/reconcile_neo4j_tasks.py` — automated in hourly_reflection.sh
+**Details:** `memory/neo4j-reconciliation.md` (script comparison table, usage patterns)
+
+### Two Reconciliation Scripts (IMPORTANT)
+| Script | Status | Purpose |
+|--------|--------|---------|
+| `reconcile_neo4j_tasks.py` | ✅ ACTIVE | Recovers orphaned filesystem tasks (when Neo4j was down) |
+| `neo4j-state-sync.py` | ❌ DEPRECATED (2026-03-09) | Old architecture; Neo4j now source of truth |
+
 ## WHEN/THEN Rules
 
-**Canonical registry:** `memory/when_then_rules.md` (7 active rules, R001-R007)
+**Canonical registry:** `memory/when_then_rules.md` (12 active rules, R001-R012)
 **Rule lifecycle docs:** `memory/rules_lifecycle.md`
 
 > Do NOT define rules here. All rules live in the canonical registry above.
+
+## Agent Behavioral Rules (Topic Files)
+
+Agent-specific behavioral rules extracted from each agent's rules.json:
+
+| Agent | Rules File | Rules Count |
+|-------|-----------|-------------|
+| **Chagatai** | `memory/chagatai-behavioral-rules.md` | C001-C005 (5 rules) |
+| **Jochi** | `memory/jochi-behavioral-rules.md` | J004 (1 rule) |
+| **Kublai** | `memory/kublai-behavioral-rules.md` | K001-K008 (8 rules) |
+| **Ogedei** | `memory/ogedei-behavioral-rules.md` | O001-O006 (6 rules) |
+| **Mongke** | `memory/mongke-research-protection.md` | M001-M004 + R008 (5 rules) |
+
+See individual files for full WHEN/THEN conditions, rationale, and implementation guidance.
 
 ## Memory Maintenance
 

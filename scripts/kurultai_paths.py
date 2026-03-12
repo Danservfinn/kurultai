@@ -29,9 +29,9 @@ BRAINSTORM_LOG = LOGS_DIR / "kurultai-brainstorm.log"
 BRAINSTORM_COOLDOWN = LOGS_DIR / "brainstorm-cooldown.json"
 BRAINSTORM_DOMAIN_ROTATION = LOGS_DIR / "brainstorm-domain-rotation.json"
 
-# Valid agent names
-VALID_AGENTS = frozenset({"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"})
-DISPATCH_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
+# Valid agent names (tolui excluded: uses ollama executor, not claude-agent)
+VALID_AGENTS = frozenset({"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"})
+DISPATCH_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
 # Agent routing keywords (canonical source)
 AGENT_KEYWORDS = {

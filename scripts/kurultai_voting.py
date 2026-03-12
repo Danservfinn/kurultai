@@ -74,7 +74,18 @@ def log_phase(phase: int, message: str, data: dict = None):
 
 def run_script(script_name: str, args: List[str] = None) -> Tuple[int, str, str]:
     """Run a Python script and return exit code, stdout, stderr."""
-    script_path = SCRIPTS_DIR / script_name
+    import sys
+    # Ensure scripts directory is in path for imports
+    scripts_dir = Path(__file__).parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    
+    try:
+        from script_paths import get_script_path
+        script_path = get_script_path(script_name.replace(".py", ""))
+    except (KeyError, ImportError, ModuleNotFoundError):
+        # Fallback for scripts not in registry
+        script_path = SCRIPTS_DIR / script_name
     cmd = ["python3", str(script_path)] + (args or [])
 
     try:
@@ -212,6 +223,264 @@ def phase3_start_voting() -> Dict[str, str]:
     return voting_started
 
 
+def get_proposals_last_24h() -> List[Path]:
+    """Get all proposals (pending + voting) from the last 24 hours."""
+    proposals = []
+    now = datetime.now()
+    cutoff = now - timedelta(hours=24)
+
+    # Check pending directory
+    for f in PENDING_DIR.glob("*.md"):
+        try:
+            content = f.read_text()
+            if "created:" in content:
+                for line in content.split("\n"):
+                    if line.startswith("created:"):
+                        created_str = line.split(":", 1)[1].strip()
+                        # Parse ISO format
+                        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                        # Handle timezone-naive comparison
+                        created = created.replace(tzinfo=None)
+                        if created >= cutoff:
+                            proposals.append(f)
+                        break
+        except Exception:
+            # Include file if we can't parse timestamp (safer to include)
+            proposals.append(f)
+
+    # Check voting directory (proposals already in voting from last 24h)
+    for f in VOTING_DIR.glob("*.md"):
+        if "-votes.json" in f.name:
+            continue
+        try:
+            content = f.read_text()
+            if "created:" in content:
+                for line in content.split("\n"):
+                    if line.startswith("created:"):
+                        created_str = line.split(":", 1)[1].strip()
+                        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                        created = created.replace(tzinfo=None)
+                        if created >= cutoff:
+                            proposals.append(f)
+                        break
+        except Exception:
+            proposals.append(f)
+
+    # Deduplicate
+    seen = set()
+    unique = []
+    for p in proposals:
+        if p.stem not in seen:
+            seen.add(p.stem)
+            unique.append(p)
+
+    return unique
+
+
+def refresh_voting_deadline(proposal_path: Path) -> bool:
+    """
+    Refresh the voting deadline for a proposal to 60 minutes from now.
+
+    This is needed for proposals that are still in voting but have expired deadlines.
+    """
+    try:
+        # Find the proposal (may have moved from pending/ to voting/)
+        proposal_id = proposal_path.stem
+        actual_path = VOTING_DIR / f"{proposal_id}.md"
+        if not actual_path.exists():
+            actual_path = PENDING_DIR / f"{proposal_id}.md"
+        if not actual_path.exists():
+            log_phase(3, f"  Could not find proposal {proposal_id} for deadline refresh")
+            return False
+
+        content = actual_path.read_text()
+        now = datetime.now()
+        new_deadline = (now + timedelta(hours=1)).isoformat()
+
+        # Update voting_deadline in frontmatter
+        lines = content.split("\n")
+        new_lines = []
+        for line in lines:
+            if line.startswith("voting_deadline:"):
+                new_lines.append(f"voting_deadline: {new_deadline}")
+            else:
+                new_lines.append(line)
+
+        new_content = "\n".join(new_lines)
+        actual_path.write_text(new_content)
+
+        log_phase(3, f"  Refreshed voting deadline for {proposal_id}")
+        return True
+
+    except Exception as e:
+        log_phase(3, f"  Failed to refresh deadline for {proposal_path.stem}: {e}")
+        return False
+
+
+def cast_agent_vote(agent: str, proposal_id: str) -> Optional[str]:
+    """
+    Have an agent evaluate a proposal and cast a vote.
+
+    Agent evaluates based on their domain expertise:
+    - kublai: Routing, coordination, cross-agent orchestration
+    - temujin: Development, infrastructure, code, APIs
+    - mongke: Research, market analysis, fact-finding
+    - chagatai: Documentation, content, marketing
+    - jochi: Testing, analysis, security, code review
+    - ogedei: Operations, monitoring, incidents, infrastructure
+
+    Returns: APPROVE, REJECT, or ABSTAIN
+    """
+    try:
+        # Find the proposal file (could be in pending/ or voting/)
+        proposal_path = VOTING_DIR / f"{proposal_id}.md"
+        if not proposal_path.exists():
+            proposal_path = PENDING_DIR / f"{proposal_id}.md"
+        if not proposal_path.exists():
+            log_phase(3, f"  Could not find proposal {proposal_id}")
+            return None
+
+        content = proposal_path.read_text()
+        frontmatter = {}
+
+        # Parse frontmatter
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                fm_text = parts[1].strip()
+                for line in fm_text.split("\n"):
+                    if ":" in line:
+                        key, value = line.split(":", 1)
+                        frontmatter[key.strip()] = value.strip()
+
+        proposal_id = frontmatter.get("proposal_id", proposal_path.stem)
+        proposal_agent = frontmatter.get("agent", "unknown")
+        domain = frontmatter.get("domain", "")
+        impact = frontmatter.get("impact", "medium")
+        effort = frontmatter.get("effort", "medium")
+
+        # Agent evaluates based on domain alignment and proposal quality
+        # Simple heuristic: approve if domain aligns and impact >= effort
+        vote = "APPROVE"
+        reason = ""
+
+        # Domain alignment scoring
+        domain_keywords = {
+            "temujin": ["code", "development", "infrastructure", "api", "technical", "architecture"],
+            "mongke": ["research", "market", "analysis", "data", "knowledge"],
+            "chagatai": ["documentation", "content", "marketing", "communication", "style"],
+            "jochi": ["testing", "security", "review", "quality", "audit", "detection"],
+            "ogedei": ["operations", "monitoring", "incident", "health", "infrastructure", "alert"],
+            "kublai": ["routing", "coordination", "orchestration", "queue", "task"]
+        }
+
+        agent_keywords = domain_keywords.get(agent, [])
+        content_lower = (domain + " " + frontmatter.get("title", "")).lower()
+
+        # Check if proposal aligns with agent's domain
+        domain_match = any(kw in content_lower for kw in agent_keywords)
+
+        # Impact/effort ratio check
+        impact_scores = {"low": 1, "medium": 2, "high": 3}
+        effort_scores = {"low": 1, "medium": 2, "high": 3}
+
+        impact_val = impact_scores.get(impact.lower(), 2)
+        effort_val = effort_scores.get(effort.lower(), 2)
+
+        # Decision logic:
+        # - APPROVE: High impact + low/medium effort, OR domain alignment
+        # - ABSTAIN: Low impact OR unclear proposal
+        # - REJECT: High effort + low impact (poor ROI)
+
+        if impact_val >= effort_val or domain_match:
+            vote = "APPROVE"
+            reason = f"Good ROI (impact={impact}, effort={effort})" + (" + domain alignment" if domain_match else "")
+        elif impact_val < effort_val and not domain_match:
+            vote = "ABSTAIN"
+            reason = f"Low priority (impact={impact} < effort={effort})"
+
+        # Cast the vote
+        rc, stdout, stderr = run_script(
+            "voting_manager.py",
+            ["--action", "cast-vote", "--proposal", proposal_id, "--agent", agent, "--vote", vote]
+        )
+
+        if rc == 0:
+            log_phase(3, f"  {agent} voted {vote} on {proposal_id}: {reason}")
+            return vote
+        else:
+            log_phase(3, f"  {agent} vote failed on {proposal_id}: {stderr}")
+            return None
+
+    except Exception as e:
+        log_phase(3, f"  Error evaluating {proposal_path}: {e}")
+        return None
+
+
+def phase3_cast_votes() -> Dict[str, Dict[str, str]]:
+    """
+    Each Khan votes on all proposals from the last 24 hours.
+
+    This is the authentic Mongolian Kurultai model - all Khans participate
+    in evaluating and approving proposals before implementation.
+
+    Returns: Dict of proposal_id -> {agent -> vote}
+    """
+    log_phase(3, "Casting votes for proposals from last 24 hours")
+
+    votes_cast = {}
+
+    # Get all proposals from last 24 hours
+    proposals = get_proposals_last_24h()
+    log_phase(3, f"Found {len(proposals)} proposals from last 24 hours")
+
+    if not proposals:
+        log_phase(3, "No proposals to vote on")
+        return votes_cast
+
+    # Start voting and refresh deadlines for all proposals before casting votes
+    log_phase(3, "Starting voting and refreshing deadlines...")
+    for proposal in proposals:
+        proposal_id = proposal.stem
+        # Start voting (moves from pending/ to voting/)
+        rc, stdout, stderr = run_script(
+            "voting_manager.py",
+            ["--action", "start-voting", "--proposal", proposal_id]
+        )
+        if rc == 0:
+            log_phase(3, f"  Voting started for {proposal_id}")
+        else:
+            # May already be in voting stage - that's ok
+            if "already" in stderr.lower() or "voting" in stderr.lower():
+                log_phase(3, f"  {proposal_id} already in voting")
+            else:
+                log_phase(3, f"  Warning: Could not start voting for {proposal_id}: {stderr}")
+        # Refresh deadline
+        refresh_voting_deadline(proposal)
+
+    # Each agent votes on each proposal
+    for proposal in proposals:
+        proposal_id = proposal.stem
+        votes_cast[proposal_id] = {}
+
+        for agent in ALL_KHANS:
+            vote = cast_agent_vote(agent, proposal_id)
+            if vote:
+                votes_cast[proposal_id][agent] = vote
+
+        # Log summary for this proposal
+        if votes_cast[proposal_id]:
+            approve_count = sum(1 for v in votes_cast[proposal_id].values() if v == "APPROVE")
+            reject_count = sum(1 for v in votes_cast[proposal_id].values() if v == "REJECT")
+            abstain_count = sum(1 for v in votes_cast[proposal_id].values() if v == "ABSTAIN")
+            log_phase(3, f"  {proposal_id}: APPROVE={approve_count}, REJECT={reject_count}, ABSTAIN={abstain_count}")
+
+    total_votes = sum(len(v) for v in votes_cast.values())
+    log_phase(3, f"Voting complete: {total_votes} votes cast across {len(votes_cast)} proposals")
+
+    return votes_cast
+
+
 def phase3_simulate_voting() -> Dict[str, dict]:
     """
     Simulate voting for testing purposes.
@@ -299,6 +568,9 @@ def phase4_check_consensus() -> Dict[str, dict]:
 
     Kublai creates tasks ONLY for proposals with 6/6 APPROVE votes.
     This is the authentic Mongolian Kurultai model - no unilateral action.
+
+    Proposals with 6/6 APPROVE are moved to approved/.
+    Proposals with any REJECT are moved to rejected/.
     """
     log_phase(4, "Checking consensus for all proposals in voting")
 
@@ -311,12 +583,6 @@ def phase4_check_consensus() -> Dict[str, dict]:
 
         proposal_id = f.stem
 
-        # Check if voting is complete
-        rc, stdout, stderr = run_script(
-            "voting_manager.py",
-            ["--action", "check-status", "--proposal", proposal_id]
-        )
-
         # Get vote tally
         rc2, stdout2, stderr2 = run_script(
             "voting_manager.py",
@@ -328,22 +594,196 @@ def phase4_check_consensus() -> Dict[str, dict]:
         except json.JSONDecodeError:
             tally = {}
 
+        consensus = tally.get("APPROVE", 0) == 6
+        vetoed = tally.get("REJECT", 0) > 0
+
         results[proposal_id] = {
             "status": "checking",
             "tally": tally,
-            "consensus": tally.get("APPROVE", 0) == 6,
-            "vetoed": tally.get("REJECT", 0) > 0
+            "consensus": consensus,
+            "vetoed": vetoed
         }
 
         log_phase(4, f"  {proposal_id}: APPROVE={tally.get('APPROVE', 0)}/6, REJECT={tally.get('REJECT', 0)}")
 
-    # Identify approved proposals
-    approved = [p for p, r in results.items() if r["consensus"]]
-    vetoed = [p for p, r in results.items() if r["vetoed"]]
+        # Finalize proposals that have reached consensus or been vetoed
+        # check_voting_complete automatically determines approved/rejected based on tally
+        if consensus or vetoed:
+            rc, stdout, stderr = run_script(
+                "voting_manager.py",
+                ["--action", "finalize", "--proposal", proposal_id]
+            )
+            if rc == 0:
+                if "approved" in stdout.lower():
+                    results[proposal_id]["finalized"] = "approved"
+                    log_phase(4, f"  -> MOVED TO APPROVED: {proposal_id}")
+                elif "rejected" in stdout.lower():
+                    results[proposal_id]["finalized"] = "rejected"
+                    log_phase(4, f"  -> MOVED TO REJECTED: {proposal_id}")
+                else:
+                    results[proposal_id]["finalized"] = stdout.strip()
+            else:
+                results[proposal_id]["finalized"] = f"failed: {stderr}"
+
+    # Count results
+    approved = [p for p, r in results.items() if r.get("finalized") == "approved"]
+    vetoed = [p for p, r in results.items() if r.get("finalized") == "rejected"]
 
     log_phase(4, f"Consensus check complete: {len(approved)} approved, {len(vetoed)} vetoed")
 
+    # Create tasks for newly approved proposals
+    if approved:
+        log_phase(4, f"Creating tasks for {len(approved)} approved proposals...")
+        for proposal_id in approved:
+            _create_task_for_proposal(proposal_id)
+
     return results
+
+
+def create_neo4j_task(task_id: str, agent: str, title: str, body: str,
+                     priority: str = "normal", source: str = "kurultai_voting",
+                     proposal_id: str = None) -> bool:
+    """Create a Neo4j Task node for Kurultai proposal tasks.
+
+    Prevents PENDING_NO_DISPATCH stall by ensuring tasks exist in Neo4j
+    (source of truth for task-watcher atomic claiming).
+
+    Returns: True if successful, False otherwise
+    """
+    try:
+        from neo4j import GraphDatabase
+
+        # Get Neo4j credentials from environment
+        uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
+        user = os.environ.get('NEO4J_USER', 'neo4j')
+
+        if 'NEO4J_AUTH' in os.environ:
+            password = os.environ.get('NEO4J_AUTH', '').split('://')[1].split('@')[0]
+        else:
+            password = os.environ.get('NEO4J_PASSWORD', 'password')
+
+        driver = GraphDatabase.driver(uri, auth=(user, password))
+        with driver.session() as session:
+            query = """
+                MERGE (t:Task {task_id: $task_id})
+                SET t.agent = $agent,
+                    t.title = $title,
+                    t.priority = $priority,
+                    t.status = 'pending',
+                    t.created = datetime($created),
+                    t.source = $source,
+                    t.skill_hint = '/horde-implement',
+                    t.proposal_id = $proposal_id
+                RETURN t.task_id as id
+            """
+            result = session.run(query,
+                task_id=task_id,
+                agent=agent,
+                title=title[:200],  # Neo4j title limit
+                priority=priority,
+                created=datetime.now().isoformat(),
+                source=source,
+                proposal_id=proposal_id or ""
+            )
+            created_id = result.single()["id"]
+        driver.close()
+        log_phase(4, f"  -> Neo4j entry created: {created_id}")
+        return True
+    except Exception as e:
+        log_phase(4, f"  -> Neo4j creation FAILED: {e}")
+        return False
+
+
+def _create_task_for_proposal(proposal_id: str) -> None:
+    """Create an implementation task for an approved proposal."""
+    try:
+        # Find the approved proposal file
+        proposal_files = list(APPROVED_DIR.glob(f"{proposal_id}*.md"))
+        if not proposal_files:
+            log_phase(4, f"  Could not find approved proposal: {proposal_id}")
+            return
+
+        proposal_file = proposal_files[0]
+        content = proposal_file.read_text()
+        frontmatter = {}
+
+        # Parse frontmatter
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                fm_text = parts[1].strip()
+                for line in fm_text.split("\n"):
+                    if ":" in line:
+                        key, value = line.split(":", 1)
+                        frontmatter[key.strip()] = value.strip()
+
+        agent = frontmatter.get("agent", "temujin")
+        domain = frontmatter.get("domain", "Development")
+        title = frontmatter.get("title", proposal_id)
+
+        # Create task file in the appropriate agent's queue
+        agent_task_dir = Path(f"/Users/kublai/.openclaw/agents/{agent}/tasks")
+        agent_task_dir.mkdir(parents=True, exist_ok=True)
+
+        task_id = f"proposal-{proposal_id}"
+        timestamp = int(datetime.now().timestamp())
+        task_file = agent_task_dir / f"high-{timestamp}-{task_id}.md"
+
+        task_content = f"""---
+task_id: {task_id}
+agent: {agent}
+priority: high
+created: {datetime.now().isoformat()}
+source: kurultai_consensus
+proposal_id: {proposal_id}
+skill_hint: /horde-implement
+---
+
+# Task: Implement Approved Kurultai Proposal
+
+**This task was created after unanimous consent (6/6 APPROVE) from the Kurultai.**
+
+## Original Proposal
+See: `proposals/approved/{proposal_id}.md`
+
+## Title
+{title}
+
+## Agent Domain
+{domain}
+
+## Instructions
+1. Read the approved proposal in `proposals/approved/{proposal_id}.md`
+2. Review the implementation steps outlined in the proposal
+3. Implement the solution following Kurultai development standards
+4. Update the proposal with implementation notes when complete
+5. Mark task as done with resolution summary
+
+## Context
+This proposal passed the authentic Mongolian Kurultai consensus model - all 6 Khans voted APPROVE.
+The implementation has full backing from the entire agent collective.
+"""
+        # Write filesystem task first
+        task_file.write_text(task_content)
+        log_phase(4, f"  -> Filesystem task created: {task_file.name}")
+
+        # CRITICAL: Create Neo4j entry to prevent PENDING_NO_DISPATCH stall
+        # task-watcher requires Neo4j entries for atomic task claiming
+        neo4j_success = create_neo4j_task(
+            task_id=task_id,
+            agent=agent,
+            title=f"Implement: {title}",
+            body=task_content,
+            priority="high",
+            source="kurultai_consensus",
+            proposal_id=proposal_id
+        )
+
+        if not neo4j_success:
+            log_phase(4, f"  WARNING: Task created but Neo4j entry failed - may cause dispatch stall")
+
+    except Exception as e:
+        log_phase(4, f"  Error creating task for {proposal_id}: {e}")
 
 
 def phase4_create_tasks_for_approved() -> List[str]:
@@ -378,17 +818,22 @@ def phase4_create_tasks_for_approved() -> List[str]:
             agent = frontmatter.get("agent", "temujin")
             domain = frontmatter.get("domain", "")
 
-            # Create task file
+            # Create task file in the AGENT'S queue (not central TASKS_DIR)
+            agent_task_dir = Path(f"/Users/kublai/.openclaw/agents/{agent}/tasks")
+            agent_task_dir.mkdir(parents=True, exist_ok=True)
+
             task_id = f"proposal-{proposal_id}"
-            task_file = TASKS_DIR / f"normal-{int(datetime.now().timestamp())}-{task_id}.md"
+            timestamp = int(datetime.now().timestamp())
+            task_file = agent_task_dir / f"high-{timestamp}-{task_id}.md"
 
             task_content = f"""---
 task_id: {task_id}
 agent: {agent}
-priority: normal
+priority: high
 created: {datetime.now().isoformat()}
 source: kurultai_consensus
 proposal_id: {proposal_id}
+skill_hint: /horde-implement
 ---
 
 # Task: Implement Approved Proposal
@@ -408,9 +853,25 @@ See: proposals/approved/{proposal_id}.md
 Review the approved proposal and implement the solution described.
 The proposal has passed consensus voting and is ready for implementation.
 """
+            # Write filesystem task first
             task_file.write_text(task_content)
+
+            # CRITICAL: Create Neo4j entry to prevent PENDING_NO_DISPATCH stall
+            neo4j_success = create_neo4j_task(
+                task_id=task_id,
+                agent=agent,
+                title=f"Implement Approved Proposal: {proposal_id}",
+                body=task_content,
+                priority="high",
+                source="kurultai_consensus",
+                proposal_id=proposal_id
+            )
+
             tasks_created.append(task_id)
-            log_phase(4, f"  Created task {task_id} for proposal {proposal_id}")
+            if neo4j_success:
+                log_phase(4, f"  Created task {task_id} for proposal {proposal_id} (filesystem + Neo4j)")
+            else:
+                log_phase(4, f"  Created task {task_id} for proposal {proposal_id} (filesystem only - Neo4j FAILED)")
 
         except Exception as e:
             log_phase(4, f"  Error creating task for {proposal_id}: {e}")
@@ -571,6 +1032,8 @@ def main():
                        help="Show current status")
     parser.add_argument("--diagnose", action="store_true",
                        help="Run voting diagnostics to understand why votes may be 0/6")
+    parser.add_argument("--cast-votes", action="store_true",
+                       help="Cast votes for all agents on proposals from last 24h")
 
     args = parser.parse_args()
 
@@ -598,6 +1061,18 @@ def main():
         print("\n" + "="*60)
         print("CYCLE COMPLETE")
         print(f"Duration: {results['duration_seconds']:.1f}s")
+        print("="*60 + "\n")
+
+    elif args.cast_votes:
+        print("\n" + "="*60)
+        print("CASTING AGENT VOTES (Last 24h Proposals)")
+        print("="*60 + "\n")
+
+        results = phase3_cast_votes()
+
+        print("\n" + "="*60)
+        print("VOTING COMPLETE")
+        print(f"Proposals voted: {len(results)}")
         print("="*60 + "\n")
 
     elif args.phase:

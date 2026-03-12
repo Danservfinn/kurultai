@@ -281,11 +281,21 @@ log_auth_failure() {
     echo "[$timestamp] AUTH_FAILURE: $agent failed preflight (reason: $reason)" >> "$LOGS_DIR/ticks.jsonl"
 }
 
+# Per-agent provider mapping (must match credential vault)
+# All agents -> Z.AI (Tier 1) - Alibaba (sk-sp-*) timing out with Exit 124
+get_agent_provider() {
+    local agent="$1"
+    case "$agent" in
+        *) echo "zai" ;;  # All agents on zai (jochi, ogedei fixed 2026-03-12: was alibaba, timeout Exit 124)
+    esac
+}
+
 auth_health_preflight() {
     local agent="${1:-kublai}"
-    local timeout="${2:-15}"
+    local timeout="${2:-30}"  # Increased from 15s to reduce Exit 124 false positives
     local max_retries=3  # Exponential backoff: 0s, 2s, 4s delays
     local attempt=0
+    local provider=$(get_agent_provider "$agent")
 
     # Quick test: Can claude-agent complete a minimal request?
     # NOTE: claude-agent wrapper doesn't support --agent flag
@@ -298,6 +308,9 @@ auth_health_preflight() {
     while [ $attempt -lt $max_retries ]; do
         (
             cd "$agent_dir" || exit 1
+            # CRITICAL: Set CLAUDE_PROVIDER to use fallback credentials
+            # Without this, claude-agent defaults to "default" provider with NO credentials
+            export CLAUDE_PROVIDER="$provider"
             timeout ${timeout}s "$CLAUDE_AGENT_BIN" \
                 "Respond with exactly: OK" \
                 >/dev/null 2>&1
@@ -335,13 +348,34 @@ run_agent_reflection() {
     # AUTH PREFLIGHT: Check before attempting reflection
     # Skip gracefully if auth fails (don't fail the entire cron job)
     # ============================================================
-    if ! auth_health_preflight "$AGENT" 15; then
+    if ! auth_health_preflight "$AGENT" 30; then
         echo "[$(date)] [$AGENT] SKIP: Auth preflight failed - skipping reflection"
         log_auth_failure "$AGENT" "preflight_timeout_or_auth_error"
         return 0  # Exit gracefully, not as error
     fi
 
     echo "[$(date)] [$AGENT] Auth confirmed - Starting protocol reflection..."
+
+    # Run Neo4j/filesystem reconciliation to catch drift early
+    # (Prevents phantom queue entries that block task dispatch)
+    if [ -f "$SCRIPTS/reconcile_neo4j_tasks.py" ]; then
+        echo "[$(date)] [$AGENT] Running Neo4j reconciliation..."
+        python3 "$SCRIPTS/reconcile_neo4j_tasks.py" --fix >> "$LOGS_DIR/reconciliation.log" 2>&1 || true
+    fi
+
+    # Clear stale task claims (>10 min old) that block dispatch
+    # (Fixes PENDING+session_key state inconsistency)
+    if [ -f "$SCRIPTS/clear_stale_claims.py" ]; then
+        echo "[$(date)] [$AGENT] Clearing stale task claims..."
+        python3 "$SCRIPTS/clear_stale_claims.py" >> "$LOGS_DIR/reconciliation.log" 2>&1 || true
+    fi
+
+    # Run state consistency check to detect stale locks and orphaned tasks
+    # (Added 2026-03-11: Prevents phantom dispatch failures)
+    if [ -f "$SCRIPTS/state_consistency_check.py" ]; then
+        echo "[$(date)] [$AGENT] Running state consistency check..."
+        python3 "$SCRIPTS/state_consistency_check.py" --fix >> "$LOGS_DIR/state-consistency.log" 2>&1 || true
+    fi
 
     # Ensure memory directory exists
     mkdir -p "$MEMORY_DIR"
@@ -511,14 +545,28 @@ timed_step "task-metrics" \
 
 echo "[$(date)] Starting Consensus Voting (Kurultai Model)..."
 
-# Phase 1: Generate proposals from each agent
-# CHANGE: Removed --sample flag - only use real reflection proposals
-timed_step "voting-phase1-proposals" \
-    run_with_timeout 60 python3 "$SCRIPTS/proposal_generator.py" --agent kublai >> "$LOGS_DIR/voting-phase1.log" 2>&1
+# Phase 1: Generate proposals from each agent's reflection
+# Each agent generates 1 sample proposal based on their domain expertise
+# In production, this would extract proposals from reflection output
+echo "[$(date)] Starting Consensus Voting - Phase 1: Generate proposals..."
+for agent in kublai temujin mongke chagatai jochi ogedei; do
+    echo "[$(date)] Generating proposal for $agent..."
+    if run_with_timeout 30 python3 "$SCRIPTS/proposal_generator.py" --agent "$agent" --sample >> "$LOGS_DIR/voting-phase1.log" 2>&1; then
+        echo "[$(date)] Proposal generated for $agent"
+    else
+        echo "[$(date)] WARNING: Proposal generation failed for $agent (rc=$?)"
+    fi
+done
+echo "[$(date)] Phase 1 complete"
 
 # Phase 2: Start voting for pending proposals
 timed_step "voting-phase2-start" \
     run_with_timeout 30 python3 "$SCRIPTS/kurultai_voting.py" --phase 3 >> "$LOGS_DIR/voting-phase2.log" 2>&1
+
+# Phase 2b: Cast votes - Each agent votes on proposals from last 24h
+# This is the authentic Kurultai model - all Khans evaluate proposals
+timed_step "voting-phase2b-cast-votes" \
+    run_with_timeout 120 python3 "$SCRIPTS/kurultai_voting.py" --cast-votes >> "$LOGS_DIR/voting-phase2b.log" 2>&1
 
 # Phase 3: Check consensus (will finalize proposals)
 timed_step "voting-phase3-consensus" \
@@ -564,7 +612,7 @@ _bg_timed_step() {
 
 echo "[$(date)] Starting Tier 1 (independent steps) with semaphore..."
 
-for step_name in "reflection-research-persist" "session-drift-detect" "memory-audit-fix" "cross-agent-rules" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis"; do
+for step_name in "reflection-research-persist" "session-drift-detect" "memory-audit-fix" "cross-agent-rules" "agent-rules-evaluator" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis"; do
     wait_for_semaphore
     case "$step_name" in
         reflection-research-persist)
@@ -578,6 +626,9 @@ for step_name in "reflection-research-persist" "session-drift-detect" "memory-au
             ;;
         cross-agent-rules)
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/cross_agent_rules.py" >> "$LOGS_DIR/cross-agent-rules.log" 2>&1 &
+            ;;
+        agent-rules-evaluator)
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/evaluate_agent_rules.py" --exec >> "$LOGS_DIR/agent-rules-evaluator.log" 2>&1 &
             ;;
         capability-scores)
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/route_quality_tracker.py" >> "$LOGS_DIR/capability-scores.log" 2>&1 &

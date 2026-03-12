@@ -1,56 +1,86 @@
 {
-  "last_run": "2026-03-11T06:02:32.581321",
-  "last_count": 10,
+  "last_run": "2026-03-12T06:02:51.175490",
+  "last_count": 16,
   "reported_tasks": [
     {
-      "agent": "tolui",
-      "filename": "_archive-normal-1773039928.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581344"
+      "agent": "ogedei",
+      "filename": "normal-1773309241.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175524"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773303770.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175531"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773302276-cdb686ad.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175535"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773298687-a96ee05c.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175538"
+    },
+    {
+      "agent": "chagatai",
+      "filename": "normal-1773277724.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175541"
+    },
+    {
+      "agent": "ogedei",
+      "filename": "normal-1773275434.failed.revision-1.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175544"
+    },
+    {
+      "agent": "chagatai",
+      "filename": "normal-1773275433.failed.revision-1.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175547"
+    },
+    {
+      "agent": "jochi",
+      "filename": "normal-1773275435.failed.revision-1.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175550"
+    },
+    {
+      "agent": "temujin",
+      "filename": "normal-1773273053.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175553"
+    },
+    {
+      "agent": "ogedei",
+      "filename": "task-watcher-dispatch-fix-20260311-193300.pending.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175556"
+    },
+    {
+      "agent": "ogedei",
+      "filename": "chagatai-auth-fix-20260311-183348.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175558"
+    },
+    {
+      "agent": "chagatai",
+      "filename": "update-stale-doc-escalation-protocol-20260311-143000.revision-1.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175561"
+    },
+    {
+      "agent": "jochi",
+      "filename": "normal-1773250998.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175564"
+    },
+    {
+      "agent": "ogedei",
+      "filename": "high-1773226804.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175566"
     },
     {
       "agent": "mongke",
-      "filename": "normal-1773200607.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581348"
+      "filename": "high-1773226804.failed.revision-1.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175569"
     },
     {
-      "agent": "temujin",
-      "filename": "normal-1773183803.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581351"
-    },
-    {
-      "agent": "temujin",
-      "filename": "normal-1773180201.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581353"
-    },
-    {
-      "agent": "temujin",
-      "filename": "normal-1773176600.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581355"
-    },
-    {
-      "agent": "temujin",
-      "filename": "normal-1773173000.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581357"
-    },
-    {
-      "agent": "temujin",
-      "filename": "normal-1773169399.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581359"
-    },
-    {
-      "agent": "temujin",
-      "filename": "critical-parse-stripe-setup-001.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581361"
-    },
-    {
-      "agent": "temujin",
-      "filename": "high-1773166103.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581363"
-    },
-    {
-      "agent": "temujin",
-      "filename": "high-1773165834.failed.done.md",
-      "ts": "2026-03-11T06:02:32.581365"
+      "agent": "ogedei",
+      "filename": "normal-1773227787.failed.revision-1.failed.done.md",
+      "ts": "2026-03-12T06:02:51.175571"
     }
   ]
 }

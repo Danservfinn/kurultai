@@ -61,21 +61,87 @@ def count_active_claude_processes():
 
     ACP sessions (the current architecture) don't create .executing.md files.
     This function checks for running claude processes as a proxy for active work.
+
+    Uses ps aux instead of pgrep for more reliable detection of bash wrapper processes.
+
     Returns: int - number of active claude-agent processes
     """
+    count = 0
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "claude-agent"],
+            ["ps", "aux"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=10
         )
         if result.returncode == 0:
-            pids = result.stdout.strip().split('\n')
-            return len([p for p in pids if p])
+            # Count bash processes running claude-agent with --workdir
+            for line in result.stdout.split('\n'):
+                if 'bin/claude-agent' in line and '--workdir' in line:
+                    count += 1
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
-    return 0
+    return count
+
+
+def is_reflection_running():
+    """Detect if Kurultai hourly reflection is currently running.
+
+    During reflection, all 6 agents run meta_reflection.py which takes them
+    away from normal task execution. This causes total_executing==0 temporarily,
+    which would trigger PENDING_NO_DISPATCH false positives.
+
+    Detection methods (in order of reliability):
+    1. Check for running meta_reflection.py or prepare_reflection_context.py processes
+    2. Check for recent *_reflection_context.md files in /tmp (< 10 min old)
+
+    Returns: bool - True if reflection appears to be running
+    """
+    import glob
+
+    # Method 1: Check for active reflection processes (most reliable)
+    try:
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                # Look for reflection-related processes
+                if any(pattern in line for pattern in [
+                    'meta_reflection.py',
+                    'prepare_reflection_context.py',
+                    'kurultai_reflect',
+                    'hourly_reflection.sh'
+                ]):
+                    # Ignore grep processes
+                    if 'grep' not in line and 'def is_reflection_running' not in line:
+                        return True
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+    # Method 2: Check for recent reflection context files in /tmp
+    tmp_dir = Path("/tmp")
+    now = time.time()
+    reflection_window_s = 600  # 10 minutes
+
+    try:
+        # Look for agent reflection context files (created by prepare_reflection_context.py)
+        pattern = "*_reflection_context.md"
+        for f in tmp_dir.glob(pattern):
+            try:
+                mtime = f.stat().st_mtime
+                age = now - mtime
+                if age < reflection_window_s:
+                    return True
+            except (OSError, FileNotFoundError):
+                continue
+    except (OSError, FileNotFoundError):
+        pass
+
+    return False
 
 
 def get_active_claude_processes_by_agent():
@@ -84,73 +150,38 @@ def get_active_claude_processes_by_agent():
     Uses process command line inspection to determine which agent
     each claude-agent process is working for.
 
+    ACP sessions execute via: /bin/bash /path/to/claude-agent --workdir /path/to/agents/{agent}
+    This function extracts the agent name from the --workdir argument.
+
     Returns: dict mapping agent_name -> process_count
     """
     agent_counts = {a: 0 for a in DISPATCH_AGENTS}
+    import re
 
     try:
-        # Get PIDs of all claude-agent processes (including bash wrappers)
+        # Use ps aux directly instead of pgrep for more reliable detection
+        # pgrep doesn't handle bash wrapper processes with embedded newlines well
         result = subprocess.run(
-            ["pgrep", "-f", "claude-agent"],
+            ["ps", "aux"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=10
         )
         if result.returncode != 0:
             return agent_counts
 
-        pids = result.stdout.strip().split('\n')
-        pids = [p for p in pids if p]
+        # Find lines containing claude-agent wrapper with --workdir
+        for line in result.stdout.split('\n'):
+            # Look for bash processes running claude-agent with --workdir
+            if 'bin/claude-agent' in line and '--workdir' in line:
+                # Extract agent name from --workdir argument
+                # Pattern: --workdir /path/to/agents/{agent}
+                match = re.search(r'--workdir\s+\S+agents/(\w+)', line)
+                if match:
+                    agent = match.group(1)
+                    if agent in DISPATCH_AGENTS:
+                        agent_counts[agent] += 1
 
-        # For each PID, check the command line to identify the agent
-        for pid in pids:
-            try:
-                # Get process command line (includes agent directory path)
-                cmd_result = subprocess.run(
-                    ["ps", "-p", pid, "-o", "command="],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
-                if cmd_result.returncode == 0:
-                    cmd_line = cmd_result.stdout
-                    # Extract agent name from path like:
-                    # ".../agents/ogedei/..." or ".../agents/mongke/..."
-                    for agent in DISPATCH_AGENTS:
-                        if f"/agents/{agent}/" in cmd_line:
-                            agent_counts[agent] += 1
-                            break
-            except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-                pass
-
-        # Also check for claude processes with --workdir flag (direct claude invocation)
-        # This catches processes that might not have "claude-agent" in the name
-        result = subprocess.run(
-            ["pgrep", "-f", "claude.*--workdir.*agents/"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            extra_pids = result.stdout.strip().split('\n')
-            extra_pids = [p for p in extra_pids if p and p not in pids]
-            
-            for pid in extra_pids:
-                try:
-                    cmd_result = subprocess.run(
-                        ["ps", "-p", pid, "-o", "command="],
-                        capture_output=True,
-                        text=True,
-                        timeout=2
-                    )
-                    if cmd_result.returncode == 0:
-                        cmd_line = cmd_result.stdout
-                        for agent in DISPATCH_AGENTS:
-                            if f"/agents/{agent}/" in cmd_line:
-                                agent_counts[agent] += 1
-                                break
-                except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-                    pass
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
 
@@ -363,17 +394,20 @@ def get_last_completion_age_hours():
 def get_failure_rates(hours):
     """Count FAILED and COMPLETED events per agent in window. Returns (per_agent, fleet) dicts.
 
-    ACP-aware: Excludes failed tasks that are actively being retried via ACP sessions.
-    If an agent has active claude-agent processes, those processes represent tasks
-    being retried after failure. We exclude those from the failure rate to avoid
-    false positives when agents are actively working.
+    Rework-aware: Excludes failed tasks that eventually complete (rework cycles).
+    Quality gate failures that trigger revision but eventually complete are not
+    counted as terminal failures. This prevents false-positive HIGH_FAILURE_RATE
+    alerts when agents are productively working through revision cycles.
+
+    ACP-aware: Also excludes failed tasks that are actively being retried via ACP sessions.
     """
     events = read_ledger(hours=hours)
     agent_failed = defaultdict(int)
     agent_completed = defaultdict(int)
 
-    # Track task_ids that failed within the window
+    # Track task_ids per event type for rework-aware calculation
     failed_task_ids = defaultdict(set)  # agent -> set of failed task_ids
+    completed_task_ids = defaultdict(set)  # agent -> set of completed task_ids
 
     for e in events:
         agent = e.get("agent")
@@ -381,51 +415,62 @@ def get_failure_rates(hours):
             continue
         ev = e.get("event")
         if ev == "FAILED":
-            agent_failed[agent] += 1
-            # Track which specific tasks failed
             task_id = e.get("task_id")
             if task_id:
                 failed_task_ids[agent].add(task_id)
         elif ev == "COMPLETED":
-            agent_completed[agent] += 1
+            task_id = e.get("task_id")
+            if task_id:
+                completed_task_ids[agent].add(task_id)
 
-    # ACP-aware adjustment: Exclude failed tasks that are actively retrying
-    # Get active claude processes per agent
+    # Rework-aware calculation: Exclude failures for tasks that eventually completed
+    # A task that fails 3 times then completes = 1 completion, 0 failures (rework cycle)
+    # A task that fails and never completes = 1 failure (terminal failure)
+    rework_adjusted_failed = defaultdict(int)
+    for agent in DISPATCH_AGENTS:
+        failed = failed_task_ids.get(agent, set())
+        completed = completed_task_ids.get(agent, set())
+
+        # Terminal failures = tasks that failed but NEVER completed
+        terminal_failures = failed - completed
+        rework_adjusted_failed[agent] = len(terminal_failures)
+
+    # ACP-aware adjustment: Also exclude failed tasks actively being retried
     active_processes = get_active_claude_processes_by_agent()
 
-    # For each agent with active processes, subtract those from failed count
-    # Each active process represents one task being retried after failure
     adjusted_failed = defaultdict(int)
     for agent in DISPATCH_AGENTS:
-        raw_failed = agent_failed.get(agent, 0)
+        terminal_count = rework_adjusted_failed.get(agent, 0)
         active_count = active_processes.get(agent, 0)
 
-        # Exclude actively-retrying tasks from failure count
+        # Subtract actively-retrying tasks from terminal failure count
         # Each active process = one failed task now being retried
-        adjusted_failed[agent] = max(0, raw_failed - active_count)
+        adjusted_failed[agent] = max(0, terminal_count - active_count)
 
     per_agent = {}
-    for agent in set(list(agent_failed) + list(agent_completed)):
+    for agent in set(list(failed_task_ids) + list(completed_task_ids)):
         failed = adjusted_failed.get(agent, 0)
-        completed = agent_completed.get(agent, 0)
+        completed = len(completed_task_ids.get(agent, set()))
         total = failed + completed
+        raw_failed = len(failed_task_ids.get(agent, set()))
         per_agent[agent] = {
             "failed": failed,
             "completed": completed,
             "total": total,
-            "raw_failed": agent_failed.get(agent, 0),  # Include raw count for debugging
+            "raw_failed": raw_failed,  # Include raw count for debugging
             "active_processes": active_processes.get(agent, 0),
             "rate": failed / total if total > 0 else 0,
         }
 
     fleet_failed = sum(adjusted_failed.values())
-    fleet_completed = sum(agent_completed.values())
+    fleet_completed = sum(len(ct) for ct in completed_task_ids.values())
     fleet_total = fleet_failed + fleet_completed
+    fleet_raw_failed = sum(len(ft) for ft in failed_task_ids.values())
     fleet = {
         "failed": fleet_failed,
         "completed": fleet_completed,
         "total": fleet_total,
-        "raw_failed": sum(agent_failed.values()),  # Include raw count for debugging
+        "raw_failed": fleet_raw_failed,  # Include raw count for debugging
         "active_processes_total": sum(active_processes.values()),
         "rate": fleet_failed / fleet_total if fleet_total > 0 else 0,
     }
@@ -486,14 +531,19 @@ def detect_anomalies():
 
     # Anomaly 4: Tasks pending but nothing executing (dispatch starvation)
     # Catches the gap where tasks queue up but task-watcher isn't picking them up
+    # REFLECTION-AWARE: Suppress false positives during hourly reflection cycle
+    # (all agents run meta_reflection.py, causing temporary 0 executing state)
     if total_pending >= 3 and total_executing == 0:
-        pend_list = ", ".join(f"{a}={n}" for a, n in sorted(pending.items()))
-        warnings.append(
-            f"THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — "
-            f"{total_pending} task(s) pending [{pend_list}] but "
-            f"0 executing. Task-watcher may be stalled or not running. "
-            f"Check: launchctl list | grep task-watcher"
-        )
+        # Check if reflection is running before flagging anomaly
+        if not is_reflection_running():
+            pend_list = ", ".join(f"{a}={n}" for a, n in sorted(pending.items()))
+            warnings.append(
+                f"THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — "
+                f"{total_pending} task(s) pending [{pend_list}] but "
+                f"0 executing. Task-watcher may be stalled or not running. "
+                f"Check: launchctl list | grep task-watcher"
+            )
+        # else: Reflection running - agents are busy reflecting, not stalled
 
     # Anomaly 5: Queue imbalance — some agents overloaded while others idle
     # Detects routing failures where work piles up on 1-2 agents while others starve
@@ -621,6 +671,30 @@ def update_anomaly_persistence(anomaly_types):
     last_tick = state.get("last_tick", 0)
     prev_type = state.get("type")
     consecutive = state.get("consecutive", 0)
+
+    # Recovery detection: For HIGH_FAILURE_RATE, check recent health (last 1 hour)
+    # If recent rate is healthy, the system has recovered even with old failures in 2h window
+    if prev_type == "HIGH_FAILURE_RATE" and primary == "HIGH_FAILURE_RATE":
+        # Check recent window (1 hour)
+        _, recent_fleet = get_failure_rates(hours=1.0)
+        recent_rate = recent_fleet.get("rate", 1.0)  # Default to 100% if no data
+        recent_total = recent_fleet.get("total", 0)
+
+        # If we have meaningful recent data and rate is healthy (<50%), reset counter
+        # This allows the alert to clear when the system recovers, even with old failures in window
+        # FIX: Lowered threshold from >=2 to >=1 to handle low-activity recovery (e.g., only 1 task completed)
+        # A 0% rate with any activity means recovery, regardless of task count
+        if (recent_total >= 1 and recent_rate == 0.0) or (recent_total >= 2 and recent_rate < 0.50):
+            # System recovered: reset consecutive counter
+            consecutive = 1
+        elif consecutive >= 5:
+            # For persistent alerts, also check if 2h rate is improving
+            _, fleet = get_failure_rates(FAILURE_RATE_WINDOW_H)
+            current_rate = fleet.get("rate", 0)
+
+            # If rate dropped significantly (below 80% of threshold), reduce counter
+            if current_rate < FLEET_FAILURE_RATE_THRESHOLD * 0.8:
+                consecutive = max(1, consecutive // 2)
 
     if now - last_tick > TICK_STALENESS_S:
         # Too long since last tick — reset (missed ticks or restart)

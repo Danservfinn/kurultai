@@ -22,6 +22,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -36,10 +37,14 @@ WAKE_LOG_FILE = LOGS_DIR / "self-wake.log"
 WATCHDOG_LOG = LOGS_DIR / "watchdog.log"
 
 AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
-# Exclude kublai -- lead agent, woken separately by LLM triage
+# Kublai added 2026-03-12: Router needs proactive wake for routing duty when idle
+KUBLAI = "kublai"
+ALL_AGENTS = AGENTS + [KUBLAI]
+
 IDLE_THRESHOLD_MIN = 30
 COOLDOWN_MIN = 60  # Don't re-wake an agent within this window
 MAX_WAKES_PER_CYCLE = 2  # Limit concurrent wakes to avoid resource contention
+STALL_THRESHOLD_MIN = 60  # Agent with pending tasks but idle this long = STUCK
 
 
 def log(msg, level="INFO"):
@@ -132,13 +137,22 @@ def save_wake_state(state):
 
 
 def agent_has_active_session(agent):
-    """Check if agent has a running Claude Code process."""
+    """Check if agent has a running Claude Code process.
+
+    FIX 2026-03-12: Use workdir pattern matching to avoid false positives.
+    Old pattern "claude.*{agent}" matched kublai's prompt containing other agent names.
+    New pattern checks for --workdir argument pointing to the agent's directory.
+    """
     try:
         result = subprocess.run(
-            ["pgrep", "-f", f"claude.*{agent}"],
+            ["ps", "aux"],
             capture_output=True, text=True, timeout=5
         )
-        return bool(result.stdout.strip())
+        agent_path = str(AGENTS_DIR / agent)  # e.g., ~/.openclaw/agents/kublai
+        for line in result.stdout.splitlines():
+            if "claude" in line.lower() and f"--workdir {agent_path}" in line:
+                return True
+        return False
     except Exception:
         return False
 
@@ -284,20 +298,80 @@ def extract_blocked_items(agent):
     return unique[:5]  # Cap at 5 items
 
 
+def create_kublai_routing_audit(stalled_agents):
+    """Create a routing audit task for kublai when system has stalled agents.
+
+    This implements the PRIORITY_FIX from /horde-review: kublai should proactively
+    check for routing issues even when queue=0.
+    """
+    tasks_dir = AGENTS_DIR / KUBLAI / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = int(time.time())
+    uuid_suffix = uuid.uuid4().hex[:8]
+    task_id = f"normal-{ts}-{uuid_suffix}"
+    filename = f"{task_id}.md"
+    task_path = tasks_dir / filename
+
+    stalled_list = "\n".join(f"- {agent}: {info['pending']} pending, idle {info['idle_min']:.0f}m"
+                             for agent, info in stalled_agents.items())
+
+    content = f"""# Task: Routing Audit — Investigate Stalled Agents
+
+task_id: {task_id}
+source: agent-self-wake (kublai routing duty)
+priority: normal
+
+---
+
+You have been idle while other agents have pending tasks that aren't being executed.
+This indicates a potential routing or task-dispatch failure.
+
+## Stalled Agents Detected
+
+{stalled_list if stalled_agents else "(none)"}
+
+## Instructions
+
+1. Check `~/.openclaw/agents/main/logs/task-watcher.log` for dispatch errors
+2. Verify task-watcher is running: `pgrep -f task-watcher`
+3. Check Neo4j task status: Are these tasks in PENDING state?
+4. If task-watcher is down, restart it: `python3 scripts/task-watcher.py --daemon`
+5. If agents have sessions but aren't executing, investigate Claude Code health
+6. Report findings and take corrective action
+
+Do NOT just describe what should be done. Actually investigate and fix.
+"""
+
+    task_path.write_text(content)
+
+    if create_neo4j_task(task_id, KUBLAI, "Routing Audit — Investigate Stalled Agents", content, "normal", "kublai-routing-wake"):
+        log(f"Created kublai routing audit task in Neo4j+filesystem: {filename}")
+    else:
+        log(f"Created kublai routing audit task (filesystem-only): {filename}", "WARN")
+
+    return str(task_path)
+
+
 def create_wake_task(agent, blocked_items):
     """Create a task file in the agent's queue to wake them up."""
     tasks_dir = AGENTS_DIR / agent / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
     ts = int(time.time())
-    filename = f"normal-selfwake-{ts}.md"
+    uuid_suffix = uuid.uuid4().hex[:8]
+    # FIX (2026-03-11): Use canonical task_id format: {priority}-{timestamp}-{uuid8}
+    # Old format selfwake-{agent}-{ts} caused "Non-canonical task_id format" warnings
+    # and task-watcher claim failures (LEDGER ERROR: Invalid event: invalid task_id format)
+    task_id = f"normal-{ts}-{uuid_suffix}"
+    filename = f"{task_id}.md"
     task_path = tasks_dir / filename
 
     items_text = "\n".join(f"- {item}" for item in blocked_items)
 
     content = f"""# Task: Self-Wake -- Execute Blocked Items
 
-task_id: selfwake-{agent}-{ts}
+task_id: {task_id}
 source: agent-self-wake (Rule T7)
 priority: normal
 
@@ -325,7 +399,6 @@ Do NOT just describe what should be done. Actually do it using your tools.
     # CRITICAL FIX: Also create task in Neo4j so task-watcher can claim it
     # Without this, task-watcher's claim_task_atomic() returns "not_found"
     # and the task sits in filesystem indefinitely (PENDING_NO_DISPATCH stall)
-    task_id = f"selfwake-{agent}-{ts}"
     if create_neo4j_task(task_id, agent, "Self-Wake -- Execute Blocked Items", content, "normal", "agent-self-wake"):
         log(f"Created wake task in Neo4j+filesystem: {agent}/{filename}")
     else:
@@ -334,10 +407,65 @@ Do NOT just describe what should be done. Actually do it using your tools.
     return str(task_path)
 
 
+def create_stuck_task_recovery(agent):
+    """Create a task for an agent that has pending tasks but is stuck (no session, idle).
+
+    This fixes the deadlock where agents with pending tasks are skipped by self-wake,
+    leaving them stuck forever if task-watcher isn't dispatching.
+    """
+    tasks_dir = AGENTS_DIR / agent / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = int(time.time())
+    uuid_suffix = uuid.uuid4().hex[:8]
+    task_id = f"high-{ts}-{uuid_suffix}"  # high priority - system health issue
+    filename = f"{task_id}.md"
+    task_path = tasks_dir / filename
+
+    content = f"""# Task: STUCK TASK RECOVERY — Investigate Why Your Tasks Aren't Executing
+
+task_id: {task_id}
+source: agent-self-wake (stuck-agent recovery)
+priority: high
+
+---
+
+⚠️ SYSTEM ALERT: You have pending tasks but have been idle for over {STALL_THRESHOLD_MIN} minutes
+with no active Claude Code session. This indicates a task-dispatch failure.
+
+## Immediate Actions Required
+
+1. Check your task directory: `ls -la ~/.openclaw/agents/{agent}/tasks/`
+2. Check if task-watcher is running: `pgrep -f task-watcher`
+3. If task-watcher is down, restart it: `python3 scripts/task-watcher.py --daemon`
+4. Check task-watcher logs: `tail -50 ~/.openclaw/agents/main/logs/task-watcher.log`
+5. Verify Neo4j connection: Can task-watcher claim your pending tasks?
+6. Report findings to kublai for coordination
+
+## Current Pending Tasks
+(Your task directory has pending files that aren't being executed)
+
+Do NOT just describe what should be done. Run commands, check logs, and fix the issue.
+"""
+
+    task_path.write_text(content)
+
+    if create_neo4j_task(task_id, agent, "STUCK TASK RECOVERY — Investigate Task Dispatch", content, "high", "agent-self-wake-stuck"):
+        log(f"Created stuck recovery task in Neo4j+filesystem: {agent}/{filename}")
+    else:
+        log(f"Created stuck recovery task (filesystem-only): {agent}/{filename}", "WARN")
+
+    return str(task_path)
+
+
 def check_and_wake_agent(agent, wake_state, dry_run=False):
     """Check if an agent should be woken and create a wake task if so.
 
     Returns True if agent was woken, False otherwise.
+
+    FIX 2026-03-12: Added handling for:
+    - Kublai routing duty (wakes when other agents are stalled)
+    - Stuck agents (have pending tasks but no active session)
     """
     # Check cooldown
     last_wake = wake_state.get("last_wakes", {}).get(agent)
@@ -356,20 +484,52 @@ def check_and_wake_agent(agent, wake_state, dry_run=False):
         log(f"{agent}: active session running", "SKIP")
         return False
 
-    # Check if agent already has pending tasks
-    if agent_has_pending_tasks(agent):
-        log(f"{agent}: has pending tasks", "SKIP")
-        return False
-
-    # Check idle time
+    # Get idle time before checking pending tasks (needed for both paths)
     last_activity = get_last_activity_time(agent)
     if last_activity > 0:
         idle_min = (time.time() - last_activity) / 60
-        if idle_min < IDLE_THRESHOLD_MIN:
-            log(f"{agent}: idle only {idle_min:.0f}m (threshold: {IDLE_THRESHOLD_MIN}m)", "SKIP")
-            return False
     else:
         idle_min = float("inf")
+
+    # FIX 2026-03-12: Check if agent has pending tasks but is STUCK (no session + idle)
+    # This was a deadlock: agents with pending tasks were skipped forever
+    has_pending = agent_has_pending_tasks(agent)
+    if has_pending and idle_min >= STALL_THRESHOLD_MIN:
+        # Agent is stuck - has pending tasks but no active session and very idle
+        log(f"{agent}: STUCK - has pending tasks, idle {idle_min:.0f}m (threshold: {STALL_THRESHOLD_MIN}m)", "WAKE")
+
+        if dry_run:
+            log(f"{agent}: DRY RUN -- would create stuck recovery task", "WAKE")
+            return False
+
+        create_stuck_task_recovery(agent)
+
+        # Update state
+        wake_state.setdefault("last_wakes", {})[agent] = datetime.now().isoformat()
+        wake_state["total_wakes"] = wake_state.get("total_wakes", 0) + 1
+        today = datetime.now().strftime("%Y-%m-%d")
+        if wake_state.get("today") != today:
+            wake_state["today"] = today
+            wake_state["wakes_today"] = 0
+        wake_state["wakes_today"] = wake_state.get("wakes_today", 0) + 1
+
+        try:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(WATCHDOG_LOG, "a") as f:
+                f.write(f"[{ts}] SELF-WAKE | agent={agent} | idle={idle_min:.0f}m | stuck_recovery\n")
+        except OSError:
+            pass
+
+        return True
+
+    # Original path: agents without pending tasks
+    if has_pending:
+        log(f"{agent}: has pending tasks (but not stuck: idle {idle_min:.0f}m < {STALL_THRESHOLD_MIN}m)", "SKIP")
+        return False
+
+    if idle_min < IDLE_THRESHOLD_MIN:
+        log(f"{agent}: idle only {idle_min:.0f}m (threshold: {IDLE_THRESHOLD_MIN}m)", "SKIP")
+        return False
 
     # Scan memory for blocked items
     blocked_items = extract_blocked_items(agent)
@@ -408,18 +568,119 @@ def check_and_wake_agent(agent, wake_state, dry_run=False):
     return True
 
 
+def check_kublai_routing_duty(wake_state, dry_run=False):
+    """Check if kublai should be woken for routing audit.
+
+    Kublai wakes when:
+    - Kublai is idle > IDLE_THRESHOLD_MIN
+    - Other agents have pending tasks but aren't executing
+
+    This implements PRIORITY_FIX: kublai should proactively check for routing issues.
+    """
+    agent = KUBLAI
+
+    # Check cooldown
+    last_wake = wake_state.get("last_wakes", {}).get(agent)
+    if last_wake:
+        try:
+            last_wake_time = datetime.fromisoformat(last_wake).timestamp()
+            if time.time() - last_wake_time < COOLDOWN_MIN * 60:
+                return False
+        except (ValueError, TypeError):
+            pass
+
+    # Check if kublai has active session
+    if agent_has_active_session(agent):
+        return False
+
+    # Get kublai idle time
+    last_activity = get_last_activity_time(agent)
+    if last_activity > 0:
+        idle_min = (time.time() - last_activity) / 60
+        if idle_min < IDLE_THRESHOLD_MIN:
+            return False
+    else:
+        idle_min = float("inf")
+
+    # Scan for stalled agents - agents with pending tasks but no active session
+    stalled_agents = {}
+    for other_agent in AGENTS:
+        if agent_has_active_session(other_agent):
+            continue  # Active, not stalled
+
+        if not agent_has_pending_tasks(other_agent):
+            continue  # No pending tasks, not stalled
+
+        # Has pending tasks, no session - check idle time
+        other_last = get_last_activity_time(other_agent)
+        if other_last > 0:
+            other_idle = (time.time() - other_last) / 60
+            if other_idle >= STALL_THRESHOLD_MIN:
+                # This agent is stalled
+                tasks_dir = AGENTS_DIR / other_agent / "tasks"
+                pending_count = 0
+                if tasks_dir.exists():
+                    for f in tasks_dir.glob("*.md"):
+                        if not any(x in f.name for x in [".executing", ".completed", ".done"]):
+                            pending_count += 1
+                stalled_agents[other_agent] = {
+                    "pending": pending_count,
+                    "idle_min": other_idle
+                }
+
+    if not stalled_agents:
+        return False  # No stalled agents, kublai doesn't need to wake
+
+    # Kublai should wake to investigate stalled agents
+    log(f"{agent}: ROUTING DUTY - {len(stalled_agents)} stalled agents detected", "WAKE")
+    for other, info in stalled_agents.items():
+        log(f"  -> {other}: {info['pending']} pending, idle {info['idle_min']:.0f}m", "WAKE")
+
+    if dry_run:
+        log(f"{agent}: DRY RUN -- would create routing audit task", "WAKE")
+        return False
+
+    create_kublai_routing_audit(stalled_agents)
+
+    # Update state
+    wake_state.setdefault("last_wakes", {})[agent] = datetime.now().isoformat()
+    wake_state["total_wakes"] = wake_state.get("total_wakes", 0) + 1
+    today = datetime.now().strftime("%Y-%m-%d")
+    if wake_state.get("today") != today:
+        wake_state["today"] = today
+        wake_state["wakes_today"] = 0
+    wake_state["wakes_today"] = wake_state.get("wakes_today", 0) + 1
+
+    try:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(WATCHDOG_LOG, "a") as f:
+            f.write(f"[{ts}] SELF-WAKE | agent={agent} | routing_audit | stalled={len(stalled_agents)}\n")
+    except OSError:
+        pass
+
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Wake idle agents to work on blocked items (Rule T7)")
     parser.add_argument("--dry-run", action="store_true", help="Show what would happen without creating tasks")
     parser.add_argument("--agent", help="Check single agent only")
     args = parser.parse_args()
 
-    agents = [args.agent] if args.agent else AGENTS
     wake_state = load_wake_state()
     woken = 0
 
-    for agent in agents:
-        if agent not in AGENTS and agent != "kublai":
+    # If specific agent requested, only check that one
+    if args.agent:
+        agents_to_check = [args.agent]
+        skip_kublai_routing = True  # Skip routing duty when checking single agent
+    else:
+        agents_to_check = AGENTS  # Regular agents
+        skip_kublai_routing = False
+
+    # Check regular agents first
+    for agent in agents_to_check:
+        if agent not in ALL_AGENTS:
             log(f"Unknown agent: {agent}", "ERROR")
             continue
 
@@ -433,6 +694,15 @@ def main():
         except Exception as e:
             log(f"{agent}: error: {e}", "ERROR")
 
+    # Check kublai routing duty LAST (after regular agents)
+    # Only if not checking a single agent and still under wake limit
+    if not skip_kublai_routing and woken < MAX_WAKES_PER_CYCLE:
+        try:
+            if check_kublai_routing_duty(wake_state, dry_run=args.dry_run):
+                woken += 1
+        except Exception as e:
+            log(f"{KUBLAI}: routing duty error: {e}", "ERROR")
+
     if not args.dry_run:
         save_wake_state(wake_state)
 
@@ -442,7 +712,7 @@ def main():
         log(f"No agents needed waking")
 
     # Output summary for watchdog-gather.sh
-    print(f"SELF_WAKE: woken={woken} checked={len(agents)}")
+    print(f"SELF_WAKE: woken={woken} checked={len(agents_to_check)}")
 
 
 if __name__ == "__main__":

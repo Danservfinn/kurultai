@@ -240,14 +240,52 @@ category: {category}
             elif new_status in ("expired", "rejected", "archived"):
                 self._move_proposal_file(proposal_id, "pending", "archived")
 
-    def _move_proposal_file(self, proposal_id: str, from_dir: str, to_dir: str):
-        """Move proposal file between directories."""
+    def _move_proposal_file(self, proposal_id: str, from_dir: str, to_dir: str, status: str = None):
+        """Move proposal file between directories and update Resolution section."""
+        import re
+        from datetime import datetime
+
         base = AGENTS_DIR / "main" / "proposals"
         src = base / from_dir / f"{proposal_id}.md"
         dst = base / to_dir
         dst.mkdir(parents=True, exist_ok=True)
+
         if src.exists():
-            src.rename(dst / f"{proposal_id}.md")
+            # Read proposal content
+            with open(src, 'r') as f:
+                content = f.read()
+
+            # Update Resolution section based on final status
+            resolution_text = {
+                "approved": f"APPROVED by Kurultai unanimous vote on {datetime.now().strftime('%Y-%m-%d')}. Implementation tasks created.",
+                "rejected": f"REJECTED by Kurultai vote on {datetime.now().strftime('%Y-%m-%d')}. Proposal did not receive unanimous consent.",
+                "expired": f"EXPIRED on {datetime.now().strftime('%Y-%m-%d')}. Voting deadline passed without unanimous decision.",
+                "archived": f"ARCHIVED on {datetime.now().strftime('%Y-%m-%d')}. Proposal closed."
+            }
+
+            new_status = status or to_dir.capitalize()
+            resolution_update = resolution_text.get(to_dir, f"This proposal is {new_status}.")
+
+            # Replace or add Resolution section
+            resolution_pattern = r'(## Resolution\s*\n).*?(?=\n---|\n##[A-Z]|\Z)'
+            replacement = rf'\1{resolution_update}'
+
+            if re.search(r'## Resolution', content, re.MULTILINE):
+                content = re.sub(resolution_pattern, replacement, content, flags=re.DOTALL)
+            else:
+                # Add Resolution section before the footer
+                content = re.sub(
+                    r'(\n---\n\*Generated)',
+                    rf'\n\n## Resolution\n{resolution_update}\n\1',
+                    content
+                )
+
+            # Write updated content to destination
+            with open(dst / f"{proposal_id}.md", 'w') as f:
+                f.write(content)
+
+            # Remove source file
+            src.unlink()
 
     def link_implementation_tasks(self, proposal_id: str, task_ids: list):
         """Link implementation tasks to approved proposal."""

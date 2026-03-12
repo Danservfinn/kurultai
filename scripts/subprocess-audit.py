@@ -100,26 +100,62 @@ def is_pid_alive(pid: int) -> bool:
 
 
 def get_process_info(pid: int) -> Optional[Dict[str, Any]]:
-    """Get process info via ps command."""
+    """Get process info via ps command.
+
+    Returns: dict with pid, ppid, command, age_seconds (elapsed time)
+    """
     try:
         import subprocess
         result = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "pid,ppid,command"],
+            ["ps", "-p", str(pid), "-o", "pid,ppid,etime,command"],
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             lines = result.stdout.strip().split("\n")
             if len(lines) >= 2:
-                parts = lines[1].split(None, 2)
-                if len(parts) >= 3:
+                parts = lines[1].split(None, 3)
+                if len(parts) >= 4:
+                    age_seconds = _parse_ps_etime(parts[2])
                     return {
                         "pid": int(parts[0]),
                         "ppid": int(parts[1]),
-                        "command": parts[2][:200]  # Truncate long commands
+                        "age_seconds": age_seconds,
+                        "command": parts[3][:200]  # Truncate long commands
                     }
     except Exception:
         pass
     return None
+
+
+def _parse_ps_etime(etime: str) -> Optional[float]:
+    """Parse ps etime format to seconds.
+
+    Formats: [[dd-]hh:]mm:ss or mm:ss.ss
+    Examples: "05:12", "1-02:30:15", "15:23.45"
+    """
+    try:
+        parts = etime.split('-')
+        if len(parts) == 2:
+            # dd-hh:mm:ss format
+            days = int(parts[0])
+            time_parts = parts[1].split(':')
+        else:
+            days = 0
+            time_parts = etime.split(':')
+
+        if len(time_parts) == 3:
+            # hh:mm:ss
+            hours, minutes, seconds = time_parts
+            return days * 86400 + int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+        elif len(time_parts) == 2:
+            # mm:ss or mm:ss.ss
+            minutes, seconds = time_parts
+            return int(minutes) * 60 + float(seconds)
+        else:
+            # Just seconds?
+            return float(time_parts[0]) if time_parts else None
+    except (ValueError, IndexError):
+        return None
 
 
 def detect_process_type(pid: int) -> Optional[str]:
@@ -322,7 +358,9 @@ def detect_anomalies(
             ))
 
     # 4. Zombie processes: handler running but no matching .executing.md
-    #    Filter out false positives: handlers with recent .done.md files (normal shutdown)
+    #    Filter out false positives:
+    #    - Handlers with recent .done.md files (normal shutdown)
+    #    - Handlers younger than grace period (still starting up)
     for pid, info in running_handlers.items():
         if pid not in executing_pids:
             # Check if this is an agent-task-handler for one of our agents
@@ -334,11 +372,15 @@ def detect_anomalies(
                     break
 
             if matched_agent:
-                # NEW: Check for recent completion to avoid false positives
-                # If there's a .done.md file modified within grace period, this handler
-                # is likely exiting normally and should NOT be flagged as a zombie
+                # Check for recent completion (normal shutdown transition)
                 if has_recent_completion(matched_agent):
-                    # This is a normal shutdown transition, skip zombie detection
+                    continue
+
+                # Check handler age - skip young handlers (might be starting up)
+                handler_age = info.get("age_seconds")
+                if handler_age is not None and handler_age < ZOMBIE_GRACE_PERIOD_SECONDS:
+                    # Handler is too young to be considered a zombie
+                    # It might still be in the process of renaming the task file
                     continue
 
                 anomalies.append(Anomaly(
@@ -346,7 +388,7 @@ def detect_anomalies(
                     agent=matched_agent,
                     task_id=None,
                     pid=pid,
-                    details=f"Handler process running but no .executing.md file found (no recent .done.md within {ZOMBIE_GRACE_PERIOD_SECONDS}s)",
+                    details=f"Handler process running but no .executing.md file found (age: {handler_age:.0f}s if available, no recent .done.md within {ZOMBIE_GRACE_PERIOD_SECONDS}s)",
                     action="investigate"
                 ))
 

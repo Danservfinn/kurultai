@@ -121,7 +121,8 @@ def get_optimal_config(agent: str, task_type: str = None,
     try:
         driver = get_driver()
         config = _query_learnings(driver, agent, task_type, priority)
-        driver.close()
+        # DO NOT close driver - it's a singleton shared across the system
+        # driver.close()  # REMOVED (2026-03-11) - was closing singleton driver
 
         # Check confidence threshold
         if config.get("confidence", 0) < CONFIDENCE_THRESHOLD:

@@ -255,3 +255,21 @@ Agents can **read** other agents' memory files but should **only write** to thei
 | `CONTEXT_WARN_KB` | 4 | `memory_audit.py` |
 | `CONTEXT_MAX_RECENT_ITEMS` | 3 | `memory_audit.py` |
 | `DEAD_RULE_AGE_HOURS` | 24 | `memory_audit.py` |
+
+---
+
+## Resolution
+
+This document (v1.1) updates the Memory Architecture Reference with improved documentation cross-references:
+
+**Changes Applied:**
+1. Version incremented from 1.0 to 1.1
+2. Change log table added to track document evolution
+3. New "Related Documentation" section added with cross-references to:
+   - `memory/when_then_rules.md` — Authoritative source for active WHEN/THEN rules
+   - `memory/rules_lifecycle.md` — Rule lifecycle management guidance
+   - `docs/reflection-rules-quickref.md` — Quick reference format
+
+**Design Decision:** Individual rules R010-R012 were not added to this document. The memory-architecture-reference.md focuses on system architecture and data flow, while when_then_rules.md serves as the canonical registry for individual behavioral rules. Adding cross-references maintains proper separation of concerns while keeping documentation navigable.
+
+**Status:** Complete — Task normal-1773217864 satisfactorily resolved.

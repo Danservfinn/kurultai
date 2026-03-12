@@ -1,8 +1,4 @@
 {
-  "mongke/normal-1773200607.md": {
-    "executed": "2026-03-10T23:58:07.190143",
-    "success": false
-  },
   "jochi/normal-1773198985.md": {
     "executed": "2026-03-10T23:58:08.688146",
     "success": false
@@ -173,6 +169,282 @@
   },
   "temujin/high-1773224022.md": {
     "executed": "2026-03-11T06:14:23.309950",
+    "success": false
+  },
+  "mongke/high-1773226803.md": {
+    "executed": "2026-03-11T14:03:27.455831",
+    "success": false
+  },
+  "temujin/high-1773226802.md": {
+    "executed": "2026-03-11T07:05:28.639029",
+    "success": false
+  },
+  "kublai/high-1773226805.md": {
+    "executed": "2026-03-11T07:05:53.652452",
+    "success": false
+  },
+  "temujin/high-1773226803.md": {
+    "executed": "2026-03-11T07:06:50.585590",
+    "success": false
+  },
+  "temujin/parse-stripe-setup-human-action.md": {
+    "executed": "2026-03-11T07:08:01.485190",
+    "success": false
+  },
+  "temujin/parse-stripe-setup-human-action.no_output.revision-1.md": {
+    "executed": "2026-03-11T07:09:51.824932",
+    "success": false
+  },
+  "temujin/normal-1773227791.md": {
+    "executed": "2026-03-11T08:47:46.755819",
+    "success": false
+  },
+  "temujin/normal-1773227792.md": {
+    "executed": "2026-03-11T07:17:47.174520",
+    "success": false
+  },
+  "jochi/high-1773227787.md": {
+    "executed": "2026-03-11T07:20:31.095830",
+    "success": false
+  },
+  "ogedei/normal-1773227787.md": {
+    "executed": "2026-03-11T07:28:20.371114",
+    "success": false
+  },
+  "jochi/high-1773228975.md": {
+    "executed": "2026-03-11T07:41:27.901167",
+    "success": false
+  },
+  "jochi/high-1773228975.no_output.revision-1.md": {
+    "executed": "2026-03-11T07:50:00.424103",
+    "success": false
+  },
+  "mongke/high-1773226804.md": {
+    "executed": "2026-03-11T08:41:44.813222",
+    "success": false
+  },
+  "mongke/normal-1773231126.md": {
+    "executed": "2026-03-11T08:43:46.338464",
+    "success": false
+  },
+  "kublai/ESCALATE-stale-task-mongke-high-1773226803-20260311-103054.md": {
+    "executed": "2026-03-11T10:31:28.347832",
+    "success": false
+  },
+  "chagatai/behavioral-rules-execution-guide-20260311-093000.md": {
+    "executed": "2026-03-11T10:34:02.157366",
+    "success": false
+  },
+  "ogedei/normal-1773238547.md": {
+    "executed": "2026-03-11T14:03:27.567351",
+    "success": false
+  },
+  "temujin/chagatai-request-implement-rules-evaluator-20260311-153100.md": {
+    "executed": "2026-03-11T11:36:53.237117",
+    "success": true
+  },
+  "jochi/high-1773245311.md": {
+    "executed": "2026-03-11T14:08:30.011407",
+    "success": false
+  },
+  "chagatai/normal-1773217864.completed.revision-1.md": {
+    "executed": "2026-03-11T13:32:25.074191",
+    "success": false
+  },
+  "tolui/high-1773086586.completed.revision-1.md": {
+    "executed": "2026-03-11T13:32:25.082681",
+    "success": false
+  },
+  "kublai/high-1773226805.failed.revision-1.md": {
+    "executed": "2026-03-11T13:32:25.087608",
+    "success": false
+  },
+  "temujin/high-1773226802.failed.revision-1.md": {
+    "executed": "2026-03-11T13:32:25.112622",
+    "success": false
+  },
+  "ogedei/normal-1773250998.md": {
+    "executed": "2026-03-11T14:33:20.995648",
+    "success": false
+  },
+  "chagatai/update-stale-doc-escalation-protocol-20260311-143000.md": {
+    "executed": "2026-03-11T14:33:40.392742",
+    "success": false
+  },
+  "jochi/high-1773256126.md": {
+    "executed": "2026-03-11T15:08:55.173959",
+    "success": false
+  },
+  "ogedei/normal-selfwake-1773260914.md": {
+    "executed": "2026-03-11T16:34:03.213071",
+    "success": false
+  },
+  "mongke/normal-selfwake-1773271712.pending.md": {
+    "executed": "2026-03-11T19:36:00.857086",
+    "success": false
+  },
+  "kublai/low-1773275364.md": {
+    "executed": "2026-03-11T20:31:18.637607",
+    "success": false
+  },
+  "temujin/normal-1773275556.md": {
+    "executed": "2026-03-11T20:33:29.614547",
+    "success": false
+  },
+  "mongke/normal-selfwake-1773276981.md": {
+    "executed": "2026-03-11T21:04:02.937948",
+    "success": false
+  },
+  "chagatai/normal-1773279490.md": {
+    "executed": "2026-03-11T21:40:41.041161",
+    "success": true
+  },
+  "ogedei/normal-1773279650.md": {
+    "executed": "2026-03-11T21:42:44.639486",
+    "success": false
+  },
+  "jochi/normal-1773279491.md": {
+    "executed": "2026-03-11T21:43:53.815656",
+    "success": false
+  },
+  "jochi/normal-1773280099.md": {
+    "executed": "2026-03-11T21:52:53.434174",
+    "success": true
+  },
+  "jochi/normal-1773280623.md": {
+    "executed": "2026-03-11T21:57:51.301300",
+    "success": false
+  },
+  "jochi/normal-1773280734.md": {
+    "executed": "2026-03-11T22:00:53.287151",
+    "success": true
+  },
+  "ogedei/normal-1773281404.md": {
+    "executed": "2026-03-11T22:16:44.078433",
+    "success": false
+  },
+  "temujin/normal-1773279491.failed.revision-1.md": {
+    "executed": "2026-03-11T22:17:04.897158",
+    "success": true
+  },
+  "ogedei/heartbeat-writer-implementation.md": {
+    "executed": "2026-03-11T22:17:59.867677",
+    "success": false
+  },
+  "jochi/normal-1773281825.md": {
+    "executed": "2026-03-11T22:17:59.882889",
+    "success": false
+  },
+  "temujin/normal-1773282346.md": {
+    "executed": "2026-03-11T22:28:04.081388",
+    "success": false
+  },
+  "jochi/normal-1773282346.md": {
+    "executed": "2026-03-11T22:28:04.093666",
+    "success": false
+  },
+  "ogedei/normal-1773281404.no_output.revision-1.md": {
+    "executed": "2026-03-11T22:33:06.179845",
+    "success": false
+  },
+  "ogedei/normal-1773282346.md": {
+    "executed": "2026-03-11T22:35:38.073668",
+    "success": true
+  },
+  "kublai/low-1773282987.md": {
+    "executed": "2026-03-11T22:37:27.624738",
+    "success": false
+  },
+  "kublai/low-1773282987.no_output.revision-1.md": {
+    "executed": "2026-03-11T23:01:10.570579",
+    "success": false
+  },
+  "kublai/normal-1773285099.md": {
+    "executed": "2026-03-11T23:14:07.219397",
+    "success": false
+  },
+  "kublai/normal-1773285099.no_output.revision-1.md": {
+    "executed": "2026-03-11T23:43:43.736932",
+    "success": false
+  },
+  "jochi/normal-1773288603.md": {
+    "executed": "2026-03-12T00:13:58.127499",
+    "success": false
+  },
+  "mongke/normal-1773292215.md": {
+    "executed": "2026-03-12T01:10:56.278623",
+    "success": false
+  },
+  "temujin/normal-1773294714-1b49c067.md": {
+    "executed": "2026-03-12T02:04:48.112706",
+    "success": false
+  },
+  "ogedei/normal-1773299429.md": {
+    "executed": "2026-03-12T03:16:25.052474",
+    "success": false
+  },
+  "ogedei/normal-1773299429.no_output.revision-1.md": {
+    "executed": "2026-03-12T03:35:43.175071",
+    "success": false
+  },
+  "jochi/normal-1773303767.md": {
+    "executed": "2026-03-12T04:26:05.398397",
+    "success": false
+  },
+  "temujin/normal-1773303771.md": {
+    "executed": "2026-03-12T04:26:05.425838",
+    "success": false
+  },
+  "chagatai/normal-1773303769.md": {
+    "executed": "2026-03-12T04:26:05.453239",
+    "success": false
+  },
+  "ogedei/normal-1773304873.md": {
+    "executed": "2026-03-12T04:45:45.144747",
+    "success": false
+  },
+  "ogedei/normal-1773304873.no_output.revision-1.md": {
+    "executed": "2026-03-12T04:51:17.866962",
+    "success": false
+  },
+  "temujin/normal-1773305804-8c31646f.md": {
+    "executed": "2026-03-12T05:06:25.870968",
+    "success": false
+  },
+  "jochi/normal-1773306688.md": {
+    "executed": "2026-03-12T05:16:31.725199",
+    "success": false
+  },
+  "temujin/normal-1773306688.md": {
+    "executed": "2026-03-12T05:16:31.727044",
+    "success": false
+  },
+  "jochi/normal-1773306692.md": {
+    "executed": "2026-03-12T05:24:20.146875",
+    "success": false
+  },
+  "mongke/test-m001-verification.md": {
+    "executed": "2026-03-12T05:31:40.289370",
+    "success": false
+  },
+  "ogedei/normal-1773309111.md": {
+    "executed": "2026-03-12T05:54:28.697151",
+    "success": true
+  },
+  "kublai/normal-1773310251.md": {
+    "executed": "2026-03-12T06:12:04.510912",
+    "success": false
+  },
+  "chagatai/normal-1773310249.md": {
+    "executed": "2026-03-12T06:12:04.553125",
+    "success": false
+  },
+  "jochi/normal-1773310247.md": {
+    "executed": "2026-03-12T06:12:04.568304",
+    "success": false
+  },
+  "ogedei/high-1773311092.md": {
+    "executed": "2026-03-12T06:27:11.990095",
     "success": false
   }
 }

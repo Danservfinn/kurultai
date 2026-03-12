@@ -269,8 +269,8 @@ def heuristic_initiative(reflections, goals, system_state):
     hour_mod = current_hour % 12
 
     ROTATING_TASKS = [
-        ("temujin", "Review Parse monetization blockers and create next implementation task",
-         "Parse SaaS platform - payment integration and subscription flow"),
+        ("temujin", "Review and optimize script performance for reduced memory usage",
+         "System efficiency - reduce RAM footprint and improve throughput"),
         ("mongke", "Research emerging AI agent orchestration patterns and competitive landscape",
          "Strategic intelligence - understand Kurultai's competitive position"),
         ("chagatai", "Update stale documentation in shared-context/ or docs/ directories",

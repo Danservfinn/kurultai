@@ -42,8 +42,8 @@ ANTHROPIC_MODEL=glm-5
 | mongke | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
 | chagatai | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
 | tolui | b5b1f9537... | Z.AI (DashScope) | ✅ Working |
-| jochi | sk-sp-4f75... | Unknown | ⚠️ Needs verification |
-| ogedei | sk-sp-4f75... | Unknown | ⚠️ Needs verification |
+| jochi | b5b1f9537... | Z.AI (DashScope) | ✅ Working (fixed 2026-03-12 02:30) |
+| ogedei | b5b1f9537... | Z.AI (DashScope) | ✅ Working (fixed 2026-03-12 02:30) |
 
 **Note:** The `sk-sp-` prefix on jochi/ogedei differs from Anthropic's `sk-ant-` format. Origin uncertain.
 
@@ -55,8 +55,8 @@ ANTHROPIC_MODEL=glm-5
 | temujin | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) |
 | mongke | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) |
 | chagatai | claude-opus-4-6 | claude-opus-4-6 ✅ |
-| jochi | claude-opus-4-6 | Unknown |
-| ogedei | claude-opus-4-6 | Unknown |
+| jochi | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) ✅ Fixed 2026-03-12 |
+| ogedei | claude-opus-4-6 | zai-coding/glm-5 (via Z.AI) ✅ Fixed 2026-03-12 |
 
 ---
 
@@ -90,6 +90,44 @@ ANTHROPIC_MODEL=glm-5
 **Result:** Transient auth failures recover automatically instead of cascading to full reflection blackout
 **Status:** ✅ Implemented
 **File:** `scripts/hourly_reflection.sh` (lines 284-324)
+
+### 2026-03-11: Agent-Task-Handler Auth Preflight (spawn_subagent)
+**Issue:** /horde-review found "temujin tasks spawn but never complete" — subagent spawns were failing silently when target agent had invalid/expired auth
+**Root Cause:** `spawn_subagent()` in agent-task-handler.py didn't check auth health before adding to spawn queue
+**Solution:** Added `auth_health_preflight()` function to agent-task-handler.py and integrated into `spawn_subagent()` before queueing
+**Result:** Failed auth detected early (10s timeout), logged to auth-failures.jsonl, spawn skipped instead of hanging
+**Status:** ✅ Implemented
+**Files:**
+- `scripts/agent-task-handler.py` (lines 1953-2012)
+- `docs/auth-health-preflight.md` (updated status table)
+
+### 2026-03-11: Agent-Task-Handler Auth Preflight Retry Logic
+**Issue:** agent-task-handler.py `auth_health_preflight()` had only 1 attempt while task-watcher.py had 3 attempts with exponential backoff — inconsistency causing unnecessary auth failures on transient network issues
+**Root Cause:** Original implementation used single try/except without retry loop
+**Solution:** Added 3-attempt retry loop with exponential backoff (0s, 2s, 4s delays) to match task-watcher.py implementation
+**Result:** Transient auth failures recover automatically; reduced false-positive auth failures
+**Status:** ✅ Implemented
+**File:** `scripts/agent-task-handler.py` (lines 2231-2277)
+
+### 2026-03-12: Ogedei Provider Migration (alibaba → zai)
+**Issue:** ogedei still configured for "alibaba" provider (sk-sp-* tokens) while jochi was already fixed to "zai" — auth_heartbeat.py comment flagged "Still alibaba - needs verification"
+**Root Cause:** Incomplete migration from Alibaba to Z.AI provider; Alibaba provider had Exit 124 timeout issues
+**Solution:** Updated PROVIDER_MAP in auth_heartbeat.py and get_agent_provider() in hourly_reflection.sh to use "zai" for ogedei
+**Result:** All 6 agents now consistently use Z.AI provider; reduced timeout risk
+**Status:** ✅ Implemented
+**Files:**
+- `scripts/auth_heartbeat.py` (line 40: ogedei → "zai")
+- `scripts/hourly_reflection.sh` (line 289: removed ogedei special case, all agents → "zai")
+
+### 2026-03-12 02:30: Jochi/Ogedei Z.AI Token Fix
+**Issue:** /horde-review detected 0% execution rate for jochi due to auth token mismatch in agent/models.json. Both jochi and ogedei had stale Z.AI token `b64f885d...` instead of vault token `b5b1f9537...`
+**Root Cause:** Token drift - agents' models.json not updated when vault credentials were rotated
+**Solution:** Replaced zai-coding apiKey in both agents' models.json with correct vault token from `/Users/kublai/.openclaw/credentials/provider.env`
+**Result:** Both agents now have valid Z.AI credentials matching the vault; auth preflight should pass
+**Status:** ✅ Implemented
+**Files:**
+- `/Users/kublai/.openclaw/agents/jochi/agent/models.json` (line 196)
+- `/Users/kublai/.openclaw/agents/ogedei/agent/models.json` (line 172)
 
 ### 2026-03-07: Claude Code CLI Path Migration
 **Issue:** Agents using different CLAUDE_BIN paths

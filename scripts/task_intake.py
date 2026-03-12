@@ -35,7 +35,16 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from kurultai_paths import AGENTS_DIR, LOGS_DIR, agent_tasks_dir, VALID_AGENTS, AGENT_KEYWORDS
-from kurultai_ledger import append_ledger as _kp_append_ledger, generate_task_id, validate_task_id
+from kurultai_ledger import append_ledger as _tp_append_ledger, generate_task_id, validate_task_id
+
+# Valid task file extensions (prevents false positives from intermediate state files)
+VALID_TASK_EXTENSIONS = {
+    '.md',            # Standard markdown task files
+    '.pending.md',    # Pending state
+    '.executing.md',  # Currently executing
+    '.done.md',       # Completed tasks
+    '.failed.md',     # Failed tasks
+}
 
 # Import kublai-route for pause checking
 try:
@@ -55,21 +64,24 @@ except ImportError:
 
 # Timeout configuration (mirrors agent-task-handler.py)
 _TIMEOUT_BY_PRIORITY = {
-    'high': 7200,
-    'normal': 7200,
-    'low': 7200,
+    'high': 10800,  # 3 hours for high priority
+    'normal': 10800,  # 3 hours for normal priority
+    'low': 7200,  # 2 hours for low priority
 }
 _SLOW_SKILLS_TIMEOUT = {
-    '/horde-brainstorming': 7200,
-    '/golden-horde': 7200,
-    '/horde-implement': 7200,
-    '/horde-review': 7200,
-    '/horde-debug': 7200,
-    '/horde-learn': 7200,
-    '/horde-swarm': 7200,
-    '/horde-test': 7200,
+    '/horde-brainstorming': 10800,
+    '/golden-horde': 10800,
+    '/horde-implement': 10800,
+    '/horde-review': 10800,
+    '/horde-debug': 10800,
+    '/horde-learn': 10800,
+    '/horde-swarm': 10800,
+    '/horde-test': 10800,
+    '/systematic-debugging': 10800,  # Complex debugging needs more time
+    '/kurultai-health': 10800,  # Health analysis can be extensive
+    '/code-reviewer': 10800,  # Code review needs thorough analysis
 }
-_DEFAULT_TIMEOUT = 7200
+_DEFAULT_TIMEOUT = 10800  # 3 hours default
 
 
 def compute_task_timeout(priority, skill_hint=None):
@@ -83,23 +95,23 @@ def compute_task_timeout(priority, skill_hint=None):
 # Domain Classification System
 # =============================================================================
 
-# Valid task domains for frontmatter classification
-VALID_DOMAINS = {"research", "implementation", "ops", "documentation", "strategy", "analysis", "autoresearch", "completion", "escalation"}
-
 # Domain-to-agent compatibility matrix for redistribution
 # Agents listed can receive tasks of that domain via load balancing or redistribution
-# Updated 2026-03-09: Added completion/escalation domains, included Tolui, broadened compatibility
+# Updated 2026-03-11: Removed tolui (uses ollama executor, not dispatch-capable)
 DOMAIN_AGENT_COMPATIBILITY = {
-    "research": ["mongke", "jochi", "tolui"],  # added tolui
-    "implementation": ["temujin", "ogedei", "jochi", "tolui"],  # added tolui
-    "ops": ["ogedei", "temujin", "jochi", "tolui"],  # added tolui
-    "documentation": ["chagatai", "mongke", "tolui"],  # added tolui
+    "research": ["mongke", "jochi"],
+    "implementation": ["temujin", "ogedei", "jochi"],
+    "ops": ["ogedei", "temujin", "jochi"],
+    "documentation": ["chagatai", "mongke"],
     "strategy": ["temujin", "kublai", "ogedei", "chagatai"],  # chagatai for strategic documentation/proposals
-    "analysis": ["jochi", "mongke", "kublai", "tolui"],  # added tolui
+    "analysis": ["jochi", "mongke", "kublai"],
     "autoresearch": ["mongke", "jochi", "chagatai"],
-    "completion": ["kublai", "jochi", "ogedei", "temujin", "tolui"],  # any agent can do completion work
-    "escalation": ["kublai", "ogedei", "jochi"],  # kublai coordinates, others can handle
+    "completion": ["kublai", "jochi", "ogedei", "temujin"],
+    "escalation": ["ogedei", "kublai", "jochi"],  # ogedei handles escalation (ops domain), kublai coordinates, jochi backup
 }
+
+# Valid task domains - derived from DOMAIN_AGENT_COMPATIBILITY keys for single source of truth
+VALID_DOMAINS = set(DOMAIN_AGENT_COMPATIBILITY.keys())
 
 # Skill hint to domain mapping for classification
 SKILL_DOMAIN_MAP = {
@@ -221,12 +233,12 @@ def is_domain_compatible(domain, target_agent):
 # Valid models for agent dispatch — derived from canonical agents_config.AGENT_MODELS.
 # All agents run claude-opus-4-6 via Claude Code. Third-party models in models.json
 # are for experimentation only and should NOT appear here.
+# Note: tolui excluded (uses ollama executor, not dispatch-capable)
 from agents_config import AGENT_MODELS as _CANONICAL_MODELS
 VALID_MODELS_BY_AGENT = {
     agent: {model} for agent, model in _CANONICAL_MODELS.items()
+    if agent != "tolui"  # Exclude tolui from dispatch validation
 }
-# Tolui runs local model
-VALID_MODELS_BY_AGENT["tolui"] = {"ollama/lukey03/qwen3.5-9b-abliterated-vision"}
 
 
 def validate_agent_model(agent):
@@ -282,6 +294,17 @@ _DISAMBIGUATION = [
     ({"status", "next"}, "kublai"),
     ({"status", "feature"}, "kublai"),
     ({"status", "project"}, "kublai"),
+    # System assessment/triage -> kublai (2026-03-11 fix for case #12)
+    # MUST come before bare {"status"} rule for ogedei
+    ("system-wide status assessment", "kublai"),       # exact phrase -> squad lead
+    ("system-wide status", "kublai"),                  # system status -> squad lead
+    ("status assessment", "kublai"),                   # status assessment -> squad lead
+    ("system assessment", "kublai"),                   # system assessment -> squad lead
+    ({"prioritize", "backlog"}, "kublai"),             # backlog prioritization -> squad lead
+    ({"fleet", "status"}, "kublai"),                   # fleet status -> squad lead
+    ({"agent", "prioritize"}, "kublai"),               # agent prioritization -> squad lead
+    ({"system-wide", "assess"}, "kublai"),             # system-wide assessment -> squad lead
+    ({"assess", "all", "agent"}, "kublai"),            # assess all agents -> squad lead
     ({"kanban"}, "temujin"),              # kanban UI work -> dev (before bare status)
     ({"status"}, "ogedei"),               # bare ops status -> ogedei
     ({"research", "security"}, "jochi"),
@@ -448,6 +471,22 @@ _DISAMBIGUATION = [
     ({"performance", "review"}, "jochi"),              # performance review -> analyst
     ({"quality", "review"}, "jochi"),                  # quality review -> analyst
     ({"routing", "review"}, "kublai"),                 # routing review -> squad lead
+    # Ops service restart/dispatch -> ogedei (2026-03-11 fix for case #5)
+    ({"restart", "service"}, "ogedei"),                # service restart -> ops
+    ({"service", "down"}, "ogedei"),                   # service down -> ops
+    ({"redis", "restart"}, "ogedei"),                  # redis restart -> ops
+    ({"redis", "down"}, "ogedei"),                     # redis down -> ops
+    # System assessment/triage -> kublai (2026-03-11 fix for case #12)
+    # Must come BEFORE generic status/assessment rules for ogedei
+    ("system-wide status assessment", "kublai"),       # exact phrase -> squad lead
+    ("system-wide status", "kublai"),                  # system status -> squad lead
+    ("status assessment", "kublai"),                   # status assessment -> squad lead
+    ("system assessment", "kublai"),                   # system assessment -> squad lead
+    ({"prioritize", "backlog"}, "kublai"),             # backlog prioritization -> squad lead
+    ({"fleet", "status"}, "kublai"),                   # fleet status -> squad lead
+    ({"agent", "prioritize"}, "kublai"),               # agent prioritization -> squad lead
+    ({"system-wide", "assess"}, "kublai"),             # system-wide assessment -> squad lead
+    ({"assess", "all", "agent"}, "kublai"),            # assess all agents -> squad lead
     # Design/architecture tasks -> temujin (not mongke)
     ({"design", "schema"}, "temujin"),                 # schema design -> dev
     ({"design", "neo4j"}, "temujin"),                  # neo4j design -> dev
@@ -522,6 +561,45 @@ _DISAMBIGUATION = [
     ({"landscape", "analysis"}, "mongke"),             # landscape analysis -> mongke
     ({"literature", "review"}, "mongke"),              # literature review -> mongke
     ({"source", "triangulation"}, "mongke"),           # source triangulation -> mongke
+    # JOCHI KEYWORD DISENGUATION (2026-03-11)
+    # "analyze" keyword is too broad — add domain-specific rules
+    ({"analyze", "competitor"}, "mongke"),             # competitor analysis -> researcher
+    ({"analyze", "market"}, "mongke"),                 # market analysis -> researcher
+    ({"analyze", "pricing"}, "mongke"),                # pricing analysis -> researcher
+    ({"analyze", "trend"}, "mongke"),                  # trend analysis -> researcher
+    ({"analyze", "code"}, "temujin"),                  # code analysis -> dev
+    ({"analyze", "architecture"}, "temujin"),          # architecture analysis -> dev
+    ({"analyze", "design"}, "temujin"),                # design analysis -> dev
+    ({"analyze", "performance"}, "jochi"),             # performance analysis -> analyst (explicit)
+    ({"analyze", "security"}, "jochi"),                # security analysis -> analyst (explicit)
+    ({"analyze", "vulnerability"}, "jochi"),           # vulnerability analysis -> analyst
+    ({"analyze", "routing"}, "kublai"),                # routing analysis -> squad lead
+    ({"analyze", "queue"}, "kublai"),                  # queue analysis -> squad lead
+    ({"analyze", "pipeline"}, "kublai"),               # pipeline analysis -> squad lead
+    # "check" keyword is too broad — add domain-specific rules
+    ({"check", "status"}, "ogedei"),                   # status check -> ops
+    ({"check", "health"}, "ogedei"),                   # health check -> ops
+    ({"check", "cron"}, "ogedei"),                     # cron check -> ops
+    ({"check", "deploy"}, "ogedei"),                   # deployment check -> ops
+    ({"check", "test"}, "jochi"),                      # test check -> analyst
+    ({"check", "security"}, "jochi"),                  # security check -> analyst
+    ({"check", "vulnerability"}, "jochi"),            # vulnerability check -> analyst
+    ("check vulnerabilities", "jochi"),                # vulnerability checks (plural) -> analyst
+    # "triage" keyword disambiguation
+    ({"triage", "backlog"}, "kublai"),                # backlog triage -> squad lead (exists, re-ordered for clarity)
+    ({"triage", "agent"}, "kublai"),                  # agent triage -> squad lead (exists)
+    ({"triage", "task"}, "kublai"),                   # task triage -> squad lead
+    ("triage stalled", "kublai"),                     # stalled tasks triage -> squad lead (past tense)
+    # MONGKE_RESEARCH_PROTECTION (2026-03-11) — prevent non-research tasks from routing to mongke
+    # These rules fix EXECUTING_NO_OUTPUT anomalies caused by domain misalignment
+    ("investigate calendar", "ogedei"),                # calendar investigation -> ops, not research
+    ("investigate cron", "ogedei"),                   # cron investigation -> ops
+    ("investigate backup", "ogedei"),                 # backup investigation -> ops
+    ("investigate notification", "ogedei"),           # notification investigation -> ops
+    ("enhance config", "jochi"),                      # config enhancement -> analyst, not research
+    ("agent config enhancement", "jochi"),            # agent config -> analyst
+    ("calendar notification", "ogedei"),              # calendar notifications -> ops
+    ("bidirectional linking", "temujin"),             # bidirectional linking -> dev, not research
 ]
 
 def _kw_match(kw, text_lower):
@@ -542,7 +620,12 @@ def _phrase_match(phrase, text_lower):
 
 
 def route_by_text(text):
-    """Keyword routing for programmatic task creation with disambiguation."""
+    """Keyword routing for programmatic task creation with disambiguation.
+
+    QUEUE-AWARE TIEBREAKING (2026-03-11): When multiple agents have equal
+    keyword scores, prefer the agent with lower queue depth. This prevents
+    "sticky routing" to temujin when keyword matching is ambiguous.
+    """
     text_lower = text.lower()
 
     # Check disambiguation rules first (first-match-wins)
@@ -556,11 +639,30 @@ def route_by_text(text):
             if all(_kw_match(kw, text_lower) for kw in rule):
                 return target
 
-    best, best_score = "temujin", 0
+    # Collect all agents with their scores
+    scores = {}
     for agent, keywords in AGENT_KEYWORDS.items():
-        score = sum(1 for kw in keywords if _kw_match(kw, text_lower))
-        if score > best_score:
-            best, best_score = agent, score
+        scores[agent] = sum(1 for kw in keywords if _kw_match(kw, text_lower))
+
+    # Find best score
+    best_score = max(scores.values()) if scores else 0
+
+    # QUEUE-AWARE TIEBREAKING: Among agents with best_score, prefer lowest queue depth
+    # This prevents sticky routing to temujin when keywords are ambiguous
+    if best_score > 0:
+        tied_agents = [agent for agent, score in scores.items() if score == best_score]
+        if len(tied_agents) > 1:
+            # Break tie by queue depth (lowest first)
+            best = min(tied_agents, key=lambda a: get_queue_depth(a))
+            # Log tiebreak for audit
+            print(f"QUEUE-AWARE TIEBREAK: {len(tied_agents)} agents tied with score={best_score} "
+                  f"({', '.join(tied_agents)}), selected {best} (lowest queue)")
+        else:
+            best = tied_agents[0]
+    else:
+        # No keyword matches — use queue depth to decide
+        best = min(scores.keys(), key=lambda a: get_queue_depth(a))
+        print(f"NO-KEYWORD-FALLBACK: No keyword matches, selected {best} (lowest queue)")
 
     # Apply Primary Output Test for chagatai (Rule C16 compliance)
     # Reference: docs/chagatai-routing-guide.md
@@ -568,7 +670,7 @@ def route_by_text(text):
         primary_output = _primary_output_test(text_lower)
         if primary_output and primary_output != "prose":
             # Route to the agent matching the actual primary output
-            best = _PRIMARY_OUTPUT_ROUTE_MAP.get(primary_output, "temujin")
+            best = _PRIMARY_OUTPUT_ROUTE_MAP.get(primary_output, best)
 
     return best
 
@@ -858,11 +960,11 @@ _SKILL_CAPABLE_ALTERNATES = {
     # Generate-tests can overflow to temujin (dev can write tests) (2026-03-09 fix)
     "/generate-tests": ["temujin"],
 
-    # Content writing can overflow to mongke (research+writing) and tolui (documentation-capable)
-    "/content-research-writer": ["mongke", "tolui"],
+    # Content writing can overflow to mongke (research+writing) and chagatai (writer)
+    "/content-research-writer": ["mongke", "chagatai"],
 
-    # Changelog generation can overflow to mongke and tolui
-    "/changelog-generator": ["mongke", "tolui"],
+    # Changelog generation can overflow to mongke (research) and chagatai (writer)
+    "/changelog-generator": ["mongke", "chagatai"],
 
     # Research can overflow to jochi (analyst) and chagatai (content from research)
     "/horde-learn": ["jochi", "chagatai"],
@@ -1132,9 +1234,17 @@ def check_agent_credentials(agent):
     1. OAuth for Anthropic (no stored token) — check credentials.json
     2. Centralized vault (provider.env) for fallbacks
     3. Per-agent tokens in settings.json (legacy, being phased out)
+    4. Local model agents (tolui/ollama) don't need Anthropic credentials
 
     Proactive credential check prevents routing to blocked agents.
+    
+    SPECIAL CASE (2026-03-11): Tolui uses ollama with local models and does NOT
+    require Anthropic credentials. Always return valid for tolui.
     """
+    # TOLUI SPECIAL CASE: Uses ollama/local models, no Anthropic credentials needed
+    if agent == "tolui":
+        return True, None  # Tolui uses local ollama models
+
     try:
         # 1. Check OAuth status (primary auth method for Anthropic)
         _claude_creds_path = Path.home() / ".claude" / "credentials.json"
@@ -1580,13 +1690,13 @@ def get_agent_idle_time(agent):
 
     # Agent is not idle if currently executing
     for fname in task_dir.iterdir():
-        if '.executing' in fname and '.done' not in fname and not fname.endswith('.pid'):
+        if '.executing' in fname.name and '.done' not in fname.name and not fname.name.endswith('.pid'):
             return 0
 
     # Check most recent completed task
     latest_time = None
     for fname in task_dir.iterdir():
-        if fname.suffix == '.md' and ('.done' in fname or fname.name.endswith('.done.md')):
+        if fname.suffix == '.md' and ('.done' in fname.name or fname.name.endswith('.done.md')):
             # Get file modification time as proxy for completion time
             mtime = fname.stat().st_mtime
             if latest_time is None or mtime > latest_time:
@@ -1694,10 +1804,10 @@ def should_trigger_redistribution():
     for agent in VALID_AGENTS:
         if agent in {'kublai', 'tolui'}:
             continue
-        if depths[agent] == 0:
+        if depths.get(agent, 0) == 0:
             idle_time = get_agent_idle_time(agent)
             if idle_time > REDISTRIBUTION_TRIGGERS['idle_time_threshold_s']:
-                others_have_work = any(depths[a] > 2 for a in VALID_AGENTS if a not in {agent, 'kublai', 'tolui'})
+                others_have_work = any(depths.get(a, 0) > 2 for a in VALID_AGENTS if a not in {agent, 'kublai', 'tolui'})
                 if others_have_work:
                     return True, f"Agent {agent} idle for {idle_time}s while work exists"
 
@@ -1788,7 +1898,7 @@ def route_with_queue_penalty(text, thresholds=None):
     # Calculate penalized scores
     penalized = {}
     for agent, score in scores.items():
-        depth = depths[agent]
+        depth = depths.get(agent, 0)  # Default to 0 if agent not in depths
 
         # Penalty formula per design doc:
         # - Over HIGH: score * 0.9^(depth - HIGH + 1)
@@ -1892,10 +2002,22 @@ def find_best_idle_agent(text, primary_agent, task_domain=None):
         if alt_depth <= primary_depth:
             better_or_equal_alternates.append((alt_agent, alt_depth))
 
+    # TOLUI DISPATCH CHECK (2026-03-11): Tolui is a local model agent with different execution path.
+    # If tolui is the primary agent, check if it's actually dispatching tasks.
+    # Tolui stall indicator: has pending tasks but 0 executing for >5 minutes.
+    if primary_agent == "tolui":
+        tolui_idle_time = get_agent_idle_time("tolui")
+        if tolui_idle_time > 300 and primary_depth > 0:  # 5 minutes
+            print(f"TOLUI_DISPATCH_STALL: tolui idle for {tolui_idle_time}s with {primary_depth} pending tasks")
+            # Fall through to load balancing to redistribute tolui's stalled tasks
+
     # If primary is idle, has low queue, AND no equal-or-better alternatives exist, use it directly
+    # EXCEPTION: Don't use tolui directly if it shows stall indicators
     if not is_agent_busy(primary_agent) and primary_depth < HIGH_THRESHOLD and not better_or_equal_alternates:
-        if creds_valid:
+        if creds_valid and primary_agent != "tolui":
             return primary_agent, f"primary idle, queue={primary_depth}, no equal alternatives"
+        elif primary_agent == "tolui" and get_agent_idle_time("tolui") < 300:
+            return primary_agent, f"tolui idle, queue={primary_depth}, not stalled"
 
     # Filter to underutilized agents (< LOW_THRESHOLD) from the better-or-equal set
     underutilized = [(a, d) for a, d in better_or_equal_alternates if d < LOW_THRESHOLD]
@@ -1925,6 +2047,9 @@ def find_best_idle_agent(text, primary_agent, task_domain=None):
     # check for ANY idle agent (not busy executing) with valid credentials.
     # This prevents artificial bottlenecks when primary is overloaded but idle
     # agents exist that aren't in the capability matrix due to keyword mismatch.
+    # 
+    # ENHANCED (2026-03-11): Prefer agents that are BOTH idle AND have low queue depth.
+    # Also check for agents that haven't executed tasks recently (potential stall detection).
     idle_agents = get_idle_agents(exclude={primary_agent, "kublai", "tolui"})
     if idle_agents:
         # Filter to agents with valid credentials AND with queue < primary's queue
@@ -1935,11 +2060,31 @@ def find_best_idle_agent(text, primary_agent, task_domain=None):
                 print(f"IDLE_WAKE_CREDENTIAL_BLOCK: {idle_agent} has invalid credentials ({idle_error}), skipping idle wake-up")
                 continue
             idle_depth = get_queue_depth(idle_agent)
-            # Only wake if the idle agent has less queue depth than primary
-            if idle_depth < primary_depth:
-                healthy_idle.append((idle_agent, idle_depth))
+            idle_time = get_agent_idle_time(idle_agent)
+            
+            # Score idle agents: prefer those with low queue AND recent activity
+            # Penalize agents that are idle but may be stalled (idle >10min with pending tasks)
+            stall_penalty = 0
+            if idle_time > 600 and idle_depth > 0:  # Idle >10min with pending tasks
+                stall_penalty = 10  # Heavy penalty for potentially stalled agents
+            
+            # Tolui gets special handling - local model may have different execution patterns
+            if idle_agent == "tolui" and idle_depth > 0:
+                # Check if tolui is actually stalled or just slow
+                if idle_time > 300:  # 5 minutes
+                    print(f"TOLUI_STALL_CHECK: {idle_agent} idle {idle_time}s with {idle_depth} pending")
+                    stall_penalty = 5  # Moderate penalty - may be slow, not necessarily stalled
+            
+            effective_depth = idle_depth + stall_penalty
+            
+            # Only wake if the idle agent has less effective queue depth than primary
+            if effective_depth < primary_depth:
+                healthy_idle.append((idle_agent, idle_depth, effective_depth))
+        
         if healthy_idle:
-            best_idle_agent, best_idle_depth = healthy_idle[0]
+            # Sort by effective depth (considering stall penalty)
+            healthy_idle.sort(key=lambda x: x[2])
+            best_idle_agent, best_idle_depth, _ = healthy_idle[0]
             print(f"IDLE_WAKE_UP: No capable underutilized agents for {primary_agent} (queue={primary_depth}), waking idle agent {best_idle_agent} (queue={best_idle_depth})")
             return best_idle_agent, f"idle-wake: {primary_agent} busy/loaded (queue={primary_depth}), {best_idle_agent} idle with valid creds (queue={best_idle_depth})"
 
@@ -2075,7 +2220,8 @@ def _log_routing_decision(title, dest, method, overflow_reason=None, skill_hint=
         if penalized_scores:
             entry["penalized_scores"] = penalized_scores
         if route_metadata:
-            entry["thresholds"] = route_metadata.get("thresholds", {})
+            # Log all metadata, not just thresholds (2026-03-11)
+            entry["metadata"] = route_metadata
 
         # Identify idle agents (queue=0 and not busy)
         idle = []
@@ -2136,13 +2282,23 @@ def _extract_topic_keys(title):
 
 def has_pending_task(agent, title_prefix, full_title=None):
     """Check if an agent already has an uncompleted task with this title prefix
-    or a semantically similar title (>60% keyword overlap)."""
+    or a semantically similar title (>60% keyword overlap).
+
+    FIX 2026-03-12: Exclude .done.md and .failed.md from duplicate detection.
+    Only active tasks (.md, .pending.md, .executing.md) should count.
+    """
     task_dir = f"{AGENT_DIR}/{agent}/tasks"
     if not os.path.exists(task_dir):
         return False
     topic_keys = _extract_topic_keys(full_title or title_prefix)
+    # Filter to only active task extensions (exclude completed/failed)
+    active_extensions = ('.md', '.pending.md', '.executing.md')
     for fname in os.listdir(task_dir):
-        if '.done' in fname:
+        # Skip completed/failed files and non-task files
+        if fname.endswith('.done.md') or fname.endswith('.failed.md'):
+            continue
+        # Skip files without valid active extensions
+        if not any(fname.endswith(ext) for ext in active_extensions if fname.endswith(ext)):
             continue
         fpath = os.path.join(task_dir, fname)
         try:
@@ -2178,6 +2334,7 @@ ALERT_PATTERNS = [
     "stall alert",
     "queue imbalance",
     "throughput escalation",
+    "routing audit",  # PRIORITY_FIX: deduplicate routing_audit tasks (2026-03-11)
 ]
 
 # Deduplication state file
@@ -2236,6 +2393,33 @@ def _normalize_alert_key(agent: str, title: str, source: str) -> str:
         keyword_key = "-".join(sorted(topic_keys)[:3])  # First 3 keywords
         return f"{agent}:alert:{keyword_key}"
     return f"{agent}:unknown"
+
+
+def normalize_task_filename(filename: str) -> str:
+    """Normalize task filename to standard format.
+
+    Standard formats:
+    - {task_id}.md (pending)
+    - {task_id}.executing.md (in progress)
+    - {task_id}.done.md (completed)
+    - {task_id}.failed.md (failed)
+
+    Non-standard patterns to clean up:
+    - .completed.revision-1.md -> .done.md
+    - .resolved.md -> .done.md
+    - .false-positive.md -> remove or keep .done.md
+    """
+    import re
+
+    # Remove revision suffixes
+    filename = re.sub(r'\.revision-\d+', '', filename)
+
+    # Standardize status suffixes
+    filename = re.sub(r'\.completed', '.done', filename)
+    filename = re.sub(r'\.resolved', '.done', filename)
+    filename = re.sub(r'\.false-positive', '', filename)  # Remove, will keep .done.md
+
+    return filename
 
 
 def should_suppress_alert(agent: str, title: str, source: str) -> tuple[bool, str]:
@@ -2791,8 +2975,8 @@ def create_task(title, body, priority="normal", source="task_intake",
                 dest=alternate_agent,
                 method="skill_overflow_bypass",
                 scores={agent: 0, alternate_agent: 1},
-                metadata={
-                    "skill_hint": skill_hint,
+                skill_hint=skill_hint,
+                route_metadata={
                     "primary_agent": agent,
                     "primary_depth": primary_depth,
                     "bypass_reason": bypass_reason
@@ -2808,6 +2992,121 @@ def create_task(title, body, priority="normal", source="task_intake",
     # 2.5.2. Classify domain BEFORE load balancing (prevents domain-incompatible routes)
     # This ensures DOMAIN_AGENT_COMPATIBILITY is respected when selecting alternates.
     _task_domain = classify_task_domain(title, skill_hint)
+
+    # 2.5.2b. DOMAIN COMPATIBILITY CHECK (O005 enforcement)
+    # Reject tasks routed to agents that cannot handle the classified domain.
+    # Prevents the 8-hour stuck task issue where ogedei held a documentation task.
+    # System sources and direct mentions bypass this check (they know what they're doing).
+    _system_sources = {
+        "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
+        "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
+        "cascade_detector", "throughput_anomaly", "stall_detector",
+        "action_resolution", "signal_calendar", "redistribution",
+        "system-health-check", "task_intake", "queue-audit", "kurultai-monitor",
+        "kublai-initiative", "idle-monitor", "kublai-diagnostic", "idle-crisis",
+        "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
+        "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
+        "direct-mention",  # Explicit @mention bypass
+    }
+    if (_caller_provided_agent and
+        source not in _system_sources and
+        not mention_agent and
+        _task_domain in DOMAIN_AGENT_COMPATIBILITY and
+        agent not in DOMAIN_AGENT_COMPATIBILITY[_task_domain]):
+
+        _compatible_agents = DOMAIN_AGENT_COMPATIBILITY[_task_domain]
+        _suggested = _compatible_agents[0] if _compatible_agents else "kublai"
+
+        print(f"DOMAIN_MISMATCH: agent='{agent}' cannot handle domain='{_task_domain}'")
+        print(f"  Task: '{title[:80]}'")
+        print(f"  Compatible agents for {_task_domain}: {', '.join(_compatible_agents)}")
+        print(f"  Suggested: {_suggested}")
+        print(f"  REJECTING task creation — use agent='{_suggested}' or @mention to override")
+
+        # Log domain mismatch for telemetry
+        _log_routing_decision(
+            title=title,
+            dest=agent,
+            method="domain_mismatch_reject",
+            domain=_task_domain,
+            route_metadata={
+                "reject_reason": f"agent {agent} not in domain compatibility list",
+                "compatible_agents": _compatible_agents,
+                "suggested_agent": _suggested,
+                "source": source,
+            },
+        )
+
+        return None  # Reject task creation
+
+    # 2.5.2c. TITLE-DOMAIN CONFLICT CHECK (skill hint override protection)
+    # Detect cases where skill hint overrides a clear title-domain signal.
+    # Example: /horde-implement on "Document ESCALATION_PROTOCOL.md" → documentation task
+    # misclassified as implementation, then routed to ogedei who can't do docs.
+    _title_keywords_domain = None
+    _title_lower = title.lower()
+    _title_scores = {}
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in _title_lower)
+        if score > 0:
+            _title_scores[domain] = score
+
+    if _title_scores:
+        _title_keywords_domain = max(_title_scores.items(), key=lambda x: x[1])[0]
+
+    # Check if title-based domain conflicts with classified domain
+    # AND if the target agent is incompatible with the title-based domain
+    if (_title_keywords_domain and
+        _title_keywords_domain != _task_domain and
+        _title_keywords_domain in DOMAIN_AGENT_COMPATIBILITY and
+        agent not in DOMAIN_AGENT_COMPATIBILITY[_title_keywords_domain]):
+
+        _compatible_for_title = DOMAIN_AGENT_COMPATIBILITY[_title_keywords_domain]
+        _suggested_for_title = _compatible_for_title[0] if _compatible_for_title else "kublai"
+
+        print(f"TITLE_DOMAIN_CONFLICT: title suggests '{_title_keywords_domain}' but classified as '{_task_domain}'")
+        print(f"  Task: '{title[:80]}'")
+        print(f"  Title keywords point to: {_title_keywords_domain}")
+        print(f"  Classified as: {_task_domain} (from skill hint: {skill_hint})")
+        print(f"  Target agent '{agent}' is incompatible with title-domain '{_title_keywords_domain}'")
+        print(f"  Compatible agents for {_title_keywords_domain}: {', '.join(_compatible_for_title)}")
+        print(f"  REJECTING task creation — this appears to be a {_title_keywords_domain} task")
+        print(f"  Suggested: use agent='{_suggested_for_title}' or remove skill hint to rely on title keywords")
+
+        # Log title-domain conflict for telemetry
+        _log_routing_decision(
+            title=title,
+            dest=agent,
+            method="title_domain_conflict_reject",
+            domain=_title_keywords_domain,
+            route_metadata={
+                "reject_reason": f"title suggests {_title_keywords_domain} but classified as {_task_domain}",
+                "title_domain": _title_keywords_domain,
+                "classified_domain": _task_domain,
+                "skill_hint": skill_hint,
+                "compatible_agents": _compatible_for_title,
+                "suggested_agent": _suggested_for_title,
+                "source": source,
+            },
+        )
+
+        return None  # Reject task creation
+
+    # 2.5.3. Kublai self-absorption: when router is overloaded but idle, absorb coordination tasks
+    # This fixes the "router cannot route to itself" failure mode where kublai's queue grows
+    # without bound because it never takes tasks for itself.
+    if agent != "kublai" and not mention_agent and not _skill_locked_agent:
+        if should_kublai_self_absorb(title):
+            original_agent = agent
+            agent = "kublai"
+            print(f"KUBLAI_SELF_ABSORB: {original_agent} -> kublai (queue={get_queue_depth('kublai')}, idle={int(_get_kublai_idle_minutes())}min)")
+            _log_routing_decision(
+                title=title,
+                dest="kublai",
+                method="self_absorb",
+                original_agent=original_agent,
+                domain=_task_domain,
+            )
 
     # 2.5.3. Kublai self-absorption: when router is overloaded but idle, absorb coordination tasks
     # This fixes the "router cannot route to itself" failure mode where kublai's queue grows
@@ -2829,7 +3128,7 @@ def create_task(title, body, priority="normal", source="task_intake",
     # Check all dispatch agents upfront. If ALL have invalid credentials, stop immediately.
     # This prevents wasting time on load balancing/routing when the entire fleet is dead.
     # Implements behavioral rule #1: stop creating tasks when fleet is paralyzed.
-    _dispatch_agents = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
+    _dispatch_agents = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
     _healthy_count = 0
     _unhealthy_agents = []
 
@@ -2895,16 +3194,37 @@ Multi-tier fallback: Anthropic → Z.AI → Alibaba
     # Get adaptive thresholds for load balancing decisions
     _lb_thresholds = get_adaptive_thresholds()
 
+    # REDUCE EXPLICIT ROUTING (2026-03-11): Even for explicitly-routed tasks,
+    # check if keyword routing strongly disagrees. This reduces the 81% explicit
+    # routing rate by catching misroutes before they happen.
+    # 
+    # Only skip keyword override for:
+    # 1. Direct @mentions (user explicitly chose agent)
+    # 2. System sources that require specific agents (watchdog, health checks)
+    # 3. Tasks with skill hints that lock to specific agents
+    _system_sources_requiring_explicit = {
+        "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
+        "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
+        "cascade_detector", "throughput_anomaly", "stall_detector",
+        "action_resolution", "signal_calendar", "redistribution",
+        "system-health-check", "task_intake", "queue-audit", "kurultai-monitor",
+        "kublai-initiative", "idle-monitor", "kublai-diagnostic", "idle-crisis",
+        "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
+        "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
+        "daily-task-review",  # Task review should respect explicit routing
+    }
+    _is_system_source = source in _system_sources_requiring_explicit
+
     # Load balancing applies to:
     # - Auto-routed tasks (not _caller_provided_agent)
-    # - OR explicitly-routed tasks to CRITICALLY overloaded agents (>= adaptive CRITICAL threshold)
+    # - OR explicitly-routed tasks from non-system sources where keyword routing disagrees
     load_balance_needed = (
         agent not in ("kublai", "subagent")
         and not mention_agent
         and not _skill_locked_agent
         and (
             not _caller_provided_agent  # Auto-routed: always load-balance
-            or original_depth >= _lb_thresholds['critical']  # Explicit: only if critically overloaded
+            or (not _is_system_source and original_depth >= _lb_thresholds['high'])  # Explicit from non-system: only if overloaded
         )
     )
 
@@ -3182,7 +3502,7 @@ This is blocking ALL task execution. Fleet is paralyzed.
             title=title,
             dest=agent,
             method="alert_dedup_suppressed",
-            metadata={"reason": suppress_reason},
+            route_metadata={"reason": suppress_reason},
         )
         return None
 
@@ -3254,108 +3574,13 @@ This is blocking ALL task execution. Fleet is paralyzed.
 
         return task_id
     except Exception as e:
-        print(f"ERROR: Neo4j unavailable, falling back to filesystem-only: {e}")
-        # Filesystem-only fallback
-        import time
-        task_dir = f"{AGENT_DIR}/{agent}/tasks"
-        os.makedirs(task_dir, exist_ok=True)
-        epoch = int(time.time())
-        filepath = f"{task_dir}/{priority}-{epoch}.md"
-        skill_line = f"skill_hint: {skill_hint}\n" if skill_hint else ""
-        notify_lines = ""
-        if notify_on_complete:
-            notify_lines = f"notify_on_complete: true\nnotify_channel: {notify_channel}\nnotify_target: {notify_target}\n"
-
-        # Auto-detect origin if not provided
-        if origin_type is None:
-            if origin_initiator and origin_initiator.startswith("+"):
-                origin_type = "human"
-            elif source in ("signal", "api"):
-                origin_type = "human"
-            else:
-                origin_type = "agent"
-        if origin_source is None:
-            origin_source = source
-
-        # Origin metadata for frontmatter
-        origin_lines = ""
-        if origin_type or origin_initiator or origin_source:
-            origin_lines = f"origin:\n  type: {origin_type or 'unknown'}\n"
-            if origin_initiator:
-                origin_lines += f"  initiator: {origin_initiator}\n"
-            if origin_source:
-                origin_lines += f"  source: {origin_source}\n"
-            origin_lines += f"  timestamp: {datetime.now().isoformat()}\n"
-
-        timeout = compute_task_timeout(priority, skill_hint)
-        # Auto-assign bucket based on priority if not provided
-        if bucket is None:
-            bucket_map = {
-                'critical': 'CRITICAL',
-                'high': 'TODAY',
-                'normal': 'WEEK',
-                'low': 'BACKLOG'
-            }
-            bucket = bucket_map.get(priority, 'BACKLOG')
-
-        # R008: Prominent skill invocation instruction (fixes EXECUTING_NO_OUTPUT)
-        skill_instruction = ""
-        if skill_hint:
-            skill_instruction = f"""---
-**IMPORTANT:** This task has a skill hint. You MUST invoke the Skill tool with `{skill_hint}` before starting work.
-
-This is a R008 requirement — skill hints are not optional suggestions, they are mandatory invocation instructions.
----
-
-"""
-
-        content = f"""---
-agent: {agent}
-priority: {priority}
-created: {datetime.now().isoformat()}
-source: {source}
-depth: {depth}
-bucket: {bucket}
-timeout: {timeout}
-{skill_line}{notify_lines}{origin_lines}---
-
-# Task: {title}
-
-{skill_instruction}{body}
-"""
-        with open(filepath, 'w') as f:
-            f.write(content)
-        print(f"CREATED (filesystem-only): {filepath}")
-
-        # Link task to conversation if human-initiated (filesystem fallback)
-        if CONVERSATION_LOGGER_AVAILABLE and origin_initiator and origin_initiator.startswith("+"):
-            try:
-                _link_task_to_conversation(
-                    task_id=f"fs-{epoch}",
-                    phone_number=origin_initiator,
-                    title=title,
-                    body=body,
-                    priority=priority,
-                    agent=agent,
-                    source=source
-                )
-            except Exception as e:
-                print(f"Warning: Failed to link task fs-{epoch} to conversation: {e}")
-
-        # Update kublai dispatch timestamp for self-absorption tracking
-        if agent == "kublai":
-            _update_kublai_dispatch_timestamp()
-        # Append QUEUED event to task ledger (filesystem-only fallback path)
-        try:
-            _kp_append_ledger({
-                "task_id": f"fs-{epoch}", "event": "QUEUED",
-                "ts": datetime.now().isoformat(),
-                "agent": agent, "priority": priority,
-                "task_summary": title[:100], "source": source,
-            })
-        except Exception:
-            pass
-        return f"fs-{epoch}"
+        # REMOVED: Filesystem-only fallback (2026-03-11)
+        # Neo4j is the source of truth. If Neo4j is unavailable, task creation
+        # MUST fail rather than create filesystem-only tasks that cause
+        # reconciliation issues and orphan cleanup race conditions.
+        print(f"ERROR: Neo4j unavailable — task creation FAILED: {e}")
+        print("ACTION REQUIRED: Check Neo4j connectivity before retrying.")
+        raise
 
 
 if __name__ == "__main__":
@@ -3391,8 +3616,8 @@ if __name__ == "__main__":
         print("-" * 50)
 
         for agent in sorted(VALID_AGENTS):
-            load = loads[agent]
-            depth = depths[agent]
+            load = loads.get(agent, {'pending': 0, 'executing': 0})
+            depth = depths.get(agent, 0)
             status = []
             if depth >= CRITICAL_THRESHOLD:
                 status.append("CRITICAL")

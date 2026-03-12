@@ -5,3 +5,136 @@
 {"timestamp": "2026-03-11T00:56:03-04:00", "agent": "jochi", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
 {"timestamp": "2026-03-11T00:56:03-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
 {"timestamp": "2026-03-11T01:02:33-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T14:37:45.649335", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T14:54:36.356580", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T15:04:34.493124", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T15:06:40.053290", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T15:08:20.333737", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T15:37:17.330394", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T17:09:14.406500", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T17:10:58.270306", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T17:20:52.134498", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T17:39:44.336578", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T17:44:29.220504", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T17:53:20-04:00", "agent": "kublai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T17:53:20-04:00", "agent": "mongke", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T17:53:26-04:00", "agent": "temujin", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T17:53:26-04:00", "agent": "chagatai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T17:53:32-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T17:53:32-04:00", "agent": "jochi", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T17:54:23.702722", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T18:14:38.826216", "agent": "jochi", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T18:16:52.718980", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T18:34:02.763817", "agent": "ogedei", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T18:45:21.358310", "agent": "jochi", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T18:59:37.901401", "agent": "ogedei", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T18:59:37.902769", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T19:06:14.528014", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T19:06:14.535779", "agent": "ogedei", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T19:35:35-04:00", "agent": "jochi", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:36:11-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:40:26-04:00", "agent": "mongke", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:40:26-04:00", "agent": "kublai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:41:02-04:00", "agent": "chagatai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:41:14-04:00", "agent": "chagatai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:41:17-04:00", "agent": "chagatai", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:41:19-04:00", "agent": "temujin", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:41:53-04:00", "agent": "temujin", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:41:54-04:00", "agent": "jochi", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:42:12-04:00", "agent": "ogedei", "script": "hourly_reflection.sh", "reason": "preflight_timeout_or_auth_error"}
+{"timestamp": "2026-03-11T19:51:25.387812", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T20:31:09.842602", "agent": "jochi", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T20:31:12.712858", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T20:31:26.107816", "agent": "ogedei", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T20:33:27.300505", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:04:00.953086", "agent": "mongke", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:04:03.132207", "agent": "jochi", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:04:10.518769", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:04:16.833779", "agent": "ogedei", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:34:23.766376", "agent": "jochi", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:34:28.853130", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:34:30.675361", "agent": "ogedei", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T21:35:13.855184", "agent": "chagatai", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-11T23:40:18.850609", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:40:34.094410", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:40:49.332032", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:41:04.549361", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:41:19.832294", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:47:01.087087", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:47:16.335965", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:47:31.613570", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:47:46.887240", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:48:02.119763", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:48:17.395024", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:53:59.712017", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:54:14.959609", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:54:30.173290", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:54:45.418520", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:55:00.692143", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-11T23:55:15.904976", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:00:56.403720", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:01:11.639018", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:01:26.853431", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:01:42.137351", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:02:11.623920", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:07:54.565866", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:08:09.829366", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:08:52.057580", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:09:07.265971", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:14:51.021269", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:15:06.276216", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:15:21.527290", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:15:36.785271", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:15:52.039164", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:16:07.306397", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:21:50.717442", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:22:20.376232", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:22:35.614542", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:23:05.672749", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:28:47.373828", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:29:02.588613", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:29:32.740905", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:41:23.665410", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:41:38.916819", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:41:54.195997", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:42:09.425784", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:42:24.655842", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:42:39.898820", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:48:22.908636", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:49:22.424733", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:55:19.392639", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:55:49.591949", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:56:04.836866", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T00:56:34.436092", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:02:15.449460", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:02:44.725842", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:02:59.961828", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:03:15.189731", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:09:14.814403", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:10:28.739046", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:16:14.157655", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:16:29.423782", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:16:44.698466", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:16:59.991105", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:17:15.248058", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:17:30.489027", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:23:13.371531", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:23:28.668352", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:24:12.715118", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:24:27.961817", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:30:09.154024", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:30:37.870969", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:30:53.122726", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T01:31:08.393145", "agent": "jochi", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T02:13:27.625707", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T02:49:11.570805", "agent": "mongke", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T02:49:41.805830", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T03:19:10.369199", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T03:33:45.774908", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T04:24:42.505366", "agent": "temujin", "label": "execute_task_with_llm", "script": "agent-task-handler.py", "reason": "preflight_failed"}
+{"timestamp": "2026-03-12T04:48:06.126523", "agent": "temujin", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T05:10:56.462214", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T05:16:56.085563", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T05:18:18.107471", "agent": "chagatai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T05:19:09.721746", "agent": "ogedei", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}
+{"timestamp": "2026-03-12T05:25:09.076588", "agent": "kublai", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}

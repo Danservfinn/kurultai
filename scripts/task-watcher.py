@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
 from kurultai_paths import (
     AGENTS_DIR, TASK_LEDGER, SPAWN_QUEUE, WATCHER_STATE as STATE_FILE,
-    VALID_AGENTS as _VALID_AGENTS, CLAUDE_AGENT as _CLAUDE_AGENT_PATH,
+    LOGS_DIR, VALID_AGENTS as _VALID_AGENTS, CLAUDE_AGENT as _CLAUDE_AGENT_PATH,
     agent_sessions_path as _agent_sessions_path,
     SESSION_BLOAT_THRESHOLD as _SESSION_BLOAT_THRESHOLD,
 )
@@ -101,17 +101,156 @@ def get_pending_tasks_from_neo4j(agent: str, limit: int = 10) -> list[dict]:
         return []
 
 
+def _sync_orphaned_task_to_neo4j(task_id: str, agent: str, task_file) -> bool:
+    """Sync orphaned filesystem task to Neo4j for on-demand recovery.
+
+    When a task exists in filesystem but not Neo4j (e.g., Neo4j was down during
+    task creation), this function creates the missing Neo4j Task node using
+    metadata extracted from the task file.
+
+    This prevents the PENDING_NO_DISPATCH stall where tasks are never claimed
+    because they don't exist in Neo4j.
+
+    Args:
+        task_id: The task's unique identifier
+        agent: The agent assigned to the task
+        task_file: Path object pointing to the task file
+
+    Returns:
+        True if sync succeeded, False otherwise
+    """
+    try:
+        # Parse task file frontmatter for metadata
+        content = task_file.read_text(encoding="utf-8", errors="replace")
+
+        # Extract metadata using regex patterns
+        import re
+        title = "Unknown Task"
+        body = ""
+        priority = "normal"
+        source = "recovery"
+        depth = 0
+        skill_hint = ""
+        domain = None
+
+        # Extract title (first # heading)
+        title_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+        if title_match:
+            title = title_match.group(1).strip()
+
+        # Extract body (everything after frontmatter, up to 1000 chars)
+        body_match = re.search(r'^---\s*\n(.+?)^---\s*\n(.*)', content, re.MULTILINE | re.DOTALL)
+        if body_match:
+            body = body_match.group(2)[:2000]  # Limit body size
+        else:
+            # No frontmatter, extract content after title
+            content_after_title = re.sub(r'^#\s+.+$', '', content, count=1, flags=re.MULTILINE)
+            body = content_after_title.strip()[:2000]
+
+        # Extract frontmatter metadata
+        for line in content.split('\n')[:50]:  # Only check first 50 lines
+            if ':' not in line:
+                continue
+            key, value = line.split(':', 1)
+            key = key.strip().lower()
+            value = value.strip()
+
+            if key == 'priority' and value in ('high', 'normal', 'low'):
+                priority = value
+            elif key == 'source':
+                source = value
+            elif key == 'depth':
+                try:
+                    depth = int(value)
+                except ValueError:
+                    pass
+            elif key == 'skill_hint':
+                skill_hint = value
+            elif key == 'domain':
+                domain = value
+
+        # Create Neo4j Task node
+        driver = _get_neo4j_driver()
+        if not driver:
+            log(f"SYNC FAILED: Neo4j unavailable for orphaned task {task_id}")
+            return False
+
+        with driver.session() as session:
+            label = f"{agent}-{task_id}"
+            session.run("""
+                MERGE (a:Agent {name: $agent})
+                CREATE (t:Task {
+                    task_id: $task_id,
+                    label: $label,
+                    agent: $agent,
+                    title: $title,
+                    body: $body,
+                    priority: $priority,
+                    source: $source,
+                    depth: $depth,
+                    skill_hint: $skill_hint,
+                    domain: $domain,
+                    status: 'PENDING',
+                    created: datetime(),
+                    retry_count: 0,
+                    max_retries: 3
+                })
+                CREATE (a)-[:EXECUTED]->(t)
+            """, task_id=task_id, label=label, agent=agent, title=title,
+                body=body, priority=priority, source=source, depth=depth,
+                skill_hint=skill_hint, domain=domain)
+
+        log(f"SYNC: Created Neo4j entry for orphaned task {task_id} (agent={agent})")
+        return True
+
+    except Exception as e:
+        log(f"SYNC FAILED: Could not sync orphaned task {task_id}: {e}")
+        return False
+
+
 def claim_task_atomic(task_id: str, agent: str) -> tuple[bool, str]:
     """Atomically claim a task using Neo4j CAS pattern.
 
     Returns (success, session_key) tuple.
     session_key is used to verify ownership during execution.
+
+    ON-DEMAND SYNC: If task is not_found in Neo4j but exists in filesystem,
+    creates the Neo4j entry and retries the claim (fixes PENDING_NO_DISPATCH).
     """
     import time
     try:
         from neo4j_atomic_transitions import claim_task
+        from pathlib import Path
+
         session_key = f"{agent}-{time.time()}"
         success, reason = claim_task(task_id, agent, session_key)
+
+        # ON-DEMAND SYNC: If task not found in Neo4j, try to sync from filesystem
+        if not success and "not_found" in reason.lower():
+            # Check if task file exists in filesystem
+            tasks_dir = Path(f"~/.openclaw/agents/{agent}/tasks").expanduser()
+            task_file = None
+
+            # Try different filename patterns
+            for fname in os.listdir(tasks_dir):
+                if task_id in fname:
+                    task_file = tasks_dir / fname
+                    break
+
+            if task_file and task_file.exists():
+                log(f"RECOVERY: Task {task_id} not in Neo4j, syncing from filesystem...")
+                if _sync_orphaned_task_to_neo4j(task_id, agent, task_file):
+                    # Retry the claim after successful sync
+                    success, reason = claim_task(task_id, agent, session_key)
+                    if success:
+                        log(f"RECOVERY: Successfully claimed orphaned task {task_id}")
+                    else:
+                        log(f"RECOVERY FAILED: Claim retry failed for {task_id} - {reason}")
+                else:
+                    log(f"RECOVERY FAILED: Could not sync task {task_id} to Neo4j")
+            else:
+                log(f"SKIP: Task {task_id} not found in Neo4j or filesystem - {reason}")
+
         if not success:
             # Log the specific reason for failure
             log(f"SKIP: Task {task_id} - {reason}")
@@ -207,6 +346,7 @@ TIMEOUT_BY_PRIORITY = {
     'normal': 7200, # 2 hours
     'low': 7200,    # 2 hours
 }
+API_LATENCY_BUFFER = 300  # 5 minutes for API response delays, rate limiting backoff, network latency
 CLEANUP_INTERVAL = 300  # Run cleanup every 5 minutes (aligned with tick heartbeat)
 DONE_FILE_MAX_AGE = 48 * 3600  # 48 hours in seconds
 MAX_CONCURRENT_AGENTS = 6  # One slot per agent
@@ -276,25 +416,49 @@ def _verify_task_completion(task_file, max_retries=3):
                 fcntl.flock(fd, fcntl.LOCK_UN)  # Release lock
                 os.close(fd)
 
-            # CRITICAL: Check for execution output section
-            # This is the separator added by _append_output_to_executing() in agent-task-handler.py
+            # CRITICAL: Check for execution output section OR resolution section
+            # The separator is added by _append_output_to_executing() in agent-task-handler.py
+            # FIX 2026-03-12: Accept ## Resolution as alternative completion marker
+            # to prevent false no_output markings when _append_output_to_executing fails.
             execution_marker = '## Execution Output'
+            resolution_marker = '## Resolution'
 
-            if execution_marker not in content:
+            has_execution = execution_marker in content
+            has_resolution = resolution_marker in content
+
+            if not has_execution and not has_resolution:
                 # If content looks incomplete (too short), retry before failing
                 if len(content) < 1000 and attempt < max_retries - 1:
                     time.sleep(0.1 * (2 ** attempt))
                     continue
-                return False, f"No execution output section found (missing '{execution_marker}')"
+                return False, f"No execution output section found (missing '{execution_marker}' or '{resolution_marker}')"
+
+            # Determine which marker to use for extraction (prefer execution, fallback to resolution)
+            if has_execution:
+                output_marker = execution_marker
+            else:
+                output_marker = resolution_marker
 
             # SECURITY: Use rsplit() to find the LAST occurrence of the marker,
             # which is always the system-controlled marker. This prevents injection
             # attacks where task descriptions contain the marker.
-            parts = content.rsplit(execution_marker, 1)
+            parts = content.rsplit(output_marker, 1)
             if len(parts) < 2:
                 return False, "Execution output section exists but has no content"
 
             execution_output = parts[1].strip()
+
+            # If we're using resolution marker (fallback mode), check for status line
+            if output_marker == resolution_marker:
+                output_upper = execution_output.upper()
+                has_status = (
+                    "**STATUS:" in output_upper
+                    or "STATUS:" in output_upper
+                    or "COMPLETED" in output_upper
+                    or "COMPLETE" in output_upper
+                )
+                if not has_status and len(execution_output) < 200:
+                    return False, "Resolution section missing status line (add '**Status:**' or '## Status')"
 
             # Count actual execution output lines (non-empty, excluding known metadata patterns)
             # Only filter lines that are EXACTLY metadata format, not all bold text
@@ -596,10 +760,24 @@ def list_pending_tasks(agent_dir):
     for f in tasks_dir.glob("*.md"):
         # Skip completed/executing/failed/resolved tasks and gate states
         # FIX 2026-03-10: Check for terminal state markers anywhere in filename
+        # FIX 2026-03-11: Don't skip .failed.revision-N tasks (they're retryable revisions)
         skip_patterns = ['.executing', '.pending-gate', '.gate-blocked', '.done', '.failed', '.resolved', '.completed', '.cancelled', '.false-positive']
-        # Skip any file with terminal state markers (before .md extension)
         name_without_ext = f.name[:-3] if f.name.endswith('.md') else f.name
-        if any(pattern in name_without_ext for pattern in skip_patterns):
+        # FIX 2026-03-11: Exception for .revision-N tasks WITHOUT terminal suffix AFTER the revision
+        # Examples:
+        #   'task.completed.revision-1.md' -> PENDING (terminal marker BEFORE revision, not after)
+        #   'task.completed.revision-1.done.md' -> SKIP (terminal marker AFTER revision means done)
+        #   'task.verified.done.md' -> SKIP (no revision, just terminal)
+        revision_match = re.search(r'\.revision-(\d+)', name_without_ext)
+        has_terminal_after_revision = False
+        if revision_match:
+            # Check if any terminal pattern appears AFTER the .revision-N marker
+            after_revision = name_without_ext[revision_match.end():]
+            has_terminal_after_revision = any(pattern in after_revision for pattern in skip_patterns)
+        if revision_match and not has_terminal_after_revision:
+            # This is a revision awaiting retry, include it
+            pass
+        elif any(pattern in name_without_ext for pattern in skip_patterns):
             continue
         # Skip continuous/recurring tasks (only run when explicitly triggered)
         try:
@@ -912,7 +1090,8 @@ def _schedule_verification(task_file, agent, task_id):
 def _generate_completion_report(completed_file: str, agent: str, task_id: str, status: str = 'completed'):
     """Generate task completion report using kublai-task-report skill."""
     try:
-        hook = str(Path(__file__).parent / "task-report-hook.py")
+        from script_paths import get_script_path
+        hook = str(get_script_path("task_report_hook"))
         result = subprocess.run(
             ["python3", hook,
              "--task-file", completed_file,
@@ -938,7 +1117,8 @@ def _schedule_task_report(task_file, agent, task_id, success, elapsed_s, output)
     """
     def _report():
         try:
-            hook = str(Path(__file__).parent / "task-report-hook.py")
+            from script_paths import get_script_path
+            hook = str(get_script_path("task_report_hook"))
             status = "completed" if success else "failed"
             result = subprocess.run(
                 ["python3", hook,
@@ -975,7 +1155,11 @@ SLOW_SKILLS = {
 
 
 def _timeout_for_task(task_file):
-    """Return timeout based on priority AND skill_hint (matches agent-task-handler logic)."""
+    """Return timeout based on priority AND skill_hint (matches agent-task-handler logic).
+
+    Includes API_LATENCY_BUFFER to account for model response delays, rate limiting backoff,
+    and network latency.
+    """
     name = task_file.name.lower()
     priority_timeout = TIMEOUT_DEFAULT
     for prefix in ('high-', 'normal-', 'low-'):
@@ -985,7 +1169,7 @@ def _timeout_for_task(task_file):
 
     skill_hint = _extract_skill_hint(task_file)
     skill_timeout = SLOW_SKILLS.get(skill_hint, 0)
-    return max(priority_timeout, skill_timeout)
+    return max(priority_timeout, skill_timeout) + API_LATENCY_BUFFER
 
 
 def _extract_retry_count(task_file):
@@ -1273,8 +1457,12 @@ def execute_task(task_file, agent, task_key, timeout):
         # Kill entire process group (handler + claude + all children)
         if proc:
             try:
+                # Send SIGTERM first for graceful shutdown
+                log(f"  ⚠️ TIMEOUT WARNING: Sending SIGTERM to {agent}/{task_key}")
                 os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                time.sleep(2)
+                # Wait 30 seconds for graceful handling before SIGKILL
+                time.sleep(30)
+                log(f"  ⚠️ TIMEOUT: Sending SIGKILL to {agent}/{task_key} after grace period")
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
                 pass
@@ -1503,6 +1691,84 @@ def route_spawn_to_queue(agent, task_text, priority, label):
     return str(task_path)
 
 
+def auth_health_preflight(agent: str, timeout: int = 30) -> bool:
+    """Check if claude-agent can authenticate for the given agent.
+
+    Prevents spawn crashes from invalid/expired auth tokens.
+    Pattern from hourly_reflection.sh auth preflight.
+
+    FIX (2026-03-11): Increased default from 15s to 30s because claude-agent
+    takes ~24 seconds to complete authentication and response.
+
+    FIX (2026-03-12): Use cached auth-heartbeat.json to reduce concurrent checks.
+    Multiple agents doing simultaneous auth checks cause resource contention
+    and timeouts. Use 5-minute stale threshold to match auth_heartbeat.py.
+
+    Args:
+        agent: Agent name (temujin, mongke, etc.)
+        timeout: Seconds to wait for auth check (default 30)
+
+    Returns:
+        True if auth succeeds, False otherwise
+    """
+    # First check cached auth status (5-minute stale threshold)
+    heartbeat_file = AGENTS_DIR / "main" / "logs" / "auth-heartbeat.json"
+    AUTH_STALE_SECONDS = 300  # 5 minutes - matches auth_heartbeat.py
+
+    if heartbeat_file.exists():
+        try:
+            with open(heartbeat_file) as f:
+                heartbeat = json.load(f)
+            if agent in heartbeat:
+                entry = heartbeat[agent]
+                if entry.get("status") == "ok":
+                    last_success = entry.get("last_success")
+                    if last_success:
+                        from datetime import datetime
+                        last_success_time = datetime.fromisoformat(last_success)
+                        age_seconds = (datetime.now() - last_success_time).total_seconds()
+                        if age_seconds < AUTH_STALE_SECONDS:
+                            # Cached result is fresh - skip auth check
+                            return True
+        except (json.JSONDecodeError, ValueError, KeyError):
+            # Cache read failed - fall through to fresh check
+            pass
+
+    agent_dir = AGENTS_DIR / agent
+    if not agent_dir.is_dir():
+        log(f"  AUTH PREFLIGHT: {agent} directory not found: {agent_dir}")
+        return False
+
+    # Quick test: can claude-agent complete a minimal request?
+    test_prompt = "Respond with exactly: OK"
+
+    for attempt in range(3):  # 3 attempts with exponential backoff
+        try:
+            result = subprocess.run(
+                [CLAUDE_AGENT, test_prompt],
+                cwd=str(agent_dir),
+                capture_output=True,
+                timeout=timeout,
+                # FIX (2026-03-11 23:40): Use CLAUDE_PROVIDER=zai explicitly because
+                # default provider (Anthropic OAuth) doesn't work reliably in subprocess calls
+                env={**os.environ, 'CLAUDECODE': '', 'CLAUDE_PROVIDER': 'zai'}
+            )
+            if result.returncode == 0:
+                return True  # Auth success
+        except subprocess.TimeoutExpired:
+            pass  # Try again with backoff
+        except Exception as e:
+            log(f"  AUTH PREFLIGHT: {agent} attempt {attempt + 1}: {e}")
+
+        # Exponential backoff before retry (2s, 4s)
+        if attempt < 2:
+            backoff = 2 ** attempt
+            time.sleep(backoff)
+
+    log(f"  AUTH PREFLIGHT: {agent} failed after 3 attempts")
+    return False
+
+
 def launch_spawn_direct(agent, task_text, label):
     """Launch Claude Code directly for agent_execution spawn requests.
 
@@ -1606,6 +1872,21 @@ def process_spawn_queue():
 
         try:
             if source == "agent_execution":
+                # AUTH PREFLIGHT: Check credentials before spawning
+                # Prevents claude_code_crash from invalid/expired tokens
+                if not auth_health_preflight(agent, timeout=30):
+                    log(f"  SPAWN SKIP: {agent} auth preflight failed for {label}")
+                    s['status'] = 'failed'
+                    s['error'] = f"Auth preflight failed for {agent}"
+                    # Log auth failure for monitoring
+                    auth_failure_log = AGENTS_DIR / "main" / "logs" / "auth-failures.jsonl"
+                    try:
+                        with open(auth_failure_log, "a") as af:
+                            af.write(f'{{"timestamp": "{datetime.now().isoformat()}", "agent": "{agent}", "label": "{label}", "script": "task-watcher.py", "reason": "preflight_timeout_or_auth_error"}}\n')
+                    except Exception:
+                        pass
+                    continue
+
                 launch_spawn_direct(agent, task_text, label)
                 s['status'] = 'running'
                 s['last_spawned'] = datetime.now().isoformat()
@@ -1933,6 +2214,11 @@ def cleanup_orphan_task_files():
     # Get all task IDs from Neo4j
     tracked_ids = get_all_tracked_task_ids()
 
+    # Grace period: don't remove files created in the last 5 minutes
+    # This allows time for Neo4j sync after task creation
+    GRACE_PERIOD_SECONDS = 300
+    now = time.time()
+
     removed = 0
     for agent_dir in AGENTS_DIR.iterdir():
         if not agent_dir.is_dir() or agent_dir.name == 'main':
@@ -1947,6 +2233,15 @@ def cleanup_orphan_task_files():
             # Skip already processed files
             if any(x in f.name for x in ['.done', '.executing', '.completed', '.failed']):
                 continue
+
+            # Grace period: skip files created in the last 5 minutes
+            # This allows time for Neo4j sync after task creation via task_intake.py
+            try:
+                file_age = now - f.stat().st_mtime
+                if file_age < GRACE_PERIOD_SECONDS:
+                    continue
+            except OSError:
+                pass  # If we can't stat the file, proceed with cleanup
 
             task_id = _extract_task_id(f)
             if not task_id:
@@ -1969,10 +2264,13 @@ def cleanup_orphan_task_files():
 
 # Configuration for stale claim timeout
 STALE_CLAIM_TIMEOUT_MINUTES = 30  # Release claims older than 30 minutes
+# NOTE: release_stale_claims() now handles PENDING_NO_DISPATCH by clearing
+# both EXECUTING tasks stuck too long AND PENDING tasks with stale session_keys
+# (see neo4j_atomic_transitions.py release_stale_claims function)
 
 # Orphan process cleanup configuration
 ORPHAN_PROCESS_MIN_AGE_SECONDS = 300  # 5 minutes - only kill orphans older than this (lowered from 1800s to fix PENDING_NO_DISPATCH stall)
-ORPHAN_SIGTERM_TIMEOUT = 5  # Seconds to wait after SIGTERM before SIGKILL
+ORPHAN_SIGTERM_TIMEOUT = 30  # Seconds to wait after SIGTERM before SIGKILL (matches normal task timeout grace period)
 
 
 def cleanup_orphan_processes():
@@ -2185,9 +2483,12 @@ def recover_stuck_failed_tasks():
 
     Fix: Scan for .md files that are in state as permanently failed, and rename them
     to .failed.done.md so they stop blocking the pending-task scan.
+    
+    Also cleans up stale state entries where the file is already properly named.
     """
     state = load_state()
     recovered = 0
+    stale_entries_cleaned = 0
 
     for agent_dir in AGENTS_DIR.iterdir():
         if not agent_dir.is_dir() or agent_dir.name == 'main':
@@ -2196,6 +2497,24 @@ def recover_stuck_failed_tasks():
         tasks_dir = agent_dir / "tasks"
         if not tasks_dir.exists():
             continue
+
+        # Build set of actual file names for this agent
+        actual_files = {f.name for f in tasks_dir.iterdir() if f.is_file()}
+        
+        # Check state entries for stale references
+        for key in list(state.keys()):
+            if not key.startswith(f"{agent}/"):
+                continue
+            file_name = key.split('/', 1)[1]
+            
+            # If state references a .md file but actual file is .failed.done.md, clean up state
+            if file_name.endswith('.md') and not file_name.endswith('.done.md'):
+                expected_failed_name = file_name.replace('.md', '.failed.done.md')
+                if expected_failed_name in actual_files and file_name not in actual_files:
+                    # File was already recovered, clean up stale state entry
+                    del state[key]
+                    stale_entries_cleaned += 1
+                    log(f"  STUCK-FAIL STATE CLEANUP: Removed stale state entry {key} (file already recovered as {expected_failed_name})")
 
         for f in tasks_dir.glob("*.md"):
             if any(x in f.name for x in ['.executing', '.done']):
@@ -2223,6 +2542,13 @@ def recover_stuck_failed_tasks():
 
     if recovered > 0:
         log(f"Recovered {recovered} stuck-failed task(s)")
+    if stale_entries_cleaned > 0:
+        log(f"Cleaned {stale_entries_cleaned} stale state entries")
+        # Save state after cleaning up stale entries
+        try:
+            save_state(state)
+        except Exception as e:
+            log(f"  STATE SAVE ERROR: {e}")
     return recovered
 
 
@@ -3103,6 +3429,28 @@ def _acquire_daemon_lock():
     return lock_fd
 
 
+def _write_dispatch_count(count: int):
+    """Write dispatch count to state file for heartbeat monitoring.
+
+    This fixes the visibility gap where watchdog-gather.sh shows TASKS_DISPATCHED=0
+    even though task-watcher is actively dispatching tasks. The heartbeat reads this
+    file to report accurate dispatch metrics.
+    """
+    import json
+    dispatch_state = LOGS_DIR / "task-watcher-dispatch.json"
+    try:
+        now = datetime.now().isoformat()
+        data = {
+            "last_dispatch_count": count,
+            "last_update": now,
+            "last_epoch": int(time.time())
+        }
+        with open(dispatch_state, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        log(f"Failed to write dispatch state: {e}")
+
+
 def daemon_loop(poll_interval):
     """Main daemon loop with concurrent execution."""
     log(f"Task Watcher starting (poll interval: {poll_interval}s, max concurrent: {MAX_CONCURRENT_AGENTS})")
@@ -3126,6 +3474,8 @@ def daemon_loop(poll_interval):
                 dispatched = watch_cycle(executor)
                 if dispatched > 0:
                     log(f"Dispatched {dispatched} task(s)")
+                # Write dispatch count for heartbeat visibility (fixes TASKS_DISPATCHED=0 gap)
+                _write_dispatch_count(dispatched)
             except Exception as e:
                 log(f"Error in watch cycle: {e}")
 
@@ -3211,6 +3561,7 @@ def main():
         # Single cycle mode — still uses thread pool but waits for completion
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_AGENTS) as executor:
             dispatched = watch_cycle(executor)
+            _write_dispatch_count(dispatched)  # Track for heartbeat visibility
             # Wait for all dispatched tasks
             with active_lock:
                 futures = list(active_executions.values())

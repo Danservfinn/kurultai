@@ -27,7 +27,7 @@ from kurultai_paths import TASK_LEDGER
 # Event Schema Definition
 # =============================================================================
 
-# Valid event types (as of 2026-03-10)
+# Valid event types (as of 2026-03-11)
 # Core lifecycle events
 VALID_EVENTS = {
     "QUEUED", "EXECUTING", "COMPLETED", "FAILED",
@@ -56,7 +56,10 @@ VALID_EVENTS = {
     "REQUEUED", "ORPHAN_RESOLVED", "CANCELLED",
     "CIRCUIT_BREAKER_HALF_OPEN",
     # Rule enforcement events
-    "R008_VIOLATION",
+    "R008_VIOLATION", "R008_VIOLATION_TRACKED", "R008_PREFLIGHT_FAIL", "R008_PREFLIGHT_CHECK", "AUTH_PREFLIGHT_FAIL",
+    "R008_AUTO_INVOKE_SUCCESS", "R008_AUTO_INVOKE_FAILED", "R008_SKILL_NOT_INVOKED", "R008_SKILL_AUTO_INVOKED",
+    # Timeout events
+    "TASK_TIMEOUT",
     # Test events (should not appear in production)
     "PERF_TEST", "CONCURRENT_TEST", "TEST_EVENT",
 }
@@ -64,6 +67,7 @@ VALID_EVENTS = {
 # System-level events that don't require task_id (session, system, operational events)
 SYSTEM_EVENTS = {
     "SESSION_AUTO_CLEANUP", "SESSION_RESET", "ARCH_UPDATE_CHECK",
+    "AUTH_PREFLIGHT_FAIL",
 }
 
 # UUID pattern: 8-36 hex chars with optional dashes (legacy format)

@@ -343,3 +343,38 @@ time python3 -c "from json_state import locked_json_read; locked_json_read('logs
 3. **Filesystem is source of truth** for task execution state. If Neo4j disagrees, Neo4j is wrong.
 4. **Terminal states are immutable.** Once a file has `.done` suffix, do not rename it again.
 5. **After bulk failures**, run `neo4j-state-sync.py --apply` to reconcile counts.
+
+## State Consistency Check (2026-03-11)
+
+**Script:** `scripts/state_consistency_check.py`
+
+**Purpose:** Detects state drift between Neo4j and filesystem, plus stale lock files.
+
+**What it checks:**
+1. **Stale lock files** (>15 min old) - auto-fixable with `--fix`
+   - `task-watcher.lock` - can block task dispatch
+   - `auto-dispatch.lock` - can prevent auto-routing
+   
+2. **Neo4j/filesystem orphan detection:**
+   - Tasks in Neo4j but missing on filesystem (phantom nodes)
+   - Tasks on filesystem but missing in Neo4j (usually historical .done.md files)
+   - Status mismatches (Neo4j says pending but file is .done.md)
+
+**Usage:**
+```bash
+# Check only (read-only)
+python3 scripts/state_consistency_check.py
+
+# Auto-fix stale locks
+python3 scripts/state_consistency_check.py --fix
+
+# Check specific agent
+python3 scripts/state_consistency_check.py --agent jochi
+```
+
+**Integration:** Runs hourly in `hourly_reflection.sh` after Neo4j reconciliation.
+
+**First run findings (2026-03-11 15:30):**
+- Cleared `auto-dispatch.lock` (87 hours stale!)
+- Cleared `task-watcher.lock` (76 min stale)
+- Identified 63 "orphaned" fs tasks (historical .done.md files - expected behavior)

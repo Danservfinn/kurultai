@@ -1,105 +1,95 @@
 {
   "period_hours": 1,
-  "generated_at": "2026-03-11T06:11:34.293476",
-  "total_routed": 4,
+  "generated_at": "2026-03-12T06:10:50.302477",
+  "total_routed": 14,
   "routing_methods": {
-    "redistribution": 3,
-    "explicit": 1
+    "explicit": 13,
+    "alert_dedup_suppressed": 1
   },
   "destinations": {
-    "mongke": 1,
-    "temujin": 2,
-    "jochi": 1
+    "temujin": 1,
+    "jochi": 4,
+    "ogedei": 8,
+    "chagatai": 1
   },
   "by_agent": {
-    "mongke": {
-      "routed": 1,
-      "executed": 1,
-      "succeeded": 0,
-      "failed": 1
-    },
     "temujin": {
-      "routed": 2,
+      "routed": 1,
       "executed": 1,
       "succeeded": 0,
       "failed": 1
     },
     "jochi": {
-      "routed": 1,
+      "routed": 4,
       "executed": 2,
       "succeeded": 0,
       "failed": 2
+    },
+    "ogedei": {
+      "routed": 8,
+      "executed": 1,
+      "succeeded": 1,
+      "failed": 0
+    },
+    "chagatai": {
+      "routed": 1,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
     }
   },
   "queue_state": {
     "kublai": {
       "pending": 0,
       "executing": 0,
-      "done": 9
+      "done": 3
     },
     "temujin": {
-      "pending": 2,
-      "executing": 0,
-      "done": 21
-    },
-    "mongke": {
       "pending": 1,
       "executing": 0,
-      "done": 4
+      "done": 19
+    },
+    "mongke": {
+      "pending": 0,
+      "executing": 0,
+      "done": 5
     },
     "chagatai": {
       "pending": 1,
       "executing": 0,
-      "done": 2
+      "done": 7
     },
     "jochi": {
       "pending": 1,
-      "executing": 1,
-      "done": 4
+      "executing": 0,
+      "done": 9
     },
     "ogedei": {
       "pending": 1,
       "executing": 0,
-      "done": 17
+      "done": 14
     }
   },
   "issues": [
-    "High overflow rate: 3/4 (75%) \u2014 agents frequently busy",
-    "Keyword table drift: 2/4 (50%) tasks would route differently via keywords vs actual destination",
-    "Keyword routing drift: 2/5 (40%) disagree with actual routing"
+    "High explicit routing: 13/14 (93%) \u2014 11 from non-system sources, keyword table may be underused",
+    "chagatai: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled"
   ],
   "suggestions": [
-    "mongke: 1 task(s) failed out of 1 executed (downstream)",
+    "Workload skew: ogedei got 8 tasks vs temujin got 1 (system-generated, expected)",
     "temujin: 1 task(s) failed out of 1 executed (downstream)",
     "jochi: 2 task(s) failed out of 2 executed (downstream)",
-    "Low skill hint coverage: 1/4 \u2014 consider expanding SKILL_HINTS in task_intake.py",
-    "Routing methods: redistribution=3, explicit=1"
+    "Routing methods: explicit=13, alert_dedup_suppressed=1"
   ],
   "kw_disagreements": {},
-  "kw_misroute_count": 2,
-  "kw_misroute_rate": "2/4",
-  "kw_misroute_examples": [
-    "'Investigate temujin low performance (score 3/10)' -> kw=jochi actual=mongke",
-    "'Investigate temujin task failures (1 in last 1h)' -> kw=jochi actual=temujin"
-  ],
-  "overflow_count": 3,
-  "skill_hint_coverage": "1/4",
+  "kw_misroute_count": 0,
+  "kw_misroute_rate": "0/14",
+  "overflow_count": 0,
+  "skill_hint_coverage": "10/14",
   "routing_drift": {
-    "total": 5,
-    "mismatches": 2,
-    "drift_pct": 40.0,
-    "top_examples": [
-      {
-        "task": "Investigate temujin low performance (score 3/10)",
-        "actual": "mongke",
-        "keyword_would": "jochi"
-      },
-      {
-        "task": "Investigate temujin task failures (1 in last 1h)",
-        "actual": "temujin",
-        "keyword_would": "jochi"
-      }
-    ],
-    "ts": "2026-03-11T06:11:28.957528"
+    "total": 7,
+    "mismatches": 0,
+    "drift_pct": 0.0,
+    "top_examples": [],
+    "ts": "2026-03-12T05:56:10.126552"
   }
 }

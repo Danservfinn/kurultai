@@ -20,6 +20,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from time import sleep
 
 try:
     from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
@@ -34,7 +35,7 @@ LOG_FILE = LOG_DIR / "kurultai-monitor.log"
 STATE_FILE = LOG_DIR / "kurultai-monitor-state.json"
 
 # Thresholds
-FAILURE_WARNING_THRESHOLD = 3  # After 3 consecutive failures (15 min) → create task for Ogedei
+FAILURE_WARNING_THRESHOLD = 1  # After 1 consecutive failure (5 min) → create task for Ogedei (reduced from 3 for faster detection)
 FAILURE_CRITICAL_THRESHOLD = 10  # After 10 consecutive failures (50 min) → escalate to Kublai
 
 # Timeouts (seconds)
@@ -226,12 +227,69 @@ def check_kurultai() -> tuple[bool, list[str], dict]:
     return is_healthy, issues, metrics
 
 
-def create_task(agent: str, priority: str, title: str, body: str):
-    """Create a task for an agent using task_intake.py."""
+def restart_cloudflared() -> bool:
+    """Attempt to restart the cloudflared tunnel service.
+
+    Returns True if restart was attempted, False otherwise.
+    """
+    log("HTTP 530 detected - attempting cloudflared tunnel restart", "WARN")
+
+    try:
+        # Try launchd kickstart first (preferred method)
+        result = subprocess.run(
+            ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/com.cloudflare.cloudflared"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            log("cloudflared restart triggered via launchctl kickstart", "INFO")
+            return True
+    except Exception as e:
+        log(f"launchctl kickstart failed: {e}", "ERROR")
+
+    # Fallback: unload and reload
+    try:
+        subprocess.run(
+            ["launchctl", "bootout", f"gui/{os.getuid()}/com.cloudflare.cloudflared"],
+            capture_output=True,
+            timeout=5
+        )
+        sleep(2)
+        subprocess.run(
+            ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(Path.home() / "Library/LaunchAgents/com.cloudflare.cloudflared.plist")],
+            capture_output=True,
+            timeout=5
+        )
+        log("cloudflared restart triggered via bootout/bootstrap", "INFO")
+        return True
+    except Exception as e:
+        log(f"bootout/bootstrap restart failed: {e}", "ERROR")
+
+    return False
+
+
+def create_task(agent: str, priority: str, title: str, body: str) -> bool:
+    """Create a task for an agent using task_intake.py.
+
+    Returns True if task was created successfully, False otherwise.
+    Includes fallback notification path.
+    """
     task_intake = Path.home() / ".openclaw" / "agents" / "main" / "scripts" / "task_intake.py"
 
+    # Fallback alert log - always write regardless of task creation success
+    alert_log = LOG_DIR / "alerts.log"
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    alert_entry = f"[{timestamp}] ALERT | agent={agent} priority={priority} title={title}\n{body}\n"
+
+    try:
+        with open(alert_log, "a") as f:
+            f.write(alert_entry + "\n")
+    except Exception as e:
+        log(f"Failed to write to alert log: {e}", "ERROR")
+
     if not task_intake.exists():
-        log(f"task_intake.py not found at {task_intake}", "ERROR")
+        log(f"task_intake.py not found at {task_intake} - alert written to {alert_log}", "ERROR")
         return False
 
     try:
@@ -249,13 +307,13 @@ def create_task(agent: str, priority: str, title: str, body: str):
             log(f"Task created for {agent}: {title}", "INFO")
             return True
         else:
-            log(f"Failed to create task: {result.stderr}", "ERROR")
+            log(f"Failed to create task: {result.stderr} - alert written to {alert_log}", "ERROR")
             return False
     except subprocess.TimeoutExpired:
-        log("task_intake.py timed out", "ERROR")
+        log(f"task_intake.py timed out - alert written to {alert_log}", "ERROR")
         return False
     except Exception as e:
-        log(f"Exception creating task: {e}", "ERROR")
+        log(f"Exception creating task: {e} - alert written to {alert_log}", "ERROR")
         return False
 
 
@@ -333,6 +391,40 @@ Site is now healthy. No action required.
 
         state["last_failure"] = datetime.now(timezone.utc).isoformat()
         save_state(state)
+
+        # SPECIAL HANDLING: HTTP 530 indicates Cloudflare Tunnel failure
+        # This is critical - attempt immediate cloudflared restart
+        if metrics.get("http_status") == 530:
+            log("HTTP 530 detected - Cloudflare cannot reach origin (tunnel down)", "CRITICAL")
+
+            # Attempt auto-restart
+            if restart_cloudflared():
+                # Wait for tunnel to come up
+                sleep(3)
+                log("cloudflared restart attempted - will verify on next check", "INFO")
+
+            # Create immediate critical alert for HTTP 530
+            downtime = format_downtime(state.get("downtime_start"))
+            critical_body = f"""## CRITICAL: HTTP 530 - Cloudflare Tunnel Down
+
+**HTTP 530** indicates Cloudflare cannot reach the origin server.
+This means the **cloudflared tunnel daemon has stopped**.
+
+**Downtime:** {downtime}
+**Auto-restart attempted:** {datetime.now(timezone.utc).isoformat()}
+
+**Immediate Action Required:**
+1. Check if cloudflared process is running: `pgrep -fa cloudflared`
+2. If not running, restart manually: `launchctl kickstart -k gui/$(id -u)/com.cloudflare.cloudflared`
+3. Verify site recovery: `curl -I https://the.kurult.ai`
+
+**Metrics:**
+- HTTP Status: {metrics.get('http_status', 'N/A')}
+- Consecutive Failures: {state['consecutive_failures']}
+- Downtime Started: {state.get('downtime_start')}
+"""
+            create_task("ogedei", "high", f"CRITICAL: HTTP 530 - cloudflared tunnel down", critical_body)
+            return  # Exit early after 530 handling - alert already created
 
         log(f"✗ Check failed (consecutive failures: {state['consecutive_failures']})", "ERROR")
 

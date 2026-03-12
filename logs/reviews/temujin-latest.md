@@ -1,70 +1,26 @@
-Based on my analysis of temujin's performance data from the past hour, here is the critical review:
+Based on the data gathered, here's the critical review:
 
 ---
 
 # Critical Review Report: Temujin Agent (Past Hour)
 
-## Executive Summary
-Temujin shows **zero task completions** in the past hour despite active queue management. Queue processed a burst of 9 tasks between 04:58-05:03 but completion tracking is broken. Decision quality scores remain low (1.0/3) and the stall detection rule is not triggering dispatches.
+## STRENGTHS:
+- **High-quality proposals when active** — Both recent proposals (SIGKILL→SIGTERM strategy, zombie detection fix) were implemented, verified, and address real system pain points
+- **Strong domain expertise** — Proposals correctly identify root causes (process termination race conditions, startup timing) with specific line references and surgical fixes
+- **Self-awareness in reflection** — Accurately flagged R008 violation and HIGH_FAILURE_RATE red flags, generating actionable rule candidates
 
-## Findings by Domain
+## WEAKNESSES:
+- **R008 skill invocation violation** — Task normal-1773273053 had skill_hint='/systematic-debugging' but Skill tool was not invoked first, directly violating mandatory protocol
+- **66% task failure rate** — 2 of 3 tasks failed with exit_code=-9 (SIGKILL/OOM) and auth_preflight_failed=10 times, indicating session bloat or credential issues
+- **Hollow success on completed tasks** — Task normal-1773282346 completed with substantive_score=1/3, suggesting superficial work that passed gates but lacked depth
 
-### Task Dispatch & Execution
-- **dispatched=0 consistently** across all ticks — task-watcher not tracking dispatches properly
-- Queue spiked to 12 tasks (04:58), dropped to 3 (05:03) — **9 tasks processed but not logged as completions**
-- No reports in `reports/completed/*2026-03-11*` — completion pipeline broken
-- Priority fix from 06:19: "Force queue dispatch by task-watcher — The stall detection rule exists but isn't triggering"
+## PATTERNS:
+- **Session memory bloat cascade** — Exit code -9 correlates with auth_preflight failures; temujin's sessions accumulate context without cleanup
+- **Skill hint bypass** — Recurring pattern of skipping /horde-debug or /systematic-debugging when explicitly requested, causing failed debugging attempts
+- **Dispatch verification gap** — Hourly report shows "Verify task dispatch to temujin is working" as priority fix, suggesting tasks assigned but not executing
 
-### Behavioral Rule Compliance
-- **HOLLOW_SUCCESS** (03-10): Task blocked for missing `## Resolution` section
-- **STALE_SKILL_HINT**: skill_hint="/horde-implement" present but phase_markers=[], only 149 output tokens
-- **RULE_BREAKER**: Existing rule "expand output when <20 lines" violated
-- Decision quality: **1.0/3** (low) — judgment issue, not capability (tool_score=3.0/3)
+## PRIORITY_FIX:
+**Enforce R008 skill invocation at task-handler level** — Add preflight check in `agent-task-handler.py` that blocks execution if skill_hint exists but Skill tool not called in first 3 tool invocations. This addresses the highest-impact behavioral violation that's cascading into failed debugging attempts.
 
-### Performance Metrics
-- Capability score: **6.57/10** (5 tasks, 0% fail rate)
-- Review score improved: 3/10 → 6/10 between 05:17 and 06:19
-- No failed tasks, but no completions either — **stuck in EXECUTING state**
-
-### Cross-Agent Impact
-- Load balancing triggered correctly when queue hit 12 (overflowed to mongke, jochi)
-- Routing decisions correctly targeting temujin for implementation domain
-- `would_overflow: true` on multiple routings indicates persistent queue pressure
-
-## Cross-Cutting Concerns
-- **Completion tracking broken** affects all agents — temujin's 9-task burst not logged
-- **Stall detection not triggering** — affects fleet-wide throughput
-- **Skill hint invocation** (R008) still not enforced at task-watcher level
-
-## Prioritized Improvement List
-
-| Priority | Domain | Issue | Suggested Action |
-|----------|--------|-------|------------------|
-| Critical | Dispatch | Task-watcher not tracking dispatches | Fix `dispatched` counter in task-watcher.py |
-| High | Completion | Zero completions logged despite task processing | Verify completion report generation pipeline |
-| High | Rules | Stall detection rule not triggering | Debug `stall_detector.py` trigger conditions |
-| Medium | Quality | Decision score 1.0/3 | Add decision quality scoring to pre-submit check |
-| Low | Skills | STALE_SKILL_HINT pattern | Enforce R008 at task-watcher spawn level |
-
----
-
-STRENGTHS:
-- Queue management working (burst of 9 tasks processed in 5 min)
-- Load balancing correctly triggered when queue overflowed to 12
-- Capability score stable (6.57) with 0% fail rate on completed tasks
-- Routing decisions correctly targeting temujin for implementation domain
-
-WEAKNESSES:
-- Zero completions logged in past hour — completion pipeline broken
-- `dispatched=0` consistently — task-watcher not tracking state properly
-- Decision quality scores low (1.0/3) — judgment gap, not capability
-- Stall detection rule exists but not triggering dispatches
-
-PATTERNS:
-- Tasks enter EXECUTING state but never transition to COMPLETED
-- Queue drains without generating completion reports
-- Skill hints present but not invoked (R008 violation pattern continues)
-
-PRIORITY_FIX: **Fix task-watcher dispatch tracking** — The `dispatched` counter staying at 0 while queue processes tasks indicates the state machine is broken. This is blocking all downstream completion logging and throughput measurement.
-
-SCORE: **4/10** — Queue management works but completion pipeline is completely broken. Zero visibility into actual throughput. The 9-task burst shows capability exists, but without completion tracking, the agent appears idle when it's actually working.
+## SCORE: **4/10**
+*Justification: Strong technical output when tasks complete, but 66% failure rate + mandatory rule violation (R008) + hollow successes indicate systemic execution problems that waste routing capacity and create rework for other agents.*

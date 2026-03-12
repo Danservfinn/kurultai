@@ -43,6 +43,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents_config import AGENTS, AGENT_ROLES
 from json_state import locked_json_read, locked_json_update
 
+# Import deduplication from proposal_generator
+from proposal_generator import _check_duplicate_proposal
+
 from kurultai_paths import (AGENTS_DIR as BASE, MAIN_DIR as MAIN, PROPOSALS_DIR,
     CLAUDE_AGENT as CLAUDE_AGENT_PATH, BRAINSTORM_LOG as LOG_FILE,
     BRAINSTORM_COOLDOWN as COOLDOWN_FILE, BRAINSTORM_DOMAIN_ROTATION as DOMAIN_FILE)
@@ -951,6 +954,12 @@ def write_proposal_file(agent, proposal, output_dir=None):
         title = _sanitize_proposal_field(proposal.get("proposal", "Untitled"), max_len=200)
         problem = _sanitize_proposal_field(proposal.get("problem", "(not specified)"))
         solution = _sanitize_proposal_field(proposal.get("solution", "(not specified)"))
+
+        # CHECK FOR DUPLICATES before writing
+        duplicate = _check_duplicate_proposal(agent, title, problem, solution)
+        if duplicate:
+            log(f"[DUPLICATE] Skipping - identical proposal already exists: {duplicate}")
+            return None
 
         content = PROPOSAL_TEMPLATE.format(
             title=title,

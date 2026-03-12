@@ -205,10 +205,18 @@ def tick_actions():
         log("TICK: ticks.jsonl empty, skipping")
         return 0
 
-    try:
-        tick = json.loads(lines[-1].strip())
-    except json.JSONDecodeError:
-        log("TICK: Failed to parse latest tick")
+    # Parse latest tick, with resilience to malformed JSON entries
+    # (iterate backwards from most recent to handle corrupted ticks)
+    tick = None
+    for i in range(1, min(len(lines), 10) + 1):  # check last 10 lines, most recent first
+        try:
+            tick = json.loads(lines[-i].strip())
+            break  # found valid JSON
+        except json.JSONDecodeError:
+            continue  # try next older line
+
+    if tick is None:
+        log("TICK: Failed to parse any of last 10 ticks (all malformed)")
         return 0
 
     # Staleness check — warn if tick data is too old

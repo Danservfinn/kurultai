@@ -31,6 +31,7 @@ from kurultai_paths import AGENTS_DIR
 
 AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai", "tolui"]
 MAX_EXECUTING_AGE_SECS = 7200  # 2 hours - after this, force clear regardless
+GRACE_PERIOD_SECS = 30  # Grace period for very recent tasks to avoid race condition with PID file creation
 
 
 def read_pid(pid_file):
@@ -143,7 +144,13 @@ def check_agent_subprocess(agent):
         pid = read_pid(pid_file) if pid_file.exists() else None
 
         if pid is None:
-            # No PID file - stale state
+            # No PID file - but respect grace period for very recent tasks
+            # This protects against race condition where task was just renamed
+            # to .executing.md but PID file hasn't been written yet
+            if task_age < GRACE_PERIOD_SECS:
+                # Too recent to clear - skip this check
+                continue
+            # No PID file after grace period - stale state
             clear_executing_state(task_file, pid_file, "no PID file")
             issues.append("no_pid")
             continue
@@ -158,9 +165,14 @@ def check_agent_subprocess(agent):
             continue
 
         if proc_status == "stopped":
-            # Process is stopped (T state) - kill and clear
+            # Process is stopped (T state) - terminate and clear
+            # FIX 2026-03-12: Use SIGTERM first, SIGKILL only if needed
             try:
-                os.kill(pid, 9)  # SIGKILL
+                os.kill(pid, 15)  # SIGTERM first
+                time.sleep(2)  # Give process time to exit gracefully
+                # Check if still running
+                if is_process_running(pid) != "dead":
+                    os.kill(pid, 9)  # SIGKILL as last resort
             except Exception:
                 pass
             clear_executing_state(task_file, pid_file, f"PID {pid} was stopped")
@@ -175,8 +187,13 @@ def check_agent_subprocess(agent):
 
         # Task is too old - force clear
         if task_age > MAX_EXECUTING_AGE_SECS:
+            # FIX 2026-03-12: Use SIGTERM first for graceful shutdown
             try:
-                os.kill(pid, 9)
+                os.kill(pid, 15)  # SIGTERM first
+                time.sleep(2)  # Give process time to exit gracefully
+                # Check if still running
+                if is_process_running(pid) != "dead":
+                    os.kill(pid, 9)  # SIGKILL as last resort
             except Exception:
                 pass
             clear_executing_state(task_file, pid_file, f"stale for {int(task_age/60)}min")

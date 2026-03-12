@@ -50,8 +50,9 @@ def clear_session_key_for_task(task_file_path: str) -> bool:
             # Try to extract from filename
             basename = os.path.basename(task_file_path)
             # Remove extensions like .executing.md, .completed.done.md, etc.
-            for suffix in ['.executing.md', '.completed.done.md', '.failed.done.md', 
-                          '.no_output.done.md', '.credential_failed.done.md']:
+            for suffix in ['.executing.md', '.completed.done.md', '.failed.done.md',
+                          '.no_output.done.md', '.credential_failed.done.md',
+                          '.investigation_required.done.md']:
                 if basename.endswith(suffix):
                     task_id = basename[:-len(suffix)]
                     break

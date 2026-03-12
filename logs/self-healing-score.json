@@ -1,23 +1,23 @@
 {
-  "ts": "2026-03-11T06:17:46.415596",
+  "ts": "2026-03-12T06:24:24.887464",
   "window_hours": 24,
   "score": {
-    "score": 67.9,
-    "auto_resolved": 36,
-    "escalated": 17,
+    "score": 100.0,
+    "auto_resolved": 45,
+    "escalated": 0,
     "manual": 0,
     "partial": 0,
-    "total_issues": 53,
+    "total_issues": 45,
     "by_type": {
-      "memory_bloat": {
-        "auto": 28,
+      "quality_retry": {
+        "auto": 18,
         "escalated": 0,
         "manual": 0,
         "partial": 0
       },
-      "gateway_restart": {
-        "auto": 0,
-        "escalated": 17,
+      "memory_bloat": {
+        "auto": 26,
+        "escalated": 0,
         "manual": 0,
         "partial": 0
       },
@@ -26,18 +26,20 @@
         "escalated": 0,
         "manual": 0,
         "partial": 0
-      },
-      "quality_retry": {
-        "auto": 7,
-        "escalated": 0,
-        "manual": 0,
-        "partial": 0
       }
     },
     "trends": [
       {
+        "direction": "up",
+        "description": "Score improved by 17.3%"
+      },
+      {
+        "direction": "up",
+        "description": "Auto-resolution rate increased by 17%"
+      },
+      {
         "direction": "down",
-        "description": "Issue volume decreased by 72%"
+        "description": "Issue volume decreased by 54%"
       }
     ]
   }

@@ -3,7 +3,19 @@
 Audit task completion reports for missing resolution sections.
 
 Jochi's quality assurance script - scans completed task reports and flags
-those missing the ## Resolution section that agents should include.
+those missing acceptable resolution headers.
+
+ACCEPTED RESOLUTION PATTERNS (must match task_verification.py):
+- ## Resolution (explicit, preferred for manual updates)
+- ## What Was Done (auto-generated report standard)
+- ## Summary (alternative summary)
+- ## Changes Made (change-focused)
+- ## Files (Created|Modified) (file-centric)
+- ## Acceptance Criteria (verification-focused)
+- ## Deliverables (output-focused, auto-generated)
+
+This script is run by watchdog-gather.sh to monitor task completion quality.
+If compliance < 90%, system status is marked as degraded.
 
 Usage:
     python scripts/audit_missing_resolutions.py [--agent AGENT] [--recent HOURS]
@@ -47,8 +59,21 @@ def parse_report(filepath: Path) -> dict:
         elif line.startswith("**Priority:**"):
             priority = line.split("**Priority:**")[1].strip().lower()
 
-    # Check for resolution section (after auto-generated footer)
-    has_resolution = bool(re.search(r"^## Resolution\s*$", content, re.MULTILINE))
+    # Check for resolution section (matches accepted patterns from task_verification.py
+    # and auto-generated reports from task_report_hook.py)
+    #
+    # Auto-generated reports use "## What Was Done" as their execution summary.
+    # For manual updates, agents should add explicit resolution headers.
+    resolution_patterns = [
+        r"^## Resolution\s*$",           # Explicit resolution (preferred)
+        r"^## What Was Done\s*$",         # Auto-generated report standard
+        r"^## Summary\s*$",               # Alternative summary header
+        r"^## Changes Made\s*$",          # Change-focused summary
+        r"^## Files (Created|Modified)\s*$",  # File-centric summary
+        r"^## Acceptance Criteria\s*$",   # Verification-focused
+        r"^## Deliverables\s*$",          # Output-focused (auto-generated)
+    ]
+    has_resolution = any(re.search(p, content, re.MULTILINE) for p in resolution_patterns)
 
     # Check if file was updated by an agent (has "*Updated by" in footer)
     was_updated = bool(re.search(r"\*Updated by \w+ at", content))

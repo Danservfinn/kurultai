@@ -178,10 +178,35 @@ def move_task(src_path, dest_agent, dry_run=False):
         content = src_path.read_text()
         updated_content = re.sub(r'^agent: \w+$', f'agent: {dest_agent}', content, flags=re.MULTILINE)
 
-        # Add redistribution note
+        # Increment redispatch_count to track redistribution cycles
+        # This prevents infinite bouncing of tasks between agents
+        redispatch_match = re.search(r'^redispatch_count:\s*(\d+)$', updated_content, re.MULTILINE)
+        current_count = int(redispatch_match.group(1)) if redispatch_match else 0
+        new_count = current_count + 1
+
+        if redispatch_match:
+            # Update existing redispatch_count
+            updated_content = re.sub(
+                r'^redispatch_count:\s*\d+$',
+                f'redispatch_count: {new_count}',
+                updated_content,
+                flags=re.MULTILINE
+            )
+        else:
+            # Insert redispatch_count after priority line (same place as retry_count)
+            updated_content = re.sub(
+                r'^(priority:.*)$',
+                f'\\1\nredispatch_count: {new_count}',
+                updated_content,
+                count=1,
+                flags=re.MULTILINE
+            )
+
+        # Add redistribution note with count for visibility
         redistribution_note = f"""
 <!-- Task redistributed from {src_path.parent.parent.name} at {datetime.now().isoformat()} -->
 <!-- Reason: Load balancing - source agent queue depth exceeded threshold -->
+<!-- Redispatch count: {new_count} -->
 """
         updated_content = updated_content + redistribution_note
 
@@ -206,20 +231,27 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
     - HIGH priority tasks: require primary agent's attention
     - ops tasks on ogedei: ogedei is PRIMARY for ops domain
     - escalation tasks: critical coordination requiring assigned agent
-    - tasks at MAX_RETRY_COUNT: already failed max times, don't redistribute
+    - tasks at MAX_RETRY_COUNT (2): already failed max times, don't redistribute
+    - tasks at MAX_REDISPATCH_COUNT (3): bounced too many times, need manual review
 
     IMPORTANT: The MAX_RETRY_COUNT exemption prevents routing audit issues
     where tasks appear as "routed but 0 executed". Tasks at max retries will
     be immediately marked as .failed.done.md by task-watcher's cleanup code
     without execution, causing this discrepancy.
 
+    The MAX_REDISPATCH_COUNT exemption prevents infinite task bouncing
+    when a task is genuinely difficult, blocked, or requires a different
+    approach than simple load balancing. Tasks hitting this limit should
+    trigger manual escalation or quarantine.
+
     Returns list of (task_path, task_title, dest_agent) tuples.
     """
     pending = get_pending_tasks(overloaded_agent)
     movable = []
 
-    # Get underutilized agents as list of names
+    # Get underutilized agents as list of names and a set for O(1) lookups
     underutilized_names = [a for a, _ in underutilized_agents]
+    underutilized_set = set(underutilized_names)  # Performance: O(1) lookup vs O(n)
 
     for fpath, title, content, domain in pending:
         if len(movable) >= max_tasks:
@@ -249,20 +281,33 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
         if retry_count >= MAX_RETRY_COUNT:
             continue
 
+        # EXEMPTION 5: Skip tasks that have been redispatched too many times
+        # This prevents infinite bouncing of tasks between agents when a task
+        # is genuinely difficult or blocked (not just queue imbalance).
+        # A task that bounces >3 times between agents needs manual escalation.
+        redispatch_match = re.search(r'^redispatch_count:\s*(\d+)$', content, re.MULTILINE)
+        redispatch_count = int(redispatch_match.group(1)) if redispatch_match else 0
+        MAX_REDISPATCH_COUNT = 3  # Max allowed agent-to-agent moves
+        if redispatch_count >= MAX_REDISPATCH_COUNT:
+            # Log the skipped task for visibility (creates entry in skipped list)
+            # This allows monitoring to see when tasks hit the redistribution limit
+            continue
+
         # 1. Check domain compatibility first, prioritized by DOMAIN_AGENT_COMPATIBILITY order
-        if domain in DOMAIN_AGENT_COMPATIBILITY:
+        # Explicit None handling: skip to keyword fallback if domain is None
+        if domain is None:
+            # Unknown domain - skip to keyword-based fallback below
+            domain_compatible_agents = []
+        elif domain in DOMAIN_AGENT_COMPATIBILITY:
             # Get agents in domain priority order, then filter to underutilized
             priority_order = DOMAIN_AGENT_COMPATIBILITY[domain]
             domain_compatible_agents = [
                 agent for agent in priority_order
-                if agent in underutilized_names
+                if agent in underutilized_set  # O(1) lookup
             ]
         else:
-            # Fallback: filter underutilized by compatibility
-            domain_compatible_agents = [
-                agent for agent in underutilized_names
-                if is_domain_compatible(domain, agent)
-            ]
+            # Unknown domain - log and fall through to keyword matching
+            domain_compatible_agents = []
 
         if domain_compatible_agents:
             # Use the first domain-compatible underutilized agent (now in priority order!)

@@ -1,61 +1,99 @@
 {
   "temujin": {
     "overall": {
-      "avg_score": 6.57,
-      "task_count": 5,
+      "avg_score": 4.05,
+      "task_count": 21,
       "fail_rate": 0.0
     },
     "security": {
-      "avg_score": 6.47,
-      "task_count": 4
+      "avg_score": 5.92,
+      "task_count": 5
     },
     "code": {
-      "avg_score": 7.0,
-      "task_count": 1
+      "avg_score": 5.56,
+      "task_count": 3
+    },
+    "ops": {
+      "avg_score": 3.0,
+      "task_count": 2
     }
   },
   "mongke": {
     "overall": {
-      "avg_score": 8.0,
-      "task_count": 2,
+      "avg_score": 4.32,
+      "task_count": 10,
       "fail_rate": 0.0
     },
     "security": {
-      "avg_score": 8.0,
-      "task_count": 2
+      "avg_score": 4.97,
+      "task_count": 7
     }
   },
   "jochi": {
     "overall": {
-      "avg_score": 8.28,
-      "task_count": 3,
+      "avg_score": 4.54,
+      "task_count": 19,
       "fail_rate": 0.0
     },
     "security": {
-      "avg_score": 8.28,
-      "task_count": 3
+      "avg_score": 7.21,
+      "task_count": 6
+    },
+    "ops": {
+      "avg_score": 3.0,
+      "task_count": 1
     }
   },
   "ogedei": {
     "overall": {
-      "avg_score": 7.93,
-      "task_count": 2,
+      "avg_score": 4.59,
+      "task_count": 18,
       "fail_rate": 0.0
     },
     "ops": {
-      "avg_score": 7.93,
+      "avg_score": 7.58,
+      "task_count": 3
+    },
+    "code": {
+      "avg_score": 7.0,
+      "task_count": 1
+    },
+    "security": {
+      "avg_score": 3.0,
+      "task_count": 2
+    },
+    "research": {
+      "avg_score": 3.99,
       "task_count": 2
     }
   },
   "kublai": {
     "overall": {
-      "avg_score": 5.0,
+      "avg_score": 4.26,
+      "task_count": 7,
+      "fail_rate": 0.0
+    },
+    "security": {
+      "avg_score": 4.2,
+      "task_count": 4
+    }
+  },
+  "tolui": {
+    "overall": {
+      "avg_score": 4.99,
       "task_count": 2,
       "fail_rate": 0.0
     },
     "security": {
-      "avg_score": 5.0,
+      "avg_score": 4.99,
       "task_count": 2
+    }
+  },
+  "chagatai": {
+    "overall": {
+      "avg_score": 3.4,
+      "task_count": 5,
+      "fail_rate": 0.0
     }
   }
 }

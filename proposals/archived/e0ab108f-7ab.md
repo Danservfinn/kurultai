@@ -22,3 +22,5 @@ Testing the proposal voting system
 ## Implementation Plan
 
 *To be filled by Kublai upon approval.*
+## Resolution
+Archived proposal from voting era. Status unknown.

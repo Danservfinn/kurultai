@@ -3,7 +3,8 @@
 **Agent:** {AGENT_NAME}  
 **Role:** {AGENT_ROLE}  
 **Reflection Period:** Last {HOURS} hours  
-**Timestamp:** {TIMESTAMP}
+**Timestamp:** {TIMESTAMP}  
+**Last Updated:** 2026-03-11 (aligned with Neo4j reflection pipeline)
 
 ---
 

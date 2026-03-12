@@ -356,13 +356,16 @@ def get_task_status(task_id: str) -> Optional[dict]:
 
 
 def release_stale_claims(timeout_minutes: int = 30) -> Tuple[int, list[str]]:
-    """Release tasks stuck in EXECUTING status for too long.
+    """Release tasks stuck with stale claims.
 
-    Finds tasks that have been EXECUTING for longer than timeout_minutes and
-    resets them to PENDING status so they can be retried.
+    Handles two cases causing PENDING_NO_DISPATCH:
+    1. Tasks in EXECUTING status for too long (handler crashed/timeout)
+    2. Tasks in PENDING status with stale session_keys (claim interrupted)
+
+    Both cases prevent task dispatch and need to be cleared.
 
     Args:
-        timeout_minutes: Maximum time a task can stay in EXECUTING (default 30)
+        timeout_minutes: Maximum age for stale claims (default 30)
 
     Returns:
         Tuple of (count_released: int, task_ids: list[str])
@@ -370,8 +373,9 @@ def release_stale_claims(timeout_minutes: int = 30) -> Tuple[int, list[str]]:
     try:
         driver = get_driver()
         with driver.session() as session:
-            # Find and release stale claims atomically
-            # Use timestamp comparison instead of duration function (more compatible)
+            released_ids = []
+
+            # Case 1: EXECUTING tasks stuck too long (original behavior)
             result = session.run("""
                 MATCH (t:Task {status: 'EXECUTING'})
                 WHERE t.started IS NOT NULL
@@ -386,7 +390,29 @@ def release_stale_claims(timeout_minutes: int = 30) -> Tuple[int, list[str]]:
                 RETURN t.task_id as task_id
             """, timeout_minutes=timeout_minutes)
 
-            released_ids = [r["task_id"] for r in result]
+            released_ids.extend([r["task_id"] for r in result])
+
+            # Case 2: PENDING tasks with stale session_keys (fixes PENDING_NO_DISPATCH)
+            # This happens when a claim is partially applied but status reverted to PENDING
+            # without clearing session_key, blocking further claims
+            result = session.run("""
+                MATCH (t:Task {status: 'PENDING'})
+                WHERE t.session_key IS NOT NULL
+                AND t.session_key <> ''
+                AND t.started IS NOT NULL
+                WITH t, datetime() as now
+                WITH t, duration.between(t.started, now).minutes as age_minutes
+                WHERE age_minutes >= $timeout_minutes
+                SET t.session_key = null,
+                    t.started = null,
+                    t.claimed_by = null,
+                    t.updated = datetime()
+                RETURN t.task_id as task_id
+            """, timeout_minutes=timeout_minutes)
+
+            pending_ids = [r["task_id"] for r in result]
+            released_ids.extend(pending_ids)
+
             return len(released_ids), released_ids
 
     except Exception as e:

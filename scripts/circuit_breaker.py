@@ -137,6 +137,7 @@ class AgentCircuitBreaker:
     RECOVERY_TIMEOUT = 1800      # 30 minutes in OPEN before HALF-OPEN
     SUCCESS_THRESHOLD = 0.5      # 50% success in HALF-OPEN to close circuit
     MAX_REDISTRIBUTION_PER_CYCLE = 10  # Max tasks to move per cycle
+    MAX_REDISPATCH_COUNT = 3     # Max allowed agent-to-agent moves (matches task-redistribute.py)
 
     # State file location
     STATE_FILE = LOGS_DIR / "circuit-breaker-state.json"
@@ -361,6 +362,34 @@ class AgentCircuitBreaker:
                 continue
             if not f.is_file():
                 continue
+
+            # FIX: Check Neo4j status to skip tasks already executing
+            # This prevents moving tasks that are currently being worked on
+            # which causes orphaned files when the original agent completes them
+            task_id = extract_task_id(str(f))
+            if task_id:
+                try:
+                    from neo4j_task_tracker import get_driver
+                    driver = get_driver()
+                    with driver.session() as session:
+                        result = session.run("""
+                            MATCH (t:Task {task_id: $task_id})
+                            RETURN t.status as status, t.claimed_by as claimed_by
+                        """, task_id=task_id)
+                        record = result.single()
+                        if record:
+                            status = record.get("status", "").upper()
+                            if status == "EXECUTING":
+                                self.log(f"Skipping {f.name}: already EXECUTING in Neo4j")
+                                continue
+                            # Also skip COMPLETED/FAILED tasks (shouldn't be here, but be safe)
+                            if status in ("COMPLETED", "FAILED", "CANCELLED"):
+                                self.log(f"Skipping {f.name}: already {status} in Neo4j (cleanup candidate)")
+                                continue
+                except Exception as e:
+                    # If Neo4j check fails, log but don't skip (fail-open)
+                    self.log(f"Neo4j check failed for {f.name}: {e}", "WARN")
+
             pending.append(f)
 
         if not pending:
@@ -382,13 +411,55 @@ class AgentCircuitBreaker:
 
                 new_path = target_dir / task_path.name
 
-                # Update file content to note redistribution
+                # Update file content: change agent field AND add redistribution note
                 content = task_path.read_text(encoding="utf-8", errors="replace")
+
+                # Check redispatch_count to prevent infinite bouncing
+                # This matches task-redistribute.py logic: tasks that have been
+                # redistributed MAX_REDISPATCH_COUNT times need manual review
+                redispatch_match = re.search(r'^redispatch_count:\s*(\d+)$', content, re.MULTILINE)
+                current_count = int(redispatch_match.group(1)) if redispatch_match else 0
+                if current_count >= self.MAX_REDISPATCH_COUNT:
+                    self.log(f"Skipping {task_path.name}: redispatch_count={current_count} >= {self.MAX_REDISPATCH_COUNT}", "WARN")
+                    continue
+
+                # CRITICAL FIX: Update the agent field in frontmatter
+                # Without this, task-watcher won't dispatch the task because
+                # the file is in target's directory but frontmatter still points to failed_agent
+                new_count = current_count + 1
+                updated_content = re.sub(
+                    r'^agent:\s*\w+\s*$',
+                    f'agent: {target}',
+                    content,
+                    flags=re.MULTILINE
+                )
+
+                # Increment or insert redispatch_count (same logic as task-redistribute.py)
+                if redispatch_match:
+                    # Update existing redispatch_count
+                    updated_content = re.sub(
+                        r'^redispatch_count:\s*\d+$',
+                        f'redispatch_count: {new_count}',
+                        updated_content,
+                        flags=re.MULTILINE
+                    )
+                else:
+                    # Insert redispatch_count after priority line
+                    updated_content = re.sub(
+                        r'^(priority:.*)$',
+                        rf'\1\nredispatch_count: {new_count}',
+                        updated_content,
+                        count=1,
+                        flags=re.MULTILINE
+                    )
+
+                # Add redistribution note for audit trail (with count)
                 redistribution_note = (
                     f"\n\n<!-- Task redistributed from {failed_agent} at {datetime.now().isoformat()} -->\n"
                     f"<!-- Reason: Circuit breaker quarantine -->\n"
+                    f"<!-- Redispatch count: {new_count} -->\n"
                 )
-                updated_content = content + redistribution_note
+                updated_content = updated_content + redistribution_note
 
                 new_path.write_text(updated_content)
                 task_path.unlink()
@@ -558,6 +629,57 @@ class AgentCircuitBreaker:
             return True
         return False
 
+    def recover_stale_circuits(self) -> dict:
+        """Auto-recover circuits that have been OPEN longer than RECOVERY_TIMEOUT.
+
+        This method transitions OPEN → HALF_OPEN after 30min quarantine.
+        Called by watchdog every tick to ensure circuits don't stay stuck.
+
+        Returns:
+            {
+                "recovered": list of agent names transitioned to HALF_OPEN,
+                "still_open": list of agents still in quarantine,
+                "timestamp": str
+            }
+        """
+        recovered = []
+        still_open = []
+
+        for agent in VALID_AGENTS:
+            if agent not in self.state["agents"]:
+                continue
+
+            agent_state = self.state["agents"][agent]
+            if agent_state["state"] != "OPEN":
+                continue
+
+            time_in_state = time.time() - agent_state["since"]
+            if time_in_state > self.RECOVERY_TIMEOUT:
+                # Transition to HALF_OPEN
+                self.log(
+                    f"Auto-recovery: {agent} OPEN→HALF_OPEN after {int(time_in_state//60)}min quarantine "
+                    f"({agent_state['failure_count']} failures, {agent_state['last_failure_rate']:.0%} rate)"
+                )
+                agent_state["state"] = "HALF_OPEN"
+                agent_state["since"] = time.time()
+                agent_state["half_open_trials"] = 0
+                recovered.append(agent)
+            else:
+                still_open.append({
+                    "agent": agent,
+                    "minutes_remaining": int((self.RECOVERY_TIMEOUT - time_in_state) // 60),
+                    "failures": agent_state["failure_count"]
+                })
+
+        if recovered:
+            self.save_state()
+
+        return {
+            "recovered": recovered,
+            "still_open": still_open,
+            "timestamp": datetime.now().isoformat()
+        }
+
 
 # CLI for manual management
 def main():
@@ -570,6 +692,7 @@ def main():
     parser.add_argument("--status", action="store_true", help="Show circuit breaker status")
     parser.add_argument("--reset", type=str, metavar="AGENT", help="Reset agent circuit to CLOSED")
     parser.add_argument("--check", type=str, metavar="AGENT", help="Check specific agent status")
+    parser.add_argument("--recover", action="store_true", help="Auto-recover stale OPEN circuits")
     args = parser.parse_args()
 
     breaker = AgentCircuitBreaker()
@@ -589,6 +712,11 @@ def main():
             print(f"Reset {args.reset} circuit to CLOSED")
         else:
             print(f"Agent {args.reset} not found in circuit state")
+        return
+
+    if args.recover:
+        result = breaker.recover_stale_circuits()
+        print(json.dumps(result, indent=2))
         return
 
     # Default: show status

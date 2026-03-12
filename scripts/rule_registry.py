@@ -33,8 +33,19 @@ MAX_PRUNED_RETENTION_DAYS = 30
 
 
 def _rules_path(agent: str) -> Path:
-    """Return path to an agent's rules.json file."""
+    """Return path to an agent's rules.json file (memory subdirectory)."""
     return AGENTS_DIR / agent / "memory" / "rules.json"
+
+
+def _behavioral_rules_path(agent: str) -> Path:
+    """Return path to an agent's behavioral rules.json file (agent root level).
+
+    This is the behavioral rules format used by R008 enforcement:
+    - enabled: true/false
+    - when: trigger condition
+    - then: action to take
+    """
+    return AGENTS_DIR / agent / "rules.json"
 
 
 def load_rules(agent: str) -> dict:
@@ -86,12 +97,35 @@ def save_rules(agent: str, data: dict) -> bool:
 
 
 def get_active_rules(agent: str) -> list[str]:
-    """Return list of active rule texts for an agent (max MAX_ACTIVE_RULES)."""
+    """Return list of active rule texts for an agent (max MAX_ACTIVE_RULES).
+
+    Checks two sources:
+    1. memory/rules.json - rule_registry format (status="active", text="WHEN...THEN...")
+    2. rules.json (agent root) - behavioral rules format (enabled, when/then fields)
+    """
+    rules = []
+
+    # Source 1: rule_registry in memory/ subdirectory
     data = load_rules(agent)
-    return [
-        r["text"] for r in data["rules"]
-        if r.get("status") == "active"
-    ][:MAX_ACTIVE_RULES]
+    registry_rules = [
+        r["text"] for r in data.get("rules", [])
+        if r.get("status") == "active" and "text" in r
+    ]
+    rules.extend(registry_rules)
+
+    # Source 2: behavioral rules in agent root (created by R008 enforcement)
+    behavioral_path = _behavioral_rules_path(agent)
+    if behavioral_path.exists():
+        try:
+            with open(behavioral_path, encoding="utf-8") as f:
+                behavioral_data = json.load(f)
+            for r in behavioral_data.get("rules", []):
+                if r.get("enabled") and "when" in r and "then" in r:
+                    rules.append(f"WHEN {r['when']} THEN {r['then']}")
+        except (json.JSONDecodeError, IOError):
+            pass  # If behavioral rules file is corrupt, skip it
+
+    return rules[:MAX_ACTIVE_RULES]
 
 
 def add_rule(agent: str, text: str, source: str = "reflection",

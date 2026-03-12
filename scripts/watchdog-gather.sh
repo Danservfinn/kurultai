@@ -226,6 +226,66 @@ except Exception: print('down')
 REDIS_STATUS=$(redis-cli ping 2>/dev/null | grep -q "PONG" && echo "up" || echo "down")
 
 # ============================================================
+# SECTION 4aa: Cloudflare Tunnel (cloudflared) Health + Auto-Recovery
+# ============================================================
+# Critical infrastructure: the.kurult.ai depends on cloudflared tunnel
+# If cloudflared stops, the site returns HTTP 530 (origin unreachable)
+CLOUDFLARED_STATUS=$(pgrep -f "cloudflared tunnel run" >/dev/null 2>&1 && echo "up" || echo "down")
+# Sanitize PIDs: replace newlines with commas for JSON safety
+CLOUDFLARED_PID=$(pgrep -f "cloudflared tunnel run" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "none")
+CLOUDFLARED_RECOVERY_ATTEMPTED=0
+CLOUDFLARED_RECOVERY_RESULT=""
+
+# Auto-restart cloudflared if down (prevents extended downtime)
+if [ "$CLOUDFLARED_STATUS" = "down" ]; then
+    # Check for recent recovery attempt (5 min cooldown to avoid thrashing)
+    CLOUDFLARED_COOLDOWN_FILE="$LOGDIR/.cloudflared_recovery_last"
+    MAY_RECOVER=1
+    if [ -f "$CLOUDFLARED_COOLDOWN_FILE" ]; then
+        LAST_RECOVERY=$(cat "$CLOUDFLARED_COOLDOWN_FILE" 2>/dev/null || echo "0")
+        RECOVERY_AGE_S=$((EPOCH - LAST_RECOVERY))
+        if [ "$RECOVERY_AGE_S" -lt 300 ]; then
+            MAY_RECOVER=0
+        fi
+    fi
+
+    if [ "$MAY_RECOVER" = "1" ]; then
+        CLOUDFLARED_RECOVERY_ATTEMPTED=1
+        echo "[$TS] CLOUDFLARED_RECOVERY | attempting restart (tunnel detected down)" >> "$WATCHDOG_LOG"
+
+        # Try launchd first (preferred persistent method)
+        if launchctl list | grep -q "com.cloudflare.cloudflared"; then
+            # Unload and reload to force restart
+            launchctl bootout gui/$(id -u)/com.cloudflare.cloudflared 2>/dev/null || true
+            sleep 2
+            launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cloudflare.cloudflared.plist 2>/dev/null
+        else
+            # Fallback: direct cloudflared start
+            ~/bin/cloudflared tunnel run kublai-macmini >/dev/null 2>&1 &
+        fi
+
+        # Wait and verify tunnel started
+        sleep 3
+        CLOUDFLARED_STATUS_AFTER=$(pgrep -f "cloudflared tunnel run" >/dev/null 2>&1 && echo "up" || echo "down")
+
+        if [ "$CLOUDFLARED_STATUS_AFTER" = "up" ]; then
+            CLOUDFLARED_RECOVERY_RESULT="success"
+            CLOUDFLARED_STATUS="up"
+            CLOUDFLARED_PID=$(pgrep -f "cloudflared tunnel run" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "unknown")
+            echo "[$TS] CLOUDFLARED_RECOVERY | success | tunnel PID: $CLOUDFLARED_PID" >> "$WATCHDOG_LOG"
+        else
+            CLOUDFLARED_RECOVERY_RESULT="failed"
+            echo "[$TS] CLOUDFLARED_RECOVERY | failed | escalation required - the.kurult.ai may be down" >> "$WATCHDOG_LOG"
+        fi
+
+        # Record recovery attempt time
+        echo "$EPOCH" > "$CLOUDFLARED_COOLDOWN_FILE"
+    else
+        echo "[$TS] CLOUDFLARED_RECOVERY | skipped | cooldown active (${RECOVERY_AGE_S}s since last)" >> "$WATCHDOG_LOG"
+    fi
+fi
+
+# ============================================================
 # SECTION 4a: Neo4j Auto-Recovery
 # ============================================================
 # Attempt to restart Neo4j if down (prevents EXECUTING_NO_OUTPUT cascade)
@@ -308,6 +368,27 @@ CRED_HEALTH_INVALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; 
 CRED_HEALTH_MISSING=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('missing',0))" 2>/dev/null || echo "0")
 
 # ============================================================
+# SECTION 4c: Auth Heartbeat (actual authentication test)
+# ============================================================
+# Tests if claude-agent can actually authenticate (not just format check)
+# Creates logs/auth-heartbeat.json with last-success timestamps
+# Task-watcher checks this BEFORE dispatching to prevent auth failures
+# FIX 2026-03-11: Added to prevent jochi/ogedei auth failures during task execution
+AUTH_HEARTBEAT_OUTPUT=$(python3 "$SCRIPTS/auth_heartbeat.py" 2>&1 || true)
+AUTH_HEARTBEAT_FAILED=$(echo "$AUTH_HEARTBEAT_OUTPUT" | grep -c "✗" || true)
+# If any agent failed auth, mark degraded but continue (tasks will skip unhealthy agents)
+
+# ============================================================
+# SECTION 4d: Circuit Breaker Auto-Recovery
+# ============================================================
+# Recover OPEN circuits that have been quarantined longer than RECOVERY_TIMEOUT (30min)
+# Prevents agents from being stuck in OPEN state indefinitely
+# Transitions OPEN -> HALF_OPEN automatically after timeout
+CIRCUIT_RECOVER_OUTPUT=$(python3 "$SCRIPTS/circuit_breaker.py" --recover 2>/dev/null || echo '{"recovered":[],"still_open":[]}')
+CIRCUIT_RECOVERED=$(echo "$CIRCUIT_RECOVER_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('recovered',[])))" 2>/dev/null || echo "0")
+CIRCUIT_STILL_OPEN=$(echo "$CIRCUIT_RECOVER_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('still_open',[])))" 2>/dev/null || echo "0")
+
+# ============================================================
 # SECTION 5: Task Queue Status + Push Forward
 # ============================================================
 AGENTS=("kublai" "temujin" "mongke" "chagatai" "jochi" "ogedei" "tolui")
@@ -383,11 +464,12 @@ for agent in "${AGENTS[@]}"; do
     fi
 
     # Count pending tasks — match ALL .md files, exclude terminal states (done/executing/completed/stale/resolved)
+    # Also exclude revision/escalation/no_output patterns which represent terminal or failed states
     PENDING=0
     shopt -s nullglob
     for f in "$TASK_DIR"/*.md; do
         case "$f" in
-            *.done*|*.executing*|*.completed*|*.stale*|*.failed*|*.obsolete*|*.cancelled*|*.resolved*) continue ;;
+            *.done*|*.executing*|*.completed*|*.stale*|*.failed*|*.obsolete*|*.cancelled*|*.resolved*|*.revision*|*.no_output*|*.loop*) continue ;;
             *) PENDING=$((PENDING + 1)) ;;
         esac
     done
@@ -401,7 +483,18 @@ for agent in "${AGENTS[@]}"; do
 done
 
 # task-watcher.py (launchd daemon) is the sole dispatcher for all tasks and spawns
+# Read dispatch count from task-watcher state file (fixes visibility gap)
 TASKS_DISPATCHED=0
+if [ -f "$BASE/logs/task-watcher-dispatch.json" ]; then
+    TASKS_DISPATCHED=$(python3 -c "
+import json, sys
+try:
+    d=json.load(open('$BASE/logs/task-watcher-dispatch.json'))
+    print(d.get('last_dispatch_count', 0))
+except Exception: print(0)
+" 2>/dev/null || echo "0")
+fi
+# Fallback: spawn queue count
 if [ -f "$BASE/logs/spawn-pending.json" ]; then
     SPAWN_COUNT=$(python3 -c "
 import json
@@ -498,7 +591,7 @@ for agent in agents:
     if os.path.isdir(task_dir):
         pending = 0
         for f in glob.glob(f'{task_dir}/*.md'):
-            if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed', '.obsolete', '.cancelled', '.resolved']):
+            if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed', '.obsolete', '.cancelled', '.resolved', '.revision', '.no_output', '.loop']):
                 continue
             pending += 1
         depths.append(pending)
@@ -587,9 +680,9 @@ elif [ "$ERRORS_5M" -gt 20 ] && [ -n "$ERR_AVG_5M" ] && [ "$(echo "$ERRORS_5M > 
     STATUS="degraded"; ACTION="warn"; REASON="error spike: $ERRORS_5M in 5m (rolling avg: $ERR_AVG_5M)"; EXIT_CODE=1
 elif [ "$LATENCY_MS" -gt 2000 ] && [ "$HTTP" = "200" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="latency ${LATENCY_MS}ms"; EXIT_CODE=1
-elif [ "$NEO4J_STATUS" = "down" ] || [ "$REDIS_STATUS" = "down" ]; then
+elif [ "$NEO4J_STATUS" = "down" ] || [ "$REDIS_STATUS" = "down" ] || [ "$CLOUDFLARED_STATUS" = "down" ]; then
     STATUS="degraded"; ACTION="warn"
-    REASON="services down: $([ "$NEO4J_STATUS" = "down" ] && echo neo4j)$([ "$REDIS_STATUS" = "down" ] && echo ${NEO4J_STATUS:+,}redis)"
+    REASON="services down: $([ "$NEO4J_STATUS" = "down" ] && echo neo4j)$([ "$REDIS_STATUS" = "down" ] && echo ${NEO4J_STATUS:+,}redis)$([ "$CLOUDFLARED_STATUS" = "down" ] && echo ${NEO4J_STATUS:+${REDIS_STATUS:+,}}cloudflared)"
     EXIT_CODE=1
 # Resolution compliance: task completion quality tracking (horde-review PRIORITY_FIX)
 elif [ "$RESOLUTION_COMPLIANCE" -lt 90 ] 2>/dev/null; then
@@ -703,6 +796,30 @@ except Exception: pass
     fi
 fi
 
+# ============================================================
+# SECTION 5f: Stale Task Claim Cleanup
+# ============================================================
+# Clear stale session_keys from PENDING tasks that failed to execute
+# This fixes PENDING_NO_DISPATCH where tasks have old session_keys but
+# no handler is running (from crashed/timed-out handlers)
+#
+# BUG: When a handler crashes or times out, the session_key remains in
+# Neo4j. The claim_task_atomic() function rejects PENDING tasks with
+# non-null session_keys as "already_claimed", preventing re-dispatch.
+#
+# FIX: Clear session_keys for PENDING tasks with stale claims (>10 min old)
+# allowing task-watcher to re-dispatch them.
+#
+# NOTE: Run on EVERY tick, not just when subprocess anomalies detected.
+# Stale claims occur from handler timeouts, manual kills, network issues, etc.
+# The 10-minute age threshold prevents clearing active legitimate claims.
+#
+STALE_CLAIMS_OUTPUT=$(python3 "$SCRIPTS/clear_stale_claims.py" 2>/dev/null || echo "")
+STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -o "cleared=[0-9]*" | cut -d= -f2 || echo "0")
+if [ "${STALE_CLAIMS_CLEARED:-0}" -gt 0 ]; then
+    echo "[$TS] STALE_CLAIM_CLEANUP | cleared $STALE_CLAIMS_CLEARED stale claim(s)" >> "$WATCHDOG_LOG"
+fi
+
 # Disk space check
 AVAIL_KB=$(df -k "$LOGDIR" 2>/dev/null | awk 'NR==2{print $4}')
 if [ "${AVAIL_KB:-0}" -lt 524288 ] 2>/dev/null; then  # < 512MB
@@ -740,13 +857,15 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_minutes":%s,"last_epoch":%s},"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s","recovery":{"neo4j":{"attempted":%s,"result":"%s"}}},"credentials":{"fleet_health":"%s","valid":%s,"invalid":%s,"missing":%s},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"resolution":{"compliance_pct":%s,"with":%s,"without":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_minutes":%s,"last_epoch":%s},"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s","cloudflared":"%s","cloudflared_pid":"%s","recovery":{"neo4j":{"attempted":%s,"result":"%s"},"cloudflared":{"attempted":%s,"result":"%s"}}},"credentials":{"fleet_health":"%s","valid":%s,"invalid":%s,"missing":%s},"auth_heartbeat":{"failed_checks":%s},"circuit_breaker":{"recovered":%s,"still_open":%s},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"resolution":{"compliance_pct":%s,"with":%s,"without":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
     "$TS_ISO" "$EPOCH" "$MODEL" "$GAP_DETECTED" "${GAP_MINUTES:-0}" "$LAST_EPOCH" \
     "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
-    "$NEO4J_STATUS" "$REDIS_STATUS" "${NEO4J_RECOVERY_ATTEMPTED:-0}" "${NEO4J_RECOVERY_RESULT:-}" \
+    "$NEO4J_STATUS" "$REDIS_STATUS" "$CLOUDFLARED_STATUS" "${CLOUDFLARED_PID:-none}" "${NEO4J_RECOVERY_ATTEMPTED:-0}" "${NEO4J_RECOVERY_RESULT:-}" "${CLOUDFLARED_RECOVERY_ATTEMPTED:-0}" "${CLOUDFLARED_RECOVERY_RESULT:-}" \
     "$CRED_HEALTH_FLEET" "$CRED_HEALTH_VALID" "$CRED_HEALTH_INVALID" "$CRED_HEALTH_MISSING" \
+    "${AUTH_HEARTBEAT_FAILED:-0}" \
+    "${CIRCUIT_RECOVERED:-0}" "${CIRCUIT_STILL_OPEN:-0}" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "${SPAWN_COUNT:-0}" "$TASK_QUEUE_STATUS" \
     "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" "$VOTE_SYNC_COUNT" \
     "$SUBPROCESS_EXECUTING" "$SUBPROCESS_ALIVE" "$SUBPROCESS_DEAD" "$SUBPROCESS_STALE" "$SUBPROCESS_ZOMBIES" "$SUBPROCESS_ORPHANED" "$SUBPROCESS_ANOMALIES" \
@@ -758,14 +877,16 @@ printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_m
 # ============================================================
 # WRITE 2: Overwrite tick-summary.txt (for LLM)
 # ============================================================
-printf 'TICK %s\nMODEL: %s (LLM triage)\nHEARTBEAT: gap_detected=%s gap_minutes=%s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s\nRECOVERY: neo4j_attempted=%s neo4j_result=%s\nCREDENTIALS: fleet_health=%s valid=%s invalid=%s missing=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nSUBPROC: executing=%s alive=%s dead=%s stale=%s zombies=%s orphaned=%s anomalies=%s\nRESOLUTION: compliance=%s%% (with=%s without=%s)\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
+printf 'TICK %s\nMODEL: %s (LLM triage)\nHEARTBEAT: gap_detected=%s gap_minutes=%s\nGATEWAY: %s pid=%s http=%s latency=%sms uptime=%s instances=%s\nPROCESS: cpu=%s%% mem=%s%% rss=%sMB threads=%s\nERRORS:  last5m=%s last1h=%s fatal=%s\nSERVICES: neo4j=%s redis=%s cloudflared=%s pid=%s\nRECOVERY: neo4j_attempted=%s neo4j_result=%s cloudflared_attempted=%s cloudflared_result=%s\nCREDENTIALS: fleet_health=%s valid=%s invalid=%s missing=%s\nAUTH_HEARTBEAT: failed_checks=%s\nCIRCUIT_BREAKER: recovered=%s still_open=%s\nTASKS:   pending=%s dispatched=%s spawn=%s queues=[%s]\nAUDIT:   verified=%s fake=%s requeued=%s llm_decision=%s llm_confidence=%s%%\nVOTES:   synced=%s errors=%s\nSUBPROC: executing=%s alive=%s dead=%s stale=%s zombies=%s orphaned=%s anomalies=%s\nRESOLUTION: compliance=%s%% (with=%s without=%s)\nROUTING: balance_idx=%s missed=%s accuracy=%s%% p95=%ss routed=%s\nTRENDS:  uptime_1h=%s%% avg_cpu=%s%% err_avg_5m=%s err_direction=%s restarts_1h=%s\nDECISION: %s\nACTION:   %s\nREASON:   %s\n' \
     "$TS" "$MODEL" "$GAP_DETECTED" "${GAP_MINUTES:-0}" \
     "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "$UPTIME_H" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "$RSS_MB" "${THREADS:-0}" \
     "$ERRORS_5M" "$ERRORS_1H" "$FATAL_5M" \
-    "$NEO4J_STATUS" "$REDIS_STATUS" \
-    "${NEO4J_RECOVERY_ATTEMPTED:-0}" "${NEO4J_RECOVERY_RESULT:--}" \
+    "$NEO4J_STATUS" "$REDIS_STATUS" "$CLOUDFLARED_STATUS" "${CLOUDFLARED_PID:-none}" \
+    "${NEO4J_RECOVERY_ATTEMPTED:-0}" "${NEO4J_RECOVERY_RESULT:--}" "${CLOUDFLARED_RECOVERY_ATTEMPTED:-0}" "${CLOUDFLARED_RECOVERY_RESULT:--}" \
     "$CRED_HEALTH_FLEET" "$CRED_HEALTH_VALID" "$CRED_HEALTH_INVALID" "$CRED_HEALTH_MISSING" \
+    "${AUTH_HEARTBEAT_FAILED:-0}" \
+    "${CIRCUIT_RECOVERED:-0}" "${CIRCUIT_STILL_OPEN:-0}" \
     "$TASKS_PENDING_TOTAL" "$TASKS_DISPATCHED" "$SPAWN_COUNT" "$TASK_QUEUE_STATUS" \
     "$COMPLETION_AUDIT_VERIFIED" "$COMPLETION_AUDIT_FAKE" "$COMPLETION_AUDIT_REQUEUED" "$COMPLETION_AUDIT_LLM_DECISION" "$COMPLETION_AUDIT_LLM_CONFIDENCE" \
     "$VOTE_SYNC_COUNT" "$VOTE_SYNC_ERRORS" \
@@ -807,7 +928,7 @@ fi
 # ============================================================
 # WRITE 3: Append to watchdog.log (one-liner)
 # ============================================================
-echo "[$TS] TICK | gap_detected=$GAP_DETECTED | gap_minutes=${GAP_MINUTES:-0} | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | credentials=$CRED_HEALTH_FLEET valid=$CRED_HEALTH_VALID invalid=$CRED_HEALTH_INVALID | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | subprocess_exec=$SUBPROCESS_EXECUTING | subprocess_alive=$SUBPROCESS_ALIVE | subprocess_dead=$SUBPROCESS_DEAD | subprocess_stale=$SUBPROCESS_STALE | subprocess_anomalies=$SUBPROCESS_ANOMALIES | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
+echo "[$TS] TICK | gap_detected=$GAP_DETECTED | gap_minutes=${GAP_MINUTES:-0} | status=$STATUS | pid=$PIDS | cpu=${CPU:-0}% | mem=${MEM:-0}% | rss=${RSS_MB}MB | http=$HTTP | latency=${LATENCY_MS}ms | errors=$ERRORS_5M | neo4j=$NEO4J_STATUS | redis=$REDIS_STATUS | cloudflared=$CLOUDFLARED_STATUS cloudflared_pid=${CLOUDFLARED_PID:-none} | credentials=$CRED_HEALTH_FLEET valid=$CRED_HEALTH_VALID invalid=$CRED_HEALTH_INVALID | auth_heartbeat_failed=${AUTH_HEARTBEAT_FAILED:-0} | tasks_pending=$TASKS_PENDING_TOTAL | tasks_dispatched=$TASKS_DISPATCHED | audit_verified=$COMPLETION_AUDIT_VERIFIED | audit_fake=$COMPLETION_AUDIT_FAKE | audit_requeued=$COMPLETION_AUDIT_REQUEUED | audit_llm=$COMPLETION_AUDIT_LLM_DECISION | vote_sync_count=$VOTE_SYNC_COUNT | vote_sync_errors=$VOTE_SYNC_ERRORS | subprocess_exec=$SUBPROCESS_EXECUTING | subprocess_alive=$SUBPROCESS_ALIVE | subprocess_dead=$SUBPROCESS_DEAD | subprocess_stale=$SUBPROCESS_STALE | subprocess_anomalies=$SUBPROCESS_ANOMALIES | routing_balance=$ROUTING_BALANCE_IDX | routing_missed=$ROUTING_MISSED | routing_accuracy=$ROUTING_ACCURACY | routing_p95=$ROUTING_P95 | action=$ACTION | reason=$REASON" >> "$WATCHDOG_LOG"
 
 # ============================================================
 # SECTION 8: LLM Triage (local ollama — decide if Kublai should act)
@@ -1145,12 +1266,13 @@ fi
 
 # ============================================================
 # GAP_ESCALATION: Auto-escalate when monitoring gaps detected
-# Implements Rule O4: WHEN kurultai-monitor log shows >10min gap, investigate cron/launchd reliability
+# Implements Rule O003: WHEN kurultai-monitor log shows >5min gap, investigate cron/launchd reliability
+# Proactive escalation (reduced from 10min to 5min threshold for faster response)
 # Bypasses LLM triage — monitoring blackouts are deterministic failures requiring escalation
 # ============================================================
 GAP_ESCALATION_SHOULD_DISPATCH=0
 GAP_ESCALATION_LAST_ESCALATION="$LOGDIR/.gap-escalation-last-escalation"
-GAP_ESCALATION_THRESHOLD_MINUTES=10  # Rule O4 threshold
+GAP_ESCALATION_THRESHOLD_MINUTES=5  # Rule O003 threshold - proactive escalation (reduced from 10 for faster detection)
 
 # Check if gap detected and exceeds threshold
 if [ "$GAP_DETECTED" -eq 1 ] && [ "${GAP_MINUTES:-0}" -gt "$GAP_ESCALATION_THRESHOLD_MINUTES" ]; then
