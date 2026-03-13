@@ -365,6 +365,22 @@ def main():
         scored = generate_action_scored(agent, hours=args.hours)
         if scored:
             _append_ledger(scored)
+            # Persist action scores to Neo4j for each task in the window
+            try:
+                from neo4j_task_tracker import get_driver
+                driver = get_driver()
+                events = read_ledger(hours=args.hours * 4)
+                agent_events = [e for e in events if e.get("agent") == agent]
+                task_ids = set(e.get("task_id") for e in agent_events if e.get("task_id"))
+                score = scored.get("memory_score", 0) or 0
+                with driver.session() as session:
+                    for task_id in task_ids:
+                        session.run("""
+                            MATCH (t:Task {task_id: $task_id})
+                            SET t.action_score = $score, t.action_scored_at = datetime()
+                        """, task_id=task_id, score=score)
+            except Exception:
+                pass  # Best-effort — don't crash if Neo4j unavailable
             print(f"Scored {agent}: worst={scored.get('worst_category')} cc_rate={scored.get('claude_code_rate'):.0%}")
         else:
             print(f"No scoring needed for {agent} (no tasks or already scored this hour)")

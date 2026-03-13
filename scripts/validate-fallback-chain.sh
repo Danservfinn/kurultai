@@ -188,8 +188,8 @@ fi
 # CHECK 8: Proxy endpoint health
 # ============================================================================
 if command -v curl >/dev/null 2>&1; then
-    ZAI_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$EXPECTED_TIER_1_URL" 2>/dev/null || echo "000")
-    if [[ "$ZAI_HEALTH" == "000" ]]; then
+    ZAI_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$EXPECTED_TIER_1_URL" 2>/dev/null || echo "0")
+    if [[ "$ZAI_HEALTH" == "0" ]]; then
         VALIDATION_RESULT="INVALID"
         VALIDATION_REASON="zai_endpoint_unreachable"
         DETAILS+=("FAIL: Z.AI endpoint unreachable (HTTP $ZAI_HEALTH)")
@@ -199,8 +199,8 @@ if command -v curl >/dev/null 2>&1; then
         DETAILS+=("PASS: Z.AI endpoint reachable (HTTP $ZAI_HEALTH)")
     fi
 
-    ALIBABA_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$EXPECTED_TIER_2_URL" 2>/dev/null || echo "000")
-    if [[ "$ALIBABA_HEALTH" == "000" ]]; then
+    ALIBABA_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$EXPECTED_TIER_2_URL" 2>/dev/null || echo "0")
+    if [[ "$ALIBABA_HEALTH" == "0" ]]; then
         DETAILS+=("WARN: Alibaba endpoint unreachable (HTTP $ALIBABA_HEALTH) - Tier 2 fallback may fail")
     elif [[ "$ALIBABA_HEALTH" == "404" ]]; then
         DETAILS+=("WARN: Alibaba endpoint returns 404 - API URL may be incorrect or service changed")

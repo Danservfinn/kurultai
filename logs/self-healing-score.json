@@ -1,45 +1,57 @@
 {
-  "ts": "2026-03-12T06:24:24.887464",
+  "ts": "2026-03-12T23:29:16.479529",
   "window_hours": 24,
   "score": {
-    "score": 100.0,
-    "auto_resolved": 45,
-    "escalated": 0,
+    "score": 56.0,
+    "auto_resolved": 56,
+    "escalated": 44,
     "manual": 0,
     "partial": 0,
-    "total_issues": 45,
+    "total_issues": 100,
     "by_type": {
-      "quality_retry": {
-        "auto": 18,
+      "memory_deprecated_rules": {
+        "auto": 2,
         "escalated": 0,
         "manual": 0,
         "partial": 0
       },
       "memory_bloat": {
-        "auto": 26,
+        "auto": 20,
         "escalated": 0,
         "manual": 0,
         "partial": 0
       },
-      "memory_deprecated_rules": {
-        "auto": 1,
+      "quality_retry": {
+        "auto": 31,
         "escalated": 0,
+        "manual": 0,
+        "partial": 0
+      },
+      "queue_rebalanced": {
+        "auto": 3,
+        "escalated": 0,
+        "manual": 0,
+        "partial": 0
+      },
+      "gateway_restart": {
+        "auto": 0,
+        "escalated": 44,
         "manual": 0,
         "partial": 0
       }
     },
     "trends": [
       {
-        "direction": "up",
-        "description": "Score improved by 17.3%"
-      },
-      {
-        "direction": "up",
-        "description": "Auto-resolution rate increased by 17%"
+        "direction": "down",
+        "description": "Score declined by 14.7%"
       },
       {
         "direction": "down",
-        "description": "Issue volume decreased by 54%"
+        "description": "Auto-resolution rate decreased by 15%"
+      },
+      {
+        "direction": "down",
+        "description": "Issue volume decreased by 33%"
       }
     ]
   }

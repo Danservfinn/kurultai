@@ -10,6 +10,9 @@ Checks task completions against quality thresholds:
 Provides auto-retry with feedback and escalation to Kublai.
 """
 
+# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -198,6 +201,11 @@ class CompletionQualityGate:
         if char_count < 50:
             issues.append(f"Trivial completion: only {char_count} chars")
 
+        # Check for shallow implementation output (PRIORITY_FIX: workspace .md with no code)
+        shallow_issue = self._check_shallow_implementation(content, output, task_file)
+        if shallow_issue:
+            issues.append(shallow_issue)
+
         # If no issues, pass
         if not issues:
             return QualityResult(passed=True, action="pass")
@@ -227,6 +235,83 @@ class CompletionQualityGate:
             reason=f"Retry #{retry_count + 1}",
             retry_count=retry_count + 1,
         )
+
+    # Skills that require actual code deliverables (not just workspace docs)
+    CODE_DELIVERY_SKILLS = {
+        "/horde-implement", "/implement", "/senior-frontend", "/senior-backend",
+        "/senior-fullstack", "/senior-architect", "/horde-debug",
+        "/systematic-debugging", "/generate-tests",
+    }
+
+    # File extensions that count as code (not just documentation)
+    CODE_EXTENSIONS = {
+        ".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java",
+        ".cpp", ".c", ".h", ".sh", ".bash", ".zsh", ".sql", ".json",
+        ".yaml", ".yml", ".toml", ".css", ".scss", ".html",
+    }
+
+    def _check_shallow_implementation(
+        self, full_content: str, output: str, task_file: Path
+    ) -> str | None:
+        """Detect implementation tasks that produced only docs with no code changes.
+
+        Returns an issue string if the task is a shallow implementation, None otherwise.
+        """
+        # Extract skill hint from frontmatter
+        skill_match = re.search(r"skill[_\s]*hint?:\s*(\S+)", full_content, re.IGNORECASE)
+        if not skill_match:
+            return None  # No skill hint — skip this check
+
+        skill = skill_match.group(1).strip().lower()
+        if skill not in self.CODE_DELIVERY_SKILLS:
+            return None  # Not a code-delivery skill — skip
+
+        # Check deliverables section for actual code files
+        has_code_file = False
+
+        # Look for file paths with code extensions in output
+        file_refs = re.findall(r"[\w/~.-]+\.\w{1,5}", output)
+        for ref in file_refs:
+            ext = os.path.splitext(ref)[1].lower()
+            if ext in self.CODE_EXTENSIONS:
+                has_code_file = True
+                break
+
+        # Also check for git commit indicators
+        has_git_commit = bool(
+            re.search(r"(?:commit|committed|pushed|git add)\b", output, re.IGNORECASE)
+        )
+
+        # Check for code blocks that contain actual code (not just markdown)
+        code_blocks = re.findall(r"```(\w*)\n(.*?)```", output, re.DOTALL)
+        has_substantial_code = False
+        for lang, block_content in code_blocks:
+            # Skip markdown/text blocks — only count code languages
+            if lang.lower() in ("", "md", "markdown", "text", "txt"):
+                continue
+            # At least 5 lines of actual code
+            code_lines = [l for l in block_content.strip().split("\n") if l.strip()]
+            if len(code_lines) >= 5:
+                has_substantial_code = True
+                break
+
+        # Check for workspace-only .md deliverables
+        workspace_refs = re.findall(r"workspace/[\w/.-]+\.md", output)
+        all_refs = re.findall(r"(?:Created|Wrote|Saved|Modified|Updated)[:\s]+([^\s\n]+)", output, re.IGNORECASE)
+        all_are_docs = all_refs and all(
+            os.path.splitext(r)[1].lower() in (".md", ".txt", ".rst")
+            for r in all_refs
+        )
+
+        # Flag as shallow if: code-delivery skill + no code files + no git + no substantial code blocks
+        if not has_code_file and not has_git_commit and not has_substantial_code:
+            if workspace_refs or all_are_docs:
+                return (
+                    f"Shallow implementation: skill {skill} produced only documentation "
+                    f"({len(workspace_refs)} workspace .md files) with no code changes or commits"
+                )
+
+        return None
 
     def extract_output(self, content: str) -> str:
         """Extract the task output from completion file.

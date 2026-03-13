@@ -81,11 +81,23 @@ FAILURE_CATEGORIES = {
         "label": "Claude Code Crash",
         "suggestion": "Check API availability; may be transient",
     },
+    "sigkill": {
+        "patterns": [
+            r"exit_code\s*=\s*-?9",
+            r"returncode\s*=\s*-?9",
+            r"signal.*9(?!.*minutes)",  # signal 9 but not "9 minutes"
+            r"sigkill",
+            r"killed.*signal.*9",
+            r"oom\s*killer",
+            r"out\s+of\s+memory",
+        ],
+        "label": "SIGKILL (OOM or System Kill)",
+        "suggestion": "Memory exhaustion or system kill - check RAM usage, reduce task complexity",
+    },
     "timeout": {
         "patterns": [
             r"timed?\s*out(?!\s*:\s*\d)",
             r"execution.*exceed",
-            r"killed.*signal.*9",
             r"exceeded.*timeout",
         ],
         "label": "Timeout",

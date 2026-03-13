@@ -10,7 +10,7 @@ type: feedback
 **Role:** Squad Lead / Router
 **Domain:** Task classification, routing, coordination, queue management
 
-## Active Rules (8/8)
+## Active Rules (9/8)
 
 ### K001: Pre-Submit Gate Check (R009)
 **Priority:** 1 (CRITICAL)
@@ -54,13 +54,13 @@ type: feedback
 ### K004: Queue Overflow Acceptance
 **Priority:** 4
 
-**WHEN:** Queue imbalance detected (idle agent with capacity >=2, others have >5 pending tasks for 3+ ticks)
+**WHEN:** kublai queue < 2 AND 2+ agents have queue >= 4
 
-**THEN:** Accept overflow tasks to balance load
+**THEN:** Claim tasks from overloaded agents (up to 3 per cycle) instead of creating new triage tasks
 
-**Why:** Prevents starvation when some agents are idle while others are backlogged.
+**Why:** Kublai must act as active coordinator, not passive message-forwarder. When kublai is idle while others struggle, it should absorb overflow to reduce backlog, not create more tasks.
 
-**How to apply:** When detecting queue imbalance, accept overflow tasks to redistribute work.
+**How to apply:** In tock_actions(), detect queue imbalance and call task_redistribute.move_task() to claim coordination/routing/triage tasks from overloaded agents. Implemented 2026-03-12 in kublai-actions.py Rule 2c. Import shim task_redistribute.py created 2026-03-12 to fix ImportError (file was task-redistribute.py, not importable with hyphens).
 
 ---
 
@@ -114,9 +114,22 @@ type: feedback
 
 **How to apply:** Research tasks always go to mongke, even if other agents have shorter queues.
 
+---
+
+### K009: CRITICAL Fleet Failure Auto-Investigation
+**Priority:** 2 (CRITICAL)
+
+**WHEN:** Watchdog detects CRITICAL severity anomaly (HIGH_FAILURE_RATE >=75% across 10+ tasks, or AUTH_HEARTBEAT failed_checks >=1)
+
+**THEN:** Self-initiate investigation task in kublai's own queue with priority=high, assigned to ogedei, with title "CRITICAL: Investigate fleet-wide [ANOMALY_TYPE] - [detected_at_timestamp]"
+
+**Why:** Fix for 2026-03-12 incident: 92% fleet failure rate persisted for 10+ ticks without investigation despite CRITICAL severity. K002 escalates severity but doesn't CREATE investigation tasks. K003 only triggers at >100 errors/hour, not high failure rate percentages.
+
+**How to apply:** In watchdog-gather.sh or tick processing, when CRITICAL anomaly is detected, create task file at ~/.openclaw/agents/kublai/tasks/ with priority=high and clear investigation scope (check AUTH_HEARTBEAT, verify credentials, reset circuit-breaker if stuck).
+
 ## Rule Categories
 - **Quality:** 2 rules (K001, K006)
-- **Ops:** 2 rules (K002, K003)
+- **Ops:** 3 rules (K002, K003, K009)
 - **Load-balancing:** 1 rule (K004)
 - **Routing:** 3 rules (K005, K007, K008)
 
@@ -125,4 +138,5 @@ type: feedback
 
 ## Version History
 - Created: 2026-03-11
+- Updated: 2026-03-12T21:35:00Z — K004 implementation in kublai-actions.py Rule 2c
 - Last updated: 2026-03-11T14:30:00Z

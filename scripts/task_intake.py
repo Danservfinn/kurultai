@@ -35,7 +35,10 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from kurultai_paths import AGENTS_DIR, LOGS_DIR, agent_tasks_dir, VALID_AGENTS, AGENT_KEYWORDS
-from kurultai_ledger import append_ledger as _tp_append_ledger, generate_task_id, validate_task_id
+from kurultai_ledger import generate_task_id, validate_task_id
+
+# Ogedei failure flag state file (watchdog writes this)
+_OGEDEI_WATCHDOG_STATE = LOGS_DIR / "ogedei-watchdog-state.json"
 
 # Valid task file extensions (prevents false positives from intermediate state files)
 VALID_TASK_EXTENSIONS = {
@@ -63,6 +66,11 @@ except ImportError:
     print("Warning: conversation_logger not available, task-conversation linking disabled")
 
 # Timeout configuration (mirrors agent-task-handler.py)
+# TODO: Consolidate with kurultai_paths.py TIMEOUT_BY_PRIORITY (canonical source).
+#   kurultai_paths has: high=7200, normal=7200, low=7200
+#   These local values are intentionally higher (10800/3h) for task_intake's
+#   frontmatter timeout field. Reconcile after verifying agent-task-handler
+#   respects frontmatter timeout over its own defaults.
 _TIMEOUT_BY_PRIORITY = {
     'high': 10800,  # 3 hours for high priority
     'normal': 10800,  # 3 hours for normal priority
@@ -89,6 +97,24 @@ def compute_task_timeout(priority, skill_hint=None):
     priority_timeout = _TIMEOUT_BY_PRIORITY.get(priority, _DEFAULT_TIMEOUT)
     skill_timeout = _SLOW_SKILLS_TIMEOUT.get(skill_hint, 0) if skill_hint else 0
     return max(priority_timeout, skill_timeout)
+
+
+def _get_ogedei_failure_flag() -> float:
+    """Read ogedei's current failure flag from watchdog state.
+
+    Returns:
+        float: Failure flag value (0.0 = healthy, 1.0 = completely failing).
+               Returns 0.0 if state file unavailable or missing data.
+    """
+    try:
+        if _OGEDEI_WATCHDOG_STATE.exists():
+            with open(_OGEDEI_WATCHDOG_STATE) as f:
+                state = json.load(f)
+            flags = state.get("agent_failure_flags", {})
+            return flags.get("ogedei", 0.0)
+    except Exception:
+        pass
+    return 0.0
 
 
 # =============================================================================
@@ -258,6 +284,9 @@ def validate_agent_model(agent):
 
         # All agents run via Claude Code — openclaw.json model is gateway config,
         # not execution model. Validate that the canonical config itself is sane.
+        # "claude-code/settings" is the sentinel for claude-code executor agents and is always valid.
+        if canonical_model == "claude-code/settings":
+            return True, canonical_model, None
         if canonical_model not in ("claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"):
             # Only flag if canonical model is set to something clearly wrong
             return False, canonical_model, (
@@ -354,6 +383,14 @@ _DISAMBIGUATION = [
     ({"investigate", "fatal"}, "jochi"),
     ({"investigate", "spike"}, "jochi"),
     ({"investigate", "timeout"}, "jochi"),
+    # OPS-ESCALATION GUARD (2026-03-12): Ops metrics that contain "failure"/"anomaly" must
+    # route to ogedei BEFORE jochi's generic failure/anomaly keywords score higher.
+    # Evidence: "SUSTAINED THROUGHPUT ANOMALY: HIGH_FAILURE_RATE" routed to jochi (wrong)
+    # because jochi scored 2 ("anomaly" + "failure") vs ogedei's 1 ("failure").
+    ({"throughput", "anomaly"}, "ogedei"),    # throughput anomaly = ops metric, not security
+    ({"failure", "rate"}, "ogedei"),          # failure rate investigation -> ops (not security)
+    ({"fleet", "failure"}, "ogedei"),         # fleet-wide failure = ops coordination
+    ({"sustained", "anomaly"}, "ogedei"),     # sustained anomaly = ops monitoring pattern
     ({"investigate", "failure"}, "jochi"),
     ({"investigate", "failures"}, "jochi"),  # plural form for task failure investigations
     ({"investigate", "performance"}, "jochi"),  # perf analysis -> analyst
@@ -625,44 +662,57 @@ def route_by_text(text):
     QUEUE-AWARE TIEBREAKING (2026-03-11): When multiple agents have equal
     keyword scores, prefer the agent with lower queue depth. This prevents
     "sticky routing" to temujin when keyword matching is ambiguous.
+
+    QUEUE-AWARE PRIMARY SELECTION (2026-03-12): Before returning the primary
+    agent, check if it's significantly overloaded compared to alternatives.
+    If primary queue >= 3 and another agent has queue <= 1, use the lower-queue
+    agent instead. This prevents tasks from piling up on busy agents while
+    idle agents sit unused. This check now applies EVEN to disambiguation rules.
     """
     text_lower = text.lower()
 
+    # Collect all agents with their scores (needed for queue-aware redirect even with disambiguation)
+    scores = {}
+    for agent, keywords in AGENT_KEYWORDS.items():
+        scores[agent] = sum(1 for kw in keywords if _kw_match(kw, text_lower))
+
+    # Find best score (for queue-aware logic)
+    best_score = max(scores.values()) if scores else 0
+
     # Check disambiguation rules first (first-match-wins)
+    # But DON'T return immediately — apply queue-aware check first
+    best = None
+    disambiguation_matched = False
     for rule, target in _DISAMBIGUATION:
         # Handle string-based phrase rules (2026-03-09)
         # String rules use phrase matching (words can be separated), set rules are keyword intersections
         if isinstance(rule, str):
             if _phrase_match(rule, text_lower):
-                return target
+                best = target
+                disambiguation_matched = True
+                break
         elif isinstance(rule, set):
             if all(_kw_match(kw, text_lower) for kw in rule):
-                return target
+                best = target
+                disambiguation_matched = True
+                break
 
-    # Collect all agents with their scores
-    scores = {}
-    for agent, keywords in AGENT_KEYWORDS.items():
-        scores[agent] = sum(1 for kw in keywords if _kw_match(kw, text_lower))
-
-    # Find best score
-    best_score = max(scores.values()) if scores else 0
-
-    # QUEUE-AWARE TIEBREAKING: Among agents with best_score, prefer lowest queue depth
-    # This prevents sticky routing to temujin when keywords are ambiguous
-    if best_score > 0:
-        tied_agents = [agent for agent, score in scores.items() if score == best_score]
-        if len(tied_agents) > 1:
-            # Break tie by queue depth (lowest first)
-            best = min(tied_agents, key=lambda a: get_queue_depth(a))
-            # Log tiebreak for audit
-            print(f"QUEUE-AWARE TIEBREAK: {len(tied_agents)} agents tied with score={best_score} "
-                  f"({', '.join(tied_agents)}), selected {best} (lowest queue)")
+    # If no disambiguation match, use keyword scoring
+    if best is None:
+        if best_score > 0:
+            tied_agents = [agent for agent, score in scores.items() if score == best_score]
+            if len(tied_agents) > 1:
+                # Break tie by queue depth (lowest first)
+                best = min(tied_agents, key=lambda a: get_queue_depth(a))
+                # Log tiebreak for audit
+                print(f"QUEUE-AWARE TIEBREAK: {len(tied_agents)} agents tied with score={best_score} "
+                      f"({', '.join(tied_agents)}), selected {best} (lowest queue)")
+            else:
+                best = tied_agents[0]
         else:
-            best = tied_agents[0]
-    else:
-        # No keyword matches — use queue depth to decide
-        best = min(scores.keys(), key=lambda a: get_queue_depth(a))
-        print(f"NO-KEYWORD-FALLBACK: No keyword matches, selected {best} (lowest queue)")
+            # No keyword matches — use queue depth to decide
+            best = min(scores.keys(), key=lambda a: get_queue_depth(a))
+            print(f"NO-KEYWORD-FALLBACK: No keyword matches, selected {best} (lowest queue)")
 
     # Apply Primary Output Test for chagatai (Rule C16 compliance)
     # Reference: docs/chagatai-routing-guide.md
@@ -671,6 +721,51 @@ def route_by_text(text):
         if primary_output and primary_output != "prose":
             # Route to the agent matching the actual primary output
             best = _PRIMARY_OUTPUT_ROUTE_MAP.get(primary_output, best)
+
+    # QUEUE-AWARE PRIMARY SELECTION (2026-03-12): If the selected primary is
+    # significantly overloaded but another agent has much lower queue, use the
+    # lower-queue agent instead. This prevents the "sticky routing" problem where
+    # tasks pile up on busy agents while idle agents sit unused.
+    # This now applies to disambiguation matches too!
+    # Threshold: primary >= 3 tasks AND another agent <= 1 task
+    primary_depth = get_queue_depth(best)
+    if primary_depth >= 3:
+        # Find agents with significantly lower queue depth
+        all_depths = get_all_agent_queue_depths()
+        lower_queue_agents = [(a, d) for a, d in all_depths.items() if d <= 1 and a != best]
+        # DOMAIN-AWARE FILTERING (2026-03-12): When disambiguation explicitly matched
+        # a target agent, restrict redirect candidates to domain-compatible agents only.
+        # Without this, a research task → mongke can redirect to temujin/ogedei just
+        # because they have empty queues, causing domain misalignment and task failures.
+        if disambiguation_matched and lower_queue_agents:
+            task_domain = classify_task_domain(text)
+            domain_filtered = [(a, d) for a, d in lower_queue_agents
+                               if is_domain_compatible(task_domain, a)]
+            # Only apply domain filter if at least one candidate survives;
+            # otherwise keep the unfiltered list as a safety fallback.
+            if domain_filtered:
+                lower_queue_agents = domain_filtered
+
+        if lower_queue_agents:
+            # Among low-queue agents, prefer one with decent keyword match (if any)
+            # Otherwise, just use the one with lowest queue
+            best_alt, best_alt_depth = min(lower_queue_agents, key=lambda x: x[1])
+            # Check if alternate has at least some keyword relevance
+            alt_score = scores.get(best_alt, 0)
+
+            # Redirect if:
+            # 1. Disambiguation matched (strong signal, allow redirect to domain-compatible idle agent), OR
+            # 2. Alternate has keyword relevance, OR
+            # 3. Primary has only weak keyword match (best_score == 1)
+            should_redirect = (disambiguation_matched or
+                              alt_score > 0 or
+                              best_score == 1)
+
+            if should_redirect:
+                source_note = " (disambiguation)" if disambiguation_matched else ""
+                print(f"QUEUE-AWARE PRIMARY REDIRECT{source_note}: {best} (queue={primary_depth}, score={best_score}) "
+                      f"-> {best_alt} (queue={best_alt_depth}, score={alt_score})")
+                best = best_alt
 
     return best
 
@@ -951,8 +1046,9 @@ _SKILL_CAPABLE_ALTERNATES = {
     # Planning can overflow to mongke (analyst) and chagatai (proposal/document output)
     "/horde-plan": ["mongke", "chagatai"],
 
-    # Kurultai health can overflow to jochi (diagnostics/analysis) (2026-03-09 fix)
-    "/kurultai-health": ["jochi"],
+    # Kurultai health overflows to temujin only — jochi OOM-killed on heavy diagnostics (2026-03-12 fix)
+    # jochi removed: fleet health tasks spawn heavy context that exceeds jochi's memory budget
+    "/kurultai-health": ["temujin"],
 
     # Code review can overflow to temujin (dev perspective) (2026-03-09 fix)
     "/code-reviewer": ["temujin"],
@@ -2617,22 +2713,6 @@ def create_self_task(
         skill_hint=skill_hint,
     )
 
-    if task_id:
-        # Log to ledger
-        _kp_append_ledger({
-            "task_id": task_id,
-            "event": "SELF_TASK_CREATED",
-            "ts": datetime.now().isoformat(),
-            "creator_agent": agent,
-            "priority": priority,
-            "skill_hint": skill_hint,
-            "parent_task_id": parent_task_id,
-            "justification": justification,
-            "source": "self-created",
-            "approval_required": priority == "high",
-            "rate_limit_remaining": remaining,
-        })
-
     return task_id
 
 
@@ -2821,8 +2901,7 @@ def update_task_status(
     return True
 
 
-CLAUDE_CODE_PREAMBLE = """**EXECUTION METHOD:** Use Claude Code via ACP for this task.
-Command: sessions_spawn({ runtime: "acp", agentId: "claude", mode: "run" })
+CLAUDE_CODE_PREAMBLE = """**EXECUTION METHOD:** Use Claude Code for this task.
 Include relevant horde skills in the task description (e.g., /horde-brainstorming, /horde-implement, /horde-review).
 
 """
@@ -2846,7 +2925,7 @@ def create_task(title, body, priority="normal", source="task_intake",
         parent_id: Parent task ID for chain tracking
         skip_duplicate_check: Set True to skip the has_pending_task guard
         skill_hint: Explicit skill hint (skips auto-detection if provided)
-        force_claude_code: Prepend Claude Code ACP invocation instruction to body
+        force_claude_code: Prepend Claude Code invocation instruction to body
         notify_on_complete: Send Signal notification when task completes
         notify_channel: Notification channel (default: "signal")
         notify_target: Notification target phone number
@@ -2885,8 +2964,18 @@ def create_task(title, body, priority="normal", source="task_intake",
             title = stripped_title  # Use the message body without @mention prefix
             source = "direct-mention"
         else:
-            # Use queue-penalized routing (Dynamic Queue Balancing - Phase 5)
-            agent, _route_metadata = route_with_queue_penalty(title)
+            # v2 graph-based routing (Phase 4 cutover 2026-03-12)
+            try:
+                from neo4j_v2_router import route_task as _v2_route
+                from neo4j_v2_core import TaskStore as _V2Store
+                _v2_store = _V2Store()
+                agent = _v2_route(_v2_store, title, priority, skill_hint=skill_hint)
+                _v2_store.close()
+                _route_metadata = {"method": "v2_graph_routing"}
+                print(f"  V2_ROUTE: {title[:50]} -> {agent}")
+            except Exception as _v2_err:
+                print(f"  V2_ROUTE_FALLBACK: {_v2_err}")
+                agent, _route_metadata = route_with_queue_penalty(title)
             if agent == "subagent":
                 agent = "kublai"  # Default fallback
     else:
@@ -3043,6 +3132,13 @@ def create_task(title, body, priority="normal", source="task_intake",
     # Detect cases where skill hint overrides a clear title-domain signal.
     # Example: /horde-implement on "Document ESCALATION_PROTOCOL.md" → documentation task
     # misclassified as implementation, then routed to ogedei who can't do docs.
+    #
+    # FIX 2026-03-12: When domain came from skill hint, only reject if title domain
+    # score is significantly higher (2x) than classified domain score. This prevents
+    # false rejects on titles with generic words like "create" or "feature" that
+    # accidentally score higher for the wrong domain.
+    _domain_from_skill_hint = (skill_hint and skill_hint in SKILL_DOMAIN_MAP)
+
     _title_keywords_domain = None
     _title_lower = title.lower()
     _title_scores = {}
@@ -3056,41 +3152,60 @@ def create_task(title, body, priority="normal", source="task_intake",
 
     # Check if title-based domain conflicts with classified domain
     # AND if the target agent is incompatible with the title-based domain
+    _skip_title_conflict_check = False
     if (_title_keywords_domain and
         _title_keywords_domain != _task_domain and
         _title_keywords_domain in DOMAIN_AGENT_COMPATIBILITY and
         agent not in DOMAIN_AGENT_COMPATIBILITY[_title_keywords_domain]):
 
-        _compatible_for_title = DOMAIN_AGENT_COMPATIBILITY[_title_keywords_domain]
-        _suggested_for_title = _compatible_for_title[0] if _compatible_for_title else "kublai"
+        # When domain came from skill hint, require 2x score threshold to reject
+        # This filters out weak conflicts from generic keywords while protecting
+        # against clear mismatches (e.g., /horde-implement on "Document X")
+        if _domain_from_skill_hint:
+            _classified_score = _title_scores.get(_task_domain, 0)
+            _conflict_score = _title_scores.get(_title_keywords_domain, 0)
+            # Only reject if conflict score is MORE than 2x higher (strong signal)
+            # Special case: if classified domain has 0 matches but conflict has >0,
+            # the skill hint is clearly wrong - reject to prevent misrouting.
+            if _classified_score == 0 and _conflict_score > 0:
+                # Skill hint domain has no keyword support in title - reject
+                print(f"TITLE_DOMAIN_CONFLICT: skill hint domain '{_task_domain}' has 0 keyword matches, title suggests '{_title_keywords_domain}' (score {_conflict_score})")
+                # Fall through to reject below
+            elif _conflict_score <= 2 * max(_classified_score, 1):
+                print(f"TITLE_DOMAIN_CONFLICT: skipped (weak conflict: {_conflict_score} vs {_classified_score}, domain from skill hint)")
+                _skip_title_conflict_check = True  # Skip rejection, allow task through
 
-        print(f"TITLE_DOMAIN_CONFLICT: title suggests '{_title_keywords_domain}' but classified as '{_task_domain}'")
-        print(f"  Task: '{title[:80]}'")
-        print(f"  Title keywords point to: {_title_keywords_domain}")
-        print(f"  Classified as: {_task_domain} (from skill hint: {skill_hint})")
-        print(f"  Target agent '{agent}' is incompatible with title-domain '{_title_keywords_domain}'")
-        print(f"  Compatible agents for {_title_keywords_domain}: {', '.join(_compatible_for_title)}")
-        print(f"  REJECTING task creation — this appears to be a {_title_keywords_domain} task")
-        print(f"  Suggested: use agent='{_suggested_for_title}' or remove skill hint to rely on title keywords")
+        if not _skip_title_conflict_check:
+            _compatible_for_title = DOMAIN_AGENT_COMPATIBILITY[_title_keywords_domain]
+            _suggested_for_title = _compatible_for_title[0] if _compatible_for_title else "kublai"
 
-        # Log title-domain conflict for telemetry
-        _log_routing_decision(
-            title=title,
-            dest=agent,
-            method="title_domain_conflict_reject",
-            domain=_title_keywords_domain,
-            route_metadata={
-                "reject_reason": f"title suggests {_title_keywords_domain} but classified as {_task_domain}",
-                "title_domain": _title_keywords_domain,
-                "classified_domain": _task_domain,
-                "skill_hint": skill_hint,
-                "compatible_agents": _compatible_for_title,
-                "suggested_agent": _suggested_for_title,
-                "source": source,
-            },
-        )
+            print(f"TITLE_DOMAIN_CONFLICT: title suggests '{_title_keywords_domain}' but classified as '{_task_domain}'")
+            print(f"  Task: '{title[:80]}'")
+            print(f"  Title keywords point to: {_title_keywords_domain}")
+            print(f"  Classified as: {_task_domain} (from skill hint: {skill_hint})")
+            print(f"  Target agent '{agent}' is incompatible with title-domain '{_title_keywords_domain}'")
+            print(f"  Compatible agents for {_title_keywords_domain}: {', '.join(_compatible_for_title)}")
+            print(f"  REJECTING task creation — this appears to be a {_title_keywords_domain} task")
+            print(f"  Suggested: use agent='{_suggested_for_title}' or remove skill hint to rely on title keywords")
 
-        return None  # Reject task creation
+            # Log title-domain conflict for telemetry
+            _log_routing_decision(
+                title=title,
+                dest=agent,
+                method="title_domain_conflict_reject",
+                domain=_title_keywords_domain,
+                route_metadata={
+                    "reject_reason": f"title suggests {_title_keywords_domain} but classified as {_task_domain}",
+                    "title_domain": _title_keywords_domain,
+                    "classified_domain": _task_domain,
+                    "skill_hint": skill_hint,
+                    "compatible_agents": _compatible_for_title,
+                    "suggested_agent": _suggested_for_title,
+                    "source": source,
+                },
+            )
+
+            return None  # Reject task creation
 
     # 2.5.3. Kublai self-absorption: when router is overloaded but idle, absorb coordination tasks
     # This fixes the "router cannot route to itself" failure mode where kublai's queue grows
@@ -3330,9 +3445,23 @@ Do NOT proceed until ALL 7 agents show sk-ant- prefix.
 
                         return None, "deadlock_human_intervention_required"
                     else:
-                        # ogedei is healthy — can receive escalation
-                        print(f"  Creating CRITICAL escalation for ogedei to fix credentials")
-                        # Create escalation task for ogedei
+                        # CIRCULAR FAILURE CASCADE PREVENTION (2026-03-12)
+                        # Check if ogedei is already failing before routing CRITICAL tasks to it
+                        # This breaks the circular cascade: ogedei fails → CRITICAL task → ogedei
+                        _ogedei_failure = _get_ogedei_failure_flag()
+                        _OGEDEI_FAILURE_THRESHOLD = 0.5  # Exclude ogedei at 50%+ failure rate
+
+                        if _ogedei_failure >= _OGEDEI_FAILURE_THRESHOLD:
+                            # ogedei is failing — route CRITICAL task to jochi instead
+                            print(f"  CIRCULAR CASCADE PREVENTION: ogedei failure flag={_ogedei_failure:.2f} >= {_OGEDEI_FAILURE_THRESHOLD}")
+                            print(f"  Routing CRITICAL escalation to jochi instead of ogedei to break cascade")
+                            _escalation_target = "jochi"
+                        else:
+                            # ogedei is healthy — can receive escalation
+                            print(f"  Creating CRITICAL escalation for ogedei to fix credentials")
+                            _escalation_target = "ogedei"
+
+                        # Create escalation task for the determined target
                         _escalation_title = f"CRITICAL: Fix fleet-wide credential failure (all agents invalid)"
                         _escalation_body = f"""
 All dispatch agents have invalid Anthropic API credentials (no sk-ant- prefix found).
@@ -3349,14 +3478,13 @@ Required action:
 
 This is blocking ALL task execution. Fleet is paralyzed.
 """
-                        # Recursively call with explicit agent=ogedei and skip duplicate check
-                        # to bypass the same credential check for ogedei
-                        _ogedei_queue = AGENTS_DIR / "ogedei" / "tasks"
-                        _ogedei_queue.mkdir(parents=True, exist_ok=True)
+                        # Create task file directly in target agent's queue
+                        _target_queue = AGENTS_DIR / _escalation_target / "tasks"
+                        _target_queue.mkdir(parents=True, exist_ok=True)
                         _esc_id = f"cred-fail-{int(time.time())}"
-                        _esc_file = _ogedei_queue / f"{_esc_id}.md"
+                        _esc_file = _target_queue / f"{_esc_id}.md"
                         _esc_file.write_text(f"# {_escalation_title}\n\n{_escalation_body}")
-                        print(f"  ESCALATION created: {_esc_file.name}")
+                        print(f"  ESCALATION created: {_esc_file.name} -> {_escalation_target}")
                         return None, "fleet_credential_failure"
 
     # 2.7. Misroute detection AND correction: cross-check explicit routing against keyword scoring
@@ -3479,17 +3607,6 @@ This is blocking ALL task execution. Fleet is paralyzed.
     is_valid, actual_model, error_msg = validate_agent_model(agent)
     if not is_valid:
         print(f"ERROR: {error_msg}")
-        # Log to anomaly ledger for visibility
-        try:
-            _kp_append_ledger({
-                "event": "MODEL_CONFIG_ERROR",
-                "agent": agent,
-                "model": actual_model,
-                "error": error_msg,
-                "ts": datetime.now().isoformat(),
-            })
-        except Exception:
-            pass
         # Still create the task but with a warning — ops can fix config
         body = f"**WARNING: Agent model misconfiguration detected ({actual_model}).**\n\n{body}"
 
@@ -3558,19 +3675,30 @@ This is blocking ALL task execution. Fleet is paralyzed.
         # Update kublai dispatch timestamp for self-absorption tracking
         if agent == "kublai":
             _update_kublai_dispatch_timestamp()
-        # Append QUEUED event to task ledger (enables pending time measurement)
-        try:
-            _kp_append_ledger({
-                "task_id": task_id, "event": "QUEUED",
-                "ts": datetime.now().isoformat(),
-                "agent": agent, "priority": priority,
-                "task_summary": title[:100], "source": source,
-            })
-        except Exception:
-            pass
-
         # Record alert for deduplication tracking
         record_alert_created(agent, title, source, task_id)
+
+        # v2: set v2 properties on Neo4j node (Phase 4 cutover 2026-03-12)
+        try:
+            _domain = classify_task_domain(title, skill_hint)
+            _timeout = compute_task_timeout(priority, skill_hint)
+            tracker.driver.session().run("""
+                MATCH (t:Task {task_id: $id})
+                SET t.v2_eligible = true,
+                    t.assigned_to = t.agent,
+                    t.prompt = $body,
+                    t.domain = $domain,
+                    t.claim_epoch = 0,
+                    t.claimed_by = null,
+                    t.lease_expires_at = null,
+                    t.timeout_s = $timeout,
+                    t.created_at = coalesce(t.created_at, t.created),
+                    t.started_at = null,
+                    t.completed_at = null,
+                    t.updated_at = datetime()
+            """, id=task_id, body=body, domain=_domain, timeout=_timeout)
+        except Exception as e:
+            print(f"  V2_FLAG_WARN: Could not set v2 properties on {task_id}: {e}")
 
         return task_id
     except Exception as e:
@@ -3592,7 +3720,7 @@ if __name__ == "__main__":
     parser.add_argument("--agent", default=None, help="Target agent (auto-routed if omitted)")
     parser.add_argument("--source", default="cli", help="Task source")
     parser.add_argument("--skill-hint", default=None, help="Explicit skill hint (overrides auto-detection)")
-    parser.add_argument("--force-claude-code", action="store_true", help="Prepend Claude Code ACP invocation instruction")
+    parser.add_argument("--force-claude-code", action="store_true", help="Prepend Claude Code invocation instruction")
     parser.add_argument("--notify-on-complete", action="store_true", help="Send Signal notification when task completes")
     parser.add_argument("--notify-channel", default="signal", help="Notification channel (default: signal)")
     parser.add_argument("--notify-target", default="+19194133445", help="Notification target (default: +19194133445)")

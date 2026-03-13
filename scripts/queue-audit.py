@@ -206,10 +206,11 @@ def original_name(done_filename):
     """Strip .done suffixes to get original pending filename."""
     name = done_filename
 
-    # Step 1: Remove -DISPATCHED-TO-ACP prefix (ACP dispatch marker)
-    if name.endswith("-DISPATCHED-TO-ACP.done.md"):
-        name = name[:-len("-DISPATCHED-TO-ACP.done.md")] + ".md"
-        return name
+    # Step 1: Remove dispatch markers (supports legacy ACP and new format)
+    for suffix in ["-DISPATCHED-TO-ACP.done.md", "-DISPATCHED.done.md"]:
+        if name.endswith(suffix):
+            name = name[:-len(suffix)] + ".md"
+            return name
 
     # Step 2: Must end with .done.md to be a done file
     if not name.endswith(".done.md"):

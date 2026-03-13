@@ -29,8 +29,8 @@ BRAINSTORM_LOG = LOGS_DIR / "kurultai-brainstorm.log"
 BRAINSTORM_COOLDOWN = LOGS_DIR / "brainstorm-cooldown.json"
 BRAINSTORM_DOMAIN_ROTATION = LOGS_DIR / "brainstorm-domain-rotation.json"
 
-# Valid agent names (tolui excluded: uses ollama executor, not claude-agent)
-VALID_AGENTS = frozenset({"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"})
+# Valid agent names (all agents in kurultai.json)
+VALID_AGENTS = frozenset({"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"})
 DISPATCH_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
 # Agent routing keywords (canonical source)
@@ -70,7 +70,8 @@ AGENT_KEYWORDS = {
                "incident", "status", "queue", "pipeline", "watchdog", "cleanup",
                "disk", "memory", "process", "fix", "error", "failure", "deploy",
                "railway", "domain", "generate", "api", "auth", "401", "log", "report",
-               "configure", "vercel", "server", "gateway", "timeout", "recover"],
+               "configure", "vercel", "server", "gateway", "timeout", "recover",
+               "throughput", "failure rate", "fleet"],  # ops metrics (2026-03-12)
     "kublai": ["triage", "coordinate", "prioritize", "system-wide", "assessment", "status assessment",
                "agent status", "backlog", "routing", "dispatch", "workload"],
     "tolui": ["truth", "honest", "brutal", "verify", "completion", "fake", "bs", "quality gate",
@@ -214,6 +215,9 @@ REVIEW_TIMEOUT = 120  # generate_hourly_report.py
 
 # Rate Limiting
 MAX_RATE_LIMIT_RETRIES = 1  # Only retry once with fallback model
+
+# Valid Claude model IDs (single source of truth)
+VALID_CLAUDE_MODELS = frozenset({'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'})
 
 
 # =============================================================================

@@ -49,6 +49,9 @@ from kurultai_paths import AGENTS_DIR, VALID_AGENTS as VALID_AGENTS_SET
 VALID_AGENTS = list(VALID_AGENTS_SET)
 
 # Configuration
+# TODO: Import from kurultai_paths.py (canonical: CLAUDE_TIMEOUT = 7200).
+#   This value matches CLAUDE_TIMEOUT and represents the max expected execution time
+#   before flagging as stale. Keep in sync with kurultai_paths.CLAUDE_TIMEOUT.
 STALE_EXECUTING_AGE_SECONDS = 7200  # 2 hours
 ZOMBIE_GRACE_PERIOD_SECONDS = 60  # 1 minute: allow handlers to exit gracefully after task completion
 

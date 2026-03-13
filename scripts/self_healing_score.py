@@ -6,6 +6,9 @@ Calculates percentage of issues auto-resolved vs. escalated.
 Tracks healing events and produces metrics on system self-healing effectiveness.
 """
 
+# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
+from __future__ import annotations
+
 import json
 import os
 import sys

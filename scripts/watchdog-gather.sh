@@ -176,8 +176,10 @@ fi
 # SECTION 2: Health Endpoint (with latency)
 # ============================================================
 HEALTH_RESULT=$(curl -s -o /dev/null -w "%{http_code} %{time_total}" \
-    --max-time 5 http://127.0.0.1:18789/health 2>/dev/null || echo "000 0")
+    --max-time 5 http://127.0.0.1:18789/health 2>/dev/null || echo "0 0")
 HTTP=$(echo "$HEALTH_RESULT" | awk '{print $1}')
+# Sanitize: curl returns "000" on connection failure (invalid JSON) - force to integer
+HTTP=$((10#$HTTP))  # Strip leading zeros (base 10), e.g., 000 -> 0
 LATENCY_S=$(echo "$HEALTH_RESULT" | awk '{print $2}')
 LATENCY_MS=$(echo "$LATENCY_S" | awk '{printf "%.0f", $1 * 1000}')
 
@@ -814,8 +816,17 @@ fi
 # Stale claims occur from handler timeouts, manual kills, network issues, etc.
 # The 10-minute age threshold prevents clearing active legitimate claims.
 #
-STALE_CLAIMS_OUTPUT=$(python3 "$SCRIPTS/clear_stale_claims.py" 2>/dev/null || echo "")
-STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -o "cleared=[0-9]*" | cut -d= -f2 || echo "0")
+STALE_CLAIMS_OUTPUT=$(python3 -c "
+import sys
+sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_v2_core import TaskStore
+s = TaskStore()
+orphans = s.recover_orphans(grace_minutes=10)
+for o in orphans: print(f\"Recovered: {o['task_id']} ({o.get('assigned_to','?')})\")
+if not orphans: print('No stale claims')
+s.close()
+" 2>/dev/null || echo "Neo4j unavailable")
+STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -o "cleared=[0-9]*" | head -1 | cut -d= -f2 || echo "0")
 if [ "${STALE_CLAIMS_CLEARED:-0}" -gt 0 ]; then
     echo "[$TS] STALE_CLAIM_CLEANUP | cleared $STALE_CLAIMS_CLEARED stale claim(s)" >> "$WATCHDOG_LOG"
 fi
@@ -857,7 +868,7 @@ RSS_MB=$(( ${RSS:-0} / 1024 ))
 # ============================================================
 # WRITE 1: Append to ticks.jsonl
 # ============================================================
-printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_minutes":%s,"last_epoch":%s},"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s","cloudflared":"%s","cloudflared_pid":"%s","recovery":{"neo4j":{"attempted":%s,"result":"%s"},"cloudflared":{"attempted":%s,"result":"%s"}}},"credentials":{"fleet_health":"%s","valid":%s,"invalid":%s,"missing":%s},"auth_heartbeat":{"failed_checks":%s},"circuit_breaker":{"recovered":%s,"still_open":%s},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"resolution":{"compliance_pct":%s,"with":%s,"without":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
+printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_minutes":%s,"last_epoch":%s},"gateway":{"status":"%s","pid":"%s","http":%s,"latency_ms":%s,"uptime_s":%s,"instance_count":%s},"process":{"cpu_pct":%s,"mem_pct":%s,"rss_kb":%s,"threads":%s},"errors":{"last_5m":%s,"last_1h":%s,"fatal_5m":%s},"services":{"neo4j":"%s","redis":"%s","cloudflared":"%s","cloudflared_pid":"%s","recovery":{"neo4j":{"attempted":%s,"result":"%s"},"cloudflared":{"attempted":%s,"result":"%s"}}},"credentials":{"fleet_health":"%s","valid":%s,"invalid":%s,"missing":%s},"auth_heartbeat":{"failed_checks":%s},"circuit_breaker":{"recovered":%s,"still_open":%s},"tasks":{"pending":%s,"dispatched":%s,"spawn_ready":%s,"queues":"%s","audit":{"verified":%s,"fake_found":%s,"requeued":%s,"llm_decision":"%s","llm_confidence":%s},"vote_sync_count":%s},"subprocess":{"executing":%s,"alive":%s,"dead":%s,"stale":%s,"zombies":%s,"orphaned":%s,"anomalies":%s},"resolution":{"compliance_pct":%s,"with":%s,"without":%s},"routing":{"queue_balance_index":%s,"missed_opportunities":%s,"routing_accuracy":%s,"time_to_start_p95":%s,"total_routed":%s},"trends":{"uptime_pct_1h":%s,"avg_cpu_1h":%s,"avg_latency_1h":%s,"err_avg_5m":%s,"err_direction":"%s","restarts_1h":%s},"throughput":{"anomaly_type":"%s","severity":"%s","consecutive":%s},"decision":"%s","action":"%s","reason":"%s"}\n' \
     "$TS_ISO" "$EPOCH" "$MODEL" "$GAP_DETECTED" "${GAP_MINUTES:-0}" "$LAST_EPOCH" \
     "$GW_STATUS" "$PIDS" "$HTTP" "$LATENCY_MS" "${UPTIME_S:-0}" "${GW_COUNT:-1}" \
     "${CPU:-0}" "${MEM:-0}" "${RSS:-0}" "${THREADS:-0}" \
@@ -872,6 +883,7 @@ printf '{"ts":"%s","epoch":%s,"model":"%s","heartbeat":{"gap_detected":%s,"gap_m
     "$RESOLUTION_COMPLIANCE" "$RESOLUTION_WITH" "$RESOLUTION_WITHOUT" \
     "$ROUTING_BALANCE_IDX" "$ROUTING_MISSED" "$ROUTING_ACCURACY" "$ROUTING_P95" "$ROUTING_TOTAL" \
     "$UPTIME_1H" "$AVG_CPU_1H" "$AVG_LAT_1H" "$ERR_AVG_5M" "$ERR_DIRECTION" "$RESTARTS_1H" \
+    "${THROUGHPUT_ANOMALY_TYPE:-}" "${THROUGHPUT_SEVERITY:-}" "${THROUGHPUT_CONSECUTIVE:-0}" \
     "$STATUS" "$ACTION" "$REASON" >> "$TICKS"
 
 # ============================================================
@@ -897,7 +909,19 @@ printf 'TICK %s\nMODEL: %s (LLM triage)\nHEARTBEAT: gap_detected=%s gap_minutes=
     "$STATUS" "$ACTION" "$REASON" > "$SUMMARY"
 
 # Append STALL_WARNINGs for tasks idle > 60 minutes
-STALL_OUTPUT=$(python3 "$SCRIPTS/stall_detector.py" 2>/dev/null)
+STALL_OUTPUT=$(python3 -c "
+import sys
+sys.path.insert(0, '$SCRIPTS_DIR')
+from neo4j_v2_core import TaskStore
+s = TaskStore()
+tasks = s.get_agent_tasks('', status='WORKING')
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc)
+for t in tasks:
+    if t.get('lease_expires_at') and t['lease_expires_at'] < now.isoformat():
+        print(f\"STALL: {t['task_id']} on {t.get('assigned_to','?')}\")
+s.close()
+" 2>/dev/null || echo "Neo4j unavailable")
 if [ -n "$STALL_OUTPUT" ]; then
     echo "$STALL_OUTPUT" >> "$SUMMARY"
 fi
@@ -1372,6 +1396,12 @@ fi
 # STALE LOCK CLEANUP: Remove orphaned session lock files
 # Runs every 5 minutes to prevent "session file locked" errors
 # ============================================================
+# TODO(2026-03-12): system-health-check.py (cron id: 26e111ed) also calls
+# stale-lock-cleanup.py every 5 min (systemEvent, no LLM cost). It adds
+# git-operation-monitor.py which watchdog lacks, plus gateway/neo4j/redis/
+# website HTTP checks. Overlap is CPU-only (both are systemEvent), so
+# leaving both active. If consolidating later, merge git ops monitoring
+# here and disable the separate cron entry.
 python3 "$BASE/scripts/stale-lock-cleanup.py" --json >> "$BASE/logs/stale-lock-cleanup.log" 2>&1
 
 # KUBLAI ACTIONS: Rule-based actions (safety net, runs alongside LLM triage)

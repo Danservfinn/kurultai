@@ -88,8 +88,11 @@ Violating this rule wastes compute and violates human operator authority.
 """
     
     try:
-        from prepare_reflection_context import generate_context
-        context = generate_context(agent, hours=hours)
+        from neo4j_v2_reflection import prepare_reflection
+        from neo4j_v2_core import TaskStore
+        store = TaskStore()
+        context = prepare_reflection(store, agent, hours=hours)
+        store.close()
     except Exception as e:
         context = f"*Protocol context unavailable: {e}*\n"
 

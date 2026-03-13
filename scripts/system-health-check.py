@@ -312,12 +312,33 @@ def create_notification(issues: list[str], severity: str = "MEDIUM"):
     """
     Create a task for Ogedei if there are health issues.
     Uses task_intake.py if available.
+
+    CIRCULAR CASCADE PREVENTION (2026-03-12): If ogedei is already failing,
+    route to jochi instead to break the circular failure cascade.
     """
     task_intake = BASE_DIR / "scripts" / "task_intake.py"
 
     if not task_intake.exists():
         log("task_intake.py not found - skipping notification", "WARN")
         return False
+
+    # CIRCULAR CASCADE PREVENTION: Check if ogedei is failing
+    _OGEDEI_FAILURE_THRESHOLD = 0.5
+    _target_agent = "ogedei"
+    _watchdog_state = LOGS_DIR / "ogedei-watchdog-state.json"
+
+    try:
+        if _watchdog_state.exists():
+            with open(_watchdog_state) as f:
+                state = json.load(f)
+            flags = state.get("agent_failure_flags", {})
+            ogedei_failure = flags.get("ogedei", 0.0)
+            if ogedei_failure >= _OGEDEI_FAILURE_THRESHOLD:
+                log(f"CIRCULAR CASCADE PREVENTION: ogedei failure flag={ogedei_failure:.2f} >= {_OGEDEI_FAILURE_THRESHOLD}", "WARN")
+                log(f"  Routing health alert to jochi instead of ogedei to break cascade", "WARN")
+                _target_agent = "jochi"
+    except Exception:
+        pass  # Default to ogedei if state read fails
 
     body = "## System Health Check Failed\n\n**Issues Detected:**\n" + "\n".join(f"- {issue}" for issue in issues)
     body += f"\n\n**Severity:** {severity}\n**Time:** {datetime.now(timezone.utc).isoformat()}"
@@ -328,7 +349,7 @@ def create_notification(issues: list[str], severity: str = "MEDIUM"):
             str(task_intake),
             "--title", f"System Health Alert ({len(issues)} issue{'s' if len(issues) > 1 else ''})",
             "--body", body,
-            "--agent", "ogedei",
+            "--agent", _target_agent,
             "--priority", "high" if severity == "HIGH" else "normal",
             "--source", "system-health-check"
         ]
@@ -336,7 +357,7 @@ def create_notification(issues: list[str], severity: str = "MEDIUM"):
 
         # task_intake.py outputs text, check for "CREATED:" in output
         if result.returncode == 0 and "CREATED:" in result.stdout:
-            log(f"Task created for Ogedei: {len(issues)} health issue(s)", "INFO")
+            log(f"Task created for {_target_agent}: {len(issues)} health issue(s)", "INFO")
             return True
         else:
             log(f"Failed to create task: returncode={result.returncode}", "ERROR")

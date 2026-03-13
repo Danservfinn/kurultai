@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-11T00:32:29.711570",
+  "timestamp": "2026-03-12T17:03:50.380588",
   "scanned_agents": [
     "kublai",
     "temujin",
@@ -8,20 +8,30 @@
     "jochi",
     "ogedei"
   ],
-  "found": 1,
-  "created": 1,
+  "found": 2,
+  "created": 2,
   "tasks": [
     {
-      "path": "/Users/kublai/.openclaw/agents/ogedei/tasks/ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done.md",
-      "filename": "ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done.md",
-      "task_id": "ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done",
+      "path": "/Users/kublai/.openclaw/agents/jochi/tasks/high-1773227787.failed.revision-1.resolved.done.md",
+      "filename": "high-1773227787.failed.revision-1.resolved.done.md",
+      "task_id": "high-1773227787.failed.revision-1.resolved.done",
       "title": "Unknown",
-      "priority": "critical",
+      "priority": "high",
+      "original_agent": "jochi",
+      "missing_since": "2026-03-11T07:22:25.904451"
+    },
+    {
+      "path": "/Users/kublai/.openclaw/agents/ogedei/tasks/normal-1773227787.failed.revision-1.failed.done.md",
+      "filename": "normal-1773227787.failed.revision-1.failed.done.md",
+      "task_id": "normal-1773227787.failed.revision-1.failed.done",
+      "title": "Unknown",
+      "priority": "normal",
       "original_agent": "ogedei",
-      "missing_since": "2026-03-09T01:41:00.682731"
+      "missing_since": "2026-03-11T07:29:20.450958"
     }
   ],
   "created_tasks": [
-    "/Users/kublai/.openclaw/agents/ogedei/tasks/critical-fix-resolution-ESCALATE-stale-task-kublai-\"high\"-fix-resolution-\"autoresearch-coordination-1772985003\"-213e7b6e-20260309-003033.resolved.false-positive.done-79cbff96.md"
+    "/Users/kublai/.openclaw/agents/jochi/tasks/high-fix-resolution-high-1773227787.failed.revision-1.resolved.done-8a26352c.md",
+    "/Users/kublai/.openclaw/agents/ogedei/tasks/normal-fix-resolution-normal-1773227787.failed.revision-1.failed.done-ba5fd873.md"
   ]
 }

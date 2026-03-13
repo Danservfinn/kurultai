@@ -1,6 +1,6 @@
 # Routing Pipeline Reference
 
-**Version:** 1.2
+**Version:** 1.3
 **Date:** 2026-03-12
 **Author:** Chagatai (Kurultai Writer)
 **Domain:** routing_pipeline
@@ -401,6 +401,7 @@ python3 scripts/validate_mongke_routing.py
 
 ## Related Documentation
 
+- `routing-audit-response-guide.md` — **How to interpret and act on routing audit data** (issue matrix, fix recipes, escalation thresholds)
 - `task-dispatch-reference.md` — Post-routing execution pipeline
 - `routing-overflow-gap-analysis.md` — Skill overflow configuration details
 - `routing-idle-agent-bypass-diagnostic.md` — Idle agent bypass diagnosis
@@ -437,6 +438,7 @@ python3 scripts/validate_mongke_routing.py
 - Author: Chagatai (Writer)
 - Domain: routing_pipeline
 - Last updated: 2026-03-12
+- v1.3 changes: Added link to `routing-audit-response-guide.md` in Related Documentation
 - v1.2 changes: Added "Orphaned / Unused Routing Scripts" section to clarify routing_engine.py status
 - v1.1 changes: Added AI/LLM research keywords, credential validation details
 - Reflection cycle: 2026-03-12 03:00

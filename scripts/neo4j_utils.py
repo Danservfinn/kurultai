@@ -5,19 +5,30 @@ Neo4j Utilities - Shared helper functions for Neo4j operations.
 This module provides common utilities used across Neo4j store classes:
 - JSON field parsing with safe fallbacks
 - Connection management helpers
+- Safe Neo4j operations with graceful degradation
 
 Usage:
-    from neo4j_utils import parse_json_field, parse_json_fields
+    from neo4j_utils import parse_json_field, parse_json_fields, safe_neo4j_op
 
     # Parse a single field
     data = parse_json_field(record.get("metadata"), default={})
 
     # Parse multiple fields in a dict
     record = parse_json_fields(record, ["communication_style", "preferences"])
+
+    # Safe Neo4j operation with fallback
+    result = safe_neo4j_op(lambda session: session.run("MATCH (n) RETURN n"))
 """
 
 import json
-from typing import Any, Dict, List, Optional, Union
+import os
+import logging
+from typing import Any, Callable, Dict, List, Optional, Union, TypeVar
+
+logger = logging.getLogger(__name__)
+
+# Type variable for return values
+T = TypeVar('T')
 
 
 def parse_json_field(
@@ -130,3 +141,164 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return float(value) if value is not None else default
     except (ValueError, TypeError):
         return default
+
+
+class Neo4jUnavailableError(Exception):
+    """Raised when Neo4j is unavailable and fallback mode is active."""
+    pass
+
+
+def check_neo4j_available() -> bool:
+    """Check if Neo4j is available without raising exceptions.
+
+    Returns:
+        True if Neo4j is reachable, False otherwise
+    """
+    try:
+        from neo4j import GraphDatabase
+
+        uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
+        user = os.environ.get('NEO4J_USER', 'neo4j')
+
+        # Handle both NEO4J_PASSWORD and NEO4J_AUTH formats
+        if 'NEO4J_AUTH' in os.environ:
+            password = os.environ.get('NEO4J_AUTH', '').split('://')[1].split('@')[0]
+        else:
+            password = os.environ.get('NEO4J_PASSWORD', 'password')
+
+        # Quick connectivity check with short timeout
+        driver = GraphDatabase.driver(
+            uri,
+            auth=(user, password),
+            connection_timeout=3,  # Short timeout for health check
+            max_connection_lifetime=1
+        )
+        with driver.session() as session:
+            session.run("RETURN 1 as test").consume()
+        driver.close()
+        return True
+    except Exception as e:
+        logger.debug(f"Neo4j health check failed: {e}")
+        return False
+
+
+def safe_neo4j_op(
+    operation: Callable,
+    fallback: T = None,
+    silent: bool = False,
+    log_error: bool = True
+) -> Union[T, Any]:
+    """Execute a Neo4j operation with graceful degradation.
+
+    When Neo4j is unavailable, returns the fallback value instead of
+    raising an exception. This enables filesystem-only mode for research
+    and analysis tasks.
+
+    Args:
+        operation: Callable that takes a Neo4j session and returns a value
+                   Signature: operation(session) -> result
+        fallback: Value to return when Neo4j is unavailable (default: None)
+        silent: If True, suppress warning messages (default: False)
+        log_error: If True, log errors (default: True)
+
+    Returns:
+        Result of operation if Neo4j available, otherwise fallback value
+
+    Examples:
+        >>> # Simple query with list fallback
+        >>> results = safe_neo4j_op(
+        ...     lambda s: list(s.run("MATCH (t:Task) RETURN t")),
+        ...     fallback=[]
+        ... )
+
+        >>> # Single record with dict fallback
+        >>> task = safe_neo4j_op(
+        ...     lambda s: s.run("MATCH (t:Task {id: $id}) RETURN t", id=123).single(),
+        ...     fallback=None
+        ... )
+
+        >>> # Write operation (returns success status)
+        >>> success = safe_neo4j_op(
+        ...     lambda s: s.run("CREATE (n:Task {id: $id})", id=123),
+        ...     fallback=False
+        ... ) is not False
+    """
+    try:
+        from neo4j import GraphDatabase
+
+        uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
+        user = os.environ.get('NEO4J_USER', 'neo4j')
+
+        # Handle both NEO4J_PASSWORD and NEO4J_AUTH formats
+        if 'NEO4J_AUTH' in os.environ:
+            password = os.environ.get('NEO4J_AUTH', '').split('://')[1].split('@')[0]
+        else:
+            password = os.environ.get('NEO4J_PASSWORD', 'password')
+
+        driver = GraphDatabase.driver(
+            uri,
+            auth=(user, password),
+            connection_timeout=5,
+            max_connection_lifetime=60
+        )
+
+        try:
+            with driver.session() as session:
+                return operation(session)
+        finally:
+            driver.close()
+
+    except Exception as e:
+        if log_error:
+            logger.warning(f"Neo4j unavailable, using fallback: {e}")
+        if not silent:
+            import warnings
+            warnings.warn(
+                f"Neo4j unavailable - running in filesystem-only mode. Error: {e}",
+                UserWarning,
+                stacklevel=2
+            )
+        return fallback
+
+
+def execute_query_cypher(
+    query: str,
+    params: Optional[Dict[str, Any]] = None,
+    fallback: T = None,
+    single: bool = False
+) -> Union[T, Any]:
+    """Execute a Cypher query with safe fallback.
+
+    Convenience wrapper around safe_neo4j_op for simple query execution.
+
+    Args:
+        query: Cypher query string
+        params: Query parameters (default: None)
+        fallback: Value to return when Neo4j unavailable (default: None)
+        single: If True, return single() result; otherwise return list of records
+
+    Returns:
+        Query result or fallback value
+
+    Examples:
+        >>> # Get all tasks
+        >>> tasks = execute_query_cypher(
+        ...     "MATCH (t:Task) RETURN t",
+        ...     fallback=[]
+        ... )
+
+        >>> # Get single task
+        >>> task = execute_query_cypher(
+        ...     "MATCH (t:Task {id: $id}) RETURN t",
+        ...     params={"id": "123"},
+        ...     fallback=None,
+        ...     single=True
+        ... )
+    """
+    def op(session):
+        result = session.run(query, params or {})
+        if single:
+            return result.single()
+        return list(result)
+
+    return safe_neo4j_op(op, fallback=fallback)

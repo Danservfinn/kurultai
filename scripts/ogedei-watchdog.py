@@ -2,8 +2,8 @@
 """
 Ogedei Watchdog — Persistent quality-assurance daemon for the Kurultai.
 
-Runs every 30 seconds between tock cycles. Fourteen checks per cycle:
-  1. check_watcher_alive()         — pgrep task-watcher.py + log mtime
+Runs every 30 seconds between tock cycles. Seventeen checks per cycle:
+  1. check_watcher_alive()         — pgrep neo4j_v2_executor + log mtime
   2. check_stalled_tasks()         — .executing.md files > 15 min old
   3. verify_recent_completions()   — new .done.md → check for real Claude Code execution + quality gate
   4. periodic_queue_audit()        — full queue_audit.audit() every 30 min
@@ -12,11 +12,16 @@ Runs every 30 seconds between tock cycles. Fourteen checks per cycle:
   7. check_memory_health()         — memory_audit.py every 30 min (contamination, bloat, rules)
   8. check_routing_drift()         — keyword vs actual routing drift every 30 min
   9. check_agent_failure_rates()   — 1h failure rate per agent, writes health flags every 5 min
+  9b. check_credential_failures()  — AUTH/PROXY_AUTH detection, O006 auth_health_preflight.py trigger
  10. check_queue_balance()         — auto-redistribute tasks from overloaded to underloaded agents
  11. check_cascade_risk()          — detect cascade failure patterns every 10 min
  12. check_quality_gate()          — verify completion quality on recent .done.md files
  13. update_self_healing_score()   — track and report self-healing metrics every hour
  14. check_watchdog_health()       — internal watchdog health check
+ 15. check_circuit_breaker_health() — proactive circuit breaker state transitions
+ 16. check_git_operations()        — autonomous git activity monitoring
+ 17. check_proactive_health_patrol() — O003/O006 activation: fleet health patrol when idle
+ 18. check_model_drift()             — O001 detection: session model vs config model mismatch
 
 False Positive Prevention:
   The escalation system skips tasks with terminal state patterns in their filenames:
@@ -136,8 +141,8 @@ sys.stderr.reconfigure(line_buffering=True)
 SCRIPTS_DIR = Path(__file__).parent
 STATE_FILE = LOGS_DIR / "ogedei-watchdog-state.json"
 LOG_FILE = LOGS_DIR / "ogedei-watchdog.log"
-WATCHER_PLIST = "com.kurultai.task-watcher"
-WATCHER_LOG = LOGS_DIR / "task-watcher.log"
+WATCHER_PLIST = "com.kurultai.v2-executor"
+WATCHER_LOG = LOGS_DIR / "neo4j-v2-executor.log"
 
 POLL_INTERVAL = 30        # seconds
 STALE_EXECUTING_SECS = 900  # 15 minutes
@@ -229,13 +234,13 @@ except Exception as e:
 # Check 1: Is task-watcher alive?
 # ============================================================
 def check_watcher_alive(state):
-    """Verify task-watcher.py is running and its log is fresh."""
+    """Verify neo4j_v2_executor is running and its log is fresh."""
     issues = []
 
     # Check process
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "task-watcher.py"],
+            ["pgrep", "-f", "neo4j_v2_executor"],
             capture_output=True, text=True, timeout=5
         )
         alive = result.returncode == 0
@@ -244,7 +249,7 @@ def check_watcher_alive(state):
 
     if not alive:
         log("WATCHER DOWN — attempting restart via launchctl", "WARN")
-        issues.append("task-watcher not running")
+        issues.append("neo4j_v2_executor not running")
         try:
             result = subprocess.run(
                 ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{WATCHER_PLIST}"],
@@ -264,7 +269,7 @@ def check_watcher_alive(state):
         age = time.time() - WATCHER_LOG.stat().st_mtime
         if age > WATCHER_LOG_MAX_AGE:
             log(f"WATCHER LOG STALE — {age:.0f}s old (threshold: {WATCHER_LOG_MAX_AGE}s)", "WARN")
-            issues.append(f"task-watcher log stale ({age:.0f}s)")
+            issues.append(f"neo4j_v2_executor log stale ({age:.0f}s)")
 
     return issues
 
@@ -1164,6 +1169,150 @@ GIT_SPIKE_THRESHOLD = 5             # commits per hour to trigger alert
 GIT_STALE_BRANCH_DAYS = 7           # days before branch is considered stale
 GIT_LARGE_DELETION_THRESHOLD = 100  # files deleted in single commit to alert
 
+# Check 17: Proactive health patrol (O003/O006 activation)
+PROACTIVE_PATROL_INTERVAL = 1800    # 30 minutes between proactive patrol checks
+PROACTIVE_PATROL_COOLDOWN = LOGS_DIR / "ogedei-proactive-patrol-cooldown.json"
+PROACTIVE_PATROL_IDLE_MINUTES = 30  # Only patrol if no cascade activity for 30 min
+
+# Check 18: Session model drift detection (O001)
+MODEL_DRIFT_INTERVAL = 1800         # 30 minutes between model drift checks
+TOCK_LATEST_FILE = LOGS_DIR / "tock" / "latest.json"
+MODEL_DRIFT_FLEET_THRESHOLD = 3     # Escalate if >= 3 agents have model drift
+
+
+def check_model_drift(state):
+    """Detect session model vs config model mismatch fleet-wide (O001 anomaly).
+
+    Reads the latest tock snapshot and checks each agent's session.model against
+    config_model.resolved. A mismatch means the agent is running under a different
+    model than configured (e.g., glm-5 instead of claude-opus-4-6), which silently
+    degrades task quality.
+
+    Fleet-wide drift (>= MODEL_DRIFT_FLEET_THRESHOLD agents mismatched) triggers
+    an O001 escalation task routed to kublai for credential/config investigation.
+    """
+    issues = []
+    now = time.time()
+    last_check = state.get("last_model_drift_check", 0)
+
+    if (now - last_check) < MODEL_DRIFT_INTERVAL:
+        return issues
+
+    state["last_model_drift_check"] = now
+
+    if not TOCK_LATEST_FILE.exists():
+        return issues
+
+    try:
+        with open(str(TOCK_LATEST_FILE), "r") as f:
+            tock = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        log(f"MODEL_DRIFT: Cannot read tock snapshot: {e}", "WARN")
+        return issues
+
+    tock_age_s = now - TOCK_LATEST_FILE.stat().st_mtime
+    if tock_age_s > 3600:
+        log(f"MODEL_DRIFT: Tock snapshot is {tock_age_s/60:.0f}m old, skipping drift check", "WARN")
+        return issues
+
+    agents_data = tock.get("agents", {})
+    drifted = []
+    checked = 0
+
+    for agent, data in agents_data.items():
+        session = data.get("session", {})
+        config_model = data.get("config_model", {})
+
+        session_model = session.get("model", "none")
+        resolved_model = config_model.get("resolved", "unknown")
+        session_match = config_model.get("session_match", True)
+
+        # Only flag agents that have an active session (model != "none")
+        if session_model == "none":
+            continue
+
+        checked += 1
+        if not session_match:
+            drifted.append({
+                "agent": agent,
+                "session_model": session_model,
+                "config_model": resolved_model,
+            })
+            log(f"O001 MODEL_DRIFT: {agent} running {session_model!r} "
+                f"(configured: {resolved_model!r})", "WARN")
+            issues.append(f"O001 model drift: {agent} session={session_model} config={resolved_model}")
+
+    if not drifted:
+        if checked > 0:
+            log(f"MODEL_DRIFT: {checked} active agents — all session models match config", "INFO")
+        state["model_drift_last_clean"] = datetime.now().isoformat()
+        state["model_drift_drifted"] = []
+        return issues
+
+    # Persist drift summary to state for tock/dashboard consumption
+    state["model_drift_drifted"] = drifted
+    state["model_drift_checked"] = checked
+    state["model_drift_ts"] = datetime.now().isoformat()
+
+    drift_pct = len(drifted) / checked * 100 if checked else 0
+    log(f"O001 MODEL_DRIFT SUMMARY: {len(drifted)}/{checked} agents mismatched "
+        f"({drift_pct:.0f}%) — session model != configured model", "WARN")
+
+    # Fleet-wide drift escalation
+    if len(drifted) >= MODEL_DRIFT_FLEET_THRESHOLD:
+        drift_last_escalate = state.get("model_drift_last_escalate", 0)
+        if (now - drift_last_escalate) > 7200:  # 2-hour cooldown on escalation
+            _escalate_model_drift(drifted, state)
+            state["model_drift_last_escalate"] = now
+
+    return issues
+
+
+def _escalate_model_drift(drifted: list, state: dict):
+    """Create a kublai task to investigate fleet-wide model drift."""
+    try:
+        kublai_tasks_dir = AGENTS_DIR / "kublai" / "tasks"
+        kublai_tasks_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        task_path = kublai_tasks_dir / f"ogedei-model-drift-alert-{ts}.md"
+
+        drift_lines = "\n".join(
+            f"  - {d['agent']}: session={d['session_model']!r} config={d['config_model']!r}"
+            for d in drifted
+        )
+        content = f"""# Task: Investigate Fleet-Wide Model Drift (O001)
+
+**Priority:** HIGH
+**Source:** ogedei-watchdog check_model_drift()
+**Detected:** {datetime.now().isoformat()}
+
+## Problem
+
+{len(drifted)} agents are running under a different model than their configured model.
+This silently degrades task quality (e.g., glm-5 producing lower quality output than claude-opus-4-6).
+
+## Drifted Agents
+
+{drift_lines}
+
+## Investigation Steps
+
+1. Check `~/.openclaw/agents/{{agent}}/config.json` vs active session model in tock snapshot
+2. Verify credential provider resolves to correct model (Z.AI/DashScope maps differently)
+3. Check `~/.openclaw/kurultai.json` primary/fallback model config
+4. If Z.AI fallback is active, confirm model mapping in provider config
+
+## Success Criteria
+
+- All active agents' session models match their configured models
+- Tock snapshot shows session_match=true for all agents with active sessions
+"""
+        with open(str(task_path), "w") as f:
+            f.write(content)
+        log(f"MODEL_DRIFT: Escalation task created → {task_path.name}", "WARN")
+    except Exception as e:
+        log(f"MODEL_DRIFT: Failed to create escalation task: {e}", "ERROR")
+
 
 def check_routing_drift(state):
     """Detect keyword routing vs actual routing disagreement.
@@ -1429,6 +1578,30 @@ def check_credential_failures(state):
         except Exception as e:
             log(f"Failed to write credential alerts: {e}", "ERROR")
 
+        # O006: Auth Health Gap Response — Run auth_health_preflight.py when credential failures detected
+        # This creates an ogedei task and logs auth failures for monitoring
+        try:
+            auth_script = Path(__file__).parent / "auth_health_preflight.py"
+            if auth_script.exists():
+                log("O006: Running auth_health_preflight.py --fix to assess and create task if needed", "WARN")
+                result = subprocess.run(
+                    [sys.executable, str(auth_script), "--fix"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                if result.returncode != 0:
+                    log(f"O006: auth_health_preflight.py detected issues (rc={result.returncode})", "WARN")
+                # Log output for debugging (limited)
+                if result.stdout:
+                    log(f"O006: {result.stdout.strip()[:200]}", "WARN")
+            else:
+                log(f"O006: auth_health_preflight.py not found at {auth_script}", "ERROR")
+        except subprocess.TimeoutExpired:
+            log("O006: auth_health_preflight.py timed out", "ERROR")
+        except Exception as e:
+            log(f"O006: Failed to run auth_health_preflight.py: {e}", "ERROR")
+
     state["last_cred_failure_check"] = now
     return issues
 
@@ -1691,6 +1864,8 @@ def check_quality_gate(state):
                     ".verified.failed.done.",    # Verified failure
                     ".resolved.",                # Escalations that were resolved
                     ".orphan-resolved.",         # Orphan tasks that were resolved
+                    ".failed.done.",             # Task crashed/failed — quality checks are irrelevant
+                    ".no_output.done.",          # No output captured — nothing to grade
                 )):
                     continue
 
@@ -1987,6 +2162,121 @@ def check_git_operations(state):
 
 
 # ============================================================
+# Check 17: Proactive health patrol (O003/O006 activation)
+# ============================================================
+def check_proactive_health_patrol(state):
+    """Generate proactive 'fleet health patrol' task when ogedei is idle.
+
+    Implements O003/O006 rules: When ogedei's queue is empty AND no cascade
+    detections in 30 minutes, auto-create a fleet health patrol task to:
+    - Check auth health (credential expiry, token validity)
+    - Check cron gaps (tick/tock schedule drift)
+    - Check session bloat (stale .jsonl files)
+
+    This ensures the ops agent adds value during steady-state periods
+    instead of being completely idle.
+    """
+    issues = []
+    now = time.time()
+    now_dt = datetime.now()
+
+    # Check cooldown
+    last_patrol = state.get("last_proactive_patrol", 0)
+    if (now - last_patrol) < PROACTIVE_PATROL_INTERVAL:
+        return issues
+
+    # Check if ogedei's queue is empty
+    ogedei_tasks_dir = AGENTS_DIR / "ogedei" / "tasks"
+    pending_count = 0
+    if ogedei_tasks_dir.exists():
+        for f in ogedei_tasks_dir.iterdir():
+            name = f.name
+            if name.endswith(".md") and not any(
+                tag in name for tag in [".done", ".failed", ".completed", ".verified", ".rerouted", ".absorbed", ".executing"]
+            ):
+                pending_count += 1
+
+    # Only patrol if queue is empty (or very small)
+    if pending_count > 2:
+        log(f"Proactive patrol: skipping (ogedei has {pending_count} pending)")
+        return issues
+
+    # Check cascade activity - only patrol if quiet for 30+ minutes
+    last_cascade = state.get("last_cascade_check", 0)
+    cascade_quiet_minutes = (now - last_cascade) / 60
+    if cascade_quiet_minutes < PROACTIVE_PATROL_IDLE_MINUTES:
+        log(f"Proactive patrol: skipping (cascade check {cascade_quiet_minutes:.0f}min ago)")
+        return issues
+
+    # Also check if we recently had any cascade risk
+    cascade_risk = state.get("cascade_risk", "low")
+    if cascade_risk in ["medium", "high"]:
+        log(f"Proactive patrol: skipping (cascade risk={cascade_risk})")
+        return issues
+
+    log("Proactive patrol: ogedei idle, cascade quiet — creating fleet health patrol task")
+
+    # Create the patrol task
+    try:
+        from task_intake import create_task
+
+        patrol_topics = [
+            "1. Auth health: Check for credential failures in logs/credential-alerts.json",
+            "2. Cron gaps: Verify tick/tock schedules are running on time",
+            "3. Session bloat: Check sessions/ for stale .jsonl files >24h old",
+            "4. Circuit breaker: Verify all agents are CLOSED (not OPEN/HALF_OPEN)",
+            "5. Neo4j health: Check connection pool and recent query latency",
+        ]
+
+        task_body = f"""# Fleet Health Patrol
+
+This is a proactive health patrol task generated by ogedei-watchdog during idle periods.
+
+**Context:** Ogedei queue was empty ({pending_count} pending) and no cascade activity for {cascade_quiet_minutes:.0f} minutes.
+
+**Checks to perform:**
+
+{chr(10).join(patrol_topics)}
+
+**Deliverables:**
+- Summary of any issues found
+- Recommended actions if issues detected
+- Update self-healing score if auto-recovery actions taken
+
+**Skills:** Use /kurultai-health for comprehensive system status.
+"""
+
+        task_id = create_task(
+            title="Fleet Health Patrol — Proactive Ops Check",
+            body=task_body,
+            priority="low",
+            source="ogedei_proactive_patrol",
+            agent="ogedei",
+            skill_hint="/kurultai-health"
+        )
+
+        state["last_proactive_patrol"] = now
+        state["proactive_patrols"] = state.get("proactive_patrols", 0) + 1
+        log(f"Created fleet health patrol task: {task_id}")
+        issues.append("proactive_patrol_created")
+
+        # Record this as a healing event (proactive monitoring)
+        record_healing(
+            issue_type="proactive_patrol",
+            action="auto_created",
+            outcome="success",
+            agent="ogedei",
+            details={"task_id": task_id, "pending_before": pending_count}
+        )
+
+    except Exception as e:
+        log(f"Failed to create proactive patrol task: {e}", "ERROR")
+        issues.append(f"proactive_patrol_error: {e}")
+
+    return issues
+
+
+# ============================================================
 # Main cycle
 # ============================================================
 def run_cycle():
@@ -2006,6 +2296,7 @@ def run_cycle():
     all_issues.extend(check_routing_drift(state))
     all_issues.extend(check_agent_failure_rates(state))
     all_issues.extend(check_credential_failures(state))
+    all_issues.extend(check_model_drift(state))
     all_issues.extend(check_queue_balance(state))
 
     # P2 enhancement checks
@@ -2015,6 +2306,9 @@ def run_cycle():
     all_issues.extend(check_circuit_breaker_health(state))
     all_issues.extend(check_watchdog_health(state))
     all_issues.extend(check_git_operations(state))
+
+    # P3 proactive ops (O003/O006 activation)
+    all_issues.extend(check_proactive_health_patrol(state))
 
     state["cycles"] = state.get("cycles", 0) + 1
     state["last_cycle"] = datetime.now().isoformat()

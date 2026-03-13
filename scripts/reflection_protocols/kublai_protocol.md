@@ -86,6 +86,7 @@ REPORT_LOG:
 GRADE: [A-F or INCOMPLETE]
 KEY_FINDING: [one-line summary of most important finding]
 ISSUE: [most significant issue, or NONE]
+PRIORITY_FIX: [specific action to address /horde-review findings, or NONE]
 RULE: [new WHEN/THEN rule, or NONE]
 SKILLS_USED: [comma-separated list of skills invoked]
 ```

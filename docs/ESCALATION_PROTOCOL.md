@@ -24,7 +24,7 @@
 | Scenario | Example | Action |
 |----------|---------|--------|
 | **System Down** | Neo4j/Redis unreachable >30m, tick gap >10min | Ögedei watchdog → Kublai escalates |
-| **Throughput Collapse** | HIGH_FAILURE_RATE for 3+ consecutive ticks (15min) | Kublai → Human immediately |
+| **Throughput Collapse** | HIGH_FAILURE_RATE for 3+ consecutive ticks (15min) | Kublai → Human immediately (see [fleet-failure-triage.md](fleet-failure-triage.md)) |
 | **Agent Stall** | Agent stuck EXECUTING >90min (STALE threshold) | Kublai → Human + restart investigation |
 | **Security Breach** | API keys leaked, unauthorized access | Kublai → Human + revoke access |
 | **Data Loss** | Neo4j corruption, orphaned tasks >100 | Kublai → Human + backup restore |

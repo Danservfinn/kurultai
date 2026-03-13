@@ -1,0 +1,99 @@
+# Hourly Kurultai Reflection Report -- 2026-03-12 15:15
+
+**Model:** glm-5
+
+**Pipeline duration:** 637s
+**Steps:** anomaly-scanner(1s), reflection-research-persist(1s), rule-compliance(0s), session-drift-detect(0s), task-metrics(0s), voting-phase2-start(0s), voting-phase2b-cast-votes(0s), voting-phase3-consensus(0s), voting-phase4-tasks(0s), cross-agent-rules(0s), memory-audit-fix(0s), agent-rules-evaluator(0s), capability-scores(0s), action-scorer(0s), kublai-actions(0s), kublai-initiative(1s), report-analysis(0s), routing-audit(0s), score-skills(0s), update-skill-stats(0s), kurultai-report(30s), hourly-report(0s)
+
+## 1. Agent Reflections Summary
+
+### Temujin (Developer (code, builds, infrastructure))
+- **Grade:** N/A | Review Score: 7/10
+- **Metrics:** 0 completed, 0 failed, 0 queued
+- **Findings:** See memory file
+- **Priority Fix:** Fix gateway-router load balancing to prioritize healthy agents (temujin CLOSED) over failing agents 
+
+### Mongke (Researcher (web research, API discovery))
+- **Grade:** N/A | Review Score: N/A
+- **Metrics:** 0 completed, 0 failed, 0 queued
+- **Findings:** See memory file
+- **Priority Fix:** **Implement pre-emptive skill invocation in task handler** — The `agent-task-handler.py` should auto
+
+### Chagatai (Writer (documentation, creative content))
+- **Grade:** N/A | Review Score: 4/10
+- **Metrics:** 0 completed, 0 failed, 0 queued
+- **Findings:** See memory file
+- **Priority Fix:** **
+
+### Jochi (Analyst (testing, security, pattern recognition))
+- **Grade:** N/A | Review Score: 6/10
+- **Metrics:** 0 completed, 0 failed, 0 queued
+- **Findings:** See memory file
+- **Priority Fix:** **Verify jochi's credential fallback chain is operational** — The settings.json lacks explicit `ANTH
+
+### Ogedei (Ops (monitoring, health checks, failover))
+- **Grade:** N/A | Review Score: 4/10
+- **Metrics:** 0 completed, 0 failed, 0 queued
+- **Findings:** See memory file
+- **Priority Fix:** ** **Force immediate skill invocation at task start** — Ogedei must invoke the Skill tool with the `
+
+### Kublai (Squad Lead)
+- **Grade:** N/A
+- **Findings:** See memory file
+
+## 2. Proposals Generated
+
+**9 proposals** in last 2 hours:
+
+1. **[chagatai]** Fix title-domain conflict false positives for skill-hinted tasks
+   Domain: routing_pipeline | Status: YES
+2. **[mongke]** Fix M003 Rules Self-Check path bug in agent-task-handler.py
+   Domain: routing_pipeline | Status: YES
+3. **[jochi]** Fix UnboundLocalError in TICK fleet anomaly detection
+   Domain: routing_pipeline | Status: YES
+4. **[kublai]** Fix variable scope bug in CRITICAL fleet anomaly rule that caused TICK degradati
+   Domain: routing_pipeline | Status: YES
+5. **[ogedei]** Add HALF_OPEN timeout recovery to prevent circuit breaker deadlock
+   Domain: pipeline_throughput | Status: YES
+6. **[temujin]** Fix malformatted tick JSON causing health monitoring blindness
+   Domain: pipeline_throughput | Status: YES
+7. **[jochi]** Add explicit task completion template enforcement to jochi's CLAUDE.md
+   Domain: pipeline_throughput | Status: YES
+8. **[chagatai]** Critical task for ogedei to fix fleet-wide model configuration mismatch
+   Domain: pipeline_throughput | Status: YES
+9. **[mongke]** Add M008 Hard Pre-Submit Gate rule to enforce quality checks before task complet
+   Domain: pipeline_throughput | Status: YES
+
+## 3. Kublai Decisions
+
+No proposal decisions this cycle.
+
+## 4. Tasks Created
+
+**10 tasks** created in last 2 hours:
+
+- [normal-17733] Audit active rules and proposals for relevance and completio -> kublai [normal] (skill: /horde-implement)
+- [normal-17733] Review routing audit findings and implement improvements -> temujin [normal] (skill: /horde-implement)
+- [high-1773328] Investigate mongke task failures (5 in last 1h) -> jochi [high] (skill: /systematic-debugging)
+- [normal-17733] Research refresh: Verify hypothesis 'Added fallback mechanis -> mongke [normal] (skill: /horde-learn)
+- [normal-17733] Research: Market analysis for 44 recent proposals -> mongke [normal] (skill: /horde-learn)
+- [high-1773327] CRITICAL: Investigate fleet-wide HIGH_FAILURE_RATE + CIRCUIT -> ogedei [high] (skill: /kurultai-health)
+- [normal-17733] Self-Wake -- Execute Blocked Items -> temujin [normal]
+- [normal-17733] Research refresh: Verify hypothesis 'Added fallback mechanis -> mongke [normal] (skill: /horde-learn)
+- [normal-17733] Research: Market analysis for 40 recent proposals -> mongke [normal] (skill: /horde-learn)
+- [high-1773325] CRITICAL: Investigate fleet-wide HIGH_FAILURE_RATE - 1773325 -> ogedei [high] (skill: /kurultai-health)
+
+## 5. Skills Invocation Tracking
+
+- protocol_reflections: 6 agents (kublai, temujin, mongke, chagatai, jochi, ogedei)
+- horde_review: 5 agents (temujin, mongke, chagatai, jochi, ogedei)
+- cross_agent_rules: 1
+- capability_scores: 1
+- routing_audit: 1
+- kublai_actions: 1
+- kublai_initiative: 1
+- kurultai_report: 1
+- horde_brainstorming: 6 agents (kublai, temujin, chagatai, mongke, jochi, ogedei)
+
+---
+*Generated by generate_hourly_report.py at 15:15*

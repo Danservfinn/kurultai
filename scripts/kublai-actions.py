@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -61,6 +62,8 @@ COOLDOWNS = {
     "feedback_review": 7200,   # 2 hours
     "queue_audit": 1800,       # 30 min
     "resolution_compliance": 3600,  # 1 hour (2026-03-11)
+    "critical_fleet_anomaly": 1800,  # 30 min (2026-03-12) — CRITICAL fleet investigation
+    "queue_overflow_acceptance": 900,  # 15 min (2026-03-12) — K004 queue overflow absorption
 }
 
 MAX_ACTIONS_PER_CYCLE = 3
@@ -88,6 +91,73 @@ def route_by_text(text):
     """Lightweight keyword routing for programmatic task creation."""
     from task_intake import route_by_text as _route
     return _route(text)
+
+
+def _attempt_dispatch_restart(log_fn):
+    """Directly check and restart the v2-executor (task dispatch) service.
+
+    Called when PENDING_NO_DISPATCH is CRITICAL and investigation tasks are
+    also pending (circular stall — creating more tasks won't help when the
+    dispatch mechanism itself is down).
+
+    Returns: str — "restarted", "already_running", or "failed:<reason>"
+    """
+    service = "com.kurultai.v2-executor"
+    uid = os.getuid()
+
+    try:
+        # Check if service is loaded and running via tabular list format.
+        # `launchctl list | grep <service>` outputs: <PID|->\t<exit_code>\t<label>
+        # PID is a number when running, "-" when loaded-but-not-running.
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True, text=True, timeout=10
+        )
+
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if service in line:
+                    parts = line.split()
+                    if parts and parts[0].isdigit():
+                        log_fn(f"DISPATCH_RESTART: v2-executor already running (PID={parts[0]}), "
+                               f"dispatch stall is not a launchd issue — investigate task files")
+                        return "already_running"
+                    break  # Found the service entry but no PID — proceed to kickstart
+
+        # Service not running — attempt kickstart
+        log_fn("DISPATCH_RESTART: v2-executor not responding, attempting kickstart...")
+        kick = subprocess.run(
+            ["launchctl", "kickstart", "-k", f"gui/{uid}/{service}"],
+            capture_output=True, text=True, timeout=15
+        )
+
+        if kick.returncode == 0:
+            log_fn("DISPATCH_RESTART: SUCCESS — v2-executor restarted via launchctl kickstart")
+            return "restarted"
+
+        # Kickstart failed — try bootstrap from plist
+        plist_path = os.path.expanduser(f"~/Library/LaunchAgents/{service}.plist")
+        if os.path.exists(plist_path):
+            boot = subprocess.run(
+                ["launchctl", "bootstrap", f"gui/{uid}", plist_path],
+                capture_output=True, text=True, timeout=15
+            )
+            if boot.returncode == 0:
+                log_fn("DISPATCH_RESTART: SUCCESS — v2-executor bootstrapped via launchctl bootstrap")
+                return "restarted"
+            log_fn(f"DISPATCH_RESTART: FAILED — kickstart={kick.returncode}, "
+                   f"bootstrap={boot.returncode}: {kick.stderr.strip()}")
+            return f"failed:kickstart={kick.returncode}"
+
+        log_fn(f"DISPATCH_RESTART: FAILED — plist not found at {plist_path}")
+        return "failed:no_plist"
+
+    except subprocess.TimeoutExpired:
+        log_fn("DISPATCH_RESTART: TIMEOUT — launchctl command timed out")
+        return "failed:timeout"
+    except Exception as e:
+        log_fn(f"DISPATCH_RESTART: ERROR — {e}")
+        return f"failed:{e}"
 
 
 def has_pending_task(agent, title_prefix):
@@ -336,45 +406,38 @@ OpenClaw gateway RSS is {rss_mb:.0f}MB (threshold: 900MB).
     # Rule 6: Time-to-first-action stall detection
     if actions_created < MAX_ACTIONS_PER_CYCLE:
         try:
-            from stall_detector import detect_stalls
-            stall_warnings = detect_stalls()
-            for warning in stall_warnings:
-                # Parse agent and task filename from "STALL_WARNING: <agent> idle <minutes>m on "<title>" (file: <task_filename>)"
-                # Example: STALL_WARNING: temujin idle 65m on "Fix authentication bug" (file: high-1234567890-abcd1234.md)
-                parts = warning.split()
-                if len(parts) < 2:
-                    continue
-                stalled_agent = parts[1]
+            from neo4j_v2_core import TaskStore
+            def detect_stalls_v2():
+                store = TaskStore()
+                try:
+                    orphans = store.recover_orphans(grace_minutes=15)
+                    return [{"task_id": t["task_id"], "agent": t.get("assigned_to", "unknown"),
+                             "warning": f"Stalled task recovered: {t['task_id']}"} for t in orphans]
+                finally:
+                    store.close()
+            stall_warnings = detect_stalls_v2()
+            for stall in stall_warnings:
+                stalled_agent = stall.get("agent", "unknown")
+                task_id = stall.get("task_id", "unknown")
+                warning_text = stall.get("warning", f"Stalled task: {task_id}")
 
-                # Extract task filename for task-specific cooldown (prevents escalation loops)
-                # Format: (file: <filename>) at the end
-                task_filename = None
-                if "(file:" in warning:
-                    start_idx = warning.index("(file:") + 6
-                    end_idx = warning.rindex(")")
-                    if end_idx > start_idx:
-                        task_filename = warning[start_idx:end_idx].strip()
-
-                # Use task-specific cooldown key to prevent repeated escalations for same stalled task
-                # Falls back to agent-level if filename extraction fails
-                cooldown_key = f"task_stall:{stalled_agent}:{task_filename}" if task_filename else f"task_stall:{stalled_agent}"
+                # Use task-specific cooldown key to prevent repeated escalations
+                cooldown_key = f"task_stall:{stalled_agent}:{task_id}"
 
                 # Route investigation away from the stalled agent
                 target = "kublai" if stalled_agent == "jochi" else "jochi"
 
                 # Check: not in cooldown, no existing investigation for THIS specific stalled task
                 pending_title = f"Investigate stalled task: {stalled_agent}"
-                if task_filename:
-                    pending_title += f" {task_filename[:20]}"  # Unique per stalled task
 
                 if not is_cooled_down(cooldown_key) and not has_pending_task(target, pending_title) and actions_created < MAX_ACTIONS_PER_CYCLE:
                     create_task(
                         target, "normal",
-                        f"Investigate stalled task: {stalled_agent}{' ' + task_filename if task_filename else ''}",
+                        f"Investigate stalled task: {stalled_agent} {task_id[:20]}",
                         f"""## Context
-{warning}
+{warning_text}
 
-An active task has been sitting for over 60 minutes with no workspace artifact produced.
+An active task has been sitting for over 15 minutes with no progress.
 This likely indicates a stuck execution, a task that was never picked up, or a silent failure.
 
 ## Action Required
@@ -388,9 +451,8 @@ This likely indicates a stuck execution, a task that was never picked up, or a s
                     )
                     mark_fired(cooldown_key)
                     actions_created += 1
-        except ImportError:
-            pass  # stall_detector not available
         except Exception as e:
+            stall_warnings = []
             log(f"TICK: stall detection error: {e}")
 
     # Rule 7: Low resolution compliance — trigger fix-missing-resolutions
@@ -421,6 +483,187 @@ This will:
         )
         mark_fired("resolution_compliance")
         actions_created += 1
+
+    # Rule 8: CRITICAL fleet anomaly auto-investigation (R013/K009)
+    # FIX 2026-03-12: Addresses "92% failure rate persisted 10+ ticks without investigation" incident
+    # FIX 2026-03-12 12:35: Implements adaptive cooldown based on cumulative CRITICAL duration
+    # Creates direct investigation task when CRITICAL severity detected, bypassing message dispatch
+    CRITICAL_STATE_FILE = str(LOGS_DIR / "critical-anomaly-state.json")
+
+    def get_critical_state():
+        """Load or initialize CRITICAL anomaly tracking state."""
+        try:
+            with open(CRITICAL_STATE_FILE) as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {
+                "current_anomaly": None,
+                "started_at": None,
+                "total_duration_seconds": 0,
+                "tasks_created": 0,
+                "last_task_at": None
+            }
+
+    def save_critical_state(state):
+        """Save CRITICAL anomaly tracking state."""
+        try:
+            os.makedirs(os.path.dirname(CRITICAL_STATE_FILE), exist_ok=True)
+            with open(CRITICAL_STATE_FILE, "w") as f:
+                json.dump(state, f, indent=2)
+        except OSError:
+            pass  # State persistence is optional
+
+    def get_adaptive_cooldown(duration_minutes):
+        """
+        Return cooldown based on cumulative CRITICAL duration.
+        - First 30 min: 5 min cooldown (rapid response)
+        - 30-60 min: 10 min cooldown (continued vigilance)
+        - 60+ min: 15 min cooldown (persistent issue)
+        This ensures long-running CRITICAL states get more frequent investigation.
+        """
+        if duration_minutes < 30:
+            return 300   # 5 minutes
+        elif duration_minutes < 60:
+            return 600   # 10 minutes
+        else:
+            return 900   # 15 minutes
+
+    try:
+        throughput = tick.get("throughput", {})
+        anomaly_type = throughput.get("anomaly_type", "")
+        severity = throughput.get("severity", "")
+        consecutive = throughput.get("consecutive", 0)
+        failure_rate = throughput.get("failure_rate", 0)
+
+        # CRITICAL triggers: HIGH_FAILURE_RATE, AUTH_HEARTBEAT failure, or circuit-breaker stuck
+        auth_heartbeat_failed = tick.get("auth_heartbeat", {}).get("failed_checks", 0)
+        circuit_stuck = tick.get("circuit_breaker", {}).get("still_open", 0)
+
+        # Expanded CRITICAL detection: check severity OR direct metrics
+        # This catches cases where severity field is missing but metrics are critical
+        is_critical = (
+            severity == "CRITICAL" or
+            (failure_rate >= 75 and consecutive >= 3) or  # 3+ ticks of 75%+ failure
+            auth_heartbeat_failed >= 1 or
+            circuit_stuck >= 1
+        )
+
+        # Initialize anomaly_desc BEFORE conditional to prevent UnboundLocalError
+        # FIX 2026-03-12: Addresses "cannot access local variable 'anomaly_desc'" error in TICK logs
+        anomaly_desc = "NONE"
+
+        if is_critical:
+            # Build anomaly description
+            anomaly_desc = anomaly_type if anomaly_type else "UNKNOWN"
+            if auth_heartbeat_failed >= 1:
+                anomaly_desc += " + AUTH_HEARTBEAT_FAILURE"
+            if circuit_stuck >= 1:
+                anomaly_desc += " + CIRCUIT_BREAKER_STUCK"
+            if failure_rate >= 75 and severity != "CRITICAL":
+                anomaly_desc += f" (failure_rate={failure_rate}%, consecutive={consecutive})"
+
+            # Load and update CRITICAL state tracking
+            state = get_critical_state()
+            now = time.time()
+
+            # Check if this is the same anomaly or a new one
+            if state["current_anomaly"] == anomaly_desc and state["started_at"]:
+                # Same anomaly - update duration
+                duration_so_far = (now - state["started_at"]) + state["total_duration_seconds"]
+            else:
+                # New anomaly - reset tracking
+                state["current_anomaly"] = anomaly_desc
+                state["started_at"] = now
+                state["total_duration_seconds"] = 0
+                state["tasks_created"] = 0
+                state["last_task_at"] = None
+                duration_so_far = 0
+
+            # Calculate adaptive cooldown based on cumulative duration
+            adaptive_cooldown = get_adaptive_cooldown(duration_so_far / 60)
+
+            # Check if we should create a task
+            should_create = False
+            if state["last_task_at"] is None:
+                # First task for this anomaly - create immediately
+                should_create = True
+            elif (now - state["last_task_at"]) >= adaptive_cooldown:
+                # Cooldown expired - create another task
+                should_create = True
+
+            if should_create and actions_created < MAX_ACTIONS_PER_CYCLE:
+                # Idempotency guard: skip if jochi already has a pending CRITICAL investigation.
+                # Task titles include a timestamp suffix making them unique, so has_pending_task()
+                # won't catch duplicates without this prefix-based check.
+                # This prevents queue spam when the anomaly outlasts task processing time.
+                # ROUTE TO JOCHI (not ogedei): When HIGH_FAILURE_RATE fires, ogedei is likely
+                # the failing agent. Routing the investigation back to ogedei creates a circular
+                # cascade. jochi (analyst) investigates fleet-wide issues instead.
+                if has_pending_task("jochi", "CRITICAL ("):
+                    log(f"TICK: CRITICAL ({anomaly_desc}) — jochi already has pending CRITICAL task, skipping (idempotency guard)")
+                    # Recovery path: when PENDING_NO_DISPATCH is stuck AND the investigation task
+                    # is also pending, creating more tasks won't help — directly restart the
+                    # dispatch service. This breaks the circular stall without queue dependency.
+                    if "PENDING_NO_DISPATCH" in anomaly_desc:
+                        restart_result = _attempt_dispatch_restart(log)
+                        log(f"TICK: PENDING_NO_DISPATCH direct recovery attempted: {restart_result}")
+                else:
+                    escalation_level = 1 + (state["tasks_created"] // 3)  # Escalate every 3 tasks
+                    create_task(
+                        "jochi", "high",
+                        f"CRITICAL ({escalation_level}{'st' if escalation_level == 1 else 'nd' if escalation_level == 2 else 'rd' if escalation_level == 3 else 'th'}): Investigate fleet-wide {anomaly_desc} - {int(now)}",
+                        f"""## Context
+CRITICAL fleet anomaly detected — requires immediate investigation.
+
+**Anomaly Type:** {anomaly_desc}
+**Severity:** {severity if severity else 'CRITICAL (detected from metrics)'}
+**Failure Rate:** {failure_rate}%
+**Consecutive Ticks:** {consecutive}
+**Auth Heartbeat Failures:** {auth_heartbeat_failed}
+**Circuit Breaker Stuck:** {circuit_stuck}
+
+**Anomaly Duration:** {duration_so_far / 60:.1f} minutes (cumulative)
+**Tasks Created for This Anomaly:** {state['tasks_created'] + 1}
+**Escalation Level:** {escalation_level}
+
+## Action Required
+1. **Check AUTH_HEARTBEAT:** Run `python3 scripts/credential-health-monitor.py`
+   - Verify all agents have valid API credentials
+   - Check for DashScope vs Anthropic token issues
+2. **Check circuit-breaker state:** Read `logs/circuit-breaker-state.json`
+   - If stuck_open >= 1, reset via `python3 scripts/reset-circuit-breaker.py`
+3. **Review recent task failures:** Check `logs/failure-patterns.jsonl`
+4. **Verify model configuration:** Check `~/.openclaw/agents/*/config.json`
+5. **Report findings** and fix or escalate
+
+This is an automated rule (K009/R013) with adaptive cooldown.
+Next task will be created in {adaptive_cooldown / 60:.0f} minutes if CRITICAL persists.
+""",
+                        source="critical-fleet-rule",
+                    )
+                    state["tasks_created"] += 1
+                    state["last_task_at"] = now
+                    save_critical_state(state)
+                    actions_created += 1
+                    log(f"TICK: CRITICAL anomaly detected — created investigation task for {anomaly_desc} (duration: {duration_so_far / 60:.1f}m, tasks: {state['tasks_created']}, cooldown: {adaptive_cooldown / 60:.0f}m)")
+            else:
+                time_since_last = now - state["last_task_at"] if state["last_task_at"] else adaptive_cooldown
+                log(f"TICK: CRITICAL anomaly ({anomaly_desc}) detected — next task in {max(0, adaptive_cooldown - time_since_last) / 60:.1f}m (duration: {duration_so_far / 60:.1f}m)")
+        else:
+            # Anomaly cleared - reset state
+            state = get_critical_state()
+            if state["current_anomaly"]:
+                log(f"TICK: CRITICAL anomaly ({state['current_anomaly']}) cleared after {(time.time() - state['started_at']) / 60:.1f}m")
+                state["current_anomaly"] = None
+                state["started_at"] = None
+                state["total_duration_seconds"] = 0
+                state["tasks_created"] = 0
+                state["last_task_at"] = None
+                save_critical_state(state)
+
+    except Exception as e:
+        log(f"TICK: CRITICAL fleet anomaly rule ERROR: {e}")
+        # Don't let this rule failure crash the entire tick_actions() function
 
     if actions_created >= MAX_ACTIONS_PER_CYCLE:
         log(f"TICK: hit MAX_ACTIONS_PER_CYCLE={MAX_ACTIONS_PER_CYCLE}, stopping early")
@@ -505,6 +748,73 @@ Last duration: {job.get('last_duration_ms', 0)}ms
         log(f"TOCK: queue_backlog detected: {total_pending} pending ({backlog_detail}) — logging only, not creating task")
         mark_fired("queue_backlog")
 
+    # Rule 2c (PRIORITY_FIX 2026-03-12): Queue Overflow Acceptance (K004)
+    # When kublai is idle AND multiple agents are overloaded, kublai CLAIMS tasks
+    # from overloaded agents instead of creating new triage tasks.
+    # This implements /horde-review PRIORITY_FIX: "kublai acts as active coordinator,
+    # not passive message-forwarder"
+    kublai_queue = 0
+    kublai_data = agents.get("kublai", {})
+    kublai_tasks = kublai_data.get("tasks", {})
+    kublai_queue = kublai_tasks.get("queue_depth", 0)
+
+    # Find overloaded agents (queue >= 4)
+    overloaded_agents = []
+    for agent_name, agent_data in agents.items():
+        if agent_name == "kublai":
+            continue
+        agent_queue = agent_data.get("tasks", {}).get("queue_depth", 0)
+        if agent_queue >= 4:
+            overloaded_agents.append((agent_name, agent_queue))
+
+    # Trigger condition: kublai queue < 2 AND 2+ agents have queue >= 4
+    if kublai_queue < 2 and len(overloaded_agents) >= 2 and not is_cooled_down("queue_overflow_acceptance"):
+        # Import move_task from task-redistribute
+        try:
+            from task_redistribute import move_task, get_pending_tasks
+
+            moved_count = 0
+            max_to_claim = 3  # Don't take too many at once
+
+            for overloaded_agent, agent_queue in overloaded_agents:
+                if moved_count >= max_to_claim:
+                    break
+
+                # Get pending tasks from overloaded agent
+                pending = get_pending_tasks(overloaded_agent)
+                if not pending:
+                    continue
+
+                # Take the oldest task (first in queue)
+                src_path, title, content, domain = pending[0]
+
+                # Check if kublai can handle this task (coordination/routing domain)
+                # kublai can handle: coordination, routing, queue analysis, triage
+                kublai_domains = {"coordination", "routing", "queue", "monitor", "health", "ops"}
+                can_handle = domain in kublai_domains or any(
+                    kw in title.lower() for kw in ["triage", "queue", "status", "review", "investigate", "coordinate"]
+                )
+
+                if can_handle:
+                    success, result = move_task(src_path, "kublai", dry_run=False)
+                    if success:
+                        log(f"QUEUE_OVERFLOW_ACCEPTANCE: Claimed task '{title[:50]}' from {overloaded_agent} (queue={agent_queue}) -> kublai (queue={kublai_queue})")
+                        moved_count += 1
+                    else:
+                        log(f"QUEUE_OVERFLOW_ACCEPTANCE: Failed to move task from {overloaded_agent}: {result}")
+
+            if moved_count > 0:
+                mark_fired("queue_overflow_acceptance")
+                log(f"QUEUE_OVERFLOW_ACCEPTANCE: kublai claimed {moved_count} task(s) from {len(overloaded_agents)} overloaded agent(s)")
+            else:
+                # No movable tasks found - log but don't create triage task
+                log(f"QUEUE_OVERFLOW_ACCEPTANCE: Detected {len(overloaded_agents)} overloaded agents but no movable tasks found (kublai queue={kublai_queue})")
+
+        except ImportError as e:
+            log(f"QUEUE_OVERFLOW_ACCEPTANCE: Failed to import task_redistribute: {e}")
+        except Exception as e:
+            log(f"QUEUE_OVERFLOW_ACCEPTANCE: Error claiming tasks: {e}")
+
     # Rule 2b: Queue audit — fake completions detected
     queue_audit = tock.get("queue_audit", {})
     audit_requeued = queue_audit.get("requeued", 0)
@@ -549,8 +859,8 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
                     if fname.startswith('.'):
                         continue
                     # Check for terminal state patterns
-                    if any(fname.endswith(pattern) for pattern in (
-                        ".done.md",           # All done states
+                    # FIX 2026-03-12: Use 'in' check for .done to catch .done-{uuid}.md variants
+                    if ".done" in fname or any(fname.endswith(pattern) for pattern in (
                         ".resolved.md",       # Resolved tasks
                         ".cancelled.md",      # Cancelled tasks
                         ".obsolete.md",       # Obsolete tasks

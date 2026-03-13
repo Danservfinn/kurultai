@@ -136,7 +136,7 @@ def add_rule(agent: str, text: str, source: str = "reflection",
 
     # Check for duplicates
     for r in data["rules"]:
-        if r["text"].lower().strip() == normalized:
+        if r.get("text", "").lower().strip() == normalized:
             # Reactivate if deprecated
             if r["status"] in ("deprecated", "pruned") and status == "active":
                 r["status"] = "active"
@@ -278,7 +278,7 @@ def _extract_and_add_rules(agent: str, filepath: Path) -> int:
         # Check if already exists
         data = load_rules(agent)
         normalized = rule_text.lower().strip()
-        exists = any(r["text"].lower().strip() == normalized for r in data["rules"])
+        exists = any(r.get("text", "").lower().strip() == normalized for r in data["rules"])
         if not exists:
             add_rule(agent, rule_text, source=f"seeded:{filepath.name}")
             added += 1

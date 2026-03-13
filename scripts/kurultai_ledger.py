@@ -36,7 +36,7 @@ VALID_EVENTS = {
     # Scoring and routing events
     "SCORED", "ACTION_SCORED", "QUEUED_REDISTRIBUTED",
     # Verification events
-    "VERIFIED", "VERIFICATION_FAILED",
+    "VERIFIED", "VERIFICATION_FAILED", "COMPLETION_GATE_BLOCKED", "PRE_SUBMIT_GATE_BLOCKED", "PRE_SUBMIT_GATE_BLOCKED_FALLBACK",
     # Skill events
     "SKILL_INVOCATION", "SKILL_OUTCOME", "SKILL_AGGREGATE",
     # Architecture and session events
@@ -48,16 +48,20 @@ VALID_EVENTS = {
     "COMPLETION_VERIFICATION_FAILED",
     # Model events
     "MODEL_USED", "MODEL_CONFIG_ERROR", "MODEL_FALLBACK", "MODEL_FALLBACK_FAILED",
-    "MODEL_FALLBACK_SUCCESS", "MODEL_DRIFT_REJECTED",
+    "MODEL_FALLBACK_SUCCESS", "MODEL_FALLBACK_BLOCKED", "MODEL_DRIFT_REJECTED",
     # Task state events
     "TASK_REPORT_GENERATED", "FAKE_COMPLETION_BLOCKED", "COMPLETED_MD_SUFFIX_BUG",
     "STALL_DETECTED", "GATE_PASSED", "RESOLVED", "RECOVERED",
+    "SOURCE_VALIDATION_BLOCKED", "DOMAIN_COMPLIANCE_REJECT", "PROXY_HEALTH_CHECK",
+    "O002_FAST_FAILURE_REQUIRES_INVESTIGATION",
     "GATE_FOLLOWUPS_CREATED", "ESCALATION_RESOLVED", "ESCALATION_CHAIN_RESOLVED",
     "REQUEUED", "ORPHAN_RESOLVED", "CANCELLED",
     "CIRCUIT_BREAKER_HALF_OPEN",
     # Rule enforcement events
-    "R008_VIOLATION", "R008_VIOLATION_TRACKED", "R008_PREFLIGHT_FAIL", "R008_PREFLIGHT_CHECK", "AUTH_PREFLIGHT_FAIL",
+    "R008_VIOLATION", "R008_VIOLATION_TRACKED", "R008_VIOLATION_TIMEOUT", "R008_PREFLIGHT_FAIL", "R008_PREFLIGHT_CHECK",
+    "AUTH_PREFLIGHT_FAIL", "STALL_SIGTERM",
     "R008_AUTO_INVOKE_SUCCESS", "R008_AUTO_INVOKE_FAILED", "R008_SKILL_NOT_INVOKED", "R008_SKILL_AUTO_INVOKED",
+    "R008_SKILL_NOT_FOUND",
     # Timeout events
     "TASK_TIMEOUT",
     # Test events (should not appear in production)
@@ -68,6 +72,7 @@ VALID_EVENTS = {
 SYSTEM_EVENTS = {
     "SESSION_AUTO_CLEANUP", "SESSION_RESET", "ARCH_UPDATE_CHECK",
     "AUTH_PREFLIGHT_FAIL",
+    "R008_VIOLATION_TIMEOUT",  # R008 enforcement events written from monitoring loop without task_id
 }
 
 # UUID pattern: 8-36 hex chars with optional dashes (legacy format)
@@ -168,76 +173,16 @@ def generate_correlation_id() -> str:
 # =============================================================================
 
 def append_ledger(entry: dict, validate: bool = True) -> bool:
-    """Append an event to the task ledger with exclusive file locking.
+    """No-op since Phase 5 cutover (2026-03-12).
 
-    Args:
-        entry: Event dictionary to append
-        validate: If True, validate event before appending (default True)
+    JSONL ledger writes are no longer needed — Neo4j is the sole source of truth.
+    All task lifecycle events are recorded as Neo4j nodes/properties by the v2 executor.
+    This function is kept as a no-op for backward compatibility with callers.
 
     Returns:
-        True on success, False on failure
+        True always (no-op).
     """
-    try:
-        # Validate event type first
-        event_type = entry.get("event")
-        if event_type and event_type not in VALID_EVENTS:
-            print(f"[LEDGER ERROR] Invalid event type: {event_type}", file=sys.stderr)
-            # Still write for audit trail, but mark as invalid
-            if "_validation_errors" not in entry:
-                entry["_validation_errors"] = []
-            entry["_validation_errors"].append(f"invalid event type: {event_type}")
-
-        # Validate task_id - add correlation_id if missing/unknown
-        # Exception: System-level events (SESSION_AUTO_CLEANUP, etc.) don't require task_id
-        task_id = entry.get("task_id")
-        event_type = entry.get("event")
-        is_system_event = event_type in SYSTEM_EVENTS
-        if not task_id or task_id == "unknown":
-            if not is_system_event:
-                # Log warning for task events without task_id
-                print(f"[LEDGER WARNING] Event without valid task_id: {event_type}", file=sys.stderr)
-            # Generate correlation ID for tracing (system events included)
-            if "_correlation_id" not in entry:
-                entry["_correlation_id"] = generate_correlation_id()
-        elif not validate_task_id(task_id):
-            # Non-canonical task_id format - warn but accept for audit trail
-            print(f"[LEDGER WARNING] Non-canonical task_id format: {task_id}", file=sys.stderr)
-            # Add to validation errors list if it exists, or create it
-            validation_errors = entry.get("_validation_errors", [])
-            validation_errors.append(f"non-canonical task_id format: {task_id}")
-            entry["_validation_errors"] = validation_errors
-
-        # Schema validation (optional, can be disabled for emergency writes)
-        if validate:
-            is_valid, errors = validate_event(entry)
-            if not is_valid:
-                print(f"[LEDGER ERROR] Invalid event: {'; '.join(errors)}", file=sys.stderr)
-                # Still write for audit trail, but mark as invalid
-                if "_validation_errors" not in entry:
-                    entry["_validation_errors"] = errors
-                else:
-                    # Merge errors, avoiding duplicates
-                    existing = set(entry["_validation_errors"])
-                    for e in errors:
-                        if e not in existing:
-                            entry["_validation_errors"].append(e)
-
-        # Ensure timestamp exists
-        if "ts" not in entry:
-            entry["ts"] = datetime.now().isoformat()
-
-        TASK_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-        with open(TASK_LEDGER, "a", encoding="utf-8") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            try:
-                f.write(json.dumps(entry) + "\n")
-                f.flush()
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
-        return True
-    except Exception as e:
-        print(f"[ledger] append failed: {e}", file=sys.stderr)
-        return False
+    return True
 
 
 def is_valid_event(entry: dict) -> bool:
@@ -266,52 +211,60 @@ def is_valid_event(entry: dict) -> bool:
 
 
 def read_ledger(hours: float | None = None, valid_only: bool = False) -> list:
-    """Read events from the task ledger with shared locking.
+    """Read task events from Neo4j (Phase 5 cutover 2026-03-12).
+
+    Delegates to neo4j_v2_ledger_compat which reads from Neo4j Task nodes
+    and returns events in the same JSONL-compatible format.
 
     Args:
         hours: Optionally filter to events within the last N hours
-        valid_only: If True, only return events that pass validation
+        valid_only: If True, only return core lifecycle events
 
     Returns:
-        List of events
+        List of events matching the JSONL ledger schema.
     """
-    if not TASK_LEDGER.exists():
-        return []
-    cutoff = None
-    if hours is not None:
-        cutoff = datetime.now() - timedelta(hours=hours)
-    events = []
     try:
-        with open(TASK_LEDGER, "r", encoding="utf-8") as f:
-            fcntl.flock(f, fcntl.LOCK_SH)
-            try:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        ev = json.loads(line)
-                        if cutoff is not None:
-                            ts_str = ev.get("ts", "")
-                            if ts_str:
-                                try:
-                                    ev_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                                    if ev_time.tzinfo:
-                                        if ev_time < cutoff:
-                                            continue
-                                    else:
-                                        if ev_time < cutoff.replace(tzinfo=None):
-                                            continue
-                                except (ValueError, TypeError):
-                                    pass  # Keep events with unparseable timestamps
-                        # Filter invalid events if requested
-                        if valid_only and not is_valid_event(ev):
-                            continue
-                        events.append(ev)
-                    except json.JSONDecodeError:
-                        continue
-            finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+        from neo4j_v2_ledger_compat import read_ledger as _v2_read
+        return _v2_read(hours=int(hours) if hours else None, valid_only=valid_only)
     except Exception as e:
-        print(f"[ledger] read failed: {e}", file=sys.stderr)
-    return events
+        print(f"[ledger] Neo4j read failed, falling back to JSONL: {e}", file=sys.stderr)
+        # Fallback to archived JSONL if Neo4j is unavailable
+        if not TASK_LEDGER.exists():
+            return []
+        cutoff = None
+        if hours is not None:
+            cutoff = datetime.now() - timedelta(hours=hours)
+        events = []
+        try:
+            with open(TASK_LEDGER, "r", encoding="utf-8") as f:
+                fcntl.flock(f, fcntl.LOCK_SH)
+                try:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            ev = json.loads(line)
+                            if cutoff is not None:
+                                ts_str = ev.get("ts", "")
+                                if ts_str:
+                                    try:
+                                        ev_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                                        if ev_time.tzinfo:
+                                            if ev_time < cutoff:
+                                                continue
+                                        else:
+                                            if ev_time < cutoff.replace(tzinfo=None):
+                                                continue
+                                    except (ValueError, TypeError):
+                                        pass
+                            if valid_only and not is_valid_event(ev):
+                                continue
+                            events.append(ev)
+                        except json.JSONDecodeError:
+                            continue
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        except Exception as e2:
+            print(f"[ledger] JSONL fallback also failed: {e2}", file=sys.stderr)
+        return events

@@ -14,6 +14,9 @@ JavaScript syntax errors cause the page to hang forever with HTTP 200.
 Run via cron every 5 minutes.
 """
 
+# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
+from __future__ import annotations
+
 import json
 import os
 import subprocess
@@ -35,8 +38,12 @@ LOG_FILE = LOG_DIR / "kurultai-monitor.log"
 STATE_FILE = LOG_DIR / "kurultai-monitor-state.json"
 
 # Thresholds
-FAILURE_WARNING_THRESHOLD = 1  # After 1 consecutive failure (5 min) → create task for Ogedei (reduced from 3 for faster detection)
-FAILURE_CRITICAL_THRESHOLD = 10  # After 10 consecutive failures (50 min) → escalate to Kublai
+# Updated 2026-03-12: Reduced false positives by increasing warning threshold
+# - Warning: 2 consecutive failures (10 min) → creates task for Ogedei
+# - Critical: 6 consecutive failures (30 min) → escalates to Kublai
+# Rationale: 1-failure threshold created tasks on transient blips
+FAILURE_WARNING_THRESHOLD = 2  # After 2 consecutive failures (10 min) → create task for Ogedei
+FAILURE_CRITICAL_THRESHOLD = 6  # After 6 consecutive failures (30 min) → escalate to Kublai
 
 # Timeouts (seconds)
 PAGE_LOAD_TIMEOUT = 15
@@ -191,11 +198,18 @@ def check_kurultai() -> tuple[bool, list[str], dict]:
                 e for e in console_errors
                 if not any(pattern.lower() in e.lower() for pattern in benign_patterns)
             ]
+            benign_errors = [
+                e for e in console_errors
+                if any(pattern.lower() in e.lower() for pattern in benign_patterns)
+            ]
 
             if critical_errors:
                 issues.append(f"JavaScript console errors: {len(critical_errors)}")
                 for error in critical_errors[:3]:  # Log first 3
                     issues.append(f"  - {error[:200]}")
+
+            # Store benign errors for diagnostics (logged but not flagged as issues)
+            metrics["benign_errors"] = benign_errors
 
             # Additional check: page title
             try:
@@ -344,7 +358,21 @@ def main():
     log(f"Load Time: {metrics.get('load_time_ms', 'N/A')}ms")
     log(f"Render Time: {metrics.get('render_time_ms', 'N/A')}ms")
     log(f"Board Found: {metrics.get('board_found', False)}")
-    log(f"Console Errors: {len(metrics.get('console_errors', []))}")
+
+    # Console errors breakdown
+    total_errors = len(metrics.get('console_errors', []))
+    benign_errors = metrics.get('benign_errors', [])
+    critical_count = total_errors - len(benign_errors)
+
+    log(f"Console Errors: {total_errors} (critical: {critical_count}, benign: {len(benign_errors)})")
+
+    # Log benign error details for diagnostics (help identify persistent errors)
+    if benign_errors:
+        for i, error in enumerate(benign_errors[:2], 1):  # Show first 2 benign errors
+            # Truncate to reasonable length and remove newlines
+            clean_error = error.replace('\n', ' ').strip()[:150]
+            log(f"  Benign [{i}]: {clean_error}")
+
     log(f"Console Warnings: {len(metrics.get('console_warnings', []))}")
 
     if is_healthy:
@@ -370,7 +398,10 @@ The website has recovered after being down.
 
 Site is now healthy. No action required.
 """
-            create_task("ogedei", "normal", f"the.kurult.ai recovered after {downtime} downtime", recovery_body)
+            # FIX (2026-03-12 ogedei): Log recovery instead of creating a task.
+            # Recovery notifications say "No action required" — dispatching them
+            # wastes agent time and gets blocked by domain validator.
+            log(f"✓ the.kurult.ai recovered after {downtime} downtime")
 
             # Reset state
             state["consecutive_failures"] = 0

@@ -129,6 +129,26 @@ ANTHROPIC_MODEL=glm-5
 - `/Users/kublai/.openclaw/agents/jochi/agent/models.json` (line 196)
 - `/Users/kublai/.openclaw/agents/ogedei/agent/models.json` (line 172)
 
+### 2026-03-12 09:35: Fleet-Wide Model Mismatch Detection
+**Issue:** /horde-review identified sessions running `qwen3.5-plus` when configs expect `claude-opus-4-6`
+**Symptoms:** 100% fleet failure rate (12/12 tasks), 185s SIGKILL timeouts, all agents idle
+**Detection:** Chagatai meta-reflection + /horde-review critical analysis
+**Action:** Created task `critical-model-mismatch-fleet-fix-1773321300` for ogedei
+**Required Fix:** Align 3 configuration layers (claude-agent wrapper, per-agent settings.json, agents_config.py)
+**Status:** 🔄 Task queued for ogedei
+**Files:**
+- `/Users/kublai/.openclaw/agents/ogedei/tasks/critical-model-mismatch-fleet-fix-20260312-093500.md`
+
+### 2026-03-12 11:30: Auth Preflight Cache TTL Extension
+**Issue:** Fleet-wide 100% failure rate caused by concurrent auth preflight timeouts
+**Root Cause:** AUTH_STALE_SECONDS=300 (5min) too short; parallel task executions with stale cache all trigger live auth checks simultaneously, causing resource contention and timeout cascade
+**Solution:** Increased AUTH_STALE_SECONDS from 300 to 900 (15 minutes) in agent-task-handler.py; increased AUTH_TIMEOUT from 15s to 30s in auth_health_preflight.py
+**Result:** Auth cache remains fresh longer, reducing concurrent live checks; auth_heartbeat (runs every 5min) keeps cache updated without triggering parallel checks
+**Status:** ✅ Implemented
+**Files:**
+- `scripts/agent-task-handler.py` (line 2326: AUTH_STALE_SECONDS = 900)
+- `scripts/auth_health_preflight.py` (line 37: AUTH_TIMEOUT = 30)
+
 ### 2026-03-07: Claude Code CLI Path Migration
 **Issue:** Agents using different CLAUDE_BIN paths
 **Solution:** Standardized on `/Users/kublai/.local/bin/claude`

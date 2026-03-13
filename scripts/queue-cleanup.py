@@ -279,6 +279,61 @@ def cleanup_old_unverified(dry_run=False, verbose=True):
     return removed
 
 
+def archive_done_tasks(dry_run=False, verbose=True):
+    """Archive .done.md, .failed.md, .completed.md files to reports/completed/.
+
+    Completed task files accumulate in the task queue and should be archived
+    to keep the queues clean and searchable. This runs every tock (30min).
+
+    Files are moved to: {AGENT_DIR}/reports/completed/{filename}
+    """
+    archived = 0
+
+    for agent in ["temujin", "mongke", "chagatai", "jochi", "ogedei", "kublai"]:
+        tasks_dir = AGENTS_DIR / agent / "tasks"
+        completed_dir = AGENTS_DIR / agent / "reports" / "completed"
+
+        if not tasks_dir.exists():
+            continue
+
+        # Ensure completed directory exists
+        completed_dir.mkdir(parents=True, exist_ok=True)
+
+        # Find all done/failed/completed files (skip .executing.md)
+        for pattern in ["*.done.md", "*.failed.md", "*.completed.md"]:
+            for f in tasks_dir.glob(pattern):
+                # Skip executing files and already-archived patterns
+                if ".executing.md" in f.name:
+                    continue
+                # Skip files that would be re-queued (e.g., .failed.done.md patterns that indicate retries)
+                if ".revision-" in f.name and ".failed." in f.name:
+                    # These are retry artifacts, keep them for routing
+                    continue
+
+                age_hours = get_file_age_hours(f)
+
+                # Archive if older than 1 hour (avoid race conditions with active completion)
+                if age_hours > 1:
+                    dest = completed_dir / f.name
+                    if not dry_run:
+                        try:
+                            # Handle name collisions - add timestamp if exists
+                            if dest.exists():
+                                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                                dest = completed_dir / f"{f.stem}-{timestamp}{f.suffix}"
+
+                            f.rename(dest)
+                            archived += 1
+                            log(f"ARCHIVED ({agent}): {f.name} -> reports/completed/ ({age_hours:.1f}h old)", verbose)
+                        except Exception as e:
+                            log(f"ERROR archiving {f.name}: {e}", verbose)
+                    else:
+                        log(f"DRY-RUN ARCHIVE ({agent}): {f.name} ({age_hours:.1f}h old)", verbose)
+                        archived += 1
+
+    return archived
+
+
 def main():
     parser = argparse.ArgumentParser(description='Queue cleanup for tock heartbeat')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be removed')
@@ -296,18 +351,21 @@ def main():
     esc_removed, esc_kept = cleanup_escalations(dry_run=args.dry_run, verbose=verbose)
     no_output_removed = cleanup_old_no_output(dry_run=args.dry_run, verbose=verbose)
     unverified_removed = cleanup_old_unverified(dry_run=args.dry_run, verbose=verbose)
-    
+    done_archived = archive_done_tasks(dry_run=args.dry_run, verbose=verbose)
+
     total_removed = esc_removed + no_output_removed + unverified_removed
-    
+    total_processed = total_removed + done_archived
+
     log("=" * 60, verbose)
-    log(f"CLEANUP COMPLETE: {total_removed} files removed, {esc_kept} escalations kept", verbose)
+    log(f"CLEANUP COMPLETE: {total_removed} files removed, {done_archived} archived, {esc_kept} escalations kept", verbose)
     log(f"  - Escalations removed: {esc_removed}", verbose)
     log(f"  - Old .no_output removed: {no_output_removed}", verbose)
     log(f"  - Old .unverified removed: {unverified_removed}", verbose)
+    log(f"  - Done tasks archived: {done_archived}", verbose)
     log("=" * 60, verbose)
     
     # Return summary for tock-gather integration
-    print(f"\nQUEUE_CLEANUP_SUMMARY: removed={total_removed}, kept={esc_kept}")
+    print(f"\nQUEUE_CLEANUP_SUMMARY: removed={total_removed}, archived={done_archived}, kept={esc_kept}")
     
     return 0
 

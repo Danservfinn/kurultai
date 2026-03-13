@@ -85,11 +85,39 @@ Real-time credential health monitoring that **tests actual authentication** (not
 - Queue audit system effectively identifying fake completions
 - Ledger reconciliation shows -15 delta (Neo4j vs actual ledger)
 
+## Circuit Breaker Stale State Bug (2026-03-12)
+
+**Problem:** `last_failure_rate` values stuck at 1.0 even for healthy agents with 0 failures
+**Impact:** Blocked task dispatch despite agents being CLOSED and healthy
+**Fix:** Reset `last_failure_rate` to 0.0 when agents recover from HALF_OPEN → CLOSED
+**Details:** `memory/circuit-breaker-stale-state-fix.md`
+
+## Orphan Process OOM Bug (2026-03-12)
+
+**Problem:** Exit code -9 (SIGKILL) from orphaned Claude processes accumulating RAM
+**Impact:** Tasks failing at 14 seconds from OOM killer; 10 orphaned /horode-review processes using 3.9% RAM
+**Fix:** Integrated `cleanup-orphan-claude.sh` into `hourly_reflection.sh` (was manual-only)
+**Details:** `memory/orphan-process-oom-fix.md`
+
+## COMPLETED Event Logging Fix (2026-03-12)
+
+**Problem:** False 100% HIGH_FAILURE_RATE alerts despite tasks completing successfully
+**Impact:** CRITICAL alerts triggered incorrectly; ogedei flooded with investigation tasks
+**Root Cause:** `mark_task_completed()` renamed tasks to `.done.md` but never logged COMPLETED events to ledger
+**Fix:** Added COMPLETED event logging to both normal and fallback completion paths
+**Details:** `memory/ledger-completed-event-fix.md`
+
 ## State Consistency (Neo4j + filesystem dual-state)
 
 **Problem:** Neo4j unavailable → filesystem-only mode creates orphaned tasks
 **Solution:** `scripts/reconcile_neo4j_tasks.py` — automated in hourly_reflection.sh
 **Details:** `memory/neo4j-reconciliation.md` (script comparison table, usage patterns)
+
+**Safe Operations Pattern (2026-03-12):**
+- Use `safe_neo4j_op()` and `execute_query_cypher()` from `neo4j_utils.py`
+- Prevents task failures when Neo4j is unavailable
+- Returns fallback value instead of raising exceptions
+- See M005 in mongke's rules for usage example
 
 ### Two Reconciliation Scripts (IMPORTANT)
 | Script | Status | Purpose |
@@ -114,7 +142,7 @@ Agent-specific behavioral rules extracted from each agent's rules.json:
 | **Jochi** | `memory/jochi-behavioral-rules.md` | J004 (1 rule) |
 | **Kublai** | `memory/kublai-behavioral-rules.md` | K001-K008 (8 rules) |
 | **Ogedei** | `memory/ogedei-behavioral-rules.md` | O001-O006 (6 rules) |
-| **Mongke** | `memory/mongke-research-protection.md` | M001-M004 + R008 (5 rules) |
+| **Mongke** | `memory/mongke-research-protection.md` | M001-M005 + R008 (6 rules) |
 
 See individual files for full WHEN/THEN conditions, rationale, and implementation guidance.
 

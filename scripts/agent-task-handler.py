@@ -601,10 +601,31 @@ def _spawn_haiku_completion(agent_name):
     threading.Thread(target=_run, daemon=True).start()
 
 def load_agent_config(agent_name):
-    """Load agent configuration"""
+    """Load agent configuration with fallback for missing config.json.
+
+    Returns agent config dict, falling back to defaults if config.json
+    doesn't exist. This prevents dispatch failures when agents don't
+    have explicit config.json files.
+    """
     config_path = f"{AGENTS_DIR}/{agent_name}/config.json"
-    with open(config_path, 'r') as f:
-        return json.load(f)
+
+    # Default configuration for agents without config.json
+    default_config = {
+        'task_queue_path': f"{AGENTS_DIR}/{agent_name}/tasks",
+        'model': None,  # Will fall back to settings.json
+    }
+
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            # Merge with defaults (config values take precedence)
+            return {**default_config, **config}
+    except FileNotFoundError:
+        # Config doesn't exist - use defaults
+        return default_config
+    except json.JSONDecodeError as e:
+        print(f"[CONFIG] Invalid JSON in {config_path}: {e}, using defaults")
+        return default_config
 
 def load_acp_fallback_config():
     """Load ACP fallback configuration from openclaw.json.

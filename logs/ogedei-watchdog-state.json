@@ -1,75 +1,67 @@
 {
-  "last_audit": 1773311201.03353,
-  "cycles": 16881,
-  "last_cycle": "2026-03-12T06:44:03.650430",
-  "watcher_restarts": 74,
+  "last_audit": 1773373025.47849,
+  "cycles": 18682,
+  "last_cycle": "2026-03-13T00:03:40.267270",
+  "watcher_restarts": 118,
   "stalled_warnings": 508,
   "fakes_detected": 16,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 57,
-    "fake_found": 2,
+    "audited": 6,
+    "fake_found": 0,
     "requeued": 0,
-    "skipped": 2,
+    "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1773312243.6504478,
+  "last_cycle_epoch": 1773374620.2672799,
   "last_issues": [],
   "reflection_misses": 0,
-  "last_memory_audit": 1773311201.2841752,
+  "last_memory_audit": 1773374585.5666611,
   "memory_audit_result": {
-    "total": 6,
+    "total": 11,
     "critical": 0,
-    "warning": 6,
-    "ts": "2026-03-12T06:26:41.321319"
+    "warning": 4,
+    "ts": "2026-03-13T00:03:05.708440"
   },
-  "last_routing_drift_check": 1773311201.334338,
+  "last_routing_drift_check": 1773373025.551533,
   "routing_drift": {
-    "total": 4,
+    "total": 2,
     "mismatches": 0,
     "drift_pct": 0.0,
     "top_examples": [],
-    "ts": "2026-03-12T06:26:41.358999"
+    "ts": "2026-03-12T23:37:05.578781"
   },
-  "memory_fixes": 554,
-  "last_failure_rate_check": 1773312140.7411451,
-  "agent_failure_flags": {
-    "ogedei": 0.8
-  },
-  "cycle_start_time": 1773312243.5639958,
-  "last_queue_balance_check": 1773312140.7583559,
+  "memory_fixes": 619,
+  "last_failure_rate_check": 1773374550.490226,
+  "agent_failure_flags": {},
+  "cycle_start_time": 1773374620.209634,
+  "last_queue_balance_check": 1773374550.5188549,
   "queue_depths": {
-    "kublai": 0,
-    "temujin": 0,
+    "kublai": 3,
+    "temujin": 5,
     "mongke": 0,
-    "chagatai": 0,
-    "jochi": 0,
-    "ogedei": 0,
-    "tolui": 0
+    "chagatai": 2,
+    "jochi": 4,
+    "ogedei": 2,
+    "tolui": 7
   },
-  "last_cascade_check": 1773312210.0997791,
+  "last_cascade_check": 1773374342.884198,
   "cascade_risk": "low",
   "cascade_metrics": {
-    "events_analyzed": 3,
-    "patterns_detected": 0,
-    "agents_failing": 1,
-    "failures_by_agent": {
-      "ogedei": 3
-    },
-    "lookback_minutes": 30
+    "events_analyzed": 0
   },
-  "last_quality_gate_check": 1773312210.131819,
-  "quality_gate_checked": 2,
+  "last_quality_gate_check": 1773374550.5207129,
+  "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1773311064.860095,
-  "self_healing_score": 100.0,
+  "last_self_healing_score_check": 1773372556.443328,
+  "self_healing_score": 56.0,
   "self_healing_metrics": {
-    "auto_resolved": 45,
-    "escalated": 0,
+    "auto_resolved": 56,
+    "escalated": 44,
     "manual": 0,
-    "total": 45
+    "total": 100
   },
   "circuit_half_open_agents": [
     "ogedei",
@@ -77,26 +69,8 @@
     "temujin"
   ],
   "circuit_report": {
-    "ts": "2026-03-12T06:44:03.649765",
+    "ts": "2026-03-13T00:03:40.266557",
     "agents": {
-      "chagatai": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
-      "jochi": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
-      "temujin": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
       "ogedei": {
         "state": "CLOSED",
         "available": true,
@@ -109,7 +83,19 @@
         "reason": "normal",
         "detail": null
       },
-      "tolui": {
+      "jochi": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "chagatai": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "temujin": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -117,27 +103,28 @@
       }
     },
     "summary": {
-      "closed": 6,
+      "closed": 5,
       "open": 0,
       "half_open": 0
     }
   },
   "circuit_summary": {
-    "closed": 6,
+    "closed": 5,
     "open": 0,
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.08635807037353516,
-  "state_file_size": 3640,
-  "tasks_recovered": 176,
+  "last_cycle_duration": 0.05724072456359863,
+  "state_file_size": 4835,
+  "tasks_recovered": 180,
   "slow_cycles": 15,
-  "queue_balance_moves": 180,
+  "queue_balance_moves": 209,
   "circuit_open_agents": [
-    "jochi"
+    "jochi",
+    "ogedei"
   ],
-  "last_cred_failure_check": 1773312210.083193,
-  "last_git_operation_check": 1773312140.762903,
+  "last_cred_failure_check": 1773374550.505505,
+  "last_git_operation_check": 1773374550.5223942,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
@@ -147,10 +134,43 @@
     "anomaly_count": 0,
     "blocked_operations_24h": 0
   },
-  "stall_escalated": 158,
+  "stall_escalated": 161,
   "stall_escalations": {
-    "mongke/high-1773226803.executing.md_escalation": 1773239454.1887748
+    "temujin/normal-1773344342.failed.revision-1.executing.md_escalation": 1773364082.703344,
+    "temujin/normal-1773348190-d337e0ff.failed.revision-1.failed.revision-1.executing.md_escalation": 1773364082.703344,
+    "jochi/high-1773345765.failed.revision-1.failed.revision-1.executing.md_escalation": 1773364082.703344
   },
   "stall_skips_completed": 2,
-  "stall_cleaned_artifacts": 2
+  "stall_cleaned_artifacts": 2,
+  "last_model_drift_check": 1773373059.9229739,
+  "model_drift_drifted": [
+    {
+      "agent": "mongke",
+      "session_model": "glm-5",
+      "config_model": "claude-opus-4-6"
+    },
+    {
+      "agent": "chagatai",
+      "session_model": "glm-5",
+      "config_model": "claude-opus-4-6"
+    },
+    {
+      "agent": "temujin",
+      "session_model": "glm-5",
+      "config_model": "claude-opus-4-6"
+    },
+    {
+      "agent": "jochi",
+      "session_model": "glm-5",
+      "config_model": "claude-opus-4-6"
+    },
+    {
+      "agent": "ogedei",
+      "session_model": "glm-5",
+      "config_model": "claude-opus-4-6"
+    }
+  ],
+  "model_drift_checked": 5,
+  "model_drift_ts": "2026-03-12T23:37:39.924116",
+  "model_drift_last_escalate": 1773369427.722044
 }

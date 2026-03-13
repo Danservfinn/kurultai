@@ -6,6 +6,72 @@ type: reference
 
 # Neo4j Reconciliation Reference
 
+## Safe Operations Pattern (NEW - 2026-03-12)
+
+When writing scripts that interact with Neo4j, use the safe wrapper functions to prevent task failures when Neo4j is unavailable:
+
+### Option 1: Using `neo4j_utils.py` (for queries)
+
+```python
+from neo4j_utils import safe_neo4j_op, execute_query_cypher, check_neo4j_available
+
+# Check health first
+if not check_neo4j_available():
+    logger.warning("Neo4j unavailable - using filesystem-only mode")
+
+# Safe operation with fallback
+tasks = safe_neo4j_op(
+    lambda s: list(s.run("MATCH (t:Task) RETURN t")),
+    fallback=[]  # Returns empty list if Neo4j down
+)
+
+# Convenience wrapper for simple queries
+results = execute_query_cypher(
+    "MATCH (t:Task {id: $id}) RETURN t",
+    params={"id": "123"},
+    fallback=None,
+    single=True
+)
+```
+
+### Option 2: Using `neo4j_task_tracker.py` (for TaskTracker)
+
+```python
+from neo4j_task_tracker import is_neo4j_available, safe_get_driver, require_neo4j
+
+# Check before creating TaskTracker
+if is_neo4j_available():
+    tracker = TaskTracker()
+    tracker.create_task(...)
+else:
+    logger.warning("Neo4j unavailable - skipping task creation")
+
+# Get driver with graceful fallback
+driver = safe_get_driver()
+if driver:
+    with driver.session() as session:
+        session.run("CREATE (n:Task {id: $id})", id=123)
+else:
+    # Fallback to filesystem-only mode
+    filesystem_create_task(123)
+
+# For scripts that MUST have Neo4j
+require_neo4j()  # Raises Neo4jConnectionError if unavailable
+tracker = TaskTracker()  # Safe to proceed
+```
+
+**Benefits:**
+- Prevents task failures from Neo4j connection issues
+- Enables filesystem-only mode during Neo4j outages
+- Consistent error handling across all scripts
+- Pre-flight checks fail fast instead of timing out
+
+**See also:**
+- `scripts/neo4j_utils.py` — Query-level safe operations
+- `scripts/neo4j_task_tracker.py` — Tracker-level safe operations
+
+---
+
 ## Problem Space
 
 The Kurultai maintains **dual state**: Neo4j (graph DB) + filesystem (task files). Desynchronization occurs in two distinct scenarios:

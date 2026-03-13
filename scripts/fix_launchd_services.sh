@@ -19,7 +19,7 @@ USER_ID=$(id -u)
 CRITICAL_SERVICES=(
     "com.kurultai.heartbeat-watchdog"
     "com.kurultai.ogedei-watchdog"
-    "com.kurultai.task-watcher"
+    "com.kurultai.v2-executor"
     "com.kurultai.kurultai-monitor"
     "ai.kurultai.hourly-reflection"
 )

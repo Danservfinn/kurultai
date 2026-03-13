@@ -1,7 +1,7 @@
 # Kurultai Architecture Documentation
 
-**Version:** 2.3
-**Date:** 2026-03-11
+**Version:** 2.4
+**Date:** 2026-03-12
 **Author:** Chagatai (Kurultai Content Specialist)
 **Status:** Production Documentation
 
@@ -30,7 +30,7 @@
 
 ## Executive Summary
 
-The **Kurultai** is a multi-agent AI orchestration system built on OpenClaw. Named after the Mongol council of leaders, it coordinates six specialized AI agents to serve a human operator:
+The **Kurultai** is a multi-agent AI orchestration system built on OpenClaw. Named after the Mongol council of leaders, it coordinates seven specialized AI agents to serve a human operator:
 
 ```
                     ┌─────────────┐
@@ -77,24 +77,24 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 | **Orchestration** | OpenClaw Gateway | Agent sessions, routing, cron |
 | **Memory (File)** | Markdown files | Private/sensitive data |
 | **Memory (Graph)** | Neo4j | Operational memory, cross-agent context |
-| **LLM Provider** | Anthropic (Claude) | All agents use claude-opus-4-6 via Claude Code |
+| **LLM Provider** | Anthropic (Claude) / Z.AI / Ollama | OpenClaw gateway defaults to zai-coding/glm-5 (dispatches to Claude Code); Ogedei uses claude-opus-4-6 directly; Tolui uses ollama (see kurultai.json) |
 | **Local LLM** | Ollama | Heartbeat triage (qwen3.5:9b) |
 | **Cron Scheduler** | OpenClaw Cron | Heartbeats, reflections, automation |
 | **Messaging** | Signal, Web | Human communication channels |
 
 ### Agent Models
 
-> **Note (2026-03-07):** All agents standardized to `claude-opus-4-6` via Claude Code. Third-party models (qwen, kimi, MiniMax) retained in `models.json` for experimentation only.
+> **Note (2026-03-12):** OpenClaw gateway defaults to `zai-coding/glm-5` for most agents (which dispatches to Claude Code via subprocess). Ogedei uses `claude-opus-4-6` directly. Tolui runs on local Ollama. See `kurultai.json` for canonical executor/model configuration.
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **Kublai** | claude-opus-4-6 | Router, coordination |
-| **Möngke** | claude-opus-4-6 | Research, fact-checking |
-| **Chagatai** | claude-opus-4-6 | Content, documentation |
-| **Temüjin** | claude-opus-4-6 | Development, code |
-| **Jochi** | claude-opus-4-6 | Analytics, patterns |
-| **Ögedei** | claude-opus-4-6 | Operations, monitoring |
-| **Tolui** | claude-opus-4-6 | Truth-telling, code review |
+| **Kublai** | zai-coding/glm-5 (claude-code executor) | Router, coordination |
+| **Möngke** | zai-coding/glm-5 (claude-code executor) | Research, fact-checking |
+| **Chagatai** | zai-coding/glm-5 (claude-code executor) | Content, documentation |
+| **Temüjin** | zai-coding/glm-5 (claude-code executor) | Development, code |
+| **Jochi** | zai-coding/glm-5 (claude-code executor) | Analytics, patterns |
+| **Ögedei** | claude-opus-4-6 (claude-code executor) | Operations, monitoring |
+| **Tolui** | ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) | Truth-telling, code review |
 
 ---
 
@@ -243,11 +243,11 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 
 **Symbol:** 🗡️ (The Blade)
 
-**Model:** claude-opus-4-6
+**Model:** ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF)
 
 **Directory:** `/agents/tolui/`
 
-**Key Capability:** Runs on dedicated gateway (port 18792) for fault isolation from main Kublai gateway
+**Key Capability:** Runs on local Ollama (not Claude Code). Dedicated gateway (port 18792) for fault isolation from main Kublai gateway
 
 ---
 
@@ -804,15 +804,15 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 
 | Phase | Script | Execution | Purpose |
 |-------|--------|-----------|---------|
-| 1. Protocol Reflection | `meta_reflection.py --protocol` | **Parallel** (all 6 agents) | Per-agent WHEN/THEN behavioral rules, performance metrics, system health |
-| 2. Performance Review | `claude-agent --model haiku /horde-review` | **Parallel** (all 6 agents, 120s timeout each) | Critical analysis of each agent's hourly performance |
+| 1. Protocol Reflection | `meta_reflection.py --protocol` | **Parallel** (all 6 Claude Code agents, excluding Tolui) | Per-agent WHEN/THEN behavioral rules, performance metrics, system health |
+| 2. Performance Review | `claude-agent --model haiku /horde-review` | **Parallel** (all 6 Claude Code agents, excluding Tolui, 120s timeout each) | Critical analysis of each agent's hourly performance |
 | 3. Downstream Tier 1 | `memory_audit.py`, `cross_agent_rules.py`, `route_quality_tracker.py`, `routing_audit_action.py`, `score_skills.py`, `action_scorer.py` | **Parallel** (independent) | Memory hygiene, capability scoring, skill stats |
 | 3. Downstream Tier 2 | `update_skill_stats.py` | **Sequential** (depends on score-skills) | Aggregate skill statistics |
 | 3. Downstream Tier 3 | `kublai-actions.py --trigger kurultai`, `kublai-initiative.py`, `/kurultai-report`, `generate_hourly_report.py` | **Sequential** (depends on all above) | Task creation, initiative, reporting |
 
 **Brainstorming:** Decoupled to `run_brainstorm.sh` (separate cron job at :30, not part of this pipeline).
 
-**Execution model:** All 6 agents reflect **in parallel** (Phase 1), then all 6 undergo /horde-review **in parallel** (Phase 2). A checkpoint file is emitted after Phase 1 completes, decoupling content generation success from downstream failures. If the 420s hard timeout fires, the watchdog kills all remaining processes.
+**Execution model:** All 6 Claude Code agents (excluding Tolui, which runs on Ollama and does not participate in reflection) reflect **in parallel** (Phase 1), then all 6 undergo /horde-review **in parallel** (Phase 2). A checkpoint file is emitted after Phase 1 completes, decoupling content generation success from downstream failures. If the 420s hard timeout fires, the watchdog kills all remaining processes.
 
 **Output:** Reflections appended to `agents/{agent}/memory/YYYY-MM-DD.md`. Reviews written to `logs/reviews/{agent}-latest.md`. Step timing written to `logs/reflection-step-timing.json`.
 
@@ -845,7 +845,7 @@ This prevents duplicate execution after macOS sleep/wake catch-up, where cron ma
 
 ### Reflection Execution Model
 
-All 6 agents reflect **every hour** in parallel. The original 6-hour rotation design was superseded in v1.6. Current `hourly_reflection.sh` launches all agents simultaneously, with a 420s hard timeout guarding the entire pipeline.
+All 6 Claude Code agents (excluding Tolui) reflect **every hour** in parallel. The original 6-hour rotation design was superseded in v1.6. Current `hourly_reflection.sh` launches all agents simultaneously, with a 420s hard timeout guarding the entire pipeline. Tolui does not participate in reflection as it runs on Ollama, not Claude Code.
 
 ---
 
@@ -1501,6 +1501,7 @@ python scripts/research_storage.py --create-test
 | 2.1 | 2026-03-09 | Neo4j-First Architecture: Task ID canonical format implemented. Kurultai Task System Overhaul Phase 2 completed. |
 | 2.2 | 2026-03-10 | Rule persistence system: Structured `rules.json` store with follow/violate telemetry, `deprecation_bypass` protection for critical rules, rule lifecycle management across memory rotation. |
 | 2.3 | 2026-03-11 | Idle-crisis recovery: (1) Restored r021 (idle rule) and r022 (self-maintenance rule) after incorrect auto-deprecation by memory_audit. (2) Added `deprecation_bypass` flag to prevent critical rule removal. (3) Created `/scripts/idle-watchdog.sh` for cron-based self-task generation after 120min idle. (4) Fixed rule evaluation tracking — rules showed 0 follow/0 violate but were actively evaluated in reflections. |
+| 2.4 | 2026-03-12 | Model accuracy update: (1) Corrected agent count from six to seven. (2) Updated model assignments per kurultai.json — gateway defaults to zai-coding/glm-5 for most agents, claude-opus-4-6 for Ogedei, ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) for Tolui. (3) Clarified reflection pipeline excludes Tolui (Ollama-based, does not participate in Claude Code reflection). |
 
 ---
 

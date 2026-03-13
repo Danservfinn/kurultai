@@ -84,6 +84,40 @@ def count_active_claude_processes():
     return count
 
 
+def is_task_watcher_running():
+    """Check if task-watcher.py process is running.
+
+    Uses ps aux to detect task-watcher.py process. This provides diagnostic
+    information for PENDING_NO_DISPATCH anomalies to distinguish between:
+    - task-watcher not running (needs restart)
+    - task-watcher running but not dispatching (different issue)
+
+    Returns: tuple (is_running: bool, pid: int or None, details: str)
+    """
+    try:
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'task-watcher' in line and 'python' in line:
+                    # Extract PID (second column in ps aux output)
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            pid = int(parts[1])
+                            return True, pid, f"running (pid={pid})"
+                        except ValueError:
+                            pass
+                    return True, None, "running (pid unknown)"
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    return False, None, "NOT RUNNING"
+
+
 def is_reflection_running():
     """Detect if Kurultai hourly reflection is currently running.
 
@@ -533,15 +567,19 @@ def detect_anomalies():
     # Catches the gap where tasks queue up but task-watcher isn't picking them up
     # REFLECTION-AWARE: Suppress false positives during hourly reflection cycle
     # (all agents run meta_reflection.py, causing temporary 0 executing state)
+    # DIAGNOSTIC: Includes task-watcher process status for faster triage
     if total_pending >= 3 and total_executing == 0:
         # Check if reflection is running before flagging anomaly
         if not is_reflection_running():
             pend_list = ", ".join(f"{a}={n}" for a, n in sorted(pending.items()))
+            # Diagnostic: Check task-watcher process status
+            tw_running, tw_pid, tw_status = is_task_watcher_running()
+            tw_info = f"task-watcher={tw_status}" if tw_status else "task-watcher status unknown"
             warnings.append(
                 f"THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — "
                 f"{total_pending} task(s) pending [{pend_list}] but "
-                f"0 executing. Task-watcher may be stalled or not running. "
-                f"Check: launchctl list | grep task-watcher"
+                f"0 executing. {tw_info}. "
+                f"Action: {'check dispatch logs' if tw_running else 'restart task-watcher via launchctl'}"
             )
         # else: Reflection running - agents are busy reflecting, not stalled
 
@@ -578,24 +616,32 @@ def detect_anomalies():
     # ACP-aware suppression: Don't flag HIGH_FAILURE_RATE if work is actively happening
     # Work is "actively happening" if:
     # 1. There are active claude-agent processes (ACP sessions executing tasks)
-    # 2. OR there are pending tasks with matching active processes (tasks being claimed/executed)
-    has_active_work = total_active > 0
+    # 2. OR there are pending tasks waiting to execute
+    has_active_work = total_active > 0 or total_pending > 0
+
+    # FIX 2026-03-12: Check for recent activity to prevent false positives from stale failure data
+    # If there's no current work AND no recent events (in shorter window), the failure rate
+    # is based on old data and shouldn't trigger alerts. Only alert when failures are current.
+    recent_events = read_ledger(hours=0.5)  # Last 30 minutes
+    has_recent_activity = len(recent_events) > 0
 
     if fleet_rates["total"] >= MIN_TASKS_FOR_FAILURE_RATE:
         if fleet_rates["rate"] >= FLEET_FAILURE_RATE_THRESHOLD:
-            # ACP-aware: Suppress alert if work is actively happening
-            # This prevents false positives when:
-            # - ACP sessions are executing tasks (no .executing.md files)
-            # - Tasks have failed historically but are being retried now
-            # - System is in normal operation with some failures but active progress
+            # Jochi fix: Require recent activity to confirm failures are current, not historical
+            # This prevents HIGH_FAILURE_RATE false positives when system is idle with old failures
             if not has_active_work:
-                warnings.append(
-                    f"THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — "
-                    f"Fleet-wide failure rate {fleet_rates['rate']:.0%} "
-                    f"({fleet_rates['failed']}/{fleet_rates['total']} tasks) "
-                    f"in last {FAILURE_RATE_WINDOW_H}h. "
-                    f"Possible model misconfiguration, API outage, or systemic error."
-                )
+                # Additional check: only alert if there's recent activity
+                # This prevents escalation based on stale 2-hour-old failure data
+                if has_recent_activity:
+                    warnings.append(
+                        f"THROUGHPUT_ANOMALY: HIGH_FAILURE_RATE — "
+                        f"Fleet-wide failure rate {fleet_rates['rate']:.0%} "
+                        f"({fleet_rates['failed']}/{fleet_rates['total']} tasks) "
+                        f"in last {FAILURE_RATE_WINDOW_H}h. "
+                        f"Recent activity: {len(recent_events)} events in 30min. "
+                        f"Possible model misconfiguration, API outage, or systemic error."
+                    )
+                # else: No recent activity - failures are historical, not a current anomaly
             # else: Work is actively happening via ACP sessions - suppress false positive
 
     # Per-agent failure rate (only if fleet-wide didn't fire, to avoid noise)

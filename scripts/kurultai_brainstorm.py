@@ -498,35 +498,58 @@ def gather_context(agent):
         context["tock"] = {}
 
     # 5. Cross-agent system health
+    # FIX (2026-03-12): Fall back to TICK log if tock data is stale (>10 min old)
+    # This prevents reflection context from showing "unknown" for neo4j/redis
+    # when tock hasn't run recently but TICK is fresh (5min interval)
+    use_tick_fallback = False
     try:
         target = (MAIN / "logs/tock/latest.json").resolve()
-        with open(target) as f:
-            tock = json.load(f)
-        system = tock.get("system", {})
-        all_agents = tock.get("agents", {})
-        # Neo4j health: prefer neo4j_reachable over neo4j_status (fixes contradictory tock data)
-        neo4j_status = system.get("neo4j_status", "unknown")
-        neo4j_reachable = system.get("neo4j_reachable", False)
-        # If status is "down" but reachable says true, trust reachable (tock data bug workaround)
-        if neo4j_status == "down" and neo4j_reachable:
-            neo4j_status = "up"
-        elif neo4j_status in (None, "unknown", ""):
-            neo4j_status = "up" if neo4j_reachable else "unknown"
-
-        context["system_health"] = {
-            "neo4j": neo4j_status,
-            "redis": system.get("redis_status", "unknown"),
-            "total_queued": sum(
-                a.get("tasks", {}).get("queue_depth", 0)
-                for a in all_agents.values()
-            ),
-            "total_failed": sum(
-                a.get("tasks", {}).get("failed", 0)
-                for a in all_agents.values()
-            ),
-        }
+        tock_age_seconds = time.time() - target.stat().st_mtime
+        if tock_age_seconds > 600:  # 10 minutes = 2 missed tock cycles
+            use_tick_fallback = True
     except Exception:
-        context["system_health"] = {}
+        use_tick_fallback = True
+
+    if use_tick_fallback:
+        # Fallback: parse TICK log directly for neo4j/redis status
+        tick_health = _parse_tick_log_for_system_health()
+        context["system_health"] = {
+            "neo4j": tick_health.get("neo4j", "unknown"),
+            "redis": tick_health.get("redis", "unknown"),
+            "total_queued": "?",  # TICK doesn't have queue depth
+            "total_failed": "?",
+        }
+    else:
+        # Normal path: use tock data (fresh)
+        try:
+            target = (MAIN / "logs/tock/latest.json").resolve()
+            with open(target) as f:
+                tock = json.load(f)
+            system = tock.get("system", {})
+            all_agents = tock.get("agents", {})
+            # Neo4j health: prefer neo4j_reachable over neo4j_status (fixes contradictory tock data)
+            neo4j_status = system.get("neo4j_status", "unknown")
+            neo4j_reachable = system.get("neo4j_reachable", False)
+            # If status is "down" but reachable says true, trust reachable (tock data bug workaround)
+            if neo4j_status == "down" and neo4j_reachable:
+                neo4j_status = "up"
+            elif neo4j_status in (None, "unknown", ""):
+                neo4j_status = "up" if neo4j_reachable else "unknown"
+
+            context["system_health"] = {
+                "neo4j": neo4j_status,
+                "redis": system.get("redis_status", "unknown"),
+                "total_queued": sum(
+                    a.get("tasks", {}).get("queue_depth", 0)
+                    for a in all_agents.values()
+                ),
+                "total_failed": sum(
+                    a.get("tasks", {}).get("failed", 0)
+                    for a in all_agents.values()
+                ),
+            }
+        except Exception:
+            context["system_health"] = {}
 
     # 6. Last 2 hours of chat/session history
     context["chat_history"] = _recent_sessions(agent)
@@ -590,6 +613,45 @@ def gather_context(agent):
 
 
 # ── Prompt Building ──────────────────────────────────────────────────
+
+
+def _parse_tick_log_for_system_health():
+    """Parse latest TICK log line directly as fallback for stale tock data.
+
+    Returns dict with neo4j, redis status or empty dict on failure.
+    """
+    try:
+        watchdog_log = MAIN / "logs" / "watchdog.log"
+        if not watchdog_log.exists():
+            return {}
+
+        # Get last TICK line (not TICK_LLM)
+        last_tick = subprocess.run(
+            ["tail", "-20", str(watchdog_log)],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if last_tick.returncode != 0:
+            return {}
+
+        for line in last_tick.stdout.splitlines():
+            if "] TICK |" in line and "TICK_LLM" not in line:
+                # Parse key=value pairs from TICK line
+                neo4j_status = "unknown"
+                redis_status = "unknown"
+                if "neo4j=up" in line:
+                    neo4j_status = "up"
+                elif "neo4j=down" in line:
+                    neo4j_status = "down"
+                if "redis=up" in line:
+                    redis_status = "up"
+                elif "redis=down" in line:
+                    redis_status = "down"
+                return {"neo4j": neo4j_status, "redis": redis_status}
+        return {}
+    except Exception:
+        return {}
 
 
 def _format_capability_scores(cap_scores):

@@ -73,6 +73,39 @@ The watchdog includes a **pre-filter** to prevent false-positive escalations:
 
 Implementation: `is_task_already_completed()` in `ogedei-watchdog.py`
 
+### Circuit Breaker Health Monitor
+
+**Script:** `scripts/circuit_breaker_health.py`
+**Frequency:** Every 5 minutes (via cron)
+**Purpose:** Prevents circuit breaker deadlock by forcing timed state transitions
+
+**Problem Solved:** The circuit breaker has a deadlock condition — OPEN agents need `check_agent()` to transition to HALF_OPEN, but OPEN agents aren't routed to, so `check_agent()` never gets called.
+
+**Features:**
+1. **Proactive State Transitions:** Forces OPEN → HALF_OPEN after RECOVERY_TIMEOUT (30min normal, 10min urgent)
+2. **Urgent Mode:** When fleet failure rate ≥80%, uses 10min timeout instead of 30min
+3. **Fleet Failure Rate Calculation:** Reads ledger from last 2 hours to determine system health
+4. **State Logging:** Writes to `logs/circuit-breaker-health.log`
+
+**Cron Configuration:**
+```bash
+*/5 * * * * cd ~/.openclaw/agents/main && python3 scripts/circuit_breaker_health.py >> logs/circuit-breaker-health.log 2>&1
+```
+
+**Exit Codes:** 0 = success, 1 = import error
+
+**State Machine:**
+```
+CLOSED --(failure_threshold)--> OPEN --(recovery_timeout)--> HALF_OPEN --(success)--> CLOSED
+                                                              |
+                                                            (failure)
+                                                              |
+                                                              v
+                                                           OPEN
+```
+
+**Related Documentation:** `docs/architecture.md` — Circuit breaker design reference
+
 ---
 
 ## Phase 2: TOCK — Agent Effectiveness Metrics
@@ -274,6 +307,7 @@ rm -f logs/reflection-status.json
 
 ## Related Documentation
 
+- `docs/heartbeat-quickref.md` — **Quick-reference card for incidents** (one-page diagnostics)
 - `docs/auth-heartbeat-reference.md` — Credential monitoring details
 - `docs/heartbeat-troubleshooting.md` — Tick gap diagnosis guide
 - `docs/reflection-pipeline-reference.md` — Kurultai cycle details
@@ -285,6 +319,8 @@ rm -f logs/reflection-status.json
 
 | Date | Change |
 |------|--------|
+| 2026-03-12 | Added heartbeat-quickref.md — one-page diagnostic card for incident response |
+| 2026-03-12 | Added circuit breaker health monitor documentation (deadlock prevention) |
 | 2026-03-12 | Created unified heartbeat system documentation |
 | 2026-03-11 | Added auth heartbeat pre-filter for completed tasks |
 | 2026-03-08 | Extended kurultai timeout to 600s for jochi/ogedei |

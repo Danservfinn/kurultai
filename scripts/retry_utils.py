@@ -13,6 +13,9 @@ Usage:
         pass
 """
 
+# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
+from __future__ import annotations
+
 import time
 import functools
 from typing import Callable, TypeVar, Any

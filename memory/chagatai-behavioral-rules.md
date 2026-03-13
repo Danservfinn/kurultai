@@ -6,6 +6,21 @@ type: feedback
 
 # Chagatai Behavioral Rules
 
+## 🚨 COMPLETION QUICK CHECKLIST — Read This First
+
+**Every task completion requires ALL THREE. No exceptions.**
+
+| # | Requirement | Command / Check |
+|---|-------------|-----------------|
+| 1 | Run pre-submit check | `python3 /Users/kublai/.openclaw/agents/main/scripts/pre_submit_check.py <task_file>` |
+| 2 | Include `## Resolution` section | Final section in every task output |
+| 3 | Minimum 3 headings + 200 chars | Structure check — must PASS |
+
+> **Why this matters:** C001+C004 violations caused 40% of revision cycles in the last review period.
+> The pre-submit script catches all three automatically — run it, fix failures, only then rename to `.done.md`.
+
+---
+
 ## Agent Overview
 **Role:** Writer (documentation, creative content)
 **Domain:** Documentation, content, marketing, technical writing, blog posts
@@ -95,5 +110,6 @@ type: feedback
 
 ## Version History
 - Created: 2026-03-11
-- Last updated: 2026-03-12T01:30:00Z
+- Last updated: 2026-03-12T22:15:00Z
 - 2026-03-12: Added C006 (R008 skill enforcement) — was missing from shared memory, causing violations
+- 2026-03-12: Added COMPLETION QUICK CHECKLIST at top of file — C001+C004 violations persisting at 40% rate; checklist now first content loaded, impossible to skip

@@ -110,6 +110,8 @@ class AuditLogger:
         """
         Query audit logs.
 
+        Memory-efficient: Reads file backwards without loading entire file into memory.
+
         Args:
             actor: Filter by actor
             target: Filter by target
@@ -124,28 +126,70 @@ class AuditLogger:
             return []
 
         results = []
-        with open(self.log_file, "r") as f:
-            for line in reversed(list(f.readlines())):
-                try:
-                    entry = json.loads(line.strip())
+        # Memory-efficient reverse file reading: seek to end and read backwards
+        with open(self.log_file, "rb") as f:
+            # Get file size
+            f.seek(0, 2)
+            file_size = f.tell()
+            pos = file_size - 1
+            line = b""
+            lines_read = 0
+            max_lines = limit * 10  # Read more than needed to account for filtering
 
-                    # Apply filters
-                    if actor and entry.get("actor") != actor:
-                        continue
-                    if target and entry.get("target") != target:
-                        continue
-                    if action and entry.get("action") != action:
-                        continue
-                    if since:
-                        entry_time = datetime.fromisoformat(entry["timestamp"])
-                        if entry_time < since:
+            # Read backwards through file
+            while pos >= 0 and len(results) < limit and lines_read < max_lines:
+                f.seek(pos)
+                char = f.read(1)
+                pos -= 1
+
+                if char == b"\n":
+                    if line:
+                        try:
+                            entry = json.loads(line.decode().strip())
+
+                            # Apply filters
+                            if actor and entry.get("actor") != actor:
+                                line = b""
+                                lines_read += 1
+                                continue
+                            if target and entry.get("target") != target:
+                                line = b""
+                                lines_read += 1
+                                continue
+                            if action and entry.get("action") != action:
+                                line = b""
+                                lines_read += 1
+                                continue
+                            if since:
+                                entry_time = datetime.fromisoformat(entry["timestamp"])
+                                if entry_time < since:
+                                    line = b""
+                                    lines_read += 1
+                                    continue
+
+                            results.append(entry)
+                            line = b""
+                            lines_read += 1
+                            if len(results) >= limit:
+                                break
+                        except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+                            line = b""
+                            lines_read += 1
                             continue
+                else:
+                    line = char + line
 
-                    results.append(entry)
-                    if len(results) >= limit:
-                        break
-                except (json.JSONDecodeError, KeyError):
-                    continue
+            # Handle first line if file doesn't end with newline
+            if line and len(results) < limit:
+                try:
+                    entry = json.loads(line.decode().strip())
+                    if not actor or entry.get("actor") == actor:
+                        if not target or entry.get("target") == target:
+                            if not action or entry.get("action") == action:
+                                if not since or datetime.fromisoformat(entry["timestamp"]) >= since:
+                                    results.append(entry)
+                except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+                    pass
 
         return results
 

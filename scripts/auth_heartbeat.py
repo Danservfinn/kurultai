@@ -30,7 +30,7 @@ HEARTBEAT_FILE = LOGS_DIR / "auth-heartbeat.json"
 CLAUDE_AGENT_BIN = Path("/Users/kublai/.local/bin/claude-agent")
 
 # Auth thresholds
-AUTH_TIMEOUT = 30  # Seconds to wait for auth check (increased from 15s due to Exit 124 timeouts)
+AUTH_TIMEOUT = 90  # Seconds to wait for auth check (increased from 30s: primary can take ~30s to fail, then backup needs ~15s)
 AUTH_STALE_SECONDS = 300  # 5 minutes - auth is stale if older than this
 
 # Provider mapping (must match hourly_reflection.sh)
@@ -97,8 +97,7 @@ def check_agent_auth(agent: str) -> dict:
             text=True,
             timeout=AUTH_TIMEOUT + 2,
             env={
-                "PATH": subprocess.os.environ["PATH"],
-                "HOME": subprocess.os.environ["HOME"],
+                **subprocess.os.environ,  # FIX 2026-03-12: Pass full env — stripped env caused dirname/mktemp not found in claude-agent shell script, producing false-positive AUTH_HEARTBEAT_FAILURE for all 6 agents
                 "CLAUDE_PROVIDER": provider,
             }
         )

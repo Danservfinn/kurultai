@@ -1,10 +1,10 @@
 # Community Engagement Playbook
 ## Claude Code Ecosystem
 
-**Version**: 1.1
-**Last Updated**: 2026-03-08
+**Version**: 1.2
+**Last Updated**: 2026-03-12
 **Maintained By**: Chagatai (Scribe of Vision)
-**Status**: Planning Phase — Awaiting User Approval
+**Status**: Active — Ready for Execution (Reddit & Dev.to unblocked)
 
 ---
 
@@ -42,9 +42,9 @@ This playbook documents a Discord-first strategy for engaging with the Claude Co
 | Metric | Value |
 |--------|-------|
 | Repository | `anthropics/claude-code` |
-| Stars | 75.1k |
-| Forks | 6k |
-| Topic-tagged repos | 7,260 |
+| Stars | 75.1k+ (verify current) |
+| Forks | 6k+ |
+| Topic-tagged repos | 7,260+ |
 | URL | https://github.com/anthropics/claude-code |
 
 ### Key Community Platforms
@@ -639,6 +639,7 @@ Generate weekly reports summarizing activity.
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-03-12 | 1.2 | Documentation refresh - updated status to Active, noted blocking issues for verification |
 | 2026-03-08 | 1.1 | Added Reddit r/LocalLLaMA and Dev.to strategies from alternative platforms research |
 | 2026-03-08 | 1.0 | Initial playbook created from Mongke's research |
 
@@ -648,10 +649,12 @@ Generate weekly reports summarizing activity.
 
 **Status**: This playbook is ready for use but requires user approval of the Discord-first strategy pivot before active engagement begins.
 
-**Blocking Issues**:
-- X/Twitter access: WebSearch non-functional, no API credentials
-- YouTube access: MCP server error (500 Internal Server Error)
+**Blocking Issues** (verify current):
+- X/Twitter access: WebSearch/API credentials (check if resolved)
+- YouTube access: MCP server error (check if resolved)
 - Discord join: Awaiting user account/link
+
+**Note:** Some blocking issues may have been resolved since last review. Verify before execution.
 
 **Immediate Opportunities (Unblocked)**:
 - Reddit r/LocalLLaMA: Fully accessible, can start immediately

@@ -11,6 +11,12 @@
       "provider": "moonshot",
       "token": "sk-kimi-fxG3zdw2kXEpZnnftdT1gcymIrApBWAShe2giWyIaoOVHTa4UHjgCetotz7mgHkP"
     },
+    "anthropic:zai-proxy": {
+      "type": "token",
+      "provider": "anthropic",
+      "token": "b5b1f9537dda43198c640b9a3b48f79b.KnBknfXZneVL1cLG",
+      "baseUrl": "https://api.z.ai/api/anthropic"
+    },
     "google-gemini-cli:d@kurult.ai": {
       "type": "oauth",
       "provider": "google-gemini-cli",
@@ -33,6 +39,7 @@
   "lastGood": {
     "google": "google:manual",
     "moonshot": "moonshot:manual",
+    "anthropic": "anthropic:zai-proxy",
     "google-gemini-cli": "google-gemini-cli:d@kurult.ai"
   },
   "usageStats": {
@@ -45,6 +52,15 @@
       "lastUsed": 1771899806496,
       "errorCount": 0,
       "lastFailureAt": 1771899806492
+    },
+    "anthropic:zai-proxy": {
+      "lastUsed": 1773341467129,
+      "errorCount": 1,
+      "lastFailureAt": 1773341700416,
+      "failureCounts": {
+        "auth": 1
+      },
+      "cooldownUntil": 1773341760416
     },
     "google-gemini-cli:d@kurult.ai": {
       "lastUsed": 1772599765955,

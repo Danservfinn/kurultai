@@ -34,6 +34,10 @@ STALE_DAYS = 7
 _COOLDOWN_FILE = Path(__file__).parent.parent / "logs" / "mongke-self-task-cooldown.json"
 _COOLDOWN_MINUTES = 30  # Don't self-task more than once per 30 minutes (reduced from 2h)
 
+# Exclude file to track already-tasked items (prevents failing task loops)
+_EXCLUDED_TITLES_FILE = Path(__file__).parent.parent / "logs" / "mongke-self-task-exclusions.json"
+_EXCLUSION_DAYS = 7  # Keep exclusions for 7 days, then allow retry
+
 
 def _check_cooldown():
     """Return True if cooldown has expired (ok to generate tasks)."""
@@ -55,6 +59,49 @@ def _update_cooldown():
         json.dump({"last_run": datetime.now().isoformat()}, f)
 
 
+def _load_excluded_titles() -> set:
+    """Load set of titles that have already had self-tasks created."""
+    if not _EXCLUDED_TITLES_FILE.exists():
+        return set()
+
+    try:
+        with open(_EXCLUDED_TITLES_FILE) as f:
+            data = json.load(f)
+
+        # Filter out expired exclusions (older than _EXCLUSION_DAYS)
+        cutoff = datetime.now() - timedelta(days=_EXCLUSION_DAYS)
+        valid = {
+            title: ts for title, ts in data.items()
+            if datetime.fromisoformat(ts) > cutoff
+        }
+
+        # If we pruned any, update the file
+        if len(valid) != len(data):
+            _EXCLUDED_TITLES_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(_EXCLUDED_TITLES_FILE, "w") as f:
+                json.dump(valid, f)
+
+        return set(valid.keys())
+    except (json.JSONDecodeError, ValueError):
+        return set()
+
+
+def _add_excluded_title(title: str):
+    """Add a title to the exclusion list after creating a task for it."""
+    _EXCLUDED_TITLES_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(_EXCLUDED_TITLES_FILE) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        data = {}
+
+    data[title] = datetime.now().isoformat()
+
+    with open(_EXCLUDED_TITLES_FILE, "w") as f:
+        json.dump(data, f)
+
+
 def _mongke_queue_empty():
     """Check if mongke has 0 pending tasks."""
     tasks_dir = AGENTS_DIR / "mongke" / "tasks"
@@ -72,6 +119,7 @@ def _mongke_queue_empty():
 def _find_stale_knowledge():
     """Query Neo4j for knowledge nodes not updated in STALE_DAYS days."""
     cutoff_iso = (datetime.now() - timedelta(days=STALE_DAYS)).isoformat()
+    excluded = _load_excluded_titles()
     tasks = []
 
     driver = get_driver()
@@ -82,10 +130,13 @@ def _find_stale_knowledge():
             WHERE h.created < datetime($cutoff)
             RETURN h.action as title, toString(h.created) as created
             ORDER BY h.created ASC
-            LIMIT 5
+            LIMIT 20
         """, cutoff=cutoff_iso)
         for rec in result:
             title = rec["title"] or "Unknown hypothesis"
+            # Skip if we've already created a task for this hypothesis
+            if title in excluded:
+                continue
             age = rec["created"] or "unknown"
             tasks.append({
                 "type": "refresh_hypothesis",
@@ -96,7 +147,10 @@ def _find_stale_knowledge():
                     f"Check current sources and update or invalidate the Neo4j node.\n\n"
                     f"Use /horde-learn to extract and store updated findings."
                 ),
+                "exclude_key": title,  # Track for exclusion after task creation
             })
+            if len(tasks) >= 5:  # Limit after filtering
+                break
 
         # StrategicInsight nodes use 'created'/'updated' (ISO strings), 'name' as title
         result = s.run("""
@@ -104,10 +158,12 @@ def _find_stale_knowledge():
             WHERE si.updated < $cutoff OR si.created < $cutoff
             RETURN si.name as title, si.updated as updated, si.created as created
             ORDER BY coalesce(si.updated, si.created) ASC
-            LIMIT 3
+            LIMIT 10
         """, cutoff=cutoff_iso)
         for rec in result:
             title = rec["title"] or "Unknown insight"
+            if title in excluded:
+                continue
             tasks.append({
                 "type": "refresh_insight",
                 "title": f"Research refresh: Validate strategic insight '{title[:50]}'",
@@ -116,7 +172,10 @@ def _find_stale_knowledge():
                     f"Research current market/technical landscape to confirm or update.\n\n"
                     f"Use /horde-learn to store validated findings."
                 ),
+                "exclude_key": title,
             })
+            if len(tasks) >= 8:
+                break
 
         # ContentBrief nodes use 'created_at' (neo4j DateTime), 'angle'/'tip_topic' as title
         result = s.run("""
@@ -124,10 +183,12 @@ def _find_stale_knowledge():
             WHERE cb.status IN ['draft_pending', 'pending', 'draft']
                AND cb.created_at < datetime($cutoff)
             RETURN coalesce(cb.angle, cb.tip_topic, cb.id) as title, cb.status as status
-            LIMIT 3
+            LIMIT 10
         """, cutoff=cutoff_iso)
         for rec in result:
             title = rec["title"] or "Unknown brief"
+            if title in excluded:
+                continue
             tasks.append({
                 "type": "research_for_content",
                 "title": f"Research sources for content brief: '{title[:50]}'",
@@ -137,7 +198,10 @@ def _find_stale_knowledge():
                     f"that can strengthen this content.\n\n"
                     f"Use /horde-learn to extract and store source findings."
                 ),
+                "exclude_key": title,
             })
+            if len(tasks) >= 10:
+                break
 
     # Note: Do NOT close driver here - it's a singleton managed by neo4j_task_tracker.py
 
@@ -466,6 +530,9 @@ def generate_self_tasks(dry_run=True):
         if task_id:
             print(f"Created: {task_id} — {t['title']}")
             created.append(task_id)
+            # Add to exclusion list to prevent recreation of same failing task
+            exclude_key = t.get("exclude_key", t["title"][:80])
+            _add_excluded_title(exclude_key)
         else:
             print(f"Rejected (duplicate?): {t['title']}")
 

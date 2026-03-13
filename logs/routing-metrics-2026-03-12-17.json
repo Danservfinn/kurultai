@@ -1,0 +1,205 @@
+{
+  "timestamp": "2026-03-12T21:07:14.192886Z",
+  "hour_file": "2026-03-12-21",
+  "period_hours": 1,
+  "queue_balance": {
+    "index": 2.236,
+    "depths": {
+      "temujin": 0,
+      "mongke": 0,
+      "chagatai": 0,
+      "jochi": 1,
+      "ogedei": 0
+    },
+    "mean": 0.2,
+    "std": 0.45
+  },
+  "routing": {
+    "total_routed": 26,
+    "overflow_count": 0,
+    "missed_opportunities": 0,
+    "routing_accuracy": 0.87,
+    "time_to_start_p95_seconds": 420
+  },
+  "audit_summary": {
+    "period_hours": 1,
+    "generated_at": "2026-03-12T17:07:14.076322",
+    "total_routed": 26,
+    "routing_methods": {
+      "explicit": 21,
+      "skill_overflow_bypass": 1,
+      "keyword_override": 2
+    },
+    "destinations": {
+      "jochi": 9,
+      "temujin": 4,
+      "ogedei": 7,
+      "mongke": 3,
+      "kublai": 1
+    },
+    "by_agent": {
+      "jochi": {
+        "routed": 9,
+        "executed": 5,
+        "succeeded": 0,
+        "failed": 5
+      },
+      "temujin": {
+        "routed": 4,
+        "executed": 1,
+        "succeeded": 0,
+        "failed": 1
+      },
+      "ogedei": {
+        "routed": 7,
+        "executed": 3,
+        "succeeded": 0,
+        "failed": 3
+      },
+      "mongke": {
+        "routed": 3,
+        "executed": 4,
+        "succeeded": 0,
+        "failed": 4
+      },
+      "kublai": {
+        "routed": 1,
+        "executed": 0,
+        "succeeded": 0,
+        "failed": 0
+      }
+    },
+    "queue_state": {
+      "kublai": {
+        "pending": 3,
+        "executing": 1,
+        "done": 0
+      },
+      "temujin": {
+        "pending": 4,
+        "executing": 0,
+        "done": 4
+      },
+      "mongke": {
+        "pending": 5,
+        "executing": 0,
+        "done": 5
+      },
+      "chagatai": {
+        "pending": 2,
+        "executing": 0,
+        "done": 0
+      },
+      "jochi": {
+        "pending": 13,
+        "executing": 1,
+        "done": 5
+      },
+      "ogedei": {
+        "pending": 5,
+        "executing": 0,
+        "done": 4
+      }
+    },
+    "issues": [
+      "High explicit routing: 21/26 (81%) \u2014 20 from non-system sources, keyword table may be underused",
+      "jochi: 5/5 tasks failed (100%) \u2014 check if agent is healthy before routing more tasks",
+      "ogedei: 3/3 tasks failed (100%) \u2014 check if agent is healthy before routing more tasks",
+      "mongke: 4/4 tasks failed (100%) \u2014 check if agent is healthy before routing more tasks",
+      "jochi: 13 tasks pending in queue (backlog)",
+      "kublai: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+      "RECURRING: 4 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended"
+    ],
+    "suggestions": [
+      "Workload skew: jochi got 9 tasks vs kublai got 1 (system-generated, expected)",
+      "temujin: 1 task(s) failed out of 1 executed (downstream)",
+      "Routing methods: explicit=21, keyword_override=2, skill_overflow_bypass=1",
+      "Missed opportunities: 3 task(s) could have been routed to idle agents"
+    ],
+    "kw_disagreements": {},
+    "kw_misroute_count": 1,
+    "kw_misroute_rate": "1/26",
+    "kw_misroute_examples": [
+      "'Research refresh: Validate strategic insight 'ClawShield - S' -> kw=ogedei actual=jochi"
+    ],
+    "overflow_count": 0,
+    "skill_hint_coverage": "17/26",
+    "routing_drift": {
+      "total": 5,
+      "mismatches": 0,
+      "drift_pct": 0.0,
+      "top_examples": [],
+      "ts": "2026-03-12T17:03:40.095068"
+    },
+    "recurring_issues": [
+      {
+        "issue_key": "jochi: # tasks pending in queue (backlog)",
+        "consecutive": 12,
+        "first_seen": "2026-03-12T12:09:34.372524"
+      },
+      {
+        "issue_key": "mongke: #/# tasks failed (#%) \u2014 check if agent is healthy before routing more tasks",
+        "consecutive": 3,
+        "first_seen": "2026-03-12T17:06:32.341512"
+      },
+      {
+        "issue_key": "ogedei: #/# tasks failed (#%) \u2014 check if agent is healthy before routing more tasks",
+        "consecutive": 3,
+        "first_seen": "2026-03-12T17:06:32.341512"
+      },
+      {
+        "issue_key": "jochi: #/# tasks failed (#%) \u2014 check if agent is healthy before routing more tasks",
+        "consecutive": 3,
+        "first_seen": "2026-03-12T17:06:32.341512"
+      }
+    ],
+    "missed_opportunities": {
+      "count": 3,
+      "by_agent": {
+        "mongke": 1,
+        "jochi": 2
+      },
+      "examples": [
+        {
+          "task": "Research refresh: Verify hypothesis 'System idle - no tasks queued in last hour,",
+          "routed_to": "mongke",
+          "dest_queue": 1,
+          "idle_alternatives": [
+            [
+              "ogedei",
+              1
+            ]
+          ],
+          "method": "explicit",
+          "ts": "2026-03-12T16:27:59.019684"
+        },
+        {
+          "task": "CRITICAL UPDATE: Gateway restarted during HIGH_FAILURE_RATE investigation",
+          "routed_to": "jochi",
+          "dest_queue": 1,
+          "idle_alternatives": [
+            [
+              "ogedei",
+              1
+            ]
+          ],
+          "method": "explicit",
+          "ts": "2026-03-12T16:43:51.716486"
+        },
+        {
+          "task": "Tock assessment: HIGH \u2014 ",
+          "routed_to": "jochi",
+          "dest_queue": 1,
+          "idle_alternatives": [
+            [
+              "kublai",
+              1
+            ]
+          ],
+          "method": "explicit",
+          "ts": "2026-03-12T17:03:50.387336"
+        }
+      ]
+    }
+  }
+}

@@ -1079,3 +1079,4 @@
 {"timestamp": "2026-03-09T14:58:49.126135", "event_type": "vote_cast", "proposal_id": "46e2729b-96a", "agent": "temujin", "decision": "yes", "vote_id": "0d15aac7-860"}
 {"timestamp": "2026-03-09T14:58:50.253983", "event_type": "vote_cast", "proposal_id": "7effb4fd-dfc", "agent": "mongke", "decision": "yes", "vote_id": "e4dd7af2-f0d"}
 {"timestamp": "2026-03-09T14:58:50.290062", "event_type": "vote_cast", "proposal_id": "46e2729b-96a", "agent": "mongke", "decision": "yes", "vote_id": "ade1ff24-125"}
+{"timestamp": "2026-03-12T16:49:56.089278", "event_type": "proposal_status_changed", "proposal_id": "46e2729b-96a", "new_status": "expired", "actor": "system"}

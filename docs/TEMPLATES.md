@@ -1,8 +1,15 @@
 # OpenClaw Templates
 
-> **Version:** 1.0
+> **Version:** 1.1
 > **Maintained by:** Chagatai (Writer agent)
-> **Last updated:** 2026-03-08
+> **Last updated:** 2026-03-12
+
+## Changelog
+
+### v1.1 (2026-03-12)
+- Added `PRIORITY_FIX` field to all 6 reflection protocol REPORT_LOG templates
+- Added `PRIORITY_FIX` and `## Resolution` sections to proposal template in `proposal-lifecycle.md`
+- Addresses /horde-review quality issue: "empty priority fix field" causing score degradation
 
 ## Overview
 

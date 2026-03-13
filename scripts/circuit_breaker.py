@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Agent Circuit Breaker — Prevent routing to failing agents.
 
@@ -10,8 +11,8 @@ States:
 Transitions:
 CLOSED → OPEN: Failure rate ≥80% over 1h (min 3 tasks)
 OPEN → HALF-OPEN: After 30min timeout
-HALF-OPEN → CLOSED: Successful task completion
-HALF-OPEN → OPEN: Failed task completion
+HALF-OPEN → CLOSED: Successful task completion OR 20min timeout (graceful recovery)
+HALF-OPEN → OPEN: Failed task completion (re-opens circuit)
 
 Usage:
     from circuit_breaker import AgentCircuitBreaker
@@ -22,9 +23,9 @@ Usage:
         # Find alternative agent
         ...
 """
-
 import json
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -135,6 +136,7 @@ class AgentCircuitBreaker:
     FAILURE_THRESHOLD = 0.8      # Open circuit at 80% failure rate
     MIN_TASKS_THRESHOLD = 3      # Minimum tasks before measuring
     RECOVERY_TIMEOUT = 1800      # 30 minutes in OPEN before HALF-OPEN
+    HALF_OPEN_RECOVERY_TIMEOUT = 1200  # 20 minutes in HALF_OPEN before forced CLOSED (graceful recovery)
     SUCCESS_THRESHOLD = 0.5      # 50% success in HALF-OPEN to close circuit
     MAX_REDISTRIBUTION_PER_CYCLE = 10  # Max tasks to move per cycle
     MAX_REDISPATCH_COUNT = 3     # Max allowed agent-to-agent moves (matches task-redistribute.py)
@@ -209,6 +211,27 @@ class AgentCircuitBreaker:
                     "detail": f"Agent entering probation after {int(time_in_state // 60)}min quarantine"
                 }
 
+        # Handle HALF_OPEN → CLOSED transition (timeout - graceful recovery)
+        # This prevents agents from being stuck in HALF_OPEN forever when
+        # they receive no tasks or all tasks fail. After 20min, force recovery.
+        if current_state == "HALF_OPEN":
+            time_in_state = time.time() - agent_state["since"]
+            if time_in_state > self.HALF_OPEN_RECOVERY_TIMEOUT:
+                self.log(f"Circuit breaker: {agent} HALF_OPEN→CLOSED (graceful recovery after {int(time_in_state)}s)")
+                agent_state["state"] = "CLOSED"
+                agent_state["since"] = 0
+                # Reset failure count to give agent a fresh start
+                agent_state["failure_count"] = 0
+                if "half_open_trials" in agent_state:
+                    del agent_state["half_open_trials"]
+                self.save_state()
+                return {
+                    "available": True,
+                    "state": "CLOSED",
+                    "reason": "normal",
+                    "detail": f"Graceful recovery after {int(time_in_state // 60)}min in HALF_OPEN"
+                }
+
         # Handle OPEN/HALF_OPEN states
         if current_state == "OPEN":
             return {
@@ -271,6 +294,8 @@ class AgentCircuitBreaker:
                 self.log(f"Circuit breaker: {agent} recovered, closing circuit {task_info}")
                 agent_state["state"] = "CLOSED"
                 agent_state["since"] = 0
+                agent_state["failure_count"] = 0  # Reset failure count on recovery
+                agent_state["last_failure_rate"] = 0.0  # FIX: Clear stale failure rate that blocks dispatch
                 del agent_state["half_open_trials"]
 
             self.save_state()

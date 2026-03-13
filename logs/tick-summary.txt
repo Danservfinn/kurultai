@@ -1,21 +1,22 @@
-TICK 2026-03-12 06:36:40
-MODEL: glm-5 (LLM triage)
+TICK 2026-03-12 23:58:11
+MODEL: unknown (LLM triage)
 HEARTBEAT: gap_detected=0 gap_minutes=0
-GATEWAY: up pid=5813,14020,37449,37455,37862 http=200 latency=2ms uptime=13h13m instances=1
-PROCESS: cpu=0.0% mem=0.1% rss=12MB threads=7
-ERRORS:  last5m=0 last1h=0 fatal=0
-SERVICES: neo4j=up redis=up cloudflared=up pid=37786
+GATEWAY: up pid=5199,14188,14434,48241,49648 http=200 latency=2ms uptime=5h28m instances=1
+PROCESS: cpu=0.2% mem=3.4% rss=557MB threads=24
+ERRORS:  last5m=2 last1h=40 fatal=0
+SERVICES: neo4j=up redis=up cloudflared=up pid=91145
 RECOVERY: neo4j_attempted=0 neo4j_result=- cloudflared_attempted=0 cloudflared_result=-
-CREDENTIALS: fleet_health=unknown valid=0 invalid=0 missing=0
-AUTH_HEARTBEAT: failed_checks=0
+CREDENTIALS: fleet_health=degraded valid=1 invalid=0 missing=0
+AUTH_HEARTBEAT: failed_checks=6
 CIRCUIT_BREAKER: recovered=0 still_open=0
-TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
+TASKS:   pending=7 dispatched=0 spawn=0 queues=[kublai=1,temujin=2,ogedei=2,tolui=2]
 AUDIT:   verified=0 fake=0 requeued=0 llm_decision=IGNORE llm_confidence=0%
 VOTES:   synced=0 errors=0
 SUBPROC: executing=0 alive=0 dead=0 stale=0 zombies=0 orphaned=0 anomalies=0
-RESOLUTION: compliance=100.0% (with=8 without=0)
-ROUTING: balance_idx=0 missed=0 accuracy=87% p95=420s routed=0
-TRENDS:  uptime_1h=100.0% avg_cpu=0.1% err_avg_5m=0.0 err_direction=stable restarts_1h=0
-DECISION: healthy
-ACTION:   none
-REASON:   all checks passed
+RESOLUTION: compliance=100.0% (with=18 without=0)
+ROUTING: balance_idx=1.491 missed=0 accuracy=87% p95=420s routed=10
+TRENDS:  uptime_1h=100.0% avg_cpu=16.9% err_avg_5m=2.7 err_direction=rising restarts_1h=0
+DECISION: degraded
+ACTION:   escalate
+REASON:   sustained throughput anomaly: PENDING_NO_DISPATCH x3 ticks (CRITICAL)
+THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — 6 task(s) pending [ogedei=2, temujin=2, tolui=2] but 0 executing. task-watcher=NOT RUNNING. Action: restart task-watcher via launchctl

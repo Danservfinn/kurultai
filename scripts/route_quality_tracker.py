@@ -21,9 +21,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kurultai_paths import TASK_LEDGER, LOGS_DIR
+from kurultai_paths import TASK_LEDGER, LOGS_DIR, AGENT_KEYWORDS
 from kurultai_ledger import read_ledger as _kp_read_ledger
-from score_tasks import AGENT_DOMAINS, normalize_score
+from agents_config import AGENTS
+
+# Inline normalize_score (trivial function from archived score_tasks.py):
+def normalize_score(raw: float, max_val: float = 10.0) -> float:
+    """Normalize score to 0-1 range."""
+    return max(0.0, min(1.0, raw / max_val))
+
+# Build AGENT_DOMAINS from AGENT_KEYWORDS for backward compat
+AGENT_DOMAINS = {agent: keywords for agent, keywords in AGENT_KEYWORDS.items()}
 
 CAPABILITY_SCORES_FILE = LOGS_DIR / "capability-scores.json"
 SCORES_STALENESS_S = 7200  # 2 hours — stale if older than this

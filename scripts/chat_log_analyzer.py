@@ -20,48 +20,60 @@ from pathlib import Path
 SESSIONS_DIR = "/Users/kublai/.openclaw/agents/main/sessions"
 ARCHITECTURE_FILE = "/Users/kublai/.openclaw/agents/main/ARCHITECTURE.md"
 
-def get_recent_sessions(hours=2):
-    """Get session files from last N hours"""
+def get_recent_sessions(hours=2, max_messages_per_session=100, max_sessions=10):
+    """Get session files from last N hours with memory bounds."""
     cutoff = datetime.now() - timedelta(hours=hours)
     sessions = []
-    
+
     # Find all session JSONL files
     session_files = glob.glob(f"{SESSIONS_DIR}/*.jsonl")
-    
+
+    # Sort by modification time (newest first) and limit
+    session_files_with_mtime = []
     for filepath in session_files:
         try:
-            # Check file modification time
             mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
             if mtime >= cutoff:
-                sessions.append({
-                    'file': filepath,
-                    'modified': mtime,
-                    'messages': []
-                })
-        except Exception as e:
+                session_files_with_mtime.append((filepath, mtime))
+        except Exception:
             pass
-    
-    # Read messages from each session
+
+    # Sort by mtime descending and limit
+    session_files_with_mtime.sort(key=lambda x: x[1], reverse=True)
+    session_files_with_mtime = session_files_with_mtime[:max_sessions]
+
+    for filepath, mtime in session_files_with_mtime:
+        sessions.append({
+            'file': filepath,
+            'modified': mtime,
+            'messages': []
+        })
+
+    # Read messages from each session with per-session limit
     for session in sessions:
         try:
+            msg_count = 0
             with open(session['file'], 'r') as f:
                 for line in f:
+                    if msg_count >= max_messages_per_session:
+                        break
                     try:
                         msg = json.loads(line)
                         # Only include messages from last N hours
                         msg_time = datetime.fromtimestamp(msg.get('timestamp', 0) / 1000)
                         if msg_time >= cutoff:
                             session['messages'].append(msg)
-                    except:
+                            msg_count += 1
+                    except (json.JSONDecodeError, KeyError, ValueError):
                         pass
-        except Exception as e:
+        except Exception:
             pass
-    
+
     return sessions
 
-def analyze_chat_logs(hours=2):
+def analyze_chat_logs(hours=2, max_messages_per_session=100, max_sessions=10):
     """Analyze chat logs and extract insights"""
-    sessions = get_recent_sessions(hours)
+    sessions = get_recent_sessions(hours, max_messages_per_session, max_sessions)
     
     analysis = {
         'period_hours': hours,

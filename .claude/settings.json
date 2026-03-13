@@ -3,14 +3,6 @@
     "defaultMode": "default"
   },
   "alwaysThinkingEnabled": true,
-  "env": {
-    "ANTHROPIC_AUTH_TOKEN": "b5b1f9537dda43198c640b9a3b48f79b.KnBknfXZneVL1cLG",
-    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
-    "API_TIMEOUT_MS": "3000000",
-    "ANTHROPIC_MODEL": "glm-5",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5"
-  },
   "enabledPlugins": {
     "claude-mem@thedotmack": true,
     "hookify@claude-plugins-official": true,

@@ -35,6 +35,8 @@ OPTIMIZATION_ENABLED = os.getenv("OPTIMIZATION_ENABLED", "true").lower() == "tru
 EPSILON_GREEDY_RATE = 0.10  # 10% exploration
 CONFIDENCE_THRESHOLD = 0.60  # 60% minimum confidence
 DEFAULT_TEMPLATE = "agent-protocol-v2"
+# TODO: Import CLAUDE_TIMEOUT from kurultai_paths instead of redefining.
+#   Canonical value: kurultai_paths.CLAUDE_TIMEOUT = 7200
 DEFAULT_TIMEOUT = 7200  # 2 hours
 
 # Path to prompt templates
@@ -65,6 +67,10 @@ AGENT_SKILL_DEFAULTS = {
 }
 
 # Timeout by priority (in seconds)
+# TODO: Consolidate with kurultai_paths.py TIMEOUT_BY_PRIORITY (canonical source).
+#   kurultai_paths has: high=7200, normal=7200, low=7200 (no "critical" key).
+#   This version has different values and an extra "critical" tier.
+#   Reconcile by adding "critical" to kurultai_paths, then import from there.
 TIMEOUT_BY_PRIORITY = {
     "critical": 3600,   # 1 hour
     "high": 5400,       # 1.5 hours

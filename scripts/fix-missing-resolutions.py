@@ -114,6 +114,15 @@ def find_incomplete_tasks(agent: str) -> list[dict]:
         if file_path.name.endswith(".executing.md"):
             continue
 
+        # Skip failed tasks — they crashed, so missing resolution is expected
+        # Creating fix-resolution tasks for crashes causes cascading failures
+        if ".failed." in file_path.name:
+            continue
+
+        # Skip existing fix-resolution tasks (prevent cascade loops)
+        if "fix-resolution" in file_path.name:
+            continue
+
         # Check for incomplete patterns
         is_incomplete_type = any(
             file_path.name.endswith(pattern) for pattern in INCOMPLETE_PATTERNS
@@ -149,9 +158,21 @@ def find_incomplete_tasks(agent: str) -> list[dict]:
 
 
 def create_fixup_task(incomplete_task: dict, dry_run: bool = False) -> str | None:
-    """Create a follow-up task to add the missing resolution section."""
+    """Create a follow-up task to add the missing resolution section.
+
+    CASCADE PREVENTION (2026-03-12): Limits fix-resolution tasks per parent to 2.
+    Previous cascade: 30 fix-resolution tasks spawned from single parent 1773227787
+    across 6 agents, all failing and creating more fix attempts.
+    """
     agent = incomplete_task["original_agent"]
     task_id = incomplete_task["task_id"]
+
+    # CASCADE BREAKER: Check how many fix-resolution tasks already exist for this parent
+    agent_tasks_dir = AGENTS_DIR / agent / "tasks"
+    existing_fixes = list(agent_tasks_dir.glob(f"*fix-resolution-*{task_id}*"))
+    if len(existing_fixes) >= 2:
+        print(f"  SKIP: {task_id} already has {len(existing_fixes)} fix-resolution tasks (max 2)")
+        return None
 
     # New fixup task ID
     fixup_id = f"fix-resolution-{task_id}-{uuid.uuid4().hex[:8]}"

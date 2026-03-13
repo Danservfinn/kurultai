@@ -356,25 +356,29 @@ run_agent_reflection() {
 
     echo "[$(date)] [$AGENT] Auth confirmed - Starting protocol reflection..."
 
-    # Run Neo4j/filesystem reconciliation to catch drift early
-    # (Prevents phantom queue entries that block task dispatch)
-    if [ -f "$SCRIPTS/reconcile_neo4j_tasks.py" ]; then
-        echo "[$(date)] [$AGENT] Running Neo4j reconciliation..."
-        python3 "$SCRIPTS/reconcile_neo4j_tasks.py" --fix >> "$LOGS_DIR/reconciliation.log" 2>&1 || true
-    fi
-
-    # Clear stale task claims (>10 min old) that block dispatch
-    # (Fixes PENDING+session_key state inconsistency)
-    if [ -f "$SCRIPTS/clear_stale_claims.py" ]; then
-        echo "[$(date)] [$AGENT] Clearing stale task claims..."
-        python3 "$SCRIPTS/clear_stale_claims.py" >> "$LOGS_DIR/reconciliation.log" 2>&1 || true
-    fi
+    # reconcile_neo4j_tasks.py and clear_stale_claims.py removed in Phase 5 (2026-03-12)
+    # v2 executor handles orphan recovery via lease expiry and claim_epoch fencing
 
     # Run state consistency check to detect stale locks and orphaned tasks
     # (Added 2026-03-11: Prevents phantom dispatch failures)
     if [ -f "$SCRIPTS/state_consistency_check.py" ]; then
         echo "[$(date)] [$AGENT] Running state consistency check..."
         python3 "$SCRIPTS/state_consistency_check.py" --fix >> "$LOGS_DIR/state-consistency.log" 2>&1 || true
+    fi
+
+    # Run session health watchdog to prevent SIGKILL from session bloat
+    # (Added 2026-03-12: Fixes exit code -9 at 14s from memory pressure)
+    if [ -f "$SCRIPTS/session_health_watchdog.py" ]; then
+        echo "[$(date)] [$AGENT] Running session health watchdog..."
+        python3 "$SCRIPTS/session_health_watchdog.py" >> "$LOGS_DIR/session-cleanup.log" 2>&1 || true
+    fi
+
+    # Run orphaned process cleanup to prevent OOM-induced SIGKILL
+    # (Added 2026-03-12: cleanup-orphan-claude.sh was manual-only)
+    # Exit code -9 = SIGKILL, typically from OOM when orphans accumulate
+    if [ -f "$SCRIPTS/cleanup-orphan-claude.sh" ]; then
+        echo "[$(date)] [$AGENT] Cleaning orphaned Claude processes..."
+        "$SCRIPTS/cleanup-orphan-claude.sh" --run --older-minutes=120 >> "$LOGS_DIR/orphan-cleanup.log" 2>&1 || true
     fi
 
     # Ensure memory directory exists
@@ -579,6 +583,26 @@ timed_step "voting-phase4-tasks" \
 echo "[$(date)] Consensus Voting complete"
 
 # ============================================================
+# PROPOSAL LIFECYCLE: Track, review, and convert proposals to tasks
+# Closes the loop: brainstorm -> proposal -> review -> task -> implementation
+# FIX 2026-03-12: Added proposal lifecycle tracking to prevent proposal graveyard
+# ============================================================
+echo "[$(date)] Running proposal lifecycle check..."
+if [ -f "$SCRIPTS/proposal_lifecycle.py" ]; then
+    # Count pending proposals
+    PENDING_COUNT=$(python3 "$SCRIPTS/proposal_lifecycle.py" --list 2>/dev/null | grep -c "⏳" || echo 0)
+    echo "[$(date)] Pending proposals: $PENDING_COUNT"
+
+    # Log stale proposals (>24h old without action)
+    if [ "$PENDING_COUNT" -gt 0 ]; then
+        python3 "$SCRIPTS/proposal_lifecycle.py" --stale >> "$LOGS_DIR/proposal-lifecycle.log" 2>&1 || true
+    fi
+
+    # Generate proposal status report for kublai to review
+    python3 "$SCRIPTS/proposal_lifecycle.py" --list > "$LOGS_DIR/proposal-status.txt" 2>&1 || true
+fi
+
+# ============================================================
 # BRAINSTORMING: Decoupled to run_brainstorm.sh (separate schedule at :30)
 # ============================================================
 
@@ -637,7 +661,8 @@ for step_name in "reflection-research-persist" "session-drift-detect" "memory-au
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/routing_audit_action.py" >> "$LOGS_DIR/routing-audit.log" 2>&1 &
             ;;
         score-skills)
-            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/score_skills.py" --hours 2 >> "$LOGS_DIR/skill-scorer.log" 2>&1 &
+            # Phase 5 (2026-03-12): score_skills.py archived, v2 scorer handles inline
+            _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/neo4j_v2_scorer.py" --update-all >> "$LOGS_DIR/skill-scorer.log" 2>&1 &
             ;;
         action-scorer)
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/action_scorer.py" --all --hours 2 >> "$LOGS_DIR/action-scorer.log" 2>&1 &

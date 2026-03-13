@@ -36,6 +36,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
 from kurultai_ledger import generate_task_id, validate_task_id
 
+# Import Neo4j health check for pre-flight validation
+try:
+    from neo4j_utils import check_neo4j_available
+    _HAS_HEALTH_CHECK = True
+except ImportError:
+    _HAS_HEALTH_CHECK = False
+    def check_neo4j_available():
+        """Fallback: always return True if health check unavailable."""
+        return True
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -69,6 +79,36 @@ def _load_neo4j_env():
 _cached_driver = None
 _driver_refcount = 0
 
+
+def is_neo4j_available() -> bool:
+    """Check if Neo4j is available using pre-flight health check.
+
+    Returns:
+        True if Neo4j is reachable, False otherwise.
+        Uses cached result from neo4j_utils.check_neo4j_available().
+
+    This enables scripts to gracefully degrade to filesystem-only mode
+    when Neo4j is unavailable, preventing cascade failures across
+    the fleet.
+
+    Example:
+        if is_neo4j_available():
+            tracker = TaskTracker()
+            tracker.create_task(...)
+        else:
+            logger.warning("Neo4j unavailable, using filesystem-only mode")
+    """
+    if not _HAS_HEALTH_CHECK:
+        # If health check module unavailable, assume available (legacy behavior)
+        return True
+
+    try:
+        return check_neo4j_available()
+    except Exception as e:
+        logger.debug(f"Neo4j health check error, assuming unavailable: {e}")
+        return False
+
+
 def get_driver():
     """Get a Neo4j driver using centralized credentials.
 
@@ -79,6 +119,9 @@ def get_driver():
     Call close_driver() when done to properly release connections.
 
     Thread-safe: Uses lock to protect singleton initialization.
+
+    Raises:
+        Neo4jConnectionError: If Neo4j is unavailable or credentials are missing.
     """
     global _cached_driver, _driver_refcount
 
@@ -87,6 +130,14 @@ def get_driver():
         if _cached_driver is not None:
             _driver_refcount += 1
             return _cached_driver
+
+        # Pre-flight health check: fail fast if Neo4j is unavailable
+        # This prevents lengthy timeout delays when Neo4j is down
+        if not is_neo4j_available():
+            raise Neo4jConnectionError(
+                "Neo4j is unavailable (pre-flight check failed). "
+                "Use safe_get_driver() for graceful fallback to filesystem-only mode."
+            )
 
         _load_neo4j_env()
         uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -184,6 +235,56 @@ def get_pool_metrics() -> dict:
         }
     finally:
         _lock.release()
+
+
+def safe_get_driver():
+    """Get Neo4j driver with graceful fallback when unavailable.
+
+    Unlike get_driver(), which raises Neo4jConnectionError when
+    Neo4j is down, this function returns None, enabling scripts
+    to implement filesystem-only fallback behavior.
+
+    Returns:
+        Neo4j driver if available, None otherwise.
+
+    Example:
+        driver = safe_get_driver()
+        if driver:
+            with driver.session() as session:
+                session.run("CREATE (n:Task {id: $id})", id=123)
+        else:
+            # Fallback to filesystem-only mode
+            filesystem_create_task(123)
+    """
+    if not is_neo4j_available():
+        logger.warning("Neo4j unavailable - safe_get_driver() returning None")
+        return None
+
+    try:
+        return get_driver()
+    except Neo4jConnectionError as e:
+        logger.warning(f"Neo4j connection failed: {e}")
+        return None
+
+
+def require_neo4j():
+    """Raise exception if Neo4j is unavailable.
+
+    Use this for scripts that MUST have Neo4j to function correctly.
+    Provides a clear early error instead of cryptic connection failures.
+
+    Raises:
+        Neo4jConnectionError: If Neo4j is not available.
+
+    Example:
+        require_neo4j()  # Will raise if Neo4j is down
+        tracker = TaskTracker()  # Safe to proceed
+    """
+    if not is_neo4j_available():
+        raise Neo4jConnectionError(
+            "Neo4j is required but not available. "
+            "Start Neo4j service or use filesystem-only mode."
+        )
 
 
 @contextmanager
@@ -649,71 +750,8 @@ class TaskTracker:
             origin_initiator=origin_initiator or "",
             origin_source=origin_source or "")
 
-        # Backward-compatible filesystem write
-        base = _AGENTS_BASE
-        task_dir = f"{base}/{agent}/tasks"
-        os.makedirs(task_dir, exist_ok=True)
-        epoch = int(datetime.now().timestamp())
-        filepath = f"{task_dir}/{priority}-{epoch}.md"
-
-        skill_line = f"skill_hint: {skill_hint}\n" if skill_hint else ""
-        template_line = f"template_version: {template_version}\n" if template_version else ""
-        prompt_template_line = f"prompt_template: {prompt_template}\n" if prompt_template else ""
-        opt_source = prompt_optimization.get("source", "none")
-        opt_confidence = prompt_optimization.get("confidence", 0)
-        optimization_line = f"optimization_source: {opt_source}\noptimization_confidence: {opt_confidence}\n" if use_optimization else ""
-        notify_lines = ""
-        if notify_on_complete:
-            notify_lines = f"notify_on_complete: true\nnotify_channel: {notify_channel}\nnotify_target: {notify_target}\n"
-
-        # Origin metadata for frontmatter
-        origin_lines = ""
-        if origin_type or origin_initiator or origin_source:
-            origin_lines = f"origin:\n  type: {origin_type or 'unknown'}\n"
-            if origin_initiator:
-                origin_lines += f"  initiator: {origin_initiator}\n"
-            if origin_source:
-                origin_lines += f"  source: {origin_source}\n"
-            origin_lines += f"  timestamp: {datetime.now().isoformat()}\n"
-
-        if timeout is None:
-            try:
-                from task_intake import compute_task_timeout
-                timeout = compute_task_timeout(priority, skill_hint)
-            except Exception:
-                timeout = 7200
-
-        # R008: Prominent skill invocation instruction (fixes EXECUTING_NO_OUTPUT)
-        # When skill_hint is present, prepend a MUST-DO instruction to the task body
-        skill_instruction = ""
-        if skill_hint:
-            skill_instruction = f"""---
-**IMPORTANT:** This task has a skill hint. You MUST invoke the Skill tool with `{skill_hint}` before starting work.
-
-This is a R008 requirement — skill hints are not optional suggestions, they are mandatory invocation instructions.
----
-
-"""
-
-        content = f"""---
-agent: {agent}
-priority: {priority}
-created: {datetime.now().isoformat()}
-source: {source}
-depth: {depth}
-task_id: {task_id}
-parent_id: {parent_id or ''}
-bucket: {bucket}
-domain: {domain}
-timeout: {timeout}
-{skill_line}{template_line}{prompt_template_line}{optimization_line}{notify_lines}{origin_lines}---
-
-# Task: {title}
-
-{skill_instruction}{body}
-"""
-        with open(filepath, 'w') as f:
-            f.write(content)
+        # Filesystem write removed in Phase 4 cutover (2026-03-12)
+        # Neo4j is the sole source of truth for task state
 
         return task_id
 

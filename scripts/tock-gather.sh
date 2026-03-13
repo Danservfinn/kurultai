@@ -84,16 +84,22 @@ try:
     from neo4j_task_tracker import get_driver, close_driver
     driver = get_driver()
     with driver.session() as session:
-        # Per-agent tasks (30m)
+        # Per-agent tasks (30m activity + all pending/running)
+        # FIXED 2026-03-12: Count ALL pending/running (current state), but only
+        # completions/failures from last 30m (recent activity). Previously only
+        # counted tasks created in last 30m, missing older pending tasks.
         results["agent_tasks"] = run_query(session, """
             MATCH (t:Task)
-            WHERE t.created > datetime() - duration('PT30M')
             WITH t.agent AS agent,
-                 count(t) AS total,
-                 sum(CASE WHEN toUpper(t.status) = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
-                 sum(CASE WHEN toUpper(t.status) = 'FAILED' THEN 1 ELSE 0 END) AS failed,
+                 // All pending/running (current queue state)
                  sum(CASE WHEN toUpper(t.status) IN ['READY','QUEUED','PENDING'] THEN 1 ELSE 0 END) AS pending,
                  sum(CASE WHEN toUpper(t.status) IN ['RUNNING','EXECUTING','IN_PROGRESS'] THEN 1 ELSE 0 END) AS running,
+                 // Only recent completions/failures (30m activity)
+                 sum(CASE WHEN toUpper(t.status) = 'COMPLETED'
+                          AND t.completed_at > datetime() - duration('PT30M') THEN 1 ELSE 0 END) AS completed,
+                 sum(CASE WHEN toUpper(t.status) = 'FAILED'
+                          AND t.updated > datetime() - duration('PT30M') THEN 1 ELSE 0 END) AS failed,
+                 count(t) AS total,
                  coalesce(sum(t.retry_count),0) AS retries
             RETURN agent, total, completed, failed, pending, running, retries
         """, "agent_tasks")
@@ -455,7 +461,53 @@ PYEOF
 QUEUE_AUDIT=${QUEUE_AUDIT:-'{"audited":0,"fake_found":0,"requeued":0,"skipped":0}'}
 
 # ============================================================
-# 4b. Stale lock detection — scan all agent task directories for .pid files
+# 4b.1. Filesystem Queue Depths — ACTUAL pending counts from task files
+# ============================================================
+# This provides the REAL queue state from filesystem, independent of Neo4j's
+# 30-minute window. Neo4j only tracks tasks created in last 30 minutes,
+# but pending tasks can sit in queues for hours. This is the source of truth.
+FILESYSTEM_QUEUES=$(python3 2>/dev/null << 'PYEOF'
+import json
+from pathlib import Path
+
+AGENTS_DIR = Path("/Users/kublai/.openclaw/agents")
+AGENTS = ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei", "tolui"]
+
+result = {"by_agent": {}, "total_pending": 0, "total_executing": 0, "total_done": 0}
+
+for agent in AGENTS:
+    tasks_dir = AGENTS_DIR / agent / "tasks"
+    if not tasks_dir.exists():
+        result["by_agent"][agent] = {"pending": 0, "executing": 0, "done": 0}
+        continue
+
+    # Pending: .md files that aren't executing or done
+    # FIX 2026-03-12: Also exclude .done-<hash>.md and .failed-<hash>.md patterns
+    pending = len([
+        f for f in tasks_dir.glob("*.md")
+        if not f.name.endswith(('.executing.md', '.done.md', '.failed.md'))
+        and '.done.' not in f.name  # Catches .done-<hash>.md
+        and '.failed.' not in f.name  # Catches .failed revision files
+    ])
+
+    # Executing: .executing.md files
+    executing = len(list(tasks_dir.glob("*.executing.md")))
+
+    # Done: .done.md files (includes .failed.done.md)
+    done = len(list(tasks_dir.glob("*.done.md")))
+
+    result["by_agent"][agent] = {"pending": pending, "executing": executing, "done": done}
+    result["total_pending"] += pending
+    result["total_executing"] += executing
+    result["total_done"] += done
+
+print(json.dumps(result))
+PYEOF
+)
+FILESYSTEM_QUEUES=${FILESYSTEM_QUEUES:-'{"by_agent":{},"total_pending":0,"total_executing":0,"total_done":0}'}
+
+# ============================================================
+# 4c. Stale lock detection — scan all agent task directories for .pid files
 # ============================================================
 STALE_LOCKS=$(python3 2>/dev/null << 'PYEOF'
 import json, os, glob, time, subprocess
@@ -859,6 +911,7 @@ echo "$QUEUE_DATA" > "$TOCK_TMP/queues.json"
 echo "$QUEUE_AUDIT" > "$TOCK_TMP/queue_audit.json"
 echo "$LEDGER_DATA" > "$TOCK_TMP/ledger.json"
 echo "$CONFIG_MODELS" > "$TOCK_TMP/config_models.json"
+echo "$FILESYSTEM_QUEUES" > "$TOCK_TMP/filesystem_queues.json"
 
 # ============================================================
 # 4b. Live session model reading (direct from sessions.json, not gateway cache)
@@ -914,6 +967,7 @@ cron = safe_load(f"{tmp}/cron.json", {"total_jobs":0,"healthy":0,"erroring":0,"j
 cron_jobs = safe_load(f"{tmp}/cron_jobs.json", {})
 queues = safe_load(f"{tmp}/queues.json", {})
 config_models = safe_load(f"{tmp}/config_models.json", {})
+filesystem_queues = safe_load(f"{tmp}/filesystem_queues.json", {"by_agent":{},"total_pending":0,"total_executing":0,"total_done":0})
 queue_audit = safe_load(f"{tmp}/queue_audit.json", {"audited":0,"fake_found":0,"requeued":0,"skipped":0})
 ledger = safe_load(f"{tmp}/ledger.json", {"completed":{},"failed":{}})
 stale_locks = safe_load(f"{tmp}/stale_locks.json", {"total":0,"by_agent":{},"details":[]})
@@ -991,11 +1045,16 @@ for name in agent_names:
     session_model = s.get("model", "none") if s else live_session_models.get(name, "none")
     config_resolved = cm.get("resolved", "claude-opus-4-6")
     model_match = session_model == "none" or session_model == config_resolved
+    # Use filesystem queue depths as source of truth for pending/executing counts
+    # Neo4j only tracks last 30 minutes, but tasks can queue for hours
+    fs_pending = filesystem_queues.get("by_agent", {}).get(name, {}).get("pending", 0)
+    fs_executing = filesystem_queues.get("by_agent", {}).get(name, {}).get("executing", 0)
     agents[name] = {
         "tasks": {
             "completed": completed, "failed": t.get("failed",0),
-            "pending": t.get("pending",0), "running": t.get("running",0),
-            "total": total, "queue_depth": queues.get(name,0)
+            "pending": fs_pending if fs_pending > 0 else t.get("pending",0),
+            "running": fs_executing if fs_executing > 0 else t.get("running",0),
+            "total": total, "queue_depth": fs_pending if fs_pending > 0 else queues.get(name,0)
         },
         "success_rate": round(100.0*completed/total,1) if total > 0 else None,
         "retries": t.get("retries",0),
@@ -1029,7 +1088,7 @@ def _gather_gate_metrics():
         # Method 1: Use gate resolver if available
         sys.path.insert(0, "/Users/kublai/.openclaw/agents/main/scripts")
         try:
-            from completion_gate_resolver import GateResolver
+            from completion_gate_resolver_v2 import GateResolver
             resolver = GateResolver(dry_run=True)
             metrics = resolver.get_gate_metrics()
             return {

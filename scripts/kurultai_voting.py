@@ -721,13 +721,7 @@ def _create_task_for_proposal(proposal_id: str) -> None:
         domain = frontmatter.get("domain", "Development")
         title = frontmatter.get("title", proposal_id)
 
-        # Create task file in the appropriate agent's queue
-        agent_task_dir = Path(f"/Users/kublai/.openclaw/agents/{agent}/tasks")
-        agent_task_dir.mkdir(parents=True, exist_ok=True)
-
         task_id = f"proposal-{proposal_id}"
-        timestamp = int(datetime.now().timestamp())
-        task_file = agent_task_dir / f"high-{timestamp}-{task_id}.md"
 
         task_content = f"""---
 task_id: {task_id}
@@ -763,12 +757,7 @@ See: `proposals/approved/{proposal_id}.md`
 This proposal passed the authentic Mongolian Kurultai consensus model - all 6 Khans voted APPROVE.
 The implementation has full backing from the entire agent collective.
 """
-        # Write filesystem task first
-        task_file.write_text(task_content)
-        log_phase(4, f"  -> Filesystem task created: {task_file.name}")
-
-        # CRITICAL: Create Neo4j entry to prevent PENDING_NO_DISPATCH stall
-        # task-watcher requires Neo4j entries for atomic task claiming
+        # Create Neo4j entry (sole source of truth for task dispatch)
         neo4j_success = create_neo4j_task(
             task_id=task_id,
             agent=agent,
@@ -780,7 +769,7 @@ The implementation has full backing from the entire agent collective.
         )
 
         if not neo4j_success:
-            log_phase(4, f"  WARNING: Task created but Neo4j entry failed - may cause dispatch stall")
+            log_phase(4, f"  WARNING: Neo4j task creation failed for {task_id}")
 
     except Exception as e:
         log_phase(4, f"  Error creating task for {proposal_id}: {e}")
@@ -818,13 +807,7 @@ def phase4_create_tasks_for_approved() -> List[str]:
             agent = frontmatter.get("agent", "temujin")
             domain = frontmatter.get("domain", "")
 
-            # Create task file in the AGENT'S queue (not central TASKS_DIR)
-            agent_task_dir = Path(f"/Users/kublai/.openclaw/agents/{agent}/tasks")
-            agent_task_dir.mkdir(parents=True, exist_ok=True)
-
             task_id = f"proposal-{proposal_id}"
-            timestamp = int(datetime.now().timestamp())
-            task_file = agent_task_dir / f"high-{timestamp}-{task_id}.md"
 
             task_content = f"""---
 task_id: {task_id}
@@ -853,10 +836,7 @@ See: proposals/approved/{proposal_id}.md
 Review the approved proposal and implement the solution described.
 The proposal has passed consensus voting and is ready for implementation.
 """
-            # Write filesystem task first
-            task_file.write_text(task_content)
-
-            # CRITICAL: Create Neo4j entry to prevent PENDING_NO_DISPATCH stall
+            # Create Neo4j entry (sole source of truth for task dispatch)
             neo4j_success = create_neo4j_task(
                 task_id=task_id,
                 agent=agent,
@@ -869,9 +849,9 @@ The proposal has passed consensus voting and is ready for implementation.
 
             tasks_created.append(task_id)
             if neo4j_success:
-                log_phase(4, f"  Created task {task_id} for proposal {proposal_id} (filesystem + Neo4j)")
+                log_phase(4, f"  Created task {task_id} for proposal {proposal_id} (Neo4j)")
             else:
-                log_phase(4, f"  Created task {task_id} for proposal {proposal_id} (filesystem only - Neo4j FAILED)")
+                log_phase(4, f"  WARNING: Neo4j task creation failed for {task_id}")
 
         except Exception as e:
             log_phase(4, f"  Error creating task for {proposal_id}: {e}")

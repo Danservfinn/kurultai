@@ -1,37 +1,36 @@
 {
   "period_hours": 1,
-  "generated_at": "2026-03-12T06:10:50.302477",
-  "total_routed": 14,
+  "generated_at": "2026-03-13T00:01:17.519892",
+  "total_routed": 7,
   "routing_methods": {
-    "explicit": 13,
-    "alert_dedup_suppressed": 1
+    "explicit": 7
   },
   "destinations": {
     "temujin": 1,
-    "jochi": 4,
-    "ogedei": 8,
-    "chagatai": 1
+    "kublai": 2,
+    "jochi": 3,
+    "ogedei": 1
   },
   "by_agent": {
     "temujin": {
       "routed": 1,
-      "executed": 1,
+      "executed": 0,
       "succeeded": 0,
-      "failed": 1
-    },
-    "jochi": {
-      "routed": 4,
-      "executed": 2,
-      "succeeded": 0,
-      "failed": 2
-    },
-    "ogedei": {
-      "routed": 8,
-      "executed": 1,
-      "succeeded": 1,
       "failed": 0
     },
-    "chagatai": {
+    "kublai": {
+      "routed": 2,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "jochi": {
+      "routed": 3,
+      "executed": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "ogedei": {
       "routed": 1,
       "executed": 0,
       "succeeded": 0,
@@ -40,56 +39,144 @@
   },
   "queue_state": {
     "kublai": {
-      "pending": 0,
+      "pending": 7,
       "executing": 0,
-      "done": 3
+      "done": 0
     },
     "temujin": {
-      "pending": 1,
+      "pending": 5,
       "executing": 0,
-      "done": 19
+      "done": 1
     },
     "mongke": {
       "pending": 0,
       "executing": 0,
-      "done": 5
+      "done": 0
     },
     "chagatai": {
-      "pending": 1,
+      "pending": 2,
       "executing": 0,
-      "done": 7
+      "done": 0
     },
     "jochi": {
-      "pending": 1,
+      "pending": 4,
       "executing": 0,
-      "done": 9
+      "done": 2
     },
     "ogedei": {
-      "pending": 1,
+      "pending": 2,
       "executing": 0,
-      "done": 14
+      "done": 3
     }
   },
   "issues": [
-    "High explicit routing: 13/14 (93%) \u2014 11 from non-system sources, keyword table may be underused",
-    "chagatai: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled"
+    "High explicit routing: 7/7 (100%) \u2014 3 from non-system sources, keyword table may be underused",
+    "kublai: 7 tasks pending in queue (backlog)",
+    "temujin: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "kublai: 2 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "jochi: 3 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "ogedei: 1 task(s) routed but 0 executed \u2014 dispatch may be stalled",
+    "RECURRING: 4 issue(s) unresolved for 3+ consecutive audits \u2014 escalation recommended",
+    "Missed routing opportunities: 4 tasks routed to busy agents when idle alternatives existed (57% of routed tasks)"
   ],
   "suggestions": [
-    "Workload skew: ogedei got 8 tasks vs temujin got 1 (system-generated, expected)",
-    "temujin: 1 task(s) failed out of 1 executed (downstream)",
-    "jochi: 2 task(s) failed out of 2 executed (downstream)",
-    "Routing methods: explicit=13, alert_dedup_suppressed=1"
+    "Routing methods: explicit=7",
+    "  kublai: 2 missed opportunities \u2014 consider adjusting load balancing thresholds"
   ],
   "kw_disagreements": {},
   "kw_misroute_count": 0,
-  "kw_misroute_rate": "0/14",
+  "kw_misroute_rate": "0/7",
   "overflow_count": 0,
-  "skill_hint_coverage": "10/14",
+  "skill_hint_coverage": "5/7",
   "routing_drift": {
-    "total": 7,
+    "total": 2,
     "mismatches": 0,
     "drift_pct": 0.0,
     "top_examples": [],
-    "ts": "2026-03-12T05:56:10.126552"
+    "ts": "2026-03-12T23:37:05.578781"
+  },
+  "recurring_issues": [
+    {
+      "issue_key": "jochi: # task(s) routed but # executed \u2014 dispatch may be stalled",
+      "consecutive": 13,
+      "first_seen": "2026-03-12T18:18:26.083165"
+    },
+    {
+      "issue_key": "kublai: # tasks pending in queue (backlog)",
+      "consecutive": 8,
+      "first_seen": "2026-03-12T21:12:09.750406"
+    },
+    {
+      "issue_key": "kublai: # task(s) routed but # executed \u2014 dispatch may be stalled",
+      "consecutive": 8,
+      "first_seen": "2026-03-12T21:12:09.750406"
+    },
+    {
+      "issue_key": "temujin: # task(s) routed but # executed \u2014 dispatch may be stalled",
+      "consecutive": 4,
+      "first_seen": "2026-03-12T23:01:29.996144"
+    }
+  ],
+  "missed_opportunities": {
+    "count": 4,
+    "by_agent": {
+      "temujin": 1,
+      "kublai": 2,
+      "ogedei": 1
+    },
+    "examples": [
+      {
+        "task": "Investigate jochi task failures (4 in last 1h)",
+        "routed_to": "temujin",
+        "dest_queue": 1,
+        "idle_alternatives": [
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-12T23:01:25.877943"
+      },
+      {
+        "task": "Review and process pending task queue backlog",
+        "routed_to": "kublai",
+        "dest_queue": 4,
+        "idle_alternatives": [
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-12T23:01:31.684551"
+      },
+      {
+        "task": "Review and process pending task queue backlog",
+        "routed_to": "kublai",
+        "dest_queue": 4,
+        "idle_alternatives": [
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-12T23:48:58.729429"
+      },
+      {
+        "task": "Investigate high CPU usage: 97.1%",
+        "routed_to": "ogedei",
+        "dest_queue": 2,
+        "idle_alternatives": [
+          [
+            "jochi",
+            1
+          ]
+        ],
+        "method": "explicit",
+        "ts": "2026-03-12T23:54:06.589263"
+      }
+    ]
   }
 }

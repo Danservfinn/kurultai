@@ -19,6 +19,7 @@ Usage:
 
 import argparse
 import fcntl
+import gc
 import json
 import os
 import re
@@ -41,6 +42,10 @@ LOCK_FILE = LOGS_DIR / "auto-dispatch.lock"
 
 # Stale task threshold: must exceed task-watcher's max timeout (900s) + buffer (120s) = 1020s
 # Using 1200s (20 min) to avoid reverting tasks that task-watcher is still running
+# TODO: Import STALE_EXECUTING_SECS from kurultai_paths.py (canonical: 900s / 15 min).
+#   This local value is intentionally higher (1200s) to avoid reverting tasks that
+#   task-watcher is still monitoring. If consolidating, kurultai_paths should define
+#   both STALE_EXECUTING_SECS (for task-watcher) and STALE_REVERT_SECS (for auto_dispatch).
 STALE_EXECUTING_SECS = 1200  # 20 minutes
 
 # Max tasks to dispatch per cycle (across all agents)
@@ -424,6 +429,7 @@ def run_cycle(target_agent=None, dry_run=False, cleanup_only=False):
         reverted = cleanup_stale_executing(agent)
         stats["reverted"] += reverted
 
+    gc.collect()  # Release memory after cycle
     return stats
 
 

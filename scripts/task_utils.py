@@ -6,7 +6,10 @@ This module consolidates duplicate functions that were previously defined
 in multiple files (agent-task-handler.py, task-watcher.py, etc.).
 
 Usage:
-    from task_utils import extract_task_id, verify_task_completion, derive_status_from_filename
+    from task_utils import extract_task_id, derive_status_from_filename
+
+Note: verify_task_completion() is deprecated here. Use task_verification.py instead:
+    from task_verification import verify_task_completion
 """
 
 import os
@@ -56,14 +59,36 @@ def extract_task_id(filepath: str) -> Optional[str]:
 
 
 def verify_task_completion(filepath: str) -> dict:
-    """Verify task completion by checking file content for completion markers.
+    """DEPRECATED: Use task_verification.verify_task_completion() instead.
 
-    Returns dict with:
-    - completed: bool
-    - has_completion_section: bool
-    - has_summary: bool
-    - issues: list of str
+    The canonical implementation lives in task_verification.py and includes:
+    - File locking via fcntl.LOCK_SH (race condition fix)
+    - Exponential backoff retries
+    - Resolution-section check for substantive outputs
+    - Returns tuple[bool, str] (not dict)
+
+    This stub remains for backward compatibility. New code should import from
+    task_verification directly:
+        from task_verification import verify_task_completion
+
+    This legacy version returns a dict (not a tuple) — callers expecting a dict
+    should migrate to the task_verification API.
     """
+    # Delegate to the canonical implementation and adapt the return format
+    try:
+        from task_verification import verify_task_completion as _canonical_verify
+        is_valid, reason = _canonical_verify(filepath)
+        return {
+            'completed': is_valid,
+            'has_completion_section': is_valid,
+            'has_summary': is_valid,
+            'issues': [] if is_valid else [reason],
+        }
+    except ImportError:
+        # Fallback if task_verification is unavailable
+        pass
+
+    # Minimal fallback logic (original behavior)
     result = {
         'completed': False,
         'has_completion_section': False,
@@ -78,15 +103,10 @@ def verify_task_completion(filepath: str) -> dict:
         result['issues'].append(f"Cannot read file: {e}")
         return result
 
-    # Check for completion section markers
     completion_markers = [
-        '## Summary',
-        '## Completion',
-        '## Result',
-        '## Changes Made',
-        '## Implementation Complete',
-        '# Summary',
-        '# Completion',
+        '## Summary', '## Completion', '## Result',
+        '## Changes Made', '## Implementation Complete',
+        '# Summary', '# Completion',
     ]
 
     for marker in completion_markers:
@@ -94,18 +114,15 @@ def verify_task_completion(filepath: str) -> dict:
             result['has_completion_section'] = True
             break
 
-    # Check for summary content
     if '## Summary' in content or '# Summary' in content:
         summary_section = content.split('## Summary')[-1] if '## Summary' in content else content.split('# Summary')[-1]
         summary_lines = [l for l in summary_section.split('\n') if l.strip() and not l.startswith('#')]
         if len(summary_lines) >= 2:
             result['has_summary'] = True
 
-    # Determine overall completion
     if result['has_completion_section'] or result['has_summary']:
         result['completed'] = True
     elif len(content) > 500:
-        # Heuristic: if file has substantial content, consider it potentially complete
         result['completed'] = True
         result['issues'].append("No explicit completion section found")
 

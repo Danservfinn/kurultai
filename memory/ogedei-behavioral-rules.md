@@ -10,7 +10,7 @@ type: feedback
 **Role:** Operations (monitoring, health, failover)
 **Domain:** System health, monitoring, cron/launchd, auth, recovery operations
 
-## Active Rules (6/6)
+## Active Rules (7/7)
 
 ### O001: Model Mismatch Detection
 **Priority:** 1 (CRITICAL)
@@ -88,11 +88,28 @@ type: feedback
 
 **How to apply:** On monitoring gap with degraded status, immediately check auth health and create task if failures found.
 
+**Status:** ✅ IMPLEMENTED (2026-03-12) — Wired into ogedei-watchdog.py `check_credential_failures()` function
+
+---
+
+### O007: Session Bloat SIGKILL Prevention
+**Priority:** 2 (HIGH)
+
+**WHEN:** Tasks failing with exit code -9 (SIGKILL) at consistent execution time (~14s) OR session directory >100MB OR >200 session files accumulated
+
+**THEN:** Run `python3 /Users/kublai/.openclaw/agents/main/scripts/session_health_watchdog.py` AND check for drift/stale/reset file accumulation INSTEAD OF ignoring or assuming transient error
+
+**Why:** Session bloat causes OS SIGKILL when Claude Code loads bloated sessions. Drift-correction creates `.jsonl.drift-*`, `.jsonl.stale-*`, `.jsonl.reset.*` variants that accumulate and aren't caught by standard `*.jsonl` glob patterns.
+
+**How to apply:** When SIGKILL detected, immediately run session_health_watchdog.py. The script now handles all `.jsonl*` patterns including drift/stale/reset variants and archives old/large/excessive drift files.
+
+**Status:** ✅ IMPLEMENTED (2026-03-12) — Fixed session_health_watchdog.py to handle drift/stale/reset variants, archived 1188 files freeing 166.8MB
+
 ## Rule Categories
 - **Quality:** 1 rule (O001)
-- **Debugging:** 1 rule (O002)
+- **Debugging:** 2 rules (O002, O007)
 - **Monitoring:** 2 rules (O003, O006)
-- **Recovery:** 1 rule (O004)
+- **Recovery:** 2 rules (O004, O007)
 - **Routing:** 1 rule (O005)
 
 ## Status
@@ -103,5 +120,6 @@ See `docs/ops-behavioral-rules.md` for detailed ops procedures.
 
 ## Version History
 - Created: 2026-03-11
-- Last updated: 2026-03-12T09:15:00Z
+- Last updated: 2026-03-12T13:40:00Z
 - 2026-03-12: O003/O006 threshold reduced from 10min to 5min for proactive gap detection
+- 2026-03-12: O007 added — Session bloat SIGKILL prevention via drift file cleanup

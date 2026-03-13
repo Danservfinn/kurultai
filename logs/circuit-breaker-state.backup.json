@@ -1,18 +1,18 @@
 {
-  "ts": "2026-03-12T06:36:29.132119",
+  "ts": "2026-03-12T21:08:22.034330",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 13,
+      "failure_count": 14,
       "success_count": 23,
       "last_failure_rate": 0.0
     },
     "mongke": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 5,
-      "success_count": 18,
+      "failure_count": 0,
+      "success_count": 0,
       "last_failure_rate": 0.0
     },
     "tolui": {
@@ -23,31 +23,30 @@
       "last_failure_rate": 0.0
     },
     "jochi": {
-      "state": "HALF_OPEN",
-      "since": 1773282937.5796769,
-      "failure_count": 1,
+      "state": "CLOSED",
+      "since": 0,
+      "failure_count": 2,
       "success_count": 19,
-      "last_failure_rate": 1.0,
-      "half_open_trials": 0
+      "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 2,
-      "success_count": 30,
+      "failure_count": 3,
+      "success_count": 0,
       "last_failure_rate": 0.0
     },
     "temujin": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 3,
-      "success_count": 47,
-      "last_failure_rate": 0.0
+      "failure_count": 7,
+      "success_count": 48,
+      "last_failure_rate": 0.75
     },
     "kublai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 1,
+      "failure_count": 2,
       "success_count": 66,
       "last_failure_rate": 0.0
     }

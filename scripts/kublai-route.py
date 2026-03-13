@@ -36,7 +36,7 @@ PAUSED_AGENTS = []
 def is_task_paused_in_neo4j(task_id):
     """Check if task is marked as PAUSED in Neo4j."""
     try:
-        from neo4j_atomic_transitions import get_driver
+        from neo4j_task_tracker import get_driver
         driver = get_driver()
         with driver.session() as session:
             result = session.run("""
@@ -55,7 +55,7 @@ def is_task_paused_in_neo4j(task_id):
 def mark_task_paused_in_neo4j(task_id, agent, reason):
     """Mark a task as PAUSED in Neo4j."""
     try:
-        from neo4j_atomic_transitions import get_driver
+        from neo4j_task_tracker import get_driver
         driver = get_driver()
         with driver.session() as session:
             session.run("""
@@ -248,7 +248,7 @@ def pause_task_by_id(task_id, reason="Manual pause"):
 def unpause_task_by_id(task_id):
     """Unpause a task by setting status back to PENDING."""
     try:
-        from neo4j_atomic_transitions import get_driver
+        from neo4j_task_tracker import get_driver
         driver = get_driver()
         with driver.session() as session:
             result = session.run("""
@@ -269,7 +269,7 @@ def unpause_task_by_id(task_id):
 def list_paused_tasks():
     """List all paused tasks in Neo4j."""
     try:
-        from neo4j_atomic_transitions import get_driver
+        from neo4j_task_tracker import get_driver
         driver = get_driver()
         with driver.session() as session:
             result = session.run("""

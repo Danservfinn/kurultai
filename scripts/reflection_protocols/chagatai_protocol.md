@@ -104,9 +104,16 @@ REPORT_LOG:
 GRADE: [A-F or INCOMPLETE]
 KEY_FINDING: [one-line summary of most important finding]
 ISSUE: [most significant issue, or NONE]
+PRIORITY_FIX: [specific action to address /horde-review findings, or NONE]
 RULE: [new WHEN/THEN rule, or NONE]
 SKILLS_USED: [comma-separated list of skills invoked]
 ```
+
+**PRIORITY_FIX field requirements:**
+- If /horde-review identified a PRIORITY_FIX, you MUST address it here
+- Format: Specific action with verification step (e.g., "Kill stale session: `pkill -f 'claude.*chagatai'`; verify fresh spawn uses claude-opus-4-6")
+- If addressing a cross-domain issue, create a task for the appropriate agent
+- Empty PRIORITY_FIX will cause /horde-review to flag quality degradation (score impact: -2 points)
 
 ## Banned Words
 

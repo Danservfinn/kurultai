@@ -1,6 +1,6 @@
 {
-  "consecutive": 0,
-  "type": null,
-  "first_seen": null,
-  "last_tick": 1773311913.674598
+  "consecutive": 3,
+  "type": "PENDING_NO_DISPATCH",
+  "first_seen": 1773373969.193871,
+  "last_tick": 1773374366.275769
 }

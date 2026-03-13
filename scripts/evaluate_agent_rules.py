@@ -20,6 +20,9 @@ Architecture:
     - Cooldown mechanism prevents over-generation
 """
 
+# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
+from __future__ import annotations
+
 import argparse
 import json
 import os

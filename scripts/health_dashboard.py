@@ -35,20 +35,18 @@ SPAWN_QUEUE = str(_SPAWN_QUEUE)
 
 
 def get_queue_depths():
-    """Get pending task counts from filesystem."""
-    queues = {}
-    for agent in AGENTS:
-        task_dir = f"{AGENT_DIR}/{agent}/tasks"
-        if not os.path.isdir(task_dir):
-            queues[agent] = 0
-            continue
-        pending = 0
-        for pattern in ["high-*.md", "normal-*.md", "low-*.md"]:
-            for f in glob.glob(f"{task_dir}/{pattern}"):
-                if not f.endswith(".executing.md") and not f.endswith(".done.md"):
-                    pending += 1
-        queues[agent] = pending
-    return queues
+    """Get pending/working task counts from Neo4j."""
+    from neo4j_v2_core import TaskStore
+
+    store = TaskStore()
+    try:
+        depths = {}
+        for agent in AGENTS:
+            d = store.get_queue_depth(agent)
+            depths[agent] = {"pending": d.get("PENDING", 0), "working": d.get("WORKING", 0)}
+        return depths
+    finally:
+        store.close()
 
 
 def get_spawn_queue_depth():
@@ -62,10 +60,10 @@ def get_spawn_queue_depth():
 
 
 def get_dispatch_health():
-    """Check if task-watcher.py daemon is running."""
+    """Check if neo4j_v2_executor daemon is running."""
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "task-watcher.py"],
+            ["pgrep", "-f", "neo4j_v2_executor"],
             capture_output=True, text=True, timeout=5
         )
         running = result.returncode == 0
@@ -83,9 +81,9 @@ def system_health():
         "issues": [],
     }
 
-    # Queue depths from filesystem
+    # Queue depths from Neo4j
     queues = get_queue_depths()
-    total_pending = sum(queues.values())
+    total_pending = sum(q["pending"] for q in queues.values())
     report["queues"] = {
         "by_agent": queues,
         "total_pending": total_pending,
@@ -96,7 +94,7 @@ def system_health():
     dispatch = get_dispatch_health()
     report["dispatch"] = dispatch
     if not dispatch["running"]:
-        report["issues"].append("task-watcher.py daemon not running")
+        report["issues"].append("neo4j_v2_executor daemon not running")
         report["status"] = "degraded"
 
     # Neo4j data
@@ -156,9 +154,9 @@ def main():
 
         print(f"Queue: {health['queues']['total_pending']} pending, "
               f"{health['queues']['spawn_pending']} spawn")
-        for agent, count in health['queues']['by_agent'].items():
-            if count > 0:
-                print(f"  {agent}: {count}")
+        for agent, counts in health['queues']['by_agent'].items():
+            if counts["pending"] > 0 or counts["working"] > 0:
+                print(f"  {agent}: {counts['pending']} pending, {counts['working']} working")
 
         print(f"\nDispatch: {'running' if health['dispatch']['running'] else 'NOT RUNNING'}")
         print(f"Neo4j: {health.get('neo4j', 'unknown')}")

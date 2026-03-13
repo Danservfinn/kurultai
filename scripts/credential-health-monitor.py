@@ -17,7 +17,7 @@ Exit codes: 0=all valid, 1=some invalid, 2=all invalid (fleet crisis)
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from kurultai_paths import AGENTS_DIR, LOGS_DIR, VALID_AGENTS
@@ -92,9 +92,14 @@ def get_recent_auth_failures(minutes: int = 60) -> dict:
                 try:
                     entry = json.loads(line)
                     timestamp_str = entry.get("timestamp", "")
-                    # Parse ISO timestamp
+                    # Parse ISO timestamp, ensuring timezone-aware result
                     try:
-                        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        # Replace Z with +00:00 for UTC timestamps
+                        ts_for_parse = timestamp_str.replace("Z", "+00:00")
+                        timestamp = datetime.fromisoformat(ts_for_parse)
+                        # Ensure timezone-aware (assume UTC if no tzinfo)
+                        if timestamp.tzinfo is None:
+                            timestamp = timestamp.replace(tzinfo=timezone.utc)
                     except ValueError:
                         # Fallback for different formats
                         continue

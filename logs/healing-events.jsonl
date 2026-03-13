@@ -428,3 +428,95 @@
 {"ts": "2026-03-12T04:49:10.347995", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1773304873.no_output.done.md"}}
 {"ts": "2026-03-12T05:26:07.327702", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 6}}
 {"ts": "2026-03-12T06:26:41.333735", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 5}}
+{"ts": "2026-03-12T07:04:07.317531", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "kublai", "details": {"task_file": "high-1773313205.failed.done.md"}}
+{"ts": "2026-03-12T07:04:07.324892", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "high-1773313202.failed.done.md"}}
+{"ts": "2026-03-12T07:04:07.614901", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "high-1773313203.failed.done.md"}}
+{"ts": "2026-03-12T07:11:07.260382", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1773313660.failed.done.md"}}
+{"ts": "2026-03-12T09:39:44.014308", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "normal-1773322609.failed.done.md"}}
+{"ts": "2026-03-12T09:43:11.403312", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773322609.failed.done.md"}}
+{"ts": "2026-03-12T09:46:44.588581", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773322921-711700e5.completed.done.md"}}
+{"ts": "2026-03-12T09:50:11.756432", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773322921-711700e5.completed.revision-1.no_output.done.md"}}
+{"ts": "2026-03-12T10:25:01.762212", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773325404.failed.done.md"}}
+{"ts": "2026-03-12T10:56:23.971714", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773327205.failed.done.md"}}
+{"ts": "2026-03-12T12:13:27.684601", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "normal-1773331775.failed.done.md"}}
+{"ts": "2026-03-12T12:26:20.420694", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 10}}
+{"ts": "2026-03-12T12:55:39.326191", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "normal-1773334362.failed.done.md"}}
+{"ts": "2026-03-12T13:27:22.462300", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 6}}
+{"ts": "2026-03-12T13:35:45.094202", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["jochi", "ogedei"], "to_agents": ["kublai", "temujin", "chagatai", "tolui"]}}
+{"ts": "2026-03-12T13:48:02.062150", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773337523.failed.done.md"}}
+{"ts": "2026-03-12T13:57:55.902619", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 5}}
+{"ts": "2026-03-12T14:07:19.638700", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["ogedei"], "to_agents": ["jochi", "tolui"]}}
+{"ts": "2026-03-12T14:12:39.389066", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "chagatai", "details": {"task_file": "normal-1773339027.failed.done.md"}}
+{"ts": "2026-03-12T14:12:39.433978", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "high-1773339023.failed.done.md"}}
+{"ts": "2026-03-12T14:16:13.098900", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773339025-b543a1d5.no_output.done.md"}}
+{"ts": "2026-03-12T14:23:17.825103", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773339025-b543a1d5.no_output.revision-1.no_output.done.md"}}
+{"ts": "2026-03-12T14:23:17.902019", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773339655-90020d90.no_output.done.md"}}
+{"ts": "2026-03-12T14:28:01.471275", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 6}}
+{"ts": "2026-03-12T14:44:40.466677", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773340860.failed.done.md"}}
+{"ts": "2026-03-12T14:58:19.932366", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-12T15:05:18.371585", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "low-1773342141.failed.done.md"}}
+{"ts": "2026-03-12T15:19:10.770875", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773342707-effee6b2.no_output.done.md"}}
+{"ts": "2026-03-12T15:22:24.422501", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773343090.failed.done.md"}}
+{"ts": "2026-03-12T15:28:30.400923", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 6}}
+{"ts": "2026-03-12T15:42:48.846594", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773344342.failed.done.md"}}
+{"ts": "2026-03-12T15:59:01.025424", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-12T15:59:01.087643", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773345290.failed.done.md"}}
+{"ts": "2026-03-12T16:12:22.624605", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "high-1773345765.failed.done.md"}}
+{"ts": "2026-03-12T16:12:22.633373", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "high-1773345723.no_output.done.md"}}
+{"ts": "2026-03-12T16:19:19.718563", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "high-1773345765.failed.revision-1.failed.done.md"}}
+{"ts": "2026-03-12T16:29:12.529751", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 6}}
+{"ts": "2026-03-12T16:52:55.126243", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773348190-d337e0ff.failed.done.md"}}
+{"ts": "2026-03-12T16:59:35.556004", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 7}}
+{"ts": "2026-03-12T16:59:35.575386", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-12T16:59:35.647584", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1773348190-d337e0ff.failed.revision-1.failed.done.md"}}
+{"ts": "2026-03-12T17:29:48.363439", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 7}}
+{"ts": "2026-03-12T17:35:22.741414", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:35:55.217862", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:36:27.629345", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:37:00.170760", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:37:32.421551", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:38:04.653142", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:38:36.877181", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:39:09.105968", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:39:41.333055", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:40:14.138249", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:40:46.714995", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:41:19.308230", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:41:51.450880", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:42:56.036732", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:43:28.675013", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:44:01.261171", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:44:33.481893", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:45:05.820874", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:45:38.752037", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:46:10.753426", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:46:42.482366", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:47:14.508882", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:47:46.966532", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:48:19.202211", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:48:51.566098", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:49:23.726917", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:49:55.733441", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:50:27.874673", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:51:00.040851", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:51:31.860000", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:52:07.350628", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:52:39.707824", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:53:11.850297", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:53:43.866490", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:54:16.117628", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:54:48.047514", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:55:20.387582", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:55:52.906332", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:56:25.665850", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:56:58.035033", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:57:30.078076", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:58:02.397006", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:58:34.320844", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T17:59:06.430393", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-12T18:30:37.756678", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 4}}
+{"ts": "2026-03-12T19:30:52.613256", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-12T20:54:05.929175", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["jochi"], "to_agents": ["ogedei"]}}
+{"ts": "2026-03-12T21:45:59.101704", "issue_type": "proactive_patrol", "action": "auto_created", "outcome": "success", "agent": "ogedei", "details": {"task_id": "low-1773366358-4bf0b850", "pending_before": 1}}
+{"ts": "2026-03-12T22:02:07.736947", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 3}}
+{"ts": "2026-03-12T22:32:29.692472", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}

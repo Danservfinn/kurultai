@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -230,7 +231,7 @@ def check_rules_json(results: list):
             })
 
         # Check for dead rules (active but never evaluated after DEAD_RULE_AGE_HOURS)
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         for rule in active_rules:
             created_str = rule.get("created_at", "")
             last_eval = rule.get("last_evaluated")
@@ -242,6 +243,9 @@ def check_rules_json(results: list):
 
             try:
                 created = datetime.fromisoformat(created_str)
+                # Make timezone-aware if naive (assume UTC)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
             except (ValueError, TypeError):
                 continue
 
@@ -447,6 +451,127 @@ def check_context_bloat(results: list):
             })
 
 
+def _parse_md_rule_table(content: str) -> list:
+    """Parse a markdown pipe-table of rules into a list of row dicts.
+
+    Handles tables with columns like: ID | WHEN condition | THEN action | Category | Created | Status
+    Returns list of dicts with lowercased, underscored keys.
+    """
+    rows = []
+    in_table = False
+    header_keys = []
+
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if in_table:
+                break
+            continue
+        # Skip separator rows (e.g. |---|---|)
+        if re.match(r"^\|[\s\-|]+\|$", stripped):
+            in_table = True
+            continue
+
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if not header_keys:
+            header_keys = [c.lower().replace(" ", "_") for c in cells]
+            in_table = True
+            continue
+
+        row = dict(zip(header_keys, cells))
+        # Skip placeholder rows
+        if all(v in ("_", "", "-") for v in row.values()):
+            continue
+        rows.append(row)
+
+    return rows
+
+
+def check_system_rules_registry(results: list):
+    """Check system-level when_then_rules.md and agent behavioral rule files for capacity violations.
+
+    Detects:
+    - Over-capacity in the system registry (active count > stated max)
+    - Over-capacity in per-agent behavioral rule files
+    - System rules that are already captured in agent behavioral files (deprecation candidates)
+    """
+    main_mem = AGENTS_DIR / "main" / "memory"
+
+    # --- System-level registry ---
+    registry_path = main_mem / "when_then_rules.md"
+    if registry_path.exists():
+        content = registry_path.read_text(errors="replace")
+
+        # Parse stated capacity from header: "## Active Rules (N/M capacity...)"
+        cap_match = re.search(r"## Active Rules\s*\((\d+)/(\d+)", content)
+        if cap_match:
+            current = int(cap_match.group(1))
+            maximum = int(cap_match.group(2))
+            if current > maximum:
+                results.append({
+                    "type": "registry_overcapacity",
+                    "severity": "warning",
+                    "file": str(registry_path),
+                    "current_count": current,
+                    "max_count": maximum,
+                    "message": (
+                        f"when_then_rules.md: {current} active rules vs max {maximum} "
+                        f"({current - maximum} over) — deprecate low-impact rules or move to agent registries"
+                    ),
+                })
+
+        # Find rules that also appear in agent behavioral rule files → deprecation candidates
+        # Collect rule IDs referenced inside all *-behavioral-rules.md
+        behavioral_rule_refs: set = set()
+        for f in main_mem.glob("*-behavioral-rules.md"):
+            beh = f.read_text(errors="replace")
+            # Match explicit back-refs like "(R003)" or "### K001 (R009)"
+            behavioral_rule_refs.update(re.findall(r"\b(R\d{3})\b", beh))
+
+        # Parse the active rules table
+        active_section = re.search(
+            r"## Active Rules.*?\n(.*?)(?=\n## |\Z)", content, re.DOTALL
+        )
+        if active_section and behavioral_rule_refs:
+            rows = _parse_md_rule_table(active_section.group(1))
+            for row in rows:
+                rule_id = row.get("id", "").strip()
+                if rule_id in behavioral_rule_refs:
+                    results.append({
+                        "type": "registry_rule_in_agent_file",
+                        "severity": "info",
+                        "file": str(registry_path),
+                        "rule_id": rule_id,
+                        "message": (
+                            f"System rule {rule_id} is already captured in an agent behavioral "
+                            f"rules file — candidate for system registry deprecation"
+                        ),
+                    })
+
+    # --- Per-agent behavioral rule files ---
+    for f in sorted(main_mem.glob("*-behavioral-rules.md")):
+        content = f.read_text(errors="replace")
+        cap_match = re.search(r"## Active Rules\s*\((\d+)/(\d+)", content)
+        if not cap_match:
+            continue
+        current = int(cap_match.group(1))
+        maximum = int(cap_match.group(2))
+        if current > maximum:
+            agent_name = f.name.replace("-behavioral-rules.md", "")
+            results.append({
+                "type": "agent_rules_overcapacity",
+                "severity": "warning",
+                "agent": agent_name,
+                "file": str(f),
+                "current_count": current,
+                "max_count": maximum,
+                "message": (
+                    f"{f.name}: {current} active rules vs max {maximum} "
+                    f"({current - maximum} over) — prune or consolidate low-priority rules"
+                ),
+            })
+
+
 def run_audit() -> list:
     """Run all audit checks and return results."""
     results = []
@@ -460,6 +585,7 @@ def run_audit() -> list:
     check_intraday_bloat(results)
     check_context_bloat(results)
     check_stale_markers(results)
+    check_system_rules_registry(results)
     return results
 
 

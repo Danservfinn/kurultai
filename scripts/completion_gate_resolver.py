@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
+# DEPRECATED: This is the v1 completion gate resolver. Superseded by completion_gate_resolver_v2.py
+# (copied from completion-gate-resolver.py). tock-gather.sh now imports from v2.
+# TODO: Migrate any remaining callers to completion_gate_resolver_v2, then archive this file.
 """
 Completion Gate Resolver - Monitors and resolves pending gates
 
 Checks pending gates and resolves them when follow-up tasks complete.
 Runs via task-watcher on every cycle or can be called directly.
 
+DEPRECATED: Use completion_gate_resolver_v2 instead.
+
 Usage:
-    from completion_gate_resolver import GateResolver
+    from completion_gate_resolver_v2 import GateResolver
 
     resolver = GateResolver(dry_run=False)
     resolved_count = resolver.resolve_pending_gates()
