@@ -1,21 +1,5 @@
 {
-  "last_run": "2026-03-13T00:03:01.123958",
-  "last_count": 3,
-  "reported_tasks": [
-    {
-      "agent": "ogedei",
-      "filename": "normal-1773331775.failed.revision-1.failed.done.md",
-      "ts": "2026-03-13T00:03:01.123978"
-    },
-    {
-      "agent": "ogedei",
-      "filename": "normal-1773275435.failed.revision-1.failed.done.md",
-      "ts": "2026-03-13T00:03:01.123984"
-    },
-    {
-      "agent": "ogedei",
-      "filename": "normal-1773334362.failed.revision-1.failed.done.md",
-      "ts": "2026-03-13T00:03:01.123996"
-    }
-  ]
+  "last_run": "2026-03-15T18:03:30.654051",
+  "last_count": 0,
+  "reported_tasks": []
 }

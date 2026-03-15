@@ -379,8 +379,9 @@ def main():
                             MATCH (t:Task {task_id: $task_id})
                             SET t.action_score = $score, t.action_scored_at = datetime()
                         """, task_id=task_id, score=score)
-            except Exception:
-                pass  # Best-effort — don't crash if Neo4j unavailable
+            except Exception as e:
+                import logging
+                logging.warning(f"[action_scorer] Neo4j persistence failed: {e}")
             print(f"Scored {agent}: worst={scored.get('worst_category')} cc_rate={scored.get('claude_code_rate'):.0%}")
         else:
             print(f"No scoring needed for {agent} (no tasks or already scored this hour)")

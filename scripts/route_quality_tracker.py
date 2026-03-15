@@ -126,7 +126,7 @@ def compute_capability_scores():
     for score_ev in scored_events:
         agent = score_ev.get("agent", "unknown")
         task_id = score_ev.get("task_id")
-        total = normalize_score(score_ev)
+        total = normalize_score(score_ev.get("total_score", 0))
         w = _recency_weight(score_ev.get("ts", ""), now)
 
         # Get task summary for category detection

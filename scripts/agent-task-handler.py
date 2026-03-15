@@ -24,7 +24,11 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from json_state import locked_json_update
-from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER, CLAUDE_AGENT as _CLAUDE_AGENT
+from kurultai_paths import (
+    AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER,
+    CLAUDE_AGENT as _CLAUDE_AGENT, CLAUDE_TIMEOUT as _KP_CLAUDE_TIMEOUT,
+    TIMEOUT_BY_PRIORITY as _KP_TIMEOUT_BY_PRIORITY,
+)
 from kurultai_ledger import append_ledger as _kp_append_ledger
 
 # LEDGER RELOAD FIX: Force reload of kurultai_ledger to pick up schema updates
@@ -77,17 +81,12 @@ except Exception as e:
 AGENTS_DIR = str(_AGENTS_DIR)
 SPAWN_QUEUE = str(_SPAWN_QUEUE)
 CLAUDE_AGENT = str(_CLAUDE_AGENT)
-CLAUDE_TIMEOUT = 10800  # 3 hours for Claude Code execution (increased from 2h)
+CLAUDE_TIMEOUT = _KP_CLAUDE_TIMEOUT  # imported from kurultai_paths (canonical source)
 
 # Fallback model configuration for rate limit recovery
-# CLAUDE API RATE LIMITED until 2026-03-12 — using glm-5 as primary
 FALLBACK_MODEL = "glm-5"  # Primary model (Claude API unavailable)
 MAX_RATE_LIMIT_RETRIES = 1  # Only retry once with fallback model
-TIMEOUT_BY_PRIORITY = {
-    'high': 10800,   # 3 hours for complex high-priority tasks
-    'normal': 10800, # 3 hours
-    'low': 7200,     # 2 hours for low priority
-}
+TIMEOUT_BY_PRIORITY = _KP_TIMEOUT_BY_PRIORITY  # imported from kurultai_paths (canonical source)
 # Skills that need extra time (design exploration, brainstorming, debugging)
 SLOW_SKILLS = {
     '/horde-brainstorming': 10800,
@@ -558,6 +557,28 @@ PROXY_STALL_ELAPSED = 1800   # don't check until 30 min when using proxy
 # R008 skill hint pre-flight check — abort early if agent ignores required skill
 R008_PREFLIGHT_ELAPSED = 60   # check for skill invocation after 60 seconds
 
+# Per-skill R008 timeout overrides (ops/review skills need more startup time)
+# FIX 2026-03-14: All SLOW_SKILLS now get extended R008 timeout (3 min) to allow skill invocation
+# Previously only some skills were listed, causing false R008_VIOLATION for /horde-learn etc.
+R008_PREFLIGHT_BY_SKILL = {
+    '/kurultai-health': 180,
+    '/code-reviewer': 180,
+    '/kurultai-model-switcher': 120,
+    # All horde skills need extended preflight time (research, brainstorming, implementation)
+    '/horde-brainstorming': 180,
+    '/golden-horde': 180,
+    '/horde-implement': 180,
+    '/horde-review': 180,
+    '/horde-debug': 180,
+    '/horde-learn': 180,
+    '/horde-swarm': 180,
+    '/horde-test': 180,
+    '/horde-plan': 180,
+    '/horde-gate-testing': 180,
+    # Complex analysis skills
+    '/systematic-debugging': 180,
+}
+
 
 def _spawn_haiku_completion(agent_name):
     """Spawn haiku /task-complete in a background thread with timeout.
@@ -698,7 +719,7 @@ def get_pending_tasks(agent_name):
                     priority = 'low'
 
                 # Extract frontmatter fields
-                task_id = _extract_task_id(content)
+                task_id = _extract_task_id(content, filepath=task_file)
                 skill_hint = _extract_skill_hint(content)
                 depth = _extract_depth(content)
 
@@ -1644,11 +1665,19 @@ def _extract_depth(content):
     return int(match.group(1)) if match else 0
 
 
-def _extract_task_id(content):
-    """Extract task_id from task frontmatter."""
+def _extract_task_id(content, filepath=None):
+    """Extract task_id from task frontmatter or filename."""
     import re
     match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
-    return match.group(1) if match else None
+    if match:
+        return match.group(1)
+    # Fallback: extract canonical task_id from filename (priority-timestamp-uuid8)
+    if filepath:
+        fname = Path(filepath).name if not isinstance(filepath, Path) else filepath.name
+        canonical = re.search(r'((?:critical|high|normal|low)-\d{10}-[a-f0-9]{8})', fname, re.I)
+        if canonical:
+            return canonical.group(1).lower()
+    return None
 
 
 def _extract_skill_hint(content):
@@ -1938,8 +1967,48 @@ def _validate_session_model(agent_name: str, expected_model: str) -> tuple[bool,
 
 
 def _append_ledger(entry):
-    """Append an event to the unified task-ledger.jsonl (flock-safe via kurultai_paths)."""
-    _kp_append_ledger(entry)
+    """Append an event to the task ledger.
+
+    kurultai_ledger.append_ledger is a no-op since Phase 5 cutover (2026-03-12).
+    Delegate to _append_ledger_direct which dual-writes to JSONL + Neo4j.
+    """
+    _append_ledger_direct(entry)
+
+
+def _append_ledger_direct(entry):
+    """Write event to both JSONL and Neo4j for full telemetry visibility.
+
+    Since Phase 5 cutover (2026-03-12), read_ledger() reads from Neo4j.
+    Events written only to JSONL (SKILL_INVOCATION, SKILL_OUTCOME, etc.)
+    are invisible to reflect cycles. This dual-writes to both stores.
+    """
+    import fcntl
+    # 1. Write to JSONL (backward compat)
+    ledger_path = Path.home() / '.openclaw' / 'tasks' / 'task-ledger.jsonl'
+    try:
+        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(ledger_path, "a", encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                f.write(json.dumps(entry) + "\n")
+                f.flush()
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+    except Exception as e:
+        print(f"  WARNING: _append_ledger_direct JSONL write failed: {e}")
+
+    # 2. Write to Neo4j as PipelineEvent (makes events visible to read_ledger)
+    try:
+        from neo4j_task_tracker import TaskTracker
+        tracker = TaskTracker()
+        tracker.emit_pipeline_event(
+            event_type=entry.get("event", "UNKNOWN"),
+            payload=entry,
+            agent=entry.get("agent", ""),
+        )
+        tracker.close()
+    except Exception as e:
+        print(f"  WARNING: _append_ledger_direct Neo4j write failed (non-fatal): {e}")
 
 
 def _extract_skills_from_transcript(agent_name: str, start_time: float, task_id: str, skill_hint) -> list:
@@ -1950,7 +2019,9 @@ def _extract_skills_from_transcript(agent_name: str, start_time: float, task_id:
     Transcript location: ~/.claude/projects/{encoded_cwd}/{session_id}.jsonl
     """
     agent_root = f"{AGENTS_DIR}/{agent_name}"
-    encoded = agent_root.replace('/', '-').replace('.', '-').lstrip('-')
+    # Claude Code encodes project paths by replacing / and . with -
+    # The leading - from the absolute path's / must be preserved (not stripped)
+    encoded = agent_root.replace('/', '-').replace('.', '-')
     project_dir = Path.home() / ".claude/projects" / encoded
 
     if not project_dir.exists():
@@ -1982,13 +2053,18 @@ def _extract_skills_from_transcript(agent_name: str, start_time: float, task_id:
         except Exception:
             continue
         msg = record.get("message", {})
-        for block in msg.get("content", []):
+        content = msg.get("content", [])
+        if isinstance(content, str):
+            continue  # content is plain text, not a list of blocks
+        for block in content:
+            if not isinstance(block, dict):
+                continue
             if block.get("type") == "tool_use" and block.get("name") == "Skill":
                 skill_name = block.get("input", {}).get("skill", "")
                 if not skill_name:
                     continue
                 skill_full = f"/{skill_name}" if not skill_name.startswith("/") else skill_name
-                _append_ledger({
+                _append_ledger_direct({
                     "task_id": task_id,
                     "event": "SKILL_INVOCATION",
                     "ts": datetime.now().isoformat(),
@@ -2018,7 +2094,9 @@ def _check_skill_invocation_early(agent_name: str, start_time: float, skill_hint
         return True  # No skill hint required, pass check
 
     agent_root = f"{AGENTS_DIR}/{agent_name}"
-    encoded = agent_root.replace('/', '-').replace('.', '-').lstrip('-')
+    # Claude Code encodes project paths by replacing / and . with -
+    # The leading - from the absolute path's / must be preserved (not stripped)
+    encoded = agent_root.replace('/', '-').replace('.', '-')
     project_dir = Path.home() / ".claude/projects" / encoded
 
     if not project_dir.exists():
@@ -2052,7 +2130,12 @@ def _check_skill_invocation_early(agent_name: str, start_time: float, skill_hint
         except Exception:
             continue
         msg = record.get("message", {})
-        for block in msg.get("content", []):
+        content = msg.get("content", [])
+        if isinstance(content, str):
+            continue  # content is plain text, not a list of blocks
+        for block in content:
+            if not isinstance(block, dict):
+                continue
             if block.get("type") == "tool_use" and block.get("name") == "Skill":
                 skill_name = block.get("input", {}).get("skill", "")
                 if not skill_name:
@@ -2142,6 +2225,38 @@ def _requires_manual_approval(agent_name: str, skill_hint: str) -> bool:
     This function always returns False for backward compatibility.
     """
     return False  # Skills are auto-invoked, no manual approval needed
+
+
+def _track_skill_telemetry(task_id: str, agent_name: str, skill_hint: str, skills_invoked: list, r008_violation: bool):
+    """
+    Emit SKILL_OUTCOME event to task-ledger.jsonl after task execution.
+
+    This closes the telemetry gap flagged by kurultai-reflect: without SKILL_OUTCOME
+    events, reflect cycles cannot measure skill effectiveness or compliance rates.
+
+    NOTE: Writes directly to JSONL file because kurultai_ledger.append_ledger is a
+    no-op since Phase 5 cutover (2026-03-12). Same pattern as task_report_hook.py.
+    """
+    try:
+        hint_normalized = skill_hint.lstrip('/')
+        hint_matched = any(
+            hint_normalized in skill.lstrip('/') or skill.lstrip('/') in hint_normalized
+            for skill in skills_invoked
+        )
+        event = {
+            "task_id": task_id,
+            "event": "SKILL_OUTCOME",
+            "ts": datetime.now().isoformat(),
+            "agent": agent_name,
+            "skill_hint": skill_hint,
+            "skills_invoked": skills_invoked,
+            "hint_matched": hint_matched,
+            "r008_violation": r008_violation,
+            "invocation_count": len(skills_invoked),
+        }
+        _append_ledger_direct(event)
+    except Exception as e:
+        print(f"  WARNING: SKILL_OUTCOME telemetry failed: {e}")
 
 
 _TOOL_PATTERNS = {
@@ -2356,6 +2471,9 @@ def auth_health_preflight(agent: str, timeout: int = 30) -> bool:
                         if age_seconds < AUTH_STALE_SECONDS:
                             # Cached result is fresh - skip auth check
                             return True
+                        elif age_seconds < 900:  # 15 minutes — allow with warning
+                            print(f"  AUTH PREFLIGHT: {agent} using recent auth ({age_seconds:.0f}s ago, soft-pass)")
+                            return True
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             # Cache read failed - fall through to fresh check
             pass
@@ -2365,6 +2483,17 @@ def auth_health_preflight(agent: str, timeout: int = 30) -> bool:
     if not agent_dir.is_dir():
         print(f"  AUTH PREFLIGHT: {agent} directory not found: {agent_dir}")
         return False
+
+    # Lightweight check: claude auth status (10s timeout, no LLM invocation)
+    try:
+        status_result = subprocess.run(
+            ["claude", "auth", "status"],
+            capture_output=True, text=True, timeout=10
+        )
+        if status_result.returncode == 0 and "authenticated" in (status_result.stdout or "").lower():
+            return True
+    except (subprocess.TimeoutExpired, Exception):
+        pass  # Fall through to full check
 
     test_prompt = "Respond with exactly: OK"
 
@@ -2776,6 +2905,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
         stdout_chunks = []
         last_output_time = time.time()
         start = time.time()
+        r008_checked = False  # R008 fires at most once per task execution
 
         # Read stdout in a background thread so we can monitor for stalls
         import queue as _queue
@@ -2824,18 +2954,24 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
             # R008 LAYER 4: Preflight check for skill_hint invocation (2026-03-12 RE-ENABLED)
             # Previous "auto-invoke" was just text instructions — agents ignored it.
             # Now actively check if Skill tool was called early in execution.
-            if skill_hint and elapsed >= R008_PREFLIGHT_ELAPSED:
-                if not _check_skill_invocation_early(agent_name, start_time, skill_hint):
-                    # Agent failed to invoke required skill within R008_PREFLIGHT_ELAPSED seconds
-                    print(f"  ❌ R008_VIOLATION: Required skill '{skill_hint}' NOT invoked within {R008_PREFLIGHT_ELAPSED}s")
+            # FIX 2026-03-13: Per-skill timeouts + once-only guard (prevents repeated kills)
+            r008_timeout = R008_PREFLIGHT_BY_SKILL.get(skill_hint, R008_PREFLIGHT_ELAPSED) if skill_hint else R008_PREFLIGHT_ELAPSED
+            if skill_hint and elapsed >= r008_timeout and not r008_checked:
+                r008_checked = True
+                if not _check_skill_invocation_early(agent_name, start, skill_hint):
+                    # Agent failed to invoke required skill within r008_timeout seconds
+                    print(f"  ❌ R008_VIOLATION: Required skill '{skill_hint}' NOT invoked within {r008_timeout}s")
                     print(f"     Terminating task per R008 mandatory skill invocation rule")
+                    # Determine if this is a slow skill for logging purposes
+                    _is_slow_for_log = skill_hint in SLOW_SKILLS if skill_hint else False
                     _append_ledger({
                         "event": "R008_VIOLATION_TIMEOUT",
                         "ts": datetime.now().isoformat(),
                         "agent": agent_name,
                         "skill_hint": skill_hint,
                         "elapsed_s": int(elapsed),
-                        "preflight_timeout": R008_PREFLIGHT_ELAPSED,
+                        "preflight_timeout": r008_timeout,
+                        "is_slow_skill": _is_slow_for_log,
                     })
                     proc.terminate()
                     try:
@@ -2845,7 +2981,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
                         proc.wait()
                     return {
                         "success": False,
-                        "error": f"R008_VIOLATION: Required skill '{skill_hint}' was not invoked within {R008_PREFLIGHT_ELAPSED}s",
+                        "error": f"R008_VIOLATION: Required skill '{skill_hint}' was not invoked within {r008_timeout}s",
                         "content": "".join(stdout_chunks),
                         "model": model or "claude-code",
                     }
@@ -2876,7 +3012,7 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
                 # (active tool calls produce no stdout but do write to the session file)
                 session_active = False
                 try:
-                    project_slug = agent_root.replace('/', '-').lstrip('-')
+                    project_slug = agent_root.replace('/', '-')
                     project_dir = os.path.expanduser(f"~/.claude/projects/{project_slug}")
                     if os.path.isdir(project_dir):
                         now = time.time()
@@ -3551,17 +3687,19 @@ def process_task(agent_name, task):
     if context_history:
         print(f"  📎 Context history: {len(context_history)} previous agent(s) worked on this task")
 
+    # FIX 2026-03-13: Initialize start_time BEFORE executor conditionals to ensure it's always defined
+    # Prevents NameError when _extract_skills_from_transcript is called after model drift rejection
+    start_time = time.time()
+
     if executor == 'ollama':
         # Direct Ollama API call (no tools, text-only)
         print(f"  🤖 Executing via Ollama (direct API)... (timeout: {timeout}s)")
-        start_time = time.time()
         result = execute_task_with_ollama(agent_name, task_content, config, timeout=timeout)
         elapsed_s = round(time.time() - start_time, 1)
         executor_name = "ollama"
     else:
         # Claude Code with full tool access
         print(f"  🤖 Executing via Claude Code...{f' (skill: {skill_hint})' if skill_hint else ''} (timeout: {timeout}s)")
-        start_time = time.time()
         VALID_CLAUDE_MODELS = {
             # Only Claude models are valid for Claude Code executor
             'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5',
@@ -3705,9 +3843,8 @@ def process_task(agent_name, task):
     if task_id and skill_hint:
         try:
             _track_skill_telemetry(task_id, agent_name, skill_hint, skills_invoked, r008_violation)
-        except NameError:
-            # _track_skill_telemetry not defined - skip telemetry (non-fatal)
-            pass
+        except Exception as e:
+            print(f"  WARNING: Skill telemetry emission failed: {e}")
 
     # R008 LAYER 6: FAILURE CONSEQUENCE AMPLIFICATION
     # Track R008 violations per agent and escalate after repeated failures
@@ -4077,7 +4214,7 @@ def execute_single_task(agent_name, task_file):
             break
 
     depth = _extract_depth(content)
-    task_id = _extract_task_id(content)
+    task_id = _extract_task_id(content, filepath=task_file)
     skill_hint = _extract_skill_hint(content)
 
     # Extract new communication/context fields

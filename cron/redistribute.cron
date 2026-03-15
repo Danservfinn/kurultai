@@ -1,0 +1,16 @@
+# Dynamic Queue Balancing - Automatic Redistribution
+# Runs every 5 minutes to check for redistribution triggers
+# Only executes when trigger conditions are met (see should_trigger_redistribution())
+#
+# Trigger conditions:
+# 1. Imbalance ratio >= 2.0 with max depth >= 5
+# 2. Agent idle > 10min while others have work
+# 3. Sustained high load > 0.6 for 3 consecutive checks
+#
+# Installation:
+#   crontab -l | { cat; cat /Users/kublai/.openclaw/agents/main/cron/redistribute.cron; } | crontab -
+#
+# Verification:
+#   crontab -l | grep redistribute
+
+*/5 * * * * python3 /Users/kublai/.openclaw/agents/main/scripts/task-redistribute.py --auto --log /Users/kublai/.openclaw/logs/redistribution.jsonl

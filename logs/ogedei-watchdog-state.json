@@ -1,67 +1,69 @@
 {
-  "last_audit": 1773373025.47849,
-  "cycles": 18682,
-  "last_cycle": "2026-03-13T00:03:40.267270",
+  "last_audit": 1773612287.140966,
+  "cycles": 25654,
+  "last_cycle": "2026-03-15T18:32:52.137274",
   "watcher_restarts": 118,
-  "stalled_warnings": 508,
-  "fakes_detected": 16,
+  "stalled_warnings": 510,
+  "fakes_detected": 17,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 6,
+    "audited": 0,
     "fake_found": 0,
     "requeued": 0,
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1773374620.2672799,
-  "last_issues": [],
+  "last_cycle_epoch": 1773613972.137284,
+  "last_issues": [
+    "neo4j_v2_executor log stale (13385s)",
+    "reflection-status.json missing"
+  ],
   "reflection_misses": 0,
-  "last_memory_audit": 1773374585.5666611,
+  "last_memory_audit": 1773612184.2142851,
   "memory_audit_result": {
     "total": 11,
     "critical": 0,
     "warning": 4,
-    "ts": "2026-03-13T00:03:05.708440"
+    "ts": "2026-03-15T18:03:04.288063"
   },
-  "last_routing_drift_check": 1773373025.551533,
+  "last_routing_drift_check": 1773612321.954091,
   "routing_drift": {
-    "total": 2,
+    "total": 0,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "top_examples": [],
-    "ts": "2026-03-12T23:37:05.578781"
+    "ts": "2026-03-15T18:05:21.981721"
   },
-  "memory_fixes": 619,
-  "last_failure_rate_check": 1773374550.490226,
+  "memory_fixes": 770,
+  "last_failure_rate_check": 1773613763.923962,
   "agent_failure_flags": {},
-  "cycle_start_time": 1773374620.209634,
-  "last_queue_balance_check": 1773374550.5188549,
+  "cycle_start_time": 1773613972.033721,
+  "last_queue_balance_check": 1773613763.954422,
   "queue_depths": {
-    "kublai": 3,
-    "temujin": 5,
+    "kublai": 0,
+    "temujin": 0,
     "mongke": 0,
-    "chagatai": 2,
-    "jochi": 4,
-    "ogedei": 2,
-    "tolui": 7
+    "chagatai": 0,
+    "jochi": 0,
+    "ogedei": 0,
+    "tolui": 0
   },
-  "last_cascade_check": 1773374342.884198,
+  "last_cascade_check": 1773613524.9325051,
   "cascade_risk": "low",
   "cascade_metrics": {
     "events_analyzed": 0
   },
-  "last_quality_gate_check": 1773374550.5207129,
+  "last_quality_gate_check": 1773613937.581953,
   "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1773372556.443328,
-  "self_healing_score": 56.0,
+  "last_self_healing_score_check": 1773611360.353129,
+  "self_healing_score": 100.0,
   "self_healing_metrics": {
-    "auto_resolved": 56,
-    "escalated": 44,
+    "auto_resolved": 3,
+    "escalated": 0,
     "manual": 0,
-    "total": 100
+    "total": 3
   },
   "circuit_half_open_agents": [
     "ogedei",
@@ -69,15 +71,15 @@
     "temujin"
   ],
   "circuit_report": {
-    "ts": "2026-03-13T00:03:40.266557",
+    "ts": "2026-03-15T18:32:52.136530",
     "agents": {
-      "ogedei": {
+      "mongke": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
         "detail": null
       },
-      "mongke": {
+      "chagatai": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -89,7 +91,7 @@
         "reason": "normal",
         "detail": null
       },
-      "chagatai": {
+      "ogedei": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -114,17 +116,17 @@
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.05724072456359863,
-  "state_file_size": 4835,
-  "tasks_recovered": 180,
+  "last_cycle_duration": 0.10316920280456543,
+  "state_file_size": 4194,
+  "tasks_recovered": 191,
   "slow_cycles": 15,
-  "queue_balance_moves": 209,
+  "queue_balance_moves": 332,
   "circuit_open_agents": [
     "jochi",
     "ogedei"
   ],
-  "last_cred_failure_check": 1773374550.505505,
-  "last_git_operation_check": 1773374550.5223942,
+  "last_cred_failure_check": 1773613901.9209,
+  "last_git_operation_check": 1773613763.958644,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
@@ -134,34 +136,30 @@
     "anomaly_count": 0,
     "blocked_operations_24h": 0
   },
-  "stall_escalated": 161,
-  "stall_escalations": {
-    "temujin/normal-1773344342.failed.revision-1.executing.md_escalation": 1773364082.703344,
-    "temujin/normal-1773348190-d337e0ff.failed.revision-1.failed.revision-1.executing.md_escalation": 1773364082.703344,
-    "jochi/high-1773345765.failed.revision-1.failed.revision-1.executing.md_escalation": 1773364082.703344
-  },
+  "stall_escalated": 165,
+  "stall_escalations": {},
   "stall_skips_completed": 2,
   "stall_cleaned_artifacts": 2,
-  "last_model_drift_check": 1773373059.9229739,
+  "last_model_drift_check": 1773612424.681165,
   "model_drift_drifted": [
     {
       "agent": "mongke",
-      "session_model": "glm-5",
+      "session_model": "qwen3.5-plus",
       "config_model": "claude-opus-4-6"
     },
     {
       "agent": "chagatai",
-      "session_model": "glm-5",
+      "session_model": "qwen3.5-plus",
       "config_model": "claude-opus-4-6"
     },
     {
       "agent": "temujin",
-      "session_model": "glm-5",
+      "session_model": "qwen3.5-plus",
       "config_model": "claude-opus-4-6"
     },
     {
       "agent": "jochi",
-      "session_model": "glm-5",
+      "session_model": "qwen3.5-plus",
       "config_model": "claude-opus-4-6"
     },
     {
@@ -171,6 +169,7 @@
     }
   ],
   "model_drift_checked": 5,
-  "model_drift_ts": "2026-03-12T23:37:39.924116",
-  "model_drift_last_escalate": 1773369427.722044
+  "model_drift_ts": "2026-03-15T18:07:04.687813",
+  "model_drift_last_escalate": 1773608776.8753211,
+  "model_drift_last_clean": "2026-03-15T12:33:52.038883"
 }

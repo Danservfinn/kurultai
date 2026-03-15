@@ -10,7 +10,7 @@ type: feedback
 **Role:** Researcher (market analysis, competitive intelligence, trend analysis)
 **Domain:** Research, data gathering, insight generation, knowledge extraction
 
-## Active Rules (7/7)
+## Active Rules (6/7) — M006 DEPRECATED
 
 ### M001: Pre-Submit Quality Check (R009)
 **Priority:** 1 (CRITICAL)
@@ -111,22 +111,19 @@ results = execute_query_cypher(
 
 **Reference:** `scripts/neo4j_utils.py` — added `safe_neo4j_op()`, `execute_query_cypher()`, `check_neo4j_available()`
 
-### M006: Bypass /horde-learn — Use Direct Research Tools (ACTIVE UNTIL FIXED)
-**Priority:** 1 (CRITICAL) — overrides R008 skill hint enforcement for /horde-learn
+### M006: ~~Bypass /horde-learn~~ — DEPRECATED (FIXED 2026-03-13)
+**Status:** ~~ACTIVE~~ → **DEPRECATED**
+**Priority:** N/A (rule no longer applies)
 
-**WHEN:** Executing any research task (regardless of skill_hint or task instructions)
+**WHEN:** ~~Executing any research task (regardless of skill_hint or task instructions)~~
 
-**THEN:** Use `WebSearch` + `WebFetch` tools directly. Do NOT invoke `/horde-learn` skill.
+**THEN:** ~~Use `WebSearch` + `WebFetch` tools directly. Do NOT invoke `/horde-learn` skill.~~
 
-**Why:** `/horde-learn` skill has an active 63s timeout bug (confirmed by /horde-review 2026-03-12 PRIORITY_FIX). Invoking it causes task failure and makes mongke "functionally dead." Rule r021 in rules.json.
+**DEPRECATION REASON:** Root cause fixed by ogedei in task `normal-horde-learn-timeout-fix-20260312-2230`.
 
-**How to apply:**
-- Search: `WebSearch` tool with targeted queries
-- Fetch: `WebFetch` for specific URLs
-- Structure output per M004 (Executive Summary, Findings, Sources, Action Items)
-- Resume using `/horde-learn` only after: (1) ogedei creates a fix task, (2) fix is deployed, (3) rule is explicitly deprecated here
+**Fix deployed:** R008_PREFLIGHT_ELAPSED now respects SLOW_SKILLS configuration. Skills like `/horde-learn` that are in SLOW_SKILLS get 20-minute timeout (SLOW_SKILL_STALL_ELAPSED) instead of 60-second timeout. The `/horde-learn` skill can now be invoked normally.
 
-**Deprecation trigger:** When ogedei confirms `/horde-learn` timeout resolved, deprecate this rule and re-enable R008 for `/horde-learn` tasks.
+**Action:** Resume using `/horde-learn` for research tasks. Rule r021 in rules.json also deprecated.
 
 ---
 
@@ -154,4 +151,5 @@ results = execute_query_cypher(
 - Created: 2026-03-11
 - 2026-03-12T14:30:00Z: Added M005 (Neo4j graceful degradation) to prevent task failures when Neo4j unavailable
 - 2026-03-12T22:30:00Z: Added M006 (bypass /horde-learn, use direct tools) — CRITICAL priority, addresses horde-review PRIORITY_FIX; also added r021 to rules.json
-- Last updated: 2026-03-12T22:30:00Z
+- 2026-03-13T09:30:00Z: **DEPRECATED M006** — ogedei fixed R008_PREFLIGHT_ELAPSED to respect SLOW_SKILLS (task normal-horde-learn-timeout-fix-20260312-2230). `/horde-learn` can now be used normally. Also deprecated r021 in rules.json.
+- Last updated: 2026-03-13T09:30:00Z

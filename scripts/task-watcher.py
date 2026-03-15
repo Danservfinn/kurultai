@@ -284,16 +284,26 @@ def check_neo4j_task_status(task_id: str) -> dict | None:
 
 
 def _extract_task_id(task_file) -> str | None:
-    """Extract task_id from task file frontmatter.
+    """Extract task_id from task file frontmatter or filename.
 
     Returns the task_id or None if not found.
     """
     try:
         content = task_file.read_text(encoding="utf-8", errors="replace")[:2000]
         match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
-        return match.group(1) if match else None
+        if match:
+            return match.group(1)
     except Exception:
-        return None
+        pass
+    # Fallback: extract canonical task_id from filename
+    try:
+        fname = Path(task_file).name if not isinstance(task_file, Path) else task_file.name
+        canonical = re.search(r'((?:critical|high|normal|low)-\d{10}-[a-f0-9]{8})', fname, re.I)
+        if canonical:
+            return canonical.group(1).lower()
+    except Exception:
+        pass
+    return None
 
 
 def _neo4j_update_status(task_id, status, agent=None, error_msg=None):
@@ -519,13 +529,23 @@ def log(msg):
 
 
 def _extract_task_id(task_file):
-    """Extract task_id from task file frontmatter."""
+    """Extract task_id from task file frontmatter or filename."""
     try:
-        content = task_file.read_text(encoding="utf-8", errors="replace")
+        content = task_file.read_text(encoding="utf-8", errors="replace")[:2000]
         match = re.search(r'^task_id:\s*(\S+)', content, re.MULTILINE)
-        return match.group(1) if match else None
+        if match:
+            return match.group(1)
     except Exception:
-        return None
+        pass
+    # Fallback: extract canonical task_id from filename (priority-timestamp-uuid8)
+    try:
+        fname = Path(task_file).name if not isinstance(task_file, Path) else task_file.name
+        canonical = re.search(r'((?:critical|high|normal|low)-\d{10}-[a-f0-9]{8})', fname, re.I)
+        if canonical:
+            return canonical.group(1).lower()
+    except Exception:
+        pass
+    return None
 
 
 def _extract_skill_hint(task_file):
@@ -652,13 +672,96 @@ _last_redistribution_time = 0
 REDISTRIBUTION_COOLDOWN = 300  # 5 minutes between redistributions
 
 
+def _backfill_neo4j_pending_to_filesystem():
+    """Backfill Neo4j PENDING tasks to filesystem.
+
+    This fixes PENDING_NO_DISPATCH caused by tasks existing in Neo4j
+    but not in the filesystem task directories.
+
+    Returns: Number of tasks backfilled.
+    """
+    try:
+        driver = _get_neo4j_driver()
+        if not driver:
+            return 0
+
+        backfilled = 0
+        with driver.session() as session:
+            # Find PENDING tasks in Neo4j
+            result = session.run("""
+                MATCH (t:Task {status: 'PENDING'})
+                RETURN t.task_id as task_id, t.agent as agent, t.title as title,
+                       t.body as body, t.priority as priority, t.skill_hint as skill_hint,
+                       t.created as created
+            """)
+
+            for record in result:
+                agent = record.get("agent")
+                task_id = record.get("task_id")
+                if not agent or not task_id:
+                    continue
+
+                tasks_dir = AGENTS_DIR / agent / "tasks"
+                tasks_dir.mkdir(parents=True, exist_ok=True)
+
+                # Check if filesystem file already exists
+                existing = list(tasks_dir.glob(f"*{task_id}*.md")) if task_id else []
+                if existing:
+                    continue
+
+                # Generate filename
+                priority = record.get("priority") or "normal"
+                created = record.get("created")
+                if created:
+                    try:
+                        ts = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+                        epoch = int(ts.timestamp())
+                    except Exception:
+                        epoch = int(time.time())
+                else:
+                    epoch = int(time.time())
+
+                filename = f"{priority}-{epoch}.md"
+                filepath = tasks_dir / filename
+
+                # Create task file with frontmatter
+                title = record.get("title") or "Untitled Task"
+                body = record.get("body") or ""
+                skill_hint = record.get("skill_hint") or ""
+
+                content = f"""---
+task_id: {task_id}
+title: {title}
+priority: {priority}
+agent: {agent}
+skill_hint: {skill_hint}
+status: PENDING
+---
+
+# Task: {title}
+
+{body}
+"""
+                filepath.write_text(content, encoding="utf-8")
+                log(f"BACKFILL: Created {agent}/{filename} from Neo4j task {task_id}")
+                backfilled += 1
+
+        return backfilled
+
+    except Exception as e:
+        log(f"Backfill error: {e}")
+        return 0
+
+
 def _check_and_fix_queue_stall():
     """Detect and fix PENDING_NO_DISPATCH stall condition.
 
     Stall condition: An agent has >=1 pending tasks but 0 tasks executing.
     This indicates tasks are queueing but not being picked up for execution.
 
-    When detected, triggers redistribution to move tasks to healthier agents.
+    When detected:
+    1. First backfill Neo4j PENDING tasks to filesystem (fixes root cause)
+    2. Then trigger redistribution if still needed
 
     Returns: True if stall was detected and fix triggered, False otherwise
     """
@@ -671,6 +774,12 @@ def _check_and_fix_queue_stall():
         return False
 
     try:
+        # FIRST: Backfill any Neo4j PENDING tasks missing from filesystem
+        # This is the root cause fix for PENDING_NO_DISPATCH
+        backfilled = _backfill_neo4j_pending_to_filesystem()
+        if backfilled > 0:
+            log(f"BACKFILL: Created {backfilled} filesystem tasks from Neo4j")
+
         stalled_agents = []
 
         for agent_dir in AGENTS_DIR.iterdir():
@@ -1120,15 +1229,15 @@ def _schedule_task_report(task_file, agent, task_id, success, elapsed_s, output)
             from script_paths import get_script_path
             hook = str(get_script_path("task_report_hook"))
             status = "completed" if success else "failed"
-            result = subprocess.run(
-                ["python3", hook,
+            cmd = ["python3", hook,
                  "--task-file", str(task_file),
                  "--agent", agent,
                  "--status", status,
                  "--duration", str(elapsed_s),
-                 "--output", output[:1000] if output else ""],
-                capture_output=True, text=True, timeout=60,
-            )
+                 "--output", output[:1000] if output else ""]
+            if task_id and task_id != "unknown":
+                cmd.extend(["--task-id", task_id])
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             if result.returncode == 0:
                 log(f"  REPORT: Generated for {agent}/{task_file.name}")
             else:
@@ -1550,6 +1659,20 @@ def execute_task(task_file, agent, task_key, timeout):
 
     # Generate completion report (background thread, non-blocking)
     _schedule_task_report(task_file, agent, task_id, success, elapsed_s, output)
+
+    # Post-execution scoring: emit SCORED events for completed tasks
+    # This closes the TELEMETRY_GAP flagged by kurultai-reflect (5+ consecutive cycles)
+    if task_id and (success or is_permanent_fail):
+        try:
+            score_script = str(Path(__file__).parent / "score_tasks.py")
+            subprocess.Popen(
+                ["python3", score_script, "--hours", "1"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except Exception as e:
+            log(f"  WARNING: score_tasks.py launch failed: {e}")
 
     # Update state only on success or permanent failure (not on retry)
     if success or is_permanent_fail:

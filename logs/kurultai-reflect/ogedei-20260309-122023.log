@@ -1,0 +1,37 @@
+[PHASE 1 COMPLETE]
+[PHASE 2 COMPLETE]
+[PHASE 3 COMPLETE]
+[PHASE 4 COMPLETE]
+
+## Rule Candidates for Ogedei (Ops Agent)
+
+### Rule 1: Model Drift Detection (HIGH confidence)
+**WHEN:** Session model != configured model in `agent/models.json`
+**THEN:** Immediately halt task processing, execute `scripts/session-model-drift-detector.py` to identify drift source, and create CRITICAL escalation for kublai with model comparison details
+**INSTEAD OF:** Continuing to process tasks with wrong model (explains 4.2/10 quality score)
+**Evidence:** Current session running kimi-k2.5 vs configured claude-opus-4-6; kimi-k2.5 is Chinese-language model not suited for English ops tasks
+
+### Rule 2: Queue Bottleneck Response (HIGH confidence)
+**WHEN:** Queue depth ≥5 OR estimated clear time ≥2h
+**THEN:** Trigger load-balancing protocol: (1) Pause new task intake via `scripts/queue-cleanup.py --pause`, (2) Alert kublai for overflow redistribution, (3) Run `scripts/throughput_anomaly.py` to diagnose stall cause
+**INSTEAD OF:** Accepting new tasks while backlog persists (current behavior: 5 pending, 2.3h clear, worst in fleet)
+**Evidence:** 5 pending tasks + 0 completions in last hour = stalled ops agent
+
+### Rule 3: Cron Job Health Monitoring (MEDIUM confidence)
+**WHEN:** Kurultai Reflection cron fails 2+ consecutive executions
+**THEN:** Execute reflection pipeline self-test: `scripts/hourly_reflection.sh --test-mode`, log failure to `logs/reflection-anomalies.jsonl`, and create watchdog escalation if blockage persists >15min
+**INSTEAD OF:** Allowing reflection pipeline to degrade silently (currently: 1 consecutive error, affects self-improvement)
+**Evidence:** Cron error detected + low scores suggest feedback loop broken
+
+---
+
+## Final Summary: CRITICAL
+
+**Status:** CRITICAL - Multiple cascading failures requiring immediate intervention
+
+**Priority Actions:**
+1. **URGENT:** Fix model drift (kimi-k2.5 → claude-opus-4-6) - root cause of low quality
+2. **URGENT:** Clear queue bottleneck or pause intake - 2.3h backlog unacceptable
+3. **HIGH:** Repair cron reflection pipeline - breaking self-improvement cycle
+
+**System Impact:** Ops agent is degraded across all dimensions (quality: 4.2/10, output: 0.8/3, queue: worst in fleet). Model drift suggests configuration sync failure between `~/.openclaw/agents/ogedei/.claude/settings.json` and `agent/models.json`.

@@ -1,0 +1,7 @@
+2026-03-02 15:32:30,243 - config - ERROR - Error posting thread to X: 403 Client Error: Forbidden for url: https://api.twitter.com/2/tweets
+2026-03-02 16:32:10,740 - config - ERROR - Error posting thread to X: 402 Client Error: Payment Required for url: https://api.twitter.com/2/tweets
+2026-03-02 16:36:39,141 - config - INFO - Successfully posted tweet 1/4: 2028585297978523773
+2026-03-02 16:36:41,465 - config - INFO - Successfully posted tweet 2/4: 2028585307789000780
+2026-03-02 16:36:43,824 - config - INFO - Successfully posted tweet 3/4: 2028585317519835443
+2026-03-02 16:36:46,150 - config - INFO - Successfully posted tweet 4/4: 2028585327376433537
+2026-03-02 16:36:48,222 - config - INFO - Thread posted successfully.

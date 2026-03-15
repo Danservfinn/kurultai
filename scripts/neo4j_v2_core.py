@@ -10,8 +10,10 @@ All state transitions use compare-and-swap via claim_epoch to prevent:
 State machine:
     PENDING --(claim)--> WORKING
     WORKING --(complete)--> COMPLETED  (requires TaskOutput + no blocking children)
-    WORKING --(fail transient, retries remain)--> PENDING  (carries FailureReport)
+    WORKING --(fail transient, retries remain)--> PENDING  (carries FailureReport, retry_after backoff)
     WORKING --(fail permanent or exhausted)--> FAILED  (carries FailureReport)
+    WORKING --(orphan recovery)--> ORPHANED  (hold period before retry)
+    ORPHANED --(promote, after hold)--> PENDING
 
 Usage:
     from neo4j_v2_core import TaskStore
@@ -71,6 +73,7 @@ class TaskStore:
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (t:Task {assigned_to: $agent, status: 'PENDING'})
+                WHERE (t.retry_after IS NULL OR t.retry_after <= datetime())
                 WITH t ORDER BY
                     CASE t.priority
                         WHEN 'critical' THEN 0
@@ -132,7 +135,7 @@ class TaskStore:
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $id, status: 'WORKING', claim_epoch: $epoch})
-                OPTIONAL MATCH (t)-[:SPAWNED*1..]->(child:Task)
+                OPTIONAL MATCH (t)-[:SPAWNED*1..5]->(child:Task)
                     WHERE child.status IN ['PENDING', 'WORKING']
                 WITH t, count(child) AS blocking
                 WHERE blocking = 0
@@ -159,13 +162,16 @@ class TaskStore:
                 return True, "completed"
 
             # Diagnose why it failed
-            return self._diagnose_complete_failure(session, task_id, claim_epoch)
+            ok, reason = self._diagnose_complete_failure(session, task_id, claim_epoch)
+            if not ok:
+                logger.warning(f"Rejected completion for {task_id}: {reason} (stale executor?)")
+            return ok, reason
 
     def _diagnose_complete_failure(self, session, task_id: str, claim_epoch: int) -> tuple[bool, str]:
         """Figure out why complete_task CAS failed."""
         diag = session.run("""
             MATCH (t:Task {task_id: $id})
-            OPTIONAL MATCH (t)-[:SPAWNED*1..]->(child:Task)
+            OPTIONAL MATCH (t)-[:SPAWNED*1..5]->(child:Task)
                 WHERE child.status IN ['PENDING', 'WORKING']
             RETURN t.status AS status, t.claim_epoch AS epoch,
                    count(child) AS blocking
@@ -187,15 +193,23 @@ class TaskStore:
 
     def fail_task(self, task_id: str, claim_epoch: int,
                   error_class: str, error_msg: str,
-                  is_transient: bool, output_snippet: str = "") -> tuple[bool, str]:
+                  is_transient: bool, output_snippet: str = "",
+                  backoff_base_s: int = 30) -> tuple[bool, str]:
         """Fail a task, creating a FailureReport.
 
-        If transient and retries remain: WORKING --> PENDING (auto-retry).
+        If transient and retries remain: WORKING --> PENDING (auto-retry with backoff).
         Otherwise: WORKING --> FAILED.
+
+        Args:
+            backoff_base_s: Base seconds for exponential backoff (default 30).
+                            Actual delay = min(base * 2^retry_count, 600).
 
         Returns:
             (success, new_status) tuple.
         """
+        # Calculate exponential backoff with cap
+        max_backoff_s = 600  # 10 minute cap
+
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $id, status: 'WORKING', claim_epoch: $epoch})
@@ -212,6 +226,14 @@ class TaskStore:
                         ELSE 'FAILED'
                     END,
                     t.retry_count = t.retry_count + 1,
+                    t.retry_after = CASE
+                        WHEN $transient AND t.retry_count < t.max_retries
+                        THEN datetime() + duration({seconds: CASE
+                            WHEN $backoff_base * toInteger(2 ^ toFloat(t.retry_count)) > $max_backoff THEN $max_backoff
+                            ELSE $backoff_base * toInteger(2 ^ toFloat(t.retry_count))
+                        END})
+                        ELSE null
+                    END,
                     t.updated_at = datetime(),
                     t.lease_expires_at = null,
                     t.claimed_by = CASE
@@ -221,7 +243,8 @@ class TaskStore:
                 RETURN t.status AS new_status
             """, id=task_id, epoch=claim_epoch, error_class=error_class,
                 error_msg=error_msg, transient=is_transient,
-                snippet=output_snippet[:2000])
+                snippet=output_snippet[:2000],
+                backoff_base=backoff_base_s, max_backoff=max_backoff_s)
 
             record = result.single()
             if record:
@@ -253,7 +276,7 @@ class TaskStore:
     def recover_orphans(self, grace_minutes: int = 5) -> list[dict]:
         """Recover WORKING tasks with expired leases.
 
-        Sets them back to PENDING if transient-eligible, FAILED otherwise.
+        Moves to ORPHANED (hold period before retry) or FAILED (exhausted).
         Creates FailureReport for each recovery.
 
         Returns list of recovered task dicts.
@@ -272,13 +295,14 @@ class TaskStore:
                     created_at: datetime()
                 })
                 SET t.status = CASE
-                        WHEN t.retry_count < t.max_retries THEN 'PENDING'
+                        WHEN t.retry_count < t.max_retries THEN 'ORPHANED'
                         ELSE 'FAILED'
                     END,
-                    t.retry_count = t.retry_count + 1,
-                    t.updated_at = datetime(),
-                    t.lease_expires_at = null,
-                    t.claimed_by = null
+                    t.orphaned_at = CASE
+                        WHEN t.retry_count < t.max_retries THEN datetime()
+                        ELSE null
+                    END,
+                    t.updated_at = datetime()
                 RETURN t {.task_id, .status, .assigned_to, .retry_count} AS task
             """, grace=grace_minutes)
 
@@ -287,6 +311,30 @@ class TaskStore:
                 logger.warning(f"Recovered {len(recovered)} orphaned tasks: "
                                f"{[t['task_id'] for t in recovered]}")
             return recovered
+
+    def promote_orphans(self, hold_minutes: int = 5) -> list[dict]:
+        """Move ORPHANED tasks to PENDING after hold period.
+
+        Tasks sit in ORPHANED state for hold_minutes before being
+        promoted back to PENDING, giving slow executors time to finish.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {status: 'ORPHANED'})
+                WHERE t.orphaned_at < datetime() - duration({minutes: $hold})
+                SET t.status = 'PENDING',
+                    t.retry_count = t.retry_count + 1,
+                    t.lease_expires_at = null,
+                    t.claimed_by = null,
+                    t.orphaned_at = null,
+                    t.updated_at = datetime()
+                RETURN t {.task_id, .status, .assigned_to} AS task
+            """, hold=hold_minutes)
+            promoted = [dict(rec["task"]) for rec in result]
+            if promoted:
+                logger.info(f"Promoted {len(promoted)} orphaned tasks to PENDING: "
+                            f"{[t['task_id'] for t in promoted]}")
+            return promoted
 
     # ------------------------------------------------------------------
     # QUERY HELPERS
@@ -467,8 +515,13 @@ def _run_test():
         assert new_status == "PENDING", f"Expected PENDING after transient fail, got {new_status}"
         print(f"   [OK] Transient fail -> {new_status}")
 
-        # 5. Re-claim
+        # 5. Re-claim (clear retry_after since backoff would block immediate re-claim)
         print("5. Re-claiming after retry...")
+        with driver.session() as session:
+            session.run("""
+                MATCH (t:Task {task_id: $id})
+                SET t.retry_after = null
+            """, id=test_id)
         claimed2 = store.claim_task(test_agent)
         assert claimed2 is not None, "Re-claim returned None"
         epoch2 = claimed2["claim_epoch"]

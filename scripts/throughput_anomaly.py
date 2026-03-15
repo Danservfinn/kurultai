@@ -567,8 +567,10 @@ def detect_anomalies():
     # Catches the gap where tasks queue up but task-watcher isn't picking them up
     # REFLECTION-AWARE: Suppress false positives during hourly reflection cycle
     # (all agents run meta_reflection.py, causing temporary 0 executing state)
+    # ACP-AWARE: Uses total_activity (executing + active_processes) because ACP sessions
+    # don't create .executing.md files. Prevents false positives when work is happening.
     # DIAGNOSTIC: Includes task-watcher process status for faster triage
-    if total_pending >= 3 and total_executing == 0:
+    if total_pending >= 3 and total_activity == 0:
         # Check if reflection is running before flagging anomaly
         if not is_reflection_running():
             pend_list = ", ".join(f"{a}={n}" for a, n in sorted(pending.items()))
@@ -578,7 +580,7 @@ def detect_anomalies():
             warnings.append(
                 f"THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — "
                 f"{total_pending} task(s) pending [{pend_list}] but "
-                f"0 executing. {tw_info}. "
+                f"0 executing, 0 active processes. {tw_info}. "
                 f"Action: {'check dispatch logs' if tw_running else 'restart task-watcher via launchctl'}"
             )
         # else: Reflection running - agents are busy reflecting, not stalled

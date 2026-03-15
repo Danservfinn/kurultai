@@ -1,30 +1,9 @@
 {
   "ogedei:system health alert": {
-    "strikes": 7,
-    "last_seen": "2026-03-12T10:14:44.374646",
+    "strikes": 1,
+    "last_seen": "2026-03-14T21:46:32.203456",
     "last_title": "System Health Alert (1 issue)",
     "last_source": "system-health-check",
-    "last_task_id": "high-1773324884-20494fca"
-  },
-  "temujin:routing audit": {
-    "strikes": 3,
-    "last_seen": "2026-03-12T15:39:02.771388",
-    "last_title": "Review routing audit findings and implement improvements",
-    "last_source": "routing_audit",
-    "last_task_id": "normal-1773344342-62bbd6d7"
-  },
-  "ogedei:health check": {
-    "strikes": 3,
-    "last_seen": "2026-03-12T07:11:36.274684",
-    "last_title": "the.kurult.ai failing health checks (1x, 0 minutes)",
-    "last_source": "kurultai-monitor",
-    "last_task_id": "high-1773313896-3a5e6f5d"
-  },
-  "jochi:routing audit": {
-    "strikes": 1,
-    "last_seen": "2026-03-12T21:12:09.866363",
-    "last_title": "Review routing audit findings and implement improvements",
-    "last_source": "routing_audit",
-    "last_task_id": "normal-1773364329-0ad034e9"
+    "last_task_id": "normal-1773539189-a9a16fc3"
   }
 }

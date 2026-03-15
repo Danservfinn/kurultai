@@ -33,8 +33,18 @@ from neo4j.exceptions import (
 )
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
+from kurultai_paths import AGENTS_DIR as _AGENTS_DIR, agent_tasks_dir
 from kurultai_ledger import generate_task_id, validate_task_id
+
+import warnings
+_V1_DEPRECATED = os.environ.get('V1_DEPRECATED', 'true').lower() == 'true'
+
+def _check_deprecated(method_name):
+    if _V1_DEPRECATED:
+        warnings.warn(
+            f"TaskTracker.{method_name}() is deprecated. Use TaskStore from neo4j_v2_core instead.",
+            DeprecationWarning, stacklevel=3
+        )
 
 # Import Neo4j health check for pre-flight validation
 try:
@@ -131,6 +141,9 @@ def get_driver():
             _driver_refcount += 1
             return _cached_driver
 
+        # Load credentials FIRST so health check uses real password
+        _load_neo4j_env()
+
         # Pre-flight health check: fail fast if Neo4j is unavailable
         # This prevents lengthy timeout delays when Neo4j is down
         if not is_neo4j_available():
@@ -138,8 +151,6 @@ def get_driver():
                 "Neo4j is unavailable (pre-flight check failed). "
                 "Use safe_get_driver() for graceful fallback to filesystem-only mode."
             )
-
-        _load_neo4j_env()
         uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         user = os.getenv("NEO4J_USER", "neo4j")
         password = os.getenv("NEO4J_PASSWORD")
@@ -155,9 +166,9 @@ def get_driver():
             _cached_driver = GraphDatabase.driver(
                 uri,
                 auth=(user, password),
-                max_connection_pool_size=50,
+                max_connection_pool_size=30,
                 connection_timeout=10,           # Initial connection (reduced from 30)
-                connection_acquisition_timeout=60,  # Wait for pool slot
+                connection_acquisition_timeout=15,  # Wait for pool slot
                 max_transaction_retry_time=30,
                 max_connection_lifetime=3600     # 1 hour max connection age
             )
@@ -228,9 +239,9 @@ def get_pool_metrics() -> dict:
         return {
             "status": "active",
             "refcount": _driver_refcount,
-            "pool_size": 50,
+            "pool_size": 30,
             "connection_timeout": 10,
-            "acquisition_timeout": 60,
+            "acquisition_timeout": 15,
             "max_lifetime": 3600
         }
     finally:
@@ -347,9 +358,10 @@ class TaskTracker:
         self.close()
         return False  # Don't suppress exceptions
     
-    def create_task(self, label, agent, task_desc, priority="normal", 
+    def create_task(self, label, agent, task_desc, priority="normal",
                     mode="run", continuous=False, source="chat"):
         """Create a task node"""
+        _check_deprecated('create_task')
         with self.driver.session() as session:
             session.run("""
                 MERGE (a:Agent {name: $agent})
@@ -373,6 +385,7 @@ class TaskTracker:
     
     def update_status(self, label, status, error=None, session_key=None):
         """Update task status in a single atomic query."""
+        _check_deprecated('update_status')
         is_terminal = status in ['completed', 'failed', 'killed']
         is_running = status == 'running' and session_key is not None
         with self.driver.session() as session:
@@ -391,6 +404,7 @@ class TaskTracker:
     
     def increment_retry(self, label):
         """Increment retry count"""
+        _check_deprecated('increment_retry')
         with self.driver.session() as session:
             session.run("""
                 MATCH (t:Task {label: $label})
@@ -750,8 +764,56 @@ class TaskTracker:
             origin_initiator=origin_initiator or "",
             origin_source=origin_source or "")
 
-        # Filesystem write removed in Phase 4 cutover (2026-03-12)
-        # Neo4j is the sole source of truth for task state
+        # Filesystem write for backward compatibility with agent-task-handler.py
+        # agent-task-handler.py still reads task files from disk
+        # Neo4j is the source of truth, filesystem is for compatibility
+        task_file_written = False
+        try:
+            task_dir = agent_tasks_dir(agent)
+            task_dir.mkdir(parents=True, exist_ok=True)
+            task_file = task_dir / f"{task_id}.md"
+
+            # Build task content in markdown format
+            task_content = f"""# {title}
+
+**Priority:** {priority}
+**Agent:** {agent}
+**Source:** {source}
+**Skill Hint:** {skill_hint or 'auto-detected'}
+**Domain:** {domain}
+**Bucket:** {bucket}
+
+## Description
+
+{body}
+
+---
+*Created: {datetime.now().isoformat()}*
+*Task ID: {task_id}*
+"""
+
+            task_file.write_text(task_content)
+            task_file_written = True
+
+            # Verify the file was actually written
+            if not task_file.exists():
+                raise IOError(f"File write reported success but file does not exist: {task_file}")
+
+            # Verify the file has content
+            if task_file.stat().st_size == 0:
+                raise IOError(f"File exists but is empty: {task_file}")
+
+            logger.debug(f"Wrote task file: {task_file} ({task_file.stat().st_size} bytes)")
+        except Exception as e:
+            logger.error(f"Failed to write task file for {task_id}: {e}")
+            logger.error(f"Task dir: {task_dir}")
+            logger.error(f"Agent: {agent}, Task ID: {task_id}")
+            logger.error(f"File written flag: {task_file_written}")
+            # Don't fail - Neo4j is the source of truth
+            # But make the error visible for debugging
+            print(f"WARNING: Task file write failed for {task_id}: {e}")
+            print(f"  Expected location: {task_file}")
+            print(f"  Agent: {agent}")
 
         return task_id
 

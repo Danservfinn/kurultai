@@ -770,5 +770,385 @@
   "ogedei/high-20260312-173137-fallback-chain-invalid.md": {
     "executed": "2026-03-12T17:34:29.226411",
     "success": false
+  },
+  "temujin/ogedei-model-drift-alert-20260313-124118.md": {
+    "executed": "2026-03-13T14:01:51.898835",
+    "success": false
+  },
+  "kublai/ESCALATE-stale-task-temujin-normal-1773344342.failed.revision-1-20260312-210802.md": {
+    "executed": "2026-03-13T14:42:54.482387",
+    "success": false
+  },
+  "kublai/ESCALATE-stale-task-ogedei-normal-horde-learn-timeout-fix-20260312-2230-20260313-143826.md": {
+    "executed": "2026-03-13T14:43:20.640361",
+    "success": false
+  },
+  "ogedei/ogedei-model-drift-alert-20260313-144214.md": {
+    "executed": "2026-03-13T14:43:20.660645",
+    "success": false
+  },
+  "kublai/ESCALATE-stale-task-jochi-normal-1773368538-f1de5043-20260313-154429.md": {
+    "executed": "2026-03-13T15:47:50.055563",
+    "success": false
+  },
+  "jochi/normal-1773368538-f1de5043.md": {
+    "executed": "2026-03-13T15:47:50.143522",
+    "success": false
+  },
+  "kublai/ESCALATE-stale-task-jochi-normal-1773388505-3d947a14-20260313-154820.md": {
+    "executed": "2026-03-13T15:56:18.893380",
+    "success": false
+  },
+  "ogedei/high-1773351191.md": {
+    "executed": "2026-03-13T16:23:39.966980",
+    "success": false
+  },
+  "mongke/high-1773380089.md": {
+    "executed": "2026-03-13T15:56:39.104053",
+    "success": false
+  },
+  "kublai/high-1773413105.md": {
+    "executed": "2026-03-13T15:57:57.273096",
+    "success": false
+  },
+  "kublai/critical-1773416940.md": {
+    "executed": "2026-03-13T16:11:28.069127",
+    "success": false
+  },
+  "ogedei/high-1773394484.md": {
+    "executed": "2026-03-13T16:26:53.166462",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260313-164314.md": {
+    "executed": "2026-03-13T16:43:15.618094",
+    "success": false
+  },
+  "temujin/ogedei-model-drift-alert-20260313-164314.md": {
+    "executed": "2026-03-13T16:46:20.635665",
+    "success": false
+  },
+  "kublai/normal-1773437491.md": {
+    "executed": "2026-03-13T17:32:00.397283",
+    "success": false
+  },
+  "temujin/stuck-temujin-1773439351.md": {
+    "executed": "2026-03-13T18:04:28.599400",
+    "success": true
+  },
+  "mongke/normal-1773265091.stale-duplicate.revision-1.md": {
+    "executed": "2026-03-13T18:32:04.580350",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260313-184418.md": {
+    "executed": "2026-03-13T18:44:25.820078",
+    "success": false
+  },
+  "kublai/normal-1773442905.md": {
+    "executed": "2026-03-13T19:02:01.778130",
+    "success": false
+  },
+  "temujin/normal-1773443760-21a70c65.md": {
+    "executed": "2026-03-13T19:16:35.965009",
+    "success": false
+  },
+  "temujin/normal-1773446793-cd7fc048.md": {
+    "executed": "2026-03-13T20:08:45.934833",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260313-204508.md": {
+    "executed": "2026-03-13T20:46:47.822175",
+    "success": false
+  },
+  "temujin/normal-1773450570-a0e8a4a1.md": {
+    "executed": "2026-03-13T21:11:20.860694",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260313-224607.md": {
+    "executed": "2026-03-13T22:49:23.250042",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260314-004710.md": {
+    "executed": "2026-03-14T00:51:25.841114",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-024802.md": {
+    "executed": "2026-03-14T02:51:38.266306",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-044911.md": {
+    "executed": "2026-03-14T04:54:09.944403",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-065010.md": {
+    "executed": "2026-03-14T06:53:06.424374",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-085106.md": {
+    "executed": "2026-03-14T08:53:04.157638",
+    "success": true
+  },
+  "kublai/high-1773497319.md": {
+    "executed": "2026-03-14T10:09:56.762789",
+    "success": false
+  },
+  "ogedei/high-1741962000-session-restart.md": {
+    "executed": "2026-03-14T10:11:29.439014",
+    "success": false
+  },
+  "jochi/config-audit-202603141022.md": {
+    "executed": "2026-03-14T10:14:27.408020",
+    "success": false
+  },
+  "ogedei/normal-1773499862-7bf7fedf.md": {
+    "executed": "2026-03-14T10:53:12.297710",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-105238.md": {
+    "executed": "2026-03-14T10:53:13.866472",
+    "success": false
+  },
+  "ogedei/normal-1773499862-fac73d2b.md": {
+    "executed": "2026-03-14T10:54:57.500589",
+    "success": false
+  },
+  "mongke/normal-1773506551-0f3fe428.md": {
+    "executed": "2026-03-14T12:45:49.943669",
+    "success": false
+  },
+  "temujin/low-1773506725-f4e6f538.md": {
+    "executed": "2026-03-14T12:46:07.280465",
+    "success": true
+  },
+  "jochi/high-1773506551-11e458ec.md": {
+    "executed": "2026-03-14T12:46:19.378421",
+    "success": false
+  },
+  "mongke/normal-1773506756-c2788ac0.md": {
+    "executed": "2026-03-14T12:46:19.378726",
+    "success": false
+  },
+  "jochi/normal-1773506739-b062e4f1.md": {
+    "executed": "2026-03-14T12:47:15.111384",
+    "success": true
+  },
+  "jochi/low-1773506684.md": {
+    "executed": "2026-03-14T12:48:15.781024",
+    "success": false
+  },
+  "jochi/normal-1773507063-abba280d.md": {
+    "executed": "2026-03-14T12:51:32.417690",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260314-125335.md": {
+    "executed": "2026-03-14T12:59:10.841255",
+    "success": false
+  },
+  "jochi/low-1773507490-2e3ee458.md": {
+    "executed": "2026-03-14T12:59:18.437525",
+    "success": false
+  },
+  "temujin/low-1773507509-1af13211.md": {
+    "executed": "2026-03-14T13:01:06.006230",
+    "success": true
+  },
+  "kublai/high-1773507558-73967d6e.md": {
+    "executed": "2026-03-14T13:01:47.694934",
+    "success": true
+  },
+  "mongke/normal-1773507568-e15be82d.md": {
+    "executed": "2026-03-14T13:02:17.691352",
+    "success": true
+  },
+  "jochi/normal-1773507607-8fb3838d.md": {
+    "executed": "2026-03-14T13:03:50.936929",
+    "success": true
+  },
+  "temujin/high-1773508300-02373f3b.md": {
+    "executed": "2026-03-14T13:11:56.399750",
+    "success": false
+  },
+  "mongke/normal-1773508329-4eda0101.md": {
+    "executed": "2026-03-14T13:16:21.227288",
+    "success": true
+  },
+  "temujin/normal-1773508556-dd4d787a.md": {
+    "executed": "2026-03-14T13:16:27.973858",
+    "success": false
+  },
+  "jochi/high-1773511343-239c4168.md": {
+    "executed": "2026-03-14T14:06:22.349493",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-145435.md": {
+    "executed": "2026-03-14T14:56:30.989672",
+    "success": false
+  },
+  "temujin/high-1773515712-0cf99fe1.md": {
+    "executed": "2026-03-14T15:16:39.301014",
+    "success": false
+  },
+  "mongke/normal-1773520407-0677d17c.md": {
+    "executed": "2026-03-14T16:37:03.883382",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260314-165524.md": {
+    "executed": "2026-03-14T16:56:13.913019",
+    "success": false
+  },
+  "jochi/high-1773523896-3c742533.md": {
+    "executed": "2026-03-14T17:32:51.931601",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260314-185556.md": {
+    "executed": "2026-03-14T18:56:15.020684",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260314-205724.md": {
+    "executed": "2026-03-14T21:00:02.704769",
+    "success": true
+  },
+  "ogedei/normal-1773539189-a9a16fc3.md": {
+    "executed": "2026-03-14T21:47:27.512236",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260314-225823.md": {
+    "executed": "2026-03-14T22:59:04.757970",
+    "success": false
+  },
+  "kublai/normal-1773548422-bcc49a12.md": {
+    "executed": "2026-03-15T00:22:16.213975",
+    "success": false
+  },
+  "chagatai/test-model-recovery-20260315.md": {
+    "executed": "2026-03-15T00:22:40.546449",
+    "success": false
+  },
+  "kublai/normal-1773548560-fd8341e7.md": {
+    "executed": "2026-03-15T00:23:44.579324",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260315-005851.md": {
+    "executed": "2026-03-15T01:02:42.692465",
+    "success": false
+  },
+  "jochi/high-1773550898-6f774ec6.md": {
+    "executed": "2026-03-15T01:02:42.696334",
+    "success": false
+  },
+  "temujin/high-1773558012-2447c98b.md": {
+    "executed": "2026-03-15T03:00:29.883115",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-025933.md": {
+    "executed": "2026-03-15T03:02:20.542390",
+    "success": false
+  },
+  "jochi/normal-1773558121-d2787172.md": {
+    "executed": "2026-03-15T03:03:51.053806",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-025933.revision-1.md": {
+    "executed": "2026-03-15T03:07:28.599641",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-050026.md": {
+    "executed": "2026-03-15T05:02:26.449325",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-070127.md": {
+    "executed": "2026-03-15T07:03:30.223260",
+    "success": true
+  },
+  "temujin/normal-1773576825-0d08da30.md": {
+    "executed": "2026-03-15T08:17:02.774543",
+    "success": true
+  },
+  "kublai/ogedei-model-drift-alert-20260315-090208.md": {
+    "executed": "2026-03-15T09:02:32.108310",
+    "success": false
+  },
+  "temujin/normal-1773579752-d874caeb.md": {
+    "executed": "2026-03-15T09:02:52.016626",
+    "success": false
+  },
+  "jochi/high-1773581492-91f8165f.md": {
+    "executed": "2026-03-15T09:31:50.432824",
+    "success": false
+  },
+  "temujin/normal-1773581844-dcb46234.md": {
+    "executed": "2026-03-15T09:41:20.129853",
+    "success": false
+  },
+  "jochi/normal-1773582314-eafc9077.md": {
+    "executed": "2026-03-15T09:47:40.174681",
+    "success": false
+  },
+  "temujin/normal-1773584384-c5fbf661.md": {
+    "executed": "2026-03-15T10:21:25.255102",
+    "success": false
+  },
+  "temujin/normal-1773586888-3d4f5fab.md": {
+    "executed": "2026-03-15T11:03:18.074769",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-110316.md": {
+    "executed": "2026-03-15T11:06:28.509991",
+    "success": false
+  },
+  "jochi/normal-1773591908-5fe4a160.md": {
+    "executed": "2026-03-15T12:25:42.184203",
+    "success": false
+  },
+  "temujin/normal-1773591904-1cda7442.md": {
+    "executed": "2026-03-15T12:25:42.185804",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-130415.md": {
+    "executed": "2026-03-15T13:06:12.961718",
+    "success": false
+  },
+  "temujin/normal-1773594841-1bf060ff.md": {
+    "executed": "2026-03-15T13:18:02.387435",
+    "success": false
+  },
+  "temujin/normal-1773596974-df15e319.md": {
+    "executed": "2026-03-15T13:51:31.706278",
+    "success": false
+  },
+  "jochi/high-1773598175-bf5edf32.md": {
+    "executed": "2026-03-15T14:17:53.288413",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-150448.md": {
+    "executed": "2026-03-15T15:06:17.691101",
+    "success": false
+  },
+  "temujin/normal-1773602328-bc407e7d.md": {
+    "executed": "2026-03-15T15:21:18.081674",
+    "success": true
+  },
+  "ogedei/chagatai-infra-fix-20260315-161829.md": {
+    "executed": "2026-03-15T16:21:28.788091",
+    "success": true
+  },
+  "temujin/normal-1773607813-ebd95e9a.md": {
+    "executed": "2026-03-15T16:53:18.118645",
+    "success": false
+  },
+  "kublai/ogedei-model-drift-alert-20260315-170617.md": {
+    "executed": "2026-03-15T17:07:31.073298",
+    "success": false
+  },
+  "temujin/normal-1773609964-2c15eec7.md": {
+    "executed": "2026-03-15T17:26:31.901157",
+    "success": false
+  },
+  "jochi/high-1773610296-6e2cd8b7.md": {
+    "executed": "2026-03-15T17:32:05.699419",
+    "success": false
+  },
+  "temujin/normal-1773612518-33436dc6.md": {
+    "executed": "2026-03-15T18:11:29.071863",
+    "success": false
   }
 }

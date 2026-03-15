@@ -35,16 +35,6 @@ V2_CONSTRAINTS = [
         "cypher": "CREATE CONSTRAINT agent_name_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.name IS UNIQUE",
         "desc": "Unique agent name",
     },
-    {
-        "name": "skill_name_unique",
-        "cypher": "CREATE CONSTRAINT skill_name_unique IF NOT EXISTS FOR (s:Skill) REQUIRE s.name IS UNIQUE",
-        "desc": "Unique skill name",
-    },
-    {
-        "name": "domain_name_unique",
-        "cypher": "CREATE CONSTRAINT domain_name_unique IF NOT EXISTS FOR (d:Domain) REQUIRE d.name IS UNIQUE",
-        "desc": "Unique domain name",
-    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -57,24 +47,19 @@ V2_INDEXES = [
         "desc": "Claim queries: PENDING tasks by agent",
     },
     {
-        "name": "v2_task_claim_epoch",
-        "cypher": "CREATE INDEX v2_task_claim_epoch IF NOT EXISTS FOR (t:Task) ON (t.claim_epoch)",
-        "desc": "Fencing token lookups",
-    },
-    {
         "name": "v2_task_lease",
         "cypher": "CREATE INDEX v2_task_lease IF NOT EXISTS FOR (t:Task) ON (t.lease_expires_at)",
         "desc": "Orphan recovery: expired leases",
     },
     {
-        "name": "v2_task_created",
-        "cypher": "CREATE INDEX v2_task_created IF NOT EXISTS FOR (t:Task) ON (t.created_at)",
-        "desc": "Time-ordered task queries",
+        "name": "v2_task_claim_composite",
+        "cypher": "CREATE INDEX v2_task_claim_composite IF NOT EXISTS FOR (t:Task) ON (t.status, t.assigned_to, t.priority, t.created_at)",
+        "desc": "Claim query: PENDING tasks by agent ordered by priority",
     },
     {
-        "name": "v2_task_priority",
-        "cypher": "CREATE INDEX v2_task_priority IF NOT EXISTS FOR (t:Task) ON (t.priority)",
-        "desc": "Priority-based queue ordering",
+        "name": "v2_task_orphan_composite",
+        "cypher": "CREATE INDEX v2_task_orphan_composite IF NOT EXISTS FOR (t:Task) ON (t.status, t.lease_expires_at)",
+        "desc": "Orphan recovery: WORKING tasks with expired leases",
     },
     {
         "name": "v2_agent_heartbeat",
@@ -82,6 +67,45 @@ V2_INDEXES = [
         "desc": "Agent liveness checks",
     },
 ]
+
+# ---------------------------------------------------------------------------
+# Deprecated / Dead schema items (to be dropped)
+# ---------------------------------------------------------------------------
+
+# Indexes superseded by composites or low-value
+V2_DEPRECATED_INDEXES = [
+    "v2_task_priority",
+    "v2_task_claim_epoch",
+    "v2_task_created",  # Equivalent to pre-existing task_created_at_index
+]
+
+# Constraints for node types that are never created
+V2_DEAD_CONSTRAINTS = [
+    "skill_name_unique",
+    "domain_name_unique",
+]
+
+
+def drop_deprecated(driver, verbose=True):
+    """Drop deprecated indexes and dead constraints."""
+    with driver.session() as session:
+        for name in V2_DEPRECATED_INDEXES:
+            try:
+                session.run(f"DROP INDEX {name} IF EXISTS")
+                if verbose:
+                    print(f"  [DROPPED] index {name}")
+            except Exception as e:
+                if verbose:
+                    print(f"  [SKIP] index {name}: {e}")
+        for name in V2_DEAD_CONSTRAINTS:
+            try:
+                session.run(f"DROP CONSTRAINT {name} IF EXISTS")
+                if verbose:
+                    print(f"  [DROPPED] constraint {name}")
+            except Exception as e:
+                if verbose:
+                    print(f"  [SKIP] constraint {name}: {e}")
+
 
 # ---------------------------------------------------------------------------
 # Apply / Verify
@@ -124,6 +148,8 @@ def apply_schema(driver, verbose=True):
                     if verbose:
                         print(f"  [ERROR] index {item['name']}: {e}")
 
+    drop_deprecated(driver, verbose)
+
     return results
 
 
@@ -151,6 +177,13 @@ def verify_schema(driver, verbose=True):
                 missing.append(item["name"])
                 if verbose:
                     print(f"  [MISSING] {item['name']}")
+
+        # Verify deprecated items are gone
+        for name in V2_DEPRECATED_INDEXES + V2_DEAD_CONSTRAINTS:
+            if name in existing:
+                if verbose:
+                    print(f"  [STALE] {name} (should be dropped)")
+                missing.append(f"stale:{name}")
 
     if missing and verbose:
         print(f"\n  {len(missing)} missing schema elements")

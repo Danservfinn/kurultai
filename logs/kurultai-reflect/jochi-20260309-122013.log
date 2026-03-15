@@ -1,0 +1,67 @@
+[PHASE 1 COMPLETE]
+
+Analyzing jochi's 4-hour performance window...
+
+**Key Findings:**
+- Only 1 scored task (3.0/10) — critically low throughput AND quality
+- Code quality (5.1/10) is the weakest domain
+- 1 pending task in queue suggests workflow bottleneck
+
+[PHASE 2 COMPLETE]
+
+Model drift analysis:
+- Session running: `qkimi-k2.5` (non-Claude model)
+- Config specifies: `qwen3.5-plus` (Qwen, not Claude)
+- Expected per fleet standard: `claude-opus-4-6`
+- **Double drift:** Session mismatched from config, and config mismatched from expected
+
+[PHASE 3 COMPLETE]
+
+Memory pattern review:
+- Memory score: 0.0/3 — no memory persistence detected
+- No skill invocation telemetry available
+- Suggests missed learning capture cycles
+
+[PHASE 4 COMPLETE]
+
+---
+
+## Rule Candidates (Top 3)
+
+### Rule 1: Model Validation Before Task Execution
+**WHEN** jochi receives a new task dispatch  
+**THEN** validate session model matches expected `claude-opus-4-6` via check against `~/.openclaw/agents/jochi/.claude/settings.json`  
+**INSTEAD OF** proceeding with mismatched model (qkimi-k2.5/qwen3.5-plus) that produces substandard outputs  
+**Confidence:** HIGH | **Evidence:** 3.0/10 task score correlates with invalid model usage
+
+---
+
+### Rule 2: Code Quality Threshold Enforcement
+**WHEN** completed task receives score <6.0/10 on code quality dimension  
+**THEN** trigger self-audit using `/horde-review` with security and routing focus before marking complete  
+**INSTEAD OF** accepting low-quality outputs that degrade 7-day average (code: 5.1/10)  
+**Confidence:** HIGH | **Evidence:** Current 3.0/10 single-task drag on rolling average
+
+---
+
+### Rule 3: Memory Persistence Guard
+**WHEN** task completion includes learnings, bug findings, or pattern insights  
+**THEN** write structured memory entry to `memory/jochi-learnings.md` via Edit tool before sending completion signal  
+**INSTEAD OF** losing insights to ephemeral context (0.0/3 memory score)  
+**Confidence:** MEDIUM | **Evidence:** Zero memory actions despite 1 completed task
+
+---
+
+## Final Summary
+
+**Status:** 🔴 **CRITICAL**
+
+**Primary Issues:**
+1. Model drift (2 layers: session + config mismatch)
+2. Critical quality collapse (3.0/10 vs 6.0 threshold)
+3. Zero memory persistence
+
+**Immediate Actions Required:**
+1. Sync `~/.openclaw/agents/jochi/.claude/settings.json` to use `claude-opus-4-6`
+2. Reset session to clear stale model state
+3. Enable memory write-back in task completion handler

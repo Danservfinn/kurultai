@@ -26,40 +26,40 @@ from agents_config import AGENTS, AGENT_ROLES, AGENT_MODELS
 def get_agent_metrics(agent, hours=1):
     """Get metrics for an agent"""
     tracker = get_tracker()
-    
-    # Get task data
-    task_data = tracker.get_reflection_data(agent, hours)
-    
-    # Get recent tasks
     try:
-        recent_tasks = tracker.get_tasks_by_agent(agent, limit=5)
-    except:
-        recent_tasks = []
-    
-    # Get completion rate
-    try:
-        completion = tracker.get_completion_rate(hours * 24)
-    except:
-        completion = {}
-    
-    total = task_data.get('total_tasks', 0) or 0
-    completed = task_data.get('completed', 0) or 0
-    
-    success_rate = f"{100 * completed / total:.1f}%" if total > 0 else "N/A"
-    avg_duration = task_data.get('avg_duration')
-    
-    tracker.close()
-    
-    return {
-        "total_tasks": total,
-        "completed": completed,
-        "failed": task_data.get('failed', 0) or 0,
-        "retries": task_data.get('total_retries', 0) or 0,
-        "success_rate": success_rate,
-        "avg_duration": f"{avg_duration:.1f}s" if avg_duration else "N/A",
-        "recent_tasks": recent_tasks[:5],
-        "completion_rate": completion
-    }
+        # Get task data
+        task_data = tracker.get_reflection_data(agent, hours)
+
+        # Get recent tasks
+        try:
+            recent_tasks = tracker.get_tasks_by_agent(agent, limit=5)
+        except:
+            recent_tasks = []
+
+        # Get completion rate
+        try:
+            completion = tracker.get_completion_rate(hours * 24)
+        except:
+            completion = {}
+
+        total = task_data.get('total_tasks', 0) or 0
+        completed = task_data.get('completed', 0) or 0
+
+        success_rate = f"{100 * completed / total:.1f}%" if total > 0 else "N/A"
+        avg_duration = task_data.get('avg_duration')
+
+        return {
+            "total_tasks": total,
+            "completed": completed,
+            "failed": task_data.get('failed', 0) or 0,
+            "retries": task_data.get('total_retries', 0) or 0,
+            "success_rate": success_rate,
+            "avg_duration": f"{avg_duration:.1f}s" if avg_duration else "N/A",
+            "recent_tasks": recent_tasks[:5],
+            "completion_rate": completion
+        }
+    finally:
+        tracker.close()
 
 def generate_protocol_reflection(agent, hours=1, include_heartbeat_review=False):
     """Generate compact protocol-based reflection prompt (Option B).
@@ -131,51 +131,51 @@ Violating this rule wastes compute and violates human operator authority.
 def submit_feedback(agent, feedback_text, priority="MEDIUM", proposals=None):
     """Submit feedback to Kublai via Neo4j"""
     tracker = get_tracker()
-    
-    with tracker.driver.session() as session:
-        session.run("""
-            MERGE (a:Agent {name: $agent})
-            CREATE (f:AgentFeedback {
-                agent: $agent,
-                feedback: $feedback,
-                priority: $priority,
-                proposals: $proposals,
-                submitted: datetime(),
-                status: 'pending_review',
-                id: $feedback_id
-            })
-            CREATE (a)-[:SUBMITTED]->(f)
-        """,
-        agent=agent,
-        feedback=feedback_text,
-        priority=priority,
-        proposals=json.dumps(proposals or []),
-        feedback_id=f"{agent}-{int(datetime.now().timestamp())}"
-        )
-    
-    tracker.close()
-    print(f"✓ Feedback submitted to Kublai: {agent}")
+    try:
+        with tracker.driver.session() as session:
+            session.run("""
+                MERGE (a:Agent {name: $agent})
+                CREATE (f:AgentFeedback {
+                    agent: $agent,
+                    feedback: $feedback,
+                    priority: $priority,
+                    proposals: $proposals,
+                    submitted: datetime(),
+                    status: 'pending_review',
+                    id: $feedback_id
+                })
+                CREATE (a)-[:SUBMITTED]->(f)
+            """,
+            agent=agent,
+            feedback=feedback_text,
+            priority=priority,
+            proposals=json.dumps(proposals or []),
+            feedback_id=f"{agent}-{int(datetime.now().timestamp())}"
+            )
+    finally:
+        tracker.close()
+    print(f"Feedback submitted to Kublai: {agent}")
 
 def get_pending_feedback():
     """Get all pending feedback for Kublai to review"""
     tracker = get_tracker()
-    
-    with tracker.driver.session() as session:
-        result = session.run("""
-            MATCH (f:AgentFeedback {status: 'pending_review'})
-            RETURN f ORDER BY 
-                CASE f.priority 
-                    WHEN 'CRITICAL' THEN 1 
-                    WHEN 'HIGH' THEN 2 
-                    WHEN 'MEDIUM' THEN 3 
-                    ELSE 4 
-                END,
-                f.submitted DESC
-        """)
-        feedback = [dict(r['f']) for r in result]
-    
-    tracker.close()
-    return feedback
+    try:
+        with tracker.driver.session() as session:
+            result = session.run("""
+                MATCH (f:AgentFeedback {status: 'pending_review'})
+                RETURN f ORDER BY
+                    CASE f.priority
+                        WHEN 'CRITICAL' THEN 1
+                        WHEN 'HIGH' THEN 2
+                        WHEN 'MEDIUM' THEN 3
+                        ELSE 4
+                    END,
+                    f.submitted DESC
+            """)
+            feedback = [dict(r['f']) for r in result]
+        return feedback
+    finally:
+        tracker.close()
 
 def main():
     parser = argparse.ArgumentParser(description='Generate agent meta-reflections')

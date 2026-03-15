@@ -142,7 +142,7 @@ SCRIPTS_DIR = Path(__file__).parent
 STATE_FILE = LOGS_DIR / "ogedei-watchdog-state.json"
 LOG_FILE = LOGS_DIR / "ogedei-watchdog.log"
 WATCHER_PLIST = "com.kurultai.v2-executor"
-WATCHER_LOG = LOGS_DIR / "neo4j-v2-executor.log"
+WATCHER_LOG = LOGS_DIR / "v2-executor.log"
 
 POLL_INTERVAL = 30        # seconds
 STALE_EXECUTING_SECS = 900  # 15 minutes

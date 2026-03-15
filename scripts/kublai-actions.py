@@ -959,7 +959,6 @@ def kurultai_actions():
 
             if not feedbacks:
                 log("KURULTAI: No pending feedback to review")
-                driver.close()
                 return 0
 
             log(f"KURULTAI: Found {len(feedbacks)} pending feedback items")
@@ -1018,8 +1017,6 @@ def kurultai_actions():
                         SET f.status = 'reviewed',
                             f.reviewed_at = datetime()
                     """, id=fb_id)
-
-        driver.close()
 
     except ImportError:
         log("KURULTAI: neo4j driver not available")

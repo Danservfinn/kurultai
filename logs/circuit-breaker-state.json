@@ -1,18 +1,18 @@
 {
-  "ts": "2026-03-12T21:08:30.413332",
+  "ts": "2026-03-15T16:21:28.336369",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 14,
-      "success_count": 23,
+      "failure_count": 0,
+      "success_count": 24,
       "last_failure_rate": 0.0
     },
     "mongke": {
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 0,
+      "success_count": 1,
       "last_failure_rate": 0.0
     },
     "tolui": {
@@ -25,29 +25,29 @@
     "jochi": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 2,
-      "success_count": 19,
+      "failure_count": 0,
+      "success_count": 22,
       "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 4,
-      "success_count": 0,
+      "failure_count": 0,
+      "success_count": 3,
       "last_failure_rate": 0.0
     },
     "temujin": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 7,
-      "success_count": 48,
-      "last_failure_rate": 0.75
+      "failure_count": 1,
+      "success_count": 52,
+      "last_failure_rate": 0.0
     },
     "kublai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 2,
-      "success_count": 66,
+      "failure_count": 0,
+      "success_count": 72,
       "last_failure_rate": 0.0
     }
   },
@@ -261,6 +261,30 @@
       "to": "temujin",
       "task": "normal-1773282346.md",
       "ts": "2026-03-11T22:35:37.586939"
+    },
+    {
+      "from": "temujin",
+      "to": "mongke",
+      "task": "ogedei-model-drift-alert-20260313-083941.md",
+      "ts": "2026-03-13T09:40:57.801515"
+    },
+    {
+      "from": "temujin",
+      "to": "chagatai",
+      "task": "ogedei-model-drift-alert-20260312-223707.md",
+      "ts": "2026-03-13T09:40:57.801809"
+    },
+    {
+      "from": "temujin",
+      "to": "ogedei",
+      "task": "ogedei-model-drift-alert-20260313-003750.md",
+      "ts": "2026-03-13T09:40:57.801996"
+    },
+    {
+      "from": "temujin",
+      "to": "mongke",
+      "task": "ogedei-model-drift-alert-20260313-043856.md",
+      "ts": "2026-03-13T09:40:57.802174"
     }
   ]
 }

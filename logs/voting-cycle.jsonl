@@ -3492,3 +3492,156 @@
 {"timestamp": "2026-03-13T00:01:15.453199", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
 {"timestamp": "2026-03-13T00:01:15.498073", "phase": 5, "message": "Tallying final results", "data": {}}
 {"timestamp": "2026-03-13T00:01:15.498551", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.206753", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.207101", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.247722", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.248067", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.248121", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.289658", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.289844", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.331018", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T00:51:38.331432", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T01:01:13.996264", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T01:01:13.997510", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.073879", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.074123", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.074176", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.132595", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.132846", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.285526", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T01:01:14.301918", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T01:52:58.958682", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T01:52:58.959037", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.000109", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.000535", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.000589", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.041788", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.041976", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.083323", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T01:52:59.083758", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T02:01:32.999493", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T02:01:32.999830", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.060739", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.061000", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.061063", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.111392", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.111607", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.202044", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T02:01:33.202532", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.587697", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.588085", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.629637", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.630094", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.630157", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.671702", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.671899", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.712733", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T02:55:18.713147", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.554531", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.554907", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.599794", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.600022", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.600072", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.645066", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.645253", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.689490", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T03:01:14.689962", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.436797", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.437131", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.478903", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.479273", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.479333", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.520244", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.520416", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.561661", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T03:58:03.562093", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.469817", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.470202", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.515007", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.515237", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.515282", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.559937", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.560150", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.604598", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T04:01:18.605073", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.387079", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.387499", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.439761", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.439992", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.440046", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.488096", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.488280", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.536334", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T05:01:18.536774", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.624404", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.624618", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.672140", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.672408", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.672458", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.719145", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.719343", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.766011", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T05:01:19.766486", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.637622", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.638021", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.713467", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.714074", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.714245", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.782518", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.782731", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.831798", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T06:01:27.832313", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.174194", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.174567", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.216145", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.216606", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.216657", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.259541", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.259736", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.302276", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T06:14:16.302712", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.418628", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.419001", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.465734", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.465963", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.466232", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.513855", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.514132", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.561288", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T07:01:21.561793", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.127335", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.127718", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.169689", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.170021", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.170073", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.212158", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.212343", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.253831", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T07:22:04.254262", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.852687", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.853105", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.900141", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.900373", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.900428", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.947537", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.947815", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.995591", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T08:01:23.996123", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.654364", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.654690", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.697184", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.697426", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.697480", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.739860", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.740050", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.781992", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T08:34:34.782414", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-13T09:01:21.988911", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-13T09:01:21.989265", "phase": 3, "message": "Voting started for 0 proposals", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.035146", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.035379", "phase": 3, "message": "Found 0 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.035428", "phase": 3, "message": "No proposals to vote on", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.080808", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.081016", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.126498", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-13T09:01:22.126981", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}

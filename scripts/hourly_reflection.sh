@@ -1,13 +1,13 @@
 #!/bin/bash
-# Kurultai Reflection - All 6 Agents Reflect Simultaneously (4-Hour Cycle)
-# Runs every 4 hours: 12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM
+# Kurultai Reflection - All 6 Agents Reflect Simultaneously (3-Hour Cycle)
+# Runs every 3 hours: 12 AM, 3 AM, 6 AM, 9 AM, 12 PM, 3 PM, 6 PM, 9 PM
 #
-# BENEFITS OF 4-HOUR CYCLE:
-# - 6 reflections/day vs 24 (75% reduction in context switches)
-# - Cleaner voting windows: 6 overlapping vs 24
-# - Each Khan gets 4 hours to review before voting closes
+# BENEFITS OF 3-HOUR CYCLE:
+# - 8 reflections/day vs 24 (67% reduction in context switches)
+# - Cleaner voting windows: 8 overlapping vs 24
+# - Each Khan gets 3 hours to review before voting closes
 # - 24h voting window works cleanly with fewer cycles
-# - 4-hour response time still fast for system operations
+# - 3-hour response time still fast for system operations
 #
 # Option B: Protocol-based reflections (~800 tokens/agent vs ~6400 legacy)
 # - Role-specific protocols with WHEN/THEN behavioral rules
@@ -41,6 +41,53 @@ set -m
 LOGS_DIR="/Users/kublai/.openclaw/agents/main/logs"
 mkdir -p "$LOGS_DIR"
 rm -f "$LOGS_DIR/reflection-status.json"
+
+# Step timing variables (must be defined before cleanup_and_exit/trap)
+STEP_TIMING_FILE="$LOGS_DIR/reflection-step-timing.json"
+_STEP_TIMING_DIR=$(mktemp -d)
+_step_counter=0
+
+# Per-step timing: write individual JSON files (works in backgrounded subshells)
+timed_step() {
+    local step_name="$1"
+    shift
+    local step_start=$(date +%s)
+    echo "[$(date)] Running: $step_name..."
+    "$@"
+    local step_rc=$?
+    local step_end=$(date +%s)
+    local step_dur=$((step_end - step_start))
+    local status="ok"
+    [ $step_rc -ne 0 ] && status="failed"
+    [ $step_rc -ne 0 ] && echo "[$(date)] WARNING: $step_name FAILED (rc=$step_rc)" >&2
+    local safe_name="${step_name//\"/}"
+    # Write to temp file — survives backgrounding (subshell-safe)
+    printf '{"name":"%s","duration_s":%d,"status":"%s"}' "$safe_name" "$step_dur" "$status" \
+        > "$_STEP_TIMING_DIR/${step_start}-${safe_name}.json"
+    echo "[$(date)] Completed: $step_name (${step_dur}s, rc=$step_rc)"
+    return 0  # Don't fail the pipeline on downstream step errors
+}
+
+write_step_timing() {
+    # Guard: only write once (EXIT trap may fire after explicit call)
+    if [ "${_STEP_TIMING_WRITTEN:-0}" -eq 1 ]; then
+        return 0
+    fi
+    _STEP_TIMING_WRITTEN=1
+    local total_elapsed=$(($(date +%s) - SCRIPT_START))
+    # Collect all step timing files, sorted by filename (timestamp prefix)
+    local entries=""
+    for tf in $(ls "$_STEP_TIMING_DIR"/*.json 2>/dev/null | sort); do
+        [ -f "$tf" ] || continue
+        local content=$(cat "$tf")
+        if [ -n "$entries" ]; then entries="$entries,"; fi
+        entries="$entries$content"
+    done
+    cat > "$STEP_TIMING_FILE" << EOTIMING
+{"timestamp":"$(date -Iseconds)","total_elapsed_s":$total_elapsed,"steps":[$entries]}
+EOTIMING
+    rm -rf "$_STEP_TIMING_DIR"
+}
 
 # Rotate logs > 1MB (runs once per hour at start of reflection)
 for logfile in "$LOGS_DIR"/*.log; do
@@ -195,14 +242,96 @@ TIMING_EOF
 fi
 
 AGENTS=("kublai" "mongke" "chagatai" "temujin" "jochi" "ogedei")
-HOURS=1
+HOURS=3
 SCRIPTS="/Users/kublai/.openclaw/agents/main/scripts"
-STEP_TIMING_FILE="$LOGS_DIR/reflection-step-timing.json"
 REVIEWS_DIR="$LOGS_DIR/reviews"
 CLAUDE_AGENT_BIN="/Users/kublai/.local/bin/claude-agent"
 REVIEW_TIMEOUT=3600  # 1 hour - horde-review dispatches multiple parallel agents, needs more time
+HEALTH_FLAGS="/Users/kublai/.openclaw/agents/main/agent-health-flags.json"
 
 mkdir -p "$REVIEWS_DIR"
+
+# ============================================================
+# SESSION_MATCH GATE: Abort if agent live models mismatch config
+# Prevents wasted reflection output from wrong-model sessions
+# (Added 2026-03-15: chagatai proposal after 48h outage incident)
+# ============================================================
+SESSION_MATCH_RESULT=$(python3 << 'SMEOF'
+import json, sys, os
+from datetime import datetime
+
+tock_file = "/Users/kublai/.openclaw/agents/main/logs/tock/latest.json"
+health_flags_file = "/Users/kublai/.openclaw/agents/main/agent-health-flags.json"
+
+try:
+    with open(tock_file) as f:
+        tock = json.load(f)
+except Exception as e:
+    # No tock data — can't gate, proceed with reflection
+    print("PASS:no_tock_data")
+    sys.exit(0)
+
+agents = tock.get("agents", {})
+mismatched = []
+
+for name, data in agents.items():
+    cm = data.get("config_model", {})
+    session = data.get("session", {})
+    session_model = session.get("model", "none")
+    config_resolved = cm.get("resolved", "")
+    session_match = cm.get("session_match", True)
+
+    # Only flag active sessions (model != "none") with mismatch
+    if not session_match and session_model != "none":
+        mismatched.append({
+            "agent": name,
+            "session_model": session_model,
+            "config_model": config_resolved
+        })
+
+# Write health flags regardless of outcome
+try:
+    flags = {}
+    if os.path.exists(health_flags_file):
+        with open(health_flags_file) as f:
+            flags = json.load(f)
+
+    flags["session_match_gate"] = {
+        "timestamp": datetime.now().isoformat(),
+        "mismatched_count": len(mismatched),
+        "mismatched_agents": mismatched,
+        "gate_result": "BLOCK" if mismatched else "PASS"
+    }
+
+    with open(health_flags_file, "w") as f:
+        json.dump(flags, f, indent=2)
+except Exception:
+    pass  # Don't fail reflection over flag write errors
+
+if mismatched:
+    names = ", ".join(m["agent"] for m in mismatched)
+    print(f"BLOCK:{names}")
+else:
+    print("PASS")
+SMEOF
+)
+
+if [[ "$SESSION_MATCH_RESULT" == BLOCK:* ]]; then
+    MISMATCHED_AGENTS="${SESSION_MATCH_RESULT#BLOCK:}"
+    echo "[$(date)] SESSION_MATCH GATE: BLOCKED — model mismatch for: $MISMATCHED_AGENTS"
+    echo "[$(date)] Agent sessions are running on wrong model. Reflection would produce ineffective rules."
+    echo "[$(date)] Aborting reflection. Fix model config or restart agent sessions."
+
+    # Write step timing for observability
+    write_step_timing
+
+    # Log to ticks for visibility
+    echo "{\"timestamp\": \"$(date -Iseconds)\", \"event\": \"session_match_gate_block\", \"agents\": \"$MISMATCHED_AGENTS\"}" >> "$LOGS_DIR/ticks.jsonl"
+
+    exit 1
+else
+    echo "[$(date)] SESSION_MATCH GATE: PASS — all active sessions match configured models"
+fi
 
 # Portable timeout function (macOS lacks GNU timeout)
 run_with_timeout() {
@@ -216,50 +345,6 @@ run_with_timeout() {
     kill "$wdog_pid" 2>/dev/null
     wait "$wdog_pid" 2>/dev/null
     return $rc
-}
-
-# Per-step timing: write individual JSON files (works in backgrounded subshells)
-_STEP_TIMING_DIR=$(mktemp -d)
-_step_counter=0
-timed_step() {
-    local step_name="$1"
-    shift
-    local step_start=$(date +%s)
-    echo "[$(date)] Running: $step_name..."
-    "$@"
-    local step_rc=$?
-    local step_end=$(date +%s)
-    local step_dur=$((step_end - step_start))
-    local status="ok"
-    [ $step_rc -ne 0 ] && status="failed"
-    [ $step_rc -ne 0 ] && echo "[$(date)] WARNING: $step_name FAILED (rc=$step_rc)" >&2
-    local safe_name="${step_name//\"/}"
-    # Write to temp file — survives backgrounding (subshell-safe)
-    printf '{"name":"%s","duration_s":%d,"status":"%s"}' "$safe_name" "$step_dur" "$status" \
-        > "$_STEP_TIMING_DIR/${step_start}-${safe_name}.json"
-    echo "[$(date)] Completed: $step_name (${step_dur}s, rc=$step_rc)"
-    return 0  # Don't fail the pipeline on downstream step errors
-}
-
-write_step_timing() {
-    # Guard: only write once (EXIT trap may fire after explicit call)
-    if [ "${_STEP_TIMING_WRITTEN:-0}" -eq 1 ]; then
-        return 0
-    fi
-    _STEP_TIMING_WRITTEN=1
-    local total_elapsed=$(($(date +%s) - SCRIPT_START))
-    # Collect all step timing files, sorted by filename (timestamp prefix)
-    local entries=""
-    for tf in $(ls "$_STEP_TIMING_DIR"/*.json 2>/dev/null | sort); do
-        [ -f "$tf" ] || continue
-        local content=$(cat "$tf")
-        if [ -n "$entries" ]; then entries="$entries,"; fi
-        entries="$entries$content"
-    done
-    cat > "$STEP_TIMING_FILE" << EOTIMING
-{"timestamp":"$(date -Iseconds)","total_elapsed_s":$total_elapsed,"steps":[$entries]}
-EOTIMING
-    rm -rf "$_STEP_TIMING_DIR"
 }
 
 # ============================================================
@@ -354,7 +439,67 @@ run_agent_reflection() {
         return 0  # Exit gracefully, not as error
     fi
 
-    echo "[$(date)] [$AGENT] Auth confirmed - Starting protocol reflection..."
+    echo "[$(date)] [$AGENT] Auth confirmed - checking session model match..."
+
+    # ============================================================
+    # SESSION MODEL GATE: Abort if live model mismatches configured model
+    # Prevents wasted reflection on wrong model (e.g. chagatai 48h outage)
+    # Reads latest tock snapshot for session_match status
+    # ============================================================
+    if [ -f "$TOCK_FILE" ]; then
+        SESSION_MATCH_RESULT=$(python3 -c "
+import json, sys
+try:
+    with open('$TOCK_FILE') as f:
+        data = json.load(f)
+    agent_data = data.get('agents', {}).get('$AGENT', {})
+    cm = agent_data.get('config_model', {})
+    session = agent_data.get('session', {})
+    session_model = session.get('model', 'none')
+    config_resolved = cm.get('resolved', 'unknown')
+    session_match = cm.get('session_match', True)
+    # Only flag mismatch if there IS a live session (model != 'none')
+    if not session_match and session_model != 'none':
+        print(f'MISMATCH:{session_model}:{config_resolved}')
+    else:
+        print('OK')
+except Exception as e:
+    print('OK')  # Fail open — don't block reflection on parse errors
+" 2>/dev/null)
+
+        if [[ "$SESSION_MATCH_RESULT" == MISMATCH:* ]]; then
+            LIVE_MODEL=$(echo "$SESSION_MATCH_RESULT" | cut -d: -f2)
+            CONFIG_MODEL=$(echo "$SESSION_MATCH_RESULT" | cut -d: -f3)
+            echo "[$(date)] [$AGENT] SESSION_MODEL_MISMATCH: live=$LIVE_MODEL config=$CONFIG_MODEL — skipping reflection"
+
+            # Write warning to agent-health-flags.json
+            HEALTH_FLAGS="/Users/kublai/.openclaw/agents/main/agent-health-flags.json"
+            python3 -c "
+import json
+from datetime import datetime
+try:
+    with open('$HEALTH_FLAGS') as f:
+        flags = json.load(f)
+except:
+    flags = {}
+flags['$AGENT'] = {
+    'flag': 'SESSION_MODEL_MISMATCH',
+    'live_model': '$LIVE_MODEL',
+    'config_model': '$CONFIG_MODEL',
+    'detected_at': datetime.now().isoformat(),
+    'action': 'reflection_skipped'
+}
+with open('$HEALTH_FLAGS', 'w') as f:
+    json.dump(flags, f, indent=2)
+" 2>/dev/null
+
+            # Log to ticks for watchdog visibility
+            echo "[$(date)] SESSION_MODEL_GATE: $AGENT skipped reflection (live=$LIVE_MODEL config=$CONFIG_MODEL)" >> "$LOGS_DIR/ticks.jsonl"
+            return 0
+        fi
+    fi
+
+    echo "[$(date)] [$AGENT] Session model OK - Starting protocol reflection..."
 
     # reconcile_neo4j_tasks.py and clear_stale_claims.py removed in Phase 5 (2026-03-12)
     # v2 executor handles orphan recovery via lease expiry and claim_epoch fencing

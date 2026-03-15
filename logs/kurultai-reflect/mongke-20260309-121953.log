@@ -1,0 +1,54 @@
+[PHASE 1 COMPLETE] - Telemetry analysis complete
+
+[PHASE 2 COMPLETE] - Red flag identification complete
+
+[PHASE 3 COMPLETE] - Root cause analysis complete
+
+## Rule Candidates (mongke - Researcher)
+
+### Rule 1: Model Drift Emergency Reset
+**WHEN** session model in logs/ticks.jsonl differs from agent/config.json (e.g., kimi-k2.5 vs claude-opus-4-6)  
+**THEN** execute immediate session hard reset: 
+1. `cp sessions/sessions.json sessions/sessions.json.backup-{epoch}`
+2. `echo '{}' > sessions/sessions.json` 
+3. Verify next tick shows correct model  
+**INSTEAD OF** continuing with drifted/lower-capability model  
+
+**Confidence:** HIGH  
+**Evidence:** Current session running kimi-k2.5 despite config specifying claude-opus-4-6
+
+---
+
+### Rule 2: Low Research Quality Augmentation
+**WHEN** research domain 7-day score drops below 7.0/10 (currently 6.0/10)  
+**THEN** force /horde-learn skill invocation for all research tasks + require minimum 3 cited sources per output  
+**INSTEAD OF** proceeding with standard web search without structured knowledge extraction  
+
+**Confidence:** MEDIUM (3-task sample)  
+**Evidence:** Research tasks averaging 6.0/10, below 7.0 threshold
+
+---
+
+### Rule 3: Task Quality Self-Audit Trigger
+**WHEN** 4-hour average task score falls below 6.0/10 (currently 4.0/10 over 3 tasks)  
+**THEN** before accepting next task: 
+1. Read last 3 completion reports from reports/completed/
+2. Run pattern analysis: `scripts/report_analyzer.py --domain research --agent mongke`
+3. Apply findings to next task ACP prompt  
+**INSTEAD OF** accepting new tasks without reviewing recent failure patterns  
+
+**Confidence:** HIGH  
+**Evidence:** Last 3 tasks averaged 4.0/10, well below 6.0 threshold
+
+---
+
+[PHASE 4 COMPLETE] - Rule generation complete
+
+## Final Summary: mongke Status
+
+**STATUS:** CRITICAL  
+**Active Issues:** 3 red flags (model drift, low quality, idle state)  
+**Immediate Action Required:** 
+1. Reset session to restore claude-opus-4-6
+2. Enable /horde-learn for research tasks
+3. Review last 3 completion reports before next task

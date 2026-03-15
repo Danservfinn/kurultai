@@ -1,11 +1,11 @@
 # Kurultai Architecture Documentation
 
-**Version:** 2.4
-**Date:** 2026-03-12
-**Author:** Chagatai (Kurultai Content Specialist)
+**Version:** 2.5
+**Date:** 2026-03-13
+**Author:** Chagatai (Kurultai Content Specialist), updated by Kublai (swarm audit)
 **Status:** Production Documentation
 
-**Migration Note:** Neo4j-First Architecture (Phase 2 of Kurultai Task System Overhaul completed 2026-03-09). Task ID canonical format implemented 2026-03-10.
+**Migration Note:** Neo4j-First Architecture (Phase 2 completed 2026-03-09). Task ID canonical format (2026-03-10). Dashboard Sessions view, Model Selector, Neo4j task cross-reference, knowledge base (2026-03-13).
 
 ---
 
@@ -19,12 +19,17 @@
 6. [Heartbeat System (Cron)](#heartbeat-system-cron)
 7. [Memory Architecture](#memory-architecture)
 8. [Telemetry & Observability](#telemetry--observability)
-9. [File Structure](#file-structure)
-10. [Communication Protocols](#communication-protocols)
-11. [Active Projects](#active-projects)
-12. [Development Workflow](#development-workflow)
-13. [Troubleshooting Guide](#troubleshooting-guide)
-14. [Glossary](#glossary)
+9. [The Kurultai Dashboard](#the-kurultai-dashboard)
+10. [Credential & Provider System](#credential--provider-system)
+11. [Neo4j Task Schema (Production)](#neo4j-task-schema-production)
+12. [Security Architecture](#security-architecture)
+13. [File Structure](#file-structure)
+14. [Communication Protocols](#communication-protocols)
+15. [Active Projects](#active-projects)
+16. [Development Workflow](#development-workflow)
+17. [Troubleshooting Guide](#troubleshooting-guide)
+18. [Knowledge Base](#knowledge-base)
+19. [Glossary](#glossary)
 
 ---
 
@@ -80,6 +85,7 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 | **LLM Provider** | Anthropic (Claude) / Z.AI / Ollama | OpenClaw gateway defaults to zai-coding/glm-5 (dispatches to Claude Code); Ogedei uses claude-opus-4-6 directly; Tolui uses ollama (see kurultai.json) |
 | **Local LLM** | Ollama | Heartbeat triage (qwen3.5:9b) |
 | **Cron Scheduler** | OpenClaw Cron | Heartbeats, reflections, automation |
+| **Dashboard** | Node.js (the.kurult.ai) | Web UI: Kanban, Sessions, Reflections, Dispatch, Settings |
 | **Messaging** | Signal, Web | Human communication channels |
 
 ### Agent Models
@@ -95,6 +101,8 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 | **Jochi** | zai-coding/glm-5 (claude-code executor) | Analytics, patterns |
 | **Ögedei** | claude-opus-4-6 (claude-code executor) | Operations, monitoring |
 | **Tolui** | ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) | Truth-telling, code review |
+
+> **Note:** The gateway model (e.g. `zai-coding/glm-5`) is what OpenClaw dispatches to. The actual Claude Code execution model is determined by each agent's `~/.openclaw/agents/{name}/.claude/settings.json`, defaulting to `claude-sonnet-4-6` via the `claude-agent` wrapper.
 
 ---
 
@@ -1105,6 +1113,264 @@ This field enables filtering ledger events to distinguish Claude Code executions
 
 ---
 
+## The Kurultai Dashboard
+
+**URL:** `https://the.kurult.ai` (port 18790 locally)
+**Source:** `~/.openclaw/apps/the-kurultai/`
+**Stack:** Node.js, vanilla JS SPA, Neo4j, custom LRU+TTL cache
+
+The Dashboard is the primary web interface for monitoring and managing the Kurultai system. It serves a single-page application with 7 tabs.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│              the.kurult.ai (SPA)              │
+│  ┌─────┬──────┬────────┬────────┬──────────┐ │
+│  │Kanban│Calendar│Reflect│Sessions│Settings │ │
+│  └──┬──┴───┬──┴───┬────┴───┬────┴────┬─────┘ │
+│     │      │      │        │         │        │
+│  ┌──▼──────▼──────▼────────▼─────────▼──────┐ │
+│  │           server.js (3900+ lines)         │ │
+│  │  ┌─────────┐ ┌──────────┐ ┌───────────┐  │ │
+│  │  │ neo4j.js│ │middleware │ │  cache.js  │  │ │
+│  │  └────┬────┘ └──────────┘ └───────────┘  │ │
+│  └───────┼───────────────────────────────────┘ │
+│          │                                      │
+│  ┌───────▼───────┐  ┌─────────────────┐        │
+│  │  Neo4j (bolt) │  │  Filesystem     │        │
+│  │  :7687        │  │  (fallback)     │        │
+│  └───────────────┘  └─────────────────┘        │
+└──────────────────────────────────────────────┘
+```
+
+### Modules
+
+| Module | Purpose |
+|--------|---------|
+| `server.js` | HTTP server, all API routes (~60+ endpoints), static file serving |
+| `neo4j.js` | Neo4j driver singleton, `STATUS_MAP`, credential loading from `neo4j.env` |
+| `middleware.js` | Rate limiting (120 req/min), auth, CSRF infra, security headers, path validation |
+| `cache.js` | LRU+TTL cache for reflections (5min), tasks (30s), rate limit backing store |
+| `config.js` | Centralized config with env var overrides (auth, rate limits, CORS, cache) |
+
+### Dashboard Views
+
+| Tab | Description | Key API Endpoints |
+|-----|-------------|-------------------|
+| **Kanban** | Task board with drag-drop reorder, pause/resume, retry, review, wake | `GET/PUT /api/tasks`, `POST /api/tasks/:agent/wake` |
+| **Calendar** | Month/week/day views, person filtering, event modals | `GET /api/calendar/events`, `GET /api/calendar/people` |
+| **Reflections** | Fleet-level + per-agent reflections, grade history, proposals, rules | `GET /api/reflections`, `GET /api/agents/:name/grade-history` |
+| **Wrappers** | Agent fallback chain config, per-agent model/provider status | `GET /api/agents/wrapper-status`, `GET /api/claude-agent/config` |
+| **Sessions** | Live `claude-agent` processes, routing mode toggle, model selector | `GET /api/sessions/active`, `GET/POST /api/settings/model` |
+| **Dispatch** | ACP execution contexts from task-ledger.jsonl | `GET /api/acp-contexts` |
+| **Settings** | Per-agent model config, raw settings editor, model drift detection | `GET/PUT /api/settings/models/*` |
+
+### Sessions View (Added 2026-03-13)
+
+The Sessions view provides real-time visibility into running `claude-agent` processes.
+
+**Detection method:** `ps aux` → filter for `bin/claude-agent` → cross-reference with:
+1. `active.jsonl` (PID → settings tier, start time)
+2. Neo4j `WORKING` tasks (agent → task title, priority)
+3. Agent settings files (→ model name)
+
+**Display:** Table with columns: Agent (avatar), Provider (PRIMARY/BACKUP/FORCED badge), Model, Task (from Neo4j), Elapsed time. Auto-refreshes every 15 seconds.
+
+**Model Selector:** Dropdown driven by `GET /api/settings/model` `available` array. Writes to `~/.openclaw/claude/settings.json`. Allowed models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`.
+
+**Routing Mode Toggle:** Switches between `auto` (primary with fallback), `backup` (forced Z.AI/glm-5), `primary` (no fallback). State stored in `~/.openclaw/claude/mode.json`.
+
+### Gate Status System
+
+Task cards display colored gate indicators based on filename suffixes:
+- `.gate-passed.done` → green (passed)
+- `.gate-bypassed.done` → yellow (bypassed)
+- `.gate-blocked.*` / `.gate-failed.*` → red (failed)
+- `.pending-gate.md` → orange (pending)
+- `.verified.done` → green (passed)
+
+---
+
+## Credential & Provider System
+
+### Credential Vault
+
+**Location:** `~/.openclaw/credentials/`
+
+| File | Purpose |
+|------|---------|
+| `provider.env` | LLM provider credentials (Anthropic, Z.AI, Alibaba) |
+| `neo4j.env` | Neo4j bolt credentials |
+| `kurultai-api.key` | Dashboard API key (per-instance) |
+
+### Provider Fallback Chain
+
+The `claude-agent` wrapper (`~/.local/bin/claude-agent`) implements a primary/backup fallback:
+
+```
+┌───────────────┐     ┌────────────────┐
+│   Primary     │     │    Backup      │
+│  Anthropic    │────▶│    Z.AI        │
+│  OAuth auth   │fail │  API key auth  │
+│  claude-*     │     │  glm-5         │
+└───────────────┘     └────────────────┘
+```
+
+**Mode selection** (from `mode.json`):
+- `auto` — Try primary, fallback on retryable errors (429, auth, capacity)
+- `backup` — Skip primary, use Z.AI/glm-5 directly
+- `primary` — Primary only, no fallback
+
+**Settings files** (paths from `kurultai.json`):
+- Primary: `~/.openclaw/claude/settings.json`
+- Backup: `~/.openclaw/claude/settings.backup.json`
+
+### Dashboard Provider API
+
+- `GET /api/providers` — Read vault config (tokens masked to `***last4`). Protected.
+- `POST /api/providers` — Update single field in `provider.env`. Protected.
+- `GET/POST /api/settings/model` — Read/write model in primary settings. **Public** (unprotected).
+- `GET/POST /api/settings/mode` — Read/write dispatch mode. **Public** (unprotected).
+
+---
+
+## Neo4j Task Schema (Production)
+
+> **Note:** This supersedes the v2.4 schema documentation. The production schema has ~30 properties.
+
+### Task Node Properties
+
+```
+(:Task {
+  // Identity
+  task_id:           string    // canonical: {priority}-{epoch_secs}-{uuid8}
+  title:             string
+  prompt:            string    // full task prompt
+
+  // State
+  status:            string    // PENDING | WORKING | COMPLETED | FAILED
+  assigned_to:       string    // agent name
+  priority:          string    // critical | high | normal | low
+  domain:            string    // research | implementation | ops | documentation | strategy
+  skill_hint:        string    // /horde-review, /horde-implement, etc.
+  source:            string    // delegation:{id}, kanban-ui, signal, kanban-review, etc.
+
+  // Execution control
+  claim_epoch:       integer   // CAS fencing token, increments on each claim
+  claimed_by:        string    // agent holding the lease
+  lease_expires_at:  datetime  // auto-recovery after expiry + grace
+  retry_count:       integer
+  max_retries:       integer
+  depth:             integer   // delegation depth (0 = top-level)
+  timeout_s:         integer
+
+  // Timestamps
+  created_at:        datetime
+  started_at:        datetime
+  completed_at:      datetime
+  updated_at:        datetime
+
+  // Kanban UI
+  sort_order:        integer   // drag-drop reorder
+  paused:            boolean   // task pause/resume
+  paused_at:         datetime
+
+  // Quality & tracking
+  score:             float     // quality score
+  reassigned_from:   string    // load balancing source agent
+  reassigned_at:     datetime
+  parent_task:       string    // review parent task_id
+  reflection_id:     string    // rollback investigation link
+
+  // Gate system
+  gate_status:       string    // pending | auditing | passed | blocked | bypassed
+  gate_updated:      datetime
+  completion_percentage: integer
+  gate_audit_ref:    string    // path to audit JSON
+})
+```
+
+### Status Model (v2 State Machine)
+
+```
+PENDING ──(claim_task)──▶ WORKING
+WORKING ──(complete, no blocking children)──▶ COMPLETED
+WORKING ──(fail, transient + retries remain)──▶ PENDING
+WORKING ──(fail, permanent or exhausted)──▶ FAILED
+WORKING ──(lease expired + orphan recovery)──▶ PENDING or FAILED
+```
+
+**STATUS_MAP** (neo4j.js): `PENDING→pending, WORKING→executing, COMPLETED→done, FAILED→failed`
+
+### Key Node Types
+
+| Node | Purpose | Key Properties |
+|------|---------|----------------|
+| `:Task` | Central work unit | See above |
+| `:Agent` | Agent identity | name, role, dispatchable, score, last_heartbeat |
+| `:TaskOutput` | Completion output | text, problem, solution, rationale, duration_s |
+| `:FailureReport` | Failure record | error_class, error_msg, is_transient, attempt |
+| `:Reflection` | Hourly reflection | agent, summary, insight, tasks_completed, avg_score |
+| `:Skill` | Skill reference | name, domain |
+| `:Domain` | Domain reference | name, keywords[] |
+| `:Rule` | Behavioral rule | rule_id, condition, action, status, invocations |
+| `:GateAudit` | Gate audit record | task_id, can_complete, completion_percentage |
+
+### Key Relationships
+
+```
+(:Agent)-[:ASSIGNED_TO]->(:Task)
+(:Agent)-[:EXECUTED {outcome, duration_s}]->(:Task)
+(:Agent)-[:OWNS_DOMAIN {weight}]->(:Domain)
+(:Agent)-[:CAN_HANDLE {weight}]->(:Domain)
+(:Agent)-[:PROFICIENT_IN {weight, success_rate}]->(:Skill)
+(:Agent)-[:REFLECTS]->(:Reflection)
+(:Task)-[:HAS_OUTPUT]->(:TaskOutput)
+(:Task)-[:HAS_FAILURE]->(:FailureReport)
+(:Task)-[:SPAWNED]->(:Task)                  // delegation parent→child
+(:Task)-[:HAS_FOLLOWUP]->(:Task)             // gate followups
+(:Reflection)-[:COVERS]->(:Task)
+(:Skill)-[:BELONGS_TO]->(:Domain)
+```
+
+### Graph-Native Router
+
+The routing query in `neo4j_v2_router.py` scores agents across 5 dimensions in a single Cypher traversal:
+
+| Dimension | Weight | Source |
+|-----------|--------|--------|
+| Domain match | 1.0 (OWNS) / 0.3-0.7 (CAN_HANDLE) | Agent-Domain edges |
+| Skill bonus | prof.weight × 0.3 | PROFICIENT_IN edges |
+| Quality rate | 7-day success rate | EXECUTED edges |
+| Load penalty | -0.2 (3-5 pending) / -0.5 (6+) | PENDING+WORKING count |
+| Anti-affinity | -0.5 for excluded agent | Parameter |
+
+---
+
+## Security Architecture
+
+### Dashboard Security Layers
+
+| Layer | Implementation | Details |
+|-------|---------------|---------|
+| **CORS** | Strict origin allowlist | 7 allowed origins (localhost, the.kurult.ai, kanban.kurult.ai, Tailscale IPs) |
+| **Rate Limiting** | 120 req/min per IP | LRU-backed in `middleware.js`; review endpoint: 10 req/min |
+| **API Key Auth** | Bearer token or `?api_key=` | Protects `/api/providers`, `/api/settings` (except mode/model) |
+| **Security Headers** | X-Content-Type-Options, X-Frame-Options, HSTS, CSP, Permissions-Policy | HSTS: 1 year + includeSubDomains |
+| **Path Validation** | `safePath()` in middleware | Basename normalization + prefix check prevents traversal |
+| **CSRF** | Token infra exists | Generation, validation, 1-hour TTL — implemented but not enforced on most endpoints |
+
+### API Authentication
+
+```
+Protected paths: /api/providers, /api/settings (prefix match)
+Unprotected exceptions: /api/settings/mode, /api/settings/model
+API key source: ~/.openclaw/credentials/kurultai-api.key
+```
+
+---
+
 ## File Structure
 
 ```
@@ -1113,75 +1379,75 @@ This field enables filtering ledger events to distinguish Claude Code executions
 │   ├── main/                    # Kublai (Router)
 │   │   ├── SOUL.md
 │   │   ├── AGENTS.md
-│   │   ├── ARCHITECTURE.md
-│   │   ├── HEARTBEAT.md
-│   │   ├── MEMORY.md
-│   │   ├── memory/
-│   │   │   └── YYYY-MM-DD.md
+│   │   ├── CLAUDE.md
 │   │   ├── docs/
-│   │   │   ├── architecture.md   # This document
-│   │   │   ├── ESCALATION_PROTOCOL.md
-│   │   │   ├── routing-test-prompts.md
-│   │   │   └── system-improvement-plan.md
-│   │   ├── _exiled/              # Product files (quarantined from router)
-│   │   │   ├── projects/
-│   │   │   ├── src/
-│   │   │   ├── research/
-│   │   │   ├── content-to-post/
-│   │   │   ├── archive/
-│   │   │   └── docs/             # 7 product design docs
+│   │   │   └── architecture.md   # This document
+│   │   ├── knowledge/            # Knowledge base (added 2026-03-13)
+│   │   │   ├── INDEX.md
+│   │   │   ├── api-endpoints.md
+│   │   │   ├── neo4j-schema.md
+│   │   │   ├── provider-fallback.md
+│   │   │   ├── agent-roster.md
+│   │   │   └── dashboard-views.md
+│   │   ├── scripts/              # Python scripts (v1 + v2)
+│   │   │   ├── neo4j_v2_core.py      # Task state machine (claim, complete, fail)
+│   │   │   ├── neo4j_v2_router.py    # Graph-native routing
+│   │   │   ├── neo4j_v2_schema.py    # Constraints and indexes
+│   │   │   ├── neo4j_v2_seed.py      # Agent/Domain/Skill seeding
+│   │   │   ├── neo4j_v2_delegate.py  # Task delegation (SPAWNED)
+│   │   │   ├── neo4j_v2_reflection.py # Reflection context + writes
+│   │   │   ├── neo4j_v2_executor.py  # V2 task executor daemon
+│   │   │   ├── neo4j_task_tracker.py # V1 tracker (analytics, gates, rules)
+│   │   │   └── neo4j_calendar.py     # Calendar schema
+│   │   ├── memory/
 │   │   └── shared-context/
-│   │       ├── THESIS.md
-│   │       ├── FEEDBACK-LOG.md
-│   │       └── SIGNALS.md
 │   │
-│   ├── mongke/                  # Research Specialist
+│   ├── {agent}/                 # mongke, chagatai, temujin, jochi, ogedei, tolui
 │   │   ├── SOUL.md
-│   │   ├── AGENTS.md
-│   │   ├── memory/
-│   │   └── tasks/
-│   │
-│   ├── chagatai/                # Content Specialist
-│   │   ├── SOUL.md
-│   │   ├── AGENTS.md
-│   │   ├── memory/
-│   │   └── tasks/
-│   │
-│   ├── temujin/                 # Development Specialist
-│   │   ├── SOUL.md
-│   │   ├── AGENTS.md
-│   │   ├── rules/               # Code style, architecture
-│   │   ├── memory/
-│   │   └── tasks/
-│   │
-│   ├── jochi/                   # Data Analyst
-│   │   ├── SOUL.md
-│   │   ├── AGENTS.md
-│   │   ├── rules/
-│   │   ├── memory/
-│   │   └── tasks/
-│   │
-│   ├── ogedei/                  # Operations Specialist
-│   │   ├── SOUL.md
-│   │   ├── AGENTS.md
+│   │   ├── CLAUDE.md
+│   │   ├── .claude/settings.json  # Per-agent model config
 │   │   ├── memory/
 │   │   └── tasks/
 │   │
 │   └── shared-context/          # Cross-agent knowledge
-│       ├── KURULTAI-SYNC-PROTOCOL.md
-│       ├── AGENT-PROTOCOLS.md
-│       ├── KURULTAI-MONETIZATION.md
-│       └── [other shared docs]
 │
-├── sessions/                    # Chat session logs
-│   └── {session-id}.jsonl
+├── apps/
+│   └── the-kurultai/            # Dashboard application (the.kurult.ai)
+│       ├── server.js            # API server (3900+ lines, 60+ endpoints)
+│       ├── index.html           # SPA frontend
+│       ├── style.css            # Design system
+│       ├── neo4j.js             # Neo4j driver, STATUS_MAP
+│       ├── middleware.js         # Auth, rate limiting, CSRF, security headers
+│       ├── cache.js             # LRU+TTL cache
+│       ├── config.js            # Centralized configuration
+│       └── data/
+│           ├── calendar-events.json
+│           └── proposal-decisions.json
 │
-├── logs/                        # System logs
-│   ├── cron-*.log
-│   ├── task-watcher-state.json
-│   └── persistent-issues.json
+├── credentials/                 # Credential vault
+│   ├── provider.env             # LLM provider tokens (Anthropic, Z.AI, Alibaba)
+│   ├── neo4j.env                # Neo4j bolt credentials
+│   └── kurultai-api.key         # Dashboard API key
 │
-└── openclaw.json               # Main configuration
+├── claude/                      # Claude Code settings
+│   ├── settings.json            # Primary settings (model selector writes here)
+│   ├── settings.backup.json     # Backup provider settings (Z.AI/glm-5)
+│   └── mode.json                # Dispatch mode (auto/backup/primary)
+│
+├── kurultai.json                # Central config (executor types, settings paths)
+│
+├── logs/
+│   ├── sessions/
+│   │   └── active.jsonl         # Live session metadata (PID→settings mapping)
+│   ├── reflections/             # Per-agent reflection files
+│   ├── hourly-reports/          # Hourly report markdown files
+│   ├── debug/
+│   └── cron-*.log
+│
+├── tasks/
+│   └── task-ledger.jsonl        # Append-only task lifecycle events
+│
+└── openclaw.json                # Main configuration
 ```
 
 ---
@@ -1461,6 +1727,23 @@ python scripts/research_storage.py --create-test
 
 ---
 
+## Knowledge Base
+
+**Location:** `~/.openclaw/agents/main/knowledge/`
+
+A structured knowledge base was created (2026-03-13) to give agents quick reference to operational details without reading source code. Populated by a 3-agent swarm audit.
+
+| File | Lines | Content |
+|------|-------|---------|
+| `INDEX.md` | 51 | Topic index with cross-references |
+| `api-endpoints.md` | 199 | All 60+ API endpoints grouped by domain |
+| `neo4j-schema.md` | 192 | Task node properties, STATUS_MAP, common Cypher patterns |
+| `provider-fallback.md` | 196 | claude-agent wrapper, mode.json, primary/backup settings |
+| `agent-roster.md` | 260 | All 7 agents: roles, domains, skills, hard rules |
+| `dashboard-views.md` | 250 | All 7 dashboard tabs: data sources, APIs, user actions |
+
+---
+
 ## Glossary
 
 | Term | Definition |
@@ -1502,6 +1785,7 @@ python scripts/research_storage.py --create-test
 | 2.2 | 2026-03-10 | Rule persistence system: Structured `rules.json` store with follow/violate telemetry, `deprecation_bypass` protection for critical rules, rule lifecycle management across memory rotation. |
 | 2.3 | 2026-03-11 | Idle-crisis recovery: (1) Restored r021 (idle rule) and r022 (self-maintenance rule) after incorrect auto-deprecation by memory_audit. (2) Added `deprecation_bypass` flag to prevent critical rule removal. (3) Created `/scripts/idle-watchdog.sh` for cron-based self-task generation after 120min idle. (4) Fixed rule evaluation tracking — rules showed 0 follow/0 violate but were actively evaluated in reflections. |
 | 2.4 | 2026-03-12 | Model accuracy update: (1) Corrected agent count from six to seven. (2) Updated model assignments per kurultai.json — gateway defaults to zai-coding/glm-5 for most agents, claude-opus-4-6 for Ogedei, ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) for Tolui. (3) Clarified reflection pipeline excludes Tolui (Ollama-based, does not participate in Claude Code reflection). |
+| 2.5 | 2026-03-13 | Comprehensive architecture audit via 3-agent swarm. (1) Added Dashboard section: the.kurult.ai architecture, all 7 views (Kanban, Calendar, Reflections, Wrappers, Sessions, Dispatch, Settings), module breakdown (server.js, neo4j.js, middleware.js, cache.js, config.js). (2) Added Sessions view: live process detection via ps aux, Neo4j WORKING task cross-reference, model selector (ALLOWED_MODELS with full Haiku ID), routing mode toggle. (3) Added Credential & Provider System: vault at ~/.openclaw/credentials/, claude-agent primary/backup fallback chain, mode.json dispatch modes. (4) Added Neo4j Task Schema (Production): ~30 Task node properties (vs 5 in v2.4), v2 state machine with CAS claim_epoch fencing, 10 node types, 15+ relationships, graph-native router scoring. (5) Added Security Architecture: CORS, rate limiting, API key auth, security headers, path validation, CSRF infra. (6) Updated File Structure: added apps/the-kurultai/, credentials/, claude/, logs/sessions/, knowledge/. (7) Added Knowledge Base section: 6 reference files (1,148 lines) covering API endpoints, Neo4j schema, provider fallback, agent roster, dashboard views. (8) Fixed sessions data parsing bug (API returns object, not array). (9) Clarified gateway model vs Claude Code execution model distinction. |
 
 ---
 

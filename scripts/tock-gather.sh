@@ -358,7 +358,7 @@ for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     oldest_age_s = 0  # Default: 0 means no pending tasks (distinguishes from measurement failure)
     for pattern in ["high-*.md", "normal-*.md", "low-*.md"]:
         for f in glob.glob(f"{task_dir}/{pattern}"):
-            if ".executing" not in f and ".done" not in f:
+            if ".executing" not in f and ".done" not in f and ".resolved" not in f:
                 pending += 1
                 try:
                     age = now - os.path.getmtime(f)
@@ -483,18 +483,20 @@ for agent in AGENTS:
 
     # Pending: .md files that aren't executing or done
     # FIX 2026-03-12: Also exclude .done-<hash>.md and .failed-<hash>.md patterns
+    # FIX 2026-03-15: Also exclude .resolved files (were causing phantom pending counts)
     pending = len([
         f for f in tasks_dir.glob("*.md")
-        if not f.name.endswith(('.executing.md', '.done.md', '.failed.md'))
-        and '.done.' not in f.name  # Catches .done-<hash>.md
-        and '.failed.' not in f.name  # Catches .failed revision files
+        if not f.name.endswith(('.executing.md', '.done.md', '.failed.md', '.resolved.md'))
+        and '.done' not in f.name  # Catches .done.md, .done-<hash>.md
+        and '.failed' not in f.name  # Catches .failed.md, .failed-<hash>.md revision files
+        and '.resolved' not in f.name  # Catches .resolved.md, .false-positive.resolved.md
     ])
 
     # Executing: .executing.md files
     executing = len(list(tasks_dir.glob("*.executing.md")))
 
-    # Done: .done.md files (includes .failed.done.md)
-    done = len(list(tasks_dir.glob("*.done.md")))
+    # Done: files with .done in name (includes .done.md, .done-<hash>.md, .failed.done.md)
+    done = len([f for f in tasks_dir.glob("*.md") if '.done' in f.name])
 
     result["by_agent"][agent] = {"pending": pending, "executing": executing, "done": done}
     result["total_pending"] += pending
@@ -662,7 +664,7 @@ except Exception:
             import glob
             pending = 0
             for f in glob.glob(f"{task_dir}/*.md"):
-                if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed']):
+                if any(x in f for x in ['.done', '.executing', '.completed', '.stale', '.failed', '.resolved']):
                     continue
                 pending += 1
             depth_map[agent] = pending
@@ -1047,14 +1049,17 @@ for name in agent_names:
     model_match = session_model == "none" or session_model == config_resolved
     # Use filesystem queue depths as source of truth for pending/executing counts
     # Neo4j only tracks last 30 minutes, but tasks can queue for hours
-    fs_pending = filesystem_queues.get("by_agent", {}).get(name, {}).get("pending", 0)
-    fs_executing = filesystem_queues.get("by_agent", {}).get(name, {}).get("executing", 0)
+    # FIX 2026-03-14 (jochi): Always prefer filesystem over Neo4j — falling back
+    # to Neo4j when fs=0 caused false-positive HIGH alerts from stale Neo4j records
+    fs_agent = filesystem_queues.get("by_agent", {}).get(name, {})
+    fs_pending = fs_agent.get("pending", 0) if fs_agent else t.get("pending", 0)
+    fs_executing = fs_agent.get("executing", 0) if fs_agent else t.get("running", 0)
     agents[name] = {
         "tasks": {
             "completed": completed, "failed": t.get("failed",0),
-            "pending": fs_pending if fs_pending > 0 else t.get("pending",0),
-            "running": fs_executing if fs_executing > 0 else t.get("running",0),
-            "total": total, "queue_depth": fs_pending if fs_pending > 0 else queues.get(name,0)
+            "pending": fs_pending,
+            "running": fs_executing,
+            "total": total, "queue_depth": fs_pending
         },
         "success_rate": round(100.0*completed/total,1) if total > 0 else None,
         "retries": t.get("retries",0),
@@ -1265,7 +1270,11 @@ output = {
         "resolved_last_100": 0,
         "avg_resolution_seconds": 0,
         "success_rate": 0.0
-    })
+    }),
+    "fleet_model_mismatch": {
+        "count": sum(1 for a in agents.values() if not a.get("config_model", {}).get("session_match", True) and a.get("session", {}).get("model", "none") != "none"),
+        "agents": [name for name in agent_names if not agents[name].get("config_model", {}).get("session_match", True) and agents[name].get("session", {}).get("model", "none") != "none"]
+    }
 }
 
 print(json.dumps(output, indent=2, default=str))
@@ -1693,6 +1702,27 @@ See: {validation_log}
         print(f"Created escalation task: {task_file}")
     except Exception as e:
         print(f"Failed to create escalation task: {e}")
+
+    # Also create in Neo4j so v2-executor can dispatch it
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("neo4j_v2_core",
+            os.path.expanduser("~/.openclaw/agents/main/scripts/neo4j_v2_core.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        s = mod.TaskStore()
+        s.create_task(
+            task_id=f"auto-fallback-chain-{timestamp}",
+            agent="ogedei",
+            title="Fallback Chain Validation Failed",
+            prompt=task_content,
+            priority="high",
+            source="tock-gather-fallback-validation"
+        )
+        s.close()
+        print(f"Created Neo4j task: auto-fallback-chain-{timestamp}")
+    except Exception as e2:
+        print(f"Neo4j task creation failed (non-fatal): {e2}")
 PYEOF
 fi
 

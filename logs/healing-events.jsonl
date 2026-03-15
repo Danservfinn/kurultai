@@ -520,3 +520,25 @@
 {"ts": "2026-03-12T21:45:59.101704", "issue_type": "proactive_patrol", "action": "auto_created", "outcome": "success", "agent": "ogedei", "details": {"task_id": "low-1773366358-4bf0b850", "pending_before": 1}}
 {"ts": "2026-03-12T22:02:07.736947", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 3}}
 {"ts": "2026-03-12T22:32:29.692472", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-13T03:41:06.710710", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["temujin"], "to_agents": ["mongke"]}}
+{"ts": "2026-03-13T03:46:18.546590", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["mongke"], "to_agents": ["temujin"]}}
+{"ts": "2026-03-13T03:51:31.209608", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["temujin"], "to_agents": ["mongke"]}}
+{"ts": "2026-03-13T03:56:44.722193", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["mongke"], "to_agents": ["temujin"]}}
+{"ts": "2026-03-13T07:09:23.272403", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["temujin"], "to_agents": ["mongke"]}}
+{"ts": "2026-03-13T07:14:36.301903", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["mongke"], "to_agents": ["temujin"]}}
+{"ts": "2026-03-13T07:19:48.635700", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["temujin"], "to_agents": ["mongke"]}}
+{"ts": "2026-03-13T09:35:23.274403", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["mongke"], "to_agents": ["temujin"]}}
+{"ts": "2026-03-13T09:40:31.744832", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["temujin"], "to_agents": ["mongke"]}}
+{"ts": "2026-03-13T09:45:41.609452", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["mongke"], "to_agents": ["temujin", "chagatai"]}}
+{"ts": "2026-03-13T14:00:40.060389", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["temujin"], "to_agents": ["mongke"]}}
+{"ts": "2026-03-13T14:05:53.785244", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 9, "from_agents": ["mongke"], "to_agents": ["temujin"]}}
+{"ts": "2026-03-13T14:42:46.511357", "issue_type": "queue_rebalanced", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"moved_count": 10, "from_agents": ["ogedei"], "to_agents": ["temujin", "mongke"]}}
+{"ts": "2026-03-13T14:52:32.040473", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "high-1773427505.escalated.done.md"}}
+{"ts": "2026-03-13T18:06:42.419714", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773265091.stale-duplicate.done.md"}}
+{"ts": "2026-03-13T18:38:35.848223", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 40}}
+{"ts": "2026-03-13T20:39:27.926362", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 2}}
+{"ts": "2026-03-14T01:41:49.741938", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-14T10:29:37.891724", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1773494180.retry.done.md"}}
+{"ts": "2026-03-14T22:52:49.623495", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 107}}
+{"ts": "2026-03-15T03:04:48.891260", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "kublai", "details": {"task_file": "ogedei-model-drift-alert-20260315-025933.done.md"}}
+{"ts": "2026-03-15T09:58:18.341707", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}

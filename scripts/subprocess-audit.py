@@ -48,11 +48,8 @@ from kurultai_paths import AGENTS_DIR, VALID_AGENTS as VALID_AGENTS_SET
 # Configuration - convert frozenset to list for compatibility
 VALID_AGENTS = list(VALID_AGENTS_SET)
 
-# Configuration
-# TODO: Import from kurultai_paths.py (canonical: CLAUDE_TIMEOUT = 7200).
-#   This value matches CLAUDE_TIMEOUT and represents the max expected execution time
-#   before flagging as stale. Keep in sync with kurultai_paths.CLAUDE_TIMEOUT.
-STALE_EXECUTING_AGE_SECONDS = 7200  # 2 hours
+# Configuration — imported from canonical source (kurultai_paths.py)
+from kurultai_paths import CLAUDE_TIMEOUT as STALE_EXECUTING_AGE_SECONDS
 ZOMBIE_GRACE_PERIOD_SECONDS = 60  # 1 minute: allow handlers to exit gracefully after task completion
 
 # Process patterns for detection
@@ -398,6 +395,19 @@ def detect_anomalies(
     return anomalies
 
 
+def count_neo4j_working_tasks() -> int:
+    """Check Neo4j for tasks with WORKING status (v2 executor doesn't create .executing.md files)."""
+    try:
+        from neo4j_v2_core import TaskStore
+        s = TaskStore()
+        working = s.get_tasks_by_status('WORKING')
+        count = len(working)
+        s.close()
+        return count
+    except Exception:
+        return 0
+
+
 def run_audit() -> AuditResult:
     """Run the complete subprocess audit."""
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -412,15 +422,19 @@ def run_audit() -> AuditResult:
     # Detect anomalies
     anomalies = detect_anomalies(executing_tasks, running_handlers, running_claude)
 
+    # Supplement with Neo4j WORKING tasks (v2 executor tracks state in Neo4j, not filesystem)
+    neo4j_working = count_neo4j_working_tasks()
+
     # Build summary
     summary = {
-        "total_executing": len(executing_tasks),
+        "total_executing": max(len(executing_tasks), neo4j_working),
         "alive": sum(1 for t in executing_tasks if t.alive),
         "dead": sum(1 for t in executing_tasks if t.pid is not None and not t.alive),
         "missing_pid": sum(1 for t in executing_tasks if t.pid is None),
         "stale": sum(1 for t in executing_tasks if t.alive and t.age_seconds > STALE_EXECUTING_AGE_SECONDS),
         "running_handlers": len(running_handlers),
         "running_claude": len(running_claude),
+        "neo4j_working": neo4j_working,
         "anomaly_count": len(anomalies)
     }
 
@@ -447,7 +461,7 @@ def main():
         s = result.summary
         print(f"SUBPROCESS_AUDIT: total={s['total_executing']} alive={s['alive']} dead={s['dead']} "
               f"stale={s['stale']} anomalies={s['anomaly_count']} handlers={s['running_handlers']} "
-              f"claude={s['running_claude']}")
+              f"claude={s['running_claude']} neo4j_working={s.get('neo4j_working', 0)}")
         if result.anomalies:
             for a in result.anomalies:
                 print(f"  ANOMALY: {a['type']} agent={a['agent']} task={a['task_id']} action={a['action']}")

@@ -651,18 +651,9 @@ def create_neo4j_task(task_id: str, agent: str, title: str, body: str,
     Returns: True if successful, False otherwise
     """
     try:
-        from neo4j import GraphDatabase
-
-        # Get Neo4j credentials from environment
-        uri = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
-        user = os.environ.get('NEO4J_USER', 'neo4j')
-
-        if 'NEO4J_AUTH' in os.environ:
-            password = os.environ.get('NEO4J_AUTH', '').split('://')[1].split('@')[0]
-        else:
-            password = os.environ.get('NEO4J_PASSWORD', 'password')
-
-        driver = GraphDatabase.driver(uri, auth=(user, password))
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        from neo4j_task_tracker import get_driver
+        driver = get_driver()
         with driver.session() as session:
             query = """
                 MERGE (t:Task {task_id: $task_id})
@@ -679,14 +670,13 @@ def create_neo4j_task(task_id: str, agent: str, title: str, body: str,
             result = session.run(query,
                 task_id=task_id,
                 agent=agent,
-                title=title[:200],  # Neo4j title limit
+                title=title[:200],
                 priority=priority,
                 created=datetime.now().isoformat(),
                 source=source,
                 proposal_id=proposal_id or ""
             )
             created_id = result.single()["id"]
-        driver.close()
         log_phase(4, f"  -> Neo4j entry created: {created_id}")
         return True
     except Exception as e:

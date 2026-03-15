@@ -152,6 +152,50 @@ def read_ledger(hours: int = None, valid_only: bool = False,
                         entry["duration_s"] = output.get("duration_s", 0)
                     entries.append(entry)
 
+        # Also read telemetry events from PipelineEvent nodes
+        # These include SKILL_INVOCATION, SKILL_OUTCOME, EXECUTION_DETAIL,
+        # EXECUTION_TRACE, etc. written by _append_ledger_direct
+        if not valid_only:
+            try:
+                with _store.driver.session() as pe_session:
+                    pe_params = {}
+                    time_clause = ""
+                    if hours:
+                        time_clause = "AND e.created > datetime() - duration({hours: $hours})"
+                        pe_params["hours"] = hours
+
+                    pe_result = pe_session.run(f"""
+                        MATCH (e:PipelineEvent)
+                        WHERE e.payload IS NOT NULL
+                        {time_clause}
+                        RETURN e.event_type AS event_type, e.payload AS payload,
+                               e.agent AS agent, e.created AS created
+                        ORDER BY e.created DESC
+                        LIMIT 500
+                    """, **pe_params)
+
+                    import json as _json
+                    for record in pe_result:
+                        payload_str = record.get("payload")
+                        if not payload_str:
+                            continue
+                        try:
+                            payload = _json.loads(payload_str)
+                            # Only include telemetry events not already covered by Task nodes
+                            if payload.get("event") in (
+                                "SKILL_INVOCATION", "SKILL_OUTCOME", "SKILL_AGGREGATE",
+                                "EXECUTION_DETAIL", "EXECUTION_TRACE",
+                                "R008_SKILL_NOT_INVOKED",
+                                "REFLECT_SUMMARY", "ARCH_UPDATE_CHECK",
+                                "TASK_REPORT_GENERATED", "MODEL_USED",
+                                "SESSION_AUTO_CLEANUP",
+                            ):
+                                entries.append(payload)
+                        except Exception:
+                            continue
+            except Exception as pe_err:
+                logger.debug(f"PipelineEvent read failed (non-fatal): {pe_err}")
+
         # Sort by timestamp
         entries.sort(key=lambda e: e.get("ts", ""))
 

@@ -59,7 +59,7 @@ WEBSITES = [
 ]
 
 # Thresholds
-HTTP_TIMEOUT = 5
+HTTP_TIMEOUT = 10
 NEO4J_TIMEOUT = 3
 
 
@@ -325,7 +325,7 @@ def create_notification(issues: list[str], severity: str = "MEDIUM"):
     # CIRCULAR CASCADE PREVENTION: Check if ogedei is failing
     _OGEDEI_FAILURE_THRESHOLD = 0.5
     _target_agent = "ogedei"
-    _watchdog_state = LOGS_DIR / "ogedei-watchdog-state.json"
+    _watchdog_state = LOG_DIR / "ogedei-watchdog-state.json"
 
     try:
         if _watchdog_state.exists():

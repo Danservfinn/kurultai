@@ -1,0 +1,21 @@
+# Task Resolution Audit - Jochi's Quality Gate
+# Runs hourly to check for missing resolution sections in completed task reports
+# Logs to JSONL for analysis and triggers alerts if compliance drops below 90%
+#
+# What it checks:
+# - fix-, implement-, high-, normal-, low- priority tasks
+# - Reports that were manually updated by agents
+# - Any completed report marked as should-have-resolution
+#
+# Outputs:
+# - /Users/kublai/.openclaw/agents/main/logs/missing-resolutions-audit.jsonl
+# - Stdout summary (captured by watchdog for reflection)
+#
+# Installation:
+#   crontab -l | { cat; cat /Users/kublai/.openclaw/agents/main/cron/resolution-audit.cron; } | crontab -
+#
+# Verification:
+#   crontab -l | grep resolution
+
+# Run at the top of every hour
+0 * * * * cd /Users/kublai/.openclaw/agents/main/scripts && python3 audit_missing_resolutions.py --recent 24 >> /Users/kublai/.openclaw/logs/resolution-audit.log 2>&1

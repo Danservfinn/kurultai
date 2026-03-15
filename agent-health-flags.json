@@ -1,1 +1,15 @@
-{}
+{
+  "session_match_gate": {
+    "timestamp": "2026-03-15T16:25:00.000000",
+    "mismatched_count": 0,
+    "mismatched_agents": [],
+    "gate_result": "PASS",
+    "resolution": {
+      "fixed_at": "2026-03-15T16:25:00.000000",
+      "fixed_by": "ogedei",
+      "task_id": "chagatai-infra-fix-20260315-161829",
+      "root_cause": "temujin ran 'openclaw config set agents.list[N].model bailian/qwen3.5-plus' for all 6 agents on 2026-03-11T00:45-00:47 UTC, overwriting claude-opus-4-6 model assignments in openclaw.json",
+      "fix_applied": "Restored all 6 agents (main, mongke, chagatai, temujin, jochi, ogedei) to anthropic/claude-opus-4-6 in openclaw.json; restored agents.defaults.model.primary to anthropic/claude-opus-4-6"
+    }
+  }
+}

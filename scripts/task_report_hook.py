@@ -28,6 +28,7 @@ import hashlib
 import re
 import uuid
 from datetime import datetime, timedelta
+from task_utils import extract_task_id
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import glob as globmodule
@@ -1191,7 +1192,20 @@ def append_ledger_event(task_id: str, agent: str, status: str, metrics: dict, se
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
     except Exception as e:
-        pass  # Silently fail
+        pass  # Silently fail - JSONL write
+
+    # Also write to Neo4j as PipelineEvent for read_ledger visibility
+    try:
+        from neo4j_task_tracker import TaskTracker
+        tracker = TaskTracker()
+        for event in events:
+            tracker.emit_pipeline_event(
+                event_type=event.get("event", "UNKNOWN"),
+                payload=event,
+                agent=event.get("agent", ""),
+            )
+    except Exception:
+        pass  # Non-fatal - JSONL is the fallback
 
 
 def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
@@ -1502,7 +1516,11 @@ def main():
             # Override status to failed for error files
             task['metadata']['status'] = 'failed'
             agent = task.get('metadata', {}).get('agent', args.agent or 'unknown')
-            task_id = task.get('metadata', {}).get('task_id', args.task_id or 'unknown')
+            _fm_id = task.get('metadata', {}).get('task_id')
+            _cli_id = args.task_id if args.task_id and args.task_id != 'unknown' else None
+            _file_id = extract_task_id(args.task_file) if args.task_file else None
+            task_id = _fm_id or _cli_id or _file_id or 'unknown'
+            task.setdefault('metadata', {})['task_id'] = task_id
             parent_id = ''
             # Force status to failed
             args.status = 'failed'
@@ -1547,19 +1565,27 @@ def main():
             # Parse normal task file format
             task = parse_task_file(args.task_file)
             agent = task.get('metadata', {}).get('agent', args.agent or 'unknown')
-            task_id = task.get('metadata', {}).get('task_id', args.task_id or 'unknown')
+            # Extract task_id: frontmatter > CLI arg > filename extraction > "unknown"
+            _fm_id = task.get('metadata', {}).get('task_id')
+            _cli_id = args.task_id if args.task_id and args.task_id != 'unknown' else None
+            _file_id = extract_task_id(args.task_file) if args.task_file else None
+            task_id = _fm_id or _cli_id or _file_id or 'unknown'
+            # Propagate resolved task_id back to metadata for generate_report()
+            task.setdefault('metadata', {})['task_id'] = task_id
             parent_id = task.get('metadata', {}).get('parent_id', '')
     else:
+        # No task file provided — try CLI arg, fallback to "unknown"
+        resolved_task_id = args.task_id or 'unknown'
         task = {
             'metadata': {
-                'task_id': args.task_id or 'unknown',
+                'task_id': resolved_task_id,
                 'agent': args.agent or 'unknown',
                 'status': args.status
             },
-            'body': f"# Task {args.task_id or 'unknown'}"
+            'body': f"# Task {resolved_task_id}"
         }
         agent = args.agent or 'unknown'
-        task_id = args.task_id or 'unknown'
+        task_id = resolved_task_id
         parent_id = ''
 
     # Scan session for token usage

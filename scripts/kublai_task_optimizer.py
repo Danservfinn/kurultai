@@ -35,9 +35,7 @@ OPTIMIZATION_ENABLED = os.getenv("OPTIMIZATION_ENABLED", "true").lower() == "tru
 EPSILON_GREEDY_RATE = 0.10  # 10% exploration
 CONFIDENCE_THRESHOLD = 0.60  # 60% minimum confidence
 DEFAULT_TEMPLATE = "agent-protocol-v2"
-# TODO: Import CLAUDE_TIMEOUT from kurultai_paths instead of redefining.
-#   Canonical value: kurultai_paths.CLAUDE_TIMEOUT = 7200
-DEFAULT_TIMEOUT = 7200  # 2 hours
+from kurultai_paths import CLAUDE_TIMEOUT as DEFAULT_TIMEOUT
 
 # Path to prompt templates
 TEMPLATES_PATH = os.path.expanduser("~/.openclaw/agents/main/data/prompt_templates.json")
@@ -66,17 +64,8 @@ AGENT_SKILL_DEFAULTS = {
     "kublai": "/horde-implement",
 }
 
-# Timeout by priority (in seconds)
-# TODO: Consolidate with kurultai_paths.py TIMEOUT_BY_PRIORITY (canonical source).
-#   kurultai_paths has: high=7200, normal=7200, low=7200 (no "critical" key).
-#   This version has different values and an extra "critical" tier.
-#   Reconcile by adding "critical" to kurultai_paths, then import from there.
-TIMEOUT_BY_PRIORITY = {
-    "critical": 3600,   # 1 hour
-    "high": 5400,       # 1.5 hours
-    "normal": 7200,     # 2 hours
-    "low": 10800,       # 3 hours
-}
+# Timeout by priority — imported from canonical source (kurultai_paths.py)
+from kurultai_paths import TIMEOUT_BY_PRIORITY
 
 
 def _load_templates() -> Dict[str, Any]:

@@ -25,7 +25,7 @@ DEFAULT_MODEL="claude-sonnet-4-6"
 # Uses standard ANTHROPIC_API_KEY from environment
 
 # Tier 1: Z.AI glm-5 (First Fallback)
-ANTHROPIC_AUTH_TOKEN=b5b1f9537dda43198c640b9a3b48f79b.KnBknfXZneVL1cLG
+ANTHROPIC_AUTH_TOKEN=<REDACTED>
 ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
 ANTHROPIC_MODEL=glm-5
 

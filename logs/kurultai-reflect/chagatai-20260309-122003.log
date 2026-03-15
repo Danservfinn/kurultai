@@ -1,0 +1,38 @@
+[PHASE 1 COMPLETE]
+
+[PHASE 2 COMPLETE]
+
+[PHASE 3 COMPLETE]
+
+[PHASE 4 COMPLETE]
+
+## Rule Candidates for chagatai (Writer)
+
+### Rule 1 (HIGH Confidence)
+**WHEN**: Starting session execution detects model mismatch (session model != configured model in ~/.openclaw/agents/chagatai/config.json)
+**THEN**: Immediately log drift event to `logs/model-drift.log` with timestamp + model mismatch details, then trigger session reset via `claude-agent --reset` flag
+**INSTEAD OF**: Continuing execution with drifted model causing unpredictable behavior, capability gaps, or performance degradation
+**Evidence**: Current session running kimi-k2.5 instead of configured claude-opus-4-6
+
+### Rule 2 (MEDIUM Confidence)
+**WHEN**: 4-hour window passes with 0 scored tasks while queue depth >= 1
+**THEN**: Run self-diagnostic via `scripts/task-watcher.py --agent=chagatai`, log idle state to `logs/agent-idle-alerts.json`, and flag for kublai routing audit
+**INSTEAD OF**: Remaining idle without awareness of pending tasks or potential routing blockage
+**Evidence**: 0 tasks completed in last 4h despite 1 pending task in queue
+
+### Rule 3 (MEDIUM Confidence)
+**WHEN**: Pending task clear_time exceeds STALE threshold (2820s) without state transition
+**THEN**: Escalate to kublai via task_intake.py with priority flag "STALE_TASK_REDIRECT" for queue redistribution, include task_id and stall duration
+**INSTEAD OF**: Allowing tasks to remain stuck indefinitely without escalation or routing intervention
+**Evidence**: 1 pending task with infinite clear time indicating stalled execution
+
+---
+
+## Summary Status: **CRITICAL**
+
+**Critical Issues:** Model drift detected (kimi-k2.5 vs claude-opus-4-6) causing potential capability degradation, combined with zero task throughput in 4h window and stalled queue state.
+
+**Recommended Actions:**
+1. Immediate: Reset session to correct model (claude-opus-4-6)
+2. Short-term: Investigate routing issue causing 0 task completion
+3. Long-term: Implement automated model drift detection in task-watcher.py

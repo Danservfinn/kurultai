@@ -1,57 +1,45 @@
-# Git Ignore for Kurultai Agent
-
-## Secrets & Credentials
-.credentials.env
-*.env
-.env.local
-*.key
-*.pem
-*.secret
-
-## OpenClaw Internal
-.openclaw/
-agent/auth.json
-agent/auth-profiles.json
-*.auth.json
-
-## Session Data (Privacy)
-sessions/*.jsonl
-sessions/*.lock
-sessions/*.json
-
-## Logs
+# Operational state (changes on every tick)
 logs/*.log
-*.log
+logs/*.log.*
+logs/*.gz
+logs/.last_tick_epoch
+logs/.gap-escalation-last-escalation
+logs/.neo4j_recovery_last
+logs/.openclaw_size_prev
+logs/tock/
+logs/gate-audits/
+logs/gate-timeouts/
+logs/routing-metrics-*.json
+logs/hourly-reports/
+logs/kurultai-reflect-*.md
+logs/kurultai-reflection-*.md
+logs/kublai-learning-*.json
+logs/dispatch-*.log*
+logs/agent-manager.log*
+logs/auto-dispatch-cron.log*
+logs/cron-spawn-consumer.log*
+logs/heartbeat-watchdog.log*
+logs/routing-test-*.log*
+logs/spawn-*.log*
+logs/task-consumer.log*
+logs/watchdog-tick.log*
+logs/watchdog.log.*
+logs/system-health.log.*
+logs/qmd-index.log.*
+logs/ogedei-watchdog.log.*
+logs/task-watcher.lock
 
-## Temporary Files
-*.tmp
-*.bak
-*.bak.*
-*.deleted.*
-CFCONFIG
-CRON
-CRONEOF
-ENDOFFILE
-EOF
-PYEOF
+# State files (runtime state, not code)
+state/
+sessions/
+agent-health-flags.json
 
-## IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Credentials (NEVER commit)
+credentials/
 
-## OS
-.DS_Store
-Thumbs.db
+# Python venv
+scripts/.venv/
+scripts/__pycache__/
 
-## Node Modules (if any)
-node_modules/
-
-## Build Outputs
-dist/
-build/
-*.pyc
-__pycache__/
-.x_api_credentials
+# Archived files
+scripts/_archived/

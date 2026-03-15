@@ -1,0 +1,49 @@
+[PHASE 1 COMPLETE] Telemetry analysis initialized
+
+[PHASE 2 COMPLETE] Red flag identification complete
+
+[PHASE 3 COMPLETE] Rule generation
+
+## Rule Candidates for temujin
+
+### Rule 1: Model Drift Prevention
+**Confidence:** HIGH  
+**Evidence:** Session running kimi-k2.5 instead of configured claude-opus-4-6; quality scores 26% below threshold
+
+- **WHEN:** temujin session initializes OR task score < 5.0/10 for 2+ consecutive tasks
+- **THEN:** Immediately verify session model via `~/.local/bin/claude-agent --model` + reset to claude-opus-4-6 if drifted + log to `logs/model-drift-recovery.md`
+- **INSTEAD OF:** Continuing execution on drifted model without validation
+
+### Rule 2: Low-Quality Circuit Breaker
+**Confidence:** HIGH  
+**Evidence:** 4.4/10 average (26% below threshold), 0/5 tasks passed quality gate
+
+- **WHEN:** rolling 3-task average score < 5.0/10 AND code/ops domains both < 6.0/10
+- **THEN:** Pause task acceptance + run self-diagnostic via `scripts/session_model_drift_detector.py` + route next 2 tasks to alternate (jochi/chagatai) + escalate to ogedei if scores don't improve after 3 tasks
+- **INSTEAD OF:** Continuing normal task processing without quality intervention
+
+### Rule 3: Queue Stall Prevention
+**Confidence:** MEDIUM  
+**Evidence:** 2 pending tasks, 0 completions in last 1h, 0.7h estimated clear time
+
+- **WHEN:** queue depth ≥ 2 AND no completions for > 45min AND session model drifted
+- **THEN:** Force session reset + verify model + claim oldest pending task within 300s + notify watchdog if stall persists
+- **INSTEAD OF:** Allowing backlog to accumulate with drifted session
+
+[PHASE 4 COMPLETE] Validation complete
+
+---
+
+## Final Summary: temujin Reflection
+
+**Status:** CRITICAL
+
+**Issues:**
+- Model drift (kimi-k2.5 vs claude-opus-4-6) is likely root cause of low quality
+- Queue stalling with 2 pending tasks
+- Quality scores 26% below acceptable threshold across all domains
+
+**Immediate Actions Required:**
+1. Reset session to correct model (claude-opus-4-6)
+2. Clear queue backlog
+3. Monitor scores for next 5 tasks to confirm recovery

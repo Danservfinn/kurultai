@@ -10622,3 +10622,831 @@ Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.
 [Fri Mar 13 00:01:22 EDT 2026] Hourly reflection pipeline complete (all steps)
 [Fri Mar 13 00:01:22 EDT 2026] Reflection finished in 78s
 [Fri Mar 13 00:01:22 EDT 2026] Reflection finished in 78s
+[Fri Mar 13 01:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 01:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 28564
+================================================================
+[Fri Mar 13 01:00:01 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 01:00:01 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 01:00:01 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 01:00:20 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 01:00:20 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 01:00:21 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 01:00:21 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 01:00:39 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 01:00:39 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 01:00:39 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 01:00:39 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 01:00:57 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 01:00:58 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 01:00:58 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 01:00:58 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 01:00:58 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 01:00:58 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 01:00:58 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 01:00:58 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 01:00:58 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 01:00:58 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 01:00:58 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 01:01:02 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 01:01:02 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 01:01:02 EDT 2026] Batch 1 complete in 4s
+[Fri Mar 13 01:01:02 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 01:01:02 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 01:01:02 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 01:01:02 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 01:01:02 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 01:01:07 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 01:01:07 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Fri Mar 13 01:01:07 EDT 2026] Batch 2 complete in 5s
+[Fri Mar 13 01:01:07 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 01:01:07 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 01:01:07 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 01:01:07 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 01:01:07 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 01:01:12 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 01:01:12 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+[Fri Mar 13 01:01:12 EDT 2026] Batch 3 complete in 5s
+[Fri Mar 13 01:01:12 EDT 2026] All agent /horde-review analyses complete (total: 14s)
+================================================================
+[Fri Mar 13 01:01:13 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 01:01:13 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 01:01:13 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 01:01:13 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 01:01:13 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 01:01:13 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 01:01:13 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 01:01:13 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 01:01:13 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 01:01:13 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 01:01:13 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 01:01:13 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 01:01:13 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 01:01:13 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 01:01:13 EDT 2026] Phase 1 complete
+[Fri Mar 13 01:01:14 EDT 2026] Consensus Voting complete
+[Fri Mar 13 01:01:14 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 01:01:14 EDT 2026] Pending proposals: 3
+[Fri Mar 13 01:01:15 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 01:01:15 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 01:01:15 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 01:01:15 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 01:01:15 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 01:01:16 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 01:01:16 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 01:01:17 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 01:01:17 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 01:01:17 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 01:01:17 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 01:01:18 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 01:01:23 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 01:01:23 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 01:01:23 EDT 2026] Reflection finished in 82s
+[Fri Mar 13 01:01:23 EDT 2026] Reflection finished in 82s
+[Fri Mar 13 02:00:05 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 02:00:05 EDT 2026] Hard timeout: 7200s | Watchdog PID: 62677
+================================================================
+[Fri Mar 13 02:00:05 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 02:00:05 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 02:00:05 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 02:00:24 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 02:00:24 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 02:00:24 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 02:00:24 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 02:00:42 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 02:00:42 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 02:00:42 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 02:00:42 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 02:01:10 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 02:01:10 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 02:01:10 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 02:01:10 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 02:01:10 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 02:01:10 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 02:01:10 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 02:01:10 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 02:01:10 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 02:01:10 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 02:01:10 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 02:01:17 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 02:01:17 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 02:01:17 EDT 2026] Batch 1 complete in 7s
+[Fri Mar 13 02:01:17 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 02:01:17 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 02:01:17 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 02:01:17 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 02:01:17 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 02:01:24 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+[Fri Mar 13 02:01:24 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Fri Mar 13 02:01:24 EDT 2026] Batch 2 complete in 7s
+[Fri Mar 13 02:01:24 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 02:01:24 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 02:01:24 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 02:01:24 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 02:01:24 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 02:01:31 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 02:01:31 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+[Fri Mar 13 02:01:31 EDT 2026] Batch 3 complete in 7s
+[Fri Mar 13 02:01:31 EDT 2026] All agent /horde-review analyses complete (total: 21s)
+================================================================
+[Fri Mar 13 02:01:32 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 02:01:32 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 02:01:32 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 02:01:32 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 02:01:32 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 02:01:32 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 02:01:32 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 02:01:32 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 02:01:32 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 02:01:32 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 02:01:32 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 02:01:32 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 02:01:32 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 02:01:32 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 02:01:32 EDT 2026] Phase 1 complete
+[Fri Mar 13 02:01:33 EDT 2026] Consensus Voting complete
+[Fri Mar 13 02:01:33 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 02:01:33 EDT 2026] Pending proposals: 3
+[Fri Mar 13 02:01:33 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 02:01:33 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 02:01:33 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 02:01:33 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 02:01:34 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 02:01:35 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 02:01:35 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 02:01:35 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 02:01:35 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 02:01:36 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 02:01:36 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 02:01:36 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 02:01:42 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 02:01:42 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 02:01:42 EDT 2026] Reflection finished in 97s
+[Fri Mar 13 02:01:42 EDT 2026] Reflection finished in 97s
+[Fri Mar 13 03:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 03:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 1779
+================================================================
+[Fri Mar 13 03:00:01 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 03:00:01 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 03:00:01 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 03:00:23 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 03:00:23 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 03:00:23 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 03:00:23 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 03:00:42 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 03:00:42 EDT 2026] Spawned jochi (running:        3)
+[Fri Mar 13 03:00:42 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 03:00:42 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 03:01:00 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 03:01:00 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 03:01:00 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 03:01:00 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 03:01:00 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 03:01:00 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 03:01:00 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 03:01:00 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 03:01:00 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 03:01:00 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 03:01:00 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 03:01:05 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 03:01:05 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 03:01:05 EDT 2026] Batch 1 complete in 5s
+[Fri Mar 13 03:01:05 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 03:01:05 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 03:01:05 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 03:01:05 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 03:01:05 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 03:01:09 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 03:01:09 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Fri Mar 13 03:01:09 EDT 2026] Batch 2 complete in 4s
+[Fri Mar 13 03:01:09 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 03:01:09 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 03:01:09 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 03:01:09 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 03:01:09 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 03:01:13 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 03:01:13 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+[Fri Mar 13 03:01:13 EDT 2026] Batch 3 complete in 4s
+[Fri Mar 13 03:01:13 EDT 2026] All agent /horde-review analyses complete (total: 13s)
+================================================================
+[Fri Mar 13 03:01:14 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 03:01:14 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 03:01:14 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 03:01:14 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 03:01:14 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 03:01:14 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 03:01:14 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 03:01:14 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 03:01:14 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 03:01:14 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 03:01:14 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 03:01:14 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 03:01:14 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 03:01:14 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 03:01:14 EDT 2026] Phase 1 complete
+[Fri Mar 13 03:01:14 EDT 2026] Consensus Voting complete
+[Fri Mar 13 03:01:14 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 03:01:14 EDT 2026] Pending proposals: 3
+[Fri Mar 13 03:01:14 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 03:01:14 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 03:01:14 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 03:01:15 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 03:01:15 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 03:01:16 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 03:01:16 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 03:01:16 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 03:01:16 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 03:01:17 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 03:01:17 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 03:01:17 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 03:01:21 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 03:01:21 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 03:01:21 EDT 2026] Reflection finished in 80s
+[Fri Mar 13 03:01:21 EDT 2026] Reflection finished in 80s
+[Fri Mar 13 04:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 04:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 41713
+================================================================
+[Fri Mar 13 04:00:01 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 04:00:01 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 04:00:01 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 04:00:23 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 04:00:23 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 04:00:23 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 04:00:23 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 04:00:44 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 04:00:44 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 04:00:45 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 04:00:45 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 04:01:04 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 04:01:04 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 04:01:04 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 04:01:04 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 04:01:04 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 04:01:04 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 04:01:04 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 04:01:04 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 04:01:04 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 04:01:04 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 04:01:04 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 04:01:08 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 04:01:08 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+[Fri Mar 13 04:01:08 EDT 2026] Batch 1 complete in 4s
+[Fri Mar 13 04:01:08 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 04:01:08 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 04:01:08 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 04:01:08 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 04:01:08 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 04:01:13 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 04:01:13 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+[Fri Mar 13 04:01:13 EDT 2026] Batch 2 complete in 5s
+[Fri Mar 13 04:01:13 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 04:01:13 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 04:01:13 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 04:01:13 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 04:01:13 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 04:01:17 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 04:01:17 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+[Fri Mar 13 04:01:17 EDT 2026] Batch 3 complete in 4s
+[Fri Mar 13 04:01:17 EDT 2026] All agent /horde-review analyses complete (total: 13s)
+================================================================
+[Fri Mar 13 04:01:18 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 04:01:18 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 04:01:18 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 04:01:18 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 04:01:18 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 04:01:18 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 04:01:18 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 04:01:18 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 04:01:18 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 04:01:18 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 04:01:18 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 04:01:18 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 04:01:18 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 04:01:18 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 04:01:18 EDT 2026] Phase 1 complete
+[Fri Mar 13 04:01:18 EDT 2026] Consensus Voting complete
+[Fri Mar 13 04:01:18 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 04:01:18 EDT 2026] Pending proposals: 3
+[Fri Mar 13 04:01:18 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 04:01:18 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 04:01:18 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 04:01:19 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 04:01:19 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 04:01:19 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 04:01:19 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 04:01:20 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 04:01:20 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 04:01:21 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 04:01:21 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 04:01:21 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 04:01:25 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 04:01:25 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 04:01:25 EDT 2026] Reflection finished in 84s
+[Fri Mar 13 04:01:25 EDT 2026] Reflection finished in 84s
+[Fri Mar 13 05:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 05:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 78954
+================================================================
+[Fri Mar 13 05:00:01 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 05:00:01 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 05:00:01 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 05:00:21 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 05:00:21 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 05:00:21 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 05:00:21 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 05:00:42 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 05:00:42 EDT 2026] Spawned jochi (running:        3)
+[Fri Mar 13 05:00:42 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 05:00:43 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 05:01:02 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 05:01:02 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 05:01:02 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 05:01:02 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 05:01:02 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 05:01:02 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 05:01:02 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 05:01:02 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 05:01:02 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 05:01:02 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 05:01:02 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 05:01:07 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 05:01:07 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 05:01:07 EDT 2026] Batch 1 complete in 5s
+[Fri Mar 13 05:01:07 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 05:01:07 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 05:01:07 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 05:01:07 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 05:01:07 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 05:01:12 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 05:01:12 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+[Fri Mar 13 05:01:12 EDT 2026] Batch 2 complete in 5s
+[Fri Mar 13 05:01:12 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 05:01:12 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 05:01:12 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 05:01:12 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 05:01:12 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 05:01:18 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+[Fri Mar 13 05:01:18 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+[Fri Mar 13 05:01:18 EDT 2026] Batch 3 complete in 6s
+[Fri Mar 13 05:01:18 EDT 2026] All agent /horde-review analyses complete (total: 16s)
+================================================================
+[Fri Mar 13 05:01:19 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 05:01:19 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 05:01:19 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 05:01:19 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 05:01:19 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 05:01:19 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 05:01:19 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 05:01:19 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 05:01:19 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 05:01:19 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 05:01:19 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 05:01:19 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 05:01:19 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 05:01:19 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 05:01:19 EDT 2026] Phase 1 complete
+[Fri Mar 13 05:01:19 EDT 2026] Consensus Voting complete
+[Fri Mar 13 05:01:19 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 05:01:19 EDT 2026] Pending proposals: 3
+[Fri Mar 13 05:01:19 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 05:01:19 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 05:01:19 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 05:01:20 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 05:01:20 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 05:01:21 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 05:01:21 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 05:01:21 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 05:01:21 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 05:01:22 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 05:01:22 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 05:01:22 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 05:01:27 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 05:01:27 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 05:01:27 EDT 2026] Reflection finished in 86s
+[Fri Mar 13 05:01:27 EDT 2026] Reflection finished in 86s
+[Fri Mar 13 06:00:05 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 06:00:05 EDT 2026] Hard timeout: 7200s | Watchdog PID: 21798
+================================================================
+[Fri Mar 13 06:00:05 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 06:00:05 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 06:00:05 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 06:00:25 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 06:00:25 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 06:00:26 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 06:00:26 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 06:00:46 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 06:00:46 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 06:00:46 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 06:00:46 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 06:01:06 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 06:01:06 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 06:01:06 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 06:01:06 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 06:01:06 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 06:01:06 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 06:01:06 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 06:01:06 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 06:01:06 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 06:01:07 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 06:01:07 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 06:01:13 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 06:01:13 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 06:01:13 EDT 2026] Batch 1 complete in 7s
+[Fri Mar 13 06:01:13 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 06:01:13 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 06:01:13 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 06:01:13 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 06:01:13 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 06:01:20 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 06:01:20 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Fri Mar 13 06:01:20 EDT 2026] Batch 2 complete in 7s
+[Fri Mar 13 06:01:20 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 06:01:20 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 06:01:20 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 06:01:20 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 06:01:20 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 06:01:26 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 06:01:26 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+[Fri Mar 13 06:01:26 EDT 2026] Batch 3 complete in 6s
+[Fri Mar 13 06:01:26 EDT 2026] All agent /horde-review analyses complete (total: 20s)
+================================================================
+[Fri Mar 13 06:01:27 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 06:01:27 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 06:01:27 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 06:01:27 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 06:01:27 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 06:01:27 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 06:01:27 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 06:01:27 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 06:01:27 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 06:01:27 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 06:01:27 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 06:01:27 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 06:01:27 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 06:01:27 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 06:01:27 EDT 2026] Phase 1 complete
+[Fri Mar 13 06:01:27 EDT 2026] Consensus Voting complete
+[Fri Mar 13 06:01:27 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 06:01:27 EDT 2026] Pending proposals: 3
+[Fri Mar 13 06:01:27 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 06:01:28 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 06:01:28 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 06:01:28 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 06:01:28 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 06:01:29 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 06:01:29 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 06:01:30 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 06:01:30 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 06:01:30 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 06:01:30 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 06:01:31 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 06:01:36 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 06:01:36 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 06:01:36 EDT 2026] Reflection finished in 91s
+[Fri Mar 13 06:01:36 EDT 2026] Reflection finished in 91s
+[Fri Mar 13 07:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 07:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 65957
+================================================================
+[Fri Mar 13 07:00:01 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 07:00:01 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 07:00:01 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 07:00:21 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 07:00:21 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 07:00:22 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 07:00:22 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 07:00:43 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 07:00:43 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 07:00:43 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 07:00:43 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 07:01:04 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 07:01:04 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 07:01:04 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 07:01:04 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 07:01:04 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 07:01:04 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 07:01:04 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 07:01:04 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 07:01:04 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 07:01:04 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 07:01:04 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 07:01:09 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 07:01:10 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 07:01:10 EDT 2026] Batch 1 complete in 6s
+[Fri Mar 13 07:01:10 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 07:01:10 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 07:01:10 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 07:01:10 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 07:01:10 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 07:01:15 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 07:01:15 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Fri Mar 13 07:01:15 EDT 2026] Batch 2 complete in 5s
+[Fri Mar 13 07:01:15 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 07:01:15 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 07:01:15 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 07:01:15 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 07:01:15 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 07:01:20 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 07:01:20 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+[Fri Mar 13 07:01:20 EDT 2026] Batch 3 complete in 5s
+[Fri Mar 13 07:01:20 EDT 2026] All agent /horde-review analyses complete (total: 16s)
+================================================================
+[Fri Mar 13 07:01:21 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 07:01:21 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 07:01:21 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 07:01:21 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 07:01:21 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 07:01:21 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 07:01:21 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 07:01:21 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 07:01:21 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 07:01:21 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 07:01:21 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 07:01:21 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 07:01:21 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 07:01:21 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 07:01:21 EDT 2026] Phase 1 complete
+[Fri Mar 13 07:01:21 EDT 2026] Consensus Voting complete
+[Fri Mar 13 07:01:21 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 07:01:21 EDT 2026] Pending proposals: 3
+[Fri Mar 13 07:01:21 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 07:01:21 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 07:01:21 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 07:01:22 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 07:01:22 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 07:01:22 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 07:01:22 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 07:01:23 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 07:01:23 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 07:01:24 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 07:01:24 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 07:01:24 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 07:01:28 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 07:01:28 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 07:01:28 EDT 2026] Reflection finished in 87s
+[Fri Mar 13 07:01:28 EDT 2026] Reflection finished in 87s
+[Fri Mar 13 08:00:03 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 08:00:03 EDT 2026] Hard timeout: 7200s | Watchdog PID: 15912
+================================================================
+[Fri Mar 13 08:00:03 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 08:00:03 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 08:00:03 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 08:00:24 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 08:00:24 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 08:00:24 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 08:00:24 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 08:00:45 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 08:00:45 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 08:00:45 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 08:00:45 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 08:01:06 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 08:01:06 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 08:01:06 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 08:01:06 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 08:01:06 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 08:01:06 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 08:01:06 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 08:01:06 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 08:01:06 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 08:01:06 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 08:01:06 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 08:01:12 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+[Fri Mar 13 08:01:12 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 08:01:12 EDT 2026] Batch 1 complete in 6s
+[Fri Mar 13 08:01:12 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 08:01:12 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 08:01:12 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 08:01:12 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 08:01:12 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 08:01:17 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 08:01:17 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+[Fri Mar 13 08:01:17 EDT 2026] Batch 2 complete in 5s
+[Fri Mar 13 08:01:17 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 08:01:17 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 08:01:17 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 08:01:17 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 08:01:17 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 08:01:23 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 08:01:23 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+[Fri Mar 13 08:01:23 EDT 2026] Batch 3 complete in 6s
+[Fri Mar 13 08:01:23 EDT 2026] All agent /horde-review analyses complete (total: 17s)
+================================================================
+[Fri Mar 13 08:01:23 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 08:01:23 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 08:01:23 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 08:01:23 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 08:01:23 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 08:01:23 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 08:01:23 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 08:01:23 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 08:01:23 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 08:01:23 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 08:01:23 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 08:01:23 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 08:01:23 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 08:01:23 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 08:01:23 EDT 2026] Phase 1 complete
+[Fri Mar 13 08:01:24 EDT 2026] Consensus Voting complete
+[Fri Mar 13 08:01:24 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 08:01:24 EDT 2026] Pending proposals: 3
+[Fri Mar 13 08:01:24 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 08:01:24 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 08:01:24 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 08:01:24 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 08:01:24 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 08:01:25 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 08:01:25 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 08:01:25 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 08:01:25 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 08:01:26 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 08:01:26 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 08:01:26 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 08:01:32 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 08:01:32 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 08:01:32 EDT 2026] Reflection finished in 89s
+[Fri Mar 13 08:01:32 EDT 2026] Reflection finished in 89s
+[Fri Mar 13 09:00:03 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 09:00:03 EDT 2026] Hard timeout: 7200s | Watchdog PID: 59407
+================================================================
+[Fri Mar 13 09:00:03 EDT 2026] Launching 6 agents with semaphore (max 3 concurrent)...
+[Fri Mar 13 09:00:03 EDT 2026] Spawned kublai (running:        2)
+[Fri Mar 13 09:00:03 EDT 2026] Spawned mongke (running:        3)
+[Fri Mar 13 09:00:23 EDT 2026] [mongke] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 09:00:24 EDT 2026] [kublai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 09:00:24 EDT 2026] Spawned chagatai (running:        2)
+[Fri Mar 13 09:00:24 EDT 2026] Spawned temujin (running:        3)
+[Fri Mar 13 09:00:44 EDT 2026] [temujin] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 09:00:44 EDT 2026] [chagatai] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 09:00:44 EDT 2026] Spawned jochi (running:        2)
+[Fri Mar 13 09:00:44 EDT 2026] Spawned ogedei (running:        3)
+[Fri Mar 13 09:01:05 EDT 2026] [ogedei] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 09:01:05 EDT 2026] [jochi] SKIP: Auth preflight failed - skipping reflection
+[Fri Mar 13 09:01:05 EDT 2026] All 6 agents completed their reflections (parallel)
+================================================================
+[Fri Mar 13 09:01:05 EDT 2026] Checkpoint written to /Users/kublai/.openclaw/agents/main/logs/reflection-status.json
+[Fri Mar 13 09:01:05 EDT 2026] Concurrent Kurultai Reflection Complete
+================================================================
+[Fri Mar 13 09:01:05 EDT 2026] Starting /horde-review analysis for all agents (batched, timeout=3600s, max concurrent=3)...
+[Fri Mar 13 09:01:05 EDT 2026] Starting Batch 1: kublai, mongke
+[Fri Mar 13 09:01:05 EDT 2026] [kublai] Starting review with fallback mode...
+[Fri Mar 13 09:01:05 EDT 2026] Spawned kublai review (running:        2)
+[Fri Mar 13 09:01:05 EDT 2026] [mongke] Starting review with fallback mode...
+[Fri Mar 13 09:01:05 EDT 2026] Spawned mongke review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md (mode: degraded)
+[Fri Mar 13 09:01:10 EDT 2026] [kublai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/kublai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md (mode: degraded)
+[Fri Mar 13 09:01:10 EDT 2026] [mongke] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/mongke-latest.md
+[Fri Mar 13 09:01:10 EDT 2026] Batch 1 complete in 5s
+[Fri Mar 13 09:01:10 EDT 2026] Starting Batch 2: chagatai, temujin
+[Fri Mar 13 09:01:10 EDT 2026] [chagatai] Starting review with fallback mode...
+[Fri Mar 13 09:01:10 EDT 2026] Spawned chagatai review (running:        2)
+[Fri Mar 13 09:01:10 EDT 2026] [temujin] Starting review with fallback mode...
+[Fri Mar 13 09:01:10 EDT 2026] Spawned temujin review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md (mode: degraded)
+[Fri Mar 13 09:01:15 EDT 2026] [chagatai] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/chagatai-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md (mode: degraded)
+[Fri Mar 13 09:01:16 EDT 2026] [temujin] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/temujin-latest.md
+[Fri Mar 13 09:01:16 EDT 2026] Batch 2 complete in 6s
+[Fri Mar 13 09:01:16 EDT 2026] Starting Batch 3: jochi, ogedei
+[Fri Mar 13 09:01:16 EDT 2026] [jochi] Starting review with fallback mode...
+[Fri Mar 13 09:01:16 EDT 2026] Spawned jochi review (running:        2)
+[Fri Mar 13 09:01:16 EDT 2026] [ogedei] Starting review with fallback mode...
+[Fri Mar 13 09:01:16 EDT 2026] Spawned ogedei review (running:        3)
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md (mode: degraded)
+[Fri Mar 13 09:01:21 EDT 2026] [ogedei] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/ogedei-latest.md
+Review written to /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md (mode: degraded)
+[Fri Mar 13 09:01:21 EDT 2026] [jochi] Review complete (mode: ) -> /Users/kublai/.openclaw/agents/main/logs/reviews/jochi-latest.md
+[Fri Mar 13 09:01:21 EDT 2026] Batch 3 complete in 5s
+[Fri Mar 13 09:01:21 EDT 2026] All agent /horde-review analyses complete (total: 16s)
+================================================================
+[Fri Mar 13 09:01:21 EDT 2026] Starting Consensus Voting (Kurultai Model)...
+[Fri Mar 13 09:01:21 EDT 2026] Starting Consensus Voting - Phase 1: Generate proposals...
+[Fri Mar 13 09:01:21 EDT 2026] Generating proposal for kublai...
+[Fri Mar 13 09:01:21 EDT 2026] Proposal generated for kublai
+[Fri Mar 13 09:01:21 EDT 2026] Generating proposal for temujin...
+[Fri Mar 13 09:01:21 EDT 2026] Proposal generated for temujin
+[Fri Mar 13 09:01:21 EDT 2026] Generating proposal for mongke...
+[Fri Mar 13 09:01:21 EDT 2026] Proposal generated for mongke
+[Fri Mar 13 09:01:21 EDT 2026] Generating proposal for chagatai...
+[Fri Mar 13 09:01:21 EDT 2026] Proposal generated for chagatai
+[Fri Mar 13 09:01:21 EDT 2026] Generating proposal for jochi...
+[Fri Mar 13 09:01:21 EDT 2026] Proposal generated for jochi
+[Fri Mar 13 09:01:21 EDT 2026] Generating proposal for ogedei...
+[Fri Mar 13 09:01:21 EDT 2026] Proposal generated for ogedei
+[Fri Mar 13 09:01:21 EDT 2026] Phase 1 complete
+[Fri Mar 13 09:01:22 EDT 2026] Consensus Voting complete
+[Fri Mar 13 09:01:22 EDT 2026] Running proposal lifecycle check...
+[Fri Mar 13 09:01:22 EDT 2026] Pending proposals: 3
+[Fri Mar 13 09:01:22 EDT 2026] Starting Tier 1 (independent steps) with semaphore...
+[Fri Mar 13 09:01:22 EDT 2026] Spawned reflection-research-persist (running:        2)
+[Fri Mar 13 09:01:22 EDT 2026] Spawned session-drift-detect (running:        3)
+[Fri Mar 13 09:01:22 EDT 2026] Spawned memory-audit-fix (running:        2)
+[Fri Mar 13 09:01:22 EDT 2026] Spawned cross-agent-rules (running:        3)
+[Fri Mar 13 09:01:23 EDT 2026] Spawned agent-rules-evaluator (running:        2)
+[Fri Mar 13 09:01:23 EDT 2026] Spawned capability-scores (running:        3)
+[Fri Mar 13 09:01:24 EDT 2026] Spawned routing-audit (running:        2)
+[Fri Mar 13 09:01:24 EDT 2026] Spawned score-skills (running:        3)
+[Fri Mar 13 09:01:24 EDT 2026] Spawned action-scorer (running:        2)
+[Fri Mar 13 09:01:24 EDT 2026] Spawned report-analysis (running:        3)
+[Fri Mar 13 09:01:25 EDT 2026] Tier 1 (independent steps) complete
+[Fri Mar 13 09:01:29 EDT 2026] Step timing written to /Users/kublai/.openclaw/agents/main/logs/reflection-step-timing.json
+[Fri Mar 13 09:01:29 EDT 2026] Hourly reflection pipeline complete (all steps)
+[Fri Mar 13 09:01:29 EDT 2026] Reflection finished in 86s
+[Fri Mar 13 09:01:29 EDT 2026] Reflection finished in 86s
+[Fri Mar 13 10:00:03 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 10:00:03 EDT 2026] Hard timeout: 7200s | Watchdog PID: 92243
+================================================================
+[Fri Mar 13 10:00:03 EDT 2026] AGENT OFFLINE - skipping reflection (stale heartbeats: main(811356s),mongke(811356s),chagatai(811356s),temujin(811356s),jochi(811356s),ogedei(811356s))
+[Fri Mar 13 10:00:03 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 10:00:03 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 11:00:04 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 11:00:04 EDT 2026] Hard timeout: 7200s | Watchdog PID: 21511
+================================================================
+[Fri Mar 13 11:00:04 EDT 2026] AGENT OFFLINE - skipping reflection (stale heartbeats: main(814958s),mongke(814958s),chagatai(814958s),temujin(814958s),jochi(814958s),ogedei(814958s))
+[Fri Mar 13 11:00:04 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 11:00:04 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 12:00:04 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 12:00:04 EDT 2026] Hard timeout: 7200s | Watchdog PID: 46884
+================================================================
+[Fri Mar 13 12:00:04 EDT 2026] AGENT OFFLINE - skipping reflection (stale heartbeats: main(818557s),mongke(818557s),chagatai(818557s),temujin(818557s),jochi(818557s),ogedei(818557s))
+[Fri Mar 13 12:00:04 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 12:00:04 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 13:00:03 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 13:00:03 EDT 2026] Hard timeout: 7200s | Watchdog PID: 73681
+================================================================
+[Fri Mar 13 13:00:03 EDT 2026] AGENT OFFLINE - skipping reflection (stale heartbeats: main(822156s),mongke(822156s),chagatai(822156s),temujin(822156s),jochi(822156s),ogedei(822156s))
+[Fri Mar 13 13:00:03 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 13:00:03 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 14:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 14:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 655
+================================================================
+[Fri Mar 13 14:00:01 EDT 2026] AGENT OFFLINE - skipping reflection (stale heartbeats: main(825754s),mongke(825754s),chagatai(825754s),temujin(825754s),jochi(825754s),ogedei(825754s))
+[Fri Mar 13 14:00:01 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 14:00:01 EDT 2026] Reflection finished in 0s
+[Fri Mar 13 15:00:01 EDT 2026] Starting Concurrent Kurultai Reflection (All 6 Agents) [Protocol Mode]
+[Fri Mar 13 15:00:01 EDT 2026] Hard timeout: 7200s | Watchdog PID: 1499
+================================================================
+[Fri Mar 13 15:00:02 EDT 2026] AGENT OFFLINE - skipping reflection (stale heartbeats: main(829355s),mongke(829355s),chagatai(829355s),temujin(829355s),jochi(829355s),ogedei(829355s))
+[Fri Mar 13 15:00:02 EDT 2026] Reflection finished in 1s
+[Fri Mar 13 15:00:02 EDT 2026] Reflection finished in 1s

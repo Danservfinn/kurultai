@@ -173,16 +173,26 @@ def generate_correlation_id() -> str:
 # =============================================================================
 
 def append_ledger(entry: dict, validate: bool = True) -> bool:
-    """No-op since Phase 5 cutover (2026-03-12).
+    """Write event to Neo4j as PipelineEvent (Phase 5 cutover 2026-03-12).
 
-    JSONL ledger writes are no longer needed — Neo4j is the sole source of truth.
-    All task lifecycle events are recorded as Neo4j nodes/properties by the v2 executor.
-    This function is kept as a no-op for backward compatibility with callers.
+    Since JSONL is no longer the source of truth, this writes to Neo4j
+    so events are visible via read_ledger(). Callers like kublai_task_report.py
+    rely on this for TASK_REPORT_GENERATED, MODEL_USED, etc.
 
     Returns:
-        True always (no-op).
+        True on success, False on failure.
     """
-    return True
+    try:
+        from neo4j_task_tracker import TaskTracker
+        tracker = TaskTracker()
+        tracker.emit_pipeline_event(
+            event_type=entry.get("event", "UNKNOWN"),
+            payload=entry,
+            agent=entry.get("agent", ""),
+        )
+        return True
+    except Exception:
+        return False
 
 
 def is_valid_event(entry: dict) -> bool:

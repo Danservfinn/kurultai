@@ -1,16 +1,17 @@
 #!/bin/bash
 # validate-fallback-chain.sh — Validate claude-agent fallback chain configuration
-# Updated 2026-03-09 to support vault-based configuration
+# Updated 2026-03-13 for new primary/backup settings architecture
 #
-# Validates the 3-tier fallback system: Anthropic -> Z.AI -> Alibaba
-# The wrapper loads credentials from ~/.openclaw/credentials/provider.env
+# Validates the 2-tier fallback system: primary settings -> backup settings
+# The wrapper reads configuration from ~/.openclaw/kurultai.json
 
 set -o pipefail
 
 TS=$(date '+%Y-%m-%d %H:%M:%S')
 TS_ISO=$(date '+%Y-%m-%dT%H:%M:%S%z')
 CLAUDE_AGENT_SCRIPT="${HOME}/.local/bin/claude-agent"
-VAULT_FILE="${HOME}/.openclaw/credentials/provider.env"
+KURULTAI_JSON="${HOME}/.openclaw/kurultai.json"
+MODE_FILE="${HOME}/.openclaw/claude/mode.json"
 VALIDATION_LOG="${HOME}/.openclaw/logs/fallback-chain-validation.log"
 mkdir -p "$(dirname "$VALIDATION_LOG")"
 
@@ -19,15 +20,8 @@ VALIDATION_RESULT="valid"
 VALIDATION_REASON=""
 DETAILS=()
 
-# Expected configuration
-EXPECTED_TIER_0_MODEL="claude-sonnet-4-6"
-EXPECTED_TIER_1_MODEL="glm-5"
-EXPECTED_TIER_1_URL="https://api.z.ai/api/anthropic"
-EXPECTED_TIER_2_MODEL="qwen3.5-plus"
-EXPECTED_TIER_2_URL="https://coding-intl.dashscope.aliyuncs.com/apps/anthropic"
-
 # ============================================================================
-# CHECK 1: Script exists and is executable
+# CHECK 1: Wrapper script exists and is executable
 # ============================================================================
 if [ ! -f "$CLAUDE_AGENT_SCRIPT" ]; then
     VALIDATION_RESULT="INVALID"
@@ -39,12 +33,12 @@ else
         VALIDATION_REASON="script_not_executable"
         DETAILS+=("FAIL: ~/.local/bin/claude-agent is not executable")
     else
-        DETAILS+=("PASS: Script exists and is executable")
+        DETAILS+=("PASS: Wrapper script exists and is executable")
     fi
 fi
 
 # ============================================================================
-# CHECK 2: Script has shebang pointing to bash/sh
+# CHECK 2: Script has shebang
 # ============================================================================
 if [ -f "$CLAUDE_AGENT_SCRIPT" ]; then
     FIRST_LINE=$(head -1 "$CLAUDE_AGENT_SCRIPT")
@@ -58,164 +52,166 @@ if [ -f "$CLAUDE_AGENT_SCRIPT" ]; then
 fi
 
 # ============================================================================
-# CHECK 3: Vault file exists and is readable
+# CHECK 3: kurultai.json configuration exists
 # ============================================================================
-if [ ! -r "$VAULT_FILE" ]; then
+if [ ! -r "$KURULTAI_JSON" ]; then
     VALIDATION_RESULT="INVALID"
-    VALIDATION_REASON="vault_missing"
-    DETAILS+=("FAIL: Vault file not found: $VAULT_FILE")
+    VALIDATION_REASON="kurultai_json_missing"
+    DETAILS+=("FAIL: kurultai.json not found: $KURULTAI_JSON")
 else
-    DETAILS+=("PASS: Vault file exists and is readable")
-fi
+    DETAILS+=("PASS: kurultai.json exists and is readable")
 
-# ============================================================================
-# CHECK 4: Tier 0 configuration (Anthropic default)
-# ============================================================================
-if [ -r "$VAULT_FILE" ]; then
-    if grep -q "^DEFAULT_MODEL=" "$VAULT_FILE"; then
-        FOUND_DEFAULT=$(grep "^DEFAULT_MODEL=" "$VAULT_FILE" | cut -d'=' -f2)
-        if [[ "$FOUND_DEFAULT" == "$EXPECTED_TIER_0_MODEL" ]]; then
-            DETAILS+=("PASS: Tier 0 (default) model: $FOUND_DEFAULT")
-        else
-            DETAILS+=("WARN: Tier 0 model is '$FOUND_DEFAULT', expected '$EXPECTED_TIER_0_MODEL'")
-        fi
-    else
-        DETAILS+=("INFO: DEFAULT_MODEL not in vault (uses hard-coded default)")
-    fi
-fi
+    # Extract primary and backup settings paths
+    PRIMARY_SETTINGS=$(python3 -c "import json; print(json.load(open('$KURULTAI_JSON'))['execution']['primary_settings'])" 2>/dev/null)
+    BACKUP_SETTINGS=$(python3 -c "import json; print(json.load(open('$KURULTAI_JSON'))['execution']['backup_settings'])" 2>/dev/null)
 
-# ============================================================================
-# CHECK 5: Tier 1 configuration (Z.AI)
-# ============================================================================
-if [ -r "$VAULT_FILE" ]; then
-    if grep -q "^ZAI_BASE_URL=" "$VAULT_FILE"; then
-        FOUND_URL=$(grep "^ZAI_BASE_URL=" "$VAULT_FILE" | cut -d'=' -f2)
-        if [[ "$FOUND_URL" == "$EXPECTED_TIER_1_URL" ]]; then
-            DETAILS+=("PASS: Tier 1 (Z.AI) URL configured: $FOUND_URL")
-        else
-            DETAILS+=("WARN: Tier 1 URL is '$FOUND_URL', expected '$EXPECTED_TIER_1_URL'")
-        fi
-    else
+    if [ -z "$PRIMARY_SETTINGS" ]; then
         VALIDATION_RESULT="INVALID"
-        VALIDATION_REASON="tier1_url_missing"
-        DETAILS+=("FAIL: Tier 1 (Z.AI) URL not found in vault")
+        VALIDATION_REASON="primary_settings_missing"
+        DETAILS+=("FAIL: primary_settings not defined in kurultai.json")
+    else
+        DETAILS+=("PASS: Primary settings path: $PRIMARY_SETTINGS")
     fi
 
-    if grep -q "^ZAI_MODEL=" "$VAULT_FILE"; then
-        FOUND_MODEL=$(grep "^ZAI_MODEL=" "$VAULT_FILE" | cut -d'=' -f2)
-        if [[ "$FOUND_MODEL" == "$EXPECTED_TIER_1_MODEL" ]]; then
-            DETAILS+=("PASS: Tier 1 (Z.AI) model: $FOUND_MODEL")
-        else
-            DETAILS+=("INFO: Tier 1 model is '$FOUND_MODEL', expected '$EXPECTED_TIER_1_MODEL'")
-        fi
-    else
-        DETAILS+=("INFO: Tier 1 model not in vault (will use default)")
-    fi
-
-    if grep -q "^ZAI_AUTH_TOKEN=" "$VAULT_FILE"; then
-        DETAILS+=("PASS: Tier 1 (Z.AI) auth token configured")
-    else
+    if [ -z "$BACKUP_SETTINGS" ]; then
         VALIDATION_RESULT="INVALID"
-        VALIDATION_REASON="tier1_token_missing"
-        DETAILS+=("FAIL: Tier 1 (Z.AI) auth token not found")
+        VALIDATION_REASON="backup_settings_missing"
+        DETAILS+=("FAIL: backup_settings not defined in kurultai.json")
+    else
+        DETAILS+=("PASS: Backup settings path: $BACKUP_SETTINGS")
     fi
 fi
 
 # ============================================================================
-# CHECK 6: Tier 2 configuration (Alibaba)
+# CHECK 4: Primary settings file exists and has auth
 # ============================================================================
-if [ -r "$VAULT_FILE" ]; then
-    if grep -q "^ALIBABA_BASE_URL=" "$VAULT_FILE"; then
-        FOUND_URL=$(grep "^ALIBABA_BASE_URL=" "$VAULT_FILE" | cut -d'=' -f2)
-        DETAILS+=("PASS: Tier 2 (Alibaba) URL configured")
-    else
+if [ -n "$PRIMARY_SETTINGS" ]; then
+    if [ ! -r "$PRIMARY_SETTINGS" ]; then
         VALIDATION_RESULT="INVALID"
-        VALIDATION_REASON="tier2_url_missing"
-        DETAILS+=("FAIL: Tier 2 (Alibaba) URL not found in vault")
-    fi
+        VALIDATION_REASON="primary_file_missing"
+        DETAILS+=("FAIL: Primary settings file not found: $PRIMARY_SETTINGS")
+    else
+        DETAILS+=("PASS: Primary settings file exists")
 
-    if grep -q "^ALIBABA_MODEL=" "$VAULT_FILE"; then
-        FOUND_MODEL=$(grep "^ALIBABA_MODEL=" "$VAULT_FILE" | cut -d'=' -f2)
-        if [[ "$FOUND_MODEL" == "$EXPECTED_TIER_2_MODEL" ]]; then
-            DETAILS+=("PASS: Tier 2 (Alibaba) model: $FOUND_MODEL")
+        # Check for auth token OR default Anthropic
+        if grep -q "ANTHROPIC_AUTH_TOKEN" "$PRIMARY_SETTINGS"; then
+            DETAILS+=("PASS: Primary settings has explicit ANTHROPIC_AUTH_TOKEN")
+        elif grep -q "ANTHROPIC_BASE_URL" "$PRIMARY_SETTINGS"; then
+            # Custom base URL requires explicit auth
+            VALIDATION_RESULT="INVALID"
+            VALIDATION_REASON="primary_auth_missing"
+            DETAILS+=("FAIL: Primary uses custom base URL but missing ANTHROPIC_AUTH_TOKEN")
         else
-            DETAILS+=("INFO: Tier 2 model is '$FOUND_MODEL', expected '$EXPECTED_TIER_2_MODEL'")
+            # Using default Anthropic - auth handled by Claude Code
+            DETAILS+=("PASS: Primary uses default Anthropic auth")
         fi
-    else
-        DETAILS+=("INFO: Tier 2 model not in vault (will use default)")
-    fi
 
-    if grep -q "^ALIBABA_AUTH_TOKEN=" "$VAULT_FILE"; then
-        DETAILS+=("PASS: Tier 2 (Alibaba) auth token configured")
-    else
-        VALIDATION_RESULT="INVALID"
-        VALIDATION_REASON="tier2_token_missing"
-        DETAILS+=("FAIL: Tier 2 (Alibaba) auth token not found")
+        # Check for base URL (non-Anthropic provider)
+        if grep -q "ANTHROPIC_BASE_URL" "$PRIMARY_SETTINGS"; then
+            BASE_URL=$(grep "ANTHROPIC_BASE_URL" "$PRIMARY_SETTINGS" | head -1)
+            DETAILS+=("INFO: Primary uses custom base URL")
+        else
+            DETAILS+=("INFO: Primary uses Anthropic default endpoint")
+        fi
     fi
 fi
 
 # ============================================================================
-# CHECK 7: Fallback chain order in wrapper script
+# CHECK 5: Backup settings file exists and has auth
+# ============================================================================
+if [ -n "$BACKUP_SETTINGS" ]; then
+    if [ ! -r "$BACKUP_SETTINGS" ]; then
+        VALIDATION_RESULT="INVALID"
+        VALIDATION_REASON="backup_file_missing"
+        DETAILS+=("FAIL: Backup settings file not found: $BACKUP_SETTINGS")
+    else
+        DETAILS+=("PASS: Backup settings file exists")
+
+        # Check for auth token OR default Anthropic
+        if grep -q "ANTHROPIC_AUTH_TOKEN" "$BACKUP_SETTINGS"; then
+            DETAILS+=("PASS: Backup settings has explicit ANTHROPIC_AUTH_TOKEN")
+        elif grep -q "ANTHROPIC_BASE_URL" "$BACKUP_SETTINGS"; then
+            # Custom base URL requires explicit auth
+            VALIDATION_RESULT="INVALID"
+            VALIDATION_REASON="backup_auth_missing"
+            DETAILS+=("FAIL: Backup uses custom base URL but missing ANTHROPIC_AUTH_TOKEN")
+        else
+            # Using default Anthropic - auth handled by Claude Code
+            DETAILS+=("PASS: Backup uses default Anthropic auth")
+        fi
+    fi
+fi
+
+# ============================================================================
+# CHECK 6: Wrapper has fallback logic (primary -> backup)
 # ============================================================================
 if [ -f "$CLAUDE_AGENT_SCRIPT" ]; then
-    # Check for the fallback loop
-    if grep -q "for fallback in zai alibaba" "$CLAUDE_AGENT_SCRIPT"; then
-        DETAILS+=("PASS: Fallback chain: 3-tier (default -> zai -> alibaba)")
-    elif grep -q "for fallback in" "$CLAUDE_AGENT_SCRIPT"; then
-        FALLBACK_LINE=$(grep "for fallback in" "$CLAUDE_AGENT_SCRIPT")
-        DETAILS+=("WARN: Fallback loop found but may be non-standard: $FALLBACK_LINE")
+    # Check for run_claude function (new architecture)
+    if grep -q "run_claude()" "$CLAUDE_AGENT_SCRIPT"; then
+        DETAILS+=("PASS: Wrapper has run_claude() function")
+    else
+        DETAILS+=("WARN: Wrapper may not have run_claude() function")
+    fi
+
+    # Check for is_retryable_error function
+    if grep -q "is_retryable_error()" "$CLAUDE_AGENT_SCRIPT"; then
+        DETAILS+=("PASS: Wrapper has is_retryable_error() function")
+    else
+        DETAILS+=("WARN: Wrapper may not have is_retryable_error() function")
+    fi
+
+    # Check for primary -> backup fallback pattern
+    if grep -q "run_claude.*PRIMARY" "$CLAUDE_AGENT_SCRIPT" && grep -q "run_claude.*BACKUP" "$CLAUDE_AGENT_SCRIPT"; then
+        DETAILS+=("PASS: Wrapper has primary -> backup fallback pattern")
     else
         VALIDATION_RESULT="INVALID"
-        VALIDATION_REASON="fallback_chain_missing"
-        DETAILS+=("FAIL: Fallback loop not found in wrapper script")
+        VALIDATION_REASON="fallback_logic_missing"
+        DETAILS+=("FAIL: Wrapper missing primary -> backup fallback logic")
     fi
 
-    # Check for apply_provider function with correct providers
-    if grep -A 10 "apply_provider()" "$CLAUDE_AGENT_SCRIPT" | grep -q 'zai)'; then
-        DETAILS+=("PASS: apply_provider supports 'zai' tier")
+    # Check for kurultai.json reading
+    if grep -q "kurultai.json" "$CLAUDE_AGENT_SCRIPT"; then
+        DETAILS+=("PASS: Wrapper reads kurultai.json for configuration")
     else
-        DETAILS+=("WARN: apply_provider may not support 'zai' tier")
-    fi
-
-    if grep -A 15 "apply_provider()" "$CLAUDE_AGENT_SCRIPT" | grep -q 'alibaba)'; then
-        DETAILS+=("PASS: apply_provider supports 'alibaba' tier")
-    else
-        DETAILS+=("WARN: apply_provider may not support 'alibaba' tier")
+        DETAILS+=("WARN: Wrapper may not read kurultai.json")
     fi
 fi
 
 # ============================================================================
-# CHECK 8: Proxy endpoint health
+# CHECK 7: Mode file (optional)
 # ============================================================================
-if command -v curl >/dev/null 2>&1; then
-    ZAI_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$EXPECTED_TIER_1_URL" 2>/dev/null || echo "0")
-    if [[ "$ZAI_HEALTH" == "0" ]]; then
-        VALIDATION_RESULT="INVALID"
-        VALIDATION_REASON="zai_endpoint_unreachable"
-        DETAILS+=("FAIL: Z.AI endpoint unreachable (HTTP $ZAI_HEALTH)")
-    elif [[ "$ZAI_HEALTH" == "40"* ]] || [[ "$ZAI_HEALTH" == "50"* ]]; then
-        DETAILS+=("PASS: Z.AI endpoint reachable (HTTP $ZAI_HEALTH)")
-    else
-        DETAILS+=("PASS: Z.AI endpoint reachable (HTTP $ZAI_HEALTH)")
-    fi
-
-    ALIBABA_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$EXPECTED_TIER_2_URL" 2>/dev/null || echo "0")
-    if [[ "$ALIBABA_HEALTH" == "0" ]]; then
-        DETAILS+=("WARN: Alibaba endpoint unreachable (HTTP $ALIBABA_HEALTH) - Tier 2 fallback may fail")
-    elif [[ "$ALIBABA_HEALTH" == "404" ]]; then
-        DETAILS+=("WARN: Alibaba endpoint returns 404 - API URL may be incorrect or service changed")
-    elif [[ "$ALIBABA_HEALTH" == "40"* ]] || [[ "$ALIBABA_HEALTH" == "50"* ]]; then
-        DETAILS+=("INFO: Alibaba endpoint reachable (HTTP $ALIBABA_HEALTH)")
-    else
-        DETAILS+=("PASS: Alibaba endpoint reachable (HTTP $ALIBABA_HEALTH)")
-    fi
+if [ -r "$MODE_FILE" ]; then
+    MODE=$(python3 -c "import json; print(json.load(open('$MODE_FILE')).get('mode','auto'))" 2>/dev/null || echo "auto")
+    DETAILS+=("INFO: Current mode: $MODE")
 else
-    DETAILS+=("SKIP: Endpoint health checks (curl not available)")
+    DETAILS+=("INFO: No mode.json (defaults to auto)")
+fi
+
+# ============================================================================
+# CHECK 8: Endpoint health (check primary settings endpoint)
+# ============================================================================
+if [ -n "$PRIMARY_SETTINGS" ] && [ -r "$PRIMARY_SETTINGS" ]; then
+    # Extract base URL from settings
+    SETTINGS_URL=$(grep "ANTHROPIC_BASE_URL" "$PRIMARY_SETTINGS" | sed 's/.*: *"\([^"]*\)".*/\1/' | head -1)
+
+    if [ -n "$SETTINGS_URL" ] && command -v curl >/dev/null 2>&1; then
+        HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "$SETTINGS_URL" 2>/dev/null || echo "0")
+        if [[ "$HEALTH" == "0" ]]; then
+            VALIDATION_RESULT="INVALID"
+            VALIDATION_REASON="primary_endpoint_unreachable"
+            DETAILS+=("FAIL: Primary endpoint unreachable (HTTP $HEALTH)")
+        else
+            DETAILS+=("PASS: Primary endpoint reachable (HTTP $HEALTH)")
+        fi
+    elif [ -z "$SETTINGS_URL" ]; then
+        # Using Anthropic default - assume OK
+        DETAILS+=("INFO: Primary uses Anthropic default endpoint (assumed OK)")
+    fi
 fi
 
 # ============================================================================
 # OUTPUT RESULTS
-# =============================================================================
+# ============================================================================
 
 # Log detailed results to validation log
 {

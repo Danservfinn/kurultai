@@ -169,15 +169,17 @@ SESSION_BLOAT_THRESHOLD = 15_000  # 15KB
 # =============================================================================
 
 # Task Execution Timeouts
-CLAUDE_TIMEOUT = 7200  # 2 hours - agent-task-handler.py
-STALE_EXECUTING_SECS = 900  # 15 minutes - unified from 900/1200 discrepancy
+CLAUDE_TIMEOUT = 10800  # 3 hours (aligned with agent-task-handler operational value)
+STALE_EXECUTING_SECS = 900  # 15 minutes - task-watcher stale detection
+STALE_REVERT_SECS = 1200  # 20 min — auto_dispatch uses this for .executing reversion (intentionally > STALE_EXECUTING_SECS)
 TASK_WATCHER_INTERVAL = 60  # seconds between checks
 
 # Priority-based timeouts
 TIMEOUT_BY_PRIORITY = {
-    'high': 7200,   # 2 hours for complex high-priority tasks
-    'normal': 7200, # 2 hours
-    'low': 7200,    # 2 hours
+    'critical': 3600,  # 1 hour (from kublai_task_optimizer)
+    'high': 10800,     # 3 hours
+    'normal': 10800,   # 3 hours
+    'low': 7200,       # 2 hours
 }
 
 # Skills that need extra time or special handling
@@ -199,6 +201,10 @@ SLOW_SKILLS = {
     '/content-research-writer': 0,
     '/horde-gate-testing': 0,
     '/horde-plan': 0,
+    # Ogedei ops skills: need relaxed stall thresholds (session setup + tool loading)
+    '/kurultai-health': 0,
+    '/code-reviewer': 0,
+    '/kurultai-model-switcher': 0,
 }
 
 # Health Check Timeouts

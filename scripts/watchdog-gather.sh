@@ -825,8 +825,10 @@ orphans = s.recover_orphans(grace_minutes=10)
 for o in orphans: print(f\"Recovered: {o['task_id']} ({o.get('assigned_to','?')})\")
 if not orphans: print('No stale claims')
 s.close()
-" 2>/dev/null || echo "Neo4j unavailable")
-STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -o "cleared=[0-9]*" | head -1 | cut -d= -f2 || echo "0")
+" 2>>"$LOGDIR/watchdog-neo4j-errors.log" || echo "Neo4j unavailable")
+STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -c "Recovered:" 2>/dev/null || true)
+STALE_CLAIMS_CLEARED=${STALE_CLAIMS_CLEARED:-0}
+STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_CLEARED" | tail -1)
 if [ "${STALE_CLAIMS_CLEARED:-0}" -gt 0 ]; then
     echo "[$TS] STALE_CLAIM_CLEANUP | cleared $STALE_CLAIMS_CLEARED stale claim(s)" >> "$WATCHDOG_LOG"
 fi
@@ -914,14 +916,23 @@ import sys
 sys.path.insert(0, '$SCRIPTS_DIR')
 from neo4j_v2_core import TaskStore
 s = TaskStore()
-tasks = s.get_agent_tasks('', status='WORKING')
-from datetime import datetime, timezone
-now = datetime.now(timezone.utc)
-for t in tasks:
-    if t.get('lease_expires_at') and t['lease_expires_at'] < now.isoformat():
-        print(f\"STALL: {t['task_id']} on {t.get('assigned_to','?')}\")
-s.close()
-" 2>/dev/null || echo "Neo4j unavailable")
+try:
+    with s.driver.session() as session:
+        result = session.run('''
+            MATCH (t:Task {status: \"WORKING\"})
+            WHERE t.lease_expires_at IS NOT NULL
+              AND t.lease_expires_at < datetime()
+            RETURN t.task_id AS tid, t.assigned_to AS agent
+        ''')
+        found = False
+        for r in result:
+            print(f\"STALL: {r['tid']} on {r['agent'] or '?'}\")
+            found = True
+        if not found:
+            print('No stalled tasks')
+finally:
+    s.close()
+" 2>>"$LOGDIR/watchdog-neo4j-errors.log" || echo "Neo4j unavailable")
 if [ -n "$STALL_OUTPUT" ]; then
     echo "$STALL_OUTPUT" >> "$SUMMARY"
 fi

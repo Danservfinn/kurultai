@@ -49,8 +49,15 @@ def extract_task_id(filepath: str) -> Optional[str]:
     except Exception:
         pass
 
-    # Check filename for UUID pattern
+    # Check filename for canonical task_id format: {priority}-{timestamp}-{uuid8}
     filename = filepath.name
+    canonical_match = re.search(
+        r'((?:critical|high|normal|low)-\d{10}-[a-f0-9]{8})', filename, re.I
+    )
+    if canonical_match:
+        return canonical_match.group(1).lower()
+
+    # Check filename for full UUID pattern
     uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', filename, re.I)
     if uuid_match:
         return uuid_match.group(1).lower()

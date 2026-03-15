@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-12T17:03:50.380588",
+  "timestamp": "2026-03-14T15:31:35.303054",
   "scanned_agents": [
     "kublai",
     "temujin",
@@ -8,30 +8,20 @@
     "jochi",
     "ogedei"
   ],
-  "found": 2,
-  "created": 2,
+  "found": 1,
+  "created": 1,
   "tasks": [
     {
-      "path": "/Users/kublai/.openclaw/agents/jochi/tasks/high-1773227787.failed.revision-1.resolved.done.md",
-      "filename": "high-1773227787.failed.revision-1.resolved.done.md",
-      "task_id": "high-1773227787.failed.revision-1.resolved.done",
-      "title": "Unknown",
-      "priority": "high",
-      "original_agent": "jochi",
-      "missing_since": "2026-03-11T07:22:25.904451"
-    },
-    {
-      "path": "/Users/kublai/.openclaw/agents/ogedei/tasks/normal-1773227787.failed.revision-1.failed.done.md",
-      "filename": "normal-1773227787.failed.revision-1.failed.done.md",
-      "task_id": "normal-1773227787.failed.revision-1.failed.done",
+      "path": "/Users/kublai/.openclaw/agents/kublai/tasks/ogedei-model-drift-alert-20260314-145435.no_output.done.md",
+      "filename": "ogedei-model-drift-alert-20260314-145435.no_output.done.md",
+      "task_id": "ogedei-model-drift-alert-20260314-145435.no_output.done",
       "title": "Unknown",
       "priority": "normal",
-      "original_agent": "ogedei",
-      "missing_since": "2026-03-11T07:29:20.450958"
+      "original_agent": "kublai",
+      "missing_since": "2026-03-14T14:54:35.114602"
     }
   ],
   "created_tasks": [
-    "/Users/kublai/.openclaw/agents/jochi/tasks/high-fix-resolution-high-1773227787.failed.revision-1.resolved.done-8a26352c.md",
-    "/Users/kublai/.openclaw/agents/ogedei/tasks/normal-fix-resolution-normal-1773227787.failed.revision-1.failed.done-ba5fd873.md"
+    "/Users/kublai/.openclaw/agents/kublai/tasks/normal-fix-resolution-ogedei-model-drift-alert-20260314-145435.no_output.done-1574519b.md"
   ]
 }

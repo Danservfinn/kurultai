@@ -1,17 +1,17 @@
 
 ================================================================================
-PROPOSALS (90 total)
+PROPOSALS (57 total)
 ================================================================================
 
 ⏳ ogedei-reflect-20260312-163248.md
-   Agent: ogedei | Domain: general | Age: 7h ago
+   Agent: ogedei | Domain: general | Age: 16h ago
    Title: Skill Improvement Proposal: /kurultai-health (on ogedei)
 
 ⏳ chagatai-20260312-163500.md
-   Agent: unknown | Domain: general | Age: 7h ago
+   Agent: unknown | Domain: general | Age: 16h ago
    Title: Proposal: Fleet Failure Triage Runbook
 
 ⏳ mongke-reflect-20260312-163500.md
-   Agent: mongke | Domain: general | Age: 7h ago
+   Agent: mongke | Domain: general | Age: 16h ago
    Title: Skill Improvement Proposal: /horde-learn
 

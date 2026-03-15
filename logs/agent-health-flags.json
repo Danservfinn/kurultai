@@ -1,20 +1,5 @@
 {
-  "ts": "2026-03-12T22:38:51.609213",
+  "ts": "2026-03-15T18:29:23.952552",
   "window_hours": 1,
-  "agents": {
-    "ogedei": {
-      "completed_1h": 1,
-      "failed_1h": 0,
-      "total_1h": 1,
-      "fail_rate_1h": 0.0,
-      "flagged": false
-    },
-    "jochi": {
-      "completed_1h": 3,
-      "failed_1h": 0,
-      "total_1h": 3,
-      "fail_rate_1h": 0.0,
-      "flagged": false
-    }
-  }
+  "agents": {}
 }

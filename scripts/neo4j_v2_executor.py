@@ -329,7 +329,7 @@ async def run_claude_agent(task: dict) -> dict:
                 # Check if session JSONL is still active
                 session_active = False
                 try:
-                    project_slug = agent_root.replace('/', '-').lstrip('-')
+                    project_slug = agent_root.replace('/', '-')
                     project_dir = os.path.expanduser(f"~/.claude/projects/{project_slug}")
                     if os.path.isdir(project_dir):
                         now = time.time()

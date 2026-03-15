@@ -16,6 +16,7 @@ import os
 import sys
 import subprocess
 import json
+import fcntl
 from datetime import datetime, date
 from pathlib import Path
 
@@ -32,11 +33,20 @@ from neo4j_calendar import (
 # Signal configuration
 SIGNAL_ACCOUNT = os.getenv("SIGNAL_ACCOUNT", "+15165643945")
 GROUP_ID = os.getenv("SIGNAL_GROUP_ID", "BROemHVncLgSz8tReUKBz6V3BeDhDB0EXaJd+sRp6oA=")
+SIGNAL_API_URL = os.getenv("SIGNAL_API_URL", "http://127.0.0.1:8080")
 
-# Do-not-remind list — these numbers will never receive calendar reminders
-DO_NOT_REMIND_LIST = [
-    "+16624580725",  # Liz — opted out
-]
+# Members config — loaded from external file (no phone numbers in source)
+MEMBERS_FILE = os.path.expanduser("~/.openclaw/credentials/calendar-members.json")
+
+def _load_members_config():
+    try:
+        with open(MEMBERS_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"group_members": {}, "do_not_remind": []}
+
+_members = _load_members_config()
+DO_NOT_REMIND_LIST = _members.get("do_not_remind", [])
 
 # Logging - only for actionable events
 LOG_FILE = os.path.expanduser("~/.openclaw/logs/calendar_reminders.log")
@@ -52,21 +62,32 @@ def _load_state() -> dict:
     try:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, 'r') as f:
-                return json.load(f)
+                fcntl.flock(f, fcntl.LOCK_SH)
+                data = json.load(f)
+                fcntl.flock(f, fcntl.LOCK_UN)
+                return data
     except Exception:
         pass
     return {
         "last_digest_date": None,
-        "failed_reminders": [],  # Track failures to avoid retry spam
-        "digest_attempts_today": 0
+        "failed_reminders": [],
+        "digest_attempts_today": 0,
+        "failed_notifications": [],
+        "dead_letter": []
     }
 
 
+MAX_NOTIFICATION_RETRIES = 10
+MAX_REMINDER_RETRIES = 10
+
+
 def _save_state(state: dict):
-    """Save persistent state."""
+    """Save persistent state with file locking."""
     os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
     with open(STATE_FILE, 'w') as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
         json.dump(state, f, indent=2)
+        fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def log(message: str):
@@ -80,48 +101,74 @@ def log(message: str):
 
 
 def send_signal_dm(phone: str, message: str) -> bool:
-    """Send a direct message via signal-cli."""
-    cmd = [
-        "signal-cli",
-        "-a", SIGNAL_ACCOUNT,
-        "send",
-        "-m", message,
-        phone
-    ]
-
+    """Send a direct message via signal-cli JSON-RPC (daemon on port 8080)."""
+    import requests
+    import uuid
+    payload = {
+        "jsonrpc": "2.0",
+        "id": str(uuid.uuid4()),
+        "method": "send",
+        "params": {
+            "account": SIGNAL_ACCOUNT,
+            "message": message,
+            "recipients": [phone]
+        }
+    }
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=10
+        resp = requests.post(
+            SIGNAL_API_URL + "/api/v1/rpc",
+            json=payload,
+            timeout=(5, 30)
         )
-        # Don't log errors here - let caller decide what to log
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        # Silently fail - we don't want noise about signal-cli not being installed
+        data = resp.json()
+        if "error" in data:
+            log(f"signal-cli RPC error: {data['error'].get('message', '')[:200]}")
+            return False
+        return True
+    except requests.exceptions.Timeout:
+        log(f"signal-cli RPC timed out sending to {phone[:6]}...")
+        return False
+    except requests.exceptions.ConnectionError:
+        log("signal-cli daemon not reachable at " + SIGNAL_API_URL)
+        return False
+    except Exception as e:
+        log(f"signal-cli RPC send failed: {type(e).__name__}: {e}")
         return False
 
 
 def send_group_message(message: str) -> bool:
-    """Send a message to the group via signal-cli."""
-    cmd = [
-        "signal-cli",
-        "-a", SIGNAL_ACCOUNT,
-        "send",
-        "-m", message,
-        "-g", GROUP_ID
-    ]
-
+    """Send a message to the group via signal-cli JSON-RPC."""
+    import requests
+    import uuid
+    payload = {
+        "jsonrpc": "2.0",
+        "id": str(uuid.uuid4()),
+        "method": "send",
+        "params": {
+            "account": SIGNAL_ACCOUNT,
+            "message": message,
+            "groupId": GROUP_ID
+        }
+    }
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=10
+        resp = requests.post(
+            SIGNAL_API_URL + "/api/v1/rpc",
+            json=payload,
+            timeout=(5, 30)
         )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        data = resp.json()
+        if "error" in data:
+            log(f"signal-cli group RPC error: {data['error'].get('message', '')[:200]}")
+            return False
+        return True
+    except requests.exceptions.Timeout:
+        log("signal-cli group RPC timed out")
+        return False
+    except requests.exceptions.ConnectionError:
+        log("signal-cli daemon not reachable at " + SIGNAL_API_URL)
+        return False
+    except Exception as e:
+        log(f"signal-cli group RPC failed: {type(e).__name__}: {e}")
         return False
 
 
@@ -135,12 +182,23 @@ def process_due_reminders(state: dict) -> int:
     if not reminders:
         return 0
 
-    # Clear old failures (older than 1 hour) to allow retry
+    # Clean failures: preserve attempt counts, move max-retried to dead letter
     now = datetime.now()
-    state["failed_reminders"] = [
-        r for r in state["failed_reminders"]
-        if (now - datetime.fromisoformat(r["time"])).total_seconds() < 3600
-    ]
+    if "dead_letter" not in state:
+        state["dead_letter"] = []
+    active_reminders = []
+    for r in state.get("failed_reminders", []):
+        attempts = r.get("attempts", 1)
+        if attempts >= MAX_REMINDER_RETRIES:
+            state["dead_letter"].append({**r, "dead_lettered_at": now.isoformat()})
+            continue
+        age = (now - datetime.fromisoformat(r["time"])).total_seconds()
+        if age < 3600:
+            active_reminders.append(r)
+        else:
+            r["time"] = now.isoformat()
+            active_reminders.append(r)
+    state["failed_reminders"] = active_reminders
     failed_ids = {r["id"] for r in state["failed_reminders"]}
 
     sent_count = 0
@@ -181,12 +239,16 @@ def process_due_reminders(state: dict) -> int:
             log(f"Sent reminder to {person_name}: {event_name}")
         else:
             # Track failure to prevent immediate retry
-            state["failed_reminders"].append({
-                "id": reminder_id,
-                "time": now.isoformat()
-            })
-            # Only log first failure, not retries
-            if reminder_id not in failed_ids:
+            existing = next((r for r in state["failed_reminders"] if r["id"] == reminder_id), None)
+            if existing:
+                existing["attempts"] = existing.get("attempts", 1) + 1
+                existing["time"] = now.isoformat()
+            else:
+                state["failed_reminders"].append({
+                    "id": reminder_id,
+                    "time": now.isoformat(),
+                    "attempts": 1
+                })
                 log(f"Failed to send reminder to {person_name}: {event_name} (will retry later)")
 
     return sent_count
@@ -203,12 +265,23 @@ def process_due_notifications(state: dict) -> int:
     if not notifications:
         return 0
 
-    # Clear old failures (older than 1 hour)
+    # Clean failures: preserve attempt counts, move max-retried to dead letter
     now = datetime.now()
-    state["failed_notifications"] = [
-        n for n in state.get("failed_notifications", [])
-        if (now - datetime.fromisoformat(n["time"])).total_seconds() < 3600
-    ]
+    if "dead_letter" not in state:
+        state["dead_letter"] = []
+    active_notifs = []
+    for n in state.get("failed_notifications", []):
+        attempts = n.get("attempts", 1)
+        if attempts >= MAX_NOTIFICATION_RETRIES:
+            state["dead_letter"].append({**n, "dead_lettered_at": now.isoformat()})
+            continue
+        age = (now - datetime.fromisoformat(n["time"])).total_seconds()
+        if age < 3600:
+            active_notifs.append(n)
+        else:
+            n["time"] = now.isoformat()
+            active_notifs.append(n)
+    state["failed_notifications"] = active_notifs
     failed_ids = {n["id"] for n in state["failed_notifications"]}
 
     sent_count = 0
@@ -268,14 +341,19 @@ def process_due_notifications(state: dict) -> int:
             sent_count += 1
             log(f"Sent {template} notification to {person_name}: {event_name}")
         else:
-            # Track failure
+            # Track failure with attempt count
             if "failed_notifications" not in state:
                 state["failed_notifications"] = []
-            state["failed_notifications"].append({
-                "id": notification_id,
-                "time": now.isoformat()
-            })
-            if notification_id not in failed_ids:
+            existing = next((n for n in state["failed_notifications"] if n["id"] == notification_id), None)
+            if existing:
+                existing["attempts"] = existing.get("attempts", 1) + 1
+                existing["time"] = now.isoformat()
+            else:
+                state["failed_notifications"].append({
+                    "id": notification_id,
+                    "time": now.isoformat(),
+                    "attempts": 1
+                })
                 log(f"Failed to send notification to {person_name}: {event_name} (will retry)")
 
     return sent_count
@@ -400,7 +478,21 @@ def main():
     if work_done:
         log(f"Reminder worker: {', '.join(work_done)}")
 
-    # Exit silently if no work (no logs = no noise)
+    # Write health heartbeat (even when no work done)
+    HEALTH_FILE = os.path.expanduser("~/.openclaw/state/calendar_health.json")
+    try:
+        health = {
+            "last_run": datetime.now().isoformat(),
+            "neo4j_available": True,
+            "signal_available": True,
+            "reminders_sent": sent,
+            "notifications_sent": notif_sent,
+            "dead_letter_count": len(state.get("dead_letter", []))
+        }
+        with open(HEALTH_FILE, 'w') as f:
+            json.dump(health, f, indent=2)
+    except Exception:
+        pass  # Health file is best-effort
 
 
 if __name__ == "__main__":

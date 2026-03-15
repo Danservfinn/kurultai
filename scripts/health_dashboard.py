@@ -98,6 +98,7 @@ def system_health():
         report["status"] = "degraded"
 
     # Neo4j data
+    tracker = None
     try:
         from neo4j_task_tracker import get_tracker
         tracker = get_tracker()
@@ -126,6 +127,9 @@ def system_health():
         report["neo4j"] = f"error: {e}"
         report["issues"].append(f"Neo4j unavailable: {e}")
         report["status"] = "degraded"
+    finally:
+        if tracker is not None:
+            tracker.close()
 
     # Overall status
     if total_pending > 20:
