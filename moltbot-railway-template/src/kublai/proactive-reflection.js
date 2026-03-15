@@ -8,6 +8,8 @@
  * architecture documentation and proposing improvements.
  */
 
+const { randomUUID } = require('crypto');
+
 class ProactiveReflection {
   constructor(neo4jDriver, introspection, logger) {
     this.driver = neo4jDriver;
@@ -115,6 +117,7 @@ class ProactiveReflection {
           })
           SET o.priority = $priority,
               o.suggested_section = $suggestedSection,
+              o.id = coalesce(o.id, $id),
               o.created_at = coalesce(o.created_at, datetime()),
               o.last_seen = datetime(),
               o.status = 'proposed',
@@ -123,7 +126,8 @@ class ProactiveReflection {
           type: opp.type,
           description: opp.description,
           priority: opp.priority,
-          suggestedSection: opp.suggestedSection || null
+          suggestedSection: opp.suggestedSection || null,
+          id: randomUUID()
         });
       }
 

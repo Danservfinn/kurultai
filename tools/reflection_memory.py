@@ -362,6 +362,26 @@ class AgentReflectionMemory:
             if session is None:
                 return []
 
+            # Try vector index first (Neo4j 5.11+), fall back to manual cosine
+            try:
+                cypher_vector = f"""
+                CALL db.index.vector.queryNodes('reflection_embedding_idx', $limit, $query_embedding)
+                YIELD node as r, score as similarity
+                WHERE r.consolidated = false {agent_filter}
+                RETURN r, similarity
+                """
+                result = session.run(cypher_vector, **params)
+                reflections = []
+                for record in result:
+                    reflection = dict(record["r"])
+                    reflection.pop("embedding", None)
+                    reflection["similarity"] = record["similarity"]
+                    reflections.append(reflection)
+                if reflections:
+                    return reflections
+            except Neo4jError:
+                pass  # Vector index not available, fall back to manual
+
             try:
                 result = session.run(cypher, **params)
                 reflections = []
@@ -420,9 +440,10 @@ class AgentReflectionMemory:
                 by_type[mtype] = []
             by_type[mtype].append(reflection)
 
-        # Mark reflections as consolidated
+        # Collect IDs but do NOT mark as consolidated yet.
+        # The caller (MetaLearningEngine) marks after successful rule creation
+        # to prevent data loss if rule generation fails.
         consolidated_ids = [r["id"] for r in reflections]
-        self._mark_reflections_consolidated(consolidated_ids)
 
         # Create summary for MetaLearningEngine
         summary = {
@@ -571,6 +592,16 @@ class AgentReflectionMemory:
             ("CREATE INDEX reflection_created_idx IF NOT EXISTS FOR (r:Reflection) ON (r.created_at)", "reflection_created_idx"),
         ]
 
+        # Vector index for embedding similarity search (Neo4j 5.11+)
+        vector_indexes = [
+            ("""CREATE VECTOR INDEX reflection_embedding_idx IF NOT EXISTS
+                FOR (r:Reflection) ON (r.embedding)
+                OPTIONS {indexConfig: {
+                    `vector.dimensions`: 384,
+                    `vector.similarity_function`: 'cosine'
+                }}""", "reflection_embedding_idx"),
+        ]
+
         created = []
 
         with self._session() as session:
@@ -586,6 +617,15 @@ class AgentReflectionMemory:
                 except Neo4jError as e:
                     if "already exists" not in str(e).lower():
                         logger.error(f"Failed to create index {name}: {e}")
+
+            for cypher, name in vector_indexes:
+                try:
+                    session.run(cypher)
+                    created.append(name)
+                    logger.info(f"Created vector index: {name}")
+                except Neo4jError as e:
+                    if "already exists" not in str(e).lower() and "unsupported" not in str(e).lower():
+                        logger.warning(f"Vector index {name} not created (may require Neo4j 5.11+): {e}")
 
         return created
 

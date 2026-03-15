@@ -15,12 +15,27 @@ class ScheduledReflection {
   }
 
   /**
-   * Start the scheduled reflection task
+   * Start the scheduled reflection task.
+   * Checks for missed reflections on startup (catch-up if > 7 days since last).
    */
-  start() {
+  async start() {
     if (this.job) {
       this.logger.warn('[ScheduledReflection] Already running');
       return;
+    }
+
+    // Check if we missed a scheduled reflection (e.g., gateway restart)
+    try {
+      const lastRun = await this.getLastReflectionTime();
+      if (lastRun) {
+        const daysSince = (Date.now() - new Date(lastRun).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince > 7) {
+          this.logger.info(`[ScheduledReflection] Last reflection was ${Math.floor(daysSince)} days ago, triggering catch-up...`);
+          await this.weeklyReflection();
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`[ScheduledReflection] Catch-up check failed: ${err.message}`);
     }
 
     // Weekly reflection: Every Sunday at 8 PM
@@ -29,6 +44,24 @@ class ScheduledReflection {
     });
 
     this.logger.info('[ScheduledReflection] Started weekly reflection trigger (Sundays at 8 PM ET)');
+  }
+
+  /**
+   * Get the timestamp of the last reflection from Neo4j
+   */
+  async getLastReflectionTime() {
+    const session = this.reflection.driver.session();
+    try {
+      const result = await session.run(`
+        MATCH (o:ImprovementOpportunity)
+        RETURN max(o.last_seen) as lastRun
+      `);
+      return result.records[0]?.get('lastRun') || null;
+    } catch (err) {
+      return null;
+    } finally {
+      await session.close();
+    }
   }
 
   /**
@@ -75,7 +108,7 @@ class ScheduledReflection {
       return result;
     } catch (error) {
       this.logger.error(`[Kublai] Weekly reflection failed: ${error.message}`);
-      throw error;
+      return { error: error.message, sectionsKnown: 0, opportunitiesFound: 0 };
     }
   }
 

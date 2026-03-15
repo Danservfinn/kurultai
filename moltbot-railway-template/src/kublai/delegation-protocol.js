@@ -11,6 +11,8 @@
  *   Implementation (Temüjin) → Validation → Sync to ARCHITECTURE.md
  */
 
+const { randomUUID } = require('crypto');
+
 class DelegationProtocol {
   constructor(neo4jDriver, logger, handlers = {}) {
     this.driver = neo4jDriver;
@@ -138,6 +140,14 @@ class DelegationProtocol {
       };
     } catch (error) {
       this.logger.error(`[DelegationProtocol] Failed to create proposal: ${error.message}`);
+      await this.recordReflection(
+        'kublai', 'error',
+        `Creating proposal from opportunity ${opportunity.id || opportunity.type}`,
+        'Successful proposal creation',
+        error.message,
+        'Proposal creation handler failure',
+        'Verify state machine and mapper availability before proposal creation'
+      );
       return { success: false, error: error.message, opportunityId: opportunity.id };
     } finally {
       await session.close();
@@ -199,6 +209,14 @@ class DelegationProtocol {
       return await this.handleVettingRecommendation(proposalId, vettingResult);
     } catch (error) {
       this.logger.error(`[DelegationProtocol] Vetting route failed: ${error.message}`);
+      await this.recordReflection(
+        'kublai', 'error',
+        `Routing proposal ${proposalId} to vetting`,
+        'Successful vetting route',
+        error.message,
+        'Vetting handler failure',
+        'Check vetting handler availability before routing'
+      );
       return { success: false, error: error.message };
     }
   }
@@ -307,6 +325,14 @@ class DelegationProtocol {
       };
     } catch (error) {
       this.logger.error(`[DelegationProtocol] Implementation route failed: ${error.message}`);
+      await this.recordReflection(
+        'kublai', 'error',
+        `Routing proposal ${proposalId} to implementation`,
+        'Successful implementation route',
+        error.message,
+        'Implementation handler failure',
+        'Verify proposal is approved and impl handler is available before routing'
+      );
       return { success: false, error: error.message };
     }
   }
@@ -400,6 +426,14 @@ class DelegationProtocol {
       }
     } catch (error) {
       this.logger.error(`[DelegationProtocol] Complete/validate failed: ${error.message}`);
+      await this.recordReflection(
+        'kublai', 'error',
+        `Completing and validating implementation ${implementationId}`,
+        'Successful completion and validation',
+        error.message,
+        'Completion/validation handler failure',
+        'Ensure implementation exists and validation handler is configured'
+      );
       return { success: false, error: error.message };
     }
   }
@@ -449,6 +483,43 @@ class DelegationProtocol {
     } catch (error) {
       this.logger.error(`[DelegationProtocol] Sync failed: ${error.message}`);
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * =============================================================================
+   * REFLECTION RECORDING (Meta-Learning Intake)
+   * =============================================================================
+   */
+
+  /**
+   * Record an error as a Reflection node in Neo4j for meta-learning.
+   * The Python sidecar (heartbeat_writer.py) reads these for consolidation.
+   */
+  async recordReflection(agent, mistakeType, context, expected, actual, rootCause, lesson) {
+    const session = this.driver.session();
+    try {
+      await session.run(`
+        CREATE (r:Reflection {
+          id: $id,
+          agent: $agent,
+          mistake_type: $mistakeType,
+          context: $context,
+          expected_behavior: $expected,
+          actual_behavior: $actual,
+          root_cause: $rootCause,
+          lesson: $lesson,
+          consolidated: false,
+          created_at: datetime()
+        })
+      `, {
+        id: randomUUID(),
+        agent, mistakeType, context, expected, actual, rootCause, lesson
+      });
+    } catch (err) {
+      this.logger.warn(`[DelegationProtocol] Failed to record reflection: ${err.message}`);
+    } finally {
+      await session.close();
     }
   }
 

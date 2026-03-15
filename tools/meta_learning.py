@@ -381,12 +381,21 @@ except ValueError as e:
         rule_id = self._generate_id()
         created_at = self._now()
 
+        # Extract applicable agents from source reflections
+        applicable_agents = []
+        for rid in source_reflections:
+            ref = self.reflection_memory.get_reflection(rid)
+            if ref and ref.get("agent"):
+                if ref["agent"] not in applicable_agents:
+                    applicable_agents.append(ref["agent"])
+
         cypher = """
         CREATE (m:MetaRule {
             id: $rule_id,
             rule_content: $rule_content,
             rule_type: $rule_type,
             source_reflections: $source_reflections,
+            applicable_agents: $applicable_agents,
             success_count: 0,
             application_count: 0,
             effectiveness_score: 0.0,
@@ -411,6 +420,7 @@ except ValueError as e:
                     rule_content=rule_content,
                     rule_type=rule_type,
                     source_reflections=source_reflections,
+                    applicable_agents=applicable_agents,
                     created_at=created_at
                 )
                 record = result.single()
@@ -565,11 +575,18 @@ except ValueError as e:
             List of MetaRule dicts
         """
         confidence_threshold = min_confidence or self.default_rule_confidence
+        params = {"confidence_threshold": confidence_threshold}
 
-        cypher = """
+        agent_filter = ""
+        if agent is not None:
+            agent_filter = "AND (m.applicable_agents IS NULL OR $agent IN m.applicable_agents)"
+            params["agent"] = agent
+
+        cypher = f"""
         MATCH (m:MetaRule)
         WHERE m.approved = true
         AND m.effectiveness_score >= $confidence_threshold
+        {agent_filter}
         RETURN m
         ORDER BY m.effectiveness_score DESC, m.application_count DESC
         """
@@ -579,7 +596,7 @@ except ValueError as e:
                 return []
 
             try:
-                result = session.run(cypher, confidence_threshold=confidence_threshold)
+                result = session.run(cypher, **params)
                 rules = []
                 for record in result:
                     rule = dict(record["m"])
@@ -869,6 +886,10 @@ except ValueError as e:
                 results["rules_generated"] = 1
                 results["rule_ids"].append(rule_id)
                 results["message"] = "Successfully generated MetaRule from reflections"
+
+                # Mark reflections as consolidated AFTER successful rule creation
+                # This prevents data loss if rule generation fails
+                self.reflection_memory._mark_reflections_consolidated(reflection_ids)
 
                 # Create notification for Kublai about pending approval
                 if hasattr(self.memory, 'create_notification'):

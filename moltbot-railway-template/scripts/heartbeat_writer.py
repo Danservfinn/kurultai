@@ -124,6 +124,8 @@ def check_and_execute_tasks(driver, tick: int):
                 secondary_task = config["tasks"][1]
                 execute_agent_task(agent_id, secondary_task, driver)
 
+REFLECTION_CONSOLIDATION_INTERVAL_TICKS = 120  # every 120 heartbeats = ~60 minutes
+
 HEARTBEAT_INTERVAL = 30  # seconds
 CIRCUIT_BREAKER_THRESHOLD = 3  # consecutive failures before cooldown
 CIRCUIT_BREAKER_COOLDOWN = 60  # seconds
@@ -373,6 +375,124 @@ def write_chat_summary(driver, agent_id, response_text):
             logger.info(f"ChatSummary written for {agent_id}: {turn_count} turns, topics={topics}")
 
 
+# ============ Reflection Consolidation & SOUL Update ============
+
+def run_reflection_consolidation(driver):
+    """
+    Consolidate unconsolidated Reflection nodes into MetaRules.
+    Uses the Python reflection/meta-learning modules.
+    """
+    try:
+        tools_dir = os.path.join(os.path.dirname(__file__), '..', 'tools')
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+
+        from reflection_memory import AgentReflectionMemory
+        from meta_learning import MetaLearningEngine
+
+        # Create a minimal memory adapter that wraps the Neo4j driver
+        class DriverAdapter:
+            """Adapter to make a Neo4j driver look like OperationalMemory for reflection modules."""
+            def __init__(self, drv):
+                self._driver = drv
+            def _generate_id(self):
+                return str(uuid.uuid4())
+            def _now(self):
+                return datetime.now(timezone.utc)
+            def _session(self):
+                return self._driver.session()
+            def create_notification(self, agent, type, summary, task_id=None, data=None):
+                """Create a Notification node in Neo4j."""
+                with self._driver.session() as session:
+                    session.run("""
+                        CREATE (n:Notification {
+                            id: $id,
+                            agent: $agent,
+                            type: $type,
+                            summary: $summary,
+                            data: $data,
+                            read: false,
+                            created_at: datetime()
+                        })
+                    """, id=str(uuid.uuid4()), agent=agent, type=type,
+                        summary=summary, data=json.dumps(data or {}))
+
+        adapter = DriverAdapter(driver)
+        reflection_mem = AgentReflectionMemory(memory=adapter)
+        meta_engine = MetaLearningEngine(
+            memory=adapter,
+            reflection_memory=reflection_mem,
+            min_reflections_for_rule=3
+        )
+        result = meta_engine.consolidate_reflections_and_generate_rules()
+        logger.info(f"Reflection consolidation: {result.get('message', 'done')}, "
+                     f"rules_generated={result.get('rules_generated', 0)}")
+        return result
+    except ImportError as e:
+        logger.warning(f"Reflection modules not available: {e}")
+        return {"error": str(e)}
+    except Exception as e:
+        logger.warning(f"Reflection consolidation failed: {e}")
+        return {"error": str(e)}
+
+
+def process_soul_updates(driver):
+    """
+    Read soul_update_required notifications from Neo4j and append
+    MetaRule content to the appropriate agent's SOUL.md file.
+    """
+    with driver.session() as session:
+        try:
+            result = session.run("""
+                MATCH (n:Notification {type: 'soul_update_required', read: false})
+                RETURN n
+                ORDER BY n.created_at ASC
+                LIMIT 5
+            """)
+            records = list(result)
+
+            for record in records:
+                notif = dict(record["n"])
+                agent = notif.get("agent", "main")
+
+                # Parse data field (stored as JSON string)
+                data = notif.get("data", "{}")
+                if isinstance(data, str):
+                    try:
+                        data = json.loads(data)
+                    except (json.JSONDecodeError, TypeError):
+                        data = {}
+
+                rule_content = data.get("rule_content", "")
+                if not rule_content:
+                    continue
+
+                # Map agent name to SOUL.md path on Mac Mini
+                workspace = os.environ.get(
+                    'OPENCLAW_WORKSPACE',
+                    '/Users/kublai/.openclaw/workspace'
+                )
+                soul_path = os.path.join(workspace, 'souls', agent, 'SOUL.md')
+
+                if os.path.exists(soul_path):
+                    with open(soul_path, 'a') as f:
+                        f.write(f"\n\n## Learned Rule (Auto-applied)\n{rule_content}\n")
+                    logger.info(f"Applied MetaRule to {soul_path}")
+                else:
+                    logger.warning(f"SOUL.md not found: {soul_path}")
+
+                # Mark notification as read
+                notif_id = notif.get("id")
+                if notif_id:
+                    session.run("""
+                        MATCH (n:Notification {id: $id})
+                        SET n.read = true, n.read_at = datetime()
+                    """, id=notif_id)
+
+        except Exception as e:
+            logger.warning(f"SOUL update processing failed: {e}")
+
+
 # ============ Agent-Specific Heartbeat Task Implementations ============
 
 def task_content_creation_moltbook(driver) -> dict:
@@ -620,6 +740,14 @@ def main():
             except Exception as e:
                 logger.error(f"Task execution failed: {e}")
                 # Don't let task failures affect heartbeats
+
+            # Run reflection consolidation + SOUL updates every ~60 min
+            if tick % REFLECTION_CONSOLIDATION_INTERVAL_TICKS == 0 and tick > 0:
+                try:
+                    run_reflection_consolidation(driver)
+                    process_soul_updates(driver)
+                except Exception as e:
+                    logger.error(f"Reflection/SOUL processing failed: {e}")
 
             # Flush chat summaries every SUMMARY_INTERVAL_TICKS heartbeats (~5 min)
             if monitor and tick % SUMMARY_INTERVAL_TICKS == 0:

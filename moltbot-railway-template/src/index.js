@@ -4,6 +4,9 @@
  * Version: 2026-02-23-v71 - Port 18789 fix
  */
 
+// Load environment variables from .env file
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -100,8 +103,8 @@ async function startSignalCli() {
     return false;
   }
 
-  const signalCliPath = process.env.SIGNAL_CLI_PATH || '/usr/local/bin/signal-cli';
-  const signalDataDir = process.env.SIGNAL_DATA_DIR || '/data/.signal';
+  const signalCliPath = process.env.SIGNAL_CLI_PATH || '/opt/homebrew/bin/signal-cli';
+  const signalDataDir = process.env.SIGNAL_DATA_DIR || '/Users/kurultai/.local/share/signal-cli';
   const signalAccount = process.env.SIGNAL_ACCOUNT;
 
   if (!signalAccount) {
@@ -197,8 +200,8 @@ async function checkSignalCliHealth() {
     return true;
   }
 
-  const signalCliPath = process.env.SIGNAL_CLI_PATH || '/usr/local/bin/signal-cli';
-  const signalDataDir = process.env.SIGNAL_DATA_DIR || '/data/.signal';
+  const signalCliPath = process.env.SIGNAL_CLI_PATH || '/opt/homebrew/bin/signal-cli';
+  const signalDataDir = process.env.SIGNAL_DATA_DIR || '/Users/kurultai/.local/share/signal-cli';
 
   return new Promise((resolve) => {
     const checkProcess = spawn(signalCliPath, [
@@ -379,6 +382,7 @@ app.get('/health', async (req, res) => {
     kublai: {
       neo4jConnected: !!neo4jDriver,
       reflectionScheduled: !!scheduledReflection,
+      reflectionJobActive: scheduledReflection?.job ? true : false,
       modulesLoaded: !!(architectureIntrospection && proposalStateMachine),
       delegationProtocol: !!delegationProtocol,
       handlers: {

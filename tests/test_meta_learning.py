@@ -187,6 +187,9 @@ class TestMetaLearningEngine:
         """Test successful MetaRule creation."""
         memory, mock_session, reflection_memory = mock_dependencies
 
+        # create_metarule now calls get_reflection to extract applicable_agents
+        reflection_memory.get_reflection.return_value = {"agent": "developer"}
+
         mock_result = Mock()
         mock_result.single.return_value = {"rule_id": "test-rule-id"}
         mock_session.run.return_value = mock_result
@@ -206,6 +209,7 @@ class TestMetaLearningEngine:
         assert call_args[1]["rule_content"] == "NEVER store passwords in plaintext"
         assert call_args[1]["rule_type"] == "absolute"
         assert call_args[1]["source_reflections"] == ["r1", "r2", "r3"]
+        assert call_args[1]["applicable_agents"] == ["developer"]
 
     def test_create_metarule_invalid_type(self, meta_engine):
         """Test that invalid rule_type raises ValueError."""
@@ -221,6 +225,8 @@ class TestMetaLearningEngine:
     def test_create_metarule_valid_types(self, mock_dependencies):
         """Test that all valid rule types are accepted."""
         memory, mock_session, reflection_memory = mock_dependencies
+
+        reflection_memory.get_reflection.return_value = {"agent": "developer"}
 
         mock_result = Mock()
         mock_result.single.return_value = {"rule_id": "test-id"}
@@ -424,14 +430,15 @@ class TestMetaLearningEngine:
             "by_mistake_type": {"security": 5}
         }
 
-        # Mock reflection data for rule generation
-        reflection_memory.get_reflection.side_effect = [
-            {"id": "r1", "mistake_type": "security", "lesson": "Lesson 1", "root_cause": "Cause 1", "context": "Context 1"},
-            {"id": "r2", "mistake_type": "security", "lesson": "Lesson 2", "root_cause": "Cause 2", "context": "Context 2"},
-            {"id": "r3", "mistake_type": "security", "lesson": "Lesson 3", "root_cause": "Cause 3", "context": "Context 3"},
-            {"id": "r4", "mistake_type": "security", "lesson": "Lesson 4", "root_cause": "Cause 4", "context": "Context 4"},
-            {"id": "r5", "mistake_type": "security", "lesson": "Lesson 5", "root_cause": "Cause 5", "context": "Context 5"},
-        ]
+        ref_data = {
+            "r1": {"id": "r1", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 1", "root_cause": "Cause 1", "context": "Context 1"},
+            "r2": {"id": "r2", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 2", "root_cause": "Cause 2", "context": "Context 2"},
+            "r3": {"id": "r3", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 3", "root_cause": "Cause 3", "context": "Context 3"},
+            "r4": {"id": "r4", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 4", "root_cause": "Cause 4", "context": "Context 4"},
+            "r5": {"id": "r5", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 5", "root_cause": "Cause 5", "context": "Context 5"},
+        }
+        # get_reflection called during both generate_metarule_from_reflections and create_metarule
+        reflection_memory.get_reflection.side_effect = lambda rid: ref_data.get(rid)
 
         # Mock create_metarule result
         mock_result = Mock()
@@ -444,6 +451,8 @@ class TestMetaLearningEngine:
         assert results["reflections_consolidated"] == 5
         assert results["rules_generated"] == 1
         assert "new-rule-id" in results["rule_ids"]
+        # Verify reflections were marked consolidated after rule creation
+        reflection_memory._mark_reflections_consolidated.assert_called_once()
 
     def test_consolidate_reflections_insufficient(self, mock_dependencies):
         """Test consolidation with insufficient reflections."""
@@ -564,12 +573,13 @@ class TestConvenienceFunctions:
         """Test generate_and_create_metarule convenience function."""
         memory, mock_session, reflection_memory = mock_dependencies
 
-        # Mock reflection data
-        reflection_memory.get_reflection.side_effect = [
-            {"id": "r1", "mistake_type": "security", "lesson": "Lesson 1"},
-            {"id": "r2", "mistake_type": "security", "lesson": "Lesson 2"},
-            {"id": "r3", "mistake_type": "security", "lesson": "Lesson 3"},
-        ]
+        ref_data = {
+            "r1": {"id": "r1", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 1"},
+            "r2": {"id": "r2", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 2"},
+            "r3": {"id": "r3", "agent": "developer", "mistake_type": "security", "lesson": "Lesson 3"},
+        }
+        # Called during both generate and create
+        reflection_memory.get_reflection.side_effect = lambda rid: ref_data.get(rid)
 
         # Mock create_metarule result
         mock_result = Mock()
@@ -584,6 +594,154 @@ class TestConvenienceFunctions:
         )
 
         assert rule_id == "new-rule-id"
+
+
+class TestCommunicationAndGenericRules:
+    """Test communication and generic rule generation."""
+
+    @pytest.fixture
+    def mock_dependencies(self):
+        """Create mock dependencies."""
+        memory = Mock()
+        memory._generate_id.return_value = "test-id"
+        memory._now.return_value = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        mock_session = Mock()
+        mock_context = MagicMock()
+        mock_context.__enter__ = Mock(return_value=mock_session)
+        mock_context.__exit__ = Mock(return_value=False)
+        memory._session.return_value = mock_context
+        reflection_memory = Mock()
+        return memory, mock_session, reflection_memory
+
+    def test_abstract_pattern_communication(self, mock_dependencies):
+        """Test pattern abstraction for communication issues."""
+        memory, _, reflection_memory = mock_dependencies
+        engine = MetaLearningEngine(memory, reflection_memory)
+
+        reflections = [
+            {"mistake_type": "communication", "lesson": "Document intent clearly", "root_cause": "Poor docs", "context": "Team review"},
+            {"mistake_type": "communication", "lesson": "Confirm understanding first", "root_cause": "Miscommunication", "context": "Feature spec"},
+        ]
+
+        rule = engine.abstract_pattern(reflections)
+        assert "communicate" in rule.lower() or "intent" in rule.lower()
+        assert "Explanation:" in rule
+
+    def test_abstract_pattern_generic(self, mock_dependencies):
+        """Test pattern abstraction for unknown/other mistake types."""
+        memory, _, reflection_memory = mock_dependencies
+        engine = MetaLearningEngine(memory, reflection_memory)
+
+        reflections = [
+            {"mistake_type": "other", "lesson": "Review deployment pipeline carefully", "root_cause": "Missed step", "context": "Release process"},
+            {"mistake_type": "other", "lesson": "Check deployment pipeline before release", "root_cause": "Skipped check", "context": "Release"},
+        ]
+
+        rule = engine.abstract_pattern(reflections)
+        assert "ALWAYS" in rule
+        assert "Example:" in rule
+
+    def test_abstract_pattern_mixed_types_picks_dominant(self, mock_dependencies):
+        """Test that abstract_pattern picks the dominant mistake type."""
+        memory, _, reflection_memory = mock_dependencies
+        engine = MetaLearningEngine(memory, reflection_memory)
+
+        reflections = [
+            {"mistake_type": "security", "lesson": "Hash passwords", "root_cause": "No hash", "context": "Auth"},
+            {"mistake_type": "security", "lesson": "Use bcrypt", "root_cause": "Weak hash", "context": "Auth"},
+            {"mistake_type": "logic", "lesson": "Check nulls", "root_cause": "NPE", "context": "API"},
+        ]
+
+        rule = engine.abstract_pattern(reflections)
+        # Security is dominant (2 vs 1), so should generate security rule
+        assert "password" in rule.lower() or "NEVER" in rule or "ALWAYS" in rule
+
+    def test_generate_security_rule_generic_fallback(self, mock_dependencies):
+        """Test security rule fallback when no specific keywords match."""
+        memory, _, reflection_memory = mock_dependencies
+        engine = MetaLearningEngine(memory, reflection_memory)
+
+        rule = engine._generate_security_rule(
+            lessons=["Apply defense measures"],
+            root_causes=["Insufficient layers"],
+            contexts=["Production system"]
+        )
+        assert "defense-in-depth" in rule.lower()
+
+    def test_logic_rule_race_condition(self, mock_dependencies):
+        """Test logic rule for race condition issues."""
+        memory, _, reflection_memory = mock_dependencies
+        engine = MetaLearningEngine(memory, reflection_memory)
+
+        rule = engine._generate_logic_rule(
+            lessons=["Use proper locking for concurrent access"],
+            root_causes=["Race condition in shared state"],
+            contexts=["Worker pool"]
+        )
+        assert "synchronization" in rule.lower() or "concurrent" in rule.lower()
+
+    def test_logic_rule_generic_fallback(self, mock_dependencies):
+        """Test logic rule fallback for generic issues."""
+        memory, _, reflection_memory = mock_dependencies
+        engine = MetaLearningEngine(memory, reflection_memory)
+
+        rule = engine._generate_logic_rule(
+            lessons=["Verify data transformations"],
+            root_causes=["Incorrect mapping"],
+            contexts=["ETL pipeline"]
+        )
+        assert "validate" in rule.lower() or "assertion" in rule.lower()
+
+    def test_get_applicable_rules_with_agent_filter(self, mock_dependencies):
+        """Test that agent filter is passed to query."""
+        memory, mock_session, reflection_memory = mock_dependencies
+
+        mock_result = Mock()
+        mock_result.__iter__ = Mock(return_value=iter([
+            {"m": {"id": "r1", "rule_content": "Rule 1", "effectiveness_score": 0.9, "applicable_agents": ["developer"]}},
+        ]))
+        mock_session.run.return_value = mock_result
+
+        engine = MetaLearningEngine(memory, reflection_memory)
+        rules = engine.get_applicable_rules(agent="developer", min_confidence=0.7)
+
+        assert len(rules) == 1
+        # Verify the query included agent filter
+        call_args = mock_session.run.call_args
+        assert "agent" in call_args[1]
+        assert call_args[1]["agent"] == "developer"
+
+
+class TestIdAndSessionFallbacks:
+    """Test _generate_id, _now, _session fallback paths."""
+
+    def test_generate_id_fallback_no_method(self):
+        """Test _generate_id when memory has no _generate_id method."""
+        memory = Mock(spec=[])  # No methods at all
+        reflection_memory = Mock()
+        engine = MetaLearningEngine(memory, reflection_memory)
+        result = engine._generate_id()
+        # Should return a valid UUID string
+        assert len(result) == 36  # UUID format
+        assert "-" in result
+
+    def test_now_fallback_no_method(self):
+        """Test _now when memory has no _now method."""
+        memory = Mock(spec=[])
+        reflection_memory = Mock()
+        engine = MetaLearningEngine(memory, reflection_memory)
+        result = engine._now()
+        assert isinstance(result, datetime)
+        assert result.tzinfo == timezone.utc
+
+    def test_session_fallback_no_method(self):
+        """Test _session when memory has no _session method."""
+        memory = Mock(spec=[])
+        reflection_memory = Mock()
+        engine = MetaLearningEngine(memory, reflection_memory)
+        ctx = engine._session()
+        with ctx as session:
+            assert session is None
 
 
 class TestFallbackMode:
@@ -606,6 +764,16 @@ class TestFallbackMode:
 
         return MetaLearningEngine(memory, reflection_memory)
 
+    def test_create_metarule_fallback(self, fallback_engine):
+        """Test create_metarule in fallback mode returns ID."""
+        fallback_engine.reflection_memory.get_reflection.return_value = {"agent": "developer"}
+        rule_id = fallback_engine.create_metarule(
+            rule_content="Test rule",
+            rule_type="guideline",
+            source_reflections=["r1"]
+        )
+        assert rule_id == "test-id"
+
     def test_approve_metarule_fallback(self, fallback_engine):
         """Test approve in fallback mode."""
         result = fallback_engine.approve_metarule("rule-1", approved_by="kublai")
@@ -626,6 +794,31 @@ class TestFallbackMode:
         metrics = fallback_engine.get_rule_effectiveness("rule-1")
         assert metrics is not None
         assert metrics["success_count"] == 0
+
+    def test_update_rule_version_fallback(self, fallback_engine):
+        """Test rule versioning in fallback mode (rule not found)."""
+        with pytest.raises(MetaRuleNotFoundError):
+            fallback_engine.update_rule_version("old-id", "new content", "reason")
+
+    def test_list_metarules_fallback(self, fallback_engine):
+        """Test list_metarules in fallback mode."""
+        rules = fallback_engine.list_metarules()
+        assert rules == []
+
+    def test_get_rule_history_fallback(self, fallback_engine):
+        """Test get_rule_history in fallback mode."""
+        history = fallback_engine.get_rule_history("rule-1")
+        assert history == []
+
+    def test_create_indexes_fallback(self, fallback_engine):
+        """Test create_indexes in fallback mode."""
+        indexes = fallback_engine.create_indexes()
+        assert indexes == []
+
+    def test_queue_soul_update_not_found_fallback(self, fallback_engine):
+        """Test queue_soul_update when rule not found in fallback mode."""
+        with pytest.raises(MetaRuleNotFoundError):
+            fallback_engine.queue_soul_update("developer", "nonexistent")
 
 
 if __name__ == "__main__":

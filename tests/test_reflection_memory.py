@@ -351,12 +351,13 @@ class TestAgentReflectionMemory:
         rm = AgentReflectionMemory(memory)
         indexes = rm.create_indexes()
 
-        assert len(indexes) == 5
+        assert len(indexes) == 6
         assert "reflection_id_idx" in indexes
         assert "reflection_agent_idx" in indexes
         assert "reflection_type_idx" in indexes
         assert "reflection_consolidated_idx" in indexes
         assert "reflection_created_idx" in indexes
+        assert "reflection_embedding_idx" in indexes
 
     def test_create_indexes_fallback_mode(self, mock_memory):
         """Test creating indexes in fallback mode."""
