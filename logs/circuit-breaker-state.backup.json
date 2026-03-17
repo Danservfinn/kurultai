@@ -1,5 +1,5 @@
 {
-  "ts": "2026-03-15T15:56:25.512651",
+  "ts": "2026-03-16T22:06:43.108610",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
@@ -12,7 +12,7 @@
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 1,
+      "success_count": 5,
       "last_failure_rate": 0.0
     },
     "tolui": {
@@ -25,29 +25,29 @@
     "jochi": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 22,
+      "failure_count": 1,
+      "success_count": 25,
       "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 1,
-      "success_count": 2,
+      "failure_count": 0,
+      "success_count": 4,
       "last_failure_rate": 0.0
     },
     "temujin": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 1,
-      "success_count": 52,
+      "failure_count": 0,
+      "success_count": 63,
       "last_failure_rate": 0.0
     },
     "kublai": {
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 72,
+      "success_count": 76,
       "last_failure_rate": 0.0
     }
   },

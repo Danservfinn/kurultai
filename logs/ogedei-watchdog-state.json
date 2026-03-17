@@ -1,7 +1,7 @@
 {
-  "last_audit": 1773612287.140966,
-  "cycles": 25654,
-  "last_cycle": "2026-03-15T18:32:52.137274",
+  "last_audit": 1773728473.1250298,
+  "cycles": 28941,
+  "last_cycle": "2026-03-17T02:46:23.515582",
   "watcher_restarts": 118,
   "stalled_warnings": 510,
   "fakes_detected": 17,
@@ -13,57 +13,57 @@
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1773613972.137284,
+  "last_cycle_epoch": 1773729983.5155892,
   "last_issues": [
-    "neo4j_v2_executor log stale (13385s)",
-    "reflection-status.json missing"
+    "neo4j_v2_executor log stale (9114s)",
+    "reflection stale 1589m (miss #2592)"
   ],
-  "reflection_misses": 0,
-  "last_memory_audit": 1773612184.2142851,
+  "reflection_misses": 2592,
+  "last_memory_audit": 1773728473.12782,
   "memory_audit_result": {
     "total": 11,
     "critical": 0,
     "warning": 4,
-    "ts": "2026-03-15T18:03:04.288063"
+    "ts": "2026-03-17T02:21:13.176119"
   },
-  "last_routing_drift_check": 1773612321.954091,
+  "last_routing_drift_check": 1773728473.1787279,
   "routing_drift": {
     "total": 0,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "ts": "2026-03-15T18:05:21.981721"
+    "ts": "2026-03-17T02:21:13.196406"
   },
-  "memory_fixes": 770,
-  "last_failure_rate_check": 1773613763.923962,
+  "memory_fixes": 772,
+  "last_failure_rate_check": 1773729707.898116,
   "agent_failure_flags": {},
-  "cycle_start_time": 1773613972.033721,
-  "last_queue_balance_check": 1773613763.954422,
+  "cycle_start_time": 1773729983.4649441,
+  "last_queue_balance_check": 1773729707.93982,
   "queue_depths": {
-    "kublai": 0,
+    "kublai": 4,
     "temujin": 0,
-    "mongke": 0,
+    "mongke": 2,
     "chagatai": 0,
     "jochi": 0,
-    "ogedei": 0,
+    "ogedei": 1,
     "tolui": 0
   },
-  "last_cascade_check": 1773613524.9325051,
+  "last_cascade_check": 1773729776.254793,
   "cascade_risk": "low",
   "cascade_metrics": {
     "events_analyzed": 0
   },
-  "last_quality_gate_check": 1773613937.581953,
+  "last_quality_gate_check": 1773729811.463142,
   "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1773611360.353129,
-  "self_healing_score": 100.0,
+  "last_self_healing_score_check": 1773727156.969437,
+  "self_healing_score": 0.0,
   "self_healing_metrics": {
-    "auto_resolved": 3,
-    "escalated": 0,
+    "auto_resolved": 0,
+    "escalated": 1,
     "manual": 0,
-    "total": 3
+    "total": 1
   },
   "circuit_half_open_agents": [
     "ogedei",
@@ -71,7 +71,7 @@
     "temujin"
   ],
   "circuit_report": {
-    "ts": "2026-03-15T18:32:52.136530",
+    "ts": "2026-03-17T02:46:23.515114",
     "agents": {
       "mongke": {
         "state": "CLOSED",
@@ -116,17 +116,17 @@
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.10316920280456543,
-  "state_file_size": 4194,
+  "last_cycle_duration": 0.05034279823303223,
+  "state_file_size": 3621,
   "tasks_recovered": 191,
-  "slow_cycles": 15,
+  "slow_cycles": 17,
   "queue_balance_moves": 332,
   "circuit_open_agents": [
     "jochi",
     "ogedei"
   ],
-  "last_cred_failure_check": 1773613901.9209,
-  "last_git_operation_check": 1773613763.958644,
+  "last_cred_failure_check": 1773729811.385275,
+  "last_git_operation_check": 1773729707.9443011,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
@@ -140,36 +140,10 @@
   "stall_escalations": {},
   "stall_skips_completed": 2,
   "stall_cleaned_artifacts": 2,
-  "last_model_drift_check": 1773612424.681165,
-  "model_drift_drifted": [
-    {
-      "agent": "mongke",
-      "session_model": "qwen3.5-plus",
-      "config_model": "claude-opus-4-6"
-    },
-    {
-      "agent": "chagatai",
-      "session_model": "qwen3.5-plus",
-      "config_model": "claude-opus-4-6"
-    },
-    {
-      "agent": "temujin",
-      "session_model": "qwen3.5-plus",
-      "config_model": "claude-opus-4-6"
-    },
-    {
-      "agent": "jochi",
-      "session_model": "qwen3.5-plus",
-      "config_model": "claude-opus-4-6"
-    },
-    {
-      "agent": "ogedei",
-      "session_model": "glm-5",
-      "config_model": "claude-opus-4-6"
-    }
-  ],
+  "last_model_drift_check": 1773728815.6358771,
+  "model_drift_drifted": [],
   "model_drift_checked": 5,
-  "model_drift_ts": "2026-03-15T18:07:04.687813",
-  "model_drift_last_escalate": 1773608776.8753211,
-  "model_drift_last_clean": "2026-03-15T12:33:52.038883"
+  "model_drift_ts": "2026-03-17T01:56:52.466763",
+  "model_drift_last_escalate": 1773721547.0383291,
+  "model_drift_last_clean": "2026-03-17T02:26:55.637597"
 }

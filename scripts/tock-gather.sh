@@ -639,8 +639,8 @@ try:
                 "queue_balance_index": queue_balance.get("index", 0),
                 "queue_depths": queue_balance.get("depths", {}),
                 "missed_opportunities": routing.get("missed_opportunities", 0),
-                "routing_accuracy": routing.get("routing_accuracy", 0),
-                "time_to_start_p95": routing.get("time_to_start_p95_seconds", 0),
+                "routing_accuracy": routing.get("routing_accuracy"),
+                "time_to_start_p95": routing.get("time_to_start_p95_seconds"),
                 "total_routed": routing.get("total_routed", 0),
                 "overflow_count": routing.get("overflow_count", 0),
                 "source": "file",
@@ -681,8 +681,8 @@ except Exception:
         "queue_balance_index": balance_index,
         "queue_depths": depth_map,
         "missed_opportunities": 0,
-        "routing_accuracy": 0.87,  # Default
-        "time_to_start_p95": 420,  # Default
+        "routing_accuracy": None,
+        "time_to_start_p95": None,
         "total_routed": 0,
         "overflow_count": 0,
         "source": "computed",
@@ -690,7 +690,7 @@ except Exception:
     }))
 PYEOF
 )
-ROUTING_METRICS=${ROUTING_METRICS:-'{"queue_balance_index":0,"missed_opportunities":0,"routing_accuracy":0.87,"time_to_start_p95":420}'}
+ROUTING_METRICS=${ROUTING_METRICS:-'{"queue_balance_index":0,"missed_opportunities":0,"routing_accuracy":null,"time_to_start_p95":null}'}
 
 # ============================================================
 # 4e. Redistribution Telemetry (Dynamic Queue Balancing - Phase 2)
@@ -976,8 +976,8 @@ stale_locks = safe_load(f"{tmp}/stale_locks.json", {"total":0,"by_agent":{},"det
 routing = safe_load(f"{tmp}/routing.json", {
     "queue_balance_index": 0,
     "missed_opportunities": 0,
-    "routing_accuracy": 0.87,
-    "time_to_start_p95": 420,
+    "routing_accuracy": None,
+    "time_to_start_p95": None,
     "queue_depths": {}
 })
 redistribution = safe_load(f"{tmp}/redistribution.json", {
@@ -1223,8 +1223,8 @@ output = {
     "routing": {
         "queue_balance_index": routing.get("queue_balance_index", 0),
         "missed_opportunities": routing.get("missed_opportunities", 0),
-        "routing_accuracy": routing.get("routing_accuracy", 0.87),
-        "time_to_start_p95": routing.get("time_to_start_p95", 420),
+        "routing_accuracy": routing.get("routing_accuracy"),
+        "time_to_start_p95": routing.get("time_to_start_p95"),
         "total_routed": routing.get("total_routed", 0),
         "overflow_count": routing.get("overflow_count", 0),
         "queue_depths": routing.get("queue_depths", {}),
@@ -1354,7 +1354,11 @@ if not lr.get("reconciled", True):
         lines.append(f"  {m['agent']}: neo4j_done={m['neo4j_completed']} ledger_done={m['ledger_completed']} neo4j_fail={m['neo4j_failed']} ledger_fail={m['ledger_failed']}")
 # Routing metrics (from routing-metrics.sh)
 r = data.get("routing", {})
-lines.append(f"ROUTING: balance_idx={r.get('queue_balance_index',0):.2f} missed={r.get('missed_opportunities',0)} accuracy={r.get('routing_accuracy',0):.0%} p95={r.get('time_to_start_p95',0)}s routed={r.get('total_routed',0)}")
+acc = r.get('routing_accuracy')
+p95 = r.get('time_to_start_p95')
+acc_str = f"{acc:.0%}" if acc is not None else "N/A"
+p95_str = f"{p95}s" if p95 is not None else "N/A"
+lines.append(f"ROUTING: balance_idx={r.get('queue_balance_index',0):.2f} missed={r.get('missed_opportunities',0)} accuracy={acc_str} p95={p95_str} routed={r.get('total_routed',0)}")
 # Redistribution telemetry (Dynamic Queue Balancing)
 rd = data.get("redistribution", {})
 if rd.get("cycles_run_30m", 0) > 0:
@@ -1460,6 +1464,32 @@ if raw.strip() != "FALLBACK" and "WORKLOAD:" in raw:
         elif line.startswith("SEVERITY:"):
             sev = line[9:].strip().upper()
             if sev in ["LOW","MEDIUM","HIGH","CRITICAL"]: assessment["severity"] = sev
+
+    # --- Post-LLM validation: cross-check severity against actual metrics ---
+    # Prevents hallucinated severity (e.g., "full queues" when total_pending=0)
+    q = data.get("queues", {})
+    total_pending = q.get("total_pending", 0)
+    stale_total = data.get("stale_locks", {}).get("total", 0)
+    cron_errors = data.get("cron", {}).get("erroring", 0)
+    llm_sev = assessment["severity"]
+
+    # Compute max justified severity from actual metrics
+    if stale_total > 2:
+        max_justified = "HIGH"
+    elif stale_total > 0 or total_pending > 20:
+        max_justified = "MEDIUM"
+    elif total_pending > 10 or cron_errors > 2:
+        max_justified = "MEDIUM"
+    elif cron_errors > 0 or total_pending > 0:
+        max_justified = "LOW"
+    else:
+        max_justified = "LOW"
+
+    sev_rank = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+    if sev_rank.get(llm_sev, 0) > sev_rank.get(max_justified, 0):
+        assessment["_llm_original_severity"] = llm_sev
+        assessment["_validation_override"] = f"Downgraded from {llm_sev} to {max_justified} (pending={total_pending}, stale={stale_total}, cron_err={cron_errors})"
+        assessment["severity"] = max_justified
 else:
     # Heuristic fallback
     assessment["model"] = "heuristic-fallback"

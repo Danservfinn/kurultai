@@ -542,3 +542,6 @@
 {"ts": "2026-03-14T22:52:49.623495", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 107}}
 {"ts": "2026-03-15T03:04:48.891260", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "kublai", "details": {"task_file": "ogedei-model-drift-alert-20260315-025933.done.md"}}
 {"ts": "2026-03-15T09:58:18.341707", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-15T22:06:00.653084", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-16T01:37:50.879763", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-16T23:55:14.585533", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}

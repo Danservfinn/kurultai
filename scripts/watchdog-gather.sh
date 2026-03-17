@@ -826,10 +826,10 @@ for o in orphans: print(f\"Recovered: {o['task_id']} ({o.get('assigned_to','?')}
 if not orphans: print('No stale claims')
 s.close()
 " 2>>"$LOGDIR/watchdog-neo4j-errors.log" || echo "Neo4j unavailable")
-STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -c "Recovered:" 2>/dev/null || true)
+STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_OUTPUT" | grep -c "Recovered:" 2>/dev/null || echo 0)
+STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_CLEARED" | tr -d '[:space:]' | grep -o '[0-9]*' | tail -1)
 STALE_CLAIMS_CLEARED=${STALE_CLAIMS_CLEARED:-0}
-STALE_CLAIMS_CLEARED=$(echo "$STALE_CLAIMS_CLEARED" | tail -1)
-if [ "${STALE_CLAIMS_CLEARED:-0}" -gt 0 ]; then
+if [ "$STALE_CLAIMS_CLEARED" -gt 0 ] 2>/dev/null; then
     echo "[$TS] STALE_CLAIM_CLEANUP | cleared $STALE_CLAIMS_CLEARED stale claim(s)" >> "$WATCHDOG_LOG"
 fi
 

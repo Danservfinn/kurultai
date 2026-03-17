@@ -1,23 +1,17 @@
 {
-  "ts": "2026-03-15T17:49:20.377322",
+  "ts": "2026-03-17T01:59:17.047524",
   "window_hours": 24,
   "score": {
-    "score": 100.0,
-    "auto_resolved": 3,
-    "escalated": 0,
+    "score": 0.0,
+    "auto_resolved": 0,
+    "escalated": 1,
     "manual": 0,
     "partial": 0,
-    "total_issues": 3,
+    "total_issues": 1,
     "by_type": {
-      "memory_deprecated_rules": {
-        "auto": 2,
-        "escalated": 0,
-        "manual": 0,
-        "partial": 0
-      },
-      "quality_retry": {
-        "auto": 1,
-        "escalated": 0,
+      "gateway_restart": {
+        "auto": 0,
+        "escalated": 1,
         "manual": 0,
         "partial": 0
       }
@@ -25,7 +19,15 @@
     "trends": [
       {
         "direction": "down",
-        "description": "Issue volume decreased by 62%"
+        "description": "Score declined by 80.0%"
+      },
+      {
+        "direction": "down",
+        "description": "Auto-resolution rate decreased by 80%"
+      },
+      {
+        "direction": "down",
+        "description": "Issue volume decreased by 80%"
       }
     ]
   }

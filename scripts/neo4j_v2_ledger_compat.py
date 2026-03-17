@@ -181,20 +181,26 @@ def read_ledger(hours: int = None, valid_only: bool = False,
                             continue
                         try:
                             payload = _json.loads(payload_str)
-                            # Only include telemetry events not already covered by Task nodes
-                            if payload.get("event") in (
-                                "SKILL_INVOCATION", "SKILL_OUTCOME", "SKILL_AGGREGATE",
-                                "EXECUTION_DETAIL", "EXECUTION_TRACE",
-                                "R008_SKILL_NOT_INVOKED",
-                                "REFLECT_SUMMARY", "ARCH_UPDATE_CHECK",
-                                "TASK_REPORT_GENERATED", "MODEL_USED",
-                                "SESSION_AUTO_CLEANUP",
-                            ):
-                                entries.append(payload)
+                            # Include telemetry events from PipelineEvent nodes.
+                            # Task nodes already provide QUEUED/EXECUTING/COMPLETED/FAILED,
+                            # but PipelineEvents may contain additional instances (e.g. from
+                            # task-watcher emit) plus SCORED, ACTION_SCORED, etc.
+                            # Deduplication happens below via seen_keys set.
+                            entries.append(payload)
                         except Exception:
                             continue
             except Exception as pe_err:
                 logger.debug(f"PipelineEvent read failed (non-fatal): {pe_err}")
+
+        # Deduplicate entries that appear in both Task nodes and PipelineEvents
+        seen = set()
+        deduped = []
+        for e in entries:
+            key = (e.get("task_id", ""), e.get("event", ""), e.get("ts", "")[:19])
+            if key not in seen:
+                seen.add(key)
+                deduped.append(e)
+        entries = deduped
 
         # Sort by timestamp
         entries.sort(key=lambda e: e.get("ts", ""))

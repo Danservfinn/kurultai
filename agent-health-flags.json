@@ -11,5 +11,20 @@
       "root_cause": "temujin ran 'openclaw config set agents.list[N].model bailian/qwen3.5-plus' for all 6 agents on 2026-03-11T00:45-00:47 UTC, overwriting claude-opus-4-6 model assignments in openclaw.json",
       "fix_applied": "Restored all 6 agents (main, mongke, chagatai, temujin, jochi, ogedei) to anthropic/claude-opus-4-6 in openclaw.json; restored agents.defaults.model.primary to anthropic/claude-opus-4-6"
     }
+  },
+  "model_drift_alert": {
+    "timestamp": "2026-03-16T00:16:50.299858",
+    "severity": "HIGH",
+    "affected_agents": [
+      "mongke",
+      "chagatai",
+      "temujin",
+      "jochi",
+      "ogedei"
+    ],
+    "session_model": "qwen3.5-plus",
+    "configured_model": "claude-opus-4-6",
+    "action": "Session model override detected - requires claude-agent wrapper fix",
+    "source": "kurultai-reflection-2026-03-16-0005"
   }
 }

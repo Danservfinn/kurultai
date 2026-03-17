@@ -298,9 +298,18 @@ def _extract_task_id(task_file) -> str | None:
     # Fallback: extract canonical task_id from filename
     try:
         fname = Path(task_file).name if not isinstance(task_file, Path) else task_file.name
+        # Full format: {priority}-{timestamp}-{uuid8}
         canonical = re.search(r'((?:critical|high|normal|low)-\d{10}-[a-f0-9]{8})', fname, re.I)
         if canonical:
             return canonical.group(1).lower()
+        # Short format: {priority}-{timestamp} (no uuid suffix)
+        short = re.search(r'((?:critical|high|normal|low)-\d{10})(?=[.\-]|$)', fname, re.I)
+        if short:
+            return short.group(1).lower()
+        # Selfwake format: selfwake-{agent}-{timestamp}
+        selfwake = re.search(r'(selfwake-[a-z]+-\d{10})', fname, re.I)
+        if selfwake:
+            return selfwake.group(1).lower()
     except Exception:
         pass
     return None
@@ -537,12 +546,21 @@ def _extract_task_id(task_file):
             return match.group(1)
     except Exception:
         pass
-    # Fallback: extract canonical task_id from filename (priority-timestamp-uuid8)
+    # Fallback: extract canonical task_id from filename
     try:
         fname = Path(task_file).name if not isinstance(task_file, Path) else task_file.name
+        # Full format: {priority}-{timestamp}-{uuid8}
         canonical = re.search(r'((?:critical|high|normal|low)-\d{10}-[a-f0-9]{8})', fname, re.I)
         if canonical:
             return canonical.group(1).lower()
+        # Short format: {priority}-{timestamp} (no uuid suffix)
+        short = re.search(r'((?:critical|high|normal|low)-\d{10})(?=[.\-]|$)', fname, re.I)
+        if short:
+            return short.group(1).lower()
+        # Selfwake format: selfwake-{agent}-{timestamp}
+        selfwake = re.search(r'(selfwake-[a-z]+-\d{10})', fname, re.I)
+        if selfwake:
+            return selfwake.group(1).lower()
     except Exception:
         pass
     return None

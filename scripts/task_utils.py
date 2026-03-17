@@ -57,6 +57,18 @@ def extract_task_id(filepath: str) -> Optional[str]:
     if canonical_match:
         return canonical_match.group(1).lower()
 
+    # Short format: {priority}-{timestamp} (no uuid suffix)
+    short_match = re.search(
+        r'((?:critical|high|normal|low)-\d{10})(?=[.\-]|$)', filename, re.I
+    )
+    if short_match:
+        return short_match.group(1).lower()
+
+    # Selfwake format: selfwake-{agent}-{timestamp}
+    selfwake_match = re.search(r'(selfwake-[a-z]+-\d{10})', filename, re.I)
+    if selfwake_match:
+        return selfwake_match.group(1).lower()
+
     # Check filename for full UUID pattern
     uuid_match = re.search(r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', filename, re.I)
     if uuid_match:

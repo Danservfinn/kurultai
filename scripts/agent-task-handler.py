@@ -84,7 +84,7 @@ CLAUDE_AGENT = str(_CLAUDE_AGENT)
 CLAUDE_TIMEOUT = _KP_CLAUDE_TIMEOUT  # imported from kurultai_paths (canonical source)
 
 # Fallback model configuration for rate limit recovery
-FALLBACK_MODEL = "glm-5"  # Primary model (Claude API unavailable)
+FALLBACK_MODEL = "claude-sonnet-4-6"  # Fallback stays in Claude family to prevent model drift
 MAX_RATE_LIMIT_RETRIES = 1  # Only retry once with fallback model
 TIMEOUT_BY_PRIORITY = _KP_TIMEOUT_BY_PRIORITY  # imported from kurultai_paths (canonical source)
 # Skills that need extra time (design exploration, brainstorming, debugging)
@@ -596,7 +596,7 @@ def _spawn_haiku_completion(agent_name):
             with open(log_file, 'a') as log_f:
                 log_f.write(f"[{datetime.now().isoformat()}] Spawning /task-complete for {agent_name}\n")
                 proc = subprocess.Popen(
-                    [CLAUDE_AGENT, "--model", "glm-5", "/task-complete"],
+                    [CLAUDE_AGENT, "--model", "claude-sonnet-4-6", "/task-complete"],
                     stdout=log_f, stderr=log_f,
                     close_fds=True,
                     env=env_haiku,
