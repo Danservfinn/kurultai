@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from proposal_manager import ProposalManager
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 from kurultai_paths import AGENTS_DIR
 
 KURULTAI_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
@@ -33,7 +33,6 @@ KURULTAI_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
 class ProposalApprovalHandler:
     def __init__(self):
         self.pm = ProposalManager()
-        self.driver = get_driver()
         self.base = AGENTS_DIR
 
     def check_unanimous(self) -> list:
@@ -265,32 +264,35 @@ def main():
     parser.add_argument("--process", action="store_true", help="Process unanimous proposals")
     args = parser.parse_args()
 
-    if args.check:
-        unanimous = handler.check_unanimous()
-        if unanimous:
-            print(f"Found {len(unanimous)} unanimous proposal(s):")
-            for p in unanimous:
-                print(f"  - {p['proposal_id']}: {p['title']}")
-        else:
-            print("No unanimous proposals found.")
+    try:
+        if args.check:
+            unanimous = handler.check_unanimous()
+            if unanimous:
+                print(f"Found {len(unanimous)} unanimous proposal(s):")
+                for p in unanimous:
+                    print(f"  - {p['proposal_id']}: {p['title']}")
+            else:
+                print("No unanimous proposals found.")
 
-    elif args.process:
-        results = handler.process_all_unanimous()
-        print(f"\nProcessed {len(results)} proposal(s)")
-        success_count = sum(1 for r in results if r.get("success"))
-        print(f"Success: {success_count}, Errors: {len(results) - success_count}")
+        elif args.process:
+            results = handler.process_all_unanimous()
+            print(f"\nProcessed {len(results)} proposal(s)")
+            success_count = sum(1 for r in results if r.get("success"))
+            print(f"Success: {success_count}, Errors: {len(results) - success_count}")
 
-    else:
-        # Default: check and report
-        unanimous = handler.check_unanimous()
-        if unanimous:
-            print(f"ACTION_REQUIRED: {len(unanimous)} proposal(s) ready for approval")
-            for p in unanimous:
-                print(f"  {p['proposal_id']}: {p['title']}")
-            return 1  # Exit code 1 = action needed
         else:
-            print("OK: No proposals requiring approval")
-            return 0
+            # Default: check and report
+            unanimous = handler.check_unanimous()
+            if unanimous:
+                print(f"ACTION_REQUIRED: {len(unanimous)} proposal(s) ready for approval")
+                for p in unanimous:
+                    print(f"  {p['proposal_id']}: {p['title']}")
+                return 1  # Exit code 1 = action needed
+            else:
+                print("OK: No proposals requiring approval")
+                return 0
+    finally:
+        handler.pm.close()
 
 
 if __name__ == "__main__":

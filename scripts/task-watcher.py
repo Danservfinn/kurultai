@@ -20,6 +20,7 @@ Or via launchd (recommended for macOS):
     launchctl load ~/Library/LaunchAgents/com.kurultai.task-watcher.plist
 """
 
+import atexit
 import os
 import re
 import sys
@@ -56,7 +57,10 @@ except Exception as e:
 _neo4j_driver = None
 
 def _get_neo4j_driver():
-    """Lazy-load Neo4j driver. Returns None if unavailable."""
+    """Lazy-load Neo4j driver. Returns None if unavailable.
+
+    Note: atexit cleanup is handled by get_driver() itself — no duplicate registration.
+    """
     global _neo4j_driver
     if _neo4j_driver is None:
         try:
@@ -1269,16 +1273,7 @@ def _schedule_task_report(task_file, agent, task_id, success, elapsed_s, output)
     t.start()
 
 
-SLOW_SKILLS = {
-    '/horde-brainstorming': 7200,
-    '/golden-horde': 7200,
-    '/horde-implement': 7200,
-    '/horde-review': 7200,
-    '/horde-debug': 7200,
-    '/horde-learn': 7200,
-    '/horde-swarm': 7200,
-    '/horde-test': 7200,
-}
+# SLOW_SKILLS imported from task_verification (which re-exports from kurultai_paths)
 
 
 def _timeout_for_task(task_file):

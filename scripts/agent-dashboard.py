@@ -27,11 +27,9 @@ def get_agent_state(agent_name):
     try:
         import sys
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (a:AgentState {name: $name})
                 RETURN a.status AS status,
@@ -55,8 +53,6 @@ def get_agent_state(agent_name):
                 }
             else:
                 return {"status": "not_found"}
-        
-        driver.close()
     except Exception as e:
         return {"status": "error", "error": str(e)}
 

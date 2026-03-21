@@ -72,16 +72,14 @@ def print_test(name: str, passed: bool, details: str = ""):
 
 def cleanup_test_data():
     """Clean up test data from Neo4j."""
-    from neo4j_task_tracker import get_driver
-    driver = get_driver()
-    with driver.session() as session:
+    from neo4j_task_tracker import neo4j_session
+    with neo4j_session() as session:
         # Delete test person
         session.run("MATCH (p:Person {phone_number: $phone}) DETACH DELETE p", phone=TEST_PERSON_PHONE)
         # Delete test events (by pattern)
         session.run("MATCH (e:Event {name: 'Test Event'}) DETACH DELETE e")
         session.run("MATCH (e:Event {name: 'Team Meeting'}) DETACH DELETE e")
         session.run("MATCH (e:Event {name: 'Coffee Chat'}) DETACH DELETE e")
-    driver.close()
 
 
 # =============================================================================

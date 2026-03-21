@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 # Add script directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 from kublai_learning_queries import LearningQueries
 
 
@@ -42,10 +42,9 @@ class KublaiLearningGenerator:
         'domain'
     ]
 
-    def __init__(self, driver):
-        """Initialize with Neo4j driver."""
-        self.driver = driver
-        self.queries = LearningQueries(driver)
+    def __init__(self):
+        """Initialize learning generator."""
+        self.queries = LearningQueries()
         self.stats = {
             'created': 0,
             'deprecated': 0,
@@ -72,7 +71,7 @@ class KublaiLearningGenerator:
             pattern_key: The key identifying the pattern (template name, skill hint, etc.)
             agent_filter: Optional agent filter
         """
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             where_parts = [
                 "l.learning_type = $learning_type",
                 "l.pattern_key = $pattern_key",
@@ -153,7 +152,7 @@ class KublaiLearningGenerator:
                 self.deprecate_old_learnings('prompt_pattern', template, agent_filter)
 
                 # Create the learning node
-                with self.driver.session() as session:
+                with neo4j_session() as session:
                     recommendation_json = json.dumps({
                         'action': 'use_template',
                         'template': template,
@@ -243,7 +242,7 @@ class KublaiLearningGenerator:
 
                 self.deprecate_old_learnings('skill_hint', hint, agent_filter)
 
-                with self.driver.session() as session:
+                with neo4j_session() as session:
                     recommendation_json = json.dumps({
                         'action': 'use_skill_hint',
                         'skill_hint': hint,
@@ -337,7 +336,7 @@ class KublaiLearningGenerator:
                     'very_long': 14400
                 }.get(bucket, 3600)
 
-                with self.driver.session() as session:
+                with neo4j_session() as session:
                     recommendation_json = json.dumps({
                         'action': 'set_timeout',
                         'timeout_bucket': bucket,
@@ -421,7 +420,7 @@ class KublaiLearningGenerator:
                 confidence = self.queries.calculate_confidence(frequency, avg_quality, is_agent_specific=False)
                 learning_id = self.generate_learning_id()
 
-                with self.driver.session() as session:
+                with neo4j_session() as session:
                     priority = 'high' if avg_quality >= 0.8 else 'medium'
                     recommendation_json = json.dumps({
                         'action': 'include_context',
@@ -505,7 +504,7 @@ class KublaiLearningGenerator:
 
                 pattern_key = f"{provider}:{model}"
 
-                with self.driver.session() as session:
+                with neo4j_session() as session:
                     recommendation_json = json.dumps({
                         'action': 'use_model',
                         'model_provider': provider,
@@ -589,7 +588,7 @@ class KublaiLearningGenerator:
                 confidence = self.queries.calculate_confidence(total, avg_quality)
                 learning_id = self.generate_learning_id()
 
-                with self.driver.session() as session:
+                with neo4j_session() as session:
                     recommendation_json = json.dumps({
                         'action': 'route_to_agent',
                         'domain': domain,
@@ -723,7 +722,7 @@ class KublaiLearningGenerator:
 
         Returns count of learnings cleaned up.
         """
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (l:KublaiLearning)
                 WHERE l.valid_until < datetime()
@@ -760,7 +759,7 @@ class KublaiLearningGenerator:
 
     def get_active_learnings_summary(self) -> list:
         """Get summary of currently active learnings."""
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (l:KublaiLearning)
                 WHERE l.status = 'active' AND l.valid_until > datetime()
@@ -794,26 +793,23 @@ def main():
 
     args = parser.parse_args()
 
-    driver = get_driver()
-    generator = KublaiLearningGenerator(driver)
+    generator = KublaiLearningGenerator()
 
-    try:
-        if args.summary:
-            # Show current learning state
-            print("\n=== Active KublaiLearnings Summary ===\n")
-            learnings = generator.get_active_learnings_summary()
+    if args.summary:
+        # Show current learning state
+        print("\n=== Active KublaiLearnings Summary ===\n")
+        learnings = generator.get_active_learnings_summary()
 
-            if not learnings:
-                print("No active learnings found.")
-            else:
-                for l in learnings:
-                    print(f"  {l['type']}: {l['count']} learnings "
-                          f"(avg conf: {l.get('avg_confidence', 0):.2f}, "
-                          f"avg sample: {l.get('avg_sample_size', 0):.0f})")
+        if not learnings:
+            print("No active learnings found.")
+        else:
+            for l in learnings:
+                print(f"  {l['type']}: {l['count']} learnings "
+                      f"(avg conf: {l.get('avg_confidence', 0):.2f}, "
+                      f"avg sample: {l.get('avg_sample_size', 0):.0f})")
 
-            print()
-            driver.close()
-            return
+        print()
+        return
 
         if args.cleanup:
             print("Cleaning up expired learnings...")
@@ -822,7 +818,7 @@ def main():
         if args.test:
             print("\n=== TEST MODE - No learnings will be created ===\n")
             # Just run queries and show results
-            queries = LearningQueries(driver)
+            queries = LearningQueries()
 
             if args.agent or not args.weekly:
                 agent = args.agent
@@ -856,9 +852,6 @@ def main():
             with open(report_path, 'w') as f:
                 json.dump(results, f, indent=2, default=str)
             print(f"Report saved: {report_path}")
-
-    finally:
-        driver.close()
 
 
 if __name__ == '__main__':

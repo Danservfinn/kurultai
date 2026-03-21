@@ -30,10 +30,9 @@ sys.path.insert(0, '/Users/kublai/.openclaw/agents/main/scripts')
 def check_neo4j():
     """Check Neo4j connectivity with timeout."""
     try:
-        from neo4j_task_tracker import get_driver, close_driver
-        driver = get_driver()
-        driver.verify_connectivity()
-        close_driver()
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
+            session.run("RETURN 1").consume()
         return "up"
     except Exception:
         return "down"

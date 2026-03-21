@@ -250,6 +250,14 @@ class CompletionQualityGate:
         ".yaml", ".yml", ".toml", ".css", ".scss", ".html",
     }
 
+    # FIX 2026-03-20: Triage/coordination tasks should not be evaluated against
+    # code-delivery criteria. These tasks produce investigation reports and queue
+    # mutations, not code artifacts.
+    COORDINATION_KEYWORDS = {
+        "triage", "stalled", "stall", "coordination", "routing", "health check",
+        "queue", "backlog", "status assessment", "system-wide",
+    }
+
     def _check_shallow_implementation(
         self, full_content: str, output: str, task_file: Path
     ) -> str | None:
@@ -257,12 +265,23 @@ class CompletionQualityGate:
 
         Returns an issue string if the task is a shallow implementation, None otherwise.
         """
+        # FIX 2026-03-20: Skip shallow check for triage/coordination tasks
+        # These are legitimately documentation-only (investigation reports, queue mutations)
+        content_lower = full_content.lower()
+        if any(kw in content_lower for kw in self.COORDINATION_KEYWORDS):
+            agent_match = re.search(r"agent:\s*(\S+)", full_content, re.IGNORECASE)
+            if agent_match and agent_match.group(1).strip().lower() == "kublai":
+                return None  # Kublai coordination tasks are not code-delivery
+
         # Extract skill hint from frontmatter
         skill_match = re.search(r"skill[_\s]*hint?:\s*(\S+)", full_content, re.IGNORECASE)
         if not skill_match:
             return None  # No skill hint — skip this check
 
         skill = skill_match.group(1).strip().lower()
+        # FIX 2026-03-20: "none" is an explicit opt-out from code-delivery checks
+        if skill == "none" or skill == "null":
+            return None
         if skill not in self.CODE_DELIVERY_SKILLS:
             return None  # Not a code-delivery skill — skip
 

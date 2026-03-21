@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import get_driver, close_driver
 
 # ============================================================
 # SECURITY: Content Sanitization
@@ -89,7 +89,9 @@ class SchemaManager:
         self.driver = get_driver()
 
     def close(self):
-        self.driver.close()
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     # --------------------------------------------------------
     # ROUTING INTELLIGENCE

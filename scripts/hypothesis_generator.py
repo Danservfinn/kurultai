@@ -36,7 +36,7 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 from kublai_learning_queries import LearningQueries
 
 
@@ -109,10 +109,9 @@ class HypothesisGenerator:
     4. Agent reflection feedback - what agents complain about
     """
 
-    def __init__(self, driver):
-        """Initialize with Neo4j driver."""
-        self.driver = driver
-        self.queries = LearningQueries(driver)
+    def __init__(self):
+        """Initialize hypothesis generator."""
+        self.queries = LearningQueries()
 
         # Common file locations for hypothesis targeting
         self.file_map = {
@@ -171,7 +170,7 @@ class HypothesisGenerator:
         Returns:
             Hypothesis object or None if learning not found
         """
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (l:KublaiLearning {learning_id: $learning_id})
                 RETURN l
@@ -201,7 +200,7 @@ class HypothesisGenerator:
         """Generate hypotheses from active KublaiLearning nodes."""
         hypotheses = []
 
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             where_clause = "WHERE l.agent_filter = $agent" if agent else "WHERE l.agent_filter IS NULL OR l.agent_filter = '*'"
 
             result = session.run(f"""
@@ -353,7 +352,7 @@ class HypothesisGenerator:
         """Generate hypotheses from analyzing task failure patterns."""
         hypotheses = []
 
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             # Get failure patterns by agent and error type
             result = session.run("""
                 MATCH (t:Task {agent: $agent})
@@ -428,7 +427,7 @@ class HypothesisGenerator:
         """Generate hypotheses from duration outlier analysis."""
         hypotheses = []
 
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             # Find tasks with unusually high durations
             result = session.run("""
                 MATCH (t:Task {agent: $agent})
@@ -492,7 +491,7 @@ class HypothesisGenerator:
         hypotheses = []
 
         # Look for reflection patterns in recent task outcomes
-        with self.driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {agent: $agent})
                 WHERE t.created > datetime() - duration('P7D')
@@ -602,85 +601,80 @@ def main():
 
     args = parser.parse_args()
 
-    driver = get_driver()
-    generator = HypothesisGenerator(driver)
+    generator = HypothesisGenerator()
 
-    try:
-        if args.from_learning:
-            # Single hypothesis from learning
-            hypothesis = generator.generate_from_learning(args.from_learning)
-            if hypothesis:
-                hypotheses = [hypothesis]
-            else:
-                print(f"Error: Learning '{args.from_learning}' not found")
-                return 1
-        elif args.all:
-            # Generate for all agents
-            agents = ["temujin", "mongke", "ogedei", "chagatai", "jochi", "tolui"]
-            hypotheses = []
-            for agent in agents:
-                hypotheses.extend(generator.generate_for_agent(agent, args.limit))
+    if args.from_learning:
+        # Single hypothesis from learning
+        hypothesis = generator.generate_from_learning(args.from_learning)
+        if hypothesis:
+            hypotheses = [hypothesis]
         else:
-            # Generate for specific agent or default to all
-            agent = args.agent or "temujin"
-            hypotheses = generator.generate_for_agent(agent, args.limit)
+            print(f"Error: Learning '{args.from_learning}' not found")
+            return 1
+    elif args.all:
+        # Generate for all agents
+        agents = ["temujin", "mongke", "ogedei", "chagatai", "jochi", "tolui"]
+        hypotheses = []
+        for agent in agents:
+            hypotheses.extend(generator.generate_for_agent(agent, args.limit))
+    else:
+        # Generate for specific agent or default to all
+        agent = args.agent or "temujin"
+        hypotheses = generator.generate_for_agent(agent, args.limit)
 
-        # Output results
-        if not hypotheses:
-            print("No hypotheses generated. Possible reasons:")
-            print("  - No active KublaiLearning nodes (run kublai_learning_generator.py first)")
-            print("  - Insufficient task data for analysis")
-            print("  - Agent has no failure patterns or outliers")
-            return 0
+    # Output results
+    if not hypotheses:
+        print("No hypotheses generated. Possible reasons:")
+        print("  - No active KublaiLearning nodes (run kublai_learning_generator.py first)")
+        print("  - Insufficient task data for analysis")
+        print("  - Agent has no failure patterns or outliers")
+        return 0
 
-        if args.format == 'json':
-            output = json.dumps([h.to_dict() for h in hypotheses], indent=2)
-            if args.output:
-                with open(args.output, 'w') as f:
-                    f.write(output)
-                print(f"Wrote {len(hypotheses)} hypotheses to {args.output}")
-            else:
-                print(output)
+    if args.format == 'json':
+        output = json.dumps([h.to_dict() for h in hypotheses], indent=2)
+        if args.output:
+            with open(args.output, 'w') as f:
+                f.write(output)
+            print(f"Wrote {len(hypotheses)} hypotheses to {args.output}")
+        else:
+            print(output)
 
-        elif args.format == 'tsv':
-            lines = ["id\tagent\tdescription\texpected_impact\tconfidence\tpriority_score"]
-            for h in hypotheses:
-                lines.append(f"{h.id}\t{h.agent}\t{h.description}\t{h.expected_impact}\t{h.confidence:.2f}\t{h.priority_score:.1f}")
-            output = "\n".join(lines)
-            if args.output:
-                with open(args.output, 'w') as f:
-                    f.write(output)
-                print(f"Wrote {len(hypotheses)} hypotheses to {args.output}")
-            else:
-                print(output)
+    elif args.format == 'tsv':
+        lines = ["id\tagent\tdescription\texpected_impact\tconfidence\tpriority_score"]
+        for h in hypotheses:
+            lines.append(f"{h.id}\t{h.agent}\t{h.description}\t{h.expected_impact}\t{h.confidence:.2f}\t{h.priority_score:.1f}")
+        output = "\n".join(lines)
+        if args.output:
+            with open(args.output, 'w') as f:
+                f.write(output)
+            print(f"Wrote {len(hypotheses)} hypotheses to {args.output}")
+        else:
+            print(output)
 
-        else:  # table format
-            print(f"\n{'='*100}")
-            print(f"Generated {len(hypotheses)} hypotheses")
-            print(f"{'='*100}\n")
+    else:  # table format
+        print(f"\n{'='*100}")
+        print(f"Generated {len(hypotheses)} hypotheses")
+        print(f"{'='*100}\n")
 
-            for i, h in enumerate(hypotheses, 1):
-                print(f"[{i}] {h.id}")
-                print(f"    Agent:       {h.agent}")
-                print(f"    Description: {h.description}")
-                print(f"    Impact:      {h.expected_impact} (baseline: {h.baseline_metric})")
-                print(f"    Confidence:  {h.confidence:.2f}")
-                print(f"    Priority:    {h.priority_score:.1f}")
-                print(f"    Type:        {h.variable_type} ({h.control_value} → {h.treatment_value})")
-                print(f"    Files:       {', '.join(h.target_files) if h.target_files else 'N/A'}")
-                if h.learning_id:
-                    print(f"    Source:      KublaiLearning/{h.learning_id}")
-                print()
+        for i, h in enumerate(hypotheses, 1):
+            print(f"[{i}] {h.id}")
+            print(f"    Agent:       {h.agent}")
+            print(f"    Description: {h.description}")
+            print(f"    Impact:      {h.expected_impact} (baseline: {h.baseline_metric})")
+            print(f"    Confidence:  {h.confidence:.2f}")
+            print(f"    Priority:    {h.priority_score:.1f}")
+            print(f"    Type:        {h.variable_type} ({h.control_value} → {h.treatment_value})")
+            print(f"    Files:       {', '.join(h.target_files) if h.target_files else 'N/A'}")
+            if h.learning_id:
+                print(f"    Source:      KublaiLearning/{h.learning_id}")
+            print()
 
-        if args.output and args.format == 'table':
-            # Also save as JSON for programmatic use
-            json_path = args.output.replace('.txt', '.json') if args.output.endswith('.txt') else f"{args.output}.json"
-            with open(json_path, 'w') as f:
-                json.dump([h.to_dict() for h in hypotheses], f, indent=2)
-            print(f"Also saved JSON to {json_path}")
-
-    finally:
-        driver.close()
+    if args.output and args.format == 'table':
+        # Also save as JSON for programmatic use
+        json_path = args.output.replace('.txt', '.json') if args.output.endswith('.txt') else f"{args.output}.json"
+        with open(json_path, 'w') as f:
+            json.dump([h.to_dict() for h in hypotheses], f, indent=2)
+        print(f"Also saved JSON to {json_path}")
 
     return 0
 

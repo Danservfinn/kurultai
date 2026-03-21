@@ -58,6 +58,16 @@ class EventExtraction(BaseModel):
     description: Optional[str] = None
     reminder_text: Optional[str] = None
     recurrence: Optional[str] = None
+    # --- Enriched fields ---
+    cost: Optional[str] = None
+    dress_code: Optional[str] = None
+    what_to_bring: Optional[str] = None
+    category: Optional[str] = None
+    vibe: Optional[str] = None
+    indoor_outdoor: Optional[str] = None
+    event_url: Optional[str] = None
+    ticket_url: Optional[str] = None
+    dietary_notes: Optional[str] = None
 
 
 class QueryExtraction(BaseModel):
@@ -110,7 +120,16 @@ Schema:
     "location": "string or null",
     "duration_minutes": int or null,
     "participants": ["string"] or [],
-    "reference_event": "string or null"
+    "reference_event": "string or null",
+    "cost": "string or null (ticket price, 'free', '$20')",
+    "dress_code": "string or null (casual, smart casual, formal, costume)",
+    "what_to_bring": "string or null",
+    "category": "dinner|birthday|meeting|concert|hike|game_night|wedding|workout|travel|holiday|other or null",
+    "vibe": "casual|formal|chill|high_energy|intimate or null",
+    "indoor_outdoor": "indoor|outdoor|both or null",
+    "event_url": "URL or null",
+    "ticket_url": "URL or null",
+    "dietary_notes": "string or null"
   },
   "query": {
     "time_range": "string or null",
@@ -130,6 +149,12 @@ Rules:
 - Default duration is null (caller will apply 2-hour default)
 - Participants are first names only as mentioned in the message
 - For RSVP/modify/cancel, reference_event should match the most recent relevant event name
+- Infer category from context: "birthday dinner" → category=birthday, "standup" → category=meeting
+- Infer vibe from category if not explicit: meeting→formal, hike→casual, concert→high_energy
+- Extract URLs mentioned in the message
+- "bring X" → what_to_bring
+- "$20" or "free" or "tickets" → cost
+- "casual" / "dress up" / "black tie" → dress_code
 """
 
 
@@ -560,7 +585,7 @@ def resolve_datetime(
 # Confirmation Message Generation
 # =============================================================================
 
-def format_confirmed_event(event: ResolvedEvent) -> str:
+def format_confirmed_event(event: ResolvedEvent, enriched: Dict[str, Any] = None) -> str:
     """Format a confirmed event message."""
     lines = [
         "[Calendar] Got it!",
@@ -571,6 +596,20 @@ def format_confirmed_event(event: ResolvedEvent) -> str:
         lines.append(f"  Location: {event.location}")
     duration_hours = (event.end_datetime - event.start_datetime).total_seconds() / 3600
     lines.append(f"  Duration: {int(duration_hours)} hours")
+    # Show enriched fields if provided
+    if enriched:
+        if enriched.get("category"):
+            lines.append(f"  Type: {enriched['category']}")
+        if enriched.get("dress_code"):
+            lines.append(f"  Dress: {enriched['dress_code']}")
+        if enriched.get("cost"):
+            lines.append(f"  Cost: {enriched['cost']}")
+        if enriched.get("what_to_bring"):
+            lines.append(f"  Bring: {enriched['what_to_bring']}")
+        if enriched.get("indoor_outdoor"):
+            lines.append(f"  Setting: {enriched['indoor_outdoor']}")
+        if enriched.get("vibe"):
+            lines.append(f"  Vibe: {enriched['vibe']}")
     lines.append("React with thumbs up to join, thumbs down to skip.")
     return "\n".join(lines)
 
@@ -619,6 +658,10 @@ INTERROGATION_FIELDS = [
     "duration",       # How long?
     "location",       # Where?
     "participants",   # Who else?
+    "category",       # What kind of event?
+    "indoor_outdoor", # Indoor or outdoor?
+    "cost",           # Any cost?
+    "what_to_bring",  # Anything to bring?
     "description",    # Any details?
     "reminder_text",  # Want a reminder?
     "recurrence",     # Is this recurring?
@@ -631,6 +674,10 @@ FIELD_QUESTIONS = {
     "duration": "How long will it be? (default: 2 hours)",
     "location": "Where is it?",
     "participants": "Anyone else coming?",
+    "category": "What kind of event is this? (dinner, birthday, meeting, concert, hike, etc.)",
+    "indoor_outdoor": "Indoor or outdoor?",
+    "cost": "Any cost? (e.g. '$20', 'free', 'BYOB')",
+    "what_to_bring": "Should people bring anything?",
     "description": "Any details to add? (optional, reply 'skip')",
     "reminder_text": "Want a reminder? When? (e.g. '1 hour before', or 'no')",
     "recurrence": "Is this recurring? (e.g. 'weekly', 'monthly', or 'no')",
@@ -657,6 +704,15 @@ def detect_missing_fields(event: EventExtraction) -> List[str]:
         missing.append("reminder_text")
     if not event.recurrence:
         missing.append("recurrence")
+    # Enriched fields (only asked if not already provided)
+    if not event.category:
+        missing.append("category")
+    if not event.indoor_outdoor:
+        missing.append("indoor_outdoor")
+    if not event.cost:
+        missing.append("cost")
+    if not event.what_to_bring:
+        missing.append("what_to_bring")
 
     return missing
 
@@ -775,6 +831,14 @@ def _apply_field_answer(event: EventExtraction, field: str, answer: str):
         event.reminder_text = answer_clean
     elif field == "recurrence":
         event.recurrence = answer_clean
+    elif field == "category":
+        event.category = answer_clean
+    elif field == "indoor_outdoor":
+        event.indoor_outdoor = answer_clean.lower()
+    elif field == "cost":
+        event.cost = answer_clean
+    elif field == "what_to_bring":
+        event.what_to_bring = answer_clean
 
 
 def _parse_duration_text(text: str) -> Optional[int]:

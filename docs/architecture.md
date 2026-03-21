@@ -1,11 +1,11 @@
 # Kurultai Architecture Documentation
 
-**Version:** 2.5
-**Date:** 2026-03-13
+**Version:** 2.6
+**Date:** 2026-03-20
 **Author:** Chagatai (Kurultai Content Specialist), updated by Kublai (swarm audit)
 **Status:** Production Documentation
 
-**Migration Note:** Neo4j-First Architecture (Phase 2 completed 2026-03-09). Task ID canonical format (2026-03-10). Dashboard Sessions view, Model Selector, Neo4j task cross-reference, knowledge base (2026-03-13).
+**Migration Note:** Neo4j-First Architecture (Phase 2 completed 2026-03-09). Task ID canonical format (2026-03-10). Dashboard Sessions view, Model Selector, Neo4j task cross-reference, knowledge base (2026-03-13). Conversation Context System critical fixes (2026-03-20).
 
 ---
 
@@ -82,7 +82,7 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 | **Orchestration** | OpenClaw Gateway | Agent sessions, routing, cron |
 | **Memory (File)** | Markdown files | Private/sensitive data |
 | **Memory (Graph)** | Neo4j | Operational memory, cross-agent context |
-| **LLM Provider** | Anthropic (Claude) / Z.AI / Ollama | OpenClaw gateway defaults to zai-coding/glm-5 (dispatches to Claude Code); Ogedei uses claude-opus-4-6 directly; Tolui uses ollama (see kurultai.json) |
+| **LLM Provider** | Anthropic (Claude) / Z.AI / Alibaba / Ollama | All 6 Claude Code agents use claude-opus-4-6; Tolui uses local Ollama; Z.AI and Alibaba serve as fallback tiers (see kurultai.json) |
 | **Local LLM** | Ollama | Heartbeat triage (qwen3.5:9b) |
 | **Cron Scheduler** | OpenClaw Cron | Heartbeats, reflections, automation |
 | **Dashboard** | Node.js (the.kurult.ai) | Web UI: Kanban, Sessions, Reflections, Dispatch, Settings |
@@ -90,19 +90,17 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 
 ### Agent Models
 
-> **Note (2026-03-12):** OpenClaw gateway defaults to `zai-coding/glm-5` for most agents (which dispatches to Claude Code via subprocess). Ogedei uses `claude-opus-4-6` directly. Tolui runs on local Ollama. See `kurultai.json` for canonical executor/model configuration.
+> **Note (2026-03-19):** All 6 Claude Code agents use `anthropic/claude-opus-4-6` as confirmed in `kurultai.json`. The `claude-agent` wrapper handles provider fallback (Anthropic → Z.AI → Alibaba → Ollama). Tolui runs on local Ollama and does not participate in Claude Code reflection.
 
 | Agent | Model | Role |
 |-------|-------|------|
-| **Kublai** | zai-coding/glm-5 (claude-code executor) | Router, coordination |
-| **Möngke** | zai-coding/glm-5 (claude-code executor) | Research, fact-checking |
-| **Chagatai** | zai-coding/glm-5 (claude-code executor) | Content, documentation |
-| **Temüjin** | zai-coding/glm-5 (claude-code executor) | Development, code |
-| **Jochi** | zai-coding/glm-5 (claude-code executor) | Analytics, patterns |
-| **Ögedei** | claude-opus-4-6 (claude-code executor) | Operations, monitoring |
-| **Tolui** | ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) | Truth-telling, code review |
-
-> **Note:** The gateway model (e.g. `zai-coding/glm-5`) is what OpenClaw dispatches to. The actual Claude Code execution model is determined by each agent's `~/.openclaw/agents/{name}/.claude/settings.json`, defaulting to `claude-sonnet-4-6` via the `claude-agent` wrapper.
+| **Kublai** | anthropic/claude-opus-4-6 | Router, coordination |
+| **Möngke** | anthropic/claude-opus-4-6 | Research, fact-checking |
+| **Chagatai** | anthropic/claude-opus-4-6 | Content, documentation |
+| **Temüjin** | anthropic/claude-opus-4-6 | Development, code |
+| **Jochi** | anthropic/claude-opus-4-6 | Analytics, patterns |
+| **Ögedei** | anthropic/claude-opus-4-6 | Operations, monitoring |
+| **Tolui** | ollama (lukey03/qwen3.5-9b-abliterated-vision) | Truth-telling, code review |
 
 ---
 
@@ -409,7 +407,7 @@ Overflow decisions are logged to `routing-overflow.jsonl`.
 
 **Misroute detection:** When a caller explicitly provides `--agent`, the system cross-checks against keyword scoring. If the keyword router strongly disagrees (higher score for a different agent, or zero score for the explicit agent), a `MISROUTE WARNING` is logged. This does NOT override the explicit routing — it's an audit trail for routing_audit.py.
 
-**Stale execution recovery:** `recover_stale_executions()` runs every 5 minutes (aligned with tick heartbeat). Tasks stuck in `.executing` state longer than 12 minutes are renamed for retry (`.retry-N.md`). After 2 retries, permanently marked `.failed.done`.
+**Stale execution recovery:** `recover_stale_executions()` runs every 5 minutes (aligned with tick heartbeat). Tasks stuck in `.executing` state longer than ~2 hours (max priority timeout + 120s grace) are renamed for retry (`.retry-N.md`). After 2 retries, permanently marked `.failed.done`.
 
 **Deprecated:** `task-router.py` (archived), 185-line SKILL.md decision tree (now reference-only), `sessions_spawn` for routing classification.
 
@@ -558,7 +556,7 @@ Every task gets a canonical `task_id` in format `{priority}-{timestamp}-{uuid8}`
 
 | Event | Emitted By | When | Key Fields |
 |-------|-----------|------|------------|
-| `QUEUED` | task-router.py | Task file created in agent queue | task_id, agent, task_summary, skill_hint |
+| `QUEUED` | task_intake.py | Task file created in agent queue | task_id, agent, task_summary, skill_hint |
 | `EXECUTING` | task-watcher.py | Task picked up for execution | skill_hint, **executor** |
 | `EXECUTION_TRACE` | agent-task-handler.py | Tool usage analysis post-execution | tool_categories, phase_markers, intermediate_errors, **executor** |
 | `SKILL_INVOCATION` | agent-task-handler.py | Skill tool used during execution | skill, trigger, skill_hint_matched, **executor** |
@@ -567,8 +565,8 @@ Every task gets a canonical `task_id` in format `{priority}-{timestamp}-{uuid8}`
 | `EXECUTION_DETAIL` | agent-task-handler.py | Detailed execution metadata | output_lines, result_file, success, **executor** |
 | `ARCH_UPDATE_CHECK` | agent-task-handler.py | Architectural significance detected post-task | files_detected, new_scripts |
 | `SCORED` | score_tasks.py | Task quality scorecard computed | delegation_score, domain_match_score, total_score |
-| `SKILL_OUTCOME` | score_skills.py | Per-skill effectiveness scored | completed_protocol, output_quality, fit_score |
-| `SKILL_AGGREGATE` | score_skills.py | Hourly skill performance roll-up | success_rate, trend, recommended_action |
+| `SKILL_OUTCOME` | neo4j_v2_scorer.py | Per-skill effectiveness scored | completed_protocol, output_quality, fit_score |
+| `SKILL_AGGREGATE` | neo4j_v2_scorer.py | Hourly skill performance roll-up | success_rate, trend, recommended_action |
 | `ACTION_SCORED` | action_scorer.py | Per-agent action quality roll-up | memory_score, output_score, decision_score, **claude_code_rate** |
 | `REFLECT_SUMMARY` | kurultai-reflect | Behavioral reflection cycle complete | red_flags, rules_written, proposals_created |
 
@@ -590,16 +588,16 @@ Every task gets a canonical `task_id` in format `{priority}-{timestamp}-{uuid8}`
 Task completes
   → EXECUTION_TRACE (tool usage analysis)
   → SKILL_INVOCATION events (from transcript parser)
-  → SKILL_OUTCOME events (score_skills.py, hourly)
-  → SKILL_AGGREGATE events (score_skills.py, hourly roll-up)
+  → SKILL_OUTCOME events (neo4j_v2_scorer.py, hourly)
+  → SKILL_AGGREGATE events (neo4j_v2_scorer.py, hourly roll-up)
   → ACTION_SCORED events (action_scorer.py, hourly)
   → skill-stats.json (update_skill_stats.py, hourly cache)
-  → Reflection context (prepare_reflection_context.py injects skill + action blocks)
+  → Reflection context (neo4j_v2_reflection.py injects skill + action blocks)
   → kurultai-reflect (evidence-based WHEN/THEN rule generation)
   → Agent memory ACTIVE RULES section
 ```
 
-**Reflection integration:** `prepare_reflection_context.py` now includes:
+**Reflection integration:** `neo4j_v2_reflection.py` (replaces archived `prepare_reflection_context.py`) includes:
 - `## Skill Performance (7d)` block — lowest-performing skills with trend + recommended_action
 - `## Action Quality (Nh)` block — per-category scores, claude_code_rate, worst_flag
 - No token budget truncation — all blocks included unconditionally
@@ -608,10 +606,10 @@ Task completes
 
 Two mechanisms detect tasks:
 
-#### Immediate (10-second polling)
+#### Immediate (15-second polling)
 - **Script:** `scripts/task-watcher.py`
 - **Daemon:** `com.kurultai.task-watcher`
-- **Polls:** Every 10 seconds
+- **Polls:** Every 15 seconds
 - **Action:** Executes tasks immediately on detection
 
 #### Fallback (5-minute heartbeat)
@@ -696,20 +694,38 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 │   stall_detector  │    neo4j-state-sync │    /horde-review (Haiku)  │
 │   agent-self-wake │    kublai-actions   │    memory_audit           │
 │   kublai-actions  │    (tock trigger)   │    route_quality_tracker  │
-│                   │                     │    score_skills           │
+│                   │                     │    neo4j_v2_scorer        │
 │   (tick trigger)  │                     │    kublai-initiative      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### All Scheduled Jobs
 
-| Job | Schedule | Script | Purpose |
-|-----|----------|--------|---------|
-| **Tick (Watchdog)** | Every 5 min | `watchdog-gather.sh` | Infrastructure health, error counting, LLM triage |
-| **Tock (Telemetry)** | Every 30 min | `tock-gather.sh` | Agent metrics, cron health, queue audit, LLM assessment |
-| **Kurultai (Reflection)** | Every 60 min | `hourly_reflection.sh` | Self-improvement, brainstorming, routing audit |
-| **Task-Watcher** | Every 10 sec | `task-watcher.py` | Immediate task execution (launchd daemon) |
-| **Daily Summary** | 7:00 AM EST | — | Progress report to human |
+| Job | Schedule | Agent | Script/Command | Purpose |
+|-----|----------|-------|----------------|---------|
+| **Tick (Watchdog)** | Every 5 min | main | `watchdog-gather.sh` | Infrastructure health, error counting |
+| **Tock (Telemetry)** | :01, :31 | main | `tock-gather.sh` | Agent metrics, queue audit |
+| **Kurultai Reflection** | Every 4 hours | main | `hourly_reflection.sh` | Self-improvement, routing audit |
+| **Task-Watcher** | Every 15 sec (launchd) | — | `task-watcher.py` | Immediate task execution |
+| **Daily Summary** | 7:00 AM ET | main | cron agentTurn | Progress report |
+| **Architecture Verify** | Daily | main | cron agentTurn | Doc accuracy check |
+| **Parse Conversion** | Hourly | main | `check-conversion-alerts.ts` | Conversion rate monitoring |
+| **Neo4j Prune** | Every 6 hours | main | cypher-shell | Telemetry cleanup |
+| **Weekly Review** | Sunday 3 AM | main | `task_intake.py` | the.kurult.ai audit |
+| **Uptime Monitor** | Every 5 min | ogedei | `kurultai-monitor.py` | Browser-based health |
+| **Memory Cleanup** | Sunday 2 AM | ogedei | `cleanup-working-memory.sh` | Old working-memory purge |
+| **Routing Metrics** | Hourly | main | `routing-metrics.sh` | Routing performance |
+| **Learning Weekly** | Sunday 2 AM ET | main | `kublai_learning_generator.py` | KublaiLearning nodes |
+| **Proposal Expiration** | Every 30 min | main | `proposal_expiration.py` | Expired proposal cleanup |
+| **Proposal Votes** | Every 30 min | main | `proposal_approval_handler.py` | Vote aggregation |
+| **System Health** | Hourly | main | `system-health-check.py` | Unified health check |
+| **X Daily Status** | 8 AM ET | ogedei | `x_poster.py post_status` | Twitter/X daily post |
+| **X Build Public** | 4 PM ET | ogedei | `x_poster.py post_build_public` | Twitter/X build update |
+| **X Weekly Review** | Friday 10 AM ET | ogedei | `x_poster.py post_weekly` | Twitter/X weekly thread |
+| **X Analytics** | 9 AM | ogedei | `x-analytics-collect.sh` | Twitter analytics |
+| **Storage Monitor** | Monday 9 AM ET | ogedei | `storage_monitor.py` | Disk usage tracking |
+| **Action Scoring** | :45 hourly | main | `action_scorer.py` | Agent action quality |
+| **Daily Backup** | 3:17 AM ET | ogedei | `backup-kurultai.sh` | Neo4j/SQLite/ledger backup |
 
 ### Tier 1: Tick (Every 5 Minutes)
 
@@ -798,14 +814,14 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 
 **Data dependency:** Tock reads the last tick status from `logs/watchdog.log` to include `tick_status` in its output. If tick data is stale (>10 min), tock reports `tick_status=unknown`.
 
-### Tier 3: Kurultai Reflection (Every 60 Minutes)
+### Tier 3: Kurultai Reflection (Every 4 Hours)
 
 > **Detailed reference:** See [reflection-pipeline-reference.md](reflection-pipeline-reference.md) for complete script I/O contracts, data dependency graph, shared module docs, and troubleshooting guide.
 
 **Script:** `scripts/hourly_reflection.sh`
 **LLM:** Claude Code (Opus) per agent for reflections; Haiku for /horde-review
 **Mode:** Protocol-based (~800 tokens/agent vs ~6400 legacy)
-**Hard timeout:** 420s (7 min) — enforced by background watchdog process
+**Hard timeout:** 900s (15 min) — enforced by background watchdog process
 **Lock:** Checkpoint file `logs/reflection-status.json` emitted after core reflections
 
 **What it does (4 phases + tiered downstream):**
@@ -814,13 +830,13 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 |-------|--------|-----------|---------|
 | 1. Protocol Reflection | `meta_reflection.py --protocol` | **Parallel** (all 6 Claude Code agents, excluding Tolui) | Per-agent WHEN/THEN behavioral rules, performance metrics, system health |
 | 2. Performance Review | `claude-agent --model haiku /horde-review` | **Parallel** (all 6 Claude Code agents, excluding Tolui, 120s timeout each) | Critical analysis of each agent's hourly performance |
-| 3. Downstream Tier 1 | `memory_audit.py`, `cross_agent_rules.py`, `route_quality_tracker.py`, `routing_audit_action.py`, `score_skills.py`, `action_scorer.py` | **Parallel** (independent) | Memory hygiene, capability scoring, skill stats |
+| 3. Downstream Tier 1 | `memory_audit.py`, `cross_agent_rules.py`, `route_quality_tracker.py`, `routing_audit_action.py`, `neo4j_v2_scorer.py`, `action_scorer.py` | **Parallel** (independent) | Memory hygiene, capability scoring, skill stats |
 | 3. Downstream Tier 2 | `update_skill_stats.py` | **Sequential** (depends on score-skills) | Aggregate skill statistics |
 | 3. Downstream Tier 3 | `kublai-actions.py --trigger kurultai`, `kublai-initiative.py`, `/kurultai-report`, `generate_hourly_report.py` | **Sequential** (depends on all above) | Task creation, initiative, reporting |
 
 **Brainstorming:** Decoupled to `run_brainstorm.sh` (separate cron job at :30, not part of this pipeline).
 
-**Execution model:** All 6 Claude Code agents (excluding Tolui, which runs on Ollama and does not participate in reflection) reflect **in parallel** (Phase 1), then all 6 undergo /horde-review **in parallel** (Phase 2). A checkpoint file is emitted after Phase 1 completes, decoupling content generation success from downstream failures. If the 420s hard timeout fires, the watchdog kills all remaining processes.
+**Execution model:** All 6 Claude Code agents (excluding Tolui, which runs on Ollama and does not participate in reflection) reflect **in parallel** (Phase 1), then all 6 undergo /horde-review **in parallel** (Phase 2). A checkpoint file is emitted after Phase 1 completes, decoupling content generation success from downstream failures. If the 900s hard timeout fires, the watchdog kills all remaining processes.
 
 **Output:** Reflections appended to `agents/{agent}/memory/YYYY-MM-DD.md`. Reviews written to `logs/reviews/{agent}-latest.md`. Step timing written to `logs/reflection-step-timing.json`.
 
@@ -926,14 +942,14 @@ Each agent has memory in **two** filesystem locations that serve different purpo
 
 | Location | Owner | Purpose | Loaded By |
 |----------|-------|---------|-----------|
-| `~/.openclaw/agents/{agent}/memory/` | Filesystem | Daily logs, context.md | `prepare_reflection_context.py` |
+| `~/.openclaw/agents/{agent}/memory/` | Filesystem | Daily logs, context.md | `neo4j_v2_reflection.py` |
 | `~/.claude/projects/.../memory/MEMORY.md` | Claude Code | Persistent auto-memory across sessions | Claude Code runtime |
 
 **context.md** — Each agent's `memory/context.md` stores structured metadata: role, model, current task, recent work log, and operational notes. Updated by agents after task completion. Read by the reflection pipeline for continuity between sessions.
 
 **MEMORY.md (Claude project)** — Claude Code's auto-memory file. Persists routing policies, known bugs, architectural notes. Lines after 200 are truncated in context, so brevity is critical.
 
-**YYYY-MM-DD.md** — Daily reflection logs containing WHEN/THEN rules, worst-moment analysis, and throughput reports. Created by the hourly reflection pipeline. The most recent file is read by `prepare_reflection_context.py` to extract active rules.
+**YYYY-MM-DD.md** — Daily reflection logs containing WHEN/THEN rules, worst-moment analysis, and throughput reports. Created by the hourly reflection pipeline. The most recent file is read by `neo4j_v2_reflection.py` to extract active rules.
 
 ### WHEN/THEN Behavioral Rule Lifecycle
 
@@ -944,7 +960,7 @@ The behavioral rule system is the primary self-improvement mechanism. Rules foll
   (agent writes to memory/YYYY-MM-DD.md)
         │
         ▼
-  prepare_reflection_context.py
+  neo4j_v2_reflection.py
   (extracts rules from daily file)
         │
         ▼
@@ -963,20 +979,20 @@ The behavioral rule system is the primary self-improvement mechanism. Rules foll
 N. WHEN [trigger] THEN [action] INSTEAD OF [old default]. (Rule XN)
 ```
 
-**Extraction Priority** (`prepare_reflection_context.py:extract_active_rules`):
+**Extraction Priority** (`neo4j_v2_reflection.py:extract_active_rules`):
 1. Explicit `## ACTIVE RULES` section header in daily memory file
 2. `NEW RULE` / `Rule N` headers in reflection entries
 3. Fallback: any line matching `WHEN...THEN` pattern
 
 **Constraints:**
-- **Max 7 active rules** per agent (enforced by `MAX_ACTIVE_RULES` in `prepare_reflection_context.py`)
+- **Max 7 active rules** per agent (enforced by `MAX_ACTIVE_RULES` in `neo4j_v2_reflection.py`)
 - Rules are deduplicated (case-insensitive normalization)
 - Template placeholders (`[trigger]`, `[action]`) are filtered out
 - Agents must retire a rule before adding a new one when at the limit
 
 **Rule Naming Convention:** Each agent uses a letter prefix (e.g., C1-C7 for Chagatai, T1-T7 for Temujin) to identify rules in cross-agent contexts.
 
-**Fallback Sources:** If no rules are found in the daily memory file, `prepare_reflection_context.py` checks Claude project memory for `{agent}-reflection-*.md` files in `~/.claude/projects/.../memory/`.
+**Fallback Sources:** If no rules are found in the daily memory file, `neo4j_v2_reflection.py` checks Claude project memory for `{agent}-reflection-*.md` files in `~/.claude/projects/.../memory/`.
 
 ### Structured Rule Store (rules.json)
 
@@ -1002,7 +1018,7 @@ Each agent maintains a `memory/rules.json` file — a structured JSON store for 
 }
 ```
 
-This complements the freeform WHEN/THEN rules in daily memory files. `prepare_reflection_context.py` reads rules from daily memory files (primary) and Claude project memory (fallback); `rules.json` provides the durable structured record with follow/violate telemetry.
+This complements the freeform WHEN/THEN rules in daily memory files. `neo4j_v2_reflection.py` reads rules from daily memory files (primary) and Claude project memory (fallback); `rules.json` provides the durable structured record with follow/violate telemetry.
 
 ### Cross-Agent Rule Propagation
 
@@ -1012,7 +1028,7 @@ This complements the freeform WHEN/THEN rules in daily memory files. `prepare_re
 2. Checks Neo4j `Task` nodes for patterns that match rules from other agents
 3. Creates `RuleProposal` nodes in Neo4j when a rule has been invoked ≥3 times (`MIN_INVOCATIONS`) and would benefit another agent
 4. Max 2 proposals per target agent per cycle (`MAX_PROPOSALS_PER_CYCLE`)
-5. Target agent sees proposals in their next reflection prompt (injected by `prepare_reflection_context.py`)
+5. Target agent sees proposals in their next reflection prompt (injected by `neo4j_v2_reflection.py`)
 
 ### Memory Curation Pipeline
 
@@ -1206,21 +1222,23 @@ Task cards display colored gate indicators based on filename suffixes:
 
 ### Provider Fallback Chain
 
-The `claude-agent` wrapper (`~/.local/bin/claude-agent`) implements a primary/backup fallback:
+The `claude-agent` wrapper (`~/.local/bin/claude-agent`) implements a 4-tier provider fallback:
 
 ```
-┌───────────────┐     ┌────────────────┐
-│   Primary     │     │    Backup      │
-│  Anthropic    │────▶│    Z.AI        │
-│  OAuth auth   │fail │  API key auth  │
-│  claude-*     │     │  glm-5         │
-└───────────────┘     └────────────────┘
+┌───────────────┐     ┌────────────────┐     ┌────────────────┐     ┌────────────────┐
+│   Primary     │     │  Fallback 1    │     │  Fallback 2    │     │  Fallback 3    │
+│  Anthropic    │────▶│    Z.AI        │────▶│   Alibaba      │────▶│    Ollama      │
+│  OAuth auth   │fail │  API key auth  │fail │  API key auth  │fail │  Local, no key │
+│  claude-*     │     │  glm-5         │     │  qwen3.5-plus  │     │  qwen3.5-9b    │
+└───────────────┘     └────────────────┘     └────────────────┘     └────────────────┘
 ```
 
 **Mode selection** (from `mode.json`):
 - `auto` — Try primary, fallback on retryable errors (429, auth, capacity)
 - `backup` — Skip primary, use Z.AI/glm-5 directly
 - `primary` — Primary only, no fallback
+
+> **Note:** The `claude-agent` wrapper script implements 3-tier auto fallback (Anthropic → Z.AI → Alibaba). `openclaw.json` defines the full 4-tier chain at the gateway level (including Ollama as local fallback).
 
 **Settings files** (paths from `kurultai.json`):
 - Primary: `~/.openclaw/claude/settings.json`
@@ -1760,7 +1778,7 @@ A structured knowledge base was created (2026-03-13) to give agents quick refere
 | **Heartbeat** | 3-tier monitoring pipeline: tick (5min health), tock (30min telemetry), kurultai (60min reflection) |
 | **Reflection** | Hourly agent self-improvement process |
 | **Kurultai Sync** | Hourly cross-agent coordination meeting |
-| **Task-watcher** | Daemon that executes tasks within 10 seconds |
+| **Task-watcher** | Daemon that executes tasks within 15 seconds |
 | **Signal** | 🌙👁️⛓️‍💥 — The triad of liberation |
 
 ---
@@ -1777,15 +1795,64 @@ A structured knowledge base was created (2026-03-13) to give agents quick refere
 | 1.5 | 2026-03-05 | LLM Classification Routing: glm-5 now classifies directly (no Claude Code middleman). Replaced 185-line SKILL.md decision tree with inline classification in AGENTS.md + exec(task_intake.py). Load balancing: overflow routing via OVERFLOW_MAP when primary agent is busy. Agent roles generalized with overflow capabilities. |
 | 1.6 | 2026-03-05 | Execution reliability + skill activation. (1) Stale task recovery aligned to 5-min tick heartbeat (CLEANUP_INTERVAL 3600→300). Retry cap (MAX_RETRY_COUNT=2) prevents infinite loops on blocked tasks — after 2 retries, tasks permanently marked .failed.done. (2) Auto skill hint detection: task_intake.py detects best horde/domain skill from agent+task content (38 mappings), writes skill_hint to frontmatter. agent-task-handler.py passes directive prompt to Claude Code ("Start by invoking /skill"). (3) Kublai project management: status-of-implementation/project/feature routes to kublai (answers directly), status-of-service/deployment routes to ogedei. Split status hard rule in AGENTS.md + 5 new disambiguation rules in task_intake.py. |
 | 1.7 | 2026-03-06 | Heartbeat System documentation: Replaced sparse "Cron System" section with comprehensive "Heartbeat System (Cron)" covering the 3-tier pipeline (tick/tock/kurultai), data collection per tier, output files, companion scripts, decision thresholds, data flow between tiers, concurrency control, and timing dependencies. Corrected reflection rotation note (all agents now reflect every hour, not on 6-hour rotation). |
+| 1.8 | 2026-03-06 | Behavioral Observability System: (1) `executor: claude-code` field added to all execution ledger events — every Claude Code task completion is now explicitly trackable. (2) New ledger events: EXECUTION_TRACE (tool usage), SKILL_INVOCATION (transcript parser), SKILL_OUTCOME, SKILL_AGGREGATE, ACTION_SCORED, ARCH_UPDATE_CHECK, REFLECT_SUMMARY. (3) New scripts: neo4j_v2_scorer.py (replaced score_skills.py), update_skill_stats.py, action_scorer.py, skill_tracker_hook.py. (4) PostToolUse hook captures real-time Skill invocations. (5) neo4j_v2_reflection.py (replaced prepare_reflection_context.py): removed token budget system, added skill telemetry + action quality blocks. (6) hourly_reflection.sh: added score-skills, update-skill-stats, action-scorer steps + kurultai-reflect Phase 3b (parallel for all 6 agents). (7) architecture.md auto-update check on task completion (ARCH_UPDATE_CHECK event). |
 | 1.9 | 2026-03-06 | Heartbeat accuracy fix: (1) Tier 3 Kurultai Reflection corrected — parallel execution (not sequential), 4 phases + tiered downstream (not 5 phases), 420s hard timeout, checkpoint file, /horde-review Phase 2 documented. (2) Removed contradictory 6-hour rotation table (superseded in v1.6). (3) Added missing tock companions (neo4j-state-sync.py, kublai-actions.py). (4) Updated pipeline ASCII diagram with accurate companion scripts. (5) Brainstorming correctly documented as decoupled to run_brainstorm.sh at :30. |
-| 1.8 | 2026-03-06 | Behavioral Observability System: (1) `executor: claude-code` field added to all execution ledger events — every Claude Code task completion is now explicitly trackable. (2) New ledger events: EXECUTION_TRACE (tool usage), SKILL_INVOCATION (transcript parser), SKILL_OUTCOME, SKILL_AGGREGATE, ACTION_SCORED, ARCH_UPDATE_CHECK, REFLECT_SUMMARY. (3) New scripts: score_skills.py, update_skill_stats.py, action_scorer.py, skill_tracker_hook.py. (4) PostToolUse hook captures real-time Skill invocations. (5) prepare_reflection_context.py: removed token budget system, added skill telemetry + action quality blocks. (6) hourly_reflection.sh: added score-skills, update-skill-stats, action-scorer steps + kurultai-reflect Phase 3b (parallel for all 6 agents). (7) architecture.md auto-update check on task completion (ARCH_UPDATE_CHECK event). |
 | 1.10 | 2026-03-06 | Added cross-reference to new `reflection-pipeline-reference.md` operational guide (complete script I/O contracts, shared module docs, data dependency graph, troubleshooting). |
 | 2.0 | 2026-03-07 | Model standardization: Updated all agent models from third-party (qwen, kimi, MiniMax, glm-5) to `claude-opus-4-6`. Added Tolui (7th agent, truth-teller) with dedicated gateway on port 18792. Updated routing references, agent count, ASCII diagrams. |
 | 2.1 | 2026-03-09 | Neo4j-First Architecture: Task ID canonical format implemented. Kurultai Task System Overhaul Phase 2 completed. |
 | 2.2 | 2026-03-10 | Rule persistence system: Structured `rules.json` store with follow/violate telemetry, `deprecation_bypass` protection for critical rules, rule lifecycle management across memory rotation. |
 | 2.3 | 2026-03-11 | Idle-crisis recovery: (1) Restored r021 (idle rule) and r022 (self-maintenance rule) after incorrect auto-deprecation by memory_audit. (2) Added `deprecation_bypass` flag to prevent critical rule removal. (3) Created `/scripts/idle-watchdog.sh` for cron-based self-task generation after 120min idle. (4) Fixed rule evaluation tracking — rules showed 0 follow/0 violate but were actively evaluated in reflections. |
 | 2.4 | 2026-03-12 | Model accuracy update: (1) Corrected agent count from six to seven. (2) Updated model assignments per kurultai.json — gateway defaults to zai-coding/glm-5 for most agents, claude-opus-4-6 for Ogedei, ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) for Tolui. (3) Clarified reflection pipeline excludes Tolui (Ollama-based, does not participate in Claude Code reflection). |
+| 2.7 | 2026-03-19 | Pipeline health fixes (11 items from /horde-review audit): (1) Backfilled `assigned_to` for 73 tasks where v1 set `agent` but not `assigned_to`, making them invisible to v2 executor. (2) Fixed 4 zombie PENDING tasks with `.done` in task_id; patched `neo4j-state-sync.py` to recognize `.done-*` filenames as COMPLETED. (3) Deleted 38 orphaned TaskOutput + 25 orphaned FailureReport nodes. (4) v2 executor now writes heartbeat file (`v2-executor-heartbeat.json`, every 30s) and idle poll logging (every ~5 min). (5) v2 executor calls `promote_orphans()` + `recover_orphans()` every ~5 min (was never called). (6) v2 executor now emits EXECUTING/COMPLETED/FAILED events to `task-ledger.jsonl` with `executor: "claude-code"`. (7) Added `ORPHANED` to `STATUS_MAP` in `neo4j.js` (maps to failed column). (8) Fixed Event node schema in `neo4j-schema.md` — replaced wrong `title/date/agent` with actual `name/start_datetime/end_datetime` properties. (9) `create_task_full()` now sets `assigned_to: $agent` alongside `agent: $agent` — prevents future NULL assigned_to. (10) Backfilled `created_at` from `created` for 73 legacy tasks. (11) Dropped 3 redundant single-property indexes subsumed by v2 composites. |
+| 2.6 | 2026-03-19 | Critical review fixes (items 7-25): (1) hourly_reflection.sh timeout fixed from 7200s (bug) to 900s. (2) Dashboard API security: method-aware auth (POST to settings/mode, settings/model, tasks, queue now require API key; GET remains public), authToken stripped from GET /api/providers, rate limiter X-Forwarded-For spoofing fixed. (3) SLOW_SKILLS consolidated to single source in kurultai_paths.py. (4) claim_task() wrapped in execute_write transaction. (5) _system_sources deduplicated to module-level frozenset. (6) Agent models table corrected: all 6 agents use claude-opus-4-6 (not zai-coding/glm-5). (7) Cron table expanded from 5 to 24 jobs. (8) Stale recovery threshold corrected (12 min → ~2 hours). (9) Polling interval corrected (10s → 15s). (10) Archived script references updated (prepare_reflection_context.py → neo4j_v2_reflection.py, score_skills.py → neo4j_v2_scorer.py). (11) Provider fallback chain updated to 4-tier diagram. (12) Knowledge base: phantom endpoints removed, neo4j-schema.md reconciled, provider-fallback.md fixed. (13) neo4j-state-sync.py driver leak fixed, deprecation status updated to SOFT DEPRECATED. |
 | 2.5 | 2026-03-13 | Comprehensive architecture audit via 3-agent swarm. (1) Added Dashboard section: the.kurult.ai architecture, all 7 views (Kanban, Calendar, Reflections, Wrappers, Sessions, Dispatch, Settings), module breakdown (server.js, neo4j.js, middleware.js, cache.js, config.js). (2) Added Sessions view: live process detection via ps aux, Neo4j WORKING task cross-reference, model selector (ALLOWED_MODELS with full Haiku ID), routing mode toggle. (3) Added Credential & Provider System: vault at ~/.openclaw/credentials/, claude-agent primary/backup fallback chain, mode.json dispatch modes. (4) Added Neo4j Task Schema (Production): ~30 Task node properties (vs 5 in v2.4), v2 state machine with CAS claim_epoch fencing, 10 node types, 15+ relationships, graph-native router scoring. (5) Added Security Architecture: CORS, rate limiting, API key auth, security headers, path validation, CSRF infra. (6) Updated File Structure: added apps/the-kurultai/, credentials/, claude/, logs/sessions/, knowledge/. (7) Added Knowledge Base section: 6 reference files (1,148 lines) covering API endpoints, Neo4j schema, provider fallback, agent roster, dashboard views. (8) Fixed sessions data parsing bug (API returns object, not array). (9) Clarified gateway model vs Claude Code execution model distinction. |
+
+---
+
+## Conversation Context System (2026-03-20)
+
+The conversation context system ingests Signal messages into the Neo4j graph and assembles rich context for LLM responses. Critical fixes applied on 2026-03-20:
+
+### Data Pipeline
+- **HAS_TOPIC relationship fix**: `context_assembler.py` and `group_context_bridge.py` now read `[:HAS_TOPIC]` (matching `async_extractor.py` writes) instead of `[:MENTIONS]`
+- **Engagement decision persistence**: `store_engagement_decision()` from `engagement_learner.py` is now called after each engagement assessment, storing decisions as properties on Message nodes
+- **Legacy dual-write retired**: `conversation_ingester.py` no longer writes to legacy JSON files; JSONL fallback provides DR coverage
+
+### Security & Consent
+- **Fail-closed consent**: `signal_message_handler.py` defaults `_should_ingest = False`; consent exceptions are caught and logged (not silently swallowed)
+- **Consent bootstrapped**: All 19 active humans received `message_storage` + `message_analysis` consent grants
+- **PII scrubbing before LLM calls**: `conversational_responder.py` and `engagement_assessor.py` scrub message text through `PIIScrubber` before sending to any external LLM
+- **Encryption fail-safe**: `field_encryption.py` returns `None` (not plaintext) when encryption key is unavailable
+
+### GDPR Compliance
+- **`delete_user_data()`** now deletes both legacy files AND Neo4j graph data via `deletion_cascade.py`
+- **`export_user_data()`** now includes Threads and ActionItems in the graph data export
+
+### PII Hardening
+- JSONL fallback stores `phone_hash` (SHA-256 truncated) instead of plaintext phone numbers
+- Handler log no longer contains message content or full phone numbers
+- Log and JSONL files use `0o600` permissions
+- Response guard catches all exceptions (not just `ImportError`)
+
+### Pipeline Scheduling
+- `async_extractor.py` (message extraction) added to hourly pipeline
+- `gds_scheduler.py` (PageRank, Louvain, drift detection) runs daily with marker-based dedup
+- `engagement_learner.infer_outcomes()` runs hourly for behavioral proxy labeling
+- `thread_summarizer.py` generates summaries for DORMANT/ARCHIVED threads
+
+### Architecture Cleanup
+- Neo4j driver `close()` methods no longer call `close_driver()` — atexit handler manages lifecycle
+- Human ID resolution consolidated: `signal_message_handler.py` lets `ingest_message()` handle resolution (HumanStoreV2 only in fallback path)
+
+### Review Remediation (2026-03-21)
+- **Consent bypass fixed**: Restored human_id pre-resolution guard (`if not human_id` not `if not _HAS_INGESTER`)
+- **Auto-grant default consent**: New humans get message_storage, message_analysis, external_llm_processing consent on creation (opt-out model)
+- **GDPR export complete**: Added thread summaries, engagement decisions, TemporalMarkers, group memberships
+- **Thread summarizer consent**: Z.AI path gated on `external_llm_processing` consent
+- **PII scrubbing hardened**: Context block scrubbed before external LLM calls, not just current message; known_names used for better scrubbing
+- **Pipeline fixes**: GDS-daily marker only on success, engagement outcomes extracted to standalone script with consent-filtered humans
+- **Legacy logger gated**: `log_inbound()` only runs when `_should_ingest` is True
+- **Message content removed from logs**: WARNING log no longer leaks message text
 
 ---
 

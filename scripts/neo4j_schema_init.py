@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 # Schema definitions
@@ -94,11 +94,10 @@ def init_schema(verify_only=False, verbose=True):
     Returns:
         dict with 'constraints' and 'indexes' lists of created/verified items
     """
-    driver = get_driver()
     results = {"constraints": [], "indexes": [], "errors": []}
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Get existing constraints
             existing_constraints = set()
             try:
@@ -195,7 +194,7 @@ def init_schema(verify_only=False, verbose=True):
                 print(f"[ERRORS] {len(results['errors'])} errors occurred")
 
     finally:
-        driver.close()
+        pass
 
     return results
 

@@ -39,11 +39,9 @@ def get_agent_state(agent_name):
     """Get agent state from Neo4j"""
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (a:AgentState {name: $name})
                 RETURN a.status AS status,
@@ -52,9 +50,9 @@ def get_agent_state(agent_name):
                        a.tasks_completed AS completed,
                        a.subagents_spawned AS spawned
             """, name=agent_name)
-            
+
             record = result.single()
-            
+
             if record:
                 return {
                     "status": record["status"],
@@ -65,8 +63,6 @@ def get_agent_state(agent_name):
                 }
             else:
                 return {"status": "unknown", "error": "AgentState not found"}
-        
-        driver.close()
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -101,19 +97,16 @@ def check_agent_health(agent_name):
 def activate_agent(agent_name):
     """Activate agent in Neo4j"""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 MATCH (a:AgentState {name: $name})
                 SET a.status = 'running',
                     a.last_heartbeat = datetime(),
                     a.activated = datetime()
             """, name=agent_name)
-        
-        driver.close()
+
         log(f"✓ {agent_name} activated")
         return True
     except Exception as e:

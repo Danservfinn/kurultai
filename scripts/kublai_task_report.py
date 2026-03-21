@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_tracker, get_driver
+from neo4j_task_tracker import get_tracker, get_driver, close_driver
 from kurultai_paths import TASK_LEDGER, AGENTS_DIR
 from kurultai_ledger import append_ledger
 
@@ -157,7 +157,9 @@ class TaskReporter:
 
     def close(self):
         """Close database connection."""
-        self.driver.close()
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     # ============================================================
     # Schema Initialization
@@ -621,14 +623,9 @@ class TaskReporter:
                 },
             }
 
-            # Log TASK_REPORT_GENERATED event
-            append_ledger({
-                "task_id": task_id,
-                "event": "TASK_REPORT_GENERATED",
-                "ts": datetime.now().isoformat(),
-                "agent": task.get("agent"),
-                "report_summary": self._summarize_report(report),
-            })
+            # TASK_REPORT_GENERATED is emitted by task_report_hook.py (canonical path
+            # with duration, metrics, status). Removed duplicate emit here to avoid
+            # double-counting in analytics. This path only writes to Neo4j.
 
             # Create TaskReport node for aggregation
             session.run("""

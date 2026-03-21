@@ -57,7 +57,7 @@ REPORTS_DIR = Path(os.getenv(
     Path.home() / '.openclaw' / 'agents' / 'main' / 'reports' / 'completed'
 ))
 AGENTS_BASE = Path.home() / '.openclaw' / 'agents'
-SIGNAL_ACCOUNT = os.getenv('SIGNAL_ACCOUNT', '')
+SIGNAL_ACCOUNT = os.getenv('SIGNAL_ACCOUNT', '+15165643945')
 SIGNAL_GROUP_ID = os.getenv('SIGNAL_GROUP_ID', '')
 ENABLE_GIT_DIFF = os.getenv('ENABLE_GIT_DIFF', 'true').lower() == 'true'
 ENABLE_SIGNAL = os.getenv('SIGNAL_NOTIFY', 'true').lower() == 'true'
@@ -795,10 +795,9 @@ def get_task_context(task_id: str, agent: str, parent_id: Optional[str]) -> dict
     }
 
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
+        from neo4j_task_tracker import neo4j_session
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Get parent info
             if parent_id:
                 result = session.run("""
@@ -835,7 +834,6 @@ def get_task_context(task_id: str, agent: str, parent_id: Optional[str]) -> dict
                 for r in result
             ]
 
-        driver.close()
     except Exception:
         pass  # Silently fail if Neo4j unavailable
 
@@ -1129,20 +1127,39 @@ def save_report(task_id: str, report: str, agent: str) -> Path:
 
 
 def send_signal_notification(task_id: str, report_path: Path, status: str):
-    """Send report summary to Signal chat."""
+    """Send report summary to Signal chat via JSON-RPC HTTP endpoint."""
     if not SIGNAL_ACCOUNT or not ENABLE_SIGNAL:
         return
 
     try:
+        import urllib.request
+        import json as _json
+
         summary = f"Task {task_id} {'completed' if status == 'completed' else 'failed'} - Report: {report_path}"
 
-        if SIGNAL_GROUP_ID:
-            cmd = ['signal-cli', '-u', SIGNAL_ACCOUNT, 'send', '-g', SIGNAL_GROUP_ID, summary]
-        else:
-            cmd = ['signal-cli', '-u', SIGNAL_ACCOUNT, 'send', '-m', summary]
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "send",
+            "id": task_id,
+            "params": {
+                "account": SIGNAL_ACCOUNT,
+                "message": summary,
+            }
+        }
 
-        subprocess.run(cmd, timeout=10, capture_output=True)
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        if SIGNAL_GROUP_ID:
+            payload["params"]["groupId"] = SIGNAL_GROUP_ID
+        else:
+            payload["params"]["recipient"] = [SIGNAL_ACCOUNT]
+
+        req = urllib.request.Request(
+            "http://127.0.0.1:8080/api/v1/rpc",
+            data=_json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:
         pass
 
 
@@ -1197,13 +1214,13 @@ def append_ledger_event(task_id: str, agent: str, status: str, metrics: dict, se
     # Also write to Neo4j as PipelineEvent for read_ledger visibility
     try:
         from neo4j_task_tracker import TaskTracker
-        tracker = TaskTracker()
-        for event in events:
-            tracker.emit_pipeline_event(
-                event_type=event.get("event", "UNKNOWN"),
-                payload=event,
-                agent=event.get("agent", ""),
-            )
+        with TaskTracker() as tracker:
+            for event in events:
+                tracker.emit_pipeline_event(
+                    event_type=event.get("event", "UNKNOWN"),
+                    payload=event,
+                    agent=event.get("agent", ""),
+                )
     except Exception:
         pass  # Non-fatal - JSONL is the fallback
 
@@ -1215,9 +1232,7 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
                           resource_usage: dict, duration_seconds: float):
     """Save comprehensive task metrics to Neo4j."""
     try:
-        from neo4j_task_tracker import get_driver
-
-        driver = get_driver()
+        from neo4j_task_tracker import neo4j_session
 
         git_stats = git_diff.get('stats', {}) if isinstance(git_diff, dict) else {}
         tokens = session_data.get('token_usage', {})
@@ -1236,7 +1251,7 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
         if status == 'completed':
             quality_score += 0.2
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 MATCH (t:Task {task_id: $task_id})
                 SET t.report_generated = datetime(),
@@ -1350,7 +1365,6 @@ def save_metrics_to_neo4j(task_id: str, agent: str, status: str,
                 task_params=json.dumps(task_context.get('task_params', {}))
             )
 
-        driver.close()
         return True
     except Exception as e:
         print(f"Neo4j save failed: {e}", file=sys.stderr)
@@ -1372,9 +1386,7 @@ def record_task_outcome(task_id: str, agent: str, task: dict,
         validation_result: Optional validation from validate_workspace_completion()
     """
     try:
-        from neo4j_task_tracker import get_driver
-
-        driver = get_driver()
+        from neo4j_task_tracker import neo4j_session as _neo4j_session
 
         # Calculate success scores
         output_quality_score = _calculate_output_quality(workspace_scan, error_analysis)
@@ -1389,7 +1401,7 @@ def record_task_outcome(task_id: str, agent: str, task: dict,
         clarity_score = 5     # Medium clarity baseline
         autonomy_score = 5    # Medium autonomy baseline
 
-        with driver.session() as session:
+        with _neo4j_session() as session:
             outcome_id = str(uuid.uuid4())[:12]
             session.run("""
                 MERGE (t:Task {task_id: $task_id})
@@ -1425,7 +1437,6 @@ def record_task_outcome(task_id: str, agent: str, task: dict,
             is_completed=(error_analysis.get('category') is None),
             error_category=error_analysis.get('category'))
 
-        driver.close()
         return True
     except Exception as e:
         print(f"TaskOutcome creation failed: {e}", file=sys.stderr)

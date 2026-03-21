@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import get_driver, close_driver
 from kurultai_paths import AGENTS_DIR, LOGS_DIR
 
 KURULTAI_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
@@ -41,7 +41,9 @@ class ProposalManager:
         self.driver = get_driver()
 
     def close(self):
-        self.driver.close()
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     def create_proposal(self, title: str, description: str, proposing_agent: str,
                        priority: str = "normal", category: str = "feature",

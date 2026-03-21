@@ -1,0 +1,371 @@
+#!/usr/bin/env python3
+"""
+Signal Calendar Listener - Receives Signal messages and routes to calendar handler
+
+Uses signal-cli daemon HTTP API to receive messages.
+
+Usage:
+    python3 signal_calendar_listener.py
+    (Runs in daemon mode, polls every 10 seconds)
+
+Or with --once flag for single poll:
+    python3 signal_calendar_listener.py --once
+"""
+
+import os
+import sys
+import json
+import time
+import signal
+import requests
+from datetime import datetime
+from pathlib import Path
+
+# Setup path
+SCRIPT_DIR = Path(__file__).parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from calendar_handler import handle_message
+from profile_handler import handle_profile_command
+
+# Conversation logging for inbound and outbound messages
+from conversation_logger import log_inbound, log_outbound
+
+# V2: Neo4j graph ingestion (dual-write with legacy JSON)
+try:
+    from conversation_ingester import ingest_message
+    _HAS_V2_INGESTER = True
+except ImportError:
+    _HAS_V2_INGESTER = False
+
+# Configuration
+SIGNAL_ACCOUNT = os.getenv("SIGNAL_ACCOUNT", "+15165643945")
+SIGNAL_API_URL = os.getenv("SIGNAL_API_URL", "http://127.0.0.1:8080")
+SIGNAL_RPC_URL = f"{SIGNAL_API_URL}/api/v1/rpc"
+GROUP_ID = os.getenv("SIGNAL_GROUP_ID", "BROemHVncLgSz8tReUKBz6V3BeDhDB0EXaJd+sRp6oA=")
+POLL_INTERVAL = int(os.getenv("CALENDAR_POLL_INTERVAL", "10"))
+LOG_FILE = os.path.expanduser("~/.openclaw/logs/signal_calendar_listener.log")
+
+# Known group members (for name resolution)
+GROUP_MEMBERS = {
+    "+19194133445": "Danny",
+    "+16624580725": "Liz",
+}
+
+
+def log(message: str, level: str = "INFO"):
+    """Log to file and stdout."""
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    timestamp = datetime.now().isoformat()
+    log_line = f"[{timestamp}] [{level}] {message}\n"
+    with open(LOG_FILE, "a") as f:
+        f.write(log_line)
+    print(log_line.strip())
+
+
+def signal_rpc(method: str, params: dict = None) -> dict:
+    """Call signal-cli JSON-RPC API.
+
+    Note: signal-cli v0.13+ requires account parameter in multi-account mode.
+    The account must be included in the params dict for methods that need context.
+    """
+    # Add account to params for methods that need account context
+    # Note: 'receive' does NOT accept account parameter (only maxMessages, timeout)
+    if params is None:
+        params = {}
+    if "account" not in params and method in ("send", "listGroups"):
+        params["account"] = SIGNAL_ACCOUNT
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params
+    }
+    try:
+        response = requests.post(
+            SIGNAL_RPC_URL,
+            json=payload,
+            timeout=30
+        )
+        if response.status_code == 200:
+            result = response.json()
+            if "error" in result:
+                log(f"RPC error: {result['error']}", "WARNING")
+                return None
+            return result.get("result")
+        else:
+            log(f"API error: {response.status_code} - {response.text}", "WARNING")
+            return None
+    except Exception as e:
+        log(f"RPC call failed: {e}", "ERROR")
+        return None
+
+
+def get_messages() -> list:
+    """Poll signal-cli HTTP API for new messages."""
+    try:
+        # Use JSON-RPC receive method
+        result = signal_rpc("receive")
+        if result is None:
+            return []
+
+        # Result might be a list of messages or empty
+        if isinstance(result, list):
+            return result
+        return []
+
+    except Exception as e:
+        log(f"Error getting messages: {e}", "ERROR")
+        return []
+
+
+def extract_event_names(message_content: str) -> list:
+    """
+    Extract potential event names from message content.
+
+    Looks for:
+    - Quoted strings: "Weekly Standup"
+    - Title case phrases (excluding common verbs): Team Meeting
+    - Common event patterns
+    """
+    import re
+    events = []
+
+    # Extract quoted strings
+    quoted = re.findall(r'"([^"]+)"', message_content)
+    events.extend(quoted)
+
+    # Extract single-quoted strings
+    single_quoted = re.findall(r"'([^']+)'", message_content)
+    events.extend(single_quoted)
+
+    # Extract title case phrases (2-4 words, each starting with capital)
+    title_case = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b', message_content)
+    # Filter out common words that appear title-case but aren't events
+    exclusions = {
+        "I'm", "I'll", "I'd", "We're", "You're", "They're", "That's", "It's",
+        "Schedule", "Create", "Add", "Let's", "Can", "Will", "Need"
+    }
+    for phrase in title_case:
+        if phrase not in exclusions and len(phrase) > 3:
+            events.append(phrase)
+
+    return list(set(events))  # Remove duplicates
+
+
+def extract_task_ids(message_content: str) -> list:
+    """
+    Extract task IDs from message content.
+
+    Looks for patterns like:
+    - #123 (2+ digits)
+    - task-123
+    - TASK-123
+    """
+    import re
+    task_ids = []
+
+    # GitHub/issue style: #123 (2+ digits)
+    github_style = re.findall(r'#(\d{2,})', message_content)
+    task_ids.extend([f"#{tid}" for tid in github_style])
+
+    # Task prefix style: task-123, TASK-123 (preserve case)
+    task_prefix = re.findall(r'((?:task|TASK)-\d+)', message_content)
+    task_ids.extend(task_prefix)
+
+    return list(set(task_ids))  # Remove duplicates
+
+
+def extract_group_messages(raw_messages: list) -> list:
+    """Filter for group messages and format for calendar handler."""
+    group_messages = []
+
+    for msg in raw_messages:
+        # Check for envelope format
+        envelope = msg.get("envelope", {})
+
+        # Get sender info
+        sender = envelope.get("sender", {})
+        sender_number = sender.get("number", "")
+        sender_name = sender.get("name") or GROUP_MEMBERS.get(sender_number) or sender_number
+
+        # Get message data
+        data_message = envelope.get("dataMessage", {})
+        if not data_message:
+            continue
+
+        message_text = data_message.get("message", "")
+
+        # Check if it's from our target group
+        group_info = data_message.get("groupInfo", {})
+        group_id = group_info.get("groupId", "")
+
+        if group_id and group_id != GROUP_ID:
+            continue
+
+        if not message_text:
+            continue
+
+        group_messages.append({
+            "message": message_text,
+            "sender": sender_number,
+            "sender_name": sender_name,
+            "group_id": GROUP_ID,
+            "timestamp": datetime.now(),
+            "message_id": envelope.get("timestamp")
+        })
+
+    return group_messages
+
+
+def process_calendar_message(raw_msg: dict) -> bool:
+    """Process a single message through handlers with conversation logging."""
+    sender_phone = raw_msg.get("sender", "")
+    sender_name = raw_msg.get("sender_name", "")
+    message_content = raw_msg.get("message", "")
+
+    # Step 1: Log inbound message with context (legacy)
+    try:
+        if sender_phone and message_content:
+            related_events = extract_event_names(message_content)
+            related_tasks = extract_task_ids(message_content)
+            log_inbound(
+                phone_number=sender_phone,
+                content=message_content,
+                channel="signal",
+                message_id=str(raw_msg.get("message_id", "")),
+                related_events=related_events,
+                related_tasks=related_tasks
+            )
+    except Exception as e:
+        print(f"Warning: Failed to log inbound conversation: {e}", file=sys.stderr)
+
+    # Step 1b: V2 Neo4j ingestion (parallel to legacy, won't block on failure)
+    if _HAS_V2_INGESTER and sender_phone and message_content:
+        try:
+            ingest_message(
+                phone=sender_phone,
+                content=message_content,
+                direction="inbound",
+                channel="signal",
+            )
+        except Exception as e:
+            print(f"Warning: V2 ingestion failed: {e}", file=sys.stderr)
+
+    # Step 2: Check for profile/privacy commands first
+    try:
+        profile_response = handle_profile_command(message_content, sender_phone, sender_name)
+        if profile_response:
+            send_response(profile_response, raw_msg.get("group_id", GROUP_ID))
+            _log_outbound_both(sender_phone, profile_response, raw_msg)
+            return True
+    except Exception as e:
+        log(f"Error in profile handler: {e}", "ERROR")
+
+    # Step 3: Process through calendar handler
+    try:
+        response = handle_message(raw_msg)
+    except Exception as e:
+        log(f"Error processing message: {e}", "ERROR")
+        return False
+
+    # Step 4: Send response and log outbound
+    if response:
+        send_response(response, raw_msg.get("group_id", GROUP_ID))
+        _log_outbound_both(sender_phone, response, raw_msg)
+        return True
+
+    return False
+
+
+def _log_outbound_both(sender_phone: str, response: str, raw_msg: dict):
+    """Log outbound message to both legacy and v2 systems."""
+    try:
+        if sender_phone:
+            log_outbound(
+                phone_number=sender_phone,
+                content=response,
+                channel="signal",
+                message_id=str(raw_msg.get("message_id", ""))
+            )
+    except Exception as e:
+        print(f"Warning: Failed to log outbound conversation: {e}", file=sys.stderr)
+
+    if _HAS_V2_INGESTER and sender_phone:
+        try:
+            ingest_message(
+                phone=sender_phone,
+                content=response,
+                direction="outbound",
+                channel="signal",
+            )
+        except Exception as e:
+            print(f"Warning: V2 outbound ingestion failed: {e}", file=sys.stderr)
+
+
+def send_response(text: str, group_id: str):
+    """Send a response message to the group via JSON-RPC API."""
+    try:
+        result = signal_rpc("send", {
+            "message": text,
+            "groupId": group_id
+        })
+
+        if result:
+            log(f"Sent response to group")
+        else:
+            log(f"Failed to send response", "WARNING")
+
+    except Exception as e:
+        log(f"Error sending response: {e}", "ERROR")
+
+
+def run_once():
+    """Run a single poll cycle."""
+    log("Running single poll cycle")
+    raw_messages = get_messages()
+    group_messages = extract_group_messages(raw_messages)
+
+    if group_messages:
+        log(f"Found {len(group_messages)} group message(s)")
+        for msg in group_messages:
+            log(f"Processing: [{msg['sender_name']}] {msg['message'][:50]}...")
+            process_calendar_message(msg)
+    else:
+        log("No new messages")
+
+    return len(group_messages)
+
+
+def run_daemon():
+    """Run as daemon, polling for messages."""
+    log(f"Starting Signal calendar listener (poll every {POLL_INTERVAL}s)")
+
+    # Setup signal handlers for graceful shutdown
+    def handle_signal(signum, frame):
+        log("Shutting down listener")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    while True:
+        try:
+            run_once()
+        except Exception as e:
+            log(f"Error in daemon loop: {e}", "ERROR")
+
+        time.sleep(POLL_INTERVAL)
+
+
+def main():
+    """Main entry point."""
+    if "--once" in sys.argv:
+        run_once()
+    else:
+        run_daemon()
+
+
+if __name__ == "__main__":
+    main()

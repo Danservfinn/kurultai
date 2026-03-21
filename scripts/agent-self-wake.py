@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import atexit
 import json
 import os
 import re
@@ -63,7 +64,10 @@ def log(msg, level="INFO"):
 _neo4j_driver = None
 
 def _get_neo4j_driver():
-    """Lazy-load Neo4j driver. Returns None if unavailable."""
+    """Lazy-load Neo4j driver. Returns None if unavailable.
+
+    Note: atexit cleanup is handled by get_driver() itself — no duplicate registration.
+    """
     global _neo4j_driver
     if _neo4j_driver is None:
         try:
@@ -162,8 +166,9 @@ def agent_has_pending_tasks(agent):
     tasks_dir = AGENTS_DIR / agent / "tasks"
     if not tasks_dir.exists():
         return False
+    terminal_markers = ['.executing', '.completed', '.done', '.resolved', '.failed', '.cancelled', '.stale', '.obsolete']
     for f in tasks_dir.glob("*.md"):
-        if not any(x in f.name for x in [".executing", ".completed", ".done"]):
+        if not any(marker in f.name for marker in terminal_markers):
             return True
     return False
 
@@ -281,9 +286,37 @@ def extract_blocked_items(agent):
             if text not in [i.split(": ", 1)[-1] for i in items]:
                 items.append(f"ACTION: {text}")
 
+    # Filter out items that are already marked as RESOLVED in memory
+    # Prevents false-positive self-wake cycles on stale blocked items
+    resolved_items = []
+    for filepath in files_to_check:
+        if not filepath.exists():
+            continue
+        try:
+            content = filepath.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        # Find lines with RESOLVED markers
+        for match in re.finditer(
+            r"✅\s+RESOLVED.*?[:]\s*(.+?)(?:\n|$)", content
+        ):
+            resolved_items.append(match.group(1).strip().lower()[:80])
+
+    # Remove items whose text overlaps with resolved items
+    filtered = []
+    for item in items:
+        text = item.split(": ", 1)[-1].lower()[:80]
+        is_resolved = False
+        for resolved in resolved_items:
+            if text in resolved or resolved in text:
+                is_resolved = True
+                break
+        if not is_resolved:
+            filtered.append(item)
+
     # Deduplicate — check for substring overlap between items
     unique = []
-    for item in items:
+    for item in filtered:
         text = item.split(": ", 1)[-1].lower()[:80]
         # Skip if this item's content is already covered by an existing item
         is_dup = False

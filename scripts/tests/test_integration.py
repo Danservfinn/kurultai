@@ -43,7 +43,7 @@ class TestTaskTrackerDriverLifecycle:
         content = tracker_path.read_text()
 
         # Check for singleton pattern
-        assert "_cached_driver" in content or "get_driver()" in content, \
+        assert "_cached_driver" in content or "get_driver()" in content or "neo4j_session" in content, \
             "Should use singleton driver pattern"
         assert "_driver_refcount" in content, \
             "Should track driver reference count"

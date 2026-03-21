@@ -1,10 +1,10 @@
 {
-  "ts": "2026-03-16T22:25:46.809018",
+  "ts": "2026-03-21T02:37:58.291380",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
+      "failure_count": 1,
       "success_count": 24,
       "last_failure_rate": 0.0
     },
@@ -12,7 +12,7 @@
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 5,
+      "success_count": 11,
       "last_failure_rate": 0.0
     },
     "tolui": {
@@ -25,29 +25,29 @@
     "jochi": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 1,
-      "success_count": 25,
+      "failure_count": 0,
+      "success_count": 27,
       "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 1,
-      "success_count": 4,
+      "failure_count": 4,
+      "success_count": 6,
       "last_failure_rate": 0.0
     },
     "temujin": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 0,
-      "success_count": 63,
+      "failure_count": 2,
+      "success_count": 64,
       "last_failure_rate": 0.0
     },
     "kublai": {
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 76,
+      "success_count": 82,
       "last_failure_rate": 0.0
     }
   },
@@ -285,6 +285,12 @@
       "to": "mongke",
       "task": "ogedei-model-drift-alert-20260313-043856.md",
       "ts": "2026-03-13T09:40:57.802174"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "normal-1773990141-6a125d52.failed-exhausted.md",
+      "ts": "2026-03-20T18:01:01.985590"
     }
   ]
 }

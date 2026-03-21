@@ -21,6 +21,7 @@ import json
 import os
 import subprocess
 import sys
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -33,6 +34,15 @@ except ImportError:
 
 # Configuration
 BASE_URL = "https://the.kurult.ai"
+LOCAL_URL = "http://127.0.0.1:18790"  # For direct health checks bypassing Cloudflare Access
+
+# Cloudflare Access detection patterns
+CF_ACCESS_LOGIN_PATTERNS = [
+    "kurultai.cloudflareaccess.com",
+    "Sign in ・ Cloudflare Access",
+    "Sign in with:",
+    "Get a login code"
+]
 LOG_DIR = Path.home() / ".openclaw" / "logs"
 LOG_FILE = LOG_DIR / "kurultai-monitor.log"
 STATE_FILE = LOG_DIR / "kurultai-monitor-state.json"
@@ -150,13 +160,44 @@ def check_kurultai() -> tuple[bool, list[str], dict]:
                 # Network idle timeout is not critical - some polling connections stay open
                 pass
 
+            # CLOUDFLARE ACCESS DETECTION: Check if we hit the login page
+            # This is expected behavior - the tunnel is working, just needs auth
+            page_content = page.content()
+            page_url = page.url
+
+            is_cf_access_login = any(
+                pattern in page_content or pattern in page_url
+                for pattern in CF_ACCESS_LOGIN_PATTERNS
+            )
+
+            if is_cf_access_login:
+                # Cloudflare Access is active - tunnel is healthy, auth required
+                # This is NOT a failure - verify local server is running instead
+                metrics["cf_access_login"] = True
+                log("Cloudflare Access login page detected - verifying local server health")
+
+                try:
+                    import urllib.request
+                    local_req = urllib.request.Request(f"{LOCAL_URL}/health")
+                    local_resp = urllib.request.urlopen(local_req, timeout=5)
+                    if local_resp.status == 200:
+                        metrics["local_server_healthy"] = True
+                        log("Local server healthy - Cloudflare Access auth required (expected)")
+                        # Site is healthy - just needs auth
+                        browser.close()
+                        return True, [], metrics
+                except Exception as e:
+                    issues.append(f"Local server check failed: {e}")
+                    metrics["local_server_healthy"] = False
+                    browser.close()
+                    return False, issues, metrics
+
             # CRITICAL CHECK: Wait for actual board rendering
             # The page should NOT be stuck on "Loading..."
             render_start = datetime.now(timezone.utc)
 
             try:
                 # Check if we're stuck on "Loading..." text
-                page_content = page.content()
                 has_loading_text = "Loading" in page_content and "board" not in page_content.lower()
 
                 # Wait for actual board element to appear

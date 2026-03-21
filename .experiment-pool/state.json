@@ -7,15 +7,15 @@
       "target_files": [
         "scripts/test.py"
       ],
-      "pid": 25747,
-      "pgid": 25747,
-      "status": "running",
+      "pid": 8064,
+      "pgid": 8064,
+      "status": "crashed",
       "created_at": "2026-03-08T22:39:00.168533",
-      "started_at": "2026-03-08T22:39:30.318290",
-      "completed_at": null,
+      "started_at": "2026-03-19T14:35:59.302222",
+      "completed_at": "2026-03-19T14:36:11.090877",
       "exit_code": null,
       "error_message": null
     }
   ],
-  "updated": "2026-03-08T22:39:30.363375"
+  "updated": "2026-03-21T06:02:28.204841"
 }

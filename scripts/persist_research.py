@@ -365,16 +365,14 @@ def persist_reflection_research(agent_name: str = "mongke") -> Optional[str]:
 def ensure_fulltext_index():
     """Create the Neo4j fulltext index for Research nodes if it doesn't exist."""
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        with driver.session() as session:
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
             session.run("""
                 CREATE FULLTEXT INDEX research_search IF NOT EXISTS
                 FOR (r:Research)
                 ON EACH [r.topic, r.summary, r.content, r.keywords]
             """)
             print("[research] Fulltext index ensured")
-        driver.close()
     except Exception as e:
         print(f"[research] Index creation failed: {e}")
 

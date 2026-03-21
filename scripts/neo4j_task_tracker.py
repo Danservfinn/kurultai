@@ -184,9 +184,9 @@ def get_driver():
             logger.error(f"Neo4j connection failed: {e}")
             raise Neo4jConnectionError(f"Failed to connect to Neo4j: {e}")
 
-        # Register cleanup on exit
+        # Register force-close on exit (bypasses refcount for clean shutdown)
         import atexit
-        atexit.register(close_driver)
+        atexit.register(_force_close_driver)
 
         return _cached_driver
     finally:
@@ -207,6 +207,8 @@ def close_driver():
     try:
         if _driver_refcount > 0:
             _driver_refcount -= 1
+        else:
+            logger.warning("close_driver() called with refcount already at 0 — possible double-close bug")
 
         if _driver_refcount == 0 and _cached_driver is not None:
             try:
@@ -218,6 +220,19 @@ def close_driver():
                 _cached_driver = None
     finally:
         _lock.release()
+
+
+def _force_close_driver():
+    """Force-close driver at process exit regardless of refcount."""
+    global _cached_driver, _driver_refcount
+    with _lock:
+        if _cached_driver is not None:
+            try:
+                _cached_driver.close()
+            except Exception:
+                pass
+            _cached_driver = None
+            _driver_refcount = 0
 
 
 def get_pool_metrics() -> dict:
@@ -261,11 +276,16 @@ def safe_get_driver():
     Example:
         driver = safe_get_driver()
         if driver:
-            with driver.session() as session:
-                session.run("CREATE (n:Task {id: $id})", id=123)
+            try:
+                with driver.session() as session:
+                    session.run("CREATE (n:Task {id: $id})", id=123)
+            finally:
+                close_driver()
         else:
             # Fallback to filesystem-only mode
             filesystem_create_task(123)
+
+    Prefer neo4j_session() context manager which handles cleanup automatically.
     """
     if not is_neo4j_available():
         logger.warning("Neo4j unavailable - safe_get_driver() returning None")
@@ -305,6 +325,10 @@ def neo4j_session():
     Usage:
         with neo4j_session() as session:
             result = session.run("MATCH (n) RETURN n LIMIT 1")
+
+    Note: If get_driver() raises, the try/finally block is never entered,
+    so close_driver() is only called when get_driver() succeeded — no
+    mismatched refcount decrement.
     """
     driver = get_driver()
     session = None
@@ -719,6 +743,7 @@ class TaskTracker:
                     task_id: $task_id,
                     label: $label,
                     agent: $agent,
+                    assigned_to: $agent,
                     title: $title,
                     body: $body,
                     priority: $priority,
@@ -735,6 +760,7 @@ class TaskTracker:
                     origin_type: $origin_type,
                     origin_initiator: $origin_initiator,
                     origin_source: $origin_source,
+                    notify_target: $notify_target,
                     origin_timestamp: datetime(),
                     status: 'PENDING',
                     created: datetime(),
@@ -762,7 +788,8 @@ class TaskTracker:
             }),
             origin_type=origin_type or "unknown",
             origin_initiator=origin_initiator or "",
-            origin_source=origin_source or "")
+            origin_source=origin_source or "",
+            notify_target=notify_target or "+19194133445")
 
         # Filesystem write for backward compatibility with agent-task-handler.py
         # agent-task-handler.py still reads task files from disk
@@ -782,6 +809,7 @@ class TaskTracker:
 **Skill Hint:** {skill_hint or 'auto-detected'}
 **Domain:** {domain}
 **Bucket:** {bucket}
+notify_target: {notify_target}
 
 ## Description
 
@@ -1604,6 +1632,8 @@ def get_tracker():
     global _tracker
     if _tracker is None:
         _tracker = TaskTracker()
+        import atexit
+        atexit.register(lambda: _tracker.close() if _tracker else None)
     return _tracker
 
 

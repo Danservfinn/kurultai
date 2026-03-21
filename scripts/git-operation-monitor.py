@@ -483,10 +483,8 @@ def auto_rollback_last_n(n: int = 1, author: str = None) -> list[dict]:
 def store_metrics_neo4j(metrics: dict) -> bool:
     """Store metrics in Neo4j for trend analysis."""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
         from datetime import datetime
-
-        driver = get_driver()
 
         def parse_git_date(date_str: str) -> str:
             """Parse git date format to ISO format for Neo4j."""
@@ -498,7 +496,7 @@ def store_metrics_neo4j(metrics: dict) -> bool:
                 # Fallback: return current time
                 return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Create AutonomousCommit event nodes
             for commit in metrics.get("recent_commits", [])[:50]:
                 iso_date = parse_git_date(commit.get("date", ""))
@@ -532,7 +530,6 @@ def store_metrics_neo4j(metrics: dict) -> bool:
                      message=anomaly.get("message", ""),
                      sha=anomaly.get("sha", ""))
 
-        driver.close()
         return True
     except Exception as e:
         log(f"Failed to store metrics in Neo4j: {e}", "WARN")
@@ -542,11 +539,9 @@ def store_metrics_neo4j(metrics: dict) -> bool:
 def create_neo4j_schema() -> bool:
     """Create Neo4j indexes and constraints for git operation monitoring."""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Create uniqueness constraint on sha first (replaces index if exists)
             # In Neo4j 5.x, constraints automatically create indexes
             try:
@@ -570,7 +565,6 @@ def create_neo4j_schema() -> bool:
             session.run("CREATE INDEX IF NOT EXISTS FOR (a:GitAnomaly) ON (a.detected_at)")
             session.run("CREATE INDEX IF NOT EXISTS FOR (a:GitAnomaly) ON (a.author)")
 
-        driver.close()
         log("Neo4j schema created successfully")
         return True
     except Exception as e:

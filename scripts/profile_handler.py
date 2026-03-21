@@ -43,6 +43,38 @@ from human_profile_memory import HumanProfileMemory
 # Command Parser
 # =============================================================================
 
+def parse_privacy_command(text: str) -> Optional[Dict[str, Any]]:
+    """Parse a /privacy, /mydata, /forget, or /consent command.
+
+    Returns:
+        Dict with 'action' and relevant fields, or None if not a privacy command
+    """
+    text_lower = text.lower().strip()
+
+    # /privacy — show consent dashboard
+    if text_lower in ("/privacy", "/privacy show"):
+        return {"action": "privacy_show"}
+
+    # /consent <category> — toggle consent
+    consent_match = re.match(r'/consent\s+(\w+)', text_lower)
+    if consent_match:
+        return {"action": "consent_toggle", "category": consent_match.group(1)}
+
+    # /mydata — export all data
+    if text_lower == "/mydata":
+        return {"action": "mydata"}
+
+    # /forget — request deletion
+    if text_lower == "/forget":
+        return {"action": "forget_request"}
+
+    # FORGET EVERYTHING — confirm deletion
+    if text_lower == "forget everything":
+        return {"action": "forget_confirm"}
+
+    return None
+
+
 def parse_profile_command(text: str) -> Optional[Dict[str, Any]]:
     """
     Parse a profile command from text.
@@ -54,6 +86,11 @@ def parse_profile_command(text: str) -> Optional[Dict[str, Any]]:
         Dict with 'action', 'field', 'value', 'args' or None if not a profile command
     """
     text_lower = text.lower().strip()
+
+    # Check for v2 privacy commands first
+    privacy_parsed = parse_privacy_command(text)
+    if privacy_parsed:
+        return privacy_parsed
 
     # Must start with 'profile'
     if not text_lower.startswith("profile"):
@@ -239,6 +276,12 @@ def format_help() -> str:
 `profile consent list` - List your consents
 `profile notes <text>` - Add personal notes
 
+**Privacy Commands:**
+`/privacy` - Show consent dashboard
+`/consent <category>` - Toggle consent on/off
+`/mydata` - View your data summary
+`/forget` - Delete all your data
+
 **Fields you can update:**
 - display_name, timezone, pronouns, notes
 """
@@ -402,6 +445,228 @@ def handle_profile_notes(store: HumanProfileStore, memory: HumanProfileMemory,
 
 
 # =============================================================================
+# V2 Privacy Command Handlers
+# =============================================================================
+
+def handle_privacy_show(sender_phone: str) -> str:
+    """Handle /privacy — show consent dashboard."""
+    try:
+        from neo4j_human_v2 import HumanStoreV2
+        from consent_decorator import get_consent_status, CONSENT_HIERARCHY, CONSENT_DESCRIPTIONS
+
+        human_store = HumanStoreV2()
+        human = human_store.find_human_by_identifier("SIGNAL_PHONE", sender_phone)
+        human_store.close()
+
+        if not human:
+            return ("**Privacy Dashboard**\n\n"
+                    "No profile found. Your data is not being stored.\n\n"
+                    "Available commands:\n"
+                    "`/consent <category>` — toggle consent\n"
+                    "`/mydata` — export your data\n"
+                    "`/forget` — delete all your data")
+
+        status = get_consent_status(human["id"])
+
+        lines = [
+            f"**Privacy Dashboard for {human['displayName']}**",
+            "",
+            "**Consent Status:**",
+        ]
+
+        for cat in sorted(CONSENT_DESCRIPTIONS.keys()):
+            info = status.get(cat, {})
+            granted = info.get("granted", False)
+            icon = "ON" if granted else "OFF"
+            desc = CONSENT_DESCRIPTIONS.get(cat, "")
+            # Show hierarchy depth
+            depth = 0
+            for parent, children in CONSENT_HIERARCHY.items():
+                if cat in children:
+                    depth = 1
+                    for gp, gc in CONSENT_HIERARCHY.items():
+                        if parent in gc:
+                            depth = 2
+                            break
+                    break
+            indent = "  " * depth
+            lines.append(f"{indent}[{icon}] **{cat}** — {desc}")
+
+        lines.extend([
+            "",
+            "**Commands:**",
+            "`/consent <category>` — toggle a category",
+            "`/mydata` — export all your data as JSON",
+            "`/forget` — permanently delete all your data",
+        ])
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error loading privacy dashboard: {e}"
+
+
+def handle_consent_toggle(sender_phone: str, category: str) -> str:
+    """Handle /consent <category> — toggle consent on/off."""
+    try:
+        from neo4j_human_v2 import HumanStoreV2
+        from consent_decorator import (
+            check_consent, grant_consent, revoke_consent,
+            ALL_CATEGORIES, get_descendants, CONSENT_DESCRIPTIONS,
+        )
+
+        human_store = HumanStoreV2()
+        human = human_store.find_or_create_by_phone(sender_phone)
+        human_store.close()
+        human_id = human["id"]
+
+        if category not in ALL_CATEGORIES:
+            return f"Unknown category: {category}\nValid: {', '.join(sorted(ALL_CATEGORIES))}"
+
+        # Check current state
+        currently_granted = check_consent(human_id, category)
+
+        if currently_granted:
+            # Revoke (with cascade)
+            result = revoke_consent(human_id, category)
+            revoked = result.get("revoked", [])
+            cascade = result.get("cascade_warning")
+            msg = f"Consent **revoked** for: {', '.join(revoked)}"
+            if cascade:
+                msg += f"\n{cascade}"
+            return msg
+        else:
+            # Grant
+            success = grant_consent(human_id, category, source="signal_command")
+            if success:
+                desc = CONSENT_DESCRIPTIONS.get(category, "")
+                return f"Consent **granted** for **{category}**.\n{desc}"
+            return f"Failed to grant consent for {category}."
+
+    except Exception as e:
+        return f"Error toggling consent: {e}"
+
+
+def handle_mydata(sender_phone: str) -> str:
+    """Handle /mydata — export all data."""
+    try:
+        from neo4j_human_v2 import HumanStoreV2
+        from neo4j_task_tracker import neo4j_session
+        import json
+
+        human_store = HumanStoreV2()
+        human = human_store.find_human_by_identifier("SIGNAL_PHONE", sender_phone)
+        human_store.close()
+
+        if not human:
+            return "No data found for your phone number."
+
+        human_id = human["id"]
+
+        with neo4j_session() as session:
+            # Count data
+            msg_count = session.run(
+                "MATCH (m:Message {humanId: $hid}) RETURN count(m) AS cnt",
+                hid=human_id,
+            ).single()["cnt"]
+
+            thread_count = session.run(
+                "MATCH (t:Thread {humanId: $hid}) RETURN count(t) AS cnt",
+                hid=human_id,
+            ).single()["cnt"]
+
+            topic_count = session.run(
+                "MATCH (:Human {id: $hid})-[:DISCUSSED]->(t:Topic) RETURN count(t) AS cnt",
+                hid=human_id,
+            ).single()["cnt"]
+
+        lines = [
+            f"**Your Data Summary**",
+            "",
+            f"**Name:** {human.get('displayName', '?')}",
+            f"**Human ID:** {human_id[:12]}...",
+            f"**Messages:** {msg_count}",
+            f"**Threads:** {thread_count}",
+            f"**Topics:** {topic_count}",
+            f"**Identifiers:** {len(human.get('identifiers', []))}",
+            "",
+            "To receive a full JSON export, contact an admin.",
+            "To delete all data: `/forget`",
+        ]
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error exporting data: {e}"
+
+
+def handle_forget_request(sender_phone: str) -> str:
+    """Handle /forget — first step (confirmation request)."""
+    return ("**Data Deletion Request**\n\n"
+            "This will permanently delete ALL your data:\n"
+            "- All messages and conversations\n"
+            "- Thread history and topics\n"
+            "- Action items and inferences\n"
+            "- Consent settings\n"
+            "- Identity links\n\n"
+            "Your Human node will be anonymized (not deleted) for graph integrity.\n\n"
+            "**This cannot be undone.**\n\n"
+            "To confirm, reply with exactly:\n"
+            "`FORGET EVERYTHING`")
+
+
+def handle_forget_confirm(sender_phone: str) -> str:
+    """Handle FORGET EVERYTHING — execute deletion cascade."""
+    try:
+        from neo4j_human_v2 import HumanStoreV2
+        from deletion_cascade import execute_deletion_cascade, verify_deletion
+
+        human_store = HumanStoreV2()
+        human = human_store.find_human_by_identifier("SIGNAL_PHONE", sender_phone)
+        human_store.close()
+
+        if not human:
+            return "No data found. Nothing to delete."
+
+        human_id = human["id"]
+
+        # Execute deletion
+        result = execute_deletion_cascade(human_id, confirm=True)
+
+        if result.get("success"):
+            counts = result.get("counts", {})
+            total = result.get("total_deleted", 0)
+
+            # Verify
+            verification = verify_deletion(human_id)
+
+            lines = [
+                "**Data Deleted**",
+                "",
+                f"Messages: {counts.get('messages', 0)}",
+                f"Threads: {counts.get('threads', 0)}",
+                f"Action items: {counts.get('action_items', 0)}",
+                f"Topic links: {counts.get('discussed_edges', 0)}",
+                f"Inferences: {counts.get('inferences', 0)}",
+                f"Total items: {total}",
+                "",
+            ]
+
+            if verification.get("clean"):
+                lines.append("Verification: All data confirmed deleted.")
+            else:
+                lines.append("Verification: Some residual data may remain. Contact admin.")
+
+            lines.append("\nYour profile has been anonymized. Goodbye.")
+            return "\n".join(lines)
+        else:
+            return f"Deletion failed: {result.get('error', 'Unknown error')}"
+
+    except Exception as e:
+        return f"Error during deletion: {e}"
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -429,7 +694,24 @@ def handle_profile_command(text: str, sender_phone: str,
     try:
         action = parsed.get("action")
 
-        if action == "show":
+        # V2 privacy commands (use Human V2 system)
+        if action == "privacy_show":
+            return handle_privacy_show(sender_phone)
+
+        elif action == "consent_toggle":
+            return handle_consent_toggle(sender_phone, parsed.get("category", ""))
+
+        elif action == "mydata":
+            return handle_mydata(sender_phone)
+
+        elif action == "forget_request":
+            return handle_forget_request(sender_phone)
+
+        elif action == "forget_confirm":
+            return handle_forget_confirm(sender_phone)
+
+        # Original profile commands
+        elif action == "show":
             return handle_profile_show(store, sender_phone)
 
         elif action == "update":

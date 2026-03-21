@@ -39,7 +39,7 @@ Documents each tab/view in the Kurultai dashboard (Kanban, Calendar, Reflections
 
 ## Last Updated
 
-2026-03-13 -- Initial knowledge base build from source code analysis.
+2026-03-19 -- Updated provider-fallback, api-endpoints, dashboard-views for OpenRouter provider and auth fix.
 
 ---
 

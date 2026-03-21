@@ -229,34 +229,33 @@ class TestAgentManagerIntegration(unittest.TestCase):
         """Test full health check cycle with mock Neo4j."""
         from unittest.mock import patch
 
-        # Mock the neo4j driver
-        with patch('neo4j_task_tracker.get_driver') as mock_get_driver:
-            mock_driver = MagicMock()
-            mock_session = MagicMock()
-            mock_result = MagicMock()
+        # Mock neo4j_session context manager
+        mock_session = MagicMock()
+        mock_result = MagicMock()
 
-            # Configure mock
-            mock_result.single.return_value = {
-                "status": "running",
-                "task": "test-task",
-                "heartbeat": datetime.now().isoformat(),
-                "completed": 10,
-                "spawned": 5
-            }
-            mock_session.run.return_value = mock_result
-            mock_session.__enter__ = Mock(return_value=mock_session)
-            mock_session.__exit__ = Mock(return_value=False)
-            mock_driver.session.return_value = mock_session
-            mock_driver.close = Mock()
-            mock_get_driver.return_value = mock_driver
+        # Configure mock
+        mock_result.single.return_value = {
+            "status": "running",
+            "task": "test-task",
+            "heartbeat": datetime.now().isoformat(),
+            "completed": 10,
+            "spawned": 5
+        }
+        mock_session.run.return_value = mock_result
+
+        mock_cm = MagicMock()
+        mock_cm.__enter__ = Mock(return_value=mock_session)
+        mock_cm.__exit__ = Mock(return_value=False)
+
+        with patch('neo4j_task_tracker.neo4j_session', return_value=mock_cm):
+            from neo4j_task_tracker import neo4j_session
 
             # Simulate health check
             agents = ['kublai', 'temujin', 'mongke', 'chagatai', 'jochi', 'ogedei']
             healthy_count = 0
 
             for agent in agents:
-                driver = mock_get_driver()
-                with driver.session() as session:
+                with neo4j_session() as session:
                     result = session.run("""
                         MATCH (a:AgentState {name: $name})
                         RETURN a.status AS status
@@ -264,7 +263,6 @@ class TestAgentManagerIntegration(unittest.TestCase):
                     record = result.single()
                     if record and record["status"] == "running":
                         healthy_count += 1
-                driver.close()
 
             self.assertEqual(healthy_count, 6, "All agents should be healthy")
 

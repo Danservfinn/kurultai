@@ -26,9 +26,10 @@ from prompt_cache import get_cache, CacheEntry
 # Default configuration
 DEFAULT_CONFIG = {
     "enabled": True,
+    "mandatory_mode": False,  # If True, tasks fail when optimization fails (no fallback)
     "cache_enabled": True,
     "cache_ttl_seconds": 3600,
-    "fallback_to_original": True,
+    "fallback_to_original": True,  # Ignored when mandatory_mode is True
     "model_for_optimization": "claude-haiku-4-5-20251001",
     "token_budget": "standard",
     "min_task_length": 50,  # Only optimize tasks longer than this
@@ -223,8 +224,14 @@ def optimize_prompt(
         )
 
     except Exception as e:
-        # Fallback to original prompt
-        if config.get("fallback_to_original", True):
+        # MANDATORY MODE (2026-03-20): If mandatory_mode is enabled, always raise
+        # This ensures the caller knows optimization failed and can fail the task
+        config_for_fallback = config if config else load_optimizer_config()
+        if config_for_fallback.get("mandatory_mode", False):
+            raise  # Re-raise exception for mandatory mode - caller will handle task failure
+
+        # Fallback to original prompt (only if not in mandatory mode)
+        if config_for_fallback.get("fallback_to_original", True):
             return OptimizationResult(
                 optimized=False,
                 prompt=task,

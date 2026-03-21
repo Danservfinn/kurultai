@@ -21,16 +21,16 @@ from datetime import datetime, timedelta
 # Add scripts dir to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 AGENTS = ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
 
 
-def create_constraints(driver):
+def create_constraints():
     """Create Neo4j constraints and indexes for TaskMetric nodes."""
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Create unique constraint on metric_id
             session.run("""
                 CREATE CONSTRAINT task_metric_id_unique IF NOT EXISTS
@@ -62,7 +62,6 @@ def aggregate_metrics(period="hourly", hours=1, days=None, dry_run=False):
     Returns:
         Dict with aggregation results per agent
     """
-    driver = get_driver()
     results = {}
 
     # Calculate time window
@@ -79,7 +78,7 @@ def aggregate_metrics(period="hourly", hours=1, days=None, dry_run=False):
 
     print(f"Aggregating {period} metrics for period: {period_start} to {now}")
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         for agent in AGENTS:
             # Query tasks in period with optional outcome data
             query = f"""
@@ -245,10 +244,10 @@ def _build_distribution(items):
     return dist
 
 
-def prune_old_metrics(driver, days=30):
+def prune_old_metrics(days=30):
     """Remove TaskMetric nodes older than specified days."""
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (m:TaskMetric)
                 WHERE m.period_start < datetime() - duration({days: $days})
@@ -264,10 +263,10 @@ def prune_old_metrics(driver, days=30):
         return 0
 
 
-def verify_metrics(driver, hours=24):
+def verify_metrics(hours=24):
     """Verify TaskMetric nodes exist and return summary."""
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (a:Agent)-[:HAS_METRIC]->(m:TaskMetric)
                 WHERE m.period_start > datetime() - duration({hours: $hours})
@@ -309,37 +308,32 @@ def main():
                         help="Create constraints and indexes only")
 
     args = parser.parse_args()
-    driver = get_driver()
 
-    try:
-        # Setup: create constraints
-        if args.setup or not args.dry_run:
-            create_constraints(driver)
+    # Setup: create constraints
+    if args.setup or not args.dry_run:
+        create_constraints()
 
-        # Prune old metrics if requested
-        if args.prune:
-            prune_old_metrics(driver, args.prune)
+    # Prune old metrics if requested
+    if args.prune:
+        prune_old_metrics(args.prune)
 
-        # Run aggregation
-        if not args.setup:
-            results = aggregate_metrics(
-                period=args.period,
-                hours=args.hours,
-                days=args.days,
-                dry_run=args.dry_run
-            )
+    # Run aggregation
+    if not args.setup:
+        results = aggregate_metrics(
+            period=args.period,
+            hours=args.hours,
+            days=args.days,
+            dry_run=args.dry_run
+        )
 
-            # Summary
-            total_created = sum(1 for r in results.values() if r.get("status") in ["created", "dry_run"])
-            total_tasks = sum(r.get("data", r).get("tasks_total", 0) for r in results.values())
-            print(f"\nAggregation complete: {total_created} agents, {total_tasks} total tasks processed")
+        # Summary
+        total_created = sum(1 for r in results.values() if r.get("status") in ["created", "dry_run"])
+        total_tasks = sum(r.get("data", r).get("tasks_total", 0) for r in results.values())
+        print(f"\nAggregation complete: {total_created} agents, {total_tasks} total tasks processed")
 
-            # Verify if requested
-            if args.verify and not args.dry_run:
-                verify_metrics(driver, hours=24)
-
-    finally:
-        driver.close()
+        # Verify if requested
+        if args.verify and not args.dry_run:
+            verify_metrics(hours=24)
 
 
 if __name__ == "__main__":

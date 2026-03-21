@@ -22,6 +22,7 @@ Usage:
 
 import json
 import os
+import time
 import logging
 from typing import Any, Callable, Dict, List, Optional, Union, TypeVar
 
@@ -148,12 +149,21 @@ class Neo4jUnavailableError(Exception):
     pass
 
 
+_health_cache = {"result": None, "expires": 0.0}
+
+
 def check_neo4j_available() -> bool:
     """Check if Neo4j is available without raising exceptions.
+
+    Results are cached for 10 seconds to avoid creating ephemeral
+    drivers on every call.
 
     Returns:
         True if Neo4j is reachable, False otherwise
     """
+    if time.monotonic() < _health_cache["expires"]:
+        return _health_cache["result"]
+
     try:
         from neo4j import GraphDatabase
 
@@ -161,10 +171,17 @@ def check_neo4j_available() -> bool:
         user = os.environ.get('NEO4J_USER', 'neo4j')
 
         # Handle both NEO4J_PASSWORD and NEO4J_AUTH formats
-        if 'NEO4J_AUTH' in os.environ:
-            password = os.environ.get('NEO4J_AUTH', '').split('://')[1].split('@')[0]
-        else:
-            password = os.environ.get('NEO4J_PASSWORD', 'password')
+        password = os.environ.get('NEO4J_PASSWORD')
+        if not password and 'NEO4J_AUTH' in os.environ:
+            auth_val = os.environ.get('NEO4J_AUTH', '')
+            parts = auth_val.split('/', 1)
+            password = parts[1] if len(parts) > 1 else auth_val
+
+        if not password:
+            logger.debug("Neo4j health check: no password configured")
+            _health_cache["result"] = False
+            _health_cache["expires"] = time.monotonic() + 10
+            return False
 
         # Quick connectivity check with short timeout
         driver = GraphDatabase.driver(
@@ -176,10 +193,14 @@ def check_neo4j_available() -> bool:
         with driver.session() as session:
             session.run("RETURN 1 as test").consume()
         driver.close()
-        return True
+        result = True
     except Exception as e:
         logger.debug(f"Neo4j health check failed: {e}")
-        return False
+        result = False
+
+    _health_cache["result"] = result
+    _health_cache["expires"] = time.monotonic() + 10
+    return result
 
 
 def safe_neo4j_op(
@@ -230,10 +251,14 @@ def safe_neo4j_op(
         user = os.environ.get('NEO4J_USER', 'neo4j')
 
         # Handle both NEO4J_PASSWORD and NEO4J_AUTH formats
-        if 'NEO4J_AUTH' in os.environ:
-            password = os.environ.get('NEO4J_AUTH', '').split('://')[1].split('@')[0]
-        else:
-            password = os.environ.get('NEO4J_PASSWORD', 'password')
+        password = os.environ.get('NEO4J_PASSWORD')
+        if not password and 'NEO4J_AUTH' in os.environ:
+            auth_val = os.environ.get('NEO4J_AUTH', '')
+            parts = auth_val.split('/', 1)
+            password = parts[1] if len(parts) > 1 else auth_val
+
+        if not password:
+            raise Exception("No Neo4j password configured")
 
         driver = GraphDatabase.driver(
             uri,

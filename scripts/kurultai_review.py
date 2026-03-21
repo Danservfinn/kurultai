@@ -50,39 +50,35 @@ def log(msg):
 def get_pending_proposals():
     """Fetch all pending brainstorm proposals from Neo4j."""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                result = session.run("""
-                    MATCH (f:AgentFeedback)
-                    WHERE f.status = 'pending_review'
-                      AND f.source = 'kurultai_brainstorm'
-                    RETURN f
-                    ORDER BY
-                        CASE f.priority
-                            WHEN 'CRITICAL' THEN 1
-                            WHEN 'HIGH' THEN 2
-                            WHEN 'MEDIUM' THEN 3
-                            ELSE 4
-                        END,
-                        f.submitted DESC
-                """)
-                proposals = []
-                for r in result:
-                    node = dict(r["f"])
-                    raw_proposals = node.get("proposals", "[]")
-                    if isinstance(raw_proposals, str):
-                        try:
-                            node["parsed_proposals"] = json.loads(raw_proposals)
-                        except Exception:
-                            node["parsed_proposals"] = []
-                    else:
-                        node["parsed_proposals"] = raw_proposals if isinstance(raw_proposals, list) else []
-                    proposals.append(node)
-        finally:
-            driver.close()
+        with neo4j_session() as session:
+            result = session.run("""
+                MATCH (f:AgentFeedback)
+                WHERE f.status = 'pending_review'
+                  AND f.source = 'kurultai_brainstorm'
+                RETURN f
+                ORDER BY
+                    CASE f.priority
+                        WHEN 'CRITICAL' THEN 1
+                        WHEN 'HIGH' THEN 2
+                        WHEN 'MEDIUM' THEN 3
+                        ELSE 4
+                    END,
+                    f.submitted DESC
+            """)
+            proposals = []
+            for r in result:
+                node = dict(r["f"])
+                raw_proposals = node.get("proposals", "[]")
+                if isinstance(raw_proposals, str):
+                    try:
+                        node["parsed_proposals"] = json.loads(raw_proposals)
+                    except Exception:
+                        node["parsed_proposals"] = []
+                else:
+                    node["parsed_proposals"] = raw_proposals if isinstance(raw_proposals, list) else []
+                proposals.append(node)
         return proposals
     except Exception as e:
         log(f"Failed to fetch proposals: {e}")
@@ -92,26 +88,22 @@ def get_pending_proposals():
 def expire_old_proposals():
     """Mark proposals older than 24h as expired (Neo4j + filesystem)."""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                result = session.run("""
-                    MATCH (f:AgentFeedback)
-                    WHERE f.status = 'pending_review'
-                      AND f.source = 'kurultai_brainstorm'
-                      AND f.submitted < datetime() - duration({hours: $hours})
-                    SET f.status = 'expired',
-                        f.reviewed_at = datetime(),
-                        f.review_reason = 'Auto-expired after 24h'
-                    RETURN count(f) AS expired_count
-                """, hours=PROPOSAL_EXPIRY_HOURS)
-                count = result.single()["expired_count"]
-                if count > 0:
-                    log(f"EXPIRED: {count} proposals older than {PROPOSAL_EXPIRY_HOURS}h")
-        finally:
-            driver.close()
+        with neo4j_session() as session:
+            result = session.run("""
+                MATCH (f:AgentFeedback)
+                WHERE f.status = 'pending_review'
+                  AND f.source = 'kurultai_brainstorm'
+                  AND f.submitted < datetime() - duration({hours: $hours})
+                SET f.status = 'expired',
+                    f.reviewed_at = datetime(),
+                    f.review_reason = 'Auto-expired after 24h'
+                RETURN count(f) AS expired_count
+            """, hours=PROPOSAL_EXPIRY_HOURS)
+            count = result.single()["expired_count"]
+            if count > 0:
+                log(f"EXPIRED: {count} proposals older than {PROPOSAL_EXPIRY_HOURS}h")
     except Exception as e:
         log(f"Failed to expire proposals: {e}")
 
@@ -142,19 +134,15 @@ def update_proposal_status(feedback_id, status, reason=""):
         log(f"Invalid status '{status}' for proposal {feedback_id}")
         return False
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                session.run("""
-                    MATCH (f:AgentFeedback {id: $id})
-                    SET f.status = $status,
-                        f.reviewed_at = datetime(),
-                        f.review_reason = $reason
-                """, id=feedback_id, status=status, reason=reason)
-        finally:
-            driver.close()
+        with neo4j_session() as session:
+            session.run("""
+                MATCH (f:AgentFeedback {id: $id})
+                SET f.status = $status,
+                    f.reviewed_at = datetime(),
+                    f.review_reason = $reason
+            """, id=feedback_id, status=status, reason=reason)
         return True
     except Exception as e:
         log(f"Failed to update proposal {feedback_id}: {e}")

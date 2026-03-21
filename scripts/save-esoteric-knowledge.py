@@ -18,17 +18,15 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 def save_entity(name, entity_type, attributes=None, sources=None, tags=None):
     """Save an entity (organization, person, concept, symbol, etc.)."""
-    driver = get_driver()
-    
     entity_id = f"{entity_type.lower().replace(' ', '-')}-{name.lower().replace(' ', '-')}"
     timestamp = datetime.now().isoformat()
-    
-    with driver.session() as session:
+
+    with neo4j_session() as session:
         result = session.run("""
             MERGE (e:EsotericEntity {id: $id, name: $name})
             SET e.type = $type,
@@ -49,16 +47,13 @@ def save_entity(name, entity_type, attributes=None, sources=None, tags=None):
         
         record = result.single()
         print(f"✅ Saved: {record['name']} ({record['id']})")
-    
-    driver.close()
+
     return entity_id
 
 
 def save_relationship(from_entity, to_entity, relationship_type, attributes=None):
     """Save a relationship between two entities."""
-    driver = get_driver()
-    
-    with driver.session() as session:
+    with neo4j_session() as session:
         session.run("""
             MATCH (a:EsotericEntity {id: $from_id})
             MATCH (b:EsotericEntity {id: $to_id})
@@ -74,18 +69,14 @@ def save_relationship(from_entity, to_entity, relationship_type, attributes=None
         )
         
         print(f"✅ Linked: {from_entity} -[{relationship_type}]-> {to_entity}")
-    
-    driver.close()
 
 
 def save_concept(name, description, associations=None, symbols=None, tags=None):
     """Save an esoteric concept with associations."""
-    driver = get_driver()
-    
     concept_id = f"concept-{name.lower().replace(' ', '-')}"
     timestamp = datetime.now().isoformat()
-    
-    with driver.session() as session:
+
+    with neo4j_session() as session:
         result = session.run("""
             MERGE (c:EsotericConcept {id: $id, name: $name})
             SET c.description = $description,
@@ -106,16 +97,13 @@ def save_concept(name, description, associations=None, symbols=None, tags=None):
         
         record = result.single()
         print(f"✅ Saved concept: {record['name']}")
-    
-    driver.close()
+
     return concept_id
 
 
 def list_entities(entity_type=None, limit=20):
     """List esoteric entities."""
-    driver = get_driver()
-    
-    with driver.session() as session:
+    with neo4j_session() as session:
         if entity_type:
             result = session.run("""
                 MATCH (e:EsotericEntity {type: $type})
@@ -138,16 +126,13 @@ def list_entities(entity_type=None, limit=20):
             print(f"  ID: {e.get('id', '?')}")
             print(f"  Tags: {', '.join(e.get('tags', []))}")
             print(f"  Updated: {e.get('updated', '?')}")
-    
-    driver.close()
+
     return entities
 
 
 def list_concepts(limit=20):
     """List esoteric concepts."""
-    driver = get_driver()
-    
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (c:EsotericConcept)
             RETURN c ORDER BY c.updated DESC LIMIT $limit
@@ -163,8 +148,7 @@ def list_concepts(limit=20):
             print(f"\n{c.get('name', 'Unknown')}")
             print(f"  {c.get('description', '')[:100]}...")
             print(f"  Associations: {', '.join(c.get('associations', []))}")
-    
-    driver.close()
+
     return concepts
 
 

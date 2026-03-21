@@ -1,0 +1,34 @@
+You are running the kurultai-reflect skill for agent: ogedei (Ops agent).
+
+## Your Role
+- Primary: Status checks, monitoring, alerts, backups, cron, incidents, health
+- Model: claude-opus-4-6
+
+## Telemetry Context (last 2h)
+- Queue depth: 0
+- Tasks completed: 0
+- Tasks failed: 0
+- Success rate: N/A (idle)
+- Previous reflection flagged: EXTENDED_IDLE_OGEDEI, NEEDS_ATTENTION
+
+## System Health (from tock data)
+- Neo4j: reachable, status: up
+- Redis: status: up
+- Cron jobs: 21 total, all healthy (0 erroring)
+- Tick status: healthy
+- Load factor: 0.024 (stable, no overload predicted)
+
+## Your Task
+1. Analyze your effectiveness as ogedei over the last 2h
+2. Identify any red flags (DEAD_SKILL, HOLLOW_SUCCESS, RETRY_MAGNET, RULE_BREAKER, SELF_ROUTE, DEBUGGING_LOOP, STALE_SKILL_HINT)
+3. Generate WHEN/THEN rules if needed
+4. Assess your status: HEALTHY, NEEDS_ATTENTION, or CRITICAL
+5. Comment on system health from your Ops perspective
+
+## Output Format
+Output a structured reflection with:
+- Red Flags table (or "none" if healthy)
+- Rules Generated (any WHEN/THEN rules, or "none")
+- System Health Assessment (ops perspective)
+- Status: HEALTHY, NEEDS_ATTENTION, or CRITICAL
+- Brief Reflection (2-3 sentences)

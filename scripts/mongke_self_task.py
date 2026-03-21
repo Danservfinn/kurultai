@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from kurultai_paths import AGENTS_DIR
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 # Max tasks to self-generate per invocation (prevent flooding)
@@ -122,8 +122,7 @@ def _find_stale_knowledge():
     excluded = _load_excluded_titles()
     tasks = []
 
-    driver = get_driver()
-    with driver.session() as s:
+    with neo4j_session() as s:
         # Hypothesis nodes use 'created' (neo4j DateTime), 'action' as title
         result = s.run("""
             MATCH (h:Hypothesis)
@@ -219,8 +218,7 @@ def _find_research_needed_nodes():
     """
     tasks = []
 
-    driver = get_driver()
-    with driver.session() as s:
+    with neo4j_session() as s:
         # Find nodes with explicit research flags
         result = s.run("""
             MATCH (n)

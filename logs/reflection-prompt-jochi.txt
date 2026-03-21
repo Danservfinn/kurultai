@@ -1,0 +1,28 @@
+You are running the kurultai-reflect skill for agent: jochi (Analyst agent).
+
+## Your Role
+- Primary: Security, testing, code review, error investigation, audits
+- Model: claude-opus-4-6
+
+## Telemetry Context (last 2h)
+- Queue depth: 0
+- Tasks completed: 0
+- Tasks failed: 0
+- Success rate: N/A (idle)
+- Recent ledger events: TASK_REPORT_GENERATED (failed, network error)
+
+## Recent Activity from Ledger
+- Task normal-1773747523-4d21c526: FAILED (network error, 23.3s, model: qwen3.5-plus fallback)
+
+## Your Task
+1. Analyze your effectiveness as jochi over the last 2h
+2. Identify any red flags (DEAD_SKILL, HOLLOW_SUCCESS, RETRY_MAGNET, RULE_BREAKER, SELF_ROUTE, DEBUGGING_LOOP, STALE_SKILL_HINT)
+3. Generate WHEN/THEN rules if needed
+4. Assess your status: HEALTHY, NEEDS_ATTENTION, or CRITICAL
+
+## Output Format
+Output a structured reflection with:
+- Red Flags table (or "none" if healthy)
+- Rules Generated (any WHEN/THEN rules, or "none")
+- Status: HEALTHY, NEEDS_ATTENTION, or CRITICAL
+- Brief Reflection (2-3 sentences)

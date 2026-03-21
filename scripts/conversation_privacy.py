@@ -372,7 +372,7 @@ class ConversationPrivacy:
 
         self.audit.log("export", requesting_user, phone_number)
 
-        # Gather all data
+        # Gather legacy file-based data
         profile = self.memory.read_profile(phone_number)
         conversations_json = self.logger.export_conversations(phone_number)
         conversations = json.loads(conversations_json) if conversations_json else []
@@ -388,15 +388,147 @@ class ConversationPrivacy:
             except (json.JSONDecodeError, Exception):
                 pass
 
-        return {
+        result = {
             "export_date": datetime.now().isoformat(),
             "phone_number": phone_number,
             "profile": profile,
             "conversations": conversations,
             "archived_conversations": archived,
             "statistics": stats,
-            "file_location": str(self.memory._get_file_path(phone_number))
+            "file_location": str(self.memory._get_file_path(phone_number)),
         }
+
+        # Neo4j graph data export (v2)
+        try:
+            from neo4j_human_v2 import HumanStoreV2
+            from neo4j_task_tracker import neo4j_session
+            from field_encryption import decrypt_field
+            from consent_decorator import get_consent_status
+
+            human_store = HumanStoreV2()
+            human = human_store.find_human_by_identifier("SIGNAL_PHONE", phone_number)
+            human_store.close()
+
+            if human:
+                human_id = human["id"]
+
+                with neo4j_session() as session:
+                    # Messages
+                    msg_result = session.run(
+                        """
+                        MATCH (m:Message {humanId: $hid})
+                        RETURN m.id AS id, m.direction AS direction,
+                               m.channel AS channel, toString(m.timestamp) AS timestamp,
+                               m.content AS content, m.contentScrubbed AS scrubbed,
+                               m.summary AS summary
+                        ORDER BY m.timestamp
+                        """,
+                        hid=human_id,
+                    )
+                    graph_messages = []
+                    for r in msg_result:
+                        msg = dict(r)
+                        # Decrypt content for export
+                        if msg.get("content"):
+                            msg["content"] = decrypt_field(msg["content"])
+                        graph_messages.append(msg)
+
+                    # Topics
+                    topic_result = session.run(
+                        """
+                        MATCH (h:Human {id: $hid})-[d:DISCUSSED]->(t:Topic)
+                        RETURN t.label AS label, t.domain AS domain, d.count AS mentions
+                        ORDER BY d.count DESC
+                        """,
+                        hid=human_id,
+                    )
+                    topics = [dict(r) for r in topic_result]
+
+                    # Inferences
+                    inf_result = session.run(
+                        """
+                        MATCH (i:Inference {humanId: $hid})
+                        RETURN i.type AS type, i.content AS content,
+                               i.confidence AS confidence
+                        """,
+                        hid=human_id,
+                    )
+                    inferences = [dict(r) for r in inf_result]
+
+                    # Threads
+                    thread_result = session.run(
+                        """
+                        MATCH (t:Thread {humanId: $hid})
+                        RETURN t.id AS id, t.status AS status,
+                               toString(t.startedAt) AS startedAt,
+                               t.messageCount AS messageCount,
+                               t.summary AS summary
+                        """,
+                        hid=human_id,
+                    )
+                    threads = [dict(r) for r in thread_result]
+
+                    # ActionItems
+                    ai_result = session.run(
+                        """
+                        MATCH (ai:ActionItem {humanId: $hid})
+                        RETURN ai.description AS description,
+                               ai.status AS status, ai.priority AS priority
+                        """,
+                        hid=human_id,
+                    )
+                    action_items = [dict(r) for r in ai_result]
+
+                    # Engagement decisions
+                    eng_result = session.run(
+                        """
+                        MATCH (m:Message {humanId: $hid})
+                        WHERE m.engagementDecision IS NOT NULL
+                        RETURN m.id AS messageId, m.engagementDecision AS decision,
+                               m.engagementSource AS source
+                        """,
+                        hid=human_id,
+                    )
+                    engagement_decisions = [dict(r) for r in eng_result]
+
+                    # TemporalMarkers (drift detection data)
+                    tm_result = session.run(
+                        """
+                        MATCH (tm:TemporalMarker {humanId: $hid})
+                        RETURN tm.signal AS signal, tm.topicLabel AS topic,
+                               toString(tm.detectedAt) AS detectedAt
+                        """,
+                        hid=human_id,
+                    )
+                    temporal_markers = [dict(r) for r in tm_result]
+
+                    # Group memberships
+                    group_result = session.run(
+                        """
+                        MATCH (m:Message {humanId: $hid})-[:IN_GROUP]->(g:Group)
+                        RETURN DISTINCT g.groupId AS groupId
+                        """,
+                        hid=human_id,
+                    )
+                    groups = [dict(r) for r in group_result]
+
+                result["graph_data"] = {
+                    "human": human,
+                    "messages": graph_messages,
+                    "topics": topics,
+                    "inferences": inferences,
+                    "threads": threads,
+                    "action_items": action_items,
+                    "engagement_decisions": engagement_decisions,
+                    "temporal_markers": temporal_markers,
+                    "groups": groups,
+                    "consent_status": get_consent_status(human_id),
+                }
+
+        except Exception as e:
+            result["graph_data_error"] = str(e)
+
+        return result
 
     def delete_user_data(
         self,
@@ -451,12 +583,31 @@ class ConversationPrivacy:
                 pass
             archive_file.unlink()
 
+        # Delete Neo4j graph data
+        graph_deleted = {"success": False}
+        try:
+            from neo4j_human_v2 import HumanStoreV2
+            store = HumanStoreV2()
+            human = store.find_human_by_identifier("SIGNAL_PHONE", phone_number)
+            store.close()
+
+            if human:
+                from deletion_cascade import execute_deletion_cascade
+                graph_deleted = execute_deletion_cascade(human["id"], confirm=True)
+                self.audit.log("delete_graph", requesting_user, phone_number,
+                               {"human_id": human["id"], "result": str(graph_deleted)})
+        except Exception as e:
+            graph_deleted = {"success": False, "error": str(e)}
+            self.audit.log("delete_graph_error", requesting_user, phone_number,
+                           {"error": str(e)}, success=False)
+
         return {
             "success": deleted,
             "phone_number": phone_number,
             "conversations_deleted": conv_count,
             "archived_deleted": archive_count,
             "file_deleted": str(file_path) if deleted else None,
+            "graph_deleted": graph_deleted,
             "deleted_at": datetime.now().isoformat()
         }
 

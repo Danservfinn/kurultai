@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 # Status mapping for normalization
 STATUS_MAP = {
@@ -50,7 +50,7 @@ STATUS_MAP = {
 VALID_STATUSES = {'PENDING', 'EXECUTING', 'COMPLETED', 'FAILED'}
 
 
-def normalize_statuses(driver, dry_run=False):
+def normalize_statuses(dry_run=False):
     """Phase 1: Normalize all task status values."""
     print("\n" + "=" * 60)
     print("PHASE 1: STATUS NORMALIZATION")
@@ -59,7 +59,7 @@ def normalize_statuses(driver, dry_run=False):
     stats = {'total': 0, 'normalized': 0, 'already_valid': 0, 'errors': 0}
     changes = []
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         # Get all tasks with their current status
         result = session.run("""
             MATCH (t:Task)
@@ -107,7 +107,7 @@ def normalize_statuses(driver, dry_run=False):
 
     # Apply changes
     print("\nApplying changes...")
-    with driver.session() as session:
+    with neo4j_session() as session:
         for c in changes:
             try:
                 session.run("""
@@ -127,7 +127,7 @@ def normalize_statuses(driver, dry_run=False):
     return stats
 
 
-def fix_invalid_task_ids(driver, dry_run=False):
+def fix_invalid_task_ids(dry_run=False):
     """Phase 2: Fix or remove tasks with invalid task IDs."""
     print("\n" + "=" * 60)
     print("PHASE 2: INVALID TASK ID CLEANUP")
@@ -136,7 +136,7 @@ def fix_invalid_task_ids(driver, dry_run=False):
     stats = {'total_invalid': 0, 'generated': 0, 'removed': 0, 'errors': 0}
     invalid_tasks = []
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         # Find tasks with invalid task_id
         result = session.run("""
             MATCH (t:Task)
@@ -175,7 +175,7 @@ def fix_invalid_task_ids(driver, dry_run=False):
 
     # Fix each invalid task
     print("\nFixing task IDs...")
-    with driver.session() as session:
+    with neo4j_session() as session:
         for t in invalid_tasks:
             try:
                 # Check if task is in terminal state (COMPLETED/FAILED)
@@ -212,7 +212,7 @@ def fix_invalid_task_ids(driver, dry_run=False):
     return stats
 
 
-def handle_orphans(driver, dry_run=False):
+def handle_orphans(dry_run=False):
     """Phase 3: Resolve orphan tasks (in Neo4j but not on filesystem)."""
     print("\n" + "=" * 60)
     print("PHASE 3: ORPHAN HANDLING")
@@ -247,7 +247,7 @@ def handle_orphans(driver, dry_run=False):
     print(f"Found {len(fs_task_ids)} task_ids on filesystem")
 
     # Find orphans in Neo4j
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (t:Task)
             WHERE t.status IN ['PENDING', 'EXECUTING', 'pending', 'executing', 'ready', 'PAUSED']
@@ -282,7 +282,7 @@ def handle_orphans(driver, dry_run=False):
 
     # Resolve orphans
     print("\nResolving orphans...")
-    with driver.session() as session:
+    with neo4j_session() as session:
         for o in orphans:
             try:
                 session.run("""
@@ -303,7 +303,7 @@ def handle_orphans(driver, dry_run=False):
     return stats
 
 
-def verify_integrity(driver):
+def verify_integrity():
     """Phase 4: Verify data integrity after fixes."""
     print("\n" + "=" * 60)
     print("PHASE 4: VERIFICATION")
@@ -313,7 +313,7 @@ def verify_integrity(driver):
 
     # Check 1: All statuses are valid
     print("\n[CHECK 1] Status values...")
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (t:Task)
             RETURN t.status AS status, count(*) AS count
@@ -334,7 +334,7 @@ def verify_integrity(driver):
 
     # Check 2: All task_ids are valid UUIDs
     print("\n[CHECK 2] Task ID format...")
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (t:Task)
             WHERE t.task_id IS NULL
@@ -351,7 +351,7 @@ def verify_integrity(driver):
 
     # Check 3: No orphan PENDING/EXECUTING tasks
     print("\n[CHECK 3] Orphan check...")
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (t:Task)
             WHERE t.status IN ['PENDING', 'EXECUTING']
@@ -386,29 +386,24 @@ def main():
         print("\nExample: python3 neo4j-fix-data-integrity.py --all --dry-run")
         return 1
 
-    driver = get_driver()
+    if args.dry_run:
+        print("=" * 60)
+        print("DRY RUN MODE - No changes will be made")
+        print("=" * 60)
 
-    try:
-        if args.dry_run:
-            print("=" * 60)
-            print("DRY RUN MODE - No changes will be made")
-            print("=" * 60)
+    if args.all or args.phase == 1:
+        normalize_statuses(args.dry_run)
 
-        if args.all or args.phase == 1:
-            normalize_statuses(driver, args.dry_run)
+    if args.all or args.phase == 2:
+        fix_invalid_task_ids(args.dry_run)
 
-        if args.all or args.phase == 2:
-            fix_invalid_task_ids(driver, args.dry_run)
+    if args.all or args.phase == 3:
+        handle_orphans(args.dry_run)
 
-        if args.all or args.phase == 3:
-            handle_orphans(driver, args.dry_run)
+    if args.all or args.phase == 4:
+        verify_integrity()
 
-        if args.all or args.phase == 4:
-            verify_integrity(driver)
-
-        return 0
-    finally:
-        driver.close()
+    return 0
 
 
 if __name__ == '__main__':

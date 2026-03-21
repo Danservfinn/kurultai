@@ -82,8 +82,7 @@ def _mark_cooldown(cooldown, source_agent, rule_id, target_agent):
 def run(dry_run=False):
     """Main propagation pipeline."""
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
+        from neo4j_task_tracker import neo4j_session
     except Exception as exc:
         print(f"Neo4j unavailable: {exc}")
         return
@@ -93,7 +92,7 @@ def run(dry_run=False):
 
     try:
         # 1. Query proven rules
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 """
                 MATCH (r:Rule)
@@ -112,7 +111,7 @@ def run(dry_run=False):
 
         if not rules:
             # Provide actionable guidance when no rules qualify
-            with driver.session() as session:
+            with neo4j_session() as session:
                 count_result = session.run("MATCH (r:Rule) RETURN count(r) AS total")
                 total_rules = count_result.single()["total"]
             if total_rules == 0:
@@ -150,7 +149,7 @@ def run(dry_run=False):
                     continue
 
                 # Check if proposal already exists in Neo4j (pending)
-                with driver.session() as session:
+                with neo4j_session() as session:
                     exists = session.run(
                         """
                         MATCH (p:RuleProposal)
@@ -169,7 +168,7 @@ def run(dry_run=False):
                 )
 
                 if not dry_run:
-                    with driver.session() as session:
+                    with neo4j_session() as session:
                         session.run(
                             """
                             CREATE (p:RuleProposal {
@@ -206,7 +205,7 @@ def run(dry_run=False):
                 proposals_created += 1
 
     finally:
-        driver.close()
+        pass
 
     if not dry_run:
         _save_cooldown(cooldown)

@@ -6,14 +6,14 @@ import os
 
 sys.path.insert(0, os.path.expanduser('~/.openclaw/agents/main/scripts'))
 
-from neo4j_task_tracker import get_driver, close_driver
+from neo4j_task_tracker import get_driver, neo4j_session
 from neo4j_v2_schema import apply_schema, verify_schema, V2_DEPRECATED_INDEXES, V2_DEAD_CONSTRAINTS
 
 
-def _get_schema_names(driver):
+def _get_schema_names():
     """Get all index and constraint names from Neo4j."""
     names = set()
-    with driver.session() as session:
+    with neo4j_session() as session:
         for label in ("INDEXES", "CONSTRAINTS"):
             try:
                 for rec in session.run(f"SHOW {label}"):
@@ -27,140 +27,93 @@ def _get_schema_names(driver):
 
 def test_composite_claim_index_exists():
     """v2_task_claim_composite index present."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'v2_task_claim_composite' in names, \
-            f"v2_task_claim_composite not found in {names}"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'v2_task_claim_composite' in names, \
+        f"v2_task_claim_composite not found in {names}"
 
 
 def test_composite_orphan_index_exists():
     """v2_task_orphan_composite index present."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'v2_task_orphan_composite' in names, \
-            f"v2_task_orphan_composite not found in {names}"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'v2_task_orphan_composite' in names, \
+        f"v2_task_orphan_composite not found in {names}"
 
 
 def test_deprecated_priority_index_gone():
     """v2_task_priority index removed."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'v2_task_priority' not in names, \
-            "v2_task_priority should have been dropped"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'v2_task_priority' not in names, \
+        "v2_task_priority should have been dropped"
 
 
 def test_deprecated_claim_epoch_index_gone():
     """v2_task_claim_epoch index removed."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'v2_task_claim_epoch' not in names, \
-            "v2_task_claim_epoch should have been dropped"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'v2_task_claim_epoch' not in names, \
+        "v2_task_claim_epoch should have been dropped"
 
 
 def test_dead_skill_constraint_gone():
     """skill_name_unique constraint removed."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'skill_name_unique' not in names, \
-            "skill_name_unique should have been dropped"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'skill_name_unique' not in names, \
+        "skill_name_unique should have been dropped"
 
 
 def test_dead_domain_constraint_gone():
     """domain_name_unique constraint removed."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'domain_name_unique' not in names, \
-            "domain_name_unique should have been dropped"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'domain_name_unique' not in names, \
+        "domain_name_unique should have been dropped"
 
 
 def test_task_id_unique_still_exists():
     """task_id_unique constraint still exists."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'task_id_unique' in names, "task_id_unique should still exist"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'task_id_unique' in names, "task_id_unique should still exist"
 
 
 def test_agent_name_unique_still_exists():
     """agent_name_unique constraint still exists."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'agent_name_unique' in names, "agent_name_unique should still exist"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'agent_name_unique' in names, "agent_name_unique should still exist"
 
 
 def test_status_agent_index_still_exists():
     """v2_task_status_agent index still exists."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'v2_task_status_agent' in names, "v2_task_status_agent should still exist"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'v2_task_status_agent' in names, "v2_task_status_agent should still exist"
 
 
 def test_lease_index_still_exists():
     """v2_task_lease index still exists."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'v2_task_lease' in names, "v2_task_lease should still exist"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'v2_task_lease' in names, "v2_task_lease should still exist"
 
 
 def test_skill_constraint_dropped():
     """Skill uniqueness constraint dropped (nodes may still exist as legacy data)."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'skill_name_unique' not in names, \
-            "skill_name_unique constraint should have been dropped"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'skill_name_unique' not in names, \
+        "skill_name_unique constraint should have been dropped"
 
 
 def test_domain_constraint_dropped():
     """Domain uniqueness constraint dropped (nodes may still exist as legacy data)."""
-    driver = get_driver()
-    try:
-        names = _get_schema_names(driver)
-        assert 'domain_name_unique' not in names, \
-            "domain_name_unique constraint should have been dropped"
-    finally:
-        close_driver()
+    names = _get_schema_names()
+    assert 'domain_name_unique' not in names, \
+        "domain_name_unique constraint should have been dropped"
 
 
 def test_apply_schema_idempotent():
     """Running apply_schema() twice produces identical state."""
+    from neo4j_task_tracker import close_driver
     driver = get_driver()
     try:
         apply_schema(driver, verbose=False)
-        names1 = _get_schema_names(driver)
+        names1 = _get_schema_names()
         apply_schema(driver, verbose=False)
-        names2 = _get_schema_names(driver)
+        names2 = _get_schema_names()
         assert names1 == names2, f"Schema changed between runs: {names1.symmetric_difference(names2)}"
     finally:
         close_driver()
@@ -168,6 +121,7 @@ def test_apply_schema_idempotent():
 
 def test_verify_schema_passes():
     """verify_schema() returns True after apply."""
+    from neo4j_task_tracker import close_driver
     driver = get_driver()
     try:
         apply_schema(driver, verbose=False)
@@ -179,9 +133,12 @@ def test_verify_schema_passes():
 
 if __name__ == '__main__':
     # Ensure schema is applied first
+    from neo4j_task_tracker import close_driver
     driver = get_driver()
-    apply_schema(driver, verbose=False)
-    close_driver()
+    try:
+        apply_schema(driver, verbose=False)
+    finally:
+        close_driver()
 
     tests = [
         test_composite_claim_index_exists,

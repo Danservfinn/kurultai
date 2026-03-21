@@ -46,7 +46,7 @@ except ImportError:
     SCIPY_AVAILABLE = False
 
 try:
-    from neo4j_task_tracker import get_driver
+    from neo4j_task_tracker import get_driver, close_driver
     NEO4J_AVAILABLE = True
 except ImportError:
     NEO4J_AVAILABLE = False
@@ -668,6 +668,12 @@ class ExperimentTracker:
         self.driver = neo4j_driver or (get_driver() if NEO4J_AVAILABLE else None)
         self.experiments_dir = Path.home() / ".openclaw" / "experiments"
         self.experiments_dir.mkdir(parents=True, exist_ok=True)
+
+    def close(self):
+        """Close the Neo4j driver connection."""
+        if self.driver is not None:
+            close_driver()
+            self.driver = None
 
     def propose(self, config: ExperimentConfig) -> str:
         """

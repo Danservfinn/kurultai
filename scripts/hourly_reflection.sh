@@ -14,14 +14,14 @@
 # - Commitment tracking across sessions
 # - Tock data replaces redundant CLI calls
 #
-# HARD TIMEOUT: 600s (10 min) — Increased from 420s to accommodate all 6 agent reviews
-# Budget: reflections ~30s + reviews ~180s (30s/agent × 6 in 3 batches) + downstream ~300s + margin
-# FIX 2026-03-08: Jochi and Ogedei (Batch 3) were timing out at 420s — now have full 10 min window
+# HARD TIMEOUT: 900s (15 min) — reflections ~30s + reviews ~180s + downstream ~300s + margin
+# FIX 2026-03-08: Jochi and Ogedei (Batch 3) were timing out at 420s
+# FIX 2026-03-19: Was 7200 (bug) — set to 900 to match actual budget
 # CHECKPOINT: Emits reflection-status.json after core reflections complete
 # FALLBACK: Exit 0 even if downstream steps fail (content generation succeeded)
 
 SCRIPT_START=$(date +%s)
-TIMEOUT_SECONDS=7200  # 2 hours
+TIMEOUT_SECONDS=900  # 15 minutes (was 7200 — bug, should never be 2 hours)
 
 # ============================================================
 # MODEL DETECTION: Get default model for reflection pipeline
@@ -777,11 +777,12 @@ _bg_timed_step() {
     printf '{"name":"%s","duration_s":%d,"status":"%s"}' "$safe_name" "$step_dur" "$status" \
         > "$_STEP_TIMING_DIR/${step_start}-${safe_name}.json"
     echo "[$(date)] Completed: $step_name (${step_dur}s, rc=$step_rc)"
+    return 0  # Don't fail the pipeline on downstream step errors
 }
 
 echo "[$(date)] Starting Tier 1 (independent steps) with semaphore..."
 
-for step_name in "reflection-research-persist" "session-drift-detect" "memory-audit-fix" "cross-agent-rules" "agent-rules-evaluator" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis"; do
+for step_name in "reflection-research-persist" "session-drift-detect" "memory-audit-fix" "cross-agent-rules" "agent-rules-evaluator" "capability-scores" "routing-audit" "score-skills" "action-scorer" "report-analysis" "message-extraction" "engagement-outcomes" "thread-summaries" "gds-daily"; do
     wait_for_semaphore
     case "$step_name" in
         reflection-research-persist)
@@ -814,6 +815,38 @@ for step_name in "reflection-research-persist" "session-drift-detect" "memory-au
             ;;
         report-analysis)
             _bg_timed_step "$step_name" run_with_timeout 30 python3 "$SCRIPTS/report_analyzer.py" --all-agents --hours 1 --reflection-block > "$LOGS_DIR/task-completion-report.md" 2>&1 &
+            ;;
+        message-extraction)
+            _bg_timed_step "$step_name" run_with_timeout 120 python3 "$SCRIPTS/async_extractor.py" --limit 50 >> "$LOGS_DIR/async-extraction.log" 2>&1 &
+            ;;
+        engagement-outcomes)
+            _bg_timed_step "$step_name" run_with_timeout 60 python3 "$SCRIPTS/run_engagement_outcomes.py" >> "$LOGS_DIR/engagement-outcomes.log" 2>&1 &
+            ;;
+        thread-summaries)
+            _bg_timed_step "$step_name" run_with_timeout 120 python3 "$SCRIPTS/thread_summarizer.py" --limit 5 >> "$LOGS_DIR/thread-summaries.log" 2>&1 &
+            ;;
+        gds-daily)
+            # Run GDS daily (check if already run today)
+            _GDS_MARKER="$LOGS_DIR/gds-daily-$(date +%Y-%m-%d).done"
+            if [ ! -f "$_GDS_MARKER" ]; then
+                (
+                    step_start=$(date +%s)
+                    echo "[$(date)] Running: gds-daily..."
+                    run_with_timeout 300 python3 "$SCRIPTS/gds_scheduler.py" --daily >> "$LOGS_DIR/gds-scheduler.log" 2>&1
+                    step_rc=$?
+                    step_dur=$(( $(date +%s) - step_start ))
+                    status="ok"
+                    [ $step_rc -ne 0 ] && status="failed"
+                    printf '{"name":"gds-daily","duration_s":%d,"status":"%s"}' "$step_dur" "$status" \
+                        > "$_STEP_TIMING_DIR/$(date +%s)-gds-daily.json"
+                    if [ $step_rc -eq 0 ]; then
+                        touch "$_GDS_MARKER"
+                        echo "[$(date)] Completed: gds-daily (${step_dur}s, marker created)"
+                    else
+                        echo "[$(date)] WARNING: gds-daily FAILED (rc=$step_rc) — will retry next hour"
+                    fi
+                ) &
+            fi
             ;;
     esac
     t1_pids+=($!)

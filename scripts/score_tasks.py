@@ -202,9 +202,8 @@ def score_all_tasks(hours=None):
 
     # Also check Neo4j for already-scored tasks (additional idempotency guard)
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        with driver.session() as session:
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
             result = session.run("MATCH (t:Task) WHERE t.scored = true RETURN t.task_id as task_id")
             for record in result:
                 if record["task_id"]:

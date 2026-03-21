@@ -51,7 +51,7 @@ from neo4j import GraphDatabase
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import shared connection factory
-from neo4j_task_tracker import get_driver as get_neo4j_driver
+from neo4j_task_tracker import get_driver as get_neo4j_driver, close_driver
 
 
 # Valid categories for research
@@ -68,7 +68,8 @@ class ResearchStorage:
 
     def close(self):
         """Close the database connection."""
-        self.driver.close()
+        close_driver()
+        self.driver = None
 
     # =========================================================================
     # CREATE Operations

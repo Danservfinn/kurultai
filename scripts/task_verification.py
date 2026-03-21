@@ -6,21 +6,13 @@ Consolidates duplicate code between task-watcher.py and agent-task-handler.py.
 """
 
 import os
+import sys
 import time
 import fcntl
 import re
 
-
-SLOW_SKILLS = {
-    '/horde-brainstorming': 7200,
-    '/golden-horde': 7200,
-    '/horde-implement': 7200,
-    '/horde-review': 7200,
-    '/horde-debug': 7200,
-    '/horde-learn': 7200,
-    '/horde-swarm': 7200,
-    '/horde-test': 7200,
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kurultai_paths import SLOW_SKILLS
 
 
 def verify_task_completion(task_file: str, max_retries: int = 3) -> tuple[bool, str]:

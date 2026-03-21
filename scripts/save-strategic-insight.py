@@ -18,17 +18,15 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 def save_insight(insight_type, name, data, source="manual", tags=None):
     """Save a strategic insight to Neo4j."""
-    driver = get_driver()
-    
     insight_id = f"{insight_type.lower()}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     timestamp = datetime.now().isoformat()
-    
-    with driver.session() as session:
+
+    with neo4j_session() as session:
         # Create or update the insight
         result = session.run("""
             MERGE (i:StrategicInsight {id: $id})
@@ -53,8 +51,7 @@ def save_insight(insight_type, name, data, source="manual", tags=None):
         
         record = result.single()
         print(f"✅ Saved: {record['name']} (ID: {record['id']})")
-    
-    driver.close()
+
     return insight_id
 
 
@@ -75,24 +72,19 @@ def save_insight_entry(name, data):
 
 def link_to_goal(insight_id, goal_name):
     """Link an insight to a goal."""
-    driver = get_driver()
-    
-    with driver.session() as session:
+    with neo4j_session() as session:
         session.run("""
             MATCH (i:StrategicInsight {id: $id})
             MATCH (g:Goal {name: $goal})
             MERGE (i)-[:SUPPORTS]->(g)
         """, id=insight_id, goal=goal_name)
-    
-    driver.close()
+
     print(f"  → Linked to goal: {goal_name}")
 
 
 def list_insights(insight_type=None, limit=10):
     """List recent strategic insights."""
-    driver = get_driver()
-    
-    with driver.session() as session:
+    with neo4j_session() as session:
         if insight_type:
             result = session.run("""
                 MATCH (i:StrategicInsight {type: $type})
@@ -116,8 +108,7 @@ def list_insights(insight_type=None, limit=10):
             print(f"  Source: {i.get('source', '?')}")
             print(f"  Created: {i.get('created', '?')}")
             print(f"  Data: {i.get('data', '{}')[:100]}...")
-    
-    driver.close()
+
     return insights
 
 

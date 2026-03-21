@@ -11,11 +11,11 @@ Human/System -> Task Queue (Neo4j)
                     |
                 claude-agent wrapper
                     |
-        +-----------|------------+
-        |           |            |
-    [primary]   [backup]    [fallback]
-    Anthropic    Z.AI        Alibaba
-    OAuth        glm-5       qwen3.5-plus
+        +-----------|------------+-----------+-----------+
+        |           |            |           |           |
+    [primary]   [backup]    [fallback]  [gateway]   [local]
+    Anthropic    Z.AI        Alibaba    OpenRouter   Ollama
+    OAuth        glm-5       qwen3.5+   user model   qwen3.5-9b
 ```
 
 ---
@@ -81,7 +81,7 @@ Used for Anthropic (OAuth authentication):
 ```json
 {
   "env": {
-    "ANTHROPIC_MODEL": "claude-sonnet-4-6"
+    "ANTHROPIC_MODEL": "claude-opus-4-6"
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high"
@@ -151,21 +151,27 @@ ZAI_BASE_URL=https://api.z.ai/api/anthropic
 # Alibaba/DashScope (Fallback Tier 2 - qwen3.5-plus)
 ALIBABA_AUTH_TOKEN=<token>
 ALIBABA_BASE_URL=https://coding-intl.dashscope.aliyuncs.com/apps/anthropic
+
+# OpenRouter (Multi-provider gateway)
+OPENROUTER_API_KEY=<key>
+OPENROUTER_MODEL=<model>
 ```
 
 ### Provider Tiers
 
 | Tier | Provider | Model | Auth Method |
 |------|----------|-------|-------------|
-| Primary | Anthropic | claude-sonnet-4-6 | OAuth (managed by Claude Code) |
+| Primary | Anthropic | claude-opus-4-6 | OAuth (managed by Claude Code) |
 | Fallback 1 | Z.AI | glm-5 | Token-based |
 | Fallback 2 | Alibaba/DashScope | qwen3.5-plus | Token-based |
+| Gateway | OpenRouter | User-configured (e.g., x-ai/grok-4.20-multi-agent-beta) | API key |
+| Fallback 3 | Ollama | lukey03/qwen3.5-9b-abliterated-vision | Local (no token) |
 
 ### Vault Management
 
 - `agent-task-handler.py` calls `load_vault_credentials()` after sanitizing inherited env vars
-- Dashboard Settings tab -> Providers: manage tokens (masked as `***last8`)
-- API: `GET/POST /api/providers` for programmatic access (tokens auto-masked on read)
+- Dashboard Settings tab -> Providers: manage tokens (masked as `***last8` for OpenRouter, `***last4` for others)
+- API: `GET/POST /api/providers` for programmatic access (tokens/keys auto-masked on read)
 
 ---
 

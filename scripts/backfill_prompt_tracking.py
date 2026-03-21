@@ -163,8 +163,9 @@ def estimate_tokens(text: str) -> int:
     return len(str(text)) // 4 if text else 0
 
 
-def backfill_task(driver, task_id: str, task_data: dict, dry_run: bool = False) -> dict:
+def backfill_task(task_id: str, task_data: dict, dry_run: bool = False) -> dict:
     """Backfill prompt_construction and task_params for a single task."""
+    from neo4j_task_tracker import neo4j_session
     body = task_data.get('body', '')
     metadata = {k: v for k, v in task_data.items() if k not in ['body']}
 
@@ -219,7 +220,7 @@ def backfill_task(driver, task_id: str, task_data: dict, dry_run: bool = False) 
     # Write to Neo4j
     # Note: Neo4j properties must be primitive types, so store complex objects as JSON strings
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 MATCH (t:Task {task_id: $task_id})
                 SET t.prompt_construction = $prompt_construction,
@@ -254,14 +255,13 @@ def main():
     parser.add_argument('--status', default='COMPLETED', help='Task status to filter (default: COMPLETED)')
     args = parser.parse_args()
 
-    # Neo4j connection - use centralized driver
-    from neo4j_task_tracker import get_driver
+    # Neo4j connection - use context-managed session
+    from neo4j_task_tracker import neo4j_session
 
     print("Connecting to Neo4j...")
-    driver = get_driver()
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Fetch tasks needing backfill
             print(f"Fetching up to {args.limit} {args.status} tasks...")
             result = session.run("""
@@ -291,7 +291,7 @@ def main():
             task_id = task.pop('task_id')
             print(f"[{i}/{len(tasks)}] Processing {task_id}...", end=' ')
 
-            result = backfill_task(driver, task_id, task, args.dry_run)
+            result = backfill_task(task_id, task, args.dry_run)
 
             if args.dry_run:
                 print(f"\n  Template: {result['prompt_construction']['template_name']}")
@@ -311,7 +311,7 @@ def main():
             print(f"Complete: {results['success']} succeeded, {results['error']} failed")
 
     finally:
-        driver.close()
+        pass
 
 
 if __name__ == '__main__':

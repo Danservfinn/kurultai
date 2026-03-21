@@ -15,7 +15,7 @@ AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
 MODEL_LOCK_RULE = {
     "id": "MODEL_CHANGE_PROHIBITED",
-    "text": "NEVER propose, suggest, or consider changing the agent model configuration (ANTHROPIC_MODEL, config.json model key, or .claude/settings.json). Model changes are exclusively a human operator decision. During reflections, reviews, or any analysis, DO NOT include model configuration as a potential improvement, fix, or optimization. If you detect a model mismatch, log it but DO NOT create tasks to fix it — only humans can change models. (Rule MODEL_LOCK)",
+    "text": "NEVER propose, suggest, or consider changing the agent model configuration (ANTHROPIC_MODEL, config.json model key, .claude/settings.json), provider routing (mode.json, claude-agent wrapper, provider.env), or backup/fallback settings. Model and routing changes are exclusively a human operator decision via the.kurult.ai dashboard. During reflections, reviews, or any analysis, DO NOT include model configuration, provider routing, or fallback chain as potential improvements, fixes, or optimizations. If you detect a mismatch, log it but DO NOT create tasks to fix it — only humans can change these. (Rule MODEL_LOCK)",
     "status": "active",
     "created_at": datetime.now().isoformat(),
     "source": "human-mandate:2026-03-08",

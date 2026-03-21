@@ -8,7 +8,7 @@ import tempfile
 
 sys.path.insert(0, os.path.expanduser('~/.openclaw/agents/main/scripts'))
 
-from neo4j_task_tracker import get_driver, close_driver
+from neo4j_task_tracker import neo4j_session
 
 # We'll import the archive functions
 from neo4j_archive_tasks import archive_tasks, cleanup_failure_reports, ARCHIVE_DIR
@@ -16,8 +16,8 @@ from neo4j_archive_tasks import archive_tasks, cleanup_failure_reports, ARCHIVE_
 TEST_AGENT = '__test_archive__'
 
 
-def _cleanup(driver):
-    with driver.session() as session:
+def _cleanup():
+    with neo4j_session() as session:
         session.run("""
             MATCH (t:Task {assigned_to: $a})
             OPTIONAL MATCH (t)-[r1:HAS_OUTPUT]->(o:TaskOutput)
@@ -28,9 +28,9 @@ def _cleanup(driver):
         session.run("MATCH (a:Agent {name: $a}) WHERE NOT (a)--() DELETE a", a=TEST_AGENT)
 
 
-def _create_old_task(driver, task_id, days_old=60, status='COMPLETED'):
+def _create_old_task(task_id, days_old=60, status='COMPLETED'):
     """Create an old task for archival testing."""
-    with driver.session() as session:
+    with neo4j_session() as session:
         session.run("""
             CREATE (t:Task {
                 task_id: $tid, title: 'Archive test', prompt: 'test',
@@ -46,12 +46,16 @@ def _create_old_task(driver, task_id, days_old=60, status='COMPLETED'):
 
 def test_dryrun_no_delete():
     """Dry run counts but doesn't delete."""
-    driver = get_driver()
     try:
-        _create_old_task(driver, 'test-arch-dry', days_old=60)
-        count = archive_tasks(driver, retention_days=30, dry_run=True)
+        _create_old_task('test-arch-dry', days_old=60)
+        from neo4j_task_tracker import get_driver, close_driver
+        driver = get_driver()
+        try:
+            count = archive_tasks(driver, retention_days=30, dry_run=True)
+        finally:
+            close_driver()
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 "MATCH (t:Task {task_id: 'test-arch-dry'}) RETURN count(t) AS c")
             c = result.single()['c']
@@ -59,18 +63,21 @@ def test_dryrun_no_delete():
                 c = int(c)
         assert c == 1, f"Dry run should NOT delete, but task is gone"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 def test_preserves_recent():
     """Tasks within retention period are NOT archived."""
-    driver = get_driver()
     try:
-        _create_old_task(driver, 'test-arch-recent', days_old=5)
-        archive_tasks(driver, retention_days=30, dry_run=False)
+        _create_old_task('test-arch-recent', days_old=5)
+        from neo4j_task_tracker import get_driver, close_driver
+        driver = get_driver()
+        try:
+            archive_tasks(driver, retention_days=30, dry_run=False)
+        finally:
+            close_driver()
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 "MATCH (t:Task {task_id: 'test-arch-recent'}) RETURN count(t) AS c")
             c = result.single()['c']
@@ -78,19 +85,22 @@ def test_preserves_recent():
                 c = int(c)
         assert c == 1, f"Recent task should NOT be archived"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 def test_archive_deletes_old():
     """Archive removes tasks older than retention."""
-    driver = get_driver()
     try:
-        _create_old_task(driver, 'test-arch-old', days_old=60)
-        count = archive_tasks(driver, retention_days=30, dry_run=False)
+        _create_old_task('test-arch-old', days_old=60)
+        from neo4j_task_tracker import get_driver, close_driver
+        driver = get_driver()
+        try:
+            count = archive_tasks(driver, retention_days=30, dry_run=False)
+        finally:
+            close_driver()
         assert count >= 1, f"Should archive at least 1 task, got {count}"
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 "MATCH (t:Task {task_id: 'test-arch-old'}) RETURN count(t) AS c")
             c = result.single()['c']
@@ -98,37 +108,37 @@ def test_archive_deletes_old():
                 c = int(c)
         assert c == 0, "Old task should be deleted after archive"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 def test_empty_archive():
     """No errors when 0 tasks qualify for archival."""
+    from neo4j_task_tracker import get_driver, close_driver
     driver = get_driver()
     try:
         count = archive_tasks(driver, retention_days=9999, dry_run=False)
-        # Should not error, count should be 0 (or very small if other old tasks exist)
-        # This test passes if no exception is raised
     finally:
         close_driver()
+    # Should not error, count should be 0 (or very small if other old tasks exist)
+    # This test passes if no exception is raised
 
 
 def test_cleanup_failure_reports_dryrun():
     """FailureReport cleanup dry-run reports count without deleting."""
+    from neo4j_task_tracker import get_driver, close_driver
     driver = get_driver()
     try:
         count = cleanup_failure_reports(driver, retention_days=30, dry_run=True)
-        # Should not error or delete anything
     finally:
         close_driver()
+    # Should not error or delete anything
 
 
 def test_cleanup_failure_reports_execute():
     """FailureReport cleanup removes orphaned reports."""
-    driver = get_driver()
     try:
         # Create an orphaned FailureReport (no parent task)
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 CREATE (fr:FailureReport {
                     attempt: 1, error_class: 'TEST',
@@ -137,10 +147,15 @@ def test_cleanup_failure_reports_execute():
                 })
             """)
 
-        count = cleanup_failure_reports(driver, retention_days=30, dry_run=False)
+        from neo4j_task_tracker import get_driver, close_driver
+        driver = get_driver()
+        try:
+            count = cleanup_failure_reports(driver, retention_days=30, dry_run=False)
+        finally:
+            close_driver()
         assert count >= 1, "Should clean at least 1 orphaned FailureReport"
     finally:
-        close_driver()
+        pass
 
 
 if __name__ == '__main__':

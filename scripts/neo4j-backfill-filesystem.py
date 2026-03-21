@@ -24,16 +24,15 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 from kurultai_paths import AGENTS_DIR, VALID_AGENTS
 
 
 def get_tasks_from_neo4j(agent=None, status=None):
     """Query Neo4j for tasks to backfill."""
-    driver = get_driver()
     tasks = []
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         if agent:
             query = """
                 MATCH (t:Task {agent: $agent})

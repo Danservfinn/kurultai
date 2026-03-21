@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 from typing import Optional, List, Dict, Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 LOCAL_TZ = ZoneInfo("America/New_York")
 DEFAULT_DURATION_HOURS = 2
@@ -56,8 +56,6 @@ def json_dumps(obj, **kwargs):
 
 def init_schema():
     """Create all constraints and indexes for the calendar schema."""
-    driver = get_driver()
-
     constraints = [
         "CREATE CONSTRAINT person_phone_unique IF NOT EXISTS FOR (p:Person) REQUIRE p.phone_number IS UNIQUE",
         "CREATE CONSTRAINT person_signal_id_unique IF NOT EXISTS FOR (p:Person) REQUIRE p.signal_id IS UNIQUE",
@@ -77,7 +75,7 @@ def init_schema():
         "CREATE INDEX location_name_idx IF NOT EXISTS FOR (l:Location) ON (l.name)",
     ]
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         for constraint in constraints:
             session.run(constraint)
         for index in indexes:
@@ -86,20 +84,17 @@ def init_schema():
         # Fulltext index for event search
         session.run("CREATE FULLTEXT INDEX event_search IF NOT EXISTS FOR (e:Event) ON EACH [e.name, e.description]")
 
-    driver.close()
     return True
 
 
 def seed_persons():
     """Seed Person nodes for group members."""
-    driver = get_driver()
-
     persons = [
         {"phone": "+19194133445", "name": "Danny", "role": "admin"},
         {"phone": "+16624580725", "name": "Liz", "role": "member"},
     ]
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         for p in persons:
             session.run("""
                 MERGE (person:Person {phone_number: $phone})
@@ -112,7 +107,6 @@ def seed_persons():
                     person.updated_at = datetime()
             """, **p)
 
-    driver.close()
     return True
 
 
@@ -122,9 +116,7 @@ def seed_persons():
 
 def get_or_create_person(phone_number: str, name: str = None, aliases: List[str] = None) -> Dict[str, Any]:
     """Get existing person or create new one."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MERGE (p:Person {phone_number: $phone_number})
             ON CREATE SET
@@ -142,15 +134,12 @@ def get_or_create_person(phone_number: str, name: str = None, aliases: List[str]
         record = result.single()
         person = dict(record["p"]) if record else None
 
-    driver.close()
     return person
 
 
 def find_person_by_name(name: str) -> Optional[Dict[str, Any]]:
     """Find person by name or alias (case-insensitive)."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (p:Person)
             WHERE toLower(p.name) = toLower($name)
@@ -162,7 +151,6 @@ def find_person_by_name(name: str) -> Optional[Dict[str, Any]]:
         record = result.single()
         person = dict(record["p"]) if record else None
 
-    driver.close()
     return person
 
 
@@ -179,17 +167,61 @@ def create_event(
     location_name: str = None,
     location_address: str = None,
     source_message: str = None,
-    all_day: bool = False
+    all_day: bool = False,
+    # --- Enriched fields ---
+    cost: str = None,
+    dress_code: str = None,
+    parking_info: str = None,
+    transport_notes: str = None,
+    what_to_bring: str = None,
+    prep_time_minutes: int = None,
+    category: str = None,
+    vibe: str = None,
+    expected_group_size: int = None,
+    indoor_outdoor: str = None,
+    noise_level: str = None,
+    alcohol: str = None,
+    age_range: str = None,
+    event_url: str = None,
+    ticket_url: str = None,
+    menu_url: str = None,
+    venue_photo_url: str = None,
+    playlist_url: str = None,
+    weather_note: str = None,
+    rain_plan: str = None,
+    dietary_notes: str = None,
+    gift_registry_url: str = None,
+    rsvp_deadline: str = None,
+    post_event_followup: str = None,
+    conversation_starters: str = None,
 ) -> Dict[str, Any]:
     """Create a new event with creator and optional location."""
-    driver = get_driver()
     event_id = f"evt-{uuid.uuid4().hex[:8]}"
 
     # Default end time
     if end_datetime is None:
         end_datetime = start_datetime + timedelta(hours=DEFAULT_DURATION_HOURS)
 
-    with driver.session() as session:
+    # Build enriched properties (only non-None values)
+    enriched = {}
+    for k, v in [
+        ("cost", cost), ("dress_code", dress_code), ("parking_info", parking_info),
+        ("transport_notes", transport_notes), ("what_to_bring", what_to_bring),
+        ("prep_time_minutes", prep_time_minutes), ("category", category),
+        ("vibe", vibe), ("expected_group_size", expected_group_size),
+        ("indoor_outdoor", indoor_outdoor), ("noise_level", noise_level),
+        ("alcohol", alcohol), ("age_range", age_range), ("event_url", event_url),
+        ("ticket_url", ticket_url), ("menu_url", menu_url),
+        ("venue_photo_url", venue_photo_url), ("playlist_url", playlist_url),
+        ("weather_note", weather_note), ("rain_plan", rain_plan),
+        ("dietary_notes", dietary_notes), ("gift_registry_url", gift_registry_url),
+        ("rsvp_deadline", rsvp_deadline), ("post_event_followup", post_event_followup),
+        ("conversation_starters", conversation_starters),
+    ]:
+        if v is not None:
+            enriched[k] = v
+
+    with neo4j_session() as session:
         # Match or create creator
         if creator_phone:
             session.run("""
@@ -211,6 +243,7 @@ def create_event(
                 status: 'active',
                 visibility: 'group',
                 source_message: $source_message,
+                creator_phone: $creator_phone,
                 created_at: datetime(),
                 updated_at: datetime()
             })
@@ -229,6 +262,8 @@ def create_event(
                     l.created_at = datetime()
                 CREATE (e)-[:AT_LOCATION]->(l)
             )
+            WITH e
+            SET e += $enriched
             RETURN e
         """,
             event_id=event_id,
@@ -241,21 +276,19 @@ def create_event(
             creator_phone=creator_phone,
             location_name=location_name,
             location_key=location_name.lower().replace(' ', '-') if location_name else None,
-            location_address=location_address
+            location_address=location_address,
+            enriched=enriched
         )
 
         record = result.single()
         event = dict(record["e"]) if record else None
 
-    driver.close()
     return event
 
 
 def get_upcoming_events(hours: int = 168) -> List[Dict[str, Any]]:
     """Get all active events in the next N hours (default 7 days)."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (e:Event)
             WHERE e.status = 'active'
@@ -276,15 +309,12 @@ def get_upcoming_events(hours: int = 168) -> List[Dict[str, Any]]:
             event["attendees"] = record["attendees"]
             events.append(event)
 
-    driver.close()
     return events
 
 
 def get_events_for_person(person_name: str) -> List[Dict[str, Any]]:
     """Get all upcoming events a person is attending."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (p:Person)-[att:ATTENDING]->(e:Event)
             WHERE toLower(p.name) = toLower($person_name)
@@ -303,15 +333,12 @@ def get_events_for_person(person_name: str) -> List[Dict[str, Any]]:
             event["rsvp"] = record["rsvp"]
             events.append(event)
 
-    driver.close()
     return events
 
 
 def search_events(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     """Fulltext search for events by name/description."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -330,15 +357,12 @@ def search_events(query: str, limit: int = 10) -> List[Dict[str, Any]]:
             event["attendees"] = record["attendees"]
             events.append(event)
 
-    driver.close()
     return events
 
 
 def get_event_attendees(event_query: str) -> List[Dict[str, Any]]:
     """Get all attendees for an event."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -357,7 +381,6 @@ def get_event_attendees(event_query: str) -> List[Dict[str, Any]]:
                 "rsvp": record["rsvp"]
             })
 
-    driver.close()
     return attendees
 
 
@@ -372,9 +395,7 @@ def rsvp_to_event(
     added_by: str = "self"
 ) -> Dict[str, Any]:
     """RSVP to an event (yes/no/maybe)."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -406,7 +427,6 @@ def rsvp_to_event(
                 "rsvp": record["rsvp"]
             }
 
-    driver.close()
     return None
 
 
@@ -416,9 +436,7 @@ def add_person_to_event(
     event_query: str
 ) -> Dict[str, Any]:
     """Add another person to an event."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -449,15 +467,12 @@ def add_person_to_event(
                 "added_by": record["added_by"]
             }
 
-    driver.close()
     return None
 
 
 def remove_person_from_event(person_phone: str, event_query: str) -> Dict[str, Any]:
     """Remove self from event (decline)."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -476,7 +491,6 @@ def remove_person_from_event(person_phone: str, event_query: str) -> Dict[str, A
                 "rsvp": record["rsvp"]
             }
 
-    driver.close()
     return None
 
 
@@ -486,9 +500,7 @@ def remove_person_from_event(person_phone: str, event_query: str) -> Dict[str, A
 
 def cancel_event(creator_phone: str, event_query: str) -> Dict[str, Any]:
     """Cancel an event (creator only)."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -507,18 +519,15 @@ def cancel_event(creator_phone: str, event_query: str) -> Dict[str, Any]:
                 "status": record["status"]
             }
 
-    driver.close()
     return None
 
 
 def modify_event_time(creator_phone: str, event_query: str, new_start: datetime, new_end: datetime = None) -> Dict[str, Any]:
     """Modify event time (creator only)."""
-    driver = get_driver()
-
     if new_end is None:
         new_end = new_start + timedelta(hours=DEFAULT_DURATION_HOURS)
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -544,7 +553,6 @@ def modify_event_time(creator_phone: str, event_query: str, new_start: datetime,
                 "new_end": record["new_end"]
             }
 
-    driver.close()
     return None
 
 
@@ -560,10 +568,9 @@ def create_reminder(
     channel: str = "signal"
 ) -> Dict[str, Any]:
     """Create a reminder for an event."""
-    driver = get_driver()
     reminder_id = f"rem-{uuid.uuid4().hex[:8]}"
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             CALL db.index.fulltext.queryNodes('event_search', $search_term)
             YIELD node AS e, score
@@ -599,15 +606,12 @@ def create_reminder(
                 "reminder_id": reminder_id
             }
 
-    driver.close()
     return None
 
 
 def get_due_reminders() -> List[Dict[str, Any]]:
     """Get all unsent reminders that are due now."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (r:Reminder)-[:REMINDER_FOR]->(e:Event),
                   (r)-[:REMIND]->(p:Person)
@@ -636,21 +640,16 @@ def get_due_reminders() -> List[Dict[str, Any]]:
                 "offset": record["offset"]
             })
 
-    driver.close()
     return reminders
 
 
 def mark_reminder_sent(reminder_id: str):
     """Mark a reminder as sent."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         session.run("""
             MATCH (r:Reminder {reminder_id: $reminder_id})
             SET r.sent = true, r.sent_at = datetime()
         """, reminder_id=reminder_id)
-
-    driver.close()
 
 
 # =============================================================================
@@ -659,8 +658,6 @@ def mark_reminder_sent(reminder_id: str):
 
 def init_notification_rules_schema():
     """Create constraints and indexes for notification rules."""
-    driver = get_driver()
-
     constraints = [
         "CREATE CONSTRAINT notification_rule_id_unique IF NOT EXISTS FOR (r:NotificationRule) REQUIRE r.rule_id IS UNIQUE",
         "CREATE CONSTRAINT notification_id_unique IF NOT EXISTS FOR (n:Notification) REQUIRE n.notification_id IS UNIQUE",
@@ -672,13 +669,12 @@ def init_notification_rules_schema():
         "CREATE INDEX notification_status_idx IF NOT EXISTS FOR (n:Notification) ON (n.status)",
     ]
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         for constraint in constraints:
             session.run(constraint)
         for index in indexes:
             session.run(index)
 
-    driver.close()
     return True
 
 
@@ -698,10 +694,9 @@ def create_notification_rule(
     message_template: str = None
 ) -> Dict[str, Any]:
     """Create a notification rule for an event."""
-    driver = get_driver()
     rule_id = f"rule-{uuid.uuid4().hex[:8]}"
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         # Ensure person exists
         session.run("""
             MERGE (p:Person {phone_number: $phone})
@@ -755,15 +750,12 @@ def create_notification_rule(
                 "event_name": record["event_name"]
             }
 
-    driver.close()
     return None
 
 
 def get_event_notification_rules(event_id: str) -> List[Dict[str, Any]]:
     """Get all active notification rules for an event."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (e:Event {event_id: $event_id})-[r:HAS_NOTIFICATION_RULE]->(p:Person)
             WHERE r.is_active = true
@@ -779,7 +771,6 @@ def get_event_notification_rules(event_id: str) -> List[Dict[str, Any]]:
             rule["event_name"] = record["event_name"]
             rules.append(rule)
 
-    driver.close()
     return rules
 
 
@@ -793,9 +784,7 @@ def update_notification_rule(
     name: str = None
 ) -> Dict[str, Any]:
     """Update an existing notification rule."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         set_clauses = []
         params = {"event_id": event_id, "rule_id": rule_id, "phone": person_phone}
 
@@ -832,15 +821,12 @@ def update_notification_rule(
                 "person_name": record["person_name"]
             }
 
-    driver.close()
     return None
 
 
 def delete_notification_rule(event_id: str, rule_id: str, person_phone: str) -> Dict[str, Any]:
     """Delete a notification rule."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (e:Event {event_id: $event_id})-[r:HAS_NOTIFICATION_RULE]->(p:Person {phone_number: $phone})
             WHERE r.rule_id = $rule_id
@@ -852,16 +838,14 @@ def delete_notification_rule(event_id: str, rule_id: str, person_phone: str) -> 
         if record:
             return {"rule_id": record["deleted_rule_id"], "deleted": True}
 
-    driver.close()
     return None
 
 
 def create_notification_instances_from_rules(event_id: str) -> List[Dict[str, Any]]:
     """Create notification instances from active rules for an event."""
-    driver = get_driver()
     created = []
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         # Get all active rules for the event
         rules_result = session.run("""
             MATCH (e:Event {event_id: $event_id})-[r:HAS_NOTIFICATION_RULE]->(p:Person)
@@ -955,15 +939,12 @@ def create_notification_instances_from_rules(event_id: str) -> List[Dict[str, An
                     "person_phone": p["phone_number"]
                 })
 
-    driver.close()
     return created
 
 
 def get_due_notifications() -> List[Dict[str, Any]]:
     """Get all due notifications that haven't been sent."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (n:Notification)-[:NOTIFICATION_FOR]->(e:Event)
             MATCH (p:Person)-[:RECEIVES_NOTIFICATION]->(n)
@@ -989,28 +970,21 @@ def get_due_notifications() -> List[Dict[str, Any]]:
                 "person_phone": record["person_phone"]
             })
 
-    driver.close()
     return notifications
 
 
 def mark_notification_sent(notification_id: str):
     """Mark a notification as sent."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         session.run("""
             MATCH (n:Notification {notification_id: $notification_id})
             SET n.status = 'sent', n.sent_at = datetime()
         """, notification_id=notification_id)
 
-    driver.close()
-
 
 def delete_notification_rule_instances(event_id: str, rule_id: str) -> Dict[str, Any]:
     """Delete all notification instances for a rule."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (n:Notification {rule_id: $rule_id})-[:NOTIFICATION_FOR]->(e:Event {event_id: $event_id})
             DELETE n
@@ -1021,7 +995,6 @@ def delete_notification_rule_instances(event_id: str, rule_id: str) -> Dict[str,
         if record:
             return {"deleted_count": record["deleted_count"]}
 
-    driver.close()
     return None
 
 
@@ -1087,9 +1060,7 @@ def apply_notification_preset(event_id: str, person_phone: str, preset_name: str
 
 def get_todays_events() -> List[Dict[str, Any]]:
     """Get all events happening today."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (e:Event)
             WHERE e.status = 'active'
@@ -1113,15 +1084,12 @@ def get_todays_events() -> List[Dict[str, Any]]:
             event["attendees"] = record["attendees"]
             events.append(event)
 
-    driver.close()
     return events
 
 
 def get_daily_digest(days: int = 3) -> List[Dict[str, Any]]:
     """Get events for the next N days (for daily digest)."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (e:Event)
             WHERE e.status = 'active'
@@ -1142,15 +1110,12 @@ def get_daily_digest(days: int = 3) -> List[Dict[str, Any]]:
             event["attendees"] = record["attendees"]
             events.append(event)
 
-    driver.close()
     return events
 
 
 def check_time_conflicts(start: datetime, end: datetime) -> List[Dict[str, Any]]:
     """Check for time conflicts with existing events."""
-    driver = get_driver()
-
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (e:Event)
             WHERE e.status = 'active'
@@ -1170,7 +1135,6 @@ def check_time_conflicts(start: datetime, end: datetime) -> List[Dict[str, Any]]
                 "ends": record["ends"]
             })
 
-    driver.close()
     return conflicts
 
 
@@ -1187,8 +1151,7 @@ def handle_json_api(operation: str, params: dict) -> dict:
             person = params.get("person")
             limit = params.get("limit", 50)
 
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 # Build query based on filters
                 query_parts = ["MATCH (e:Event)", "WHERE e.status = 'active'"]
                 query_params = {}
@@ -1225,13 +1188,11 @@ def handle_json_api(operation: str, params: dict) -> dict:
                     event["attendees"] = record["attendees"]
                     events.append(event)
 
-            driver.close()
             return {"events": events, "count": len(events)}
 
         elif operation == "get_event":
             event_id = params.get("event_id")
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 result = session.run("""
                     MATCH (e:Event {event_id: $event_id})
                     OPTIONAL MATCH (e)-[:AT_LOCATION]->(l:Location)
@@ -1248,7 +1209,6 @@ def handle_json_api(operation: str, params: dict) -> dict:
                     event["attendees"] = record["attendees"]
                     return {"event": event}
                 return {"event": None}
-            driver.close()
 
         elif operation == "create_event":
             event = create_event(
@@ -1266,8 +1226,7 @@ def handle_json_api(operation: str, params: dict) -> dict:
         elif operation == "update_event":
             event_id = params.get("event_id")
             # Get existing event
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 set_clauses = []
                 query_params = {"event_id": event_id}
 
@@ -1297,13 +1256,11 @@ def handle_json_api(operation: str, params: dict) -> dict:
 
                 record = result.single()
                 return {"event": dict(record["e"]) if record else None}
-            driver.close()
 
         elif operation == "cancel_event":
             event_id = params.get("event_id")
             creator_phone = params.get("creator_phone")
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 if creator_phone:
                     result = session.run("""
                         MATCH (e:Event {event_id: $event_id})
@@ -1320,11 +1277,9 @@ def handle_json_api(operation: str, params: dict) -> dict:
 
                 record = result.single()
                 return {"event": dict(record["e"]) if record else None, "cancelled": record is not None}
-            driver.close()
 
         elif operation == "get_people":
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 result = session.run("""
                     MATCH (p:Person)
                     RETURN p {
@@ -1335,7 +1290,6 @@ def handle_json_api(operation: str, params: dict) -> dict:
                     ORDER BY p.name ASC
                 """)
                 people = [dict(record["person"]) for record in result]
-            driver.close()
             return {"people": people, "count": len(people)}
 
         elif operation == "rsvp_to_event":
@@ -1348,8 +1302,7 @@ def handle_json_api(operation: str, params: dict) -> dict:
 
         elif operation == "get_event_reminders":
             event_id = params.get("event_id")
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 result = session.run("""
                     MATCH (e:Event {event_id: $event_id})
                     MATCH (r:Reminder)-[:REMINDER_FOR]->(e)
@@ -1362,7 +1315,6 @@ def handle_json_api(operation: str, params: dict) -> dict:
                     rem = dict(record["r"])
                     rem["person_name"] = record["person_name"]
                     reminders.append(rem)
-            driver.close()
             return {"reminders": reminders}
 
         elif operation == "create_reminder":
@@ -1381,8 +1333,7 @@ def handle_json_api(operation: str, params: dict) -> dict:
 
         elif operation == "get_notification_settings":
             phone = params.get("phone")
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 result = session.run("""
                     MATCH (p:Person {phone_number: $phone})
                     RETURN p.calendar_notifications_enabled as enabled,
@@ -1399,7 +1350,6 @@ def handle_json_api(operation: str, params: dict) -> dict:
                     }
                 else:
                     return {"error": "Person not found"}, 404
-            driver.close()
 
         elif operation == "update_notification_settings":
             phone = params.get("phone")
@@ -1407,8 +1357,7 @@ def handle_json_api(operation: str, params: dict) -> dict:
             channel = params.get("channel", "signal")
             reminders = params.get("default_reminders", [15, 60])
 
-            driver = get_driver()
-            with driver.session() as session:
+            with neo4j_session() as session:
                 result = session.run("""
                     MATCH (p:Person {phone_number: $phone})
                     SET p.calendar_notifications_enabled = $enabled,
@@ -1423,7 +1372,6 @@ def handle_json_api(operation: str, params: dict) -> dict:
                     return {"success": True, "phone": record["updated"]}
                 else:
                     return {"error": "Person not found"}, 404
-            driver.close()
 
         else:
             return {"error": f"Unknown operation: {operation}"}

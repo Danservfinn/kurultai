@@ -328,11 +328,9 @@ class RollbackManager:
             return False
 
         try:
-            from neo4j_task_tracker import get_driver
+            from neo4j_task_tracker import neo4j_session
 
-            driver = get_driver()
-
-            with driver.session() as session:
+            with neo4j_session() as session:
                 # Create RollbackEvent node
                 query = """
                 CREATE (r:RollbackEvent {
@@ -373,7 +371,6 @@ class RollbackManager:
                         exp_id=result["experiment_id"]
                     )
 
-            driver.close()
             return True
 
         except Exception as e:

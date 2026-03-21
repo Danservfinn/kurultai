@@ -53,3 +53,6 @@
 {"ts": "2026-03-14T12:45:56.461344", "from": "temujin", "to": "mongke", "title": "Test kublai fix bug persistence check", "reason": "idle-wake: temujin busy/loaded (queue=1), mongke idle with valid creds (queue=0)"}
 {"ts": "2026-03-14T12:59:28.132608", "from": "temujin", "to": "mongke", "title": "fix bug in data pipeline parser", "reason": "idle-wake: temujin busy/loaded (queue=1), mongke idle with valid creds (queue=0)"}
 {"ts": "2026-03-14T13:00:07.584620", "from": "temujin", "to": "jochi", "title": "fix bug in the web server", "reason": "idle-wake: temujin busy/loaded (queue=1), jochi idle with valid creds (queue=0)"}
+{"ts": "2026-03-20T03:02:21.614831", "from": "jochi", "to": "chagatai", "title": "Assess deepagents vs Claude Code for replacement", "reason": "idle-wake: jochi busy/loaded (queue=2), chagatai idle with valid creds (queue=0)"}
+{"ts": "2026-03-20T03:12:31.044189", "from": "ogedei", "to": "mongke", "title": "Task-watcher daemon not running - 17 tasks stuck pending", "reason": "idle-wake: ogedei busy/loaded (queue=2), mongke idle with valid creds (queue=1)"}
+{"ts": "2026-03-20T04:18:18.236028", "from": "mongke", "to": "ogedei", "title": "Research best model for OpenClaw", "reason": "idle-wake: mongke busy/loaded (queue=3), ogedei idle with valid creds (queue=1)"}

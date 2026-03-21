@@ -132,19 +132,14 @@ def check_neo4j() -> tuple[bool, str, dict]:
     Returns: (is_healthy, reason, metrics)
     """
     try:
-        from neo4j_task_tracker import get_driver, close_driver, get_pool_metrics
+        from neo4j_task_tracker import neo4j_session, get_pool_metrics
 
-        driver = get_driver()
-        driver.verify_connectivity()
+        with neo4j_session() as session:
+            session.run("RETURN 1").consume()
         metrics = get_pool_metrics()
         return True, "OK", {"status": "up", **metrics}
     except Exception as e:
         return False, str(e)[:100], {"status": "down"}
-    finally:
-        try:
-            close_driver()
-        except Exception:
-            pass  # Ignore cleanup errors
 
 
 def check_redis() -> tuple[bool, str, dict]:

@@ -327,6 +327,16 @@ class Neo4jGateRepository(GateRepository):
                 raise Neo4jUnavailableError(f"neo4j_task_tracker not available: {e}")
         return self._driver
 
+    def close(self):
+        """Close the Neo4j driver connection."""
+        if self._driver is not None:
+            try:
+                from neo4j_task_tracker import close_driver
+                close_driver()
+            except ImportError:
+                pass
+            self._driver = None
+
     def find_pending(self) -> List[GateTask]:
         """Find pending gates using indexed Neo4j query."""
         try:

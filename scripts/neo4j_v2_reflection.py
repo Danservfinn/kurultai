@@ -236,6 +236,267 @@ def prepare_all_reflections(store: TaskStore, hours: int = 1) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Conversational Health Queries (for review stage only — NOT self-reflection)
+# ---------------------------------------------------------------------------
+
+def _get_curiosity_funnel(session, days: int = 7) -> dict:
+    """PendingQuestion status funnel over last N days.
+    System-wide (no agent field on PendingQuestion).
+    Statuses: PENDING, ANSWERED, SKIPPED, EXPIRED.
+    """
+    result = session.run("""
+        MATCH (pq:PendingQuestion)
+        WHERE pq.createdAt > datetime() - duration({days: toInteger($days)})
+        RETURN pq.status AS status, count(pq) AS count
+    """, days=days)
+    funnel = {}
+    for rec in result:
+        funnel[rec["status"]] = rec["count"]
+    total = sum(funnel.values())
+    answered = funnel.get("ANSWERED", 0)
+    return {
+        "total": total,
+        "funnel": funnel,
+        "answer_rate": round(answered / total, 3) if total > 0 else 0.0,
+    }
+
+
+def _get_reciprocity_ratio(session, days: int = 7) -> list:
+    """Inbound vs outbound DM message ratio per human.
+    Filters scope='dm' (excludes group messages).
+    """
+    result = session.run("""
+        MATCH (h:Human)
+        MATCH (m:Message {humanId: h.id, scope: 'dm'})
+        WHERE m.timestamp > datetime() - duration({days: toInteger($days)})
+          AND m.direction IN ['inbound', 'outbound']
+        WITH h,
+             count(CASE WHEN m.direction = 'inbound' THEN 1 END) AS inbound,
+             count(CASE WHEN m.direction = 'outbound' THEN 1 END) AS outbound
+        WHERE inbound + outbound > 0
+        RETURN coalesce(h.displayName, left(h.id, 8)) AS name,
+               h.id AS human_id,
+               inbound, outbound,
+               CASE WHEN outbound > 0
+                    THEN round(toFloat(inbound) / outbound * 100) / 100.0
+                    ELSE -1.0
+               END AS ratio
+        ORDER BY inbound + outbound DESC
+        LIMIT 10
+    """, days=days)
+    return [dict(rec) for rec in result]
+
+
+def _get_stale_action_items(session, stale_days: int = 7) -> list:
+    """ActionItems with status='OPEN' older than N days.
+    Uses epoch millis for age calculation.
+    """
+    result = session.run("""
+        MATCH (ai:ActionItem {status: 'OPEN'})
+        WHERE ai.createdAt < datetime() - duration({days: toInteger($days)})
+        OPTIONAL MATCH (h:Human {id: ai.humanId})
+        RETURN ai.description AS description,
+               ai.assignee AS assignee,
+               ai.priority AS priority,
+               toString(ai.deadline) AS deadline,
+               toString(ai.createdAt) AS created_at,
+               coalesce(h.displayName, 'unknown') AS human_name,
+               (datetime().epochMillis - ai.createdAt.epochMillis) / 86400000 AS age_days
+        ORDER BY ai.createdAt ASC
+        LIMIT 15
+    """, days=stale_days)
+    return [dict(rec) for rec in result]
+
+
+def prepare_conversational_context(store: TaskStore) -> str:
+    """Build conversational health context for the REVIEW stage only.
+
+    NOT embedded in prepare_reflection() — prevents Goodhart's Law.
+    Each query independently catches Neo4j exceptions.
+    Callers: review-with-fallback.py, generate_hourly_report.py.
+    """
+    from neo4j.exceptions import ServiceUnavailable, SessionExpired
+
+    parts = ["## Conversational Health (Last 7 Days)"]
+
+    with store.driver.session() as session:
+        # Query 1: Curiosity funnel
+        try:
+            funnel = _get_curiosity_funnel(session, days=7)
+            parts.append("\n### Curiosity Engine")
+            parts.append(f"Questions: {funnel['total']} total, "
+                         f"answer rate: {funnel['answer_rate']:.0%}")
+            for status, count in sorted(funnel['funnel'].items()):
+                parts.append(f"  {status}: {count}")
+            if funnel['total'] > 0 and funnel['answer_rate'] < 0.3:
+                parts.append("  WARNING: Answer rate below 30% — questions may be poorly timed or irrelevant")
+        except (ServiceUnavailable, SessionExpired) as e:
+            parts.append(f"\n### Curiosity Engine\n*Neo4j unavailable: {str(e)[:60]}*")
+            logger.warning(f"Curiosity funnel: Neo4j unavailable: {e}")
+        except Exception as e:
+            parts.append(f"\n### Curiosity Engine\n*Error: {str(e)[:80]}*")
+            logger.error(f"Curiosity funnel query error: {e}", exc_info=True)
+
+        # Query 2: Reciprocity ratio
+        try:
+            ratios = _get_reciprocity_ratio(session, days=7)
+            parts.append(f"\n### DM Reciprocity ({len(ratios)} humans)")
+            if ratios:
+                for r in ratios[:5]:
+                    ratio_str = f"{r['ratio']:.2f}" if r['ratio'] >= 0 else "outbound-only"
+                    parts.append(f"  {r['name']}: {r['inbound']}in/{r['outbound']}out "
+                                 f"(ratio={ratio_str})")
+                    if r['ratio'] >= 0 and r['ratio'] < 0.2 and r['outbound'] > 5:
+                        parts.append(f"    WARNING: Very low reciprocity — possible over-messaging")
+                if len(ratios) > 5:
+                    parts.append(f"  ... and {len(ratios) - 5} more")
+            else:
+                parts.append("  No DM conversations in period")
+        except (ServiceUnavailable, SessionExpired) as e:
+            parts.append(f"\n### DM Reciprocity\n*Neo4j unavailable*")
+            logger.warning(f"Reciprocity ratio: Neo4j unavailable: {e}")
+        except Exception as e:
+            parts.append(f"\n### DM Reciprocity\n*Error: {str(e)[:80]}*")
+            logger.error(f"Reciprocity ratio query error: {e}", exc_info=True)
+
+        # Query 3: Stale action items
+        try:
+            stale = _get_stale_action_items(session, stale_days=7)
+            parts.append(f"\n### Stale Promises ({len(stale)} items >7d)")
+            if stale:
+                for item in stale[:5]:
+                    age = int(item.get('age_days', 0))
+                    desc = (item.get('description') or 'no description')[:60]
+                    parts.append(f"  [{age}d] {desc} (for {item['human_name']})")
+                if len(stale) > 5:
+                    parts.append(f"  ... and {len(stale) - 5} more")
+                if len(stale) > 20:
+                    parts.append("  WARNING: >20 stale action items — action item lifecycle may need attention")
+            else:
+                parts.append("  No stale action items")
+        except (ServiceUnavailable, SessionExpired) as e:
+            parts.append(f"\n### Stale Promises\n*Neo4j unavailable*")
+        except Exception as e:
+            parts.append(f"\n### Stale Promises\n*Error: {str(e)[:80]}*")
+            logger.error(f"Stale action items query error: {e}", exc_info=True)
+
+    # ResponseGuard activation count (from JSONL, not Neo4j)
+    try:
+        from pathlib import Path
+        guard_log = Path("/Users/kublai/.openclaw/logs/response-guard-activations.jsonl")
+        if guard_log.exists():
+            import json
+            from datetime import datetime as dt, timedelta
+            cutoff = dt.now() - timedelta(days=7)
+            activations = fallbacks = 0
+            content = guard_log.read_text().strip()
+            lines = content.split("\n") if content else []
+            for line in lines[-200:]:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("event") == "group_send":
+                        continue
+                    if dt.fromisoformat(entry["timestamp"]) > cutoff:
+                        activations += 1
+                        if entry.get("is_fallback"):
+                            fallbacks += 1
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    continue
+            parts.append(f"\n### Privacy (ResponseGuard, 7d)")
+            parts.append(f"  Activations: {activations} ({fallbacks} high-redaction fallbacks)")
+            if fallbacks > 5:
+                parts.append("  WARNING: >5 fallback activations — response generation may need review")
+        else:
+            parts.append(f"\n### Privacy (ResponseGuard)")
+            parts.append("  No activation log found (file created on first group interaction)")
+    except Exception as e:
+        parts.append(f"\n### Privacy\n*Error: {str(e)[:60]}*")
+
+    return "\n".join(parts)
+
+
+def _run_conversational_self_test(store: TaskStore):
+    """Create test data, run queries, verify, clean up."""
+    import uuid
+    test_tag = f"conv-selftest-{uuid.uuid4().hex[:8]}"
+    human_id = f"test-human-{test_tag}"
+    print(f"  Self-test: {test_tag}")
+
+    # Phase 1: Create test data and run direct queries in one session
+    with store.driver.session() as s:
+        s.run("""
+            CREATE (h:Human {id: $hid, displayName: 'Test Human', status: 'active',
+                             source: 'test', _test_tag: $tag})
+
+            CREATE (pq1:PendingQuestion {id: randomUUID(), humanId: $hid,
+                    status: 'PENDING', createdAt: datetime(), expiresAt: datetime() + duration('PT30M'),
+                    type: 'event_field', question: 'Test?', _test_tag: $tag})
+            CREATE (pq2:PendingQuestion {id: randomUUID(), humanId: $hid,
+                    status: 'ANSWERED', createdAt: datetime() - duration('PT1H'),
+                    answeredAt: datetime(), type: 'profile_curiosity', question: 'Test answered',
+                    _test_tag: $tag})
+            CREATE (pq3:PendingQuestion {id: randomUUID(), humanId: $hid,
+                    status: 'EXPIRED', createdAt: datetime() - duration('PT2H'),
+                    type: 'event_field', question: 'Test expired', _test_tag: $tag})
+
+            CREATE (m1:Message {id: randomUUID(), humanId: $hid, direction: 'inbound',
+                    scope: 'dm', timestamp: datetime(), contentScrubbed: 'test in',
+                    _test_tag: $tag})
+            CREATE (m2:Message {id: randomUUID(), humanId: $hid, direction: 'outbound',
+                    scope: 'dm', timestamp: datetime(), contentScrubbed: 'test out',
+                    _test_tag: $tag})
+
+            CREATE (ai:ActionItem {id: randomUUID(), humanId: $hid, status: 'OPEN',
+                    description: 'Test stale item', priority: 'low',
+                    createdAt: datetime() - duration('P30D'),
+                    updatedAt: datetime() - duration('P30D'),
+                    _test_tag: $tag})
+        """, hid=human_id, tag=test_tag)
+        print("  [OK] Test data created")
+
+        # Run direct queries within the same session
+        try:
+            funnel = _get_curiosity_funnel(s, days=1)
+            assert funnel['total'] >= 3, f"Expected >= 3 questions, got {funnel['total']}"
+            print(f"  [OK] Curiosity funnel: {funnel['total']} questions, {funnel['answer_rate']:.0%} answer rate")
+        except Exception as e:
+            print(f"  [FAIL] Curiosity funnel: {e}")
+
+        try:
+            ratios = _get_reciprocity_ratio(s, days=1)
+            assert len(ratios) >= 1, f"Expected >= 1 human, got {len(ratios)}"
+            print(f"  [OK] Reciprocity: {len(ratios)} humans, first ratio={ratios[0].get('ratio')}")
+        except Exception as e:
+            print(f"  [FAIL] Reciprocity: {e}")
+
+        try:
+            stale = _get_stale_action_items(s, stale_days=1)
+            assert len(stale) >= 1, f"Expected >= 1 stale item, got {len(stale)}"
+            print(f"  [OK] Stale items: {len(stale)}, age={stale[0].get('age_days')}d")
+        except Exception as e:
+            print(f"  [FAIL] Stale items: {e}")
+
+    # Phase 2: Test full context wrapper in a separate session (avoids nested session deadlock)
+    try:
+        ctx = prepare_conversational_context(store)
+        assert len(ctx) > 50, f"Context too short: {len(ctx)} chars"
+        print(f"  [OK] Full context: {len(ctx)} chars")
+    except Exception as e:
+        print(f"  [FAIL] Full context: {e}")
+
+    # Phase 3: Cleanup
+    with store.driver.session() as s:
+        r = s.run("""
+            MATCH (n) WHERE n._test_tag = $tag
+            DETACH DELETE n
+            RETURN count(n) AS deleted
+        """, tag=test_tag).single()
+        print(f"  [OK] Cleaned up {r['deleted']} test nodes")
+
+    print("\n  Self-test complete.")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -246,11 +507,20 @@ def main():
     parser.add_argument("--hours", type=int, default=1)
     parser.add_argument("--save-test", action="store_true",
                         help="Save a test reflection")
+    parser.add_argument("--conversational", action="store_true",
+                        help="Show conversational health context")
+    parser.add_argument("--self-test", action="store_true",
+                        help="Run conversational query self-test")
     args = parser.parse_args()
 
     store = TaskStore()
     try:
-        if args.save_test and args.agent:
+        if args.self_test:
+            _run_conversational_self_test(store)
+        elif args.conversational:
+            ctx = prepare_conversational_context(store)
+            print(ctx if ctx else "(empty)")
+        elif args.save_test and args.agent:
             ok = save_reflection(
                 store, args.agent,
                 summary="Test reflection from CLI",

@@ -67,19 +67,22 @@ except ImportError:
 
 # Timeout configuration — imported from canonical source (kurultai_paths.py)
 from kurultai_paths import CLAUDE_TIMEOUT as _DEFAULT_TIMEOUT, TIMEOUT_BY_PRIORITY as _TIMEOUT_BY_PRIORITY
-_SLOW_SKILLS_TIMEOUT = {
-    '/horde-brainstorming': 10800,
-    '/golden-horde': 10800,
-    '/horde-implement': 10800,
-    '/horde-review': 10800,
-    '/horde-debug': 10800,
-    '/horde-learn': 10800,
-    '/horde-swarm': 10800,
-    '/horde-test': 10800,
-    '/systematic-debugging': 10800,
-    '/kurultai-health': 10800,
-    '/code-reviewer': 10800,
-}
+from kurultai_paths import SLOW_SKILLS as _SLOW_SKILLS_TIMEOUT
+
+# Single source of truth for system sources (used for routing bypass checks)
+_SYSTEM_SOURCES = frozenset({
+    "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
+    "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
+    "cascade_detector", "throughput_anomaly", "stall_detector",
+    "action_resolution", "signal_calendar", "redistribution",
+    "system-health-check", "task_intake", "queue-audit", "kurultai-monitor",
+    "kublai-initiative", "idle-monitor", "kublai-diagnostic", "idle-crisis",
+    "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
+    "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
+    "signal", "api", "direct-mention", "kurultai-delegate",
+    "jochi-debug",
+    "daily-task-review",
+})
 
 
 def compute_task_timeout(priority, skill_hint=None):
@@ -513,7 +516,7 @@ def create_task(title, body, priority="normal", source="task_intake",
                 depth=0, agent=None, parent_id=None, skip_duplicate_check=False,
                 skill_hint=None, force_claude_code=False,
                 notify_on_complete=False, notify_channel="signal",
-                notify_target="+19194133445", bucket=None,
+                notify_target=None, bucket=None,
                 origin_type=None, origin_initiator=None, origin_source=None):
     """Create a task through the canonical pipeline.
 
@@ -584,20 +587,7 @@ def create_task(title, body, priority="normal", source="task_intake",
         # Caller provided an explicit agent — check if keyword routing disagrees
         # FIX (2026-03-11): Reduce explicit routing by checking keyword matches
         # even when agent is specified, unless it's a system source or direct mention
-        _system_sources = {
-            "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
-            "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
-            "cascade_detector", "throughput_anomaly", "stall_detector",
-            "action_resolution", "signal_calendar", "redistribution",
-            "system-health-check", "task_intake", "queue-audit", "kurultai-monitor",
-            "kublai-initiative", "idle-monitor", "kublai-diagnostic", "idle-crisis",
-            "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
-            "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
-            # FIX 2026-03-14: Respect explicit agent when caller provides one via
-            # human-initiated or API sources. These sources indicate deliberate routing.
-            "signal", "api", "direct-mention", "kurultai-delegate",
-            "jochi-debug",  # Agent self-tasks with explicit routing
-        }
+        _system_sources = _SYSTEM_SOURCES
         _is_system_source = source in _system_sources
 
         if not _is_system_source:
@@ -692,17 +682,7 @@ def create_task(title, body, priority="normal", source="task_intake",
     # Reject tasks routed to agents that cannot handle the classified domain.
     # Prevents the 8-hour stuck task issue where ogedei held a documentation task.
     # System sources and direct mentions bypass this check (they know what they're doing).
-    _system_sources = {
-        "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
-        "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
-        "cascade_detector", "throughput_anomaly", "stall_detector",
-        "action_resolution", "signal_calendar", "redistribution",
-        "system-health-check", "task_intake", "queue-audit", "kurultai-monitor",
-        "kublai-initiative", "idle-monitor", "kublai-diagnostic", "idle-crisis",
-        "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
-        "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
-        "direct-mention",  # Explicit @mention bypass
-    }
+    _system_sources = _SYSTEM_SOURCES
     if (_caller_provided_agent and
         source not in _system_sources and
         not mention_agent and
@@ -907,17 +887,7 @@ Multi-tier fallback: Anthropic → Z.AI → Alibaba
     # 1. Direct @mentions (user explicitly chose agent)
     # 2. System sources that require specific agents (watchdog, health checks)
     # 3. Tasks with skill hints that lock to specific agents
-    _system_sources_requiring_explicit = {
-        "kublai-actions", "ogedei-watchdog", "task-watcher", "routing_audit",
-        "reflection", "tick", "tock", "hourly_reflection", "mongke_self_task",
-        "cascade_detector", "throughput_anomaly", "stall_detector",
-        "action_resolution", "signal_calendar", "redistribution",
-        "system-health-check", "task_intake", "queue-audit", "kurultai-monitor",
-        "kublai-initiative", "idle-monitor", "kublai-diagnostic", "idle-crisis",
-        "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
-        "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
-        "daily-task-review",  # Task review should respect explicit routing
-    }
+    _system_sources_requiring_explicit = _SYSTEM_SOURCES
     _is_system_source = source in _system_sources_requiring_explicit
 
     # Load balancing applies to:
@@ -1221,6 +1191,13 @@ This is blocking ALL task execution. Fleet is paralyzed.
             return None
 
     # 4-5. Create in Neo4j + filesystem
+    # Derive notify_target from origin_initiator when it's a phone number
+    if notify_target is None:
+        if origin_initiator and origin_initiator.startswith("+"):
+            notify_target = origin_initiator
+        else:
+            notify_target = "+19194133445"
+
     try:
         from neo4j_task_tracker import get_tracker
         tracker = get_tracker()

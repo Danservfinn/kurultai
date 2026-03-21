@@ -6,8 +6,9 @@
 
 ## Authentication
 
-- Protected paths: `/api/providers`, `/api/settings` (except `/api/settings/mode` and `/api/settings/model` which are public)
-- Auth method: API key via `Authorization: Bearer <key>` header or `?api_key=<key>` query param
+- Protected paths: `/api/providers`, `/api/settings` (except `/api/settings/mode` and `/api/settings/model` GET requests, which are public; POST requests to these paths require auth)
+- Auth method: API key via `Authorization: Bearer <key>` header only (query param auth removed to avoid log/Referer leakage)
+- Same-origin detection: checks both `Origin` and `Referer` headers against ALLOWED_ORIGINS
 - Key file: `~/.openclaw/credentials/kurultai-api.key` (auto-generated if missing)
 - Rate limiting: LRU-cache based per-IP rate limiter (general + review-specific)
 
@@ -22,7 +23,7 @@
 
 **POST /api/providers** body:
 ```json
-{ "provider": "zai|alibaba|anthropic|default", "field": "authToken|baseUrl|model|defaultModel", "value": "..." }
+{ "provider": "zai|alibaba|anthropic|openrouter|default", "field": "authToken|apiKey|baseUrl|model|defaultModel", "value": "..." }
 ```
 
 ---
@@ -107,12 +108,13 @@
 
 ---
 
-## Completions and Verifications
+## Verifications
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/completions` | No | Task completion log (JSONL). Query: `?limit=`, `?offset=`, `?agent=` |
 | GET | `/api/verifications` | No | Verification log (JSONL). Query: `?limit=`, `?offset=`, `?agent=` |
+
+> **NOT IMPLEMENTED**: `GET /api/completions` — referenced in earlier docs but no corresponding route in server.js.
 
 ---
 
@@ -122,14 +124,6 @@
 |--------|------|------|-------------|
 | GET | `/api/hourly-reports` | No | List hourly report files. Query: `?limit=`, `?offset=` |
 | GET | `/api/hourly-reports/:filename` | No | Get a specific hourly report content |
-
----
-
-## Dashboard
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/dashboard` | No | Aggregated dashboard data: tock latest, latest reflection summary, agent summaries with grades/metrics |
 
 ---
 
@@ -149,8 +143,8 @@
 | GET | `/api/agents/claude-config` | No | Read per-agent profile/model/effort settings |
 | PUT | `/api/agents/claude-config/all` | No | Apply same profile/model/effort to all agents |
 | PUT | `/api/agents/:name/claude-config` | No | Update single agent profile/model/effort |
-| GET | `/api/agents/wrapper-status` | No | Get claude-agent wrapper status, fallback chain, current tasks, recent completions |
-| GET | `/api/claude-agent/config` | No | Get claude-agent wrapper script configuration (tiers, fallback chain) |
+
+> **NOT IMPLEMENTED**: `GET /api/agents/wrapper-status` and `GET /api/claude-agent/config` — referenced in earlier docs but no corresponding routes in server.js.
 
 ---
 
@@ -173,9 +167,9 @@
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/settings/mode` | No | Read current dispatch mode (`auto`, `backup`, `primary`) |
-| POST | `/api/settings/mode` | No | Update dispatch mode |
+| POST | `/api/settings/mode` | Yes | Update dispatch mode |
 | GET | `/api/settings/model` | No | Read current Claude model from primary settings.json |
-| POST | `/api/settings/model` | No | Update Claude model (restricted to allowed list: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`) |
+| POST | `/api/settings/model` | Yes | Update Claude model (restricted to allowed list: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`) |
 
 ---
 

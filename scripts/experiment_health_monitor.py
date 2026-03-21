@@ -46,7 +46,7 @@ NEO4J_AVAILABLE = False
 NEO4J_DRIVER = None
 
 try:
-    from neo4j_task_tracker import get_driver
+    from neo4j_task_tracker import get_driver, close_driver
     NEO4J_AVAILABLE = True
 except ImportError:
     pass
@@ -437,7 +437,8 @@ class ExperimentHealthMonitor:
     def close(self):
         """Close Neo4j connection."""
         if self.driver:
-            self.driver.close()
+            close_driver()
+            self.driver = None
 
 
 def main():

@@ -545,3 +545,16 @@
 {"ts": "2026-03-15T22:06:00.653084", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
 {"ts": "2026-03-16T01:37:50.879763", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
 {"ts": "2026-03-16T23:55:14.585533", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-17T16:03:32.113828", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
+{"ts": "2026-03-18T03:37:54.589974", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-18T04:08:08.077215", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-18T07:10:10.837392", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-18T07:40:32.648630", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-03-19T02:51:09.978198", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-20T04:41:41.064842", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "kublai", "details": {"task_file": "normal-1773979337.completed.done.md"}}
+{"ts": "2026-03-20T05:16:16.556604", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1773983526-631138de.stale-resolved.done.md"}}
+{"ts": "2026-03-20T05:16:16.560155", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "high-1773986116-fbb00085.stale-resolved.done.md"}}
+{"ts": "2026-03-20T05:16:16.563805", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1773990928-b23801af.stale-resolved.done.md"}}
+{"ts": "2026-03-20T12:41:49.890722", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
+{"ts": "2026-03-20T18:03:10.954044", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "mongke", "details": {"task_file": "normal-1774043576-fb274733.done.md"}}
+{"ts": "2026-03-20T22:09:24.489045", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}

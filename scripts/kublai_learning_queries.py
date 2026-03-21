@@ -7,10 +7,8 @@ Each query returns metrics that power the learning engine's recommendations.
 
 Usage:
     from kublai_learning_queries import LearningQueries
-    from neo4j_task_tracker import get_driver
 
-    driver = get_driver()
-    queries = LearningQueries(driver)
+    queries = LearningQueries()
 
     # Get agent-specific prompt patterns
     patterns = queries.get_agent_prompt_patterns('temujin')
@@ -34,9 +32,10 @@ class LearningQueries:
     # Learning validity period
     LEARNING_TTL_DAYS = 14
 
-    def __init__(self, driver):
-        """Initialize with Neo4j driver instance."""
-        self.driver = driver
+    def __init__(self):
+        """Initialize learning queries."""
+        from neo4j_task_tracker import neo4j_session
+        self._neo4j_session = neo4j_session
 
     def get_agent_prompt_patterns(self, agent: Optional[str] = None,
                                    days: int = 30) -> List[Dict[str, Any]]:
@@ -55,7 +54,7 @@ class LearningQueries:
         Returns:
             List of dicts: {agent, template, high_quality_count, avg_quality, avg_duration, sample_size}
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             where_clause = "AND t.agent = $agent" if agent else ""
 
             # Fetch raw data and parse prompt_construction JSON in Python
@@ -148,7 +147,7 @@ class LearningQueries:
         Returns:
             List of dicts: {agent, hint, total, successes, success_rate, avg_quality}
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             where_clause = "AND t.agent = $agent" if agent else ""
 
             result = session.run(f"""
@@ -189,7 +188,7 @@ class LearningQueries:
         Returns:
             List of dicts: {agent, timeout_bucket, tasks, avg_quality, avg_utilization, success_rate}
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             where_clause = "AND t.agent = $agent" if agent else ""
 
             # Fetch raw data and parse task_params JSON in Python
@@ -288,7 +287,7 @@ class LearningQueries:
         Returns:
             List of dicts: {source, frequency, avg_quality, high_quality_rate}
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             result = session.run(f"""
                 MATCH (t:Task)
                 WHERE toUpper(t.status) IN ['COMPLETED', 'completed']
@@ -365,7 +364,7 @@ class LearningQueries:
         Returns:
             List of dicts: {agent, provider, model, avg_quality, token_efficiency, sample_size}
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             where_clause = "AND t.agent = $agent" if agent else ""
 
             result = session.run(f"""
@@ -403,7 +402,7 @@ class LearningQueries:
         Returns:
             List of dicts: {agent, domain, total, completed, success_rate, avg_quality}
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             where_clause = "AND t.agent = $agent" if agent else ""
 
             result = session.run(f"""
@@ -472,7 +471,7 @@ class LearningQueries:
         Returns:
             Baseline average quality score
         """
-        with self.driver.session() as session:
+        with self._neo4j_session() as session:
             where_clause = "AND t.agent = $agent" if agent else ""
 
             result = session.run(f"""
@@ -490,10 +489,7 @@ class LearningQueries:
 
 if __name__ == "__main__":
     # Test queries
-    from neo4j_task_tracker import get_driver
-
-    driver = get_driver()
-    queries = LearningQueries(driver)
+    queries = LearningQueries()
 
     print("=== Agent Prompt Patterns ===")
     patterns = queries.get_agent_prompt_patterns('temujin')
@@ -524,4 +520,4 @@ if __name__ == "__main__":
     baseline = queries.get_baseline_quality()
     print(f"  System-wide: {baseline:.2f}")
 
-    driver.close()
+    pass

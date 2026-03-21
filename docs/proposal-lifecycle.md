@@ -1,5 +1,50 @@
 # Proposal Lifecycle Management
 
+## Quick Start for Agents
+
+### What is a proposal?
+
+A proposal is a structured suggestion for improving the Kurultai system — a new rule, script, protocol, or process change. Any agent can create one during brainstorming or reflection cycles. Proposals live as markdown files in `proposals/` until they are reviewed, approved, and converted into executable tasks.
+
+### How does a proposal differ from a task?
+
+- **Task** = assigned work with a deadline. It goes into your `tasks/` queue and must be completed.
+- **Proposal** = an idea that needs review first. It sits in `proposals/` until someone (usually kublai) approves or rejects it. Only approved proposals become tasks.
+
+Think of proposals as the "pull request" for ideas — they need review before merging into the work queue.
+
+### When should you create a proposal?
+
+Create a proposal when you identify:
+- A recurring failure pattern that a new rule or script could prevent
+- A gap in the system that needs a new capability
+- A process improvement from a `/horde-review` PRIORITY_FIX
+- An optimization or refactor that affects multiple agents
+
+Do **not** create a proposal for work you can just do immediately within your own domain.
+
+### What happens after you submit a proposal?
+
+1. Your proposal enters the `proposals/` directory with status `Pending`
+2. The hourly reflection pipeline flags stale proposals (>24h without action)
+3. A reviewer (typically kublai) runs `proposal_lifecycle.py --list` to see pending items
+4. The proposal is either **approved** (converted to a task in the right agent's queue) or **rejected** (with a reason)
+5. If approved, the assigned agent executes it as a normal task
+
+### How to check your proposal's status
+
+```bash
+# See all pending proposals
+python3 proposal_lifecycle.py --list
+
+# See proposals that have been waiting too long
+python3 proposal_lifecycle.py --stale
+```
+
+Status icons: `⏳` Pending | `✅` Approved | `✨` Implemented | `❌` Rejected
+
+---
+
 ## Overview
 
 The Kurultai reflection pipeline generates proposals via brainstorming, but these need to be tracked, reviewed, and converted to actionable tasks. The proposal lifecycle system closes this loop.

@@ -103,15 +103,14 @@ except ImportError:
 def _update_neo4j_task_agent(task_id: str, new_agent: str) -> bool:
     """Update task agent in Neo4j after redistribution.
 
-    Note: Uses the singleton driver from get_driver(). The driver is NOT
-    closed here - it's a shared singleton managed by neo4j_task_tracker.
+    Note: Uses the neo4j_session() context manager which handles
+    driver lifecycle automatically.
     """
     if not task_id:
         return False
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        with driver.session() as session:
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $task_id})
                 SET t.agent = $new_agent,
@@ -120,7 +119,6 @@ def _update_neo4j_task_agent(task_id: str, new_agent: str) -> bool:
                 RETURN t.task_id AS updated
             """, task_id=task_id, new_agent=new_agent)
             return result.single() is not None
-        # Note: driver is singleton, do NOT close here
     except Exception as e:
         print(f"[CircuitBreaker] Neo4j sync failed for {task_id}: {e}")
         return False
@@ -394,9 +392,8 @@ class AgentCircuitBreaker:
             task_id = extract_task_id(str(f))
             if task_id:
                 try:
-                    from neo4j_task_tracker import get_driver
-                    driver = get_driver()
-                    with driver.session() as session:
+                    from neo4j_task_tracker import neo4j_session
+                    with neo4j_session() as session:
                         result = session.run("""
                             MATCH (t:Task {task_id: $task_id})
                             RETURN t.status as status, t.claimed_by as claimed_by

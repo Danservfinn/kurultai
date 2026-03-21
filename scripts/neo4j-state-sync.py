@@ -3,7 +3,7 @@
 neo4j-state-sync.py — Reconcile filesystem task state with Neo4j.
 
 ================================================================================
-DEPRECATED (2026-03-09)
+SOFT DEPRECATED (2026-03-09) — still invoked by tock-gather.sh for emergency reconciliation
 ================================================================================
 This script is no longer needed as Neo4j is now the SINGLE SOURCE OF TRUTH
 for task state. All state transitions happen in Neo4j first, then the
@@ -51,7 +51,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 from kurultai_paths import AGENTS_DIR
 AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"]
 
@@ -80,6 +80,8 @@ def derive_status_from_filename(filename):
         return 'COMPLETED'
     if '.executing' in name:
         return 'EXECUTING'
+    if '.done-' in name or '.done.' in name:
+        return 'COMPLETED'
     if name.endswith('.done'):
         return 'COMPLETED'
     return 'PENDING'
@@ -161,10 +163,10 @@ def scan_filesystem():
     return tasks
 
 
-def get_neo4j_tasks(driver):
+def get_neo4j_tasks():
     """Get all tasks from Neo4j indexed by task_id."""
     neo4j_tasks = {}
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (t:Task)
             WHERE t.task_id IS NOT NULL
@@ -182,9 +184,8 @@ def get_neo4j_tasks(driver):
 
 def sync(apply=False, verbose=False):
     """Main sync logic. Returns summary dict."""
-    driver = get_driver()
     fs_tasks = scan_filesystem()
-    neo4j_tasks = get_neo4j_tasks(driver)
+    neo4j_tasks = get_neo4j_tasks()
 
     stats = {
         'scanned': len(fs_tasks),
@@ -218,7 +219,7 @@ def sync(apply=False, verbose=False):
                 print(f"  [missing] {task['agent']}/{task['file']} task_id={tid} not in Neo4j")
             if apply:
                 try:
-                    with driver.session() as session:
+                    with neo4j_session() as session:
                         session.run("""
                             MERGE (a:Agent {name: $agent})
                             CREATE (t:Task {
@@ -279,7 +280,7 @@ def sync(apply=False, verbose=False):
 
         if apply:
             try:
-                with driver.session() as session:
+                with neo4j_session() as session:
                     session.run("""
                         MATCH (t:Task {task_id: $task_id})
                         SET t.status = $new_status,
@@ -307,8 +308,7 @@ def sync(apply=False, verbose=False):
     fs_task_ids = {t['task_id'] for t in fs_tasks if t['task_id']}
 
     # Query Neo4j for non-terminal tasks
-    driver2 = get_driver()
-    with driver2.session() as session:
+    with neo4j_session() as session:
         result = session.run("""
             MATCH (t:Task)
             WHERE t.status IN ['PENDING', 'EXECUTING', 'FAILED', 'pending', 'executing', 'ready', 'failed']
@@ -352,7 +352,7 @@ def sync(apply=False, verbose=False):
             try:
                 # Preserve FAILED status for failed orphans; resolve others as COMPLETED
                 resolved_status = 'FAILED' if orph['status'].upper() == 'FAILED' else 'COMPLETED'
-                with driver2.session() as session:
+                with neo4j_session() as session:
                     session.run("""
                         MATCH (t:Task {task_id: $task_id})
                         SET t.status = $resolved_status,
@@ -366,8 +366,6 @@ def sync(apply=False, verbose=False):
             except Exception as e:
                 orphan_stats['errors'] += 1
                 print(f"    -> ERROR: {e}")
-
-    driver2.close()
 
     # Summary
     print(f"\n{'='*50}")

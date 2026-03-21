@@ -26,7 +26,7 @@ import time
 from datetime import datetime
 from typing import Optional, Tuple
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 class StateTransitionError(Exception):
@@ -67,8 +67,7 @@ def claim_task(task_id: str, agent: str, session_key: str) -> Tuple[bool, str]:
             print(f"Claim failed: {reason}")
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             # First check if task exists at all
             check = session.run("""
                 MATCH (t:Task {task_id: $task_id})
@@ -131,8 +130,7 @@ def release_task(task_id: str, session_key: str) -> bool:
         True if release succeeded, False otherwise
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $task_id, session_key: $session_key, status: 'EXECUTING'})
                 SET t.status = 'PENDING',
@@ -177,8 +175,7 @@ def transition_status(task_id: str, from_status: str, to_status: str,
             print(f"Transition failed: {msg}")
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             is_terminal = to_status in ('COMPLETED', 'FAILED', 'TIMEOUT', 'CANCELLED')
 
             # CAS pattern: only update if current status matches
@@ -221,8 +218,7 @@ def complete_task(task_id: str, session_key: str) -> Tuple[bool, str]:
         Tuple of (success: bool, message: str)
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $task_id, session_key: $session_key, status: 'EXECUTING'})
                 SET t.status = 'COMPLETED',
@@ -256,8 +252,7 @@ def fail_task(task_id: str, session_key: str, error_msg: str) -> Tuple[bool, str
         Tuple of (success: bool, message: str)
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $task_id, session_key: $session_key, status: 'EXECUTING'})
                 SET t.status = 'FAILED',
@@ -290,8 +285,7 @@ def retry_task(task_id: str, max_retries: int = 3) -> Tuple[bool, str]:
         Tuple of (success: bool, message: str)
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $task_id, status: 'FAILED'})
                 WHERE t.retry_count < $max_retries
@@ -333,8 +327,7 @@ def get_task_status(task_id: str) -> Optional[dict]:
         Dict with task status info, or None if not found
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task {task_id: $task_id})
                 RETURN t.status as status,
@@ -371,8 +364,7 @@ def release_stale_claims(timeout_minutes: int = 30) -> Tuple[int, list[str]]:
         Tuple of (count_released: int, task_ids: list[str])
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             released_ids = []
 
             # Case 1: EXECUTING tasks stuck too long (original behavior)
@@ -431,8 +423,7 @@ def get_completed_task_ids(agent: Optional[str] = None, limit: int = 100) -> lis
         List of task_id strings for completed tasks
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             if agent:
                 result = session.run("""
                     MATCH (t:Task {agent: $agent})
@@ -462,8 +453,7 @@ def get_all_tracked_task_ids() -> set[str]:
         Set of all task_id strings in the database
     """
     try:
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task)
                 RETURN t.task_id as task_id
@@ -500,8 +490,7 @@ def _test_concurrent_claim():
             results.append((success, session_key))
 
     # Create test task - ensure it's in PENDING state
-    driver = get_driver()
-    with driver.session() as session:
+    with neo4j_session() as session:
         # First delete any existing test task
         session.run("MATCH (t:Task {task_id: $task_id}) DELETE t", task_id=test_task_id)
         # Create fresh task
@@ -541,7 +530,7 @@ def _test_concurrent_claim():
     print(f"Task status after claims: {final_status}")
 
     # Cleanup
-    with driver.session() as session:
+    with neo4j_session() as session:
         session.run("MATCH (t:Task {task_id: $task_id}) DELETE t", task_id=test_task_id)
 
     # The CAS pattern should ensure only one claim succeeds

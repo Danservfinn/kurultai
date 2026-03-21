@@ -57,6 +57,8 @@ VALID_EVENTS = {
     "GATE_FOLLOWUPS_CREATED", "ESCALATION_RESOLVED", "ESCALATION_CHAIN_RESOLVED",
     "REQUEUED", "ORPHAN_RESOLVED", "CANCELLED",
     "CIRCUIT_BREAKER_HALF_OPEN",
+    # Reaper and executor crash events (2026-03-20)
+    "ORPHAN_REAPED", "EXECUTOR_DOWN", "EXECUTOR_CRASH", "LEASE_CANCEL",
     # Rule enforcement events
     "R008_VIOLATION", "R008_VIOLATION_TRACKED", "R008_VIOLATION_TIMEOUT", "R008_PREFLIGHT_FAIL", "R008_PREFLIGHT_CHECK",
     "AUTH_PREFLIGHT_FAIL", "STALL_SIGTERM",
@@ -64,6 +66,12 @@ VALID_EVENTS = {
     "R008_SKILL_NOT_FOUND",
     # Timeout events
     "TASK_TIMEOUT",
+    # Dispatch phase events (Option B agent-owned execution)
+    "PHASE_DISPATCHED", "PHASE_PLANNING", "PHASE_EXECUTING",
+    "PHASE_PENDING_VERIFICATION", "VERIFICATION_PASSED",
+    "HEARTBEAT_STALE", "CREDENTIAL_REDISPATCH",
+    # Notification lifecycle events
+    "NOTIFICATION_QUEUED", "NOTIFICATION_SENT", "NOTIFICATION_FAILED",
     # Test events (should not appear in production)
     "PERF_TEST", "CONCURRENT_TEST", "TEST_EVENT",
 }
@@ -184,12 +192,12 @@ def append_ledger(entry: dict, validate: bool = True) -> bool:
     """
     try:
         from neo4j_task_tracker import TaskTracker
-        tracker = TaskTracker()
-        tracker.emit_pipeline_event(
-            event_type=entry.get("event", "UNKNOWN"),
-            payload=entry,
-            agent=entry.get("agent", ""),
-        )
+        with TaskTracker() as tracker:
+            tracker.emit_pipeline_event(
+                event_type=entry.get("event", "UNKNOWN"),
+                payload=entry,
+                agent=entry.get("agent", ""),
+            )
         return True
     except Exception:
         return False

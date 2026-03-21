@@ -261,60 +261,56 @@ def collect_neo4j_decisions():
     tasks_created = []
 
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                # Recent proposal decisions (last 2 hours)
-                result = session.run("""
-                    MATCH (f:AgentFeedback)
-                    WHERE f.source = 'kurultai_brainstorm'
-                      AND (f.reviewed_at >= datetime() - duration({hours: 2})
-                           OR f.submitted >= datetime() - duration({hours: 2}))
-                    RETURN f.agent AS agent, f.feedback AS feedback,
-                           f.status AS status, f.review_reason AS reason,
-                           f.priority AS priority
-                    ORDER BY f.submitted DESC
-                """)
-                for r in result:
-                    entry = {
-                        "agent": r["agent"] or "?",
-                        "feedback": (r["feedback"] or "")[:60],
-                        "reason": r["reason"] or "",
-                        "priority": r["priority"] or "MEDIUM",
-                    }
-                    st = r["status"] or "pending_review"
-                    if st == "approved":
-                        decisions["approved"].append(entry)
-                    elif st == "rejected":
-                        decisions["rejected"].append(entry)
-                    elif st == "expired":
-                        decisions["deferred"].append(entry)
-                    else:
-                        decisions["pending"].append(entry)
+        with neo4j_session() as session:
+            # Recent proposal decisions (last 2 hours)
+            result = session.run("""
+                MATCH (f:AgentFeedback)
+                WHERE f.source = 'kurultai_brainstorm'
+                  AND (f.reviewed_at >= datetime() - duration({hours: 2})
+                       OR f.submitted >= datetime() - duration({hours: 2}))
+                RETURN f.agent AS agent, f.feedback AS feedback,
+                       f.status AS status, f.review_reason AS reason,
+                       f.priority AS priority
+                ORDER BY f.submitted DESC
+            """)
+            for r in result:
+                entry = {
+                    "agent": r["agent"] or "?",
+                    "feedback": (r["feedback"] or "")[:60],
+                    "reason": r["reason"] or "",
+                    "priority": r["priority"] or "MEDIUM",
+                }
+                st = r["status"] or "pending_review"
+                if st == "approved":
+                    decisions["approved"].append(entry)
+                elif st == "rejected":
+                    decisions["rejected"].append(entry)
+                elif st == "expired":
+                    decisions["deferred"].append(entry)
+                else:
+                    decisions["pending"].append(entry)
 
-                # Recently created tasks (last 2 hours)
-                result = session.run("""
-                    MATCH (t:Task)
-                    WHERE t.created >= datetime() - duration({hours: 2})
-                    RETURN t.task_id AS id, t.title AS title, t.agent AS agent,
-                           t.priority AS priority, t.source AS source,
-                           t.skill_hint AS skill_hint
-                    ORDER BY t.created DESC
-                    LIMIT 20
-                """)
-                for r in result:
-                    tasks_created.append({
-                        "id": (r["id"] or "?")[:12],
-                        "title": (r["title"] or "?")[:60],
-                        "agent": r["agent"] or "?",
-                        "priority": r["priority"] or "normal",
-                        "source": r["source"] or "?",
-                        "skill_hint": r["skill_hint"] or "",
-                    })
-        finally:
-            driver.close()
+            # Recently created tasks (last 2 hours)
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created >= datetime() - duration({hours: 2})
+                RETURN t.task_id AS id, t.title AS title, t.agent AS agent,
+                       t.priority AS priority, t.source AS source,
+                       t.skill_hint AS skill_hint
+                ORDER BY t.created DESC
+                LIMIT 20
+            """)
+            for r in result:
+                tasks_created.append({
+                    "id": (r["id"] or "?")[:12],
+                    "title": (r["title"] or "?")[:60],
+                    "agent": r["agent"] or "?",
+                    "priority": r["priority"] or "normal",
+                    "source": r["source"] or "?",
+                    "skill_hint": r["skill_hint"] or "",
+                })
     except Exception as e:
         log(f"Neo4j query failed (non-fatal): {e}")
 
@@ -358,10 +354,26 @@ def collect_step_timing():
         return {}
 
 
+def collect_conversational_health():
+    """Collect conversational health metrics. Non-fatal on failure."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from neo4j_v2_reflection import prepare_conversational_context
+        from neo4j_v2_core import TaskStore
+        store = TaskStore()
+        try:
+            return prepare_conversational_context(store)
+        finally:
+            store.close()
+    except Exception as e:
+        log(f"Conversational health collection failed (non-fatal): {e}")
+        return ""
+
+
 # ── Report Generation ───────────────────────────────────────────────
 
 
-def generate_full_report(reflections, reviews, proposals, decisions, tasks_created, tock, skills, timing):
+def generate_full_report(reflections, reviews, proposals, decisions, tasks_created, tock, skills, timing, conv_health=""):
     """Generate the full markdown report."""
     lines = []
     time_display = NOW.strftime("%Y-%m-%d %H:%M")
@@ -495,12 +507,18 @@ def generate_full_report(reflections, reviews, proposals, decisions, tasks_creat
         lines.append("- cross-agent-rules, capability-scores, routing-audit, kublai-actions, kublai-initiative")
     lines.append("")
 
+    if conv_health:
+        lines.append("")
+        lines.append("## 6. Conversational Health")
+        lines.append("")
+        lines.append(conv_health)
+
     lines.append(f"---\n*Generated by generate_hourly_report.py at {NOW.strftime('%H:%M')}*")
 
     return "\n".join(lines)
 
 
-def generate_signal_message(reflections, reviews, proposals, decisions, tasks_created, skills):
+def generate_signal_message(reflections, reviews, proposals, decisions, tasks_created, skills, conv_health=""):
     """Generate concise Signal message for mobile readability."""
     time_display = NOW.strftime("%I:%M %p")
     lines = []
@@ -570,6 +588,16 @@ def generate_signal_message(reflections, reviews, proposals, decisions, tasks_cr
     lines.append(f"  Reflections: 6 agents | Reviews: 5 agents")
     if proposals:
         lines.append(f"  Brainstorming: {len(proposals)} proposals")
+
+    if conv_health:
+        lines.append("")
+        lines.append("CONVERSATIONAL:")
+        for line in conv_health.split("\n"):
+            s = line.strip()
+            if s.startswith(("Questions:", "Activations:", "No DM", "No stale", "WARNING")):
+                lines.append(f"  {s}")
+            elif "answer rate:" in s.lower():
+                lines.append(f"  {s}")
 
     report_path = f"logs/hourly-reports/{REPORT_FILENAME}"
     lines.append(f"\nFull report: {report_path}")
@@ -676,6 +704,7 @@ def main():
     tock = collect_tock_metrics()
     skills = collect_skills_invoked()
     timing = collect_step_timing()
+    conv_health = collect_conversational_health()
 
     # Update skills tracking
     update_skills_log(proposals)
@@ -683,7 +712,8 @@ def main():
 
     # Generate full markdown report
     full_report = generate_full_report(
-        reflections, reviews, proposals, decisions, tasks_created, tock, skills, timing
+        reflections, reviews, proposals, decisions, tasks_created, tock, skills, timing,
+        conv_health=conv_health
     )
 
     # Save to file
@@ -698,7 +728,8 @@ def main():
         print("\n=== SIGNAL MESSAGE ===\n")
 
     # Generate and send Signal message
-    signal_msg = generate_signal_message(reflections, reviews, proposals, decisions, tasks_created, skills)
+    signal_msg = generate_signal_message(reflections, reviews, proposals, decisions, tasks_created, skills,
+                                         conv_health=conv_health)
 
     if not args.no_signal:
         send_signal_message(signal_msg, dry_run=args.dry_run)

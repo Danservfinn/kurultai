@@ -8,6 +8,7 @@ All state transitions use compare-and-swap via claim_epoch to prevent:
   - FAIL vs COMPLETE race
 
 State machine:
+    BLOCKED --(unblock_dependents, all deps COMPLETED)--> PENDING
     PENDING --(claim)--> WORKING
     WORKING --(complete)--> COMPLETED  (requires TaskOutput + no blocking children)
     WORKING --(fail transient, retries remain)--> PENDING  (carries FailureReport, retry_after backoff)
@@ -70,10 +71,14 @@ class TaskStore:
         Returns:
             Task dict with all properties + prior failure_reports, or None.
         """
-        with self.driver.session() as session:
-            result = session.run("""
+        def _claim(tx):
+            result = tx.run("""
                 MATCH (t:Task {assigned_to: $agent, status: 'PENDING'})
                 WHERE (t.retry_after IS NULL OR t.retry_after <= datetime())
+                  AND NOT EXISTS {
+                    MATCH (t)-[:DEPENDS_ON]->(dep:Task)
+                    WHERE dep.status <> 'COMPLETED'
+                  }
                 WITH t ORDER BY
                     CASE t.priority
                         WHEN 'critical' THEN 0
@@ -95,12 +100,14 @@ class TaskStore:
                 WITH t, collect(f {.*}) AS failures
                 RETURN t {.*, failure_reports: failures} AS task
             """, agent=agent, lease_min=lease_minutes)
-
             record = result.single()
-            if record is None:
+            return dict(record["task"]) if record else None
+
+        with self.driver.session() as session:
+            task = session.execute_write(_claim)
+            if task is None:
                 return None
 
-            task = dict(record["task"])
             # Neo4j datetime to ISO string for JSON compatibility
             for key in ("created_at", "started_at", "completed_at", "updated_at",
                         "lease_expires_at"):
@@ -159,6 +166,8 @@ class TaskStore:
             record = result.single()
             if record:
                 logger.info(f"Task {task_id} completed")
+                # Unblock any tasks that depend on this one
+                self.unblock_dependents(task_id)
                 return True, "completed"
 
             # Diagnose why it failed
@@ -186,6 +195,39 @@ class TaskStore:
         if rec["blocking"] > 0:
             return False, f"blocking_children:{rec['blocking']}"
         return False, "unknown"
+
+    # ------------------------------------------------------------------
+    # DEPENDENCY RESOLUTION: BLOCKED --> PENDING
+    # ------------------------------------------------------------------
+
+    def unblock_dependents(self, task_id: str) -> list[str]:
+        """Promote BLOCKED tasks to PENDING when all their dependencies are COMPLETED.
+
+        Called after complete_task(). Push-based: O(dependents of this task),
+        not O(all blocked tasks).
+
+        Returns list of task_ids that were unblocked.
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (completed:Task {task_id: $id, status: 'COMPLETED'})
+                    MATCH (blocked:Task {status: 'BLOCKED'})-[:DEPENDS_ON]->(completed)
+                    WHERE NOT EXISTS {
+                        MATCH (blocked)-[:DEPENDS_ON]->(other:Task)
+                        WHERE other.task_id <> $id AND other.status <> 'COMPLETED'
+                    }
+                    SET blocked.status = 'PENDING',
+                        blocked.updated_at = datetime()
+                    RETURN blocked.task_id AS unblocked
+                """, id=task_id)
+                unblocked = [rec["unblocked"] for rec in result]
+                if unblocked:
+                    logger.info(f"Task {task_id} completed -> unblocked {len(unblocked)} dependents: {unblocked}")
+                return unblocked
+        except Exception as e:
+            logger.warning(f"unblock_dependents({task_id}) failed: {e}")
+            return []
 
     # ------------------------------------------------------------------
     # FAIL: WORKING --> FAILED or PENDING (auto-retry)
@@ -337,6 +379,29 @@ class TaskStore:
             return promoted
 
     # ------------------------------------------------------------------
+    # BLOCKED REPAIR
+    # ------------------------------------------------------------------
+
+    def repair_stuck_blocked(self) -> list[str]:
+        """Find and fix BLOCKED tasks where all dependencies are COMPLETED.
+        Idempotent — safe to run on any schedule.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {status: 'BLOCKED'})
+                WHERE NOT EXISTS {
+                    MATCH (t)-[:DEPENDS_ON]->(dep:Task)
+                    WHERE dep.status <> 'COMPLETED'
+                }
+                SET t.status = 'PENDING', t.updated_at = datetime()
+                RETURN t.task_id AS repaired
+            """)
+            repaired = [rec["repaired"] for rec in result]
+            if repaired:
+                logger.warning(f"Repaired {len(repaired)} stuck BLOCKED tasks: {repaired}")
+            return repaired
+
+    # ------------------------------------------------------------------
     # QUERY HELPERS
     # ------------------------------------------------------------------
 
@@ -361,10 +426,10 @@ class TaskStore:
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (t:Task {assigned_to: $agent})
-                WHERE t.status IN ['PENDING', 'WORKING']
+                WHERE t.status IN ['PENDING', 'WORKING', 'BLOCKED']
                 RETURN t.status AS status, count(t) AS cnt
             """, agent=agent)
-            depths = {"PENDING": 0, "WORKING": 0}
+            depths = {"PENDING": 0, "WORKING": 0, "BLOCKED": 0}
             for rec in result:
                 depths[rec["status"]] = rec["cnt"]
             return depths
@@ -392,25 +457,33 @@ class TaskStore:
                     domain: str = "implementation", skill_hint: str = "",
                     source: str = "system", depth: int = 0,
                     parent_id: Optional[str] = None,
+                    depends_on: Optional[list[str]] = None,
+                    pipeline_id: str = "", phase: float = 0,
                     max_retries: int = 3, timeout_s: int = 10800) -> dict:
-        """Create a new PENDING task in Neo4j.
+        """Create a new task in Neo4j.
 
         If parent_id is provided, creates a SPAWNED relationship.
+        If depends_on is provided, creates DEPENDS_ON edges and sets status to BLOCKED.
+        Otherwise status is PENDING.
         """
-        with self.driver.session() as session:
-            result = session.run("""
+        deps = depends_on or []
+
+        def _create(tx):
+            result = tx.run("""
                 MERGE (a:Agent {name: $agent})
                 CREATE (t:Task {
                     task_id: $task_id,
                     title: $title,
                     prompt: $prompt,
-                    status: 'PENDING',
+                    status: CASE WHEN size($depends_on) > 0 THEN 'BLOCKED' ELSE 'PENDING' END,
                     assigned_to: $agent,
                     priority: $priority,
                     domain: $domain,
                     skill_hint: $skill_hint,
                     source: $source,
                     depth: $depth,
+                    pipeline_id: $pipeline_id,
+                    phase: $phase,
                     claim_epoch: 0,
                     claimed_by: null,
                     lease_expires_at: null,
@@ -427,6 +500,8 @@ class TaskStore:
             """, task_id=task_id, title=title, prompt=prompt,
                 agent=assigned_to, priority=priority, domain=domain,
                 skill_hint=skill_hint, source=source, depth=depth,
+                pipeline_id=pipeline_id, phase=phase,
+                depends_on=deps,
                 max_retries=max_retries, timeout_s=timeout_s)
 
             record = result.single()
@@ -434,14 +509,30 @@ class TaskStore:
 
             # Create SPAWNED edge if this is a child task
             if parent_id:
-                session.run("""
+                tx.run("""
                     MATCH (parent:Task {task_id: $parent_id})
                     MATCH (child:Task {task_id: $child_id})
                     MERGE (parent)-[:SPAWNED]->(child)
                 """, parent_id=parent_id, child_id=task_id)
 
+            # Create DEPENDS_ON edges — validate each dep exists
+            for dep_id in deps:
+                edge_result = tx.run("""
+                    MATCH (child:Task {task_id: $child_id})
+                    MATCH (dep:Task {task_id: $dep_id})
+                    CREATE (child)-[:DEPENDS_ON]->(dep)
+                    RETURN dep.task_id AS matched
+                """, child_id=task_id, dep_id=dep_id)
+                if edge_result.single() is None:
+                    raise ValueError(f"Dependency {dep_id} not found")
+
+            return task
+
+        with self.driver.session() as session:
+            task = session.execute_write(_create)
             logger.info(f"Created task {task_id} assigned to {assigned_to}"
-                        f"{f' (child of {parent_id})' if parent_id else ''}")
+                        f"{f' (child of {parent_id})' if parent_id else ''}"
+                        f"{f' (blocked on {len(deps)} deps)' if deps else ''}")
             return task
 
     # ------------------------------------------------------------------
@@ -553,6 +644,104 @@ def _run_test():
         print("8. Checking queue depth...")
         depth = store.get_queue_depth(test_agent)
         print(f"   [OK] Queue: {depth}")
+
+        # 9. Dependency test
+        print("\n9. Testing task dependencies...")
+        dep_parent_id = f"dep-parent-{uuid.uuid4().hex[:8]}"
+        dep_child_id = f"dep-child-{uuid.uuid4().hex[:8]}"
+
+        store.create_task(
+            task_id=dep_parent_id, title="Dep parent", prompt="test",
+            assigned_to=test_agent, priority="normal", domain="test",
+        )
+        store.create_task(
+            task_id=dep_child_id, title="Dep child", prompt="test",
+            assigned_to=test_agent, priority="normal", domain="test",
+            depends_on=[dep_parent_id],
+        )
+
+        child = store.get_task(dep_child_id)
+        assert child["status"] == "BLOCKED", f"Expected BLOCKED, got {child['status']}"
+        print("   [OK] Child created as BLOCKED")
+
+        # Child should NOT be claimable
+        claimed = store.claim_task(test_agent)
+        assert claimed is None or claimed["task_id"] != dep_child_id, "Child was claimed despite BLOCKED status"
+        if claimed:
+            # Unclaim the parent if it got claimed
+            with driver.session() as session:
+                session.run("MATCH (t:Task {task_id: $id}) SET t.status = 'PENDING', t.claimed_by = null", id=claimed["task_id"])
+        print("   [OK] BLOCKED child not claimable")
+
+        # Claim and complete parent
+        parent_claimed = store.claim_task(test_agent)
+        assert parent_claimed is not None and parent_claimed["task_id"] == dep_parent_id, \
+            f"Expected to claim parent, got {parent_claimed}"
+        ok, _ = store.complete_task(dep_parent_id, parent_claimed["claim_epoch"],
+                                    text="done", problem="none", solution="none", rationale="test")
+        assert ok, "Parent completion failed"
+        print("   [OK] Parent completed")
+
+        # Child should now be PENDING (unblocked)
+        child = store.get_task(dep_child_id)
+        assert child["status"] == "PENDING", f"Expected PENDING after parent completed, got {child['status']}"
+        print("   [OK] Child unblocked to PENDING")
+
+        # Cleanup dep test
+        with driver.session() as session:
+            session.run("MATCH (t:Task) WHERE t.task_id IN [$p, $c] DETACH DELETE t",
+                        p=dep_parent_id, c=dep_child_id)
+        print("   [OK] Dependency test nodes cleaned up")
+
+        # 10. Fan-in dependency test
+        print("\n10. Testing fan-in dependencies (child depends on A and B)...")
+        fan_a_id = f"fan-a-{uuid.uuid4().hex[:8]}"
+        fan_b_id = f"fan-b-{uuid.uuid4().hex[:8]}"
+        fan_child_id = f"fan-child-{uuid.uuid4().hex[:8]}"
+
+        store.create_task(
+            task_id=fan_a_id, title="Fan-in A", prompt="test",
+            assigned_to=test_agent, priority="normal", domain="test",
+        )
+        store.create_task(
+            task_id=fan_b_id, title="Fan-in B", prompt="test",
+            assigned_to=test_agent, priority="normal", domain="test",
+        )
+        store.create_task(
+            task_id=fan_child_id, title="Fan-in child", prompt="test",
+            assigned_to=test_agent, priority="normal", domain="test",
+            depends_on=[fan_a_id, fan_b_id],
+        )
+
+        fan_child = store.get_task(fan_child_id)
+        assert fan_child["status"] == "BLOCKED", f"Expected BLOCKED, got {fan_child['status']}"
+        print("   [OK] Fan-in child created as BLOCKED")
+
+        # Complete A only — child should stay BLOCKED
+        claimed_a = store.claim_task(test_agent)
+        assert claimed_a is not None
+        ok, _ = store.complete_task(claimed_a["task_id"], claimed_a["claim_epoch"],
+                                    text="done", problem="none", solution="none", rationale="test")
+        assert ok
+        fan_child = store.get_task(fan_child_id)
+        assert fan_child["status"] == "BLOCKED", f"Expected still BLOCKED, got {fan_child['status']}"
+        print("   [OK] Child stays BLOCKED when only 1 of 2 deps complete")
+
+        # Complete B — child should become PENDING
+        claimed_b = store.claim_task(test_agent)
+        assert claimed_b is not None
+        ok, _ = store.complete_task(claimed_b["task_id"], claimed_b["claim_epoch"],
+                                    text="done", problem="none", solution="none", rationale="test")
+        assert ok
+        fan_child = store.get_task(fan_child_id)
+        assert fan_child["status"] == "PENDING", f"Expected PENDING after both deps complete, got {fan_child['status']}"
+        print("   [OK] Child becomes PENDING when both deps complete")
+
+        # Cleanup fan-in test
+        with driver.session() as session:
+            session.run("MATCH (t:Task) WHERE t.task_id IN [$a, $b, $c] DETACH DELETE t",
+                        a=fan_a_id, b=fan_b_id, c=fan_child_id)
+        print("   [OK] Fan-in test nodes cleaned up")
 
         print("\n  All core tests passed.")
 

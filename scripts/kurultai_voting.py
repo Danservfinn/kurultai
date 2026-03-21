@@ -562,6 +562,45 @@ def diagnose_voting_issues() -> List[str]:
 # PHASE 4: Implementation (Only After Consensus)
 # ============================================================================
 
+OWNER_PHONE = "+19194133445"
+SEND_SIGNAL_SCRIPT = Path.home() / ".claude" / "skills" / "agent-collaboration" / "scripts" / "send_signal.sh"
+
+
+def _notify_owner_for_approval(proposal_id: str, tally: dict, proposal_path: Path):
+    """Send Signal DM to owner with proposal summary for sign-off.
+
+    The owner replies 'approve <id>' or 'reject <id>' to finalize.
+    """
+    import re
+
+    try:
+        text = proposal_path.read_text()[:500]
+    except Exception:
+        text = "(could not read proposal)"
+
+    title_match = re.search(r'^#\s*Proposal:\s*(.+)', text, re.MULTILINE)
+    title = title_match.group(1).strip()[:80] if title_match else proposal_id
+
+    message = (
+        f"KURULTAI VOTE: 6/6 APPROVE\n"
+        f"Proposal: {title}\n"
+        f"ID: {proposal_id}\n\n"
+        f"{text[:300]}\n\n"
+        f"Reply:\n"
+        f"  'approve {proposal_id}' to sign off\n"
+        f"  'reject {proposal_id}' to veto"
+    )
+
+    try:
+        result = subprocess.run(
+            ["bash", str(SEND_SIGNAL_SCRIPT), message, "--dm", OWNER_PHONE],
+            capture_output=True, timeout=15, text=True,
+        )
+        log_phase(4, f"  Signal DM sent to owner for {proposal_id}")
+    except Exception as e:
+        log_phase(4, f"  Signal DM failed for {proposal_id}: {e}")
+
+
 def phase4_check_consensus() -> Dict[str, dict]:
     """
     Check voting results and identify proposals with unanimous consent.
@@ -607,35 +646,45 @@ def phase4_check_consensus() -> Dict[str, dict]:
         log_phase(4, f"  {proposal_id}: APPROVE={tally.get('APPROVE', 0)}/6, REJECT={tally.get('REJECT', 0)}")
 
         # Finalize proposals that have reached consensus or been vetoed
-        # check_voting_complete automatically determines approved/rejected based on tally
-        if consensus or vetoed:
+        if consensus:
+            # 6/6 APPROVE → move to awaiting_approval, notify owner
+            awaiting_dir = PROPOSALS_DIR / "awaiting_approval"
+            awaiting_dir.mkdir(parents=True, exist_ok=True)
+
+            # Move from voting/ to awaiting_approval/
+            src = VOTING_DIR / f"{proposal_id}.md"
+            if src.exists():
+                dest = awaiting_dir / src.name
+                src.rename(dest)
+                # Update Neo4j status before notification
+                try:
+                    from kurultai_voting_approval import _set_proposal_status
+                    _set_proposal_status(proposal_id, "PENDING_HUMAN_APPROVAL")
+                except Exception as e:
+                    log_phase(4, f"  -> Neo4j status update failed for {proposal_id}: {e}")
+                _notify_owner_for_approval(proposal_id, tally, dest)
+                results[proposal_id]["finalized"] = "awaiting_human_approval"
+                log_phase(4, f"  -> AWAITING HUMAN APPROVAL: {proposal_id}")
+            else:
+                results[proposal_id]["finalized"] = "file_not_found"
+                log_phase(4, f"  -> File not found for {proposal_id}")
+
+        elif vetoed:
             rc, stdout, stderr = run_script(
                 "voting_manager.py",
                 ["--action", "finalize", "--proposal", proposal_id]
             )
             if rc == 0:
-                if "approved" in stdout.lower():
-                    results[proposal_id]["finalized"] = "approved"
-                    log_phase(4, f"  -> MOVED TO APPROVED: {proposal_id}")
-                elif "rejected" in stdout.lower():
-                    results[proposal_id]["finalized"] = "rejected"
-                    log_phase(4, f"  -> MOVED TO REJECTED: {proposal_id}")
-                else:
-                    results[proposal_id]["finalized"] = stdout.strip()
+                results[proposal_id]["finalized"] = "rejected"
+                log_phase(4, f"  -> MOVED TO REJECTED: {proposal_id}")
             else:
                 results[proposal_id]["finalized"] = f"failed: {stderr}"
 
     # Count results
-    approved = [p for p, r in results.items() if r.get("finalized") == "approved"]
-    vetoed = [p for p, r in results.items() if r.get("finalized") == "rejected"]
+    awaiting = [p for p, r in results.items() if r.get("finalized") == "awaiting_human_approval"]
+    vetoed_list = [p for p, r in results.items() if r.get("finalized") == "rejected"]
 
-    log_phase(4, f"Consensus check complete: {len(approved)} approved, {len(vetoed)} vetoed")
-
-    # Create tasks for newly approved proposals
-    if approved:
-        log_phase(4, f"Creating tasks for {len(approved)} approved proposals...")
-        for proposal_id in approved:
-            _create_task_for_proposal(proposal_id)
+    log_phase(4, f"Consensus check complete: {len(awaiting)} awaiting human approval, {len(vetoed_list)} vetoed")
 
     return results
 
@@ -652,9 +701,8 @@ def create_neo4j_task(task_id: str, agent: str, title: str, body: str,
     """
     try:
         sys.path.insert(0, str(SCRIPTS_DIR))
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        with driver.session() as session:
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
             query = """
                 MERGE (t:Task {task_id: $task_id})
                 SET t.agent = $agent,

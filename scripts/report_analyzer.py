@@ -25,7 +25,7 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_tracker, get_driver
+from neo4j_task_tracker import get_tracker, get_driver, close_driver
 from agents_config import AGENT_ROLES
 
 # Model detection
@@ -54,8 +54,10 @@ class ReportAnalyzer:
 
     def close(self):
         """Close database connections."""
-        self.driver.close()
-        self.tracker.close()
+        if self.driver:
+            close_driver()
+            self.driver = None
+        self.tracker = None
 
     # ============================================================
     # Task Gathering

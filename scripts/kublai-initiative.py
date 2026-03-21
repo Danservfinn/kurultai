@@ -369,10 +369,9 @@ def create_task(agent, priority, title, body, depth=0,
 def log_hypothesis(action, expected_outcome):
     """Log the initiative as a hypothesis in Neo4j for future validation."""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run(
                 """
                 CREATE (h:Hypothesis {
@@ -387,7 +386,6 @@ def log_hypothesis(action, expected_outcome):
                 action=action,
                 expected_outcome=expected_outcome,
             )
-        driver.close()
         log("HYPOTHESIS: Logged to Neo4j")
     except Exception as e:
         log(f"HYPOTHESIS: Neo4j logging failed: {e}")

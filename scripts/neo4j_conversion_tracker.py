@@ -27,7 +27,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import get_driver, close_driver
 from neo4j_utils import parse_json_field, parse_json_fields
 
 
@@ -75,7 +75,9 @@ class ConversionTracker:
 
     def close(self):
         """Close the Neo4j driver."""
-        self.driver.close()
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     # ==========================================================================
     # Schema Initialization

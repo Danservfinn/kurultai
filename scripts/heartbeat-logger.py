@@ -88,6 +88,7 @@ class HeartbeatLogger:
     
     def close(self):
         close_driver()
+        self.driver = None
 
 
 if __name__ == '__main__':

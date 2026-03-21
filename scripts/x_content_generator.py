@@ -17,12 +17,14 @@ from enum import Enum
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from neo4j_task_tracker import get_driver
+    from neo4j_task_tracker import get_driver, close_driver
     from neo4j import GraphDatabase
 except ImportError:
     # Fallback if neo4j modules not available
     def get_driver():
         return None
+    def close_driver():
+        pass
 
 
 class PostCategory(Enum):
@@ -58,6 +60,11 @@ class MetricsCollector:
 
     def __init__(self):
         self.driver = get_driver()
+
+    def close(self):
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     def get_task_stats(self, hours: int = 24) -> Dict:
         """Get task statistics for the last N hours"""

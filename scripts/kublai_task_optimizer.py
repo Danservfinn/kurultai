@@ -28,7 +28,7 @@ from typing import Dict, Any, Optional, List
 # Add scripts directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 # Configuration
 OPTIMIZATION_ENABLED = os.getenv("OPTIMIZATION_ENABLED", "true").lower() == "true"
@@ -114,10 +114,7 @@ def get_optimal_config(agent: str, task_type: str = None,
         return _get_exploration_config(agent, task_type, priority)
 
     try:
-        driver = get_driver()
-        config = _query_learnings(driver, agent, task_type, priority)
-        # DO NOT close driver - it's a singleton shared across the system
-        # driver.close()  # REMOVED (2026-03-11) - was closing singleton driver
+        config = _query_learnings(agent, task_type, priority)
 
         # Check confidence threshold
         if config.get("confidence", 0) < CONFIDENCE_THRESHOLD:
@@ -132,7 +129,7 @@ def get_optimal_config(agent: str, task_type: str = None,
         return _get_default_config(agent, task_type, priority)
 
 
-def _query_learnings(driver, agent: str, task_type: str, priority: str) -> Dict[str, Any]:
+def _query_learnings(agent: str, task_type: str, priority: str) -> Dict[str, Any]:
     """Query Neo4j for learned patterns."""
     config = {
         "template": DEFAULT_TEMPLATE,
@@ -143,7 +140,7 @@ def _query_learnings(driver, agent: str, task_type: str, priority: str) -> Dict[
     }
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # 1. Get best template for this agent
             template_learning = _get_template_learning(session, agent)
             if template_learning:

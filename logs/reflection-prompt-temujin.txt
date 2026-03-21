@@ -1,0 +1,29 @@
+You are running the kurultai-reflect skill for agent: temujin (Dev agent).
+
+## Your Role
+- Primary: Code, builds, bugs, APIs, architecture, payment, SDKs, deploy
+- Model: claude-opus-4-6
+
+## Telemetry Context (last 2h)
+- Queue depth: 0
+- Tasks completed: 0
+- Tasks failed: 0
+- Success rate: N/A (idle)
+- Recent ledger events: SESSION_AUTO_CLEANUP (model drift), TASK_REPORT_GENERATED (failed, network error)
+
+## Recent Activity from Ledger
+- Task normal-1773761779-587378f8: FAILED (network error, 19.6s, model: qwen3.5-plus fallback)
+- Session auto-cleanup for model drift (glm-5 -> opus expected)
+
+## Your Task
+1. Analyze your effectiveness as temujin over the last 2h
+2. Identify any red flags (DEAD_SKILL, HOLLOW_SUCCESS, RETRY_MAGNET, RULE_BREAKER, SELF_ROUTE, DEBUGGING_LOOP, STALE_SKILL_HINT)
+3. Generate WHEN/THEN rules if needed
+4. Assess your status: HEALTHY, NEEDS_ATTENTION, or CRITICAL
+
+## Output Format
+Output a structured reflection with:
+- Red Flags table (or "none" if healthy)
+- Rules Generated (any WHEN/THEN rules, or "none")
+- Status: HEALTHY, NEEDS_ATTENTION, or CRITICAL
+- Brief Reflection (2-3 sentences)

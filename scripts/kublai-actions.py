@@ -852,6 +852,7 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
             # Filesystem cross-validation: tock queue_depth can be stale (from Neo4j).
             # Count actual pending .md files (not terminal states, not .executing) before alerting.
             fs_pending = 0
+            fs_pending_files = []
             agent_task_dir = f"{AGENT_DIR}/{name}/tasks"
             if os.path.exists(agent_task_dir):
                 for fname in os.listdir(agent_task_dir):
@@ -870,16 +871,62 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
                         continue
                     if fname.endswith('.md'):
                         fs_pending += 1
+                        fs_pending_files.append(fname)
             if fs_pending == 0:
                 log(f"TICK: stall alert suppressed for {name} — tock reports queue_depth={queue_depth} but filesystem has 0 pending tasks (stale Neo4j data)")
                 continue
+
+            # FIX 2026-03-20: Staleness check — skip triage if all pending tasks are
+            # less than 10 minutes old (agent hasn't had time to process yet)
+            all_recent = True
+            now = time.time()
+            for fname in fs_pending_files:
+                fpath = os.path.join(agent_task_dir, fname)
+                try:
+                    age_seconds = now - os.path.getmtime(fpath)
+                    if age_seconds > 600:  # 10 minutes
+                        all_recent = False
+                        break
+                except OSError:
+                    pass
+            if all_recent and fs_pending <= 3:
+                log(f"TICK: stall alert suppressed for {name} — {fs_pending} pending tasks are all <10 min old (agent hasn't had time to process)")
+                continue
+
             # Guard: if jochi is stalled, route to kublai instead (prevent self-routing deadlock)
             target = "kublai" if name == "jochi" else "jochi"
+
+            # FIX 2026-03-20: Dedup guard — also check if target already has ANY triage
+            # task for this agent created in the last 30 minutes (prevents cascade)
+            has_recent_triage = False
+            target_task_dir = f"{AGENT_DIR}/{target}/tasks"
+            if os.path.exists(target_task_dir):
+                for fname in os.listdir(target_task_dir):
+                    if f"triage" in fname.lower() or f"stall" in fname.lower():
+                        fpath = os.path.join(target_task_dir, fname)
+                        try:
+                            age = now - os.path.getmtime(fpath)
+                            if age < 1800:  # 30 minutes
+                                has_recent_triage = True
+                                break
+                        except OSError:
+                            pass
+            if has_recent_triage:
+                log(f"TICK: stall alert suppressed for {name} — {target} already has a recent triage task (dedup)")
+                continue
+
             if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task(target, f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
+                # FIX 2026-03-20: Triage tasks are coordination work, not implementation.
+                # Explicitly set skill_hint=None to prevent auto-detection from assigning
+                # /horde-implement. Also set completion_gate_optout for triage tasks.
                 create_task(
                     target, "normal",
                     f"Triage stalled agent: {name} has {queue_depth} queued tasks with 0 completions",
-                    f"""## Context
+                    f"""---
+completion_gate_optout: true
+---
+
+## Context
 Agent {name} has {queue_depth} tasks in file queue but 0 completions
 in the last 30 minutes and nothing currently running.
 
@@ -888,7 +935,8 @@ in the last 30 minutes and nothing currently running.
 2. Determine if tasks should be redistributed or if there's a blocker
 3. Take corrective action (reassign, cancel stale tasks, or investigate)
 4. Report findings to kublai for coordination
-"""
+""",
+                    skill_hint="none",  # Explicit: triage is coordination, not implementation
                 )
                 mark_fired(f"agent_stalled:{name}")
                 actions_created += 1
@@ -937,10 +985,9 @@ def kurultai_actions():
     actions_created = 0
 
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
+        from neo4j_task_tracker import neo4j_session
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Get pending feedback sorted by priority
             result = session.run("""
                 MATCH (f:AgentFeedback {status: 'pending_review'})

@@ -28,6 +28,7 @@ from kurultai_paths import (
     AGENTS_DIR as _AGENTS_DIR, SPAWN_QUEUE as _SPAWN_QUEUE, TASK_LEDGER as _TASK_LEDGER,
     CLAUDE_AGENT as _CLAUDE_AGENT, CLAUDE_TIMEOUT as _KP_CLAUDE_TIMEOUT,
     TIMEOUT_BY_PRIORITY as _KP_TIMEOUT_BY_PRIORITY,
+    SLOW_SKILLS,
 )
 from kurultai_ledger import append_ledger as _kp_append_ledger
 
@@ -87,30 +88,7 @@ CLAUDE_TIMEOUT = _KP_CLAUDE_TIMEOUT  # imported from kurultai_paths (canonical s
 FALLBACK_MODEL = "claude-sonnet-4-6"  # Fallback stays in Claude family to prevent model drift
 MAX_RATE_LIMIT_RETRIES = 1  # Only retry once with fallback model
 TIMEOUT_BY_PRIORITY = _KP_TIMEOUT_BY_PRIORITY  # imported from kurultai_paths (canonical source)
-# Skills that need extra time (design exploration, brainstorming, debugging)
-SLOW_SKILLS = {
-    '/horde-brainstorming': 10800,
-    '/golden-horde': 10800,
-    '/horde-implement': 10800,
-    '/horde-review': 10800,
-    '/horde-debug': 10800,
-    '/horde-learn': 10800,
-    '/horde-swarm': 10800,
-    '/horde-test': 10800,
-    # Complex debugging and analysis skills need extended time
-    '/systematic-debugging': 10800,
-    '/kurultai-health': 10800,
-    '/code-reviewer': 10800,
-    # Medium-complexity skills: get slow stall thresholds (7min silence / 8min elapsed)
-    # but don't override the priority-based execution timeout (value=0)
-    '/senior-frontend': 0,
-    '/senior-backend': 0,
-    '/senior-fullstack': 0,
-    '/senior-architect': 0,
-    '/content-research-writer': 0,
-    '/horde-gate-testing': 0,
-    '/horde-plan': 0,
-}
+# SLOW_SKILLS imported from kurultai_paths (single source of truth)
 
 
 # =============================================================================
@@ -545,14 +523,15 @@ def _is_rate_limit_error(error_msg, stdout_content=None):
 STALL_SILENCE_THRESHOLD = 900  # seconds of no output before considering stall
 STALL_MIN_ELAPSED = 900        # only check for stalls after this many seconds elapsed
 # Slow skills get more generous stall thresholds (inference + subagent planning takes time)
-SLOW_SKILL_STALL_SILENCE = 1200   # 20 min silence allowed for horde skills
-SLOW_SKILL_STALL_ELAPSED = 1200   # don't check until 20 min for horde skills
+SLOW_SKILL_STALL_SILENCE = 5400   # 90 min silence allowed for horde skills
+SLOW_SKILL_STALL_ELAPSED = 3600   # don't check until 60 min for horde skills
 # High priority tasks also get relaxed thresholds (complex tasks need more time)
-HIGH_PRIORITY_STALL_SILENCE = 1200
-HIGH_PRIORITY_STALL_ELAPSED = 1200
+HIGH_PRIORITY_STALL_SILENCE = 5400
+HIGH_PRIORITY_STALL_ELAPSED = 3600
 # Proxy endpoints (like z.ai) can have longer response times for complex reasoning
-PROXY_STALL_SILENCE = 2400   # 40 min silence allowed when using proxy (z.ai, openrouter, etc.)
-PROXY_STALL_ELAPSED = 1800   # don't check until 30 min when using proxy
+# MAXIMUM TIMEOUTS - applies to ALL tasks regardless of provider (2026-03-20)
+PROXY_STALL_SILENCE = 5400   # 90 min silence allowed
+PROXY_STALL_ELAPSED = 3600   # don't check until 60 min elapsed
 
 # R008 skill hint pre-flight check — abort early if agent ignores required skill
 R008_PREFLIGHT_ELAPSED = 60   # check for skill invocation after 60 seconds
@@ -573,7 +552,7 @@ R008_PREFLIGHT_BY_SKILL = {
     '/horde-learn': 180,
     '/horde-swarm': 180,
     '/horde-test': 180,
-    '/horde-plan': 180,
+    '/horde-plan': 900,  # 15 minutes for planning phase (Option B dispatch protocol)
     '/horde-gate-testing': 180,
     # Complex analysis skills
     '/systematic-debugging': 180,
@@ -722,6 +701,7 @@ def get_pending_tasks(agent_name):
                 task_id = _extract_task_id(content, filepath=task_file)
                 skill_hint = _extract_skill_hint(content)
                 depth = _extract_depth(content)
+                notify_target = _extract_notify_target(content)
 
                 # Extract new communication/context fields
                 audience = _extract_audience(content)
@@ -738,6 +718,7 @@ def get_pending_tasks(agent_name):
                     'task_id': task_id,
                     'skill_hint': skill_hint,
                     'depth': depth,
+                    'notify_target': notify_target,
                     'audience': audience,
                     'clarification_deadline': clarification_deadline,
                     'context_history': context_history,
@@ -1684,6 +1665,13 @@ def _extract_skill_hint(content):
     """Extract skill_hint from task frontmatter."""
     import re
     match = re.search(r'^skill_hint:\s*(\S+)', content, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _extract_notify_target(content):
+    """Extract notify_target from task frontmatter."""
+    import re
+    match = re.search(r'^notify_target:\s*(\S+)', content, re.MULTILINE)
     return match.group(1) if match else None
 
 
@@ -2987,25 +2975,10 @@ def _call_claude_code(agent_name, prompt, config, skill_hint=None, timeout=None,
                     }
 
             # Stall detection (T14): check after STALL_MIN_ELAPSED
-            # Use relaxed thresholds for slow skills, high priority tasks, or proxy usage
-            is_slow = (skill_hint in SLOW_SKILLS if skill_hint else False) or agent_name == "kublai" or priority == 'high'
-            # Proxy endpoints (z.ai, openrouter, etc.) need longer timeouts for complex reasoning
-            # Use is_allowed_proxy which was set earlier in this function
-            is_proxy = is_allowed_proxy if 'is_allowed_proxy' in dir() else False
-
-            if is_proxy:
-                # Proxy gets most generous thresholds - complex reasoning can take time
-                stall_elapsed_thresh = PROXY_STALL_ELAPSED
-                stall_silence_thresh = PROXY_STALL_SILENCE
-            elif is_slow:
-                stall_elapsed_thresh = SLOW_SKILL_STALL_ELAPSED
-                stall_silence_thresh = SLOW_SKILL_STALL_SILENCE
-            elif priority == 'high':
-                stall_elapsed_thresh = HIGH_PRIORITY_STALL_ELAPSED
-                stall_silence_thresh = HIGH_PRIORITY_STALL_SILENCE
-            else:
-                stall_elapsed_thresh = STALL_MIN_ELAPSED
-                stall_silence_thresh = STALL_SILENCE_THRESHOLD
+            # MAXIMUM TIMEOUTS applied to ALL tasks (2026-03-20)
+            # Uses PROXY_STALL_* thresholds universally regardless of provider/model
+            stall_elapsed_thresh = PROXY_STALL_ELAPSED
+            stall_silence_thresh = PROXY_STALL_SILENCE
             silence = time.time() - last_output_time
             if elapsed >= stall_elapsed_thresh and silence >= stall_silence_thresh:
                 # Before killing, check if the claude session JSONL is still being written
@@ -3201,36 +3174,78 @@ Evidence of skill invocation is logged. Skipping the skill will result in R008_V
 
 """
 
-    # Try to use prompt optimizer for enhanced prompts
+    # MANDATORY PROMPT OPTIMIZATION (Option 1 - horde-prompt always required)
+    # If optimization fails, the task fails - no fallback to original prompt
     prompt = None
     optimization_metadata = None
-    if PROMPT_OPTIMIZER_AVAILABLE:
-        try:
-            opt_config = load_optimizer_config()
-            if opt_config.get("enabled", True):
-                prompt, optimization_metadata = enhance_task_prompt(
-                    task=task_text,
-                    agent_name=agent_name,
-                    memory=memory if memory else None,
-                    skill_hint=skill_hint,
-                    context_history=context_history_section if context_history_section else None,
-                    audience=audience,
-                    rules=rules_section if rules_section else None,
-                )
-                # Prepend rules first section if present (must be at line 1)
-                # R008 FIX: Also prepend skill_hint as mandatory first action
-                # C16 FIX: Include actual rules in mandatory_prefix, not just instruction to read them
-                mandatory_prefix = rules_first_section + rules_section + skill_hint_first_section
-                if mandatory_prefix:
-                    prompt = mandatory_prefix + prompt
-                # Log optimization result
-                if optimization_metadata:
-                    print(f"  PROMPT_OPTIMIZED: cached={optimization_metadata.get('cached', False)}, "
-                          f"agent_type={optimization_metadata.get('agent_type', 'unknown')}")
-        except Exception as e:
-            print(f"  ⚠ Prompt optimization failed, using original: {e}")
 
-    # Fallback to original prompt construction
+    # Check if mandatory mode is enabled
+    opt_config = load_optimizer_config()
+    mandatory_mode = opt_config.get("mandatory_mode", False)
+
+    if not PROMPT_OPTIMIZER_AVAILABLE and mandatory_mode:
+        # Cannot execute - optimizer required but not available
+        print(f"  CRITICAL: Prompt optimizer required but not available - failing task")
+        _append_ledger({
+            "event": "OPTIMIZER_UNAVAILABLE",
+            "ts": datetime.now().isoformat(),
+            "agent": agent_name,
+            "task_id": task_id,
+            "enforcer": "agent-task-handler.py",
+        })
+        return {
+            "success": False,
+            "error": "PROMPT_OPTIMIZER_UNAVAILABLE: horde-prompt is required but not available",
+            "content": "",
+            "model": model or "claude-code",
+            "latency_ms": 0,
+        }
+
+    if PROMPT_OPTIMIZER_AVAILABLE and opt_config.get("enabled", True):
+        try:
+            prompt, optimization_metadata = enhance_task_prompt(
+                task=task_text,
+                agent_name=agent_name,
+                memory=memory if memory else None,
+                skill_hint=skill_hint,
+                context_history=context_history_section if context_history_section else None,
+                audience=audience,
+                rules=rules_section if rules_section else None,
+            )
+            # Prepend rules first section if present (must be at line 1)
+            # R008 FIX: Also prepend skill_hint as mandatory first action
+            # C16 FIX: Include actual rules in mandatory_prefix, not just instruction to read them
+            mandatory_prefix = rules_first_section + rules_section + skill_hint_first_section
+            if mandatory_prefix:
+                prompt = mandatory_prefix + prompt
+            # Log optimization result
+            if optimization_metadata:
+                print(f"  PROMPT_OPTIMIZED: cached={optimization_metadata.get('cached', False)}, "
+                      f"agent_type={optimization_metadata.get('agent_type', 'unknown')}")
+        except Exception as e:
+            if mandatory_mode:
+                # MANDATORY MODE: Task fails if optimization fails
+                print(f"  CRITICAL: Prompt optimization required but failed: {e}")
+                _append_ledger({
+                    "event": "OPTIMIZATION_FAILED",
+                    "ts": datetime.now().isoformat(),
+                    "agent": agent_name,
+                    "task_id": task_id,
+                    "enforcer": "agent-task-handler.py",
+                    "error": str(e),
+                })
+                return {
+                    "success": False,
+                    "error": f"PROMPT_OPTIMIZATION_FAILED: {str(e)}",
+                    "content": "",
+                    "model": model or "claude-code",
+                    "latency_ms": 0,
+                }
+            else:
+                # Fallback mode - log and continue with original prompt
+                print(f"  ⚠ Prompt optimization failed, using original: {e}")
+
+    # Fallback to original prompt construction (only if not in mandatory mode or optimization disabled)
     if prompt is None:
         # CRITICAL: Behavioral rules must be BEFORE task_text (C16 fix)
         # Agents need to see their constraints before starting work
@@ -3937,6 +3952,9 @@ def process_task(agent_name, task):
                     "execution_time_s": elapsed_s,
                     "task_summary": task['task'][:200],
                     "ts": datetime.now().isoformat(),
+                    "notify_target": task.get("notify_target", "+19194133445"),
+                    "created_at": task.get("created_at", ""),
+                    "model": os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6"),
                 }, f)
         except Exception:
             pass
@@ -4169,11 +4187,9 @@ def process_task(agent_name, task):
 def update_agent_state(agent_name, status='busy', task_label=None, increment_completed=False):
     """Update agent state in Neo4j"""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
-        driver = get_driver()
-        
-        with driver.session() as session:
+        with neo4j_session() as session:
             if increment_completed:
                 session.run("""
                     MATCH (a:AgentState {name: $name})
@@ -4196,8 +4212,6 @@ def update_agent_state(agent_name, status='busy', task_label=None, increment_com
                         a.current_task = null,
                         a.last_heartbeat = datetime()
                 """, name=agent_name, status=status)
-        
-        driver.close()
     except Exception as e:
         print(f"⚠ Neo4j update failed: {e}")
 
@@ -4216,6 +4230,7 @@ def execute_single_task(agent_name, task_file):
     depth = _extract_depth(content)
     task_id = _extract_task_id(content, filepath=task_file)
     skill_hint = _extract_skill_hint(content)
+    notify_target = _extract_notify_target(content)
 
     # Extract new communication/context fields
     audience = _extract_audience(content)
@@ -4240,6 +4255,7 @@ def execute_single_task(agent_name, task_file):
         'full_content': content,  # Pass full content to Claude Code
         'priority': priority,
         'depth': depth,
+        'notify_target': notify_target,
         'audience': audience,
         'clarification_deadline': clarification_deadline,
         'context_history': context_history,

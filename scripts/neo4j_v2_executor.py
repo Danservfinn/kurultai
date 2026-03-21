@@ -44,6 +44,7 @@ from agents_config import AGENTS
 from kurultai_paths import (
     CLAUDE_AGENT, AGENTS_DIR, DISPATCH_AGENTS,
     STALE_EXECUTING_SECS, CLAUDE_TIMEOUT,
+    SLOW_SKILLS, LOGS_DIR, TASK_LEDGER,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,10 +54,19 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 POLL_INTERVAL = 30  # seconds between poll cycles
-LEASE_MINUTES = 45  # lease duration for claimed tasks
-LEASE_RENEW_INTERVAL = 600  # renew lease every 10 minutes
+LEASE_MINUTES = 45  # lease duration for claimed tasks (default/normal)
+LEASE_RENEW_INTERVAL = 600  # renew lease every 10 minutes (default/normal)
 DEFAULT_CONCURRENCY = len(DISPATCH_AGENTS) + 1  # +1 for child tasks
 ORPHAN_GRACE_MINUTES = 5  # grace period before recovering orphans
+
+# Priority-based lease tuning: shorter leases for higher-priority tasks
+# means faster recovery when executor dies
+LEASE_BY_PRIORITY = {
+    "critical": {"lease_min": 15, "grace_min": 2, "renew_s": 300},
+    "high":     {"lease_min": 20, "grace_min": 3, "renew_s": 420},
+    "normal":   {"lease_min": 45, "grace_min": 5, "renew_s": 600},
+    "low":      {"lease_min": 60, "grace_min": 10, "renew_s": 900},
+}
 
 # Stall detection thresholds (from agent-task-handler.py)
 STALL_SILENCE_THRESHOLD = 900  # 15 min silence
@@ -68,14 +78,97 @@ HIGH_PRIORITY_STALL_ELAPSED = 1200
 PROXY_STALL_SILENCE = 2400  # 40 min for proxy
 PROXY_STALL_ELAPSED = 1800
 
-SLOW_SKILLS = {
-    '/horde-brainstorming', '/golden-horde', '/horde-implement',
-    '/horde-review', '/horde-debug', '/horde-learn', '/horde-swarm',
-    '/horde-test', '/systematic-debugging', '/kurultai-health',
-    '/code-reviewer',
-}
+# SLOW_SKILLS imported from kurultai_paths (single source of truth)
 
 PROXY_ENDPOINTS = ['dashscope.aliyuncs.com', 'openrouter.ai', 'api.z.ai']
+
+HEARTBEAT_FILE = LOGS_DIR / "v2-executor-heartbeat.json"
+HAIKU_TIMEOUT = 120  # Max seconds for /task-complete notification
+
+
+def _persist_result(agent, task_id, content, task, duration_s):
+    """Write task result to agent's workspace for /task-complete to read."""
+    try:
+        result_dir = AGENTS_DIR / agent / "workspace"
+        result_dir.mkdir(parents=True, exist_ok=True)
+        result_file = result_dir / f"{task_id}.result.md"
+        title = task.get('title', task_id)
+        body = task.get('body', '')[:300]
+        header = f"# Task Result: {title}\n\n**Task ID:** {task_id}\n**Agent:** {agent}\n**Duration:** {duration_s:.0f}s\n**Task:** {body}\n\n---\n\n"
+        result_file.write_text(header + content)
+        result_file.chmod(0o600)
+        logger.info(f"Result persisted: {result_file}")
+        return str(result_file)
+    except Exception as e:
+        logger.warning(f"Failed to persist result for {task_id}: {e}")
+        return None
+
+
+def _spawn_task_complete_notification(agent_name, task_id, duration_s=0, task_summary="", result_file=None, notify_target=None, created_at=None):
+    """Spawn /task-complete skill in background thread to send Signal notification.
+
+    Writes a breadcrumb file so the skill reads the correct task,
+    then runs claude-agent with /task-complete. Non-blocking with timeout.
+    """
+    def _run():
+        log_file = LOGS_DIR / "task-complete-debug.log"
+        try:
+            # Write breadcrumb so /task-complete knows which task just finished
+            bc_path = AGENTS_DIR / agent_name / "last-completed-task.json"
+            bc_data = {
+                "task_id": task_id,
+                "agent": agent_name,
+                "execution_time_s": duration_s,
+                "task_summary": task_summary[:200],
+                "ts": datetime.now().isoformat(),
+                "notify_target": notify_target or "+19194133445",
+                "created_at": created_at or "",
+                "model": os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6"),
+            }
+            if result_file:
+                bc_data["result_file"] = result_file
+            bc_path.write_text(json.dumps(bc_data))
+
+            env_notify = os.environ.copy()
+            env_notify.pop('CLAUDECODE', None)
+            env_notify['TASK_COMPLETE_AGENT'] = agent_name
+            with open(log_file, 'a') as log_f:
+                log_f.write(f"[{datetime.now().isoformat()}] v2-executor: Spawning /task-complete for {agent_name} task={task_id}\n")
+                proc = subprocess.Popen(
+                    [str(CLAUDE_AGENT), "--model", "claude-sonnet-4-6", "/task-complete"],
+                    stdout=log_f, stderr=log_f,
+                    close_fds=True, env=env_notify,
+                )
+                try:
+                    return_code = proc.wait(timeout=HAIKU_TIMEOUT)
+                    log_f.write(f"[{datetime.now().isoformat()}] /task-complete for {agent_name} exited with {return_code}\n")
+                except subprocess.TimeoutExpired:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+                    log_f.write(f"[{datetime.now().isoformat()}] /task-complete for {agent_name} TIMED OUT after {HAIKU_TIMEOUT}s\n")
+        except Exception as e:
+            try:
+                with open(log_file, 'a') as log_f:
+                    log_f.write(f"[{datetime.now().isoformat()}] /task-complete for {agent_name} FAILED: {e}\n")
+            except Exception:
+                pass
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _emit_ledger(event, task_id, agent, **extra):
+    """Write lifecycle event to task-ledger.jsonl."""
+    entry = {"event": event, "task_id": task_id, "agent": agent,
+             "timestamp": datetime.now().isoformat(), "executor": "claude-code", **extra}
+    try:
+        with open(TASK_LEDGER, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        logger.warning(f"Ledger write failed: {e}")
 
 # Prompt template additions for delegation
 DELEGATION_PROMPT = """
@@ -139,12 +232,9 @@ def _build_env(agent_name: str) -> dict:
         pass
 
     # Validate model
-    valid_models = {'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'}
-    env_model = env.get('ANTHROPIC_MODEL')
-    base_url = env.get('ANTHROPIC_BASE_URL', '')
-    is_proxy = any(ep in base_url for ep in PROXY_ENDPOINTS)
-    if env_model and env_model not in valid_models and not is_proxy:
-        env['ANTHROPIC_MODEL'] = 'claude-opus-4-6'
+    # NOTE: Do NOT override ANTHROPIC_MODEL here. The claude-agent wrapper
+    # reads per-agent config from settings.json (written by dashboard UI)
+    # and handles model resolution + fallback chain internally.
 
     return env
 
@@ -410,12 +500,27 @@ class Executor:
         task_id = task['task_id']
         claim_epoch = task['claim_epoch']
         agent = task.get('assigned_to', task.get('agent', 'unknown'))
+        priority = task.get('priority', 'normal')
 
-        logger.info(f"Executing {task_id} for {agent} (epoch={claim_epoch})")
+        # Priority-based lease parameters
+        lease_cfg = LEASE_BY_PRIORITY.get(priority, LEASE_BY_PRIORITY["normal"])
+        lease_min = lease_cfg["lease_min"]
+        renew_s = lease_cfg["renew_s"]
+
+        logger.info(f"Executing {task_id} for {agent} (epoch={claim_epoch}, "
+                     f"priority={priority}, lease={lease_min}m, renew={renew_s}s)")
+        _emit_ledger("EXECUTING", task_id, agent, priority=priority)
+
+        # For critical/high priority, immediately renew with shorter lease
+        if priority in ("critical", "high"):
+            try:
+                self.store.renew_lease(task_id, claim_epoch, lease_min)
+            except Exception:
+                pass  # Non-fatal — claim already set a lease
 
         # Start lease renewal background task
         lease_task = asyncio.create_task(
-            self._renew_lease_loop(task_id, claim_epoch)
+            self._renew_lease_loop(task_id, claim_epoch, lease_min, renew_s)
         )
 
         try:
@@ -438,7 +543,18 @@ class Executor:
                     if ok:
                         self.store.record_execution(task_id, agent, 'completed', duration_s)
                         score_completed_task(self.store, task_id, agent, task.get('skill_hint', ''))
+                        _emit_ledger("COMPLETED", task_id, agent, duration_s=duration_s)
                         logger.info(f"Task {task_id} completed in {duration_s:.0f}s")
+                        # Persist result to file for /task-complete to read
+                        result_file = _persist_result(agent, task_id, result['content'], task, duration_s)
+                        # Send Signal notification (non-blocking)
+                        _spawn_task_complete_notification(
+                            agent, task_id, duration_s,
+                            task.get('body', task.get('title', ''))[:200],
+                            result_file=result_file,
+                            notify_target=task.get('notify_target', task.get('origin_initiator', '+19194133445')),
+                            created_at=task.get('created_at', ''),
+                        )
                     else:
                         logger.error(f"Task {task_id} complete CAS failed: {reason}")
                         error_class, transient = classify_validation_failure(reason)
@@ -455,6 +571,7 @@ class Executor:
                         transient, output_snippet=result['content'][:2000],
                     )
                     self.store.record_execution(task_id, agent, 'validation_failed', duration_s)
+                    _emit_ledger("FAILED", task_id, agent, error_class=error_class, error=f"Output validation failed: {reason}")
                     logger.warning(f"Task {task_id} failed validation: {reason}")
             else:
                 # Process failure
@@ -471,10 +588,17 @@ class Executor:
                 self.store.record_execution(task_id, agent, f'failed:{error_class}', duration_s)
                 if new_status == 'FAILED':
                     score_failed_task(self.store, task_id, agent, task.get('skill_hint', ''))
+                _emit_ledger("FAILED", task_id, agent, error_class=error_class,
+                             error=result.get('error', 'Unknown error')[:500])
                 logger.warning(
                     f"Task {task_id} failed: {error_class} -> {new_status} "
                     f"(transient={transient})"
                 )
+
+        except asyncio.CancelledError:
+            logger.warning(f"Task {task_id} cancelled (lease lost)")
+            _emit_ledger("FAILED", task_id, agent, error_class="LEASE_LOST")
+            # Don't call fail_task — orphan recovery already changed the epoch
 
         except Exception as e:
             logger.exception(f"Unexpected error executing {task_id}")
@@ -483,22 +607,39 @@ class Executor:
                     task_id, claim_epoch, "EXECUTOR_ERROR",
                     str(e), is_transient=True,
                 )
-            except Exception:
+                _emit_ledger("FAILED", task_id, agent,
+                             error_class="EXECUTOR_ERROR",
+                             error=str(e)[:500])
+            except Exception as inner_e:
                 logger.exception(f"Failed to record failure for {task_id}")
+                _emit_ledger("EXECUTOR_CRASH", task_id, agent,
+                             error=f"fail_task raised: {inner_e}; original: {e}")
         finally:
             lease_task.cancel()
             self._active_tasks.pop(task_id, None)
 
-    async def _renew_lease_loop(self, task_id: str, claim_epoch: int):
+    def _cancel_task(self, task_id: str):
+        """Cancel a running task due to lease loss."""
+        task_handle = self._active_tasks.get(task_id)
+        if task_handle and not task_handle.done():
+            logger.warning(f"Cancelling task {task_id} due to lease loss")
+            task_handle.cancel()
+            _emit_ledger("LEASE_CANCEL", task_id, "executor",
+                         reason="lease renewal failed")
+
+    async def _renew_lease_loop(self, task_id: str, claim_epoch: int,
+                               lease_min: int = LEASE_MINUTES,
+                               renew_s: int = LEASE_RENEW_INTERVAL):
         """Periodically renew lease while task is executing."""
         try:
             while True:
-                await asyncio.sleep(LEASE_RENEW_INTERVAL)
-                ok = self.store.renew_lease(task_id, claim_epoch, LEASE_MINUTES)
+                await asyncio.sleep(renew_s)
+                ok = self.store.renew_lease(task_id, claim_epoch, lease_min)
                 if ok:
                     logger.debug(f"Lease renewed for {task_id}")
                 else:
-                    logger.warning(f"Lease renewal failed for {task_id} — may have been recovered")
+                    logger.warning(f"Lease renewal failed for {task_id} — cancelling execution")
+                    self._cancel_task(task_id)
                     break
         except asyncio.CancelledError:
             pass
@@ -510,6 +651,19 @@ class Executor:
 
     async def poll_cycle(self):
         """Single poll cycle: try to claim tasks for each agent."""
+        self._poll_count = getattr(self, '_poll_count', 0) + 1
+        if self._poll_count % 10 == 0:  # Every ~5 minutes
+            try:
+                promoted = self.store.promote_orphans(hold_minutes=5)
+                if promoted:
+                    logger.info(f"Promoted {len(promoted)} orphaned tasks to PENDING")
+                recovered = self.store.recover_orphans(ORPHAN_GRACE_MINUTES)
+                if recovered:
+                    logger.info(f"Recovered {len(recovered)} orphaned tasks")
+            except Exception as e:
+                logger.warning(f"Orphan recovery error: {e}")
+
+        any_claimed = False
         for agent in self.agents:
             if self.shutdown.is_set():
                 break
@@ -532,8 +686,16 @@ class Executor:
                 continue
 
             logger.info(f"Claimed {task_id} for {agent}")
+            any_claimed = True
             t = asyncio.create_task(self.run_with_semaphore(task))
             self._active_tasks[task_id] = t
+
+        if not any_claimed:
+            self._empty_polls = getattr(self, '_empty_polls', 0) + 1
+            if self._empty_polls % 10 == 1:
+                logger.info(f"Poll cycle {self._empty_polls}: no PENDING tasks across {len(self.agents)} agents")
+        else:
+            self._empty_polls = 0
 
     async def main_loop(self):
         """Main executor loop."""
@@ -549,6 +711,19 @@ class Executor:
                 await self.poll_cycle()
             except Exception as e:
                 logger.exception(f"Poll cycle error: {e}")
+
+            # Write heartbeat file
+            try:
+                heartbeat = {
+                    "timestamp": datetime.now().isoformat(),
+                    "pid": os.getpid(),
+                    "poll_count": getattr(self, '_poll_count', 0),
+                    "active_tasks": len(self._active_tasks),
+                    "status": "idle" if not self._active_tasks else "executing"
+                }
+                HEARTBEAT_FILE.write_text(json.dumps(heartbeat))
+            except Exception:
+                pass
 
             try:
                 await asyncio.wait_for(

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""
+GDS PageRank Runner — Computes core identity topics per human.
+
+Stores pagerank_score on DISCUSSED edges to identify the topics most
+central to a human's conversation graph.
+
+Usage:
+    from gds_pagerank import run_pagerank
+    scores = run_pagerank(human_id)
+"""
+
+import logging
+from typing import Optional, Dict, Any, List
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from neo4j_task_tracker import neo4j_session
+from gds_projection_manager import GDSProjectionManager
+
+logger = logging.getLogger(__name__)
+
+
+def run_pagerank(
+    human_id: str,
+    damping_factor: float = 0.85,
+    max_iterations: int = 20,
+    tolerance: float = 0.0001,
+) -> List[Dict[str, Any]]:
+    """Run PageRank on a human's topic graph.
+
+    Args:
+        human_id: UUID of the Human
+        damping_factor: PageRank damping factor (default: 0.85)
+        max_iterations: Max iterations (default: 20)
+        tolerance: Convergence tolerance
+
+    Returns:
+        List of {topicLabel, score} sorted by score desc
+    """
+    mgr = GDSProjectionManager()
+    if not mgr.gds_available:
+        logger.warning("GDS not available — using fallback frequency-based ranking")
+        return _fallback_ranking(human_id)
+
+    try:
+        if not mgr.ensure_projection(human_id):
+            return _fallback_ranking(human_id)
+
+        projection_name = mgr._projection_name(human_id)
+
+        with neo4j_session() as session:
+            # Run PageRank
+            result = session.run(
+                """
+                CALL gds.pageRank.stream($projection, {
+                    dampingFactor: $damping,
+                    maxIterations: $maxIter,
+                    tolerance: $tol
+                })
+                YIELD nodeId, score
+                WITH gds.util.asNode(nodeId) AS topic, score
+                RETURN topic.label AS topicLabel, topic.id AS topicId, score
+                ORDER BY score DESC
+                """,
+                projection=projection_name,
+                damping=damping_factor,
+                maxIter=max_iterations,
+                tol=tolerance,
+            )
+            scores = [dict(r) for r in result]
+
+            # Write scores back to DISCUSSED edges
+            for item in scores:
+                session.run(
+                    """
+                    MATCH (h:Human {id: $human_id})-[d:DISCUSSED]->(t:Topic {id: $topic_id})
+                    SET d.pagerank_score = $score
+                    """,
+                    human_id=human_id,
+                    topic_id=item["topicId"],
+                    score=item["score"],
+                )
+
+            logger.info(f"PageRank computed for {human_id[:8]}: {len(scores)} topics scored")
+            return scores
+
+    except Exception as e:
+        logger.error(f"PageRank failed for {human_id[:8]}: {e}")
+        return _fallback_ranking(human_id)
+    finally:
+        mgr.close()
+
+
+def _fallback_ranking(human_id: str) -> List[Dict[str, Any]]:
+    """Frequency-based fallback when GDS is unavailable."""
+    with neo4j_session() as session:
+        result = session.run(
+            """
+            MATCH (h:Human {id: $human_id})-[d:DISCUSSED]->(t:Topic)
+            RETURN t.label AS topicLabel, t.id AS topicId,
+                   toFloat(d.count) AS score
+            ORDER BY d.count DESC
+            LIMIT 50
+            """,
+            human_id=human_id,
+        )
+        scores = [dict(r) for r in result]
+
+        # Normalize to 0-1 range
+        if scores:
+            max_score = max(s["score"] for s in scores) or 1.0
+            for s in scores:
+                s["score"] = s["score"] / max_score
+
+        return scores
+
+
+def get_core_topics(human_id: str, top_n: int = 7) -> List[Dict[str, Any]]:
+    """Get the top-N core identity topics for a human."""
+    with neo4j_session() as session:
+        result = session.run(
+            """
+            MATCH (h:Human {id: $human_id})-[d:DISCUSSED]->(t:Topic)
+            RETURN t.label AS topicLabel, t.id AS topicId,
+                   coalesce(d.pagerank_score, toFloat(d.count)) AS score
+            ORDER BY score DESC
+            LIMIT $n
+            """,
+            human_id=human_id,
+            n=top_n,
+        )
+        return [dict(r) for r in result]
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("human_id", help="Human UUID")
+    args = parser.parse_args()
+
+    scores = run_pagerank(args.human_id)
+    print(f"PageRank scores for {args.human_id[:8]}:")
+    for s in scores[:15]:
+        print(f"  {s['topicLabel']}: {s['score']:.4f}")

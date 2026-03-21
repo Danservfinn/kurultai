@@ -1,10 +1,10 @@
 {
   "issue_streaks": {
-    "ogedei: # task(s) routed but # executed \u2014 dispatch may be stalled": {
-      "consecutive": 2,
-      "first_seen": "2026-03-16T19:03:53.622311",
-      "last_seen": "2026-03-16T22:05:55.759100"
+    "High explicit routing: #/# (#%) \u2014 # from non-system sources, keyword table may be underused": {
+      "consecutive": 1,
+      "first_seen": "2026-03-21T03:03:09.017129",
+      "last_seen": "2026-03-21T03:03:09.017129"
     }
   },
-  "last_run": "2026-03-16T22:05:55.759100"
+  "last_run": "2026-03-21T03:03:09.017129"
 }

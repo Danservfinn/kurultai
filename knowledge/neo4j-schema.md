@@ -19,7 +19,7 @@
 
 ### Task
 
-The primary and currently only node type. Represents a unit of work assigned to an agent.
+The primary node type. Represents a unit of work assigned to an agent.
 
 **Properties:**
 
@@ -30,8 +30,9 @@ The primary and currently only node type. Represents a unit of work assigned to 
 | `prompt` | String | Full task prompt/description (also updated for edits) |
 | `description` | String | Alternative to prompt (legacy) |
 | `result` | String | Task result/output (legacy) |
-| `status` | String | One of: `PENDING`, `WORKING`, `COMPLETED`, `FAILED` |
-| `assigned_to` | String | Agent name (e.g., `temujin`, `kublai`) |
+| `status` | String | One of: `PENDING`, `WORKING`, `COMPLETED`, `FAILED`, `ORPHANED` |
+| `assigned_to` | String | Agent name (e.g., `temujin`, `kublai`). Always set on creation alongside `agent`. |
+| `agent` | String | Agent name (legacy field, kept for backward compat; `assigned_to` is canonical) |
 | `priority` | String | One of: `critical`, `high`, `normal`, `low` |
 | `domain` | String | Task domain (e.g., `ops`, `dev`, `research`) |
 | `source` | String | Origin of the task (e.g., `kanban-ui`, `kanban-review`, `kublai_router`, `reflection-api-rollback`) |
@@ -56,6 +57,23 @@ The primary and currently only node type. Represents a unit of work assigned to 
 | `retry_after` | DateTime | Earliest time a retried task should be re-attempted |
 | `orphaned_at` | DateTime | When the task was detected as orphaned (WORKING with no active executor) |
 
+### Event
+
+Calendar events from Signal integration, used by `/api/calendar/events`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `event_id` | String | Unique event identifier |
+| `name` | String | Event name/title |
+| `description` | String | Event description |
+| `start_datetime` | DateTime | Event start time |
+| `end_datetime` | DateTime | Event end time |
+| `status` | String | Event status |
+| `visibility` | String | Event visibility |
+| `all_day` | Boolean | Whether event spans full day |
+| `created_at` | DateTime | When the event was created |
+| `updated_at` | DateTime | Last modification timestamp |
+
 ---
 
 ## Status Mapping
@@ -79,7 +97,7 @@ Defined in `neo4j.js` as `STATUS_MAP`.
 ### Load Kanban Board
 ```cypher
 MATCH (t:Task)
-WHERE t.status IN ['PENDING', 'WORKING', 'COMPLETED', 'FAILED']
+WHERE t.status IN ['PENDING', 'WORKING', 'COMPLETED', 'FAILED', 'ORPHANED']
 RETURN t {.*} AS task
 ORDER BY coalesce(t.sort_order, 0) DESC,
   CASE t.priority
@@ -211,7 +229,20 @@ Composite indexes improve performance for common multi-property queries:
 
 - `Task.task_id` -- uniqueness constraint (implicit index)
 
-**Note:** Skill and Domain nodes were removed in the v2 schema overhaul. All skill/domain data is stored as string properties on Task nodes. There are no separate Skill or Domain constraints.
+**Note:** Legacy single-property indexes (`task_agent_index`, `task_status_index`, `task_created_idx`) were dropped on 2026-03-19 as they are subsumed by the composite indexes above.
+
+**Note:** Skill and Domain nodes were removed in the v2 schema overhaul (consistent with architecture.md v1.8). All skill/domain data is stored as string properties on Task nodes. There are no separate Skill or Domain constraints.
+
+---
+
+## v2 Executor Observability
+
+The v2 executor (`neo4j_v2_executor.py`) provides:
+
+- **Heartbeat file**: `~/.openclaw/agents/main/logs/v2-executor-heartbeat.json` — updated every 30s with `timestamp`, `pid`, `poll_count`, `active_tasks`, `status` (idle/executing)
+- **Ledger emission**: Writes EXECUTING/COMPLETED/FAILED events to `~/.openclaw/tasks/task-ledger.jsonl` with `executor: "claude-code"` field
+- **Idle logging**: Logs "Poll cycle N: no PENDING tasks" every ~5 minutes when queues are empty
+- **Orphan recovery**: Calls `promote_orphans()` and `recover_orphans()` every ~5 minutes
 
 ---
 

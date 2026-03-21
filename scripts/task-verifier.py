@@ -607,9 +607,8 @@ def update_neo4j(result):
     if not result.task_id:
         return
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        with driver.session() as session:
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
             session.run("""
                 MATCH (t:Task {task_id: $task_id})
                 SET t.verified = $passed,

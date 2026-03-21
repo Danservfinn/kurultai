@@ -26,7 +26,7 @@ from pathlib import Path
 
 # Import shared Neo4j connection
 sys.path.insert(0, str(Path(__file__).parent))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import get_driver, close_driver
 
 QUEUE_DIR = Path.home() / ".openclaw" / "agents" / "mongke" / "workspace" / "knowledge-queue"
 
@@ -48,7 +48,8 @@ class KnowledgeStore:
 
     def close(self):
         if self.driver:
-            self.driver.close()
+            close_driver()
+            self.driver = None
 
     # ------------------------------------------------------------------
     # Index management

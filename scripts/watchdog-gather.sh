@@ -216,7 +216,7 @@ fi
 SCRIPTS_DIR="$(dirname "$0")"
 NEO4J_STATUS=$(python3 -c "
 import signal, sys
-signal.alarm(8)  # kill after 8 seconds
+signal.alarm(15)  # kill after 15 seconds (was 8s — too short during GC pauses with large heap)
 sys.path.insert(0, '$SCRIPTS_DIR')
 from neo4j_task_tracker import get_driver, close_driver
 try:
@@ -310,10 +310,10 @@ if [ "$NEO4J_STATUS" = "down" ]; then
         NEO4J_RECOVERY_ATTEMPTED=1
         echo "[$TS] NEO4J_RECOVERY | attempting restart (neo4j detected down)" >> "$WATCHDOG_LOG"
 
-        # Try brew services restart first (standard macOS install)
-        # Run synchronously to ensure restart completes before verification
+        # Use 'start' not 'restart' — restart sends SIGTERM first, which kills Neo4j
+        # if it was just slow to respond (GC pause). Start is a no-op if already running.
         if command -v brew >/dev/null 2>&1; then
-            brew services restart neo4j >/dev/null 2>&1
+            brew services start neo4j >/dev/null 2>&1
         else
             # Fallback: direct neo4j command
             neo4j start >/dev/null 2>&1

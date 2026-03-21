@@ -367,13 +367,12 @@ def main():
             _append_ledger(scored)
             # Persist action scores to Neo4j for each task in the window
             try:
-                from neo4j_task_tracker import get_driver
-                driver = get_driver()
+                from neo4j_task_tracker import neo4j_session
                 events = read_ledger(hours=args.hours * 4)
                 agent_events = [e for e in events if e.get("agent") == agent]
                 task_ids = set(e.get("task_id") for e in agent_events if e.get("task_id"))
                 score = scored.get("memory_score", 0) or 0
-                with driver.session() as session:
+                with neo4j_session() as session:
                     for task_id in task_ids:
                         session.run("""
                             MATCH (t:Task {task_id: $task_id})

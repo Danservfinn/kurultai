@@ -41,6 +41,13 @@ from calendar_parser import (
 
 from profile_handler import apply_profile_hints, get_context_for_conversation, format_context_for_agent
 
+# Neo4j pending question system (replaces in-memory state for sequential interrogation)
+try:
+    from pending_question import queue_event_questions as _neo4j_queue_questions
+    _HAS_PENDING_Q = True
+except ImportError:
+    _HAS_PENDING_Q = False
+
 # Conversation logging
 from conversation_logger import log_inbound, log_outbound, ConversationLogger
 
@@ -183,8 +190,8 @@ def handle_event_create(
 ) -> Optional[str]:
     """Handle event creation intent.
 
-    When key fields are missing, enters an interrogation flow to gather
-    complete event details before creating.
+    When key fields are missing, uses Neo4j PendingQuestion for sequential
+    one-at-a-time interrogation. Falls back to bulk questions if Neo4j is down.
     """
     event_data = parsed.event
 
@@ -199,6 +206,23 @@ def handle_event_create(
         missing = detect_missing_fields(event_data)
         if "date_text" not in missing:
             missing.insert(0, "date_text")
+
+        # Try Neo4j sequential questioning first
+        if _HAS_PENDING_Q:
+            try:
+                # Resolve human_id from phone
+                human_id = _resolve_human_id(sender_phone)
+                if human_id:
+                    event_dict = _event_extraction_to_dict(event_data)
+                    resolved_serial = _serialize_resolved(resolved)
+                    return _neo4j_queue_questions(
+                        human_id, event_dict, missing, resolved_serial, sender_name
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Neo4j sequential questions failed, falling back: {e}")
+
+        # Fallback: bulk questions + in-memory state
         questions = format_followup_questions(event_data, resolved)
         set_pending_interrogation(
             sender_phone, event_data, missing, sender_name, resolved
@@ -207,15 +231,26 @@ def handle_event_create(
 
     # Check which fields are missing (excluding date since we resolved it)
     missing = detect_missing_fields(event_data)
-    # Remove date_text from missing since we have it
     missing = [f for f in missing if f != "date_text"]
 
-    # If key fields are missing, interrogate before creating
-    # Key fields: duration, location, participants (always ask)
-    # Optional fields: description, reminder_text, recurrence (ask if nothing else missing)
     key_missing = [f for f in missing if f in ("duration", "location", "participants")]
 
     if key_missing:
+        # Try Neo4j sequential questioning
+        if _HAS_PENDING_Q:
+            try:
+                human_id = _resolve_human_id(sender_phone)
+                if human_id:
+                    event_dict = _event_extraction_to_dict(event_data)
+                    resolved_serial = _serialize_resolved(resolved)
+                    return _neo4j_queue_questions(
+                        human_id, event_dict, missing, resolved_serial, sender_name
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Neo4j sequential questions failed, falling back: {e}")
+
+        # Fallback: bulk questions
         questions = format_followup_questions(event_data, resolved)
         set_pending_interrogation(
             sender_phone, event_data, missing, sender_name, resolved
@@ -264,6 +299,15 @@ def _finalize_event_create(
 
     # High-confidence auto-confirm, otherwise ask
     if (parsed and parsed.confidence >= 0.8 and not getattr(parsed, 'ambiguities', [])):
+        # Collect enriched fields from extraction
+        enriched_kwargs = {}
+        for field in ["cost", "dress_code", "what_to_bring", "category",
+                       "vibe", "indoor_outdoor", "event_url", "ticket_url",
+                       "dietary_notes"]:
+            val = getattr(event_data, field, None)
+            if val is not None:
+                enriched_kwargs[field] = val
+
         created_event = create_event(
             name=event.name,
             start_datetime=event.start_datetime,
@@ -272,13 +316,14 @@ def _finalize_event_create(
             description=event.description,
             location_name=event.location,
             source_message=event.source_message,
+            **enriched_kwargs,
         )
 
         # Link event to conversation
         conversation_date = datetime.now().isoformat()
         link_conversation_to_event(sender_phone, event.name, conversation_date)
 
-        return format_confirmed_event(event)
+        return format_confirmed_event(event, enriched=enriched_kwargs)
 
     set_pending_confirmation(sender_phone, event)
     return format_needs_confirmation(event)
@@ -376,6 +421,140 @@ def _format_complete_summary(event: ResolvedEvent, event_data: Any = None) -> st
 
     lines.append("Does that look right? Reply 'yes' to confirm or 'no' to cancel.")
     return "\n".join(lines)
+
+
+def create_event_from_dict(
+    event_dict: dict,
+    resolved_time: dict,
+    sender_phone: str,
+    sender_name: str,
+) -> str:
+    """Create a calendar event from a completed event dict.
+
+    Called by pending_question handler after sequential interrogation.
+    Returns confirmation message string.
+    """
+    from datetime import datetime as _dt
+    from dateutil.parser import isoparse
+
+    # Reconstruct start datetime
+    start_raw = resolved_time.get("start")
+    if isinstance(start_raw, str):
+        start = isoparse(start_raw)
+    elif isinstance(start_raw, _dt):
+        start = start_raw
+    else:
+        return "Could not determine event start time. Please try again."
+
+    # Calculate end time
+    duration_min = event_dict.get("duration_minutes")
+    if duration_min:
+        end = start + timedelta(minutes=int(duration_min))
+    else:
+        end_raw = resolved_time.get("end")
+        if isinstance(end_raw, str):
+            end = isoparse(end_raw)
+        elif isinstance(end_raw, _dt):
+            end = end_raw
+        else:
+            end = start + DEFAULT_DURATION
+
+    event_name = event_dict.get("name") or "Unnamed Event"
+    participants = [sender_name]
+    if event_dict.get("participants"):
+        p = event_dict["participants"]
+        if isinstance(p, list):
+            participants.extend(p)
+        else:
+            participants.append(p)
+
+    event = ResolvedEvent(
+        name=event_name,
+        start_datetime=start,
+        end_datetime=end,
+        location=event_dict.get("location"),
+        participants=participants,
+        created_by=sender_name,
+        source_message="(gathered via sequential questions)",
+        confidence=0.9,
+        description=event_dict.get("description"),
+        recurrence=event_dict.get("recurrence"),
+    )
+
+    # Collect enriched fields from event_dict
+    enriched_kwargs = {}
+    for field in ["cost", "dress_code", "what_to_bring", "category",
+                   "vibe", "indoor_outdoor", "event_url", "ticket_url",
+                   "dietary_notes"]:
+        val = event_dict.get(field)
+        if val is not None:
+            enriched_kwargs[field] = val
+
+    # Create in Neo4j
+    create_event(
+        name=event.name,
+        start_datetime=event.start_datetime,
+        end_datetime=event.end_datetime,
+        creator_phone=sender_phone,
+        description=event.description,
+        location_name=event.location,
+        source_message=event.source_message,
+        **enriched_kwargs,
+    )
+
+    # Link to conversation
+    conversation_date = datetime.now().isoformat()
+    link_conversation_to_event(sender_phone, event.name, conversation_date)
+
+    return format_confirmed_event(event, enriched=enriched_kwargs)
+
+
+def _resolve_human_id(sender_phone: str) -> Optional[str]:
+    """Resolve a human_id from phone number."""
+    try:
+        from neo4j_human_v2 import HumanStoreV2
+        store = HumanStoreV2()
+        human = store.find_or_create_by_phone(sender_phone, "")
+        hid = human["id"]
+        store.close()
+        return hid
+    except Exception:
+        return None
+
+
+def _event_extraction_to_dict(event_data) -> dict:
+    """Convert EventExtraction to a plain dict for JSON storage."""
+    d = {
+        "name": event_data.name,
+        "date_text": event_data.date_text,
+        "location": event_data.location,
+        "duration_minutes": event_data.duration_minutes,
+        "participants": event_data.participants or [],
+        "description": event_data.description,
+        "reminder_text": event_data.reminder_text,
+        "recurrence": event_data.recurrence,
+    }
+    # Enriched fields
+    for field in ["cost", "dress_code", "what_to_bring", "category",
+                   "vibe", "indoor_outdoor", "event_url", "ticket_url",
+                   "dietary_notes"]:
+        val = getattr(event_data, field, None)
+        if val is not None:
+            d[field] = val
+    return d
+
+
+def _serialize_resolved(resolved: dict) -> dict:
+    """Serialize a resolved time dict (datetimes to ISO strings)."""
+    out = {}
+    for k, v in resolved.items():
+        if isinstance(v, datetime):
+            out[k] = v.isoformat()
+        elif isinstance(v, list):
+            out[k] = [x.isoformat() if isinstance(x, datetime) else x for x in v]
+        else:
+            out[k] = v
+    return out
 
 
 def handle_event_query(parsed: Any, sender_phone: str, group_id: str) -> Optional[str]:

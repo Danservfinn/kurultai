@@ -37,7 +37,7 @@ from kurultai_paths import AGENTS_DIR as _AGENTS_DIR
 
 # Import Neo4j connection from existing module
 try:
-    from neo4j_task_tracker import get_driver
+    from neo4j_task_tracker import get_driver, close_driver
     NEO4J_AVAILABLE = True
 except ImportError:
     NEO4J_AVAILABLE = False
@@ -492,7 +492,8 @@ class ExperimentManager:
     def close(self):
         """Close Neo4j connection."""
         if self.driver:
-            self.driver.close()
+            close_driver()
+            self.driver = None
 
 
 def main():

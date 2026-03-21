@@ -26,14 +26,12 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 
 
 def query_tasks(hours: Optional[float] = None, days: Optional[float] = None,
                 agent: Optional[str] = None, status: Optional[str] = None) -> List[dict]:
     """Query tasks from Neo4j with filters."""
-    driver = get_driver()
-
     time_clause = ""
     if hours:
         time_clause = f"t.created > datetime() - duration({{hours: {hours}}})"
@@ -53,7 +51,7 @@ def query_tasks(hours: Optional[float] = None, days: Optional[float] = None,
     """
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(query)
             tasks = []
             for record in result:
@@ -63,8 +61,6 @@ def query_tasks(hours: Optional[float] = None, days: Optional[float] = None,
     except Exception as e:
         print(f"Query failed: {e}", file=sys.stderr)
         return []
-    finally:
-        driver.close()
 
 
 def aggregate_basic_metrics(tasks: List[dict]) -> dict:

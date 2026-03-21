@@ -916,30 +916,139 @@ echo "$CONFIG_MODELS" > "$TOCK_TMP/config_models.json"
 echo "$FILESYSTEM_QUEUES" > "$TOCK_TMP/filesystem_queues.json"
 
 # ============================================================
-# 4b. Live session model reading (direct from sessions.json, not gateway cache)
+# 4b. Live session model reading from active.jsonl (ground truth for provider)
+# FIX 2026-03-17 (temujin): Use global provider signal from active.jsonl
+# instead of per-agent lookup, since most entries have agent="unknown".
+# If recent active.jsonl entries show anthropic as dominant provider,
+# all agents are assumed to be on their anthropic config model.
+# This prevents false positive model drift alerts from stale sessions.json.
 # ============================================================
 LIVE_SESSION_MODELS=$(python3 2>/dev/null << 'PYEOF'
 import json, os
+from datetime import datetime, timedelta
+
 base = "/Users/kublai/.openclaw/agents"
+active_jsonl = os.path.expanduser("~/.openclaw/logs/sessions/active.jsonl")
+
+# Provider → model mapping (from fallback chain)
+PROVIDER_MODEL_MAP = {
+    "zai": "glm-5",
+    "alibaba": "qwen3.5-plus"
+}
+
+# Config model for each agent (anthropic primary)
+AGENT_CONFIG_MODELS = {
+    "kublai": "claude-opus-4-6",
+    "mongke": "claude-opus-4-6",
+    "chagatai": "claude-opus-4-6",
+    "temujin": "claude-opus-4-6",
+    "jochi": "claude-opus-4-6",
+    "ogedei": "claude-opus-4-6",
+    "tolui": "claude-opus-4-6"
+}
+
+cutoff = datetime.now() - timedelta(minutes=30)
+
+# --- Step 1: Read active.jsonl for per-agent AND global provider signals ---
+per_agent_providers = {}   # agent → {provider, ts} (labeled entries only)
+global_provider_counts = {}  # provider → count (ALL recent entries including unknown)
+
+if os.path.exists(active_jsonl):
+    try:
+        with open(active_jsonl, 'r') as f:
+            lines = f.readlines()[-1000:]
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    agent = entry.get("agent", "")
+                    provider = entry.get("provider", "")
+                    ts_str = entry.get("ts", "")
+
+                    if not provider or not ts_str:
+                        continue
+
+                    # Parse timestamp
+                    try:
+                        ts = datetime.fromisoformat(ts_str)
+                        if ts.tzinfo is not None:
+                            ts = ts.replace(tzinfo=None)
+                        if ts < cutoff:
+                            continue
+                    except ValueError:
+                        continue
+
+                    # Count ALL recent providers (including agent=unknown)
+                    global_provider_counts[provider] = global_provider_counts.get(provider, 0) + 1
+
+                    # Also track per-agent for labeled entries
+                    if agent and agent != "unknown" and agent in AGENT_CONFIG_MODELS:
+                        if agent not in per_agent_providers or ts_str > per_agent_providers[agent]["ts"]:
+                            per_agent_providers[agent] = {"provider": provider, "ts": ts_str}
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        pass
+
+# --- Step 2: Determine dominant global provider ---
+total_recent = sum(global_provider_counts.values())
+dominant_provider = None
+if total_recent >= 3:  # Need at least 3 recent entries for confidence
+    # Find provider with >80% share
+    for prov, count in global_provider_counts.items():
+        if count / total_recent >= 0.8:
+            dominant_provider = prov
+            break
+
+# --- Step 3: Resolve model per agent ---
 result = {}
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
-    session_file = f"{base}/{agent}/sessions/sessions.json"
     model = "none"
-    try:
-        with open(session_file) as f:
-            data = json.load(f)
-            # Get the most recent session's model
-            if data and isinstance(data, dict):
-                # Check for active session
-                for session_id, session_data in data.items():
-                    if isinstance(session_data, dict):
-                        m = session_data.get("model")
-                        if m:
-                            model = m
-                            break
-    except (FileNotFoundError, json.JSONDecodeError, KeyError):
-        pass
+
+    # Priority 1: Per-agent labeled entry from active.jsonl (most specific)
+    if agent in per_agent_providers:
+        provider = per_agent_providers[agent]["provider"]
+        if provider == "anthropic":
+            model = AGENT_CONFIG_MODELS.get(agent, "claude-opus-4-6")
+        elif provider in PROVIDER_MODEL_MAP:
+            model = PROVIDER_MODEL_MAP[provider]
+
+    # Priority 2: Global dominant provider from active.jsonl
+    # Most entries are agent="unknown", so use the global signal
+    if model == "none" and dominant_provider:
+        if dominant_provider == "anthropic":
+            model = AGENT_CONFIG_MODELS.get(agent, "claude-opus-4-6")
+        elif dominant_provider in PROVIDER_MODEL_MAP:
+            model = PROVIDER_MODEL_MAP[dominant_provider]
+
+    # Priority 3: sessions.json (last resort, with staleness guard)
+    if model == "none":
+        session_file = f"{base}/{agent}/sessions/sessions.json"
+        try:
+            with open(session_file) as f:
+                data = json.load(f)
+                if data and isinstance(data, dict):
+                    for session_id, session_data in data.items():
+                        if isinstance(session_data, dict):
+                            m = session_data.get("model")
+                            if m:
+                                updated_at = session_data.get("updatedAt", 0)
+                                if updated_at:
+                                    try:
+                                        age_s = (datetime.now().timestamp() * 1000 - updated_at) / 1000
+                                        if age_s > 3600:
+                                            break  # Stale — don't trust
+                                    except (TypeError, ValueError):
+                                        pass
+                                model = m
+                                break
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            pass
+
     result[agent] = model
+
 print(json.dumps(result))
 PYEOF
 )
@@ -1029,7 +1138,7 @@ if "sessions" in session:
         aid = a.get("agentId","")
         recent = a.get("recent",[{}])[0] if a.get("recent") else {}
         # Use live session model instead of gateway cached value
-        live_model = live_session_models.get(aid, "unknown")
+        live_model = live_session_models.get(aid, "none")
         session_by_agent[aid] = {
             "count": a.get("count",0),
             "pct_used": recent.get("percentUsed",0),
@@ -1046,7 +1155,8 @@ for name in agent_names:
     # session_model already uses live data now (via session_by_agent)
     session_model = s.get("model", "none") if s else live_session_models.get(name, "none")
     config_resolved = cm.get("resolved", "claude-opus-4-6")
-    model_match = session_model == "none" or session_model == config_resolved
+    # "none" and "unknown" both mean no reliable session data — not a mismatch
+    model_match = session_model in ("none", "unknown") or session_model == config_resolved
     # Use filesystem queue depths as source of truth for pending/executing counts
     # Neo4j only tracks last 30 minutes, but tasks can queue for hours
     # FIX 2026-03-14 (jochi): Always prefer filesystem over Neo4j — falling back
@@ -1272,8 +1382,8 @@ output = {
         "success_rate": 0.0
     }),
     "fleet_model_mismatch": {
-        "count": sum(1 for a in agents.values() if not a.get("config_model", {}).get("session_match", True) and a.get("session", {}).get("model", "none") != "none"),
-        "agents": [name for name in agent_names if not agents[name].get("config_model", {}).get("session_match", True) and agents[name].get("session", {}).get("model", "none") != "none"]
+        "count": sum(1 for a in agents.values() if not a.get("config_model", {}).get("session_match", True) and a.get("session", {}).get("model", "none") not in ("none", "unknown")),
+        "agents": [name for name in agent_names if not agents[name].get("config_model", {}).get("session_match", True) and agents[name].get("session", {}).get("model", "none") not in ("none", "unknown")]
     }
 }
 

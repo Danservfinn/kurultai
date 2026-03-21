@@ -28,6 +28,15 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+# Conversational health context for review enrichment
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from neo4j_v2_reflection import prepare_conversational_context
+    from neo4j_v2_core import TaskStore
+    _HAS_CONV_CONTEXT = True
+except ImportError:
+    _HAS_CONV_CONTEXT = False
+
 
 # Configuration
 LOGS_DIR = Path("/Users/kublai/.openclaw/logs")
@@ -122,6 +131,31 @@ WEAKNESSES: (2-3 bullet points of what failed or underperformed)
 PATTERNS: (recurring issues or successes observed)
 PRIORITY_FIX: (single most impactful improvement for next hour)
 SCORE: (1-10 performance rating with one-line justification)
+"""
+
+    # Load conversational health context for review enrichment
+    conv_context = ""
+    if _HAS_CONV_CONTEXT:
+        try:
+            _store = TaskStore()
+            try:
+                conv_context = prepare_conversational_context(_store)
+            finally:
+                _store.close()
+        except Exception as e:
+            conv_context = "[Conversational context unavailable]"
+            import logging as _log
+            _log.getLogger(__name__).warning(f"Conversational context failed: {e}")
+
+    if conv_context:
+        prompt += f"""
+
+## Conversational Health Data (System-Wide)
+{conv_context}
+
+## Additional Review Criteria
+5. Conversational quality — curiosity question answer rate, reciprocity balance, stale promise accumulation. Flag WARNING lines.
+6. Privacy compliance — ResponseGuard activation count, fallback frequency. Any fallback >5 in 7d needs investigation.
 """
 
     try:
@@ -221,6 +255,31 @@ SCORE: N/A (no recent activity)
             issues_found.append(f"{task_name}: Missing resolution section")
             no_resolution_count += 1
 
+    # Privacy compliance check (reads ResponseGuard JSONL)
+    guard_log = Path("/Users/kublai/.openclaw/logs/response-guard-activations.jsonl")
+    guard_activations = guard_fallbacks = 0
+    if guard_log.exists():
+        try:
+            cutoff = datetime.now() - timedelta(hours=REVIEW_HOURS_WINDOW)
+            content = guard_log.read_text().strip()
+            for line in (content.split("\n") if content else [])[-100:]:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("event") == "group_send":
+                        continue
+                    if datetime.fromisoformat(entry["timestamp"]) > cutoff:
+                        guard_activations += 1
+                        if entry.get("is_fallback"):
+                            guard_fallbacks += 1
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    continue
+        except Exception:
+            pass
+
+    if guard_fallbacks > 0:
+        issues_found.append(f"ResponseGuard: {guard_fallbacks} fallback activations "
+                            f"(high-redaction responses in {REVIEW_HOURS_WINDOW}h)")
+
     total_tasks = len(completions)
     quality_rate = (total_tasks - low_quality_count) / total_tasks if total_tasks > 0 else 1
 
@@ -242,6 +301,9 @@ SCORE: N/A (no recent activity)
         f"Total completions: {total_tasks}",
         f"Average content length: {sum(c['char_count'] for c in completions) // total_tasks if total_tasks else 0} chars"
     ]
+    if guard_activations > 0:
+        patterns.append(f"ResponseGuard: {guard_activations} activations, "
+                        f"{guard_fallbacks} fallbacks")
 
     # Score calculation (1-10)
     base_score = int(10 * quality_rate)

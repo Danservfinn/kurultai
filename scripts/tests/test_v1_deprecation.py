@@ -7,14 +7,14 @@ import warnings
 
 sys.path.insert(0, os.path.expanduser('~/.openclaw/agents/main/scripts'))
 
-from neo4j_task_tracker import TaskTracker, get_driver, close_driver
+from neo4j_task_tracker import TaskTracker, neo4j_session
 
 
 TEST_AGENT = '__test_v1dep__'
 
 
-def _cleanup(driver):
-    with driver.session() as session:
+def _cleanup():
+    with neo4j_session() as session:
         session.run("""
             MATCH (t:Task) WHERE t.assigned_to = $a OR t.agent = $a
             OPTIONAL MATCH (t)-[r]-()
@@ -39,7 +39,7 @@ def test_deprecation_warning_create():
             assert len(dep_warnings) >= 1, \
                 f"Expected DeprecationWarning, got {len(dep_warnings)} warnings: {[str(x.message) for x in w]}"
     finally:
-        _cleanup(tracker.driver)
+        _cleanup()
         tracker.close()
 
 
@@ -58,7 +58,7 @@ def test_deprecation_warning_update_status():
             dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
             assert len(dep_warnings) >= 1, "update_status should emit DeprecationWarning"
     finally:
-        _cleanup(tracker.driver)
+        _cleanup()
         tracker.close()
 
 
@@ -76,7 +76,7 @@ def test_deprecation_warning_increment_retry():
             dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
             assert len(dep_warnings) >= 1, "increment_retry should emit DeprecationWarning"
     finally:
-        _cleanup(tracker.driver)
+        _cleanup()
         tracker.close()
 
 
@@ -95,7 +95,7 @@ def test_deprecation_disabled():
                 f"Should NOT emit warning when disabled, got {len(dep_warnings)}"
     finally:
         ntt._V1_DEPRECATED = True  # Restore
-        _cleanup(tracker.driver)
+        _cleanup()
         tracker.close()
 
 
@@ -121,10 +121,11 @@ def test_readonly_no_warning():
 def test_migration_dryrun():
     """Migration dry-run reports counts without modifying."""
     from neo4j_migrate_v1_status import migrate_statuses
+    from neo4j_task_tracker import get_driver
     driver = get_driver()
     try:
         # Insert a test task with lowercase status
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 CREATE (t:Task {
                     task_id: 'test-mig-dry', status: 'ready',
@@ -134,22 +135,22 @@ def test_migration_dryrun():
 
         count = migrate_statuses(driver, dry_run=True)
         # Verify the task still has lowercase status (not changed)
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 "MATCH (t:Task {task_id: 'test-mig-dry'}) RETURN t.status AS s")
             status = result.single()['s']
         assert status == 'ready', f"Dry run should not change status, got {status}"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 def test_migration_execute():
     """Execute normalizes ready->PENDING."""
     from neo4j_migrate_v1_status import migrate_statuses
+    from neo4j_task_tracker import get_driver
     driver = get_driver()
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 CREATE (t:Task {
                     task_id: 'test-mig-exec', status: 'ready',
@@ -159,22 +160,22 @@ def test_migration_execute():
 
         migrate_statuses(driver, dry_run=False)
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 "MATCH (t:Task {task_id: 'test-mig-exec'}) RETURN t.status AS s")
             status = result.single()['s']
         assert status == 'PENDING', f"Should normalize to PENDING, got {status}"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 def test_migration_idempotent():
     """Running migration twice produces same result."""
     from neo4j_migrate_v1_status import migrate_statuses
+    from neo4j_task_tracker import get_driver
     driver = get_driver()
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             session.run("""
                 CREATE (t:Task {
                     task_id: 'test-mig-idem', status: 'running',
@@ -185,22 +186,22 @@ def test_migration_idempotent():
         migrate_statuses(driver, dry_run=False)
         migrate_statuses(driver, dry_run=False)  # Second run
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run(
                 "MATCH (t:Task {task_id: 'test-mig-idem'}) RETURN t.status AS s")
             status = result.single()['s']
         assert status == 'WORKING', f"Should be WORKING, got {status}"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 def test_no_lowercase_after_migration():
     """Post-migration: no lowercase statuses remain for test tasks."""
     from neo4j_migrate_v1_status import migrate_statuses
+    from neo4j_task_tracker import get_driver
     driver = get_driver()
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             for old_status in ['ready', 'running', 'completed', 'failed', 'killed']:
                 session.run("""
                     CREATE (t:Task {
@@ -211,7 +212,7 @@ def test_no_lowercase_after_migration():
 
         migrate_statuses(driver, dry_run=False)
 
-        with driver.session() as session:
+        with neo4j_session() as session:
             result = session.run("""
                 MATCH (t:Task) WHERE t.assigned_to = $a AND t.status =~ '[a-z]+'
                 RETURN count(t) AS cnt
@@ -221,8 +222,7 @@ def test_no_lowercase_after_migration():
             count = int(count)
         assert count == 0, f"Found {count} tasks with lowercase status after migration"
     finally:
-        _cleanup(driver)
-        close_driver()
+        _cleanup()
 
 
 if __name__ == '__main__':

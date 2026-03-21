@@ -39,7 +39,7 @@ from kurultai_paths import AGENTS_DIR, OPENCLAW_DIR
 
 # Try to import Neo4j dependency
 try:
-    from neo4j_task_tracker import get_driver
+    from neo4j_task_tracker import get_driver, close_driver
     NEO4J_AVAILABLE = True
 except ImportError:
     NEO4J_AVAILABLE = False
@@ -187,7 +187,8 @@ class EvaluationEngine:
     def close(self):
         """Close Neo4j driver if we created it."""
         if self.driver and NEO4J_AVAILABLE:
-            self.driver.close()
+            close_driver()
+            self.driver = None
 
     def _ensure_ledger_exists(self):
         """Create the ledger directory and file if they don't exist."""

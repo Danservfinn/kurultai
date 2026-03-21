@@ -62,9 +62,6 @@ def acquire_lock(lock_file=REDISTRIBUTE_LOCK_FILE, timeout_s=0):
     Returns (success: bool, lock_fd or None).
     If timeout_s > 0, will wait for lock to become available.
     """
-    import fcntl
-    import time
-
     try:
         os.makedirs(lock_file, exist_ok=False)
         # Create pid file
@@ -83,7 +80,11 @@ def acquire_lock(lock_file=REDISTRIBUTE_LOCK_FILE, timeout_s=0):
                     os.kill(old_pid, 0)
                     return False, None  # Process still running
                 except OSError:
-                    # Stale lock - remove and retry
+                    # Stale lock - remove pid file first, then directory
+                    try:
+                        os.remove(f"{lock_file}/pid")
+                    except FileNotFoundError:
+                        pass
                     os.rmdir(lock_file)
                     return acquire_lock(lock_file, timeout_s)
         except (ValueError, FileNotFoundError):
@@ -115,11 +116,18 @@ def get_pending_tasks(agent):
     pending = []
     for fpath in task_dir.iterdir():
         fname = fpath.name
-        # Skip done, executing, completed, hidden, or archived files
-        # Note: .completed.md is a malformed suffix (should be .completed.done.md)
-        # Agents sometimes write these directly, so we must skip them during redistribution
-        if ('.done' in fname or '.executing' in fname or fname.startswith('.') or
-            'archived' in fname or fname.endswith('.completed.md')):
+        # Skip terminal-state, executing, hidden, or archived files
+        # Comprehensive filter aligned with watchdog-gather.sh terminal states
+        # to prevent redistribution of tasks that are no longer actionable
+        TERMINAL_MARKERS = (
+            '.done', '.executing', '.stale', '.failed', '.obsolete',
+            '.cancelled', '.resolved', '.revision', '.no_output', '.loop',
+            '.pending-gate', '.blocked', '.quarantine',
+        )
+        if (any(marker in fname for marker in TERMINAL_MARKERS)
+            or fname.startswith('.')
+            or 'archived' in fname
+            or fname.endswith('.completed.md')):
             continue
         if not fname.endswith('.md'):
             continue
@@ -147,6 +155,33 @@ def get_pending_tasks(agent):
     return pending
 
 
+def _count_redistribution_comments(content):
+    """Count redistribution HTML comments as secondary bounce detection.
+
+    This works regardless of frontmatter format and serves as a fallback
+    safety net when redispatch_count field cannot be inserted/updated.
+    """
+    return len(re.findall(r'<!-- Task redistributed from ', content))
+
+
+def _extract_priority(content):
+    """Extract priority from either YAML frontmatter or markdown bold format.
+
+    Handles both:
+      priority: high       (YAML frontmatter)
+      **Priority:** high   (markdown bold, used by watchdog/health alerts)
+    """
+    # Try YAML format first
+    match = re.search(r'^priority:\s*(\w+)$', content, re.MULTILINE)
+    if match:
+        return match.group(1).lower()
+    # Try markdown bold format
+    match = re.search(r'^\*\*Priority:\*\*\s*(\w+)', content, re.MULTILINE)
+    if match:
+        return match.group(1).lower()
+    return "normal"
+
+
 def move_task(src_path, dest_agent, dry_run=False):
     """Move a task file from one agent to another.
 
@@ -164,6 +199,13 @@ def move_task(src_path, dest_agent, dry_run=False):
     if not dest_dir.exists():
         return False, f"Destination directory does not exist: {dest_dir}"
 
+    # Validate dest_agent to prevent path traversal
+    if dest_agent not in VALID_AGENTS:
+        return False, f"Invalid agent name: {dest_agent}"
+    # Ensure resolved path is within AGENTS_DIR
+    if not dest_dir.resolve().is_relative_to(AGENTS_DIR.resolve()):
+        return False, f"Destination path escapes agents directory: {dest_dir}"
+
     if dry_run:
         return True, f"{dest_dir}/{src_path.name}"
 
@@ -174,14 +216,21 @@ def move_task(src_path, dest_agent, dry_run=False):
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             dest_path = dest_dir / f"{src_path.stem}-{timestamp}{src_path.suffix}"
 
-        # Update agent in content
+        # Update agent in content — handle both YAML and markdown bold formats
         content = src_path.read_text()
         updated_content = re.sub(r'^agent: \w+$', f'agent: {dest_agent}', content, flags=re.MULTILINE)
+        updated_content = re.sub(r'^\*\*Agent:\*\*\s*\w+', f'**Agent:** {dest_agent}', updated_content, flags=re.MULTILINE)
 
         # Increment redispatch_count to track redistribution cycles
         # This prevents infinite bouncing of tasks between agents
         redispatch_match = re.search(r'^redispatch_count:\s*(\d+)$', updated_content, re.MULTILINE)
         current_count = int(redispatch_match.group(1)) if redispatch_match else 0
+
+        # Secondary safety: count HTML redistribution comments as fallback
+        # This works even when redispatch_count field cannot be inserted
+        comment_count = _count_redistribution_comments(updated_content)
+        current_count = max(current_count, comment_count)
+
         new_count = current_count + 1
 
         if redispatch_match:
@@ -193,18 +242,40 @@ def move_task(src_path, dest_agent, dry_run=False):
                 flags=re.MULTILINE
             )
         else:
-            # Insert redispatch_count after priority line (same place as retry_count)
-            updated_content = re.sub(
+            # Try YAML priority line first
+            priority_sub = re.sub(
                 r'^(priority:.*)$',
                 f'\\1\nredispatch_count: {new_count}',
                 updated_content,
                 count=1,
                 flags=re.MULTILINE
             )
+            if priority_sub != updated_content:
+                updated_content = priority_sub
+            else:
+                # Try markdown bold priority line as fallback
+                priority_sub = re.sub(
+                    r'^(\*\*Priority:\*\*.*)$',
+                    f'\\1\nredispatch_count: {new_count}',
+                    updated_content,
+                    count=1,
+                    flags=re.MULTILINE
+                )
+                if priority_sub != updated_content:
+                    updated_content = priority_sub
+                else:
+                    # Last resort: append as standalone line before first blank line
+                    updated_content = re.sub(
+                        r'^(\s*$)',
+                        f'redispatch_count: {new_count}\n',
+                        updated_content,
+                        count=1,
+                        flags=re.MULTILINE
+                    )
 
         # Add redistribution note with count for visibility
         redistribution_note = f"""
-<!-- Task redistributed from {src_path.parent.parent.name} at {datetime.now().isoformat()} -->
+<!-- Task redistributed from {src_path.parent.parent.name} to {dest_agent} at {datetime.now().isoformat()} -->
 <!-- Reason: Load balancing - source agent queue depth exceeded threshold -->
 <!-- Redispatch count: {new_count} -->
 """
@@ -258,8 +329,8 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
             break
 
         # EXEMPTION 1: Skip HIGH priority tasks
-        priority_match = re.search(r'^priority:\s*(\w+)$', content, re.MULTILINE)
-        task_priority = priority_match.group(1).lower() if priority_match else "normal"
+        # Uses _extract_priority() to handle both YAML and markdown bold formats
+        task_priority = _extract_priority(content)
         if task_priority == "high":
             continue
 
@@ -287,10 +358,32 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
         # A task that bounces >3 times between agents needs manual escalation.
         redispatch_match = re.search(r'^redispatch_count:\s*(\d+)$', content, re.MULTILINE)
         redispatch_count = int(redispatch_match.group(1)) if redispatch_match else 0
+        # Secondary safety: count HTML redistribution comments as fallback
+        # This works even when redispatch_count field insertion fails (format mismatch)
+        comment_count = _count_redistribution_comments(content)
+        effective_redispatch = max(redispatch_count, comment_count)
         MAX_REDISPATCH_COUNT = 3  # Max allowed agent-to-agent moves
-        if redispatch_count >= MAX_REDISPATCH_COUNT:
-            # Log the skipped task for visibility (creates entry in skipped list)
-            # This allows monitoring to see when tasks hit the redistribution limit
+        if effective_redispatch >= MAX_REDISPATCH_COUNT:
+            # Quarantine the task — rename with .quarantine suffix to prevent
+            # it from being picked up by any task scanner
+            try:
+                quarantine_name = fpath.stem + '.quarantine' + fpath.suffix
+                quarantine_path = fpath.parent / quarantine_name
+                fpath.rename(quarantine_path)
+                import json as _json
+                _log_entry = {
+                    "event": "task_quarantined",
+                    "task": str(fpath),
+                    "redispatch_count": effective_redispatch,
+                    "comment_count": comment_count,
+                    "timestamp": datetime.now().isoformat()
+                }
+                log_path = Path(REDISTRIBUTE_LOG_FILE)
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, 'a') as _lf:
+                    _lf.write(_json.dumps(_log_entry) + '\n')
+            except Exception:
+                pass  # Best-effort quarantine
             continue
 
         # 1. Check domain compatibility first, prioritized by DOMAIN_AGENT_COMPATIBILITY order
@@ -432,19 +525,16 @@ def main():
             # Another instance is running, exit silently
             return 0
 
-        try:
-            # Check trigger conditions
-            should_trigger, reason = should_trigger_redistribution()
-            if not should_trigger:
-                # No trigger met - exit silently
-                return 0
-
-            # Auto mode defaults
-            max_move = args.max_move if args.max_move != 10 else REDISTRIBUTION_TRIGGERS['max_move_per_cycle']
-            log_file = args.log if args.log else REDISTRIBUTE_LOG_FILE
-        finally:
-            # Always release lock
+        # Check trigger conditions (lock held through entire redistribution)
+        should_trigger, reason = should_trigger_redistribution()
+        if not should_trigger:
+            # No trigger met - release lock and exit silently
             release_lock()
+            return 0
+
+        # Auto mode defaults
+        max_move = args.max_move if args.max_move != 10 else REDISTRIBUTION_TRIGGERS['max_move_per_cycle']
+        log_file = args.log if args.log else REDISTRIBUTE_LOG_FILE
     else:
         max_move = args.max_move
         log_file = args.log

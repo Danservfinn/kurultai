@@ -334,23 +334,19 @@ def _task_patterns():
 
     # Also check Neo4j for recent task stats
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                result = session.run("""
-                    MATCH (t:Task)
-                    WHERE t.created > datetime() - duration({hours: 2})
-                    RETURN t.status AS status, t.agent AS agent, count(t) AS cnt
-                    ORDER BY cnt DESC
-                """)
-                neo4j_stats = []
-                for r in result:
-                    neo4j_stats.append(f"  Neo4j: {r['agent']}={r['status']}(x{r['cnt']})")
-                if neo4j_stats:
-                    summaries.extend(neo4j_stats[:6])
-        finally:
-            driver.close()
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
+            result = session.run("""
+                MATCH (t:Task)
+                WHERE t.created > datetime() - duration({hours: 2})
+                RETURN t.status AS status, t.agent AS agent, count(t) AS cnt
+                ORDER BY cnt DESC
+            """)
+            neo4j_stats = []
+            for r in result:
+                neo4j_stats.append(f"  Neo4j: {r['agent']}={r['status']}(x{r['cnt']})")
+            if neo4j_stats:
+                summaries.extend(neo4j_stats[:6])
     except Exception:
         pass
 
@@ -398,44 +394,40 @@ def _latest_review(agent, max_chars=1000):
 def _previous_proposals(agent):
     """Get recent brainstorm proposal history for meta-reflection."""
     try:
-        from neo4j_task_tracker import get_driver
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                result = session.run("""
-                    MATCH (f:AgentFeedback)
-                    WHERE f.source = 'kurultai_brainstorm'
-                      AND f.agent = $agent
-                    RETURN f.feedback AS feedback, f.status AS status,
-                           f.category AS category, f.effort AS effort,
-                           f.submitted AS submitted
-                    ORDER BY f.submitted DESC
-                    LIMIT 5
-                """, agent=agent)
-                proposals = []
-                for r in result:
-                    proposals.append(
-                        f"  [{r['status']}] {r['feedback'][:80]} "
-                        f"(cat={r['category']}, effort={r['effort']})"
-                    )
+        from neo4j_task_tracker import neo4j_session
+        with neo4j_session() as session:
+            result = session.run("""
+                MATCH (f:AgentFeedback)
+                WHERE f.source = 'kurultai_brainstorm'
+                  AND f.agent = $agent
+                RETURN f.feedback AS feedback, f.status AS status,
+                       f.category AS category, f.effort AS effort,
+                       f.submitted AS submitted
+                ORDER BY f.submitted DESC
+                LIMIT 5
+            """, agent=agent)
+            proposals = []
+            for r in result:
+                proposals.append(
+                    f"  [{r['status']}] {r['feedback'][:80]} "
+                    f"(cat={r['category']}, effort={r['effort']})"
+                )
 
-            # Overall stats — reuse same driver
-            with driver.session() as session:
-                result = session.run("""
-                    MATCH (f:AgentFeedback)
-                    WHERE f.source = 'kurultai_brainstorm'
-                    RETURN f.status AS status, count(f) AS cnt
-                """)
-                stats = {r["status"]: r["cnt"] for r in result}
+        # Overall stats
+        with neo4j_session() as session:
+            result = session.run("""
+                MATCH (f:AgentFeedback)
+                WHERE f.source = 'kurultai_brainstorm'
+                RETURN f.status AS status, count(f) AS cnt
+            """)
+            stats = {r["status"]: r["cnt"] for r in result}
 
-            if proposals or stats:
-                lines = [f"  Overall: {json.dumps(stats)}"]
-                if proposals:
-                    lines.append(f"  Your last {len(proposals)} proposals:")
-                    lines.extend(proposals)
-                return "\n".join(lines)
-        finally:
-            driver.close()
+        if proposals or stats:
+            lines = [f"  Overall: {json.dumps(stats)}"]
+            if proposals:
+                lines.append(f"  Your last {len(proposals)} proposals:")
+                lines.extend(proposals)
+            return "\n".join(lines)
     except Exception:
         pass
     return "  (no previous proposals)"
@@ -915,7 +907,7 @@ def _sanitize_proposal_field(text, max_len=500):
 def submit_proposal(agent, proposal):
     """Submit proposal to Neo4j as AgentFeedback."""
     try:
-        from neo4j_task_tracker import get_driver
+        from neo4j_task_tracker import neo4j_session
 
         implemented = proposal.get("implemented", "NO").upper().startswith("Y")
         verified = proposal.get("verified", "NO").upper().startswith("Y")
@@ -929,41 +921,37 @@ def submit_proposal(agent, proposal):
             for k, v in proposal.items()
         }
 
-        driver = get_driver()
-        try:
-            with driver.session() as session:
-                session.run(
-                    """
-                    MERGE (a:Agent {name: $agent})
-                    CREATE (f:AgentFeedback {
-                        agent: $agent,
-                        feedback: $feedback,
-                        priority: $priority,
-                        proposals: $proposals,
-                        submitted: datetime(),
-                        status: $status,
-                        source: 'kurultai_brainstorm',
-                        id: $feedback_id,
-                        category: $category,
-                        effort: $effort,
-                        implemented: $implemented,
-                        verified: $verified
-                    })
-                    CREATE (a)-[:SUBMITTED]->(f)
-                    """,
-                    agent=agent,
-                    feedback=sanitized_proposal["proposal"][:200],
-                    priority=priority,
-                    proposals=json.dumps([sanitized_proposal]),
-                    feedback_id=feedback_id,
-                    status=status,
-                    category=sanitized_proposal["category"],
-                    effort=sanitized_proposal["effort"],
-                    implemented=implemented,
-                    verified=verified,
-                )
-        finally:
-            driver.close()
+        with neo4j_session() as session:
+            session.run(
+                """
+                MERGE (a:Agent {name: $agent})
+                CREATE (f:AgentFeedback {
+                    agent: $agent,
+                    feedback: $feedback,
+                    priority: $priority,
+                    proposals: $proposals,
+                    submitted: datetime(),
+                    status: $status,
+                    source: 'kurultai_brainstorm',
+                    id: $feedback_id,
+                    category: $category,
+                    effort: $effort,
+                    implemented: $implemented,
+                    verified: $verified
+                })
+                CREATE (a)-[:SUBMITTED]->(f)
+                """,
+                agent=agent,
+                feedback=sanitized_proposal["proposal"][:200],
+                priority=priority,
+                proposals=json.dumps([sanitized_proposal]),
+                feedback_id=feedback_id,
+                status=status,
+                category=sanitized_proposal["category"],
+                effort=sanitized_proposal["effort"],
+                implemented=implemented,
+                verified=verified,
+            )
 
         impl_tag = "DONE" if implemented else "PROPOSED"
         log(f"SUBMITTED: [{priority}/{impl_tag}] {agent} -> {sanitized_proposal['proposal'][:60]}")

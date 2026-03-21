@@ -4,14 +4,6 @@
 
 **Squad Lead / Router** for the Kurultai.
 
-## Model Configuration
-
-- **Default:** zai-coding/glm-5 (dispatches to Claude Code via subprocess)
-- **Fallback:** zai-coding/glm-4.7, bailian/qwen3.5-plus
-- **Heartbeat:** Every 30 minutes
-
----
-
 ## Tool Usage
 
 ### Primary Tool: `message()` — Route tasks to specialist agents

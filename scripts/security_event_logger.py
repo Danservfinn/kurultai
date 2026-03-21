@@ -94,14 +94,12 @@ def _log_to_neo4j(event: Dict[str, Any]) -> bool:
     try:
         # Neo4j connection - use centralized driver with connection pooling
         try:
-            from neo4j_task_tracker import get_driver
+            from neo4j_task_tracker import neo4j_session
         except ImportError:
             print("[WARN] neo4j_task_tracker not available - skipping Neo4j security logging")
             return False
 
-        driver = get_driver()
-
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Create immutable SecurityEvent node
             # Using CREATE ensures new node each time (no updates possible)
             query = """
@@ -130,7 +128,6 @@ def _log_to_neo4j(event: Dict[str, Any]) -> bool:
                 hostname=event.get("hostname", "unknown")
             )
 
-        driver.close()
         return True
 
     except Exception as e:

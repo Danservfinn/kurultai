@@ -28,7 +28,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import get_driver, close_driver
 from neo4j_utils import parse_json_fields
 
 
@@ -90,13 +90,10 @@ class HumanProfileStore:
         self.driver = get_driver()
 
     def close(self):
-        """Release driver reference. Does NOT close the singleton driver.
-
-        The singleton driver is managed by get_driver()/close_driver() and
-        should only be closed via close_driver() when the entire process
-        is done with Neo4j.
-        """
-        self.driver = None  # Release reference only
+        """Close Neo4j connection via refcounted close_driver()."""
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     # ==========================================================================
     # Schema Initialization

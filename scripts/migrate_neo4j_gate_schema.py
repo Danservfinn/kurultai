@@ -26,7 +26,7 @@ import os
 
 # Import Neo4j utilities
 try:
-    from neo4j_task_tracker import get_driver
+    from neo4j_task_tracker import neo4j_session
 except ImportError:
     print("Error: Cannot import neo4j_task_tracker. Run from scripts/ directory.")
     sys.exit(1)
@@ -93,7 +93,7 @@ ROLLBACK_QUERIES = {
 }
 
 
-def run_migration(driver, dry_run: bool = False) -> dict:
+def run_migration(dry_run: bool = False) -> dict:
     """Run the migration to add completion gate schema."""
     results = {
         "timestamp": datetime.now().isoformat(),
@@ -109,7 +109,7 @@ def run_migration(driver, dry_run: bool = False) -> dict:
         print()
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Step 1: Add new properties to existing Task nodes
             print("Step 1: Adding new properties to Task nodes...")
             if not dry_run:
@@ -175,12 +175,12 @@ def run_migration(driver, dry_run: bool = False) -> dict:
         return results
 
 
-def verify_migration(driver) -> bool:
+def verify_migration() -> bool:
     """Verify that the migration was successful."""
     print("=== VERIFYING MIGRATION ===\n")
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Check 1: Verify new properties exist
             print("Check 1: Verifying new properties...")
             result = session.run("""
@@ -218,7 +218,7 @@ def verify_migration(driver) -> bool:
         return False
 
 
-def rollback_migration(driver, dry_run: bool = False) -> dict:
+def rollback_migration(dry_run: bool = False) -> dict:
     """Rollback the completion gate schema migration."""
     results = {
         "timestamp": datetime.now().isoformat(),
@@ -236,7 +236,7 @@ def rollback_migration(driver, dry_run: bool = False) -> dict:
         print()
 
     try:
-        with driver.session() as session:
+        with neo4j_session() as session:
             # Rollback steps in reverse order
             print("Step 1: Dropping completion_percentage index...")
             if not dry_run:
@@ -310,28 +310,21 @@ Examples:
 
     args = parser.parse_args()
 
-    # Get Neo4j driver
-    driver = get_driver()
+    if args.migrate:
+        results = run_migration(args.dry_run)
+        return 0 if "error" not in results else 1
 
-    try:
-        if args.migrate:
-            results = run_migration(driver, args.dry_run)
-            return 0 if "error" not in results else 1
+    elif args.verify:
+        success = verify_migration()
+        return 0 if success else 1
 
-        elif args.verify:
-            success = verify_migration(driver)
-            return 0 if success else 1
+    elif args.rollback:
+        results = rollback_migration(args.dry_run)
+        return 0 if "error" not in results else 1
 
-        elif args.rollback:
-            results = rollback_migration(driver, args.dry_run)
-            return 0 if "error" not in results else 1
-
-        else:
-            parser.print_help()
-            return 1
-
-    finally:
-        driver.close()
+    else:
+        parser.print_help()
+        return 1
 
 
 if __name__ == "__main__":

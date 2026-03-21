@@ -187,34 +187,33 @@ Also provides a trigger button to manually start a Kurultai reflection session.
 
 **Route**: `/settings`
 
-Three sections:
+Three sub-tabs: **System**, **Models**, **Providers**.
 
-### Dispatch Mode
+### System Sub-tab
+
+#### Dispatch Mode
 
 Switch between routing modes:
 - **Auto**: Primary (Anthropic) first, backup (Z.AI) on failure
 - **Backup**: Forced backup only (Z.AI/glm-5)
 - **Primary**: Primary only, no fallback
 
-### Model Selection
+### Models Sub-tab
 
-Change the primary Claude model:
-- claude-opus-4-6
-- claude-sonnet-4-6
-- claude-haiku-4-5-20251001
+Per-agent and bulk model configuration:
+- Per-agent model/base URL/token/effort settings (6 agent cards)
+- Bulk apply model to all agents (dropdown + base URL + effort)
+- Global Model Registry (from `kurultai.json`)
+- Edit raw config files inline
 
-### Provider Management
+### Providers Sub-tab
 
-Manage LLM provider credentials:
-- Anthropic: OAuth status (re-auth via `claude auth login`)
-- Z.AI: token (masked), base URL, model
-- Alibaba/DashScope: token (masked), base URL, model
-
-Advanced model configuration:
-- Per-agent model/base URL/token settings
-- Bulk apply model to all agents
-- Backup all config files
-- View/edit raw config file content
+Manage LLM provider credentials (reads/writes `~/.openclaw/credentials/provider.env`):
+- **Anthropic**: Read-only OAuth status (re-auth via `claude auth login`)
+- **Z.AI**: Auth token (masked), base URL, model — with per-field Save buttons
+- **Alibaba/DashScope**: Auth token (masked), base URL, model — with per-field Save buttons
+- **OpenRouter**: API key (masked), model (free-text, e.g. `x-ai/grok-4.20-multi-agent-beta`) — with Save Key / Save Model buttons
+- **Default Model**: Default model ID (e.g. `claude-sonnet-4-6`) — with Save button
 
 **API endpoints used**:
 - `GET /api/settings/mode` -- current dispatch mode

@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import neo4j_session
 from kurultai_paths import AGENTS_DIR
 
 PROPOSALS_DIR = AGENTS_DIR / "main" / "proposals"
@@ -120,9 +120,9 @@ def parse_proposal_file(filepath: Path) -> dict:
     return data
 
 
-def check_existing_in_neo4j(driver, proposal_id: str) -> bool:
+def check_existing_in_neo4j(proposal_id: str) -> bool:
     """Check if a proposal with this ID already exists in Neo4j."""
-    with driver.session() as session:
+    with neo4j_session() as session:
         result = session.run(
             "MATCH (p:Proposal {proposal_id: $pid}) RETURN count(p) AS cnt",
             pid=proposal_id
@@ -131,7 +131,7 @@ def check_existing_in_neo4j(driver, proposal_id: str) -> bool:
         return record and record["cnt"] > 0
 
 
-def ingest_proposal(driver, data: dict) -> bool:
+def ingest_proposal(data: dict) -> bool:
     """Create a Proposal node in Neo4j from parsed data."""
     now = datetime.now()
     expires_at = now + timedelta(hours=24)
@@ -141,7 +141,7 @@ def ingest_proposal(driver, data: dict) -> bool:
     if data.get("implemented") == "YES":
         status = "implemented"
 
-    with driver.session() as session:
+    with neo4j_session() as session:
         # Ensure Agent node exists
         session.run(
             "MERGE (a:Agent {name: $name})",
@@ -250,9 +250,7 @@ def main():
 
     print(f"Found {len(files)} proposal file(s) in {PROPOSALS_DIR}")
 
-    driver = None
-    if args.ingest:
-        driver = get_driver()
+    neo4j_ready = args.ingest
 
     ingested = 0
     skipped_dup = 0
@@ -281,13 +279,13 @@ def main():
             continue
 
         # Check for duplicate
-        if check_existing_in_neo4j(driver, data["proposal_id"]):
+        if check_existing_in_neo4j(data["proposal_id"]):
             print(f"  SKIP (exists): {filepath.name} [{data['proposal_id']}]")
             skipped_dup += 1
             continue
 
         try:
-            ingest_proposal(driver, data)
+            ingest_proposal(data)
             print(f"  INGESTED: {filepath.name} -> {data['proposal_id']} ({data['title'][:60]})")
             ingested += 1
         except Exception as e:

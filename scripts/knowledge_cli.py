@@ -23,7 +23,7 @@ from typing import Dict, Any, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from neo4j_task_tracker import get_driver
+from neo4j_task_tracker import get_driver, close_driver
 
 
 class KnowledgeCLI:
@@ -34,7 +34,9 @@ class KnowledgeCLI:
 
     def close(self):
         """Close Neo4j connection."""
-        self.driver.close()
+        if self.driver:
+            close_driver()
+            self.driver = None
 
     # ==========================================================================
     # Strategic Insights
