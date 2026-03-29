@@ -260,3 +260,6 @@
 {"ts": "2026-03-29T03:00:13.409431", "from": "temujin", "to": "chagatai", "title": "Review the.kurult.ai with horde-review and implement fixes", "reason": "idle-wake: temujin busy/loaded (queue=28), chagatai idle with valid creds (queue=12)"}
 {"ts": "2026-03-29T04:20:55.205514", "from": "ogedei", "to": "chagatai", "title": "Test task from curiosity sweep", "reason": "idle-wake: ogedei busy/loaded (queue=132), chagatai idle with valid creds (queue=13)"}
 {"ts": "2026-03-29T12:31:40.470989", "from": "temujin", "to": "chagatai", "title": "Investigate 4 cron jobs erroring", "reason": "idle-wake: temujin busy/loaded (queue=36), chagatai idle with valid creds (queue=14)"}
+{"ts": "2026-03-29T15:52:28.466734", "from": "temujin", "to": "chagatai", "title": "Suno-style music analysis for YouTube link", "reason": "idle-wake: temujin busy/loaded (queue=39), chagatai idle with valid creds (queue=15)"}
+{"ts": "2026-03-29T15:57:27.710611", "from": "temujin", "to": "chagatai", "title": "Suno-style music analysis via suno-clone skill", "reason": "idle-wake: temujin busy/loaded (queue=39), chagatai idle with valid creds (queue=16)"}
+{"ts": "2026-03-29T16:18:00.932771", "from": "temujin", "to": "chagatai", "title": "Suno-clone analysis for YouTube song", "reason": "idle-wake: temujin busy/loaded (queue=39), chagatai idle with valid creds (queue=17)"}

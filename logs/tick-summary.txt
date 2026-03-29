@@ -1,8 +1,8 @@
-TICK 2026-03-29 13:52:12
+TICK 2026-03-29 18:05:41
 MODEL: unknown (LLM triage)
 HEARTBEAT: gap_detected=0 gap_minutes=0
-GATEWAY: up pid=7703,7706,66340,76120,86193 http=200 latency=13ms uptime=9d23h instances=1
-PROCESS: cpu=0.0% mem=0.1% rss=10MB threads=2
+GATEWAY: up pid=7703,7706,22360,26851,28639 http=200 latency=7ms uptime=10d3h instances=1
+PROCESS: cpu=0.0% mem=0.1% rss=12MB threads=2
 ERRORS:  last5m=0 last1h=0 fatal=0
 SERVICES: neo4j=up redis=up cloudflared=up pid=87458
 RECOVERY: neo4j_attempted=0 neo4j_result=- cloudflared_attempted=0 cloudflared_result=-
@@ -14,10 +14,10 @@ AUDIT:   verified=0 fake=0 requeued=0 llm_decision=IGNORE llm_confidence=0%
 VOTES:   synced=0 errors=0
 SUBPROC: executing=0 alive=0 dead=0 stale=0 zombies=0 orphaned=0 anomalies=0
 RESOLUTION: compliance=100.0% (with=1 without=0)
-ROUTING: balance_idx=1.03 missed=0 accuracy=87% p95=Nones routed=12
+ROUTING: balance_idx=0.995 missed=0 accuracy=87% p95=Nones routed=7
 TRENDS:  uptime_1h=100.0% avg_cpu=0.0% err_avg_5m=0 err_direction=stable restarts_1h=0
 DECISION: degraded
 ACTION:   warn
 REASON:   throughput anomaly: PENDING_NO_DISPATCH (pending=0, consecutive=1)
 No stalled tasks
-THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — 313 task(s) pending [chagatai=15, jochi=66, mongke=18, ogedei=166, temujin=37, tolui=11] but 0 executing, 0 active processes. task-executor=running (pid=86193). Action: check dispatch logs
+THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — 338 task(s) pending [chagatai=17, jochi=81, mongke=18, ogedei=172, temujin=39, tolui=11] but 0 executing, 0 active processes. task-executor=running (pid=28639). Action: check dispatch logs

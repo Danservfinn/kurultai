@@ -63,6 +63,11 @@ def format_context(
     items = _format_action_items(context.get("action_items", []))
     sections["active_items"] = budget.allocate("active_items", items)
 
+    # 5b. Active Task Requests
+    tasks = _format_active_tasks(context.get("active_tasks", []))
+    if tasks:
+        sections["active_tasks"] = budget.allocate("active_tasks", tasks)
+
     # 6. Current Thread (elastic)
     thread = _format_thread(context.get("thread_messages", []))
     sections["current_thread"] = budget.allocate_elastic("current_thread", thread)
@@ -178,6 +183,30 @@ def _format_action_items(items: List[Dict]) -> str:
         if assignee:
             line += f" (assigned: {assignee})"
         lines.append(line)
+
+    return "\n".join(lines)
+
+
+def _format_active_tasks(tasks: List[Dict]) -> str:
+    """Format active task requests from this human."""
+    if not tasks:
+        return ""
+
+    status_labels = {
+        "PENDING": "queued",
+        "WORKING": "in progress",
+        "COMPLETED": "done",
+        "FAILED": "failed",
+    }
+    lines = ["Active requests from this person:"]
+    for t in tasks:
+        status = status_labels.get(t.get("status", ""), t.get("status", ""))
+        agent = t.get("agent", "?")
+        title = t.get("title", "untitled")
+        lines.append(f"  - [{status}] {title} (agent: {agent})")
+        preview = t.get("solution_preview", "")
+        if preview and t.get("status") == "COMPLETED":
+            lines.append(f"    Result: {preview[:200]}...")
 
     return "\n".join(lines)
 

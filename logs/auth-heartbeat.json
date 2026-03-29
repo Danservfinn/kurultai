@@ -1,36 +1,36 @@
 {
   "jochi": {
     "status": "ok",
-    "last_success": "2026-03-29T13:52:48.187366",
+    "last_success": "2026-03-29T18:06:05.382077",
     "error": null
   },
   "_meta": {
-    "last_check": "2026-03-29T13:52:53.286727",
+    "last_check": "2026-03-29T18:06:09.267658",
     "stale_threshold_seconds": 300
   },
   "kublai": {
     "status": "ok",
-    "last_success": "2026-03-29T13:52:22.555315",
+    "last_success": "2026-03-29T18:05:47.619111",
     "error": null
   },
   "temujin": {
     "status": "ok",
-    "last_success": "2026-03-29T13:52:27.660847",
+    "last_success": "2026-03-29T18:05:51.707607",
     "error": null
   },
   "mongke": {
     "status": "ok",
-    "last_success": "2026-03-29T13:52:34.724630",
+    "last_success": "2026-03-29T18:05:55.953274",
     "error": null
   },
   "chagatai": {
     "status": "ok",
-    "last_success": "2026-03-29T13:52:39.620114",
+    "last_success": "2026-03-29T18:06:00.680212",
     "error": null
   },
   "ogedei": {
     "status": "ok",
-    "last_success": "2026-03-29T13:52:53.286675",
+    "last_success": "2026-03-29T18:06:09.267582",
     "error": null
   }
 }

@@ -25,6 +25,9 @@ Documents all 7 agents (kublai, temujin, mongke, chagatai, jochi, ogedei, tolui)
 ### [dashboard-views.md](dashboard-views.md)
 Documents each tab/view in the Kurultai dashboard (Kanban, Calendar, Reflections, Wrappers, Sessions, Dispatch, Settings) with what data they show, which API endpoints they call, and what user actions are available. Includes CORS configuration and security headers.
 
+### [gateway-plugin.md](gateway-plugin.md)
+Documents the rebuilt notification pipeline (direct signal_send, reply threading via quoteTimestamp, exponential backoff, dead-letter alerting), the context assembler Phase 10 (active task awareness), and verified OpenClaw gateway capabilities (plugin SDK, CLI message injection, Signal receive status) for future migration.
+
 ---
 
 ## By Topic
@@ -50,6 +53,7 @@ Documents each tab/view in the Kurultai dashboard (Kanban, Calendar, Reflections
 
 ## Last Updated
 
+2026-03-29 -- Created gateway-plugin.md. Updated task-executor.md with rebuilt notification pipeline (direct signal_send, reply threading, backoff, dead-letter). Added origin_message_id to Neo4j Task schema. Added Phase 10 (active_tasks) to context_assembler.
 2026-03-23 -- Added post-completion hook section to task-executor.md; updated INDEX with follow-up hook entry.
 2026-03-23 -- Created task-executor.md. Updated neo4j-schema.md with Event, AgentMetrics, Inference multi-label nodes, [:SUPERSEDES] chain, and new indexes/constraints. Updated agent-roster.md with unified executor, ASMR extraction, and context profile builder. Updated provider-fallback.md vault reference.
 2026-03-23 -- Added Proposal/Vote node types and tiered approval pipeline (T0-T3) to neo4j-schema.md.

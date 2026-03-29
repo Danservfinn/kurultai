@@ -597,7 +597,10 @@ class OgedeiDispatcher:
                 result_file = self._persist_result(
                     agent, task_id, result['content'], task, duration_s
                 )
-                self._queue_notification(task, agent, duration_s, result_file)
+                self._queue_notification(
+                    task, agent, duration_s, result_file,
+                    content=result['content'],
+                )
 
                 # Register result_file path in Neo4j
                 if result_file:
@@ -647,6 +650,13 @@ class OgedeiDispatcher:
         _emit_event(
             "FAILED", task_id, agent,
             error_class=error_class, error=result.get('error', '')[:500],
+        )
+        # Notify the requesting human about the failure
+        failure_reason = result.get('error', 'Unknown error')
+        self._queue_notification(
+            task, agent, duration_s,
+            content=f"Reason: {failure_reason}",
+            status="failed",
         )
 
     # ------------------------------------------------------------------
@@ -781,59 +791,63 @@ class OgedeiDispatcher:
             await self._sleep(NOTIFY_INTERVAL)
 
     def _send_notification_sync(self, item: dict):
-        """Send Signal notification via /task-complete skill (blocking)."""
-        agent_name = item['agent']
-        task_id = item['task_id']
+        """Send Signal notification directly via signal_send (blocking).
 
-        # Write breadcrumb for /task-complete
-        bc_path = AGENTS_DIR / agent_name / "last-completed-task.json"
-        bc_data = {
-            "task_id": task_id,
-            "agent": agent_name,
-            "notify_target": item.get('notify_target', '+19194133445'),
-            "ts": datetime.now().isoformat(),
-            "model": "claude-sonnet-4-6",
-        }
-        bc_path.write_text(json.dumps(bc_data))
+        Uses quoteTimestamp for reply threading when origin_message_id
+        is available in the task.
+        """
+        import signal_send
 
-        env_notify = os.environ.copy()
-        env_notify.pop('CLAUDECODE', None)
-        env_notify['TASK_COMPLETE_AGENT'] = agent_name
+        # Retrieve origin fields from the task in Neo4j for threading
+        quote_ts = None
+        quote_author = None
+        try:
+            task_id = item.get('task_id')
+            if task_id:
+                with self.store.driver.session() as s:
+                    row = s.run(
+                        "MATCH (t:Task {task_id: $id}) "
+                        "RETURN t.origin_message_id, t.origin_initiator",
+                        id=task_id,
+                    ).single()
+                    if row:
+                        quote_ts = row[0]
+                        quote_author = row[1]
+        except Exception:
+            pass  # Threading is optional — send without it
 
-        log_file = LOGS_DIR / "task-complete-debug.log"
-        with open(log_file, 'a') as log_f:
-            log_f.write(
-                f"[{datetime.now().isoformat()}] dispatcher: "
-                f"/task-complete for {agent_name} task={task_id}\n"
+        rc, resp = signal_send.send(
+            item['notify_target'], item['message'],
+            quote_timestamp=quote_ts, quote_author=quote_author,
+        )
+        if rc != 0:
+            raise RuntimeError(
+                f"Signal send failed: rc={rc} target={item['notify_target']} "
+                f"status={resp.get('status', 'unknown')}"
             )
-            proc = subprocess.Popen(
-                [str(CLAUDE_AGENT), "--model", "claude-sonnet-4-6",
-                 "/task-complete"],
-                stdout=log_f, stderr=log_f,
-                close_fds=True, env=env_notify,
-            )
-            try:
-                proc.wait(timeout=HAIKU_TIMEOUT)
-            except subprocess.TimeoutExpired:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait()
-                raise TimeoutError(f"/task-complete timed out ({HAIKU_TIMEOUT}s)")
 
     def _queue_notification(self, task: dict, agent: str, duration_s: float,
-                            result_file: str = None):
+                            result_file: str = None, content: str = "",
+                            status: str = "completed"):
         """Queue a notification for delivery."""
         task_id = task['task_id']
+        origin_type = task.get('origin_type')
+        if origin_type is not None and origin_type != 'human':
+            return  # Skip system/cron/agent tasks
         notify_target = task.get(
             'notify_target',
             task.get('origin_initiator', '+19194133445'),
         )
+        if not notify_target or not notify_target.startswith('+'):
+            return
         title = task.get('title', task_id)
-        message = f"Task completed: {title} ({duration_s:.0f}s)"
-
+        prefix = "[FAILED]" if status == "failed" else "[DONE]"
+        body = (content or '').strip()
+        message = (
+            f"{prefix} {agent}: {title}\n\n"
+            f"{body}\n\n"
+            f"Time: {duration_s:.0f}s | https://the.kurult.ai/r/{task_id}"
+        )
         self.nqueue.enqueue(task_id, agent, notify_target, message)
         _emit_event("NOTIFICATION_QUEUED", task_id, agent)
 

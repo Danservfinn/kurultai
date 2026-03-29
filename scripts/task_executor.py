@@ -58,6 +58,7 @@ from neo4j_v2_failure import classify_failure
 from neo4j_v2_events import emit_event, emit_session_reset
 from circuit_breaker import AgentCircuitBreaker
 from prompt_sanitizer import PromptSanitizer
+from notification_queue import NotificationQueue
 from delivery_classifier import classify_delivery_task
 from delivery_verifier import verify_delivery
 from kurultai_ledger import generate_task_id
@@ -595,6 +596,7 @@ class Executor:
         self._driver = None  # Lazy — resolved via _get_driver()
         self._shutdown = False
         self._worktree_mgr = WorktreeManager()
+        self._nqueue = NotificationQueue()
 
     def _get_driver(self):
         """Lazy driver access — uses TaskStore's property which auto-creates."""
@@ -1541,24 +1543,13 @@ Output NOTHING after the end delimiter."""
                     pass
 
     async def _post_completion(self, task: dict, run_result: RunResult):
-        """Write breadcrumb and result file after a task completes successfully.
+        """Write result file after a task completes, then send notification.
 
-        Writes last-completed-task.json and a .result.md in the agent's
-        workspace, then spawns /task-complete notification in the background.
+        Persists .result.md in the agent's workspace and sends a Signal
+        notification directly via signal_send (no subprocess).
         """
         agent = task.get("assigned_to", task.get("agent", ""))
-        notify_target = task.get("notify_target", "")
         try:
-            bc_path = AGENTS_DIR / agent / "last-completed-task.json"
-            bc_data = {
-                "task_id": task["task_id"],
-                "agent": agent,
-                "execution_time_s": run_result.duration_s,
-                "notify_target": notify_target or "+19194133445",
-                "ts": datetime.now().isoformat(),
-                "model": run_result.model,
-            }
-
             # Persist output to workspace
             result_dir = AGENTS_DIR / agent / "workspace"
             result_dir.mkdir(parents=True, exist_ok=True)
@@ -1569,36 +1560,63 @@ Output NOTHING after the end delimiter."""
                 f"**Agent:** {agent}\n"
                 f"**Duration:** {run_result.duration_s:.0f}s\n\n---\n\n"
             )
-            result_file.write_text(header + run_result.content[:5000])
-            bc_data["result_file"] = str(result_file)
+            result_file.write_text(header + run_result.content)
 
-            bc_path.write_text(json.dumps(bc_data))
-
-            # Fire-and-forget notification
-            asyncio.create_task(self._spawn_notification(agent))
+            # Send notification directly
+            asyncio.create_task(
+                self._send_notification(agent, task, run_result.content)
+            )
         except Exception as e:
             logger.warning(
                 f"Post-completion failed for {task['task_id']}: {e}"
             )
 
-    async def _spawn_notification(self, agent: str):
-        """Spawn /task-complete skill via claude-agent (background, 120s timeout)."""
-        try:
-            env = os.environ.copy()
-            env.pop("CLAUDECODE", None)
-            env["TASK_COMPLETE_AGENT"] = agent
-            proc = await asyncio.create_subprocess_exec(
-                str(CLAUDE_AGENT), "--model", "claude-sonnet-4-6", "/task-complete",
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-                env=env,
+    async def _send_notification(self, agent: str, task: dict,
+                                 result_content: str):
+        """Send Signal notification directly via signal_send (no subprocess)."""
+        import signal_send
+
+        origin_type = task.get('origin_type')
+        if origin_type is not None and origin_type != 'human':
+            return  # Skip system/cron/agent tasks
+        if origin_type is None:
+            logger.warning(
+                f"origin_type not hydrated for task {task.get('task_id')}, "
+                "sending notification anyway"
             )
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=120)
-            except asyncio.TimeoutError:
-                proc.terminate()
+
+        notify_target = task.get(
+            'notify_target', task.get('origin_initiator', '')
+        )
+        if not notify_target or not notify_target.startswith('+'):
+            return
+
+        title = task.get('title', 'Task')
+        body = (result_content or '').strip()
+        task_id = task.get('task_id', '')
+        message = (
+            f"[DONE] {agent}: {title}\n\n"
+            f"{body}\n\n"
+            f"https://the.kurult.ai/r/{task_id}"
+        )
+
+        quote_ts = task.get('origin_message_id')
+        quote_author = task.get('origin_initiator') if quote_ts else None
+
+        loop = asyncio.get_running_loop()
+        try:
+            rc, _ = await loop.run_in_executor(
+                None, signal_send.send, notify_target, message,
+                quote_ts, quote_author,
+            )
+            if rc != 0:
+                logger.warning(
+                    f"Direct send failed for {task_id}, enqueueing fallback"
+                )
+                self._nqueue.enqueue(task_id, agent, notify_target, message)
         except Exception as e:
-            logger.warning(f"Notification spawn failed for {agent}: {e}")
+            logger.warning(f"Notification error for {task_id}: {e}, enqueueing")
+            self._nqueue.enqueue(task_id, agent, notify_target, message)
 
     # -------------------------------------------------------------------
     # Deploy Pipeline — PR creation from worktree after task completion

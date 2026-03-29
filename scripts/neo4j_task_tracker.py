@@ -639,7 +639,7 @@ class TaskTracker:
                          timeout=None, bucket=None, domain=None,
                          template_version=None, prompt_template=None,
                          use_optimization=True, origin_type=None, origin_initiator=None,
-                         origin_source=None):
+                         origin_source=None, origin_message_id=None):
         """Create task in Neo4j (primary) AND filesystem (backward compat).
 
         Args:
@@ -760,6 +760,7 @@ class TaskTracker:
                     origin_type: $origin_type,
                     origin_initiator: $origin_initiator,
                     origin_source: $origin_source,
+                    origin_message_id: $origin_message_id,
                     notify_target: $notify_target,
                     origin_timestamp: datetime(),
                     status: 'PENDING',
@@ -789,6 +790,7 @@ class TaskTracker:
             origin_type=origin_type or "unknown",
             origin_initiator=origin_initiator or "",
             origin_source=origin_source or "",
+            origin_message_id=origin_message_id,
             notify_target=notify_target or "+19194133445")
 
         # Filesystem write for backward compatibility with agent-task-handler.py

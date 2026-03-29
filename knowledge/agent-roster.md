@@ -43,7 +43,7 @@ The Kurultai consists of 7 agents, each with a distinct role, executor, and doma
 - Parse for Agents: `/Users/kublai/projects/parse-for-agents`
 - Kurultai scripts: `~/.openclaw/agents/main/scripts/`
 
-**Specialist Skills**: `/systematic-debugging`, `/code-reviewer`, `/webapp-testing`
+**Specialist Skills**: `/systematic-debugging`, `/code-reviewer`, `/webapp-testing`, `/suno-clone`
 
 **Overflow Receives From**: jochi (code review), ogedei (deployment)
 

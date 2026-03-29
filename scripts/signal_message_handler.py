@@ -301,7 +301,10 @@ def process_message(raw_msg: dict) -> bool:
                 try:
                     from conversational_responder import detect_task_escalation
                     if detect_task_escalation(response):
-                        _escalate_to_task(message_text, sender_name, sender_phone)
+                        _escalate_to_task(
+                            message_text, sender_name, sender_phone,
+                            message_id=raw_msg.get("message_id"),
+                        )
                 except Exception:
                     pass
 
@@ -641,22 +644,47 @@ def _send_and_log(response: str, sender_phone: str, group_id: str, raw_msg: dict
             pass
 
 
-def _escalate_to_task(message_text: str, sender_name: str, sender_phone: str):
-    """Create a task via task_intake.py when Kublai decides to route work."""
+def _escalate_to_task(message_text: str, sender_name: str, sender_phone: str,
+                      message_id: int = None):
+    """Create a task via task_intake when Kublai decides to route work.
+
+    Uses the Python API directly to pass origin_message_id for Signal
+    reply threading. Falls back to subprocess CLI if import fails.
+    """
     try:
-        import subprocess
-        cmd = [
-            "python3",
-            os.path.expanduser("~/.openclaw/agents/main/scripts/task_intake.py"),
-            "--title", f"Signal request from {sender_name}: {message_text[:80]}",
-            "--body", f"From {sender_name} ({sender_phone}) via Signal: {message_text}",
-            "--priority", "normal",
-            "--source", "signal-escalation",
-        ]
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        sys.path.insert(0, os.path.expanduser("~/.openclaw/agents/main/scripts"))
+        from task_intake import create_task
+        create_task(
+            title=f"Signal request from {sender_name}: {message_text[:80]}",
+            body=f"From {sender_name} ({sender_phone}) via Signal: {message_text}",
+            priority="normal",
+            source="signal-escalation",
+            origin_type="human",
+            origin_initiator=sender_phone,
+            origin_source="signal",
+            origin_message_id=message_id,
+            notify_on_complete=True,
+            notify_target=sender_phone,
+        )
         log_msg(f"Escalated to task system ({len(message_text)} chars)")
     except Exception as e:
-        log_msg(f"Task escalation failed: {e}", "ERROR")
+        log_msg(f"Task escalation (API) failed: {e}, trying subprocess", "WARNING")
+        try:
+            import subprocess
+            cmd = [
+                "python3",
+                os.path.expanduser("~/.openclaw/agents/main/scripts/task_intake.py"),
+                "--title", f"Signal request from {sender_name}: {message_text[:80]}",
+                "--body", f"From {sender_name} ({sender_phone}) via Signal: {message_text}",
+                "--priority", "normal",
+                "--source", "signal-escalation",
+                "--notify-on-complete",
+                "--notify-target", sender_phone,
+            ]
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log_msg(f"Escalated via subprocess fallback")
+        except Exception as sub_err:
+            log_msg(f"Task escalation failed completely: {sub_err}", "ERROR")
 
 
 # Legacy compatibility: signal_jsonrpc_server.py imports process_calendar_message

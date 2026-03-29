@@ -168,6 +168,35 @@ asyncio event loop: `poll -> claim -> run -> verify -> persist`.
 
 ---
 
+## Notification on Completion (2026-03-29 rebuild)
+
+**Module**: `signal_send.py` (direct call, no subprocess)
+
+When a task completes, both dispatchers send Signal notifications directly:
+
+### task_executor.py path (`_send_notification`)
+1. Guard: skip if `origin_type` is not `human` (safe fallback: warn + send if None)
+2. Guard: skip if `notify_target` doesn't start with `+`
+3. Build message: `[DONE] agent: title\n\nresult_preview\n\nportal_link`
+4. Call `signal_send.send()` via `run_in_executor` (non-blocking)
+5. Pass `quote_timestamp` + `quote_author` from task dict for Signal reply threading
+6. On failure: enqueue to `NotificationQueue` as fallback
+
+### ogedei_dispatch.py path (`_queue_notification` → `_send_notification_sync`)
+1. Same origin_type + phone guards
+2. Enqueue to SQLite NotificationQueue (WAL mode, persistent)
+3. Notification loop peeks every 15s, respects exponential backoff
+4. `_send_notification_sync`: queries Neo4j for `origin_message_id`, calls `signal_send.send()` with threading params
+5. On max attempts (5): dead-letter alert to operator
+
+### Failed task notifications
+`_handle_failure` also calls `_queue_notification` with `status="failed"` to notify humans when their tasks fail.
+
+### Key change from previous architecture
+The old `/task-complete` skill subprocess (breadcrumb → claude-agent → signal_send) had 3 fatal bugs and has been completely removed. All notification is now direct `signal_send.send()` calls.
+
+---
+
 ## Post-Completion Hook
 
 **Module**: `agents/main/scripts/post_completion_hook.py`

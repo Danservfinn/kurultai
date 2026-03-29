@@ -38,20 +38,80 @@ def _log(entry: dict):
         f.write(json.dumps(entry) + "\n")
 
 
-def send(recipient: str, message: str) -> tuple[int, dict]:
+CHUNK_LIMIT = 3800  # Signal practical limit with safety margin
+
+
+def send(recipient: str, message: str,
+         quote_timestamp: int = None,
+         quote_author: str = None) -> tuple[int, dict]:
     """
     Send a Signal message via the HTTP daemon.
     Returns (exit_code, log_entry).
     exit_code: 0=success, 1=delivery_failure, 2=daemon_unreachable
+
+    Long messages are automatically chunked into multiple sends.
+    The first chunk gets the reply-threading quote; subsequent chunks
+    are plain follow-up messages.
+
+    Optional: quote_timestamp + quote_author create a threaded reply
+    to the original message (Signal's quoteTimestamp feature).
     """
+    if len(message) <= CHUNK_LIMIT:
+        return _send_single(recipient, message, quote_timestamp, quote_author)
+
+    # Chunk long messages at paragraph boundaries
+    chunks = _chunk_message(message, CHUNK_LIMIT)
+    last_rc, last_entry = 0, {}
+    for i, chunk in enumerate(chunks):
+        # Only first chunk gets the reply-thread quote
+        qt = quote_timestamp if i == 0 else None
+        qa = quote_author if i == 0 else None
+        rc, entry = _send_single(recipient, chunk, qt, qa)
+        last_rc, last_entry = rc, entry
+        if rc != 0:
+            return rc, entry  # Stop on first failure
+    return last_rc, last_entry
+
+
+def _chunk_message(text: str, limit: int) -> list[str]:
+    """Split text into chunks at paragraph boundaries."""
+    if len(text) <= limit:
+        return [text]
+    chunks = []
+    while text:
+        if len(text) <= limit:
+            chunks.append(text)
+            break
+        # Try to break at a double-newline (paragraph)
+        cut = text.rfind('\n\n', 0, limit)
+        if cut < limit // 3:
+            # No good paragraph break — try single newline
+            cut = text.rfind('\n', 0, limit)
+        if cut < limit // 3:
+            # No good line break — hard cut at limit
+            cut = limit
+        chunks.append(text[:cut].rstrip())
+        text = text[cut:].lstrip('\n')
+    return chunks
+
+
+def _send_single(recipient: str, message: str,
+                 quote_timestamp: int = None,
+                 quote_author: str = None) -> tuple[int, dict]:
+    """Send a single Signal message (no chunking)."""
+    params = {
+        "account": SIGNAL_ACCOUNT,
+        "recipient": [recipient],
+        "message": message,
+    }
+    if quote_timestamp and quote_author:
+        params["quoteTimestamp"] = quote_timestamp
+        params["quoteAuthor"] = quote_author
+
     payload = {
         "jsonrpc": "2.0",
         "method": "send",
-        "params": {
-            "account": SIGNAL_ACCOUNT,
-            "recipient": [recipient],
-            "message": message,
-        },
+        "params": params,
         "id": 1,
     }
 

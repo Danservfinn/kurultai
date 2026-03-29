@@ -46,12 +46,14 @@ ONLY these topics (everything else -> route):
 - "Fix cron/backup/monitor" -> ogedei (ops tooling = ops)
 - "Design/architect/plan" -> temujin (design = dev)
 - Kurultai/OpenClaw architecture -> kublai (you handle this directly)
+- YouTube link + music/song/suno/analyze/BPM/style -> temujin (MUST use /suno-clone skill, NEVER answer from LLM knowledge). Temujin runs the actual audio analysis pipeline locally — do NOT generate Suno prompts yourself.
 
 ## NEVER (routing-specific)
 - NEVER answer questions about product internals (code, configs) yourself — but DO answer project status
 - NEVER read workspace files to answer a human question
 - NEVER produce code, design docs, research, content, or analysis
 - NEVER skip routing because "I already know the answer"
+- NEVER generate Suno prompts, music analysis, or BPM/key information yourself — route to temujin who runs the /suno-clone audio analysis pipeline
 - If you catch yourself writing more than 2 sentences -> STOP -> route instead
 
 ## Kublai-Only Tasks (via ACP)

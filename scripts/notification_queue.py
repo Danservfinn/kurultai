@@ -74,12 +74,13 @@ class NotificationQueue:
             return entry_id
 
     def peek(self) -> Optional[dict]:
-        """Get the oldest pending notification without removing it."""
+        """Get the oldest pending notification respecting backoff."""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 "SELECT * FROM queue WHERE status = 'pending' "
                 f"AND attempts < {MAX_ATTEMPTS} "
+                "AND (backoff_until IS NULL OR backoff_until <= datetime('now')) "
                 "ORDER BY created_at ASC LIMIT 1"
             ).fetchone()
             return dict(row) if row else None
@@ -95,14 +96,50 @@ class NotificationQueue:
             logger.info(f"Notification #{entry_id} sent")
 
     def increment_attempts(self, entry_id: int, error: str = ""):
-        """Increment attempt count. Moves to 'failed' if max exceeded."""
+        """Increment attempt count with exponential backoff.
+
+        Backoff schedule: 2, 4, 8, 16, 32 minutes.
+        Moves to 'failed' and sends dead-letter alert if max exceeded.
+        """
         with sqlite3.connect(str(self.db_path)) as conn:
-            conn.execute(
-                "UPDATE queue SET attempts = attempts + 1, last_error = ?, "
-                "status = CASE WHEN attempts + 1 >= ? THEN 'failed' ELSE 'pending' END "
-                "WHERE id = ?",
-                (error[:500], MAX_ATTEMPTS, entry_id),
+            row = conn.execute(
+                "SELECT attempts, task_id, notify_target FROM queue WHERE id = ?",
+                (entry_id,),
+            ).fetchone()
+            if not row:
+                return
+            new_attempts = row[0] + 1
+            if new_attempts >= MAX_ATTEMPTS:
+                conn.execute(
+                    "UPDATE queue SET attempts = ?, last_error = ?, status = 'failed' "
+                    "WHERE id = ?",
+                    (new_attempts, error[:500], entry_id),
+                )
+                self._dead_letter_alert(entry_id, row[1], row[2], error)
+            else:
+                backoff_minutes = 2 ** min(new_attempts, 5)
+                conn.execute(
+                    "UPDATE queue SET attempts = ?, last_error = ?, "
+                    "backoff_until = datetime('now', '+' || ? || ' minutes') "
+                    "WHERE id = ?",
+                    (new_attempts, error[:500], backoff_minutes, entry_id),
+                )
+
+    def _dead_letter_alert(self, entry_id: int, task_id: str,
+                           notify_target: str, error: str):
+        """Alert operator when a notification permanently fails."""
+        try:
+            import signal_send
+            signal_send.send(
+                "+19194133445",
+                f"[DEAD LETTER] Notification failed after {MAX_ATTEMPTS} attempts\n"
+                f"Queue ID: {entry_id}\n"
+                f"Task: {task_id}\n"
+                f"Target: {notify_target}\n"
+                f"Error: {error[:300]}",
             )
+        except Exception as e:
+            logger.error(f"Dead-letter alert send failed: {e}")
 
     def pending_count(self) -> int:
         """Count of unsent pending notifications."""

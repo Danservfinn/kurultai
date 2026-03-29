@@ -55,6 +55,16 @@ _DISAMBIGUATION = [
     ({"system-wide", "assess"}, "kublai"),             # system-wide assessment -> squad lead
     ({"assess", "all", "agent"}, "kublai"),            # assess all agents -> squad lead
     ({"kanban"}, "temujin"),              # kanban UI work -> dev (before bare status)
+    # SUNO-CLONE ROUTING (2026-03-29)
+    # YouTube music analysis → temujin runs /suno-clone skill
+    ({"suno"}, "temujin"),                              # any suno mention -> dev
+    ({"youtube", "analyze"}, "temujin"),                 # analyze youtube -> dev
+    ({"youtube", "music"}, "temujin"),                   # youtube music -> dev
+    ({"youtube", "style"}, "temujin"),                   # youtube style clone -> dev
+    ({"youtube", "bpm"}, "temujin"),                     # youtube BPM analysis -> dev
+    ({"song", "analyze"}, "temujin"),                    # song analysis -> dev
+    ({"music", "clone"}, "temujin"),                     # music style clone -> dev
+    ({"style", "reference", "card"}, "temujin"),         # style reference card -> dev
     ({"status"}, "ogedei"),               # bare ops status -> ogedei
     ({"research", "security"}, "jochi"),
     ({"research", "vulnerabilit"}, "jochi"),

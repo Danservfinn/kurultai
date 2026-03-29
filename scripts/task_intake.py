@@ -518,7 +518,8 @@ def create_task(title, body, priority="normal", source="task_intake",
                 skill_hint=None, force_claude_code=False,
                 notify_on_complete=False, notify_channel="signal",
                 notify_target=None, bucket=None,
-                origin_type=None, origin_initiator=None, origin_source=None):
+                origin_type=None, origin_initiator=None, origin_source=None,
+                origin_message_id=None):
     """Create a task through the canonical pipeline.
 
     Args:
@@ -1207,6 +1208,7 @@ This is blocking ALL task execution. Fleet is paralyzed.
             origin_type=origin_type,
             origin_initiator=origin_initiator,
             origin_source=origin_source,
+            origin_message_id=origin_message_id,
         )
         # FIX 2026-03-14: Verify task file persisted to disk before reporting success
         _task_file = agent_tasks_dir(agent) / f"{task_id}.md"

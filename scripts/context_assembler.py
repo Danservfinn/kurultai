@@ -127,6 +127,9 @@ class ContextAssembler:
             # Phase 9: Human profile (scope-filtered at Cypher level when group_id set)
             profile = self._get_human_profile(session, human_id, group_id=group_id)
 
+            # Phase 10: Active task requests from this human (48h window)
+            active_tasks = self._get_active_tasks(session, human_id)
+
         # Assemble into structured context
         context = {
             "human_id": human_id,
@@ -141,6 +144,7 @@ class ContextAssembler:
             "inferences": inferences[:10],
             "social_context": social,
             "action_items": action_items[:10],
+            "active_tasks": active_tasks[:5],
             "scope": scope,
             "assembly_ms": round((time.monotonic() - t0) * 1000),
         }
@@ -354,6 +358,34 @@ class ContextAssembler:
             human_id=human_id,
         )
         return [dict(r) for r in result]
+
+    def _get_active_tasks(self, session, human_id: str) -> List[Dict[str, Any]]:
+        """Get recent tasks requested by this human (48h window).
+
+        Provides task awareness so Kublai can answer questions like
+        'what happened with my research request?' without a separate tool call.
+        """
+        try:
+            result = session.run(
+                """
+                MATCH (t:Task)
+                WHERE t.origin_initiator = $phone
+                  AND t.status IN ['PENDING', 'WORKING', 'COMPLETED', 'FAILED']
+                  AND t.created > datetime() - duration({hours: 48})
+                RETURN t.task_id AS task_id,
+                       t.title AS title,
+                       t.status AS status,
+                       t.assigned_to AS agent,
+                       substring(coalesce(t.solution, ''), 0, 500) AS solution_preview,
+                       toString(t.created) AS created
+                ORDER BY t.created DESC LIMIT 5
+                """,
+                phone=human_id,
+            )
+            return [dict(r) for r in result]
+        except Exception as e:
+            logger.warning(f"Phase 10 (active_tasks) failed: {e}")
+            return []
 
     def _get_human_profile(
         self, session, human_id: str, group_id: Optional[str] = None
