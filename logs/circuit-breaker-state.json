@@ -1,11 +1,11 @@
 {
-  "ts": "2026-03-29T11:07:36.525863",
+  "ts": "2026-03-29T13:10:05.149119",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 84,
+      "success_count": 85,
       "last_failure_rate": 0.0
     },
     "mongke": {
@@ -26,14 +26,14 @@
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 175,
+      "success_count": 182,
       "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 265,
+      "success_count": 273,
       "last_failure_rate": 0.0
     },
     "temujin": {

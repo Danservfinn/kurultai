@@ -125,6 +125,76 @@ def check_gateway() -> tuple[bool, str, dict]:
         return False, f"Gateway check failed: {e}", {}
 
 
+def check_signal_channel() -> tuple[bool, str, dict]:
+    """
+    Check Signal channel health by probing the signal-cli daemon HTTP endpoint.
+
+    If the daemon is not ready (HTTP 404), attempts auto-remediation:
+    kills legacy signal bridge processes (signal_jsonrpc_server.py and
+    signal-cli jsonRpc mode) that can survive OpenClaw upgrades and block
+    the new daemon-mode signal-cli from binding port 8080.
+
+    Returns: (is_healthy, reason, metrics)
+    """
+    import signal as _signal_module  # avoid name collision with module
+
+    SIGNAL_DAEMON_URL = "http://127.0.0.1:8080/v1/about"
+
+    try:
+        import requests
+        try:
+            requests.get(SIGNAL_DAEMON_URL, timeout=5)
+            # Any HTTP response (even 404) means the daemon is bound and serving.
+            # ConnectionError/ConnectionRefused means it's not running.
+            return True, "OK", {"status": "running", "remediated": False}
+        except requests.exceptions.ConnectionError:
+            pass  # Daemon not listening — fall through to orphan check
+        except Exception:
+            pass
+
+        # Daemon not responding — check for legacy orphan processes
+        result = subprocess.run(
+            ["ps", "aux"], capture_output=True, text=True, timeout=10
+        )
+        orphan_pids = []
+        for line in result.stdout.strip().split("\n")[1:]:
+            if "signal_jsonrpc_server.py" in line or (
+                "signal.Main" in line and "jsonRpc" in line
+            ):
+                parts = line.split()
+                if len(parts) > 1:
+                    try:
+                        orphan_pids.append(int(parts[1]))
+                    except ValueError:
+                        pass
+
+        if orphan_pids:
+            log(f"Signal: found {len(orphan_pids)} legacy orphan process(es): {orphan_pids}", "WARN")
+            remediated = False
+            for pid in orphan_pids:
+                try:
+                    os.kill(pid, _signal_module.SIGTERM)
+                    log(f"Signal: killed legacy process PID {pid}", "INFO")
+                    remediated = True
+                except ProcessLookupError:
+                    pass  # Already gone
+                except Exception as e:
+                    log(f"Signal: failed to kill PID {pid}: {e}", "WARN")
+            return False, f"signal daemon not ready (killed {len(orphan_pids)} orphan(s), gateway will auto-restart)", {
+                "status": "remediated",
+                "orphans_killed": len(orphan_pids),
+                "remediated": True,
+            }
+
+        return False, "signal daemon not ready (HTTP 404, no orphans found)", {
+            "status": "down",
+            "remediated": False,
+        }
+
+    except Exception as e:
+        return False, f"Signal check failed: {e}", {"status": "error"}
+
+
 def check_neo4j() -> tuple[bool, str, dict]:
     """
     Check Neo4j connectivity.
@@ -424,7 +494,17 @@ def main():
         issues.append(f"Gateway: {gateway_reason}")
     log(f"Gateway: {'OK' if gateway_healthy else 'FAIL'} - {gateway_reason}")
 
-    # 2. Neo4j health
+    # 2. Signal channel health
+    signal_healthy, signal_reason, signal_metrics = check_signal_channel()
+    metrics["signal_channel"] = signal_metrics
+    if not signal_healthy:
+        # If orphans were killed, gateway auto-restarts the channel — don't page HIGH
+        if not signal_metrics.get("remediated"):
+            all_healthy = False
+            issues.append(f"Signal: {signal_reason}")
+    log(f"Signal channel: {'OK' if signal_healthy else 'REMEDIATED' if signal_metrics.get('remediated') else 'FAIL'} - {signal_reason}")
+
+    # 3. Neo4j health
     neo4j_healthy, neo4j_reason, neo4j_metrics = check_neo4j()
     metrics["neo4j"] = neo4j_metrics
     if not neo4j_healthy:
@@ -432,7 +512,7 @@ def main():
         issues.append(f"Neo4j: {neo4j_reason}")
     log(f"Neo4j: {'OK' if neo4j_healthy else 'FAIL'} - {neo4j_reason}")
 
-    # 3. Redis health
+    # 4. Redis health
     redis_healthy, redis_reason, redis_metrics = check_redis()
     metrics["redis"] = redis_metrics
     if not redis_healthy:
@@ -440,7 +520,7 @@ def main():
         issues.append(f"Redis: {redis_reason}")
     log(f"Redis: {'OK' if redis_healthy else 'FAIL'} - {redis_reason}")
 
-    # 4. Website health
+    # 5. Website health
     website_results = check_websites()
     metrics["websites"] = website_results
     for site in website_results:
@@ -450,12 +530,12 @@ def main():
             issues.append(f"Website {site['name']}: {err}")
         log(f"Website {site['name']}: {'OK' if site['healthy'] else 'FAIL'}")
 
-    # 5. Lock cleanup (always run, even if other checks failed)
+    # 6. Lock cleanup (always run, even if other checks failed)
     cleanup_ok, cleanup_summary = cleanup_stale_locks()
     metrics["lock_cleanup"] = {"success": cleanup_ok, "summary": cleanup_summary}
     log(f"Lock cleanup: {'OK' if cleanup_ok else 'FAIL'} - {cleanup_summary}")
 
-    # 6. Git operation health
+    # 7. Git operation health
     git_healthy, git_reason, git_metrics = check_git_operations()
     metrics["git_operations"] = git_metrics
     if not git_healthy:
@@ -463,7 +543,7 @@ def main():
         issues.append(f"Git: {git_reason}")
     log(f"Git operations: {'OK' if git_healthy else 'FAIL'} - {git_reason}")
 
-    # 7. Unregistered task scan (gateway orphan backfill)
+    # 8. Unregistered task scan (gateway orphan backfill)
     orphan_healthy, orphan_reason, orphan_metrics = check_unregistered_tasks()
     metrics["unregistered_tasks"] = orphan_metrics
     if not orphan_healthy:

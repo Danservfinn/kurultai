@@ -1,18 +1,18 @@
 {
-  "ts": "2026-03-29T12:00:23.752771",
+  "ts": "2026-03-29T13:58:04.872521",
   "window_hours": 1,
   "agents": {
     "jochi": {
-      "completed_1h": 3,
+      "completed_1h": 2,
       "failed_1h": 0,
-      "total_1h": 3,
+      "total_1h": 2,
       "fail_rate_1h": 0.0,
       "flagged": false
     },
     "ogedei": {
-      "completed_1h": 1,
+      "completed_1h": 3,
       "failed_1h": 0,
-      "total_1h": 1,
+      "total_1h": 3,
       "fail_rate_1h": 0.0,
       "flagged": false
     }
