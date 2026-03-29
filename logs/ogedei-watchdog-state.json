@@ -1,7 +1,7 @@
 {
   "last_audit": 1774777765.6214368,
-  "cycles": 57829,
-  "last_cycle": "2026-03-29T06:01:38.062977",
+  "cycles": 57838,
+  "last_cycle": "2026-03-29T06:07:10.076060",
   "watcher_restarts": 1539,
   "stalled_warnings": 515,
   "fakes_detected": 17,
@@ -13,14 +13,14 @@
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1774778498.062984,
+  "last_cycle_epoch": 1774778830.076075,
   "last_issues": [
-    "task_executor log stale (492979s)",
-    "reflection stale 7735m (miss #12976)",
+    "task_executor log stale (493311s)",
+    "reflection stale 7741m (miss #12985)",
     "slow reflection step: message-extraction (120s)",
     "slow reflection step: thread-summaries (116s)"
   ],
-  "reflection_misses": 12976,
+  "reflection_misses": 12985,
   "last_memory_audit": 1774777765.631579,
   "memory_audit_result": {
     "total": 11,
@@ -43,16 +43,16 @@
     "ts": "2026-03-29T05:52:53.125505"
   },
   "memory_fixes": 1011,
-  "last_failure_rate_check": 1774778320.478909,
+  "last_failure_rate_check": 1774778644.699639,
   "agent_failure_flags": {},
-  "cycle_start_time": 1774778497.9230258,
-  "last_queue_balance_check": 1774778320.5102642,
+  "cycle_start_time": 1774778829.984331,
+  "last_queue_balance_check": 1774778645.3898041,
   "queue_depths": {
     "kublai": 9,
     "temujin": 29,
     "mongke": 17,
     "chagatai": 14,
-    "jochi": 36,
+    "jochi": 39,
     "ogedei": 133,
     "tolui": 11
   },
@@ -71,7 +71,7 @@
     },
     "lookback_minutes": 30
   },
-  "last_quality_gate_check": 1774778498.034434,
+  "last_quality_gate_check": 1774778688.739646,
   "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
@@ -91,7 +91,7 @@
     "chagatai"
   ],
   "circuit_report": {
-    "ts": "2026-03-29T06:01:38.061760",
+    "ts": "2026-03-29T06:07:10.073522",
     "agents": {
       "temujin": {
         "state": "CLOSED",
@@ -136,7 +136,7 @@
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.13898801803588867,
+  "last_cycle_duration": 0.08944916725158691,
   "state_file_size": 4814,
   "tasks_recovered": 194,
   "slow_cycles": 41,
@@ -146,8 +146,8 @@
     "ogedei",
     "mongke"
   ],
-  "last_cred_failure_check": 1774778392.6387289,
-  "last_git_operation_check": 1774778320.519391,
+  "last_cred_failure_check": 1774778795.553654,
+  "last_git_operation_check": 1774778645.397142,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
