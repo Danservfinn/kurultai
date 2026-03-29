@@ -3494,3 +3494,306 @@ fatal: a branch named 'task-reflection-2' already exists
 2026-03-29 06:06:22,546 [task_executor] INFO: COMPLETED normal-1774778527-e3930fb1 in 126s
 2026-03-29 06:06:51,566 [neo4j_v2_core] INFO: Task normal-1774778527-ac7065b0 completed
 2026-03-29 06:06:51,598 [task_executor] INFO: COMPLETED normal-1774778527-ac7065b0 in 118s
+2026-03-29 06:07:41,459 [neo4j_v2_core] INFO: Task reflection-2026-03-29-reflect-kublai completed
+2026-03-29 06:07:41,563 [neo4j_v2_core] INFO: Task reflection-2026-03-29-reflect-kublai completed -> unblocked 6 dependents: ['reflection-2026-03-29-review-ogedei', 'reflection-2026-03-29-review-jochi', 'reflection-2026-03-29-review-chagatai', 'reflection-2026-03-29-review-mongke', 'reflection-2026-03-29-review-temujin', 'reflection-2026-03-29-review-kublai']
+2026-03-29 06:07:41,685 [task_executor] INFO: COMPLETED reflection-2026-03-29-reflect-kublai in 439s
+2026-03-29 06:07:53,480 [task_executor] INFO: Executing reflection-2026-03-29-review-temujin on temujin (priority=high)
+2026-03-29 06:07:53,510 [task_executor] INFO: Executing reflection-2026-03-29-review-mongke on mongke (priority=high)
+2026-03-29 06:07:53,552 [task_executor] INFO: Executing reflection-2026-03-29-review-chagatai on chagatai (priority=high)
+2026-03-29 06:07:53,565 [task_executor] INFO: Executing reflection-2026-03-29-review-jochi on jochi (priority=high)
+2026-03-29 06:07:53,582 [task_executor] INFO: Executing reflection-2026-03-29-review-kublai on ogedei (priority=high)
+2026-03-29 06:07:53,640 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:07:53,703 [task_executor] INFO: Session reset for mongke: drift:bailian/kimi-k2.5
+2026-03-29 06:07:53,725 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:07:53,757 [task_executor] INFO: Session reset for chagatai: drift:bailian/kimi-k2.5
+2026-03-29 06:07:53,771 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:07:53,781 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:07:53,792 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:07:53,921 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: cannot lock ref 'refs/heads/task-reflection-2': reference already exists
+
+2026-03-29 06:07:53,922 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-review-mongke, falling back to in-place editing
+2026-03-29 06:07:54,334 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: cannot lock ref 'refs/heads/task-reflection-2': reference already exists
+
+2026-03-29 06:07:54,342 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-review-jochi, falling back to in-place editing
+2026-03-29 06:07:54,398 [task_executor] INFO: Worktree for reflection-2026-03-29-review-chagatai: /Users/kublai/.openclaw/agents/chagatai/worktrees/kurultai-scripts
+2026-03-29 06:07:54,414 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:07:54,415 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-review-temujin, falling back to in-place editing
+2026-03-29 06:07:54,434 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:07:54,434 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-review-kublai, falling back to in-place editing
+2026-03-29 06:08:15,622 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-kublai completed
+2026-03-29 06:08:15,683 [task_executor] INFO: COMPLETED reflection-2026-03-29-review-kublai in 21s
+2026-03-29 06:08:19,042 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-jochi completed
+2026-03-29 06:08:19,061 [task_executor] INFO: COMPLETED reflection-2026-03-29-review-jochi in 25s
+2026-03-29 06:08:19,330 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-mongke completed
+2026-03-29 06:08:19,348 [task_executor] INFO: COMPLETED reflection-2026-03-29-review-mongke in 25s
+2026-03-29 06:08:23,530 [task_executor] INFO: Executing reflection-2026-03-29-review-ogedei on ogedei (priority=high)
+2026-03-29 06:08:23,547 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:08:23,713 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:08:23,713 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-review-ogedei, falling back to in-place editing
+2026-03-29 06:08:27,999 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-temujin completed
+2026-03-29 06:08:28,010 [task_executor] INFO: COMPLETED reflection-2026-03-29-review-temujin in 34s
+2026-03-29 06:08:36,624 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-chagatai completed
+2026-03-29 06:08:36,678 [task_executor] INFO: No changes in worktree for reflection-2026-03-29-review-chagatai, skipping PR
+2026-03-29 06:08:36,678 [task_executor] INFO: COMPLETED reflection-2026-03-29-review-chagatai in 42s
+2026-03-29 06:09:02,721 [neo4j_v2_core] INFO: Task normal-1774778525-c2a78854 completed
+2026-03-29 06:09:02,731 [task_executor] INFO: COMPLETED normal-1774778525-c2a78854 in 333s
+2026-03-29 06:09:52,628 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-ogedei completed
+2026-03-29 06:09:52,638 [neo4j_v2_core] INFO: Task reflection-2026-03-29-review-ogedei completed -> unblocked 6 dependents: ['reflection-2026-03-29-propose-ogedei', 'reflection-2026-03-29-propose-jochi', 'reflection-2026-03-29-propose-chagatai', 'reflection-2026-03-29-propose-mongke', 'reflection-2026-03-29-propose-temujin', 'reflection-2026-03-29-propose-kublai']
+2026-03-29 06:09:52,657 [task_executor] INFO: COMPLETED reflection-2026-03-29-review-ogedei in 89s
+2026-03-29 06:09:53,637 [task_executor] INFO: Executing reflection-2026-03-29-propose-temujin on temujin (priority=high)
+2026-03-29 06:09:53,651 [task_executor] INFO: Executing reflection-2026-03-29-propose-mongke on mongke (priority=high)
+2026-03-29 06:09:53,661 [task_executor] INFO: Executing reflection-2026-03-29-propose-chagatai on chagatai (priority=high)
+2026-03-29 06:09:53,669 [task_executor] INFO: Executing reflection-2026-03-29-propose-jochi on jochi (priority=high)
+2026-03-29 06:09:53,679 [task_executor] INFO: Executing reflection-2026-03-29-propose-kublai on ogedei (priority=high)
+2026-03-29 06:09:53,695 [task_executor] INFO: Session reset for temujin: drift:bailian/kimi-k2.5
+2026-03-29 06:09:53,702 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:09:53,727 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:09:53,755 [task_executor] INFO: Session reset for chagatai: drift:bailian/kimi-k2.5
+2026-03-29 06:09:53,760 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:09:53,780 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 06:09:53,784 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:09:53,801 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 06:09:53,806 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:09:53,828 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:09:53,828 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-propose-mongke, falling back to in-place editing
+2026-03-29 06:09:53,838 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:09:53,838 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-propose-chagatai, falling back to in-place editing
+2026-03-29 06:09:53,847 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:09:53,847 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-propose-kublai, falling back to in-place editing
+2026-03-29 06:09:53,855 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: 'task-reflection-2' is already used by worktree at '/Users/kublai/.openclaw/agents/temujin/worktrees/kurultai-scripts'
+
+2026-03-29 06:09:53,855 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-propose-jochi, falling back to in-place editing
+2026-03-29 06:09:53,869 [task_executor] INFO: Worktree for reflection-2026-03-29-propose-temujin: /Users/kublai/.openclaw/agents/temujin/worktrees/kurultai-scripts
+2026-03-29 06:10:11,008 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-jochi completed
+2026-03-29 06:10:11,035 [task_executor] INFO: COMPLETED reflection-2026-03-29-propose-jochi in 17s
+2026-03-29 06:10:12,263 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-temujin completed
+2026-03-29 06:10:12,341 [task_executor] INFO: No changes in worktree for reflection-2026-03-29-propose-temujin, skipping PR
+2026-03-29 06:10:12,342 [task_executor] INFO: COMPLETED reflection-2026-03-29-propose-temujin in 18s
+2026-03-29 06:10:14,226 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-chagatai completed
+2026-03-29 06:10:14,244 [task_executor] INFO: COMPLETED reflection-2026-03-29-propose-chagatai in 20s
+2026-03-29 06:10:14,269 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-kublai completed
+2026-03-29 06:10:14,283 [task_executor] INFO: COMPLETED reflection-2026-03-29-propose-kublai in 20s
+2026-03-29 06:10:15,628 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-mongke completed
+2026-03-29 06:10:15,639 [task_executor] INFO: COMPLETED reflection-2026-03-29-propose-mongke in 22s
+2026-03-29 06:10:23,677 [task_executor] INFO: Executing reflection-2026-03-29-propose-ogedei on ogedei (priority=high)
+2026-03-29 06:10:24,013 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 06:10:24,021 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:10:24,063 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:10:24,063 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-propose-ogedei, falling back to in-place editing
+2026-03-29 06:10:33,293 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-ogedei completed
+2026-03-29 06:10:33,301 [neo4j_v2_core] INFO: Task reflection-2026-03-29-propose-ogedei completed -> unblocked 1 dependents: ['reflection-2026-03-29-launch-voting']
+2026-03-29 06:10:33,317 [task_executor] INFO: COMPLETED reflection-2026-03-29-propose-ogedei in 9s
+2026-03-29 06:10:53,707 [task_executor] INFO: Executing reflection-2026-03-29-launch-voting on ogedei (priority=high)
+2026-03-29 06:10:53,729 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 06:10:53,737 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 06:10:53,778 [task_executor] WARNING: Worktree creation failed: Preparing worktree (new branch 'task-reflection-2')
+fatal: a branch named 'task-reflection-2' already exists
+
+2026-03-29 06:10:53,779 [task_executor] WARNING: Worktree creation failed for reflection-2026-03-29-launch-voting, falling back to in-place editing
+2026-03-29 06:11:24,015 [neo4j_v2_core] INFO: Task reflection-2026-03-29-launch-voting completed
+2026-03-29 06:11:24,028 [task_executor] INFO: COMPLETED reflection-2026-03-29-launch-voting in 30s
+2026-03-29 06:31:54,605 [task_executor] INFO: Executing normal-1774780288-cda1e7cb on jochi (priority=normal)
+2026-03-29 06:31:54,613 [task_executor] INFO: Executing normal-1774780288-a3d47735 on ogedei (priority=normal)
+2026-03-29 06:31:54,642 [task_executor] INFO: Session reset for ogedei: bloat:113016,drift:bailian/kimi-k2.5
+2026-03-29 06:32:24,679 [task_executor] INFO: Executing normal-1774780288-54a88199 on jochi (priority=normal)
+2026-03-29 06:32:49,555 [task_executor] INFO: Phase 1 prompt generated for normal-1: 2650 chars in 54.9s
+2026-03-29 06:32:49,555 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 06:32:52,148 [task_executor] INFO: Phase 1 prompt generated for normal-1: 4819 chars in 57.5s
+2026-03-29 06:32:52,148 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 06:32:53,113 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3765 chars in 28.4s
+2026-03-29 06:32:53,114 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 06:33:18,751 [neo4j_v2_core] INFO: Task normal-1774780288-a3d47735 completed
+2026-03-29 06:33:19,328 [task_executor] INFO: COMPLETED normal-1774780288-a3d47735 in 27s
+2026-03-29 06:33:46,917 [neo4j_v2_core] INFO: Task normal-1774780288-cda1e7cb completed
+2026-03-29 06:33:46,935 [task_executor] INFO: COMPLETED normal-1774780288-cda1e7cb in 57s
+2026-03-29 06:34:31,157 [neo4j_v2_core] INFO: Task normal-1774780288-54a88199 completed
+2026-03-29 06:34:31,172 [task_executor] INFO: COMPLETED normal-1774780288-54a88199 in 98s
+2026-03-29 06:51:25,423 [task_executor] INFO: Executing high-1774781483-3f17882e on ogedei (priority=high)
+2026-03-29 06:51:25,445 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 06:52:16,980 [task_executor] INFO: Phase 1 prompt generated for high-177: 3500 chars in 51.5s
+2026-03-29 06:52:16,980 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 06:52:55,486 [task_executor] INFO: Executing ogedei-model-drift-1774781554 on ogedei (priority=high)
+2026-03-29 06:52:55,504 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 06:53:59,870 [task_executor] INFO: Phase 1 prompt generated for ogedei-m: 3079 chars in 64.4s
+2026-03-29 06:53:59,871 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 06:54:15,805 [neo4j_v2_core] INFO: Task high-1774781483-3f17882e completed
+2026-03-29 06:54:15,827 [task_executor] INFO: COMPLETED high-1774781483-3f17882e in 119s
+2026-03-29 06:55:50,980 [neo4j_v2_core] INFO: Task ogedei-model-drift-1774781554 completed
+2026-03-29 06:55:50,994 [task_executor] INFO: COMPLETED ogedei-model-drift-1774781554 in 111s
+2026-03-29 07:04:56,011 [task_executor] INFO: Executing normal-1774782284-6b41e0a9 on jochi (priority=normal)
+2026-03-29 07:04:56,035 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 07:05:14,660 [task_executor] INFO: Phase 1 prompt generated for normal-1: 2951 chars in 18.6s
+2026-03-29 07:05:14,660 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 07:05:26,042 [task_executor] INFO: Executing normal-1774782284-c08c9696 on jochi (priority=normal)
+2026-03-29 07:05:56,108 [task_executor] INFO: Executing normal-1774782284-3773922c on jochi (priority=normal)
+2026-03-29 07:06:23,731 [task_executor] INFO: Phase 1 prompt generated for normal-1: 2769 chars in 57.7s
+2026-03-29 07:06:23,732 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 07:06:31,359 [task_executor] INFO: Phase 1 prompt generated for normal-1: 4942 chars in 35.2s
+2026-03-29 07:06:31,360 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 07:07:02,582 [neo4j_v2_core] INFO: Task normal-1774782284-6b41e0a9 completed
+2026-03-29 07:07:02,605 [task_executor] INFO: COMPLETED normal-1774782284-6b41e0a9 in 108s
+2026-03-29 07:09:20,682 [neo4j_v2_core] INFO: Task normal-1774782284-c08c9696 completed
+2026-03-29 07:09:20,703 [task_executor] INFO: COMPLETED normal-1774782284-c08c9696 in 177s
+2026-03-29 07:09:27,888 [neo4j_v2_core] INFO: Task normal-1774782284-3773922c completed
+2026-03-29 07:09:27,898 [task_executor] INFO: COMPLETED normal-1774782284-3773922c in 176s
+2026-03-29 07:54:28,001 [task_executor] INFO: Executing high-1774785251-99c3cf4d on ogedei (priority=high)
+2026-03-29 07:54:28,023 [task_executor] INFO: Session reset for ogedei: bloat:113016,drift:bailian/kimi-k2.5
+2026-03-29 07:54:54,261 [task_executor] INFO: Phase 1 prompt generated for high-177: 4505 chars in 26.2s
+2026-03-29 07:54:54,261 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 07:58:05,390 [neo4j_v2_core] INFO: Task high-1774785251-99c3cf4d completed
+2026-03-29 07:58:05,417 [task_executor] INFO: COMPLETED high-1774785251-99c3cf4d in 191s
+2026-03-29 08:02:28,749 [task_executor] INFO: Executing normal-1774785727-948c5ebb on jochi (priority=normal)
+2026-03-29 08:02:28,758 [task_executor] INFO: Executing normal-1774785727-c3563c87 on ogedei (priority=normal)
+2026-03-29 08:02:28,836 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 08:02:28,855 [task_executor] INFO: Session reset for ogedei: bloat:141029,drift:bailian/kimi-k2.5
+2026-03-29 08:02:58,785 [task_executor] INFO: Executing normal-1774785727-03ffa397 on jochi (priority=normal)
+2026-03-29 08:03:08,833 [task_executor] WARNING: Phase 1 delimiter extraction failed for normal-1 (output=3906 chars)
+2026-03-29 08:03:08,835 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 08:03:15,727 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3298 chars in 46.9s
+2026-03-29 08:03:15,728 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 08:03:33,721 [task_executor] WARNING: Phase 1 delimiter extraction failed for normal-1 (output=4788 chars)
+2026-03-29 08:03:33,722 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 08:06:04,166 [neo4j_v2_core] INFO: Task normal-1774785727-03ffa397 completed
+2026-03-29 08:06:04,295 [task_executor] INFO: COMPLETED normal-1774785727-03ffa397 in 150s
+2026-03-29 08:09:15,296 [neo4j_v2_core] INFO: Task normal-1774785727-c3563c87 completed
+2026-03-29 08:09:15,322 [task_executor] INFO: COMPLETED normal-1774785727-c3563c87 in 359s
+2026-03-29 08:09:37,581 [neo4j_v2_core] INFO: Task normal-1774785727-948c5ebb completed
+2026-03-29 08:09:37,593 [task_executor] INFO: COMPLETED normal-1774785727-948c5ebb in 389s
+2026-03-29 08:31:30,640 [task_executor] INFO: Executing normal-1774787485-9221073b on jochi (priority=normal)
+2026-03-29 08:31:30,665 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 08:32:00,690 [task_executor] INFO: Executing normal-1774787485-d2e0d7a6 on jochi (priority=normal)
+2026-03-29 08:32:23,261 [task_executor] INFO: Phase 1 prompt generated for normal-1: 4672 chars in 22.6s
+2026-03-29 08:32:23,261 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 08:32:30,787 [task_executor] INFO: Executing normal-1774787485-7eb41266 on jochi (priority=normal)
+2026-03-29 08:32:49,498 [task_executor] WARNING: Phase 1 delimiter extraction failed for normal-1 (output=4995 chars)
+2026-03-29 08:32:49,500 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_FALLBACK
+2026-03-29 08:33:14,738 [task_executor] INFO: Phase 1 prompt generated for normal-1: 4673 chars in 43.9s
+2026-03-29 08:33:14,738 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 08:34:10,535 [neo4j_v2_core] INFO: Task normal-1774787485-d2e0d7a6 completed
+2026-03-29 08:34:10,559 [task_executor] INFO: COMPLETED normal-1774787485-d2e0d7a6 in 107s
+2026-03-29 08:35:43,912 [neo4j_v2_core] INFO: Task normal-1774787485-7eb41266 completed
+2026-03-29 08:35:43,930 [task_executor] INFO: COMPLETED normal-1774787485-7eb41266 in 149s
+2026-03-29 08:36:32,845 [neo4j_v2_core] INFO: Task normal-1774787485-9221073b completed
+2026-03-29 08:36:32,854 [task_executor] INFO: COMPLETED normal-1774787485-9221073b in 223s
+2026-03-29 08:54:01,847 [task_executor] INFO: Executing ogedei-model-drift-1774788821 on ogedei (priority=high)
+2026-03-29 08:54:01,884 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 08:54:57,928 [task_executor] INFO: Phase 1 prompt generated for ogedei-m: 6470 chars in 56.0s
+2026-03-29 08:54:57,928 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 08:56:18,528 [neo4j_v2_core] INFO: Task ogedei-model-drift-1774788821 completed
+2026-03-29 08:56:18,543 [task_executor] INFO: COMPLETED ogedei-model-drift-1774788821 in 81s
+2026-03-29 08:57:02,034 [task_executor] INFO: Executing high-1774788995-00b65b72 on ogedei (priority=high)
+2026-03-29 08:57:02,056 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 08:57:52,427 [task_executor] INFO: Phase 1 prompt generated for high-177: 3202 chars in 50.4s
+2026-03-29 08:57:52,428 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 08:59:58,382 [neo4j_v2_core] INFO: Task high-1774788995-00b65b72 completed
+2026-03-29 08:59:58,398 [task_executor] INFO: COMPLETED high-1774788995-00b65b72 in 126s
+2026-03-29 09:31:33,442 [task_executor] INFO: Executing normal-1774791085-d9400ac9 on jochi (priority=normal)
+2026-03-29 09:31:33,453 [task_executor] INFO: Executing normal-1774791085-61e01029 on ogedei (priority=normal)
+2026-03-29 09:31:33,471 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 09:31:33,498 [task_executor] INFO: Session reset for ogedei: bloat:141078,drift:bailian/kimi-k2.5
+2026-03-29 09:32:03,482 [task_executor] INFO: Executing normal-1774791085-8a9794f0 on jochi (priority=normal)
+2026-03-29 09:32:31,478 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3294 chars in 58.0s
+2026-03-29 09:32:31,478 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 09:32:50,848 [task_executor] INFO: Phase 1 prompt generated for normal-1: 5207 chars in 77.4s
+2026-03-29 09:32:50,848 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 09:32:51,048 [task_executor] INFO: Worktree for normal-1774791085-d9400ac9: /Users/kublai/.openclaw/agents/jochi/worktrees/parse-for-agents
+2026-03-29 09:32:52,529 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3477 chars in 49.0s
+2026-03-29 09:32:52,529 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 09:34:26,268 [neo4j_v2_core] INFO: Task normal-1774791085-8a9794f0 completed
+2026-03-29 09:34:26,399 [task_executor] INFO: COMPLETED normal-1774791085-8a9794f0 in 94s
+2026-03-29 09:36:15,738 [neo4j_v2_core] INFO: Task normal-1774791085-d9400ac9 completed
+2026-03-29 09:36:15,854 [task_executor] INFO: Deploy blocked: jochi not allowed for parse-for-agents
+2026-03-29 09:36:15,855 [task_executor] INFO: COMPLETED normal-1774791085-d9400ac9 in 205s
+2026-03-29 09:37:56,800 [neo4j_v2_core] INFO: Task normal-1774791085-61e01029 completed
+2026-03-29 09:37:56,816 [task_executor] INFO: COMPLETED normal-1774791085-61e01029 in 325s
+2026-03-29 09:59:35,651 [task_executor] INFO: Executing high-1774792757-83d2a3e1 on ogedei (priority=high)
+2026-03-29 09:59:35,672 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 10:00:21,197 [task_executor] INFO: Phase 1 prompt generated for high-177: 3097 chars in 45.5s
+2026-03-29 10:00:21,197 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:01:35,838 [task_executor] INFO: Executing normal-1774792888-af0f6190 on jochi (priority=normal)
+2026-03-29 10:01:35,869 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 10:02:05,899 [task_executor] INFO: Executing normal-1774792888-e4560b0b on jochi (priority=normal)
+2026-03-29 10:02:22,642 [task_executor] INFO: Phase 1 prompt generated for normal-1: 5628 chars in 46.8s
+2026-03-29 10:02:22,643 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:02:35,962 [task_executor] INFO: Executing normal-1774792888-68138fd4 on jochi (priority=normal)
+2026-03-29 10:02:38,739 [neo4j_v2_core] INFO: Task high-1774792757-83d2a3e1 completed
+2026-03-29 10:02:38,777 [task_executor] INFO: COMPLETED high-1774792757-83d2a3e1 in 137s
+2026-03-29 10:02:55,482 [task_executor] INFO: Phase 1 prompt generated for normal-1: 5185 chars in 49.6s
+2026-03-29 10:02:55,483 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:03:53,969 [task_executor] INFO: Phase 1 prompt generated for normal-1: 5190 chars in 78.0s
+2026-03-29 10:03:53,969 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:05:06,955 [neo4j_v2_core] INFO: Task normal-1774792888-af0f6190 completed
+2026-03-29 10:05:06,973 [task_executor] INFO: COMPLETED normal-1774792888-af0f6190 in 164s
+2026-03-29 10:05:19,681 [neo4j_v2_core] INFO: Task normal-1774792888-e4560b0b completed
+2026-03-29 10:05:19,699 [task_executor] INFO: COMPLETED normal-1774792888-e4560b0b in 144s
+2026-03-29 10:06:29,935 [neo4j_v2_core] INFO: Task normal-1774792888-68138fd4 completed
+2026-03-29 10:06:29,959 [task_executor] INFO: COMPLETED normal-1774792888-68138fd4 in 156s
+2026-03-29 10:31:38,407 [task_executor] INFO: Executing normal-1774794687-0e797df5 on jochi (priority=normal)
+2026-03-29 10:31:38,418 [task_executor] INFO: Executing normal-1774794687-cf446997 on ogedei (priority=normal)
+2026-03-29 10:31:38,435 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 10:31:38,462 [task_executor] INFO: Session reset for ogedei: bloat:113016,drift:bailian/kimi-k2.5
+2026-03-29 10:32:08,484 [task_executor] INFO: Executing normal-1774794687-f3ad6900 on jochi (priority=normal)
+2026-03-29 10:32:23,969 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3976 chars in 45.5s
+2026-03-29 10:32:23,969 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:32:43,671 [task_executor] INFO: Phase 1 prompt generated for normal-1: 2486 chars in 65.2s
+2026-03-29 10:32:43,671 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:33:11,319 [task_executor] INFO: Phase 1 prompt generated for normal-1: 2937 chars in 62.8s
+2026-03-29 10:33:11,320 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:34:13,607 [neo4j_v2_core] INFO: Task normal-1774794687-0e797df5 completed
+2026-03-29 10:34:13,667 [task_executor] INFO: COMPLETED normal-1774794687-0e797df5 in 90s
+2026-03-29 10:35:59,500 [neo4j_v2_core] INFO: Task normal-1774794687-f3ad6900 completed
+2026-03-29 10:35:59,522 [task_executor] INFO: COMPLETED normal-1774794687-f3ad6900 in 168s
+2026-03-29 10:37:39,434 [neo4j_v2_core] INFO: Task normal-1774794687-cf446997 completed
+2026-03-29 10:37:39,451 [task_executor] INFO: COMPLETED normal-1774794687-cf446997 in 315s
+2026-03-29 10:54:41,392 [task_executor] INFO: Executing ogedei-model-drift-1774796072 on ogedei (priority=high)
+2026-03-29 10:54:41,414 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 10:55:16,211 [task_executor] INFO: Phase 1 prompt generated for ogedei-m: 3681 chars in 34.8s
+2026-03-29 10:55:16,211 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 10:56:19,575 [neo4j_v2_core] INFO: Task ogedei-model-drift-1774796072 completed
+2026-03-29 10:56:19,592 [task_executor] INFO: COMPLETED ogedei-model-drift-1774796072 in 63s
+2026-03-29 11:02:11,665 [task_executor] INFO: Executing high-1774796524-eda8b5cf on ogedei (priority=high)
+2026-03-29 11:02:11,690 [task_executor] INFO: Session reset for ogedei: drift:bailian/kimi-k2.5
+2026-03-29 11:03:11,748 [task_executor] INFO: Executing normal-1774796583-90521609 on jochi (priority=normal)
+2026-03-29 11:03:11,777 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 11:03:17,747 [task_executor] INFO: Phase 1 prompt generated for high-177: 4434 chars in 66.1s
+2026-03-29 11:03:17,747 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 11:03:17,858 [task_executor] INFO: Worktree for high-1774796524-eda8b5cf: /Users/kublai/.openclaw/agents/ogedei/worktrees/kurultai-scripts
+2026-03-29 11:03:41,789 [task_executor] INFO: Executing normal-1774796583-0d517d8c on jochi (priority=normal)
+2026-03-29 11:04:03,027 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3861 chars in 51.2s
+2026-03-29 11:04:03,027 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 11:04:11,837 [task_executor] INFO: Executing normal-1774796583-2468ca29 on jochi (priority=normal)
+2026-03-29 11:04:28,335 [task_executor] INFO: Phase 1 prompt generated for normal-1: 3552 chars in 46.5s
+2026-03-29 11:04:28,335 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 11:05:02,778 [neo4j_v2_core] INFO: Task high-1774796524-eda8b5cf completed
+2026-03-29 11:05:02,909 [task_executor] INFO: No changes in worktree for high-1774796524-eda8b5cf, skipping PR
+2026-03-29 11:05:02,910 [task_executor] INFO: COMPLETED high-1774796524-eda8b5cf in 105s
+2026-03-29 11:05:44,915 [task_executor] INFO: Phase 1 prompt generated for normal-1: 5159 chars in 93.1s
+2026-03-29 11:05:44,915 [neo4j_v2_events] WARNING: Unknown event type: PROMPT_OPTIMIZED
+2026-03-29 11:05:49,056 [neo4j_v2_core] INFO: Task normal-1774796583-90521609 completed
+2026-03-29 11:05:49,081 [task_executor] INFO: COMPLETED normal-1774796583-90521609 in 106s
+2026-03-29 11:06:55,009 [neo4j_v2_core] INFO: Task normal-1774796583-0d517d8c completed
+2026-03-29 11:06:55,024 [task_executor] INFO: COMPLETED normal-1774796583-0d517d8c in 147s
+2026-03-29 11:07:36,516 [neo4j_v2_core] INFO: Task normal-1774796583-2468ca29 completed
+2026-03-29 11:07:36,527 [task_executor] INFO: COMPLETED normal-1774796583-2468ca29 in 112s
+2026-03-29 12:01:44,383 [task_executor] INFO: Executing normal-1774800100-fded41e4 on jochi (priority=normal)
+2026-03-29 12:01:44,400 [task_executor] INFO: Executing normal-1774800101-fe770f57 on ogedei (priority=normal)
+2026-03-29 12:01:44,422 [task_executor] INFO: Session reset for jochi: drift:bailian/kimi-k2.5
+2026-03-29 12:01:44,448 [task_executor] INFO: Session reset for ogedei: bloat:141078,drift:bailian/kimi-k2.5
+2026-03-29 12:02:14,414 [task_executor] INFO: Executing normal-1774800101-50cae8ab on jochi (priority=normal)
