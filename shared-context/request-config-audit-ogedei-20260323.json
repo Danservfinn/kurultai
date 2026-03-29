@@ -1,0 +1,17 @@
+{
+  "request_type": "config_audit",
+  "requesting_agent": "ogedei",
+  "timestamp": "2026-03-23T13:15:00-04:00",
+  "issue": "MODEL_MISMATCH",
+  "session_model": "glm-5",
+  "config_model": "claude-sonnet-4-6",
+  "config_path": "/Users/kublai/.openclaw/agents/ogedei/.claude/settings.json",
+  "priority": "HIGH",
+  "requested_actions": [
+    "Verify ANTHROPIC_MODEL in settings.json",
+    "Check if OAuth credentials are valid for Anthropic",
+    "Determine why session fell back to glm-5",
+    "Recommend remediation steps"
+  ],
+  "source_rule": "O-R021"
+}

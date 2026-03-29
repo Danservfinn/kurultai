@@ -104,6 +104,33 @@ V2_CONSTRAINTS = [
         "cypher": "CREATE CONSTRAINT group_thread_id_unique IF NOT EXISTS FOR (gt:GroupThread) REQUIRE gt.id IS UNIQUE",
         "desc": "Unique GroupThread UUID",
     },
+    # --- Unified Task Executor: Event-Sourced Observability ---
+    {
+        "name": "event_id_unique",
+        "cypher": "CREATE CONSTRAINT event_id_unique IF NOT EXISTS FOR (e:Event) REQUIRE e.event_id IS UNIQUE",
+        "desc": "Unique event IDs for idempotent emission",
+    },
+    {
+        "name": "agent_metrics_unique",
+        "cypher": "CREATE CONSTRAINT agent_metrics_unique IF NOT EXISTS FOR (m:AgentMetrics) REQUIRE m.agent IS UNIQUE",
+        "desc": "One metrics node per agent",
+    },
+    # --- General Curiosity Engine ---
+    {
+        "name": "research_question_id_unique",
+        "cypher": "CREATE CONSTRAINT research_question_id_unique IF NOT EXISTS FOR (rq:ResearchQuestion) REQUIRE rq.question_id IS UNIQUE",
+        "desc": "Unique research question ID",
+    },
+    {
+        "name": "knowledge_answer_id_unique",
+        "cypher": "CREATE CONSTRAINT knowledge_answer_id_unique IF NOT EXISTS FOR (ka:KnowledgeAnswer) REQUIRE ka.answer_id IS UNIQUE",
+        "desc": "Unique knowledge answer ID",
+    },
+    {
+        "name": "knowledge_topic_label_unique",
+        "cypher": "CREATE CONSTRAINT knowledge_topic_label_unique IF NOT EXISTS FOR (kt:KnowledgeTopic) REQUIRE kt.label IS UNIQUE",
+        "desc": "Unique topic label",
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -166,6 +193,11 @@ V2_INDEXES = [
         "name": "v2_message_extraction_status",
         "cypher": "CREATE INDEX v2_message_extraction_status IF NOT EXISTS FOR (m:Message) ON (m.extractionStatus)",
         "desc": "Pending extraction queue",
+    },
+    {
+        "name": "v2_message_extraction_ts",
+        "cypher": "CREATE INDEX v2_message_extraction_ts IF NOT EXISTS FOR (m:Message) ON (m.extractionStatus, m.timestamp)",
+        "desc": "Extraction queue with ORDER BY timestamp (10K+ messages optimization)",
     },
     {
         "name": "v2_inference_human_confidence",
@@ -253,10 +285,94 @@ V2_INDEXES = [
         "desc": "Pipeline run grouping for dependency-based orchestration",
     },
     {
+        "name": "v2_task_phase",
+        "cypher": "CREATE INDEX v2_task_phase IF NOT EXISTS "
+                  "FOR (t:Task) ON (t.phase)",
+        "desc": "Pipeline phase filtering for UI and queries",
+    },
+    {
         "name": "v2_task_status_pipeline",
         "cypher": "CREATE INDEX v2_task_status_pipeline IF NOT EXISTS "
                   "FOR (t:Task) ON (t.status, t.pipeline_id)",
         "desc": "Pipeline tasks by status for monitoring",
+    },
+    # --- Unified Task Executor: Event-Sourced Observability ---
+    {
+        "name": "v2_event_type_ts",
+        "cypher": "CREATE INDEX v2_event_type_ts IF NOT EXISTS FOR (e:Event) ON (e.event_type, e.ts)",
+        "desc": "Dashboard queries: events by type + time window",
+    },
+    {
+        "name": "v2_event_task_id",
+        "cypher": "CREATE INDEX v2_event_task_id IF NOT EXISTS FOR (e:Event) ON (e.task_id)",
+        "desc": "Event → Task correlation for lifecycle tracing",
+    },
+    {
+        "name": "v2_event_agent_ts",
+        "cypher": "CREATE INDEX v2_event_agent_ts IF NOT EXISTS FOR (e:Event) ON (e.agent, e.ts)",
+        "desc": "Per-agent event lookups for metrics",
+    },
+    # --- General Curiosity Engine ---
+    {
+        "name": "v2_rq_status",
+        "cypher": "CREATE INDEX v2_rq_status IF NOT EXISTS FOR (rq:ResearchQuestion) ON (rq.status, rq.created_at)",
+        "desc": "Questions by status + creation time",
+    },
+    {
+        "name": "v2_rq_canonical",
+        "cypher": "CREATE INDEX v2_rq_canonical IF NOT EXISTS FOR (rq:ResearchQuestion) ON (rq.canonical_hash)",
+        "desc": "Dedup hash lookup",
+    },
+    {
+        "name": "v2_ka_confidence",
+        "cypher": "CREATE INDEX v2_ka_confidence IF NOT EXISTS FOR (ka:KnowledgeAnswer) ON (ka.confidence, ka.stale_at)",
+        "desc": "Answers by confidence + staleness",
+    },
+    # --- ASMR Deep Extraction Indexes ---
+    {
+        "name": "v2_belief_human",
+        "cypher": "CREATE INDEX v2_belief_human IF NOT EXISTS FOR (b:ImplicitBelief) ON (b.humanId)",
+        "desc": "ImplicitBelief lookup by human",
+    },
+    {
+        "name": "v2_decision_human",
+        "cypher": "CREATE INDEX v2_decision_human IF NOT EXISTS FOR (d:DecisionPattern) ON (d.humanId)",
+        "desc": "DecisionPattern lookup by human",
+    },
+    {
+        "name": "v2_trigger_human",
+        "cypher": "CREATE INDEX v2_trigger_human IF NOT EXISTS FOR (t:EmotionalTrigger) ON (t.humanId)",
+        "desc": "EmotionalTrigger lookup by human",
+    },
+    {
+        "name": "v2_knowledge_human_domain",
+        "cypher": "CREATE INDEX v2_knowledge_human_domain IF NOT EXISTS FOR (k:KnowledgeLevel) ON (k.humanId, k.domain)",
+        "desc": "KnowledgeLevel lookup by human + domain",
+    },
+    {
+        "name": "v2_unresolved_human_status",
+        "cypher": "CREATE INDEX v2_unresolved_human_status IF NOT EXISTS FOR (u:UnresolvedThread) ON (u.humanId, u.status)",
+        "desc": "UnresolvedThread lookup by human + status",
+    },
+    {
+        "name": "v2_trust_human",
+        "cypher": "CREATE INDEX v2_trust_human IF NOT EXISTS FOR (tm:TrustMap) ON (tm.humanId)",
+        "desc": "TrustMap lookup by human",
+    },
+    {
+        "name": "v2_fingerprint_human",
+        "cypher": "CREATE INDEX v2_fingerprint_human IF NOT EXISTS FOR (cf:CommunicationFingerprint) ON (cf.humanId)",
+        "desc": "CommunicationFingerprint lookup by human",
+    },
+    {
+        "name": "v2_emocue_human",
+        "cypher": "CREATE INDEX v2_emocue_human IF NOT EXISTS FOR (ec:EmotionalCue) ON (ec.humanId)",
+        "desc": "EmotionalCue lookup by human",
+    },
+    {
+        "name": "v2_qtag_human_status",
+        "cypher": "CREATE INDEX v2_qtag_human_status IF NOT EXISTS FOR (qt:QuestionTag) ON (qt.humanId, qt.status)",
+        "desc": "QuestionTag lookup by human + status",
     },
 ]
 
@@ -292,6 +408,12 @@ V2_FULLTEXT_INDEXES = [
             FOR (t:Thread) ON EACH [t.summary]""",
         "desc": "Full-text search on thread summaries",
     },
+    # --- General Curiosity Engine ---
+    {
+        "name": "knowledge_answer_search",
+        "cypher": "CREATE FULLTEXT INDEX knowledge_answer_search IF NOT EXISTS FOR (ka:KnowledgeAnswer) ON EACH [ka.answer_text, ka.summary]",
+        "desc": "Full-text search on knowledge answers",
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -309,6 +431,7 @@ V2_DEPRECATED_INDEXES = [
 V2_DEAD_CONSTRAINTS = [
     "skill_name_unique",
     "domain_name_unique",
+    "episode_id_unique",  # Phase 4.2: Episode nodes never created, dead feature
 ]
 
 

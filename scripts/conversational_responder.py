@@ -16,6 +16,7 @@ import sys
 import json
 import time
 import logging
+import re
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -61,11 +62,49 @@ def _load_vault():
 
 _SOUL_PATH = os.path.expanduser("~/.openclaw/agents/main/SOUL.md")
 _AGENTS_PATH = os.path.expanduser("~/.openclaw/agents/main/AGENTS.md")
+_KNOWLEDGE_DIR = os.path.expanduser("~/.openclaw/agents/main/knowledge")
 _soul_cache = None
+
+# Max bytes of knowledge base content to include in system prompt.
+# Budget for smaller models (qwen3.5:9b context ~32k tokens).
+_KB_MAX_BYTES = 6000
+
+
+def _load_knowledge_base() -> str:
+    """Load key knowledge base docs for grounded architecture answers.
+
+    Loads the 'Common Agent Infrastructure' section from agent-roster.md
+    which documents ASMR, task execution, context profiles, and directory
+    structure. This prevents confabulation when answering architecture
+    questions about the Kurultai system.
+    """
+    roster_path = os.path.join(_KNOWLEDGE_DIR, "agent-roster.md")
+    if not os.path.exists(roster_path):
+        return ""
+
+    try:
+        with open(roster_path) as f:
+            content = f.read()
+    except OSError:
+        return ""
+
+    # Extract the "Common Agent Infrastructure" section — this has ASMR,
+    # task execution, context profile, and directory structure docs.
+    marker = "## Common Agent Infrastructure"
+    if marker not in content:
+        return ""
+
+    section = content[content.index(marker):]
+
+    # Truncate to budget
+    if len(section) > _KB_MAX_BYTES:
+        section = section[:_KB_MAX_BYTES].rsplit("\n", 1)[0] + "\n..."
+
+    return "\n\n## System Knowledge (from agent-roster.md)\n\n" + section
 
 
 def _load_soul() -> str:
-    """Load SOUL.md + agent roster, cached after first read."""
+    """Load SOUL.md + agent roster + knowledge base, cached after first read."""
     global _soul_cache
     if _soul_cache is not None:
         return _soul_cache
@@ -89,6 +128,11 @@ def _load_soul() -> str:
                 section = section[:section.index("\n## ", 5)]
             parts.append("## Classification Guide" + section)
 
+    # Load knowledge base docs so architecture answers are grounded
+    kb = _load_knowledge_base()
+    if kb:
+        parts.append(kb)
+
     _soul_cache = "\n\n".join(parts) if parts else ""
     return _soul_cache
 
@@ -101,6 +145,13 @@ You are responding via Signal messenger. Adapt your SOUL.md personality for chat
 - Use the context below to personalize responses — reference past conversations naturally
 - When someone asks you to do work: acknowledge it and say you're routing it to the specialist
 - Don't mention "graph" or "database" or "embedding" — just use the knowledge naturally
+
+## Epistemic Guardrail
+When answering questions about Kurultai systems, scripts, or architecture:
+- ONLY state facts that appear in the System Knowledge section above or in the context below.
+- If the information is NOT in your system prompt or context, say: "I'd need to check the source code for details on that — let me route it to the right agent."
+- NEVER invent technical details (file purposes, cron schedules, data formats) that you cannot cite from the loaded knowledge.
+- Acronyms: ASMR = Adaptive Structured Memory Representation (NOT Autonomous Sensory Meridian Response).
 
 {context}"""
 
@@ -194,7 +245,8 @@ def generate_response(
             formatted = format_context(ctx)
             context_parts = []
             for section in ["identity_preamble", "social_context", "topic_map",
-                             "active_items", "current_thread", "semantic_matches"]:
+                             "active_items", "current_thread", "group_recent",
+                             "semantic_matches"]:
                 text = formatted.get(section, "")
                 if text and len(text) > 10:
                     context_parts.append(f"## {section.replace('_', ' ').title()}\n{text}")
@@ -205,18 +257,43 @@ def generate_response(
             context_block = "(Group chat — no personal context loaded)"
         system = _build_group_system_prompt(context_block)
     else:
-        # Standard DM path — unchanged
-        ctx = assemble_context(human_id, message_text)
-        formatted = format_context(ctx)
-
-        context_parts = []
-        for section in ["identity_preamble", "social_context", "topic_map",
-                         "active_items", "current_thread", "semantic_matches"]:
-            text = formatted.get(section, "")
-            if text and len(text) > 10:
-                context_parts.append(f"## {section.replace('_', ' ').title()}\n{text}")
-
-        context_block = "\n\n".join(context_parts) if context_parts else "(No prior context — first interaction)"
+        # Standard DM path — V2 structured profile or V1 flat context
+        # V2 toggle: check env var OR config file
+        _v2_enabled = os.environ.get("CONTEXT_PROFILE_V2") == "true"
+        if not _v2_enabled:
+            _v2_flag = os.path.expanduser("~/.openclaw/context_profile_v2.enabled")
+            _v2_enabled = os.path.exists(_v2_flag)
+        if _v2_enabled:
+            try:
+                from context_profile import build_context_profile
+                context_block = build_context_profile(
+                    human_id, message_text,
+                    scope='dm', has_thread=False)
+                if not context_block:
+                    context_block = "(No prior context — first interaction)"
+                # V2 builds its own ctx dict for downstream compatibility
+                ctx = assemble_context(human_id, message_text)
+            except Exception as e:
+                logger.error(f"Context Profile V2 failed, falling back to V1: {e}")
+                ctx = assemble_context(human_id, message_text)
+                formatted = format_context(ctx)
+                context_parts = []
+                for section in ["identity_preamble", "social_context", "topic_map",
+                                 "active_items", "current_thread", "semantic_matches"]:
+                    text = formatted.get(section, "")
+                    if text and len(text) > 10:
+                        context_parts.append(f"## {section.replace('_', ' ').title()}\n{text}")
+                context_block = "\n\n".join(context_parts) if context_parts else "(No prior context — first interaction)"
+        else:
+            ctx = assemble_context(human_id, message_text)
+            formatted = format_context(ctx)
+            context_parts = []
+            for section in ["identity_preamble", "social_context", "topic_map",
+                             "active_items", "current_thread", "semantic_matches"]:
+                text = formatted.get(section, "")
+                if text and len(text) > 10:
+                    context_parts.append(f"## {section.replace('_', ' ').title()}\n{text}")
+            context_block = "\n\n".join(context_parts) if context_parts else "(No prior context — first interaction)"
         system = _build_system_prompt(context_block)
 
     # Determine response depth from engagement decision
@@ -302,6 +379,62 @@ def _try_agent_model(system: str, message: str, sender_name: str) -> str:
         return None
 
 
+def _strip_internal_thinking(text: str) -> str:
+    """Strip internal thinking/reasoning from model responses.
+
+    Handles multiple formats:
+    1. Explicit thinking tags ( Malay/</think/etc)
+    2. Internal monologue patterns that precede actual responses
+    3. Models that include reasoning without proper block separation
+
+    Pattern detected in glm-5: internal reasoning followed by actual response,
+    e.g., "Good, the script...Now I can respond.Hello."
+    """
+    if not text:
+        return text
+
+    # 1. Strip explicit thinking tags (various formats)
+    thinking_patterns = [
+        r"<think[^>]*>.*?</think\s*>",  # XML-style <think...</think >
+        r" Malay.*?```",                # Markdown code block style
+        r"\[THINKING\].*?\[/THINKING\]",  # Bracketed style
+        r"\{thinking\}.*?\{/thinking\}",  # Brace style
+    ]
+    for pattern in thinking_patterns:
+        text = re.sub(pattern, "", text, flags=re.DOTALL | re.IGNORECASE)
+
+    text = text.strip()
+
+    # 2. Detect internal monologue transition patterns
+    # Pattern: reasoning text followed by transition phrase, then actual response
+    # Example: "...Now I can respond to Danny.Hello. Good to hear from you."
+    # FIX 2026-03-22: Match full transition sentence (up to period) to prevent
+    # partial reasoning like "to Dannys greeting." from leaking through.
+    transition_patterns = [
+        # Match transition phrase + rest of sentence up to period
+        r"^.*?(?:Now I can respond|I will now respond|Let me respond|I should respond|Now responding|My response:|Final response:|Response:)[^.]*\.\s*",
+        # Match internal task marker + full sentence (handles both period and comma)
+        r"^.*?(?:This is an internal task|Internal reasoning|Internal note|Note to self:|Self:)[.,].*?\.\s*",
+    ]
+
+    for pattern in transition_patterns:
+        match = re.match(pattern, text, re.IGNORECASE | re.DOTALL)
+        if match:
+            # Extract just the part after the transition
+            remaining = text[match.end():].strip()
+            if remaining and len(remaining) < len(text) * 0.7:  # Significant reduction
+                text = remaining
+                break
+
+    # 3. Final cleanup: remove leading/trailing whitespace and common artifacts
+    text = text.strip()
+
+    # Remove any "Good," "OK," "Alright," etc. at start that might be reasoning remnants
+    text = re.sub(r"^(?:Good|OK|Alright|Right|Sure),?\s+(?:the|this|I|so|now)\s+[^.]+\.\s*", "", text, flags=re.IGNORECASE)
+
+    return text.strip()
+
+
 def _call_anthropic_api(base_url: str, auth_token: str, system: str,
                          message: str, sender_name: str, model: str = "claude-sonnet-4-6") -> str:
     """Call an Anthropic-compatible API (Z.AI, Alibaba, or native Anthropic)."""
@@ -328,15 +461,21 @@ def _call_anthropic_api(base_url: str, auth_token: str, system: str,
         data = resp.json()
         content = data.get("content", [])
         if content and isinstance(content, list):
-            # Find the text block (skip thinking blocks)
+            # First: try to find a dedicated text block (skip thinking blocks)
             for block in content:
+                if block.get("type") == "thinking":
+                    continue  # Explicit thinking block - skip
                 if block.get("type") == "text":
                     text = block.get("text", "").strip()
                     if text:
-                        return text
-            # Fallback: try first block's text field
-            text = content[0].get("text", "").strip()
-            return text if text else None
+                        # Strip any internal thinking that leaked into text
+                        return _strip_internal_thinking(text)
+
+            # Fallback: try first block's text field (but still strip thinking)
+            if content:
+                text = content[0].get("text", "").strip()
+                if text:
+                    return _strip_internal_thinking(text)
     return None
 
 
@@ -404,6 +543,8 @@ def _try_ollama(system: str, message: str, sender_name: str) -> str:
                 think_end = text.rfind("</think>")
                 if think_end >= 0:
                     text = text[think_end + 8:].strip()
+            # Apply general internal thinking stripping (consistent with other providers)
+            text = _strip_internal_thinking(text)
             if text:
                 logger.info("Response via Ollama qwen3.5:9b")
             return text if text else None

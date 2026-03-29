@@ -244,6 +244,45 @@ _DISAMBIGUATION = [
     ({"agent", "prioritize"}, "kublai"),               # agent prioritization -> squad lead
     ({"system-wide", "assess"}, "kublai"),             # system-wide assessment -> squad lead
     ({"assess", "all", "agent"}, "kublai"),            # assess all agents -> squad lead
+    # === PARSE PROJECT ROUTING (2026-03-23) ===
+    # Parse projects route by project + task-type keyword combination
+    ({"parsethe", "deploy"}, "ogedei"),
+    ({"parsethe", "monitor"}, "ogedei"),
+    ({"parsethe", "health"}, "ogedei"),
+    ({"parsethe", "restart"}, "ogedei"),
+    ({"parsethe", "railway"}, "ogedei"),
+    ({"parsethe", "test"}, "jochi"),
+    ({"parsethe", "security"}, "jochi"),
+    ({"parsethe", "audit"}, "jochi"),
+    ({"parsethe", "review"}, "jochi"),
+    ({"parsethe", "research"}, "mongke"),
+    ({"parsethe", "blog"}, "chagatai"),
+    ({"parsethe", "document"}, "chagatai"),
+    ({"parsethe"}, "temujin"),           # default: dev work
+    ("parsethe.media", "temujin"),
+    ("parse platform", "temujin"),
+    ("parse saas", "temujin"),
+    # === PARSETHIS.AI PROJECT ROUTING (2026-03-23) ===
+    # parsethis.ai routes by project + task-type keyword combination
+    ({"parsethis", "deploy"}, "ogedei"),
+    ({"parsethis", "railway"}, "ogedei"),
+    ({"parsethis", "health"}, "ogedei"),
+    ({"parsethis", "monitor"}, "ogedei"),
+    ({"parsethis", "restart"}, "ogedei"),
+    ({"parsethis", "test"}, "jochi"),
+    ({"parsethis", "security"}, "jochi"),
+    ({"parsethis", "audit"}, "jochi"),
+    ({"parsethis"}, "temujin"),           # default: dev work
+    ("parsethis.ai", "temujin"),
+    ({"parse-for-agents", "deploy"}, "ogedei"),
+    ({"parse-for-agents", "docker"}, "ogedei"),
+    ({"parse-for-agents", "railway"}, "ogedei"),
+    ({"parse-for-agents", "test"}, "jochi"),
+    ({"parse-for-agents", "security"}, "jochi"),
+    ({"parse-for-agents", "audit"}, "jochi"),
+    ({"parse-for-agents"}, "temujin"),   # default: dev work
+    ("parse for agents", "temujin"),
+    ("parse agents api", "temujin"),
     # Design/architecture tasks -> temujin (not mongke)
     ({"design", "schema"}, "temujin"),                 # schema design -> dev
     ({"design", "neo4j"}, "temujin"),                  # neo4j design -> dev
@@ -733,10 +772,66 @@ SKILL_HINTS = {
 }
 
 
+# Project-specific context skills (checked FIRST, override methodology hints)
+# These provide codebase knowledge rather than workflow methodology.
+_PROJECT_HINTS = {
+    "parsethe.media": "/parsethe-media",
+    "parsethe": "/parsethe-media",
+    "parse media": "/parsethe-media",
+    "parse platform": "/parsethe-media",
+    "parse saas": "/parsethe-media",
+    "parse-for-agents": "/parse-for-agents",
+    "parse agents api": "/parse-for-agents",
+}
+
+
 def detect_skill_hint(agent, text):
     """Auto-detect the best skill for this agent + task combination."""
     text_lower = text.lower()
+    # Check project-specific context skills first (override methodology hints)
+    for keyword, skill in _PROJECT_HINTS.items():
+        if _kw_match(keyword, text_lower):
+            return skill
+    # Then check agent+keyword methodology hints
     for (hint_agent, keyword), skill in SKILL_HINTS.items():
         if agent == hint_agent and _kw_match(keyword, text_lower):
             return skill
+    return None
+
+
+# ---------------------------------------------------------------------------
+# KB hint detection — auto-detect relevant knowledge base doc
+# ---------------------------------------------------------------------------
+
+KB_HINTS = {
+    "neo4j": "neo4j-schema.md",
+    "schema": "neo4j-schema.md",
+    "cypher": "neo4j-schema.md",
+    "graph database": "neo4j-schema.md",
+    "inference": "neo4j-schema.md",
+    "supersede": "neo4j-schema.md",
+    "api": "api-endpoints.md",
+    "endpoint": "api-endpoints.md",
+    "server.js": "api-endpoints.md",
+    "route handler": "api-endpoints.md",
+    "dashboard": "dashboard-views.md",
+    "kanban": "dashboard-views.md",
+    "provider": "provider-fallback.md",
+    "fallback": "provider-fallback.md",
+    "model switching": "provider-fallback.md",
+    "claude-agent": "provider-fallback.md",
+    "agent roster": "agent-roster.md",
+    "asmr": "agent-roster.md",
+    "task executor": "task-executor.md",
+    "concurrency": "task-executor.md",
+    "stall detection": "task-executor.md",
+}
+
+
+def detect_kb_hint(agent, text):
+    """Auto-detect the most relevant KB doc for this task."""
+    text_lower = text.lower()
+    for keyword, doc in KB_HINTS.items():
+        if keyword in text_lower:
+            return doc
     return None

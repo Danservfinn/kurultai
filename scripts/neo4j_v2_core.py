@@ -452,6 +452,12 @@ class TaskStore:
     # TASK CREATION (used by delegation and intake)
     # ------------------------------------------------------------------
 
+    # Agents that the task executor can actually dispatch to.
+    # kublai is a router/coordinator and is NOT in this list — tasks assigned
+    # to kublai will never be picked up.  Remap to ogedei (ops) instead.
+    _DISPATCHABLE_AGENTS = frozenset({"temujin", "mongke", "chagatai", "jochi", "ogedei"})
+    _KUBLAI_REMAP_TARGET = "ogedei"
+
     def create_task(self, task_id: str, title: str, prompt: str,
                     assigned_to: str, priority: str = "normal",
                     domain: str = "implementation", skill_hint: str = "",
@@ -466,6 +472,15 @@ class TaskStore:
         If depends_on is provided, creates DEPENDS_ON edges and sets status to BLOCKED.
         Otherwise status is PENDING.
         """
+        # Guard: kublai is a router, not an executor — remap to ops agent
+        if assigned_to == "kublai":
+            logging.warning(
+                "create_task: remapping agent kublai -> %s for task %s (source=%s). "
+                "kublai is not dispatchable.",
+                self._KUBLAI_REMAP_TARGET, task_id, source,
+            )
+            assigned_to = self._KUBLAI_REMAP_TARGET
+
         deps = depends_on or []
 
         def _create(tx):

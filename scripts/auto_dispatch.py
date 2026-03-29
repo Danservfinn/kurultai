@@ -6,8 +6,8 @@ Runs every 5 minutes via cron. For each agent:
 1. Check if dispatched processes (PIDs) have finished and clear state
 2. Clean up stale .executing tasks (>15 min old → revert to pending)
 
-NOTE: Dispatch is now handled exclusively by task-watcher.py → agent-task-handler.py
-→ claude-agent. This script no longer dispatches new tasks — it only does cleanup
+NOTE: Dispatch is now handled exclusively by task_executor.py → claude-agent.
+This script no longer dispatches new tasks — it only does cleanup
 to prevent stale .executing files from blocking the pipeline.
 
 Usage:

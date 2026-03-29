@@ -3,5 +3,7 @@
   "started_at": null,
   "total_duration_seconds": 0,
   "tasks_created": 0,
-  "last_task_at": null
+  "last_task_at": null,
+  "cleared_at": "2026-03-22T04:21:00",
+  "clear_reason": "False positive - transient auth heartbeat failures self-resolved. All agents now healthy."
 }

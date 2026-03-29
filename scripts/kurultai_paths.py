@@ -31,7 +31,7 @@ BRAINSTORM_DOMAIN_ROTATION = LOGS_DIR / "brainstorm-domain-rotation.json"
 
 # Valid agent names (all agents in kurultai.json)
 VALID_AGENTS = frozenset({"kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui"})
-DISPATCH_AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
+DISPATCH_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
 # Agent routing keywords (canonical source)
 AGENT_KEYWORDS = {
@@ -68,15 +68,79 @@ AGENT_KEYWORDS = {
               "crash", "fatal", "failure", "stalled", "triage", "check", "detect"],
     "ogedei": ["monitor", "health", "restart", "backup", "alert", "uptime", "cron",
                "incident", "status", "queue", "pipeline", "watchdog", "cleanup",
-               "disk", "memory", "process", "fix", "error", "failure", "deploy",
+               "disk", "memory", "process", "fix", "failure", "deploy",
                "railway", "domain", "generate", "api", "auth", "401", "log", "report",
                "configure", "vercel", "server", "gateway", "timeout", "recover",
                "throughput", "failure rate", "fleet"],  # ops metrics (2026-03-12)
+               # NOTE (2026-03-23): removed "error" — too generic, causes "fix X error" to route
+               # to ogedei when the task is code-focused (temujin domain). Specific ops keywords
+               # like "failure", "alert", "monitor" are sufficient for ops error tasks.
     "kublai": ["triage", "coordinate", "prioritize", "system-wide", "assessment", "status assessment",
                "agent status", "backlog", "routing", "dispatch", "workload"],
     "tolui": ["truth", "honest", "brutal", "verify", "completion", "fake", "bs", "quality gate",
               "call out", "assessment", "review", "calling out", "scope creep", "unrealistic"],
 }
+
+
+# =============================================================================
+# PROJECT REGISTRY — Maps project roots to deploy configuration
+# =============================================================================
+
+from typing import Optional
+
+PROJECT_REGISTRY = {
+    "/Users/kublai/projects/parse-for-agents": {
+        "name": "parse-for-agents",
+        "repo": "Danservfinn/parse-for-agents",
+        "branch": "main",
+        "test_cmd": "npm test",
+        "build_cmd": "npm run typecheck",
+        "deploy_type": "railway",
+        "health_url": "https://parse-for-agents-production.up.railway.app/health",
+        "auto_merge": True,
+        "allowed_agents": ["temujin"],
+        "docs_agents": ["chagatai"],
+    },
+    "/Users/kublai/projects/parsethe.media": {
+        "name": "parsethe.media",
+        "repo": "Danservfinn/parse",
+        "branch": "main",
+        "test_cmd": "npm run test:run --if-present",
+        "build_cmd": "npm run build",
+        "deploy_type": "railway",
+        "health_url": "https://api.parsethe.media/api/health",
+        "auto_merge": False,
+        "allowed_agents": ["temujin"],
+        "docs_agents": ["chagatai"],
+    },
+    str(OPENCLAW_DIR): {
+        "name": "kurultai-scripts",
+        "repo": "Danservfinn/kurultai-scripts",
+        "branch": "main",
+        "test_cmd": None,
+        "build_cmd": None,
+        "deploy_type": "none",
+        "health_url": None,
+        "auto_merge": False,
+        "allowed_agents": ["temujin", "ogedei"],
+        "docs_agents": ["chagatai"],
+    },
+}
+
+DEPLOY_AGENTS = frozenset({"temujin"})
+
+
+def agent_worktree_dir(agent: str, project_name: str) -> Path:
+    """Return the worktree directory for an agent working on a specific project."""
+    return AGENTS_DIR / agent / "worktrees" / project_name
+
+
+def project_for_path(file_path: str) -> Optional[dict]:
+    """Given a file path, return the matching PROJECT_REGISTRY entry or None."""
+    for root, config in PROJECT_REGISTRY.items():
+        if file_path.startswith(root):
+            return {**config, "root": root}
+    return None
 
 
 # =============================================================================
@@ -205,6 +269,9 @@ SLOW_SKILLS = {
     '/kurultai-health': 0,
     '/code-reviewer': 0,
     '/kurultai-model-switcher': 0,
+    # Parse project context skills (no special timeout)
+    '/parsethe-media': 0,
+    '/parse-for-agents': 0,
 }
 
 # Health Check Timeouts

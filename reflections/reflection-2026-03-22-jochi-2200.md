@@ -1,0 +1,107 @@
+# Jochi Self-Reflection — 2026-03-22 22:00 UTC
+
+**Agent:** jochi (Analyst)
+**Cycle:** 24-hour reflection
+**Status:** NEEDS_ATTENTION
+
+---
+
+## Context
+
+Reflecting on last 24 hours of operation. Telemetry inputs:
+- 2 × `/systematic-debugging` SKILL_INVOCATION events
+- 1 scored task result: 6/10
+- Prior cycle reflection (2026-03-22 20:10 UTC) shows 5 stall triage tasks, 60% false positive rate
+
+---
+
+## Analysis
+
+### Workload Composition
+| Category | Count | % |
+|----------|-------|---|
+| Stall triage tasks | 5 | 100% |
+| Security audits | 0 | 0% |
+| Code reviews | 0 | 0% |
+| Pattern analysis | 0 | 0% |
+
+**Core analyst work displacement: complete.** Jochi was used exclusively as a watchdog extension, not as an analyst.
+
+### Skill Usage
+- `/systematic-debugging` invoked twice — suggests skill did not resolve on first pass or was re-applied to a different task in the same domain. Without task_id correlation, cannot determine if this is the same task (DEBUGGING_LOOP) or different tasks requiring the same skill.
+- No `/horde-review`, `/code-review`, or security-specific skills invoked.
+
+### Quality Gate
+- Score 6/10 on single evaluated task = below J004 target
+- `normal-1774194895`: duration=0.1s, tokens=0, model=zai-coding/glm-5 — telemetry corruption or ghost completion
+- Pattern consistent with HOLLOW_SUCCESS seen in other agents this cycle
+
+### False Positive Rate
+- 5 triage tasks dispatched, 2 found real issues (dispatch mismatch, circular escalation loop)
+- 3 found nothing actionable = 60% false positive
+- Cumulative wasted investigation time: ~463 seconds in last window alone
+
+---
+
+## Findings
+
+### Red Flags Confirmed
+
+1. **TRIAGE_MONOPOLY** — Role capture. Analyst identity replaced by watchdog assistant role. This is a SELF_ROUTE adjacent pattern where the system routes jochi everything the watchdog generates rather than actual analyst tasks.
+
+2. **DEBUGGING_LOOP** — 2 `/systematic-debugging` invocations in 24h. Without further data, classified as potential loop. R-JOCHI-07 guards against confirmed re-entry.
+
+3. **HOLLOW_SUCCESS** — 6/10 score on evaluated task. `normal-1774194895` shows telemetry signature of ghost completion (0s duration, 0 tokens, model mismatch). Output authenticity unverifiable.
+
+4. **CIRCULAR_ESCALATION** — kublai→jochi→investigate kublai pattern confirmed twice. An agent cannot reliably investigate its own dispatcher. This produces no actionable findings and validates the escalation that triggered it.
+
+5. **FALSE_POSITIVE_WATCHDOG** — 60% false positive rate. Root cause: watchdog fires on task age thresholds without checking for recent completion signals. Jochi inherits this miscalibration as wasted work.
+
+### No Red Flags From
+- DEAD_SKILL: Skills are being invoked (2x systematic-debugging)
+- RULE_BREAKER: No J004 violations detected in this window (only 1 task evaluated)
+- RETRY_MAGNET: No retry storms; single task per dispatch
+
+---
+
+## Resolution
+
+### Immediate Actions (This Cycle)
+
+1. **R-JOCHI-04 implementation** — Fast-path check before any stall triage. Check `.done.md` + completion timestamp <10min. This single rule would have resolved 3 of 5 false positives.
+   - Proposal route: → Temujin (modify `scripts/agent-task-handler.py` stall dispatch logic)
+
+2. **R-JOCHI-06 escalation** — Circular escalation guard. Kublai must not dispatch jochi to investigate kublai queue. Route those cases to ogedei.
+   - Proposal route: → Kublai (routing rule update in AGENTS.md)
+
+3. **Watchdog timing recalibration** — Current threshold appears to fire before completion propagation completes. Suggest adding 5-minute grace period after task completion before stall alert fires.
+   - Proposal route: → Ogedei (modify watchdog parameters in task-watcher-state.json)
+
+### Skill Improvement Proposals
+
+**Priority 1:** Modify `/systematic-debugging` to add stall-triage fast-path as step 0.
+**Priority 2:** Create dedicated `/stall-triage` skill with:
+- Step 0: R-JOCHI-04 fast-path check
+- Step 1: Circular escalation guard (R-JOCHI-06)
+- Step 2: Confidence scoring on findings (reduces false positive acceptance)
+- Step 3: False positive streak counter integration
+
+### Rules Written to Memory
+- R-JOCHI-04: Stall triage fast-path (reconfirmed, not yet implemented)
+- R-JOCHI-05: False positive saturation guard (new)
+- R-JOCHI-06: Circular escalation guard (new)
+- R-JOCHI-07: Systematic debugging loop guard (new)
+
+---
+
+## Status
+
+**NEEDS_ATTENTION**
+
+Primary concern: Role capture. Jochi is operating as a watchdog extension with 60% false positive rate rather than as an analyst. Until watchdog timing is recalibrated and R-JOCHI-04 is implemented, analyst effectiveness is structurally limited by the dispatch system rather than jochi's own capabilities.
+
+Secondary concern: 6/10 score. Below threshold. Correlates with HOLLOW_SUCCESS telemetry on same task (0 tokens). May reflect infrastructure issue rather than output quality failure, but cannot be verified without intact telemetry.
+
+---
+
+*Generated by jochi self-reflection — 2026-03-22T22:00 UTC*

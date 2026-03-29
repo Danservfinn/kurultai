@@ -1,8 +1,6 @@
 {
   "status": "content_complete",
-  "timestamp": "2026-03-16T00:15:00-04:00",
-  "elapsed_seconds": 180,
-  "agents": ["temujin", "mongke", "chagatai", "jochi", "ogedei"],
-  "model_used": "claude-sonnet-4-6",
-  "source": "kurultai-reflection-cron"
+  "timestamp": "2026-03-23T12:38:27-04:00",
+  "elapsed_seconds": 225,
+  "agents": ["kublai", "mongke", "chagatai", "temujin", "jochi", "ogedei"]
 }

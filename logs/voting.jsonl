@@ -1083,3 +1083,16 @@
 {"timestamp": "2026-03-15T11:27:44.712010", "event_type": "proposal_status_changed", "proposal_id": "ae3b94599cb3", "new_status": "expired", "actor": "system"}
 {"timestamp": "2026-03-15T11:27:44.734479", "event_type": "proposal_status_changed", "proposal_id": "6337ff0d17ef", "new_status": "expired", "actor": "system"}
 {"timestamp": "2026-03-15T11:27:44.741557", "event_type": "proposal_status_changed", "proposal_id": "ca80e1f69a37", "new_status": "expired", "actor": "system"}
+{"timestamp": "2026-03-23T00:29:30.669847", "event_type": "proposal_created", "proposal_id": "636f3769-cb0", "title": "[TEST] T2 approval validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:31.480959", "event_type": "proposal_created", "proposal_id": "0eb9b6c6-77d", "title": "[TEST] T3 approval validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:31.576329", "event_type": "proposal_created", "proposal_id": "b2ccfcd9-ab0", "title": "[TEST] Kublai veto validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:31.733491", "event_type": "proposal_created", "proposal_id": "8a531a40-b8d", "title": "[TEST] TTL validation", "proposing_agent": "mongke", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:47.597496", "event_type": "proposal_created", "proposal_id": "42486501-ae7", "title": "[TEST] T2 approval validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:47.692212", "event_type": "proposal_created", "proposal_id": "94a6aa10-f9a", "title": "[TEST] T3 approval validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:47.818289", "event_type": "proposal_created", "proposal_id": "c72a6d2d-d9d", "title": "[TEST] Kublai veto validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:47.979759", "event_type": "proposal_created", "proposal_id": "30521823-32f", "title": "[TEST] TTL validation", "proposing_agent": "mongke", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T00:29:52.749322", "event_type": "proposal_created", "proposal_id": "f36f8c80-872", "title": "[TEST] Kublai veto validation", "proposing_agent": "temujin", "priority": "normal", "category": "feature"}
+{"timestamp": "2026-03-23T15:14:03-04:00", "event_type": "temujin_voting_session", "agent": "temujin", "proposals_voted": 15, "votes": {"approved": 15, "rejected": 0}}
+{"timestamp": "2026-03-23T20:30:44.222140", "event_type": "structured_vote_cast", "pipeline_id": "reflection-2026-03-23", "voter": "temujin", "proposal_count": 6, "mode": "heuristic", "elapsed_s": 0.847423}
+{"timestamp": "2026-03-23T20:40:06.890581", "event_type": "structured_vote_cast", "agent": "ogedei", "pipeline_id": "reflection-2026-03-24", "proposals_evaluated": 6, "approve_count": 3, "reject_count": 3, "dry_run": false}
+{"timestamp": "2026-03-23T20:42:11.817776", "event_type": "structured_vote_cast", "pipeline_id": "reflection-2026-03-23", "voter": "chagatai", "proposal_count": 6, "mode": "sequential", "elapsed_s": 197.051296}

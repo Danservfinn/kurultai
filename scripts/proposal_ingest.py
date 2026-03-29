@@ -131,10 +131,14 @@ def check_existing_in_neo4j(proposal_id: str) -> bool:
         return record and record["cnt"] > 0
 
 
+TIER_TTL_HOURS = {"T0": 1, "T1": 1, "T2": 5, "T3": 14}
+
 def ingest_proposal(data: dict) -> bool:
     """Create a Proposal node in Neo4j from parsed data."""
     now = datetime.now()
-    expires_at = now + timedelta(hours=24)
+    tier = data.get("tier", "T2")
+    ttl_hours = TIER_TTL_HOURS.get(tier, 24)
+    expires_at = now + timedelta(hours=ttl_hours)
 
     # Determine status based on implementation state
     status = "pending"
@@ -168,6 +172,8 @@ def ingest_proposal(data: dict) -> bool:
                 vote_abstain_count: 0,
                 vote_total: 0,
                 vote_unanimous: false,
+                vote_threshold_met: false,
+                tier: $tier,
                 ingested_from: $filename,
                 ingested_at: datetime()
             })
@@ -182,29 +188,32 @@ def ingest_proposal(data: dict) -> bool:
             status=status,
             category=data["category"] or "feature",
             domain=data["domain"] or "general",
-            filename=data["filename"]
+            filename=data["filename"],
+            tier=tier
         )
 
-        # Auto-cast YES vote from proposer
-        session.run("""
-            MATCH (p:Proposal {proposal_id: $proposal_id})
-            MATCH (a:Agent {name: $agent})
-            CREATE (a)-[:VOTED_ON {at: datetime()}]->(v:Vote {
-                vote_id: $vote_id,
-                proposal_id: $proposal_id,
-                agent: $agent,
-                decision: 'yes',
-                reasoning: 'Proposed by me',
-                voted_at: datetime(),
-                updated_at: datetime()
-            })
-            CREATE (v)-[:FOR_PROPOSAL]->(p)
-            SET p.vote_yes_count = 1, p.vote_total = 1
-        """,
-            proposal_id=data["proposal_id"],
-            agent=data["agent"],
-            vote_id=hashlib.sha256(f"vote-{data['proposal_id']}-{data['agent']}".encode()).hexdigest()[:12]
-        )
+        # Auto-cast YES vote from proposer (T0/T1 only).
+        # T2/T3 proposers are excluded from voting on their own proposals.
+        if tier in ("T0", "T1"):
+            session.run("""
+                MATCH (p:Proposal {proposal_id: $proposal_id})
+                MATCH (a:Agent {name: $agent})
+                CREATE (a)-[:VOTED_ON {at: datetime()}]->(v:Vote {
+                    vote_id: $vote_id,
+                    proposal_id: $proposal_id,
+                    agent: $agent,
+                    decision: 'yes',
+                    reasoning: 'Proposed by me',
+                    voted_at: datetime(),
+                    updated_at: datetime()
+                })
+                CREATE (v)-[:FOR_PROPOSAL]->(p)
+                SET p.vote_yes_count = 1, p.vote_total = 1
+            """,
+                proposal_id=data["proposal_id"],
+                agent=data["agent"],
+                vote_id=hashlib.sha256(f"vote-{data['proposal_id']}-{data['agent']}".encode()).hexdigest()[:12]
+            )
 
     return True
 

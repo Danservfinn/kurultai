@@ -525,6 +525,14 @@ def main():
 
     args = parser.parse_args()
 
+    # Read pipeline context injected by task_executor (review outputs from Phase 2)
+    pipeline_context = os.environ.get("PIPELINE_CONTEXT", "")
+    if pipeline_context:
+        import logging as _logging
+        _logging.getLogger(__name__).info(
+            f"Received {len(pipeline_context)} chars of pipeline context"
+        )
+
     if args.sample:
         # Generate sample proposals
         proposals = create_sample_proposals(args.agent)

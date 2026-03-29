@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_v2_core import TaskStore
 from neo4j_v2_failure import classify_failure, classify_validation_failure
 from neo4j_v2_validator import validate_completion
+from delivery_classifier import classify_delivery_task
 from neo4j_v2_scorer import score_completed_task, score_failed_task
 from neo4j_v2_wal import WAL
 from notification_queue import NotificationQueue
@@ -68,7 +69,7 @@ NOTIFY_INTERVAL = 15
 HEALTH_INTERVAL = 30
 ORPHAN_INTERVAL = 150
 
-# Stall detection (ported from v2-executor)
+# Stall detection (ported from legacy v2-executor, now task_executor.py)
 STALL_SILENCE_THRESHOLD = 900
 STALL_MIN_ELAPSED = 900
 SLOW_SKILL_STALL_SILENCE = 1200
@@ -187,7 +188,7 @@ class OgedeiDispatcher:
         self._dispatch_count = 0
 
     # ------------------------------------------------------------------
-    # Environment + Prompt (ported from v2-executor)
+    # Environment + Prompt (ported from legacy v2-executor, now task_executor.py)
     # ------------------------------------------------------------------
 
     def _build_env(self, agent_name: str) -> dict:
@@ -287,11 +288,11 @@ class OgedeiDispatcher:
         is_proxy = any(ep in base_url for ep in PROXY_ENDPOINTS)
 
         # OAuth agents don't need key check
-        if not is_proxy and not env.get('ANTHROPIC_API_KEY'):
+        if not is_proxy and not env.get('ANTHROPIC_API_KEY') and not env.get('ANTHROPIC_AUTH_TOKEN'):
             # OAuth — assumed good
             return True
 
-        if is_proxy and not env.get('ANTHROPIC_API_KEY'):
+        if is_proxy and not env.get('ANTHROPIC_API_KEY') and not env.get('ANTHROPIC_AUTH_TOKEN'):
             logger.warning(f"Auth preflight: {agent_name} proxy has no API key")
             return False
 
@@ -518,7 +519,7 @@ class OgedeiDispatcher:
                     "duration_s": time.time() - start,
                 }
 
-            # Stall detection (ported from v2-executor lines 410-449)
+            # Stall detection (ported from legacy v2-executor, now task_executor.py)
             silence = time.time() - last_output_time
             if elapsed >= stall_elapsed and silence >= stall_silence:
                 # Check session JSONL mtime before killing
@@ -568,7 +569,11 @@ class OgedeiDispatcher:
                                          agent, duration_s):
         """Handle completion when agent didn't use dispatch protocol."""
         task_id = task['task_id']
-        valid, parsed = validate_completion(result['content'])
+        _delivery_spec = classify_delivery_task(task)
+        valid, parsed = validate_completion(
+            result['content'],
+            require_delivery_section=bool(_delivery_spec),
+        )
 
         if valid:
             ok, reason = self.store.complete_task(
@@ -593,6 +598,17 @@ class OgedeiDispatcher:
                     agent, task_id, result['content'], task, duration_s
                 )
                 self._queue_notification(task, agent, duration_s, result_file)
+
+                # Register result_file path in Neo4j
+                if result_file:
+                    try:
+                        with self.store.driver.session() as neo4j_session:
+                            neo4j_session.run(
+                                "MATCH (t:Task {task_id: $id}) SET t.result_file = $path",
+                                id=task_id, path=result_file
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed to register result_file for {task_id}: {e}")
             else:
                 logger.error(f"Complete CAS failed for {task_id}: {reason}")
         else:
@@ -692,7 +708,11 @@ class OgedeiDispatcher:
                 )
                 continue
 
-            valid, parsed = validate_completion(output)
+            _delivery_spec = classify_delivery_task(task)
+            valid, parsed = validate_completion(
+                output,
+                require_delivery_section=bool(_delivery_spec),
+            )
 
             if valid:
                 ok, reason = self.store.complete_task(

@@ -28,11 +28,11 @@ DOMAIN_AGENT_COMPATIBILITY = {
     "implementation": ["temujin", "ogedei", "jochi"],
     "ops": ["ogedei", "temujin", "jochi"],
     "documentation": ["chagatai", "mongke"],
-    "strategy": ["temujin", "kublai", "ogedei", "chagatai"],  # chagatai for strategic documentation/proposals
-    "analysis": ["jochi", "mongke", "kublai"],
+    "strategy": ["temujin", "ogedei", "chagatai"],  # chagatai for strategic documentation/proposals
+    "analysis": ["jochi", "mongke", "ogedei"],
     "autoresearch": ["mongke", "jochi", "chagatai"],
-    "completion": ["kublai", "jochi", "ogedei", "temujin"],
-    "escalation": ["ogedei", "kublai", "jochi"],  # ogedei handles escalation (ops domain), kublai coordinates, jochi backup
+    "completion": ["jochi", "ogedei", "temujin"],
+    "escalation": ["ogedei", "jochi", "temujin"],  # ogedei handles escalation (ops domain)
 }
 
 # Valid task domains - derived from DOMAIN_AGENT_COMPATIBILITY keys for single source of truth
@@ -59,6 +59,9 @@ SKILL_DOMAIN_MAP = {
     "/content-research-writer": "documentation",
     # Autoresearch skills
     "/autoresearch": "autoresearch",
+    # Parse project context skills
+    "/parsethe-media": "implementation",
+    "/parse-for-agents": "implementation",
 }
 
 # Domain classification by keyword matching (fallback when no skill hint)

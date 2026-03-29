@@ -27,7 +27,9 @@ import os
 
 # Neo4j credentials
 NEO4J_USER = "neo4j"
-NEO4J_PASS = os.environ.get("NEO4J_PASSWORD", "myStrongPassword123")
+NEO4J_PASS = os.environ.get("NEO4J_PASSWORD")
+if not NEO4J_PASS:
+    raise EnvironmentError("NEO4J_PASSWORD environment variable not set")
 NEO4J_ADDR = "bolt://localhost:7687"
 
 def run_cypher(query):

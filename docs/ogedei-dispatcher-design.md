@@ -1,5 +1,7 @@
 # Ogedei Persistent Dispatcher — Design Document
 
+> **NOTE (2026-03-23):** This design document is historical. The v2-executor referenced throughout was replaced by the unified `task_executor.py` daemon. See `architecture.md` for current state.
+
 **Version:** 1.0
 **Date:** 2026-03-20
 **Author:** Kublai (system architect)

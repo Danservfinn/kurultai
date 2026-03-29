@@ -217,6 +217,18 @@ The Kurultai consists of 7 agents, each with a distinct role, executor, and doma
 
 All agents enforce R008: When a task frontmatter includes `skill_hint:`, the agent MUST invoke that skill as its first action before reading the task body. Violations are logged, and 3+ violations trigger manual review.
 
+### Task Execution
+
+All agents are executed by the unified task executor (`task_executor.py`, see [task-executor.md](task-executor.md)):
+- **Launchd**: `com.kurultai.task-executor`
+- **Concurrency**: 1 (reduced from 3 to prevent OOM on 16GB machine)
+- **Verify gate**: `verify_result()` is the sole path to COMPLETED status
+- **Session cleanup**: `SessionManager` handles bloat and model drift in a single pass
+- **Stall detection**: PID-scoped, confirmed via lsof before terminating
+- **Observability**: Event nodes in Neo4j + JSONL ledger (dual-write)
+
+The executor replaced `task-watcher.py` (3,724 lines) and `agent-task-handler.py` (4,349 lines), which are archived in `agents/main/scripts/_archived/`.
+
 ### Completion Gate
 
 All agents are subject to a completion gate:
@@ -244,6 +256,31 @@ skill_hint: <optional>
 
 <Full context and description>
 ```
+
+### ASMR Memory Extraction
+
+The ASMR (Adaptive Structured Memory Representation) pipeline runs as a cron job every 15 minutes and extracts structured knowledge from messages into Neo4j:
+
+| Component | Script | Purpose |
+|-----------|--------|---------|
+| Extractor | `asmr_extractor.py` | 6-vector extraction (PersonalFact, Preference, CalendarEvent, TemporalSeq, updates, assistant_instructions) |
+| Validator | `asmr_schema_validator.py` | Closed-enum validation before Neo4j MERGE |
+| Supersede detector | `supersede_detector.py` | Detects corrections, creates `[:SUPERSEDES]` audit chains |
+
+- **Cron**: `asmr_extractor.py --limit 20` every 900s (15 minutes)
+- **LLM**: OpenRouter (Qwen 2.5 72B) at temperature=0, with Ollama local fallback
+- **Status flow**: Message `extractionStatus`: `EXTRACTED` -> `ASMR_EXTRACTED` (or `ASMR_FAILED`)
+
+### Context Profile Builder
+
+The context profile builder (`context_profile.py`) generates structured context for agent responses:
+
+- **Toggle**: `~/.openclaw/context_profile_v2.enabled` flag file or `CONTEXT_PROFILE_V2=true` env var
+- **Integrated into**: `conversational_responder.py`
+- **Sections**: S1 (Identity), S3 (Topics), S4 (Social), S5 (Changes), S6 (Schedule), S7 (Thread), S8 (Memory via `parallel_memory_search`), S9 (Group Context), plus Instructions
+- **Cache**: Per-section TTLs (S1: 1h, S3: 30m, S5: 15m, S6: 5m, S7/S8/S9: always fresh)
+- **Message classification**: Multi-label (greeting, question, scheduling, correction, followup, task_request)
+- **Correction handling**: Cache invalidation on correction detection
 
 ### Directory Structure (Per Agent)
 

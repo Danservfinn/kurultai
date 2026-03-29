@@ -35,7 +35,7 @@ from json_state import locked_json_update
 FAILURE_PATTERNS_FILE = LOGS_DIR / "failure-patterns.jsonl"
 REVIEW_STATE_FILE = LOGS_DIR / "failed-task-review-state.json"
 SEND_SIGNAL_SCRIPT = Path.home() / ".claude" / "skills" / "agent-collaboration" / "scripts" / "send_signal.sh"
-WATCHER_STATE = LOGS_DIR / "task-watcher-state.json"
+# WATCHER_STATE removed 2026-03-22: task-watcher.py archived, state file no longer exists
 
 # Only look at failures from the last 24 hours
 MAX_AGE_HOURS = 24
@@ -413,13 +413,7 @@ def restart_task(agent, task_path, refined_instructions=None):
     except OSError as e:
         return False, f"Failed to requeue: {e}"
 
-    # Clear from watcher state
-    key = f"{agent}/{original_name}"
-    try:
-        with locked_json_update(str(WATCHER_STATE)) as state:
-            state.pop(key, None)
-    except Exception:
-        pass
+    # Watcher state clearing removed 2026-03-22: task-watcher.py archived
 
     return True, f"Requeued as {original_name}"
 

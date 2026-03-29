@@ -34,7 +34,7 @@ GRACE_BY_PRIORITY = {
     "critical": 2, "high": 3, "normal": 10, "low": 10,
 }
 PROMOTE_HOLD_MINUTES = 5       # How long ORPHANED tasks wait before PENDING
-HEARTBEAT_FILE = LOGS_DIR / "v2-executor-heartbeat.json"
+HEARTBEAT_FILE = LOGS_DIR / "task-executor-heartbeat.json"
 HEARTBEAT_STALE_SECONDS = 600  # 10 min — executor heartbeat considered stale
 STATE_FILE = LOGS_DIR / "task-reaper-state.json"
 ALERT_COOLDOWN_SECONDS = 900   # 15 min between same-class alerts
@@ -42,7 +42,7 @@ ALERT_COOLDOWN_SECONDS = 900   # 15 min between same-class alerts
 SIGNAL_TARGET = "+19194133445"
 SEND_SIGNAL_SCRIPT = Path.home() / ".claude" / "skills" / "agent-collaboration" / "scripts" / "send_signal.sh"
 
-EXECUTOR_PLIST_LABEL = "com.kurultai.v2-executor"
+EXECUTOR_PLIST_LABEL = "com.kurultai.task-executor"  # Updated 2026-03-22: unified executor
 
 logger = logging.getLogger("task-reaper")
 
@@ -168,7 +168,7 @@ def check_executor(state: dict) -> bool:
     # Heartbeat is stale — check if process is actually running
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "neo4j_v2_executor"],
+            ["pgrep", "-f", "task_executor"],  # Updated 2026-03-22: unified executor
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
@@ -195,7 +195,7 @@ def check_executor(state: dict) -> bool:
 
     if _should_alert(state, "executor_down"):
         _send_signal(
-            f"[REAPER] v2-executor is DOWN. Heartbeat stale >{HEARTBEAT_STALE_SECONDS}s, "
+            f"[REAPER] task-executor is DOWN. Heartbeat stale >{HEARTBEAT_STALE_SECONDS}s, "
             f"no process found. Attempted launchctl restart."
         )
         _record_alert(state, "executor_down")

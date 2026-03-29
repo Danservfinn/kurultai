@@ -27,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from kurultai_paths import AGENTS_DIR
+from gate_utils import validate_task_id, sanitize_task_id_for_glob
 
 # Resolution section patterns (matches quality_gate.py)
 RESOLUTION_PATTERNS = [
@@ -123,9 +124,20 @@ def find_incomplete_tasks(agent: str) -> list[dict]:
         if "fix-resolution" in file_path.name:
             continue
 
-        # Check for incomplete patterns
+        # FIX 2026-03-23: Skip .no_output tasks — these represent zero-execution
+        # failures (R008_VIOLATION, credential failures, session startup stalls).
+        # Adding a fix-resolution task to a zero-execution task fabricates evidence
+        # of completion that never occurred; these tasks need re-dispatch, not docs.
+        # Root cause of the 1773979337 cascade: .no_output files were treated the
+        # same as .done files, causing fabricated "resolution" sections to be accepted
+        # by the quality gate with no actual investigation performed.
+        if ".no_output" in file_path.name:
+            continue
+
+        # Check for incomplete patterns (excluding .no_output — handled above)
         is_incomplete_type = any(
             file_path.name.endswith(pattern) for pattern in INCOMPLETE_PATTERNS
+            if pattern != ".no_output"
         )
 
         # Also check .done.md files for missing resolutions
@@ -139,6 +151,16 @@ def find_incomplete_tasks(agent: str) -> list[dict]:
 
             if not has_resolution_section(content):
                 metadata = extract_task_metadata(file_path)
+
+                # FIX 2026-03-23: Skip tasks that explicitly opt out of the completion gate.
+                # Tasks with completion_gate_optout: true (e.g., triage/coordination tasks
+                # created by kublai-actions.py) should never trigger fix-up tasks — they
+                # opted out precisely because they produce coordination artifacts, not code.
+                # Without this check, the optout flag is written but never respected here,
+                # causing the same cascade it was meant to prevent.
+                optout = metadata.get("completion_gate_optout", "").strip().lower()
+                if optout in ("true", "1", "yes"):
+                    continue
 
                 incomplete.append({
                     "path": str(file_path),
@@ -168,8 +190,13 @@ def create_fixup_task(incomplete_task: dict, dry_run: bool = False) -> str | Non
     task_id = incomplete_task["task_id"]
 
     # CASCADE BREAKER: Check how many fix-resolution tasks already exist for this parent
+    # FIX 2026-03-23: Sanitize task_id before using in glob pattern. Unsanitized IDs
+    # containing glob metacharacters (*, ?, [, ]) caused the cascade breaker to fail
+    # silently — confirmed root cause of 16-task cascade for a single parent task.
+    # sanitize_task_id_for_glob() strips *, ?, [, ] before the glob call.
     agent_tasks_dir = AGENTS_DIR / agent / "tasks"
-    existing_fixes = list(agent_tasks_dir.glob(f"*fix-resolution-*{task_id}*"))
+    safe_task_id_for_glob = sanitize_task_id_for_glob(task_id)
+    existing_fixes = list(agent_tasks_dir.glob(f"*fix-resolution-*{safe_task_id_for_glob}*"))
     if len(existing_fixes) >= 2:
         print(f"  SKIP: {task_id} already has {len(existing_fixes)} fix-resolution tasks (max 2)")
         return None

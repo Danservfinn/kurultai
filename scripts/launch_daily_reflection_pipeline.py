@@ -22,6 +22,7 @@ Usage:
     python3 launch_daily_reflection_pipeline.py --cleanup <pid>   # Remove all tasks for a pipeline
     python3 launch_daily_reflection_pipeline.py --shadow          # Shadow mode (non-claimable tasks)
     python3 launch_daily_reflection_pipeline.py --force           # Override dedup guard
+    python3 launch_daily_reflection_pipeline.py --launch          # Manual launch from UI (alias for --force)
 """
 
 import os
@@ -90,7 +91,7 @@ def launch_pipeline(store: TaskStore, dry_run: bool = False,
                 source=source,
                 pipeline_id=pid,
                 phase=1,
-                timeout_s=120,
+                timeout_s=240,  # Increased from 120s to 240s - ogedei reflection tasks take 121-205s (avg 153s)
                 max_retries=1,
             )
         reflect_ids.append(tid)
@@ -103,9 +104,9 @@ def launch_pipeline(store: TaskStore, dry_run: bool = False,
         if not dry_run:
             store.create_task(
                 task_id=tid,
-                title=f"Performance review: {agent}",
+                title=f"Self-review: {agent}",
                 prompt=f"python3 review-with-fallback.py --agent {agent} --timeout 300",
-                assigned_to=agent_name("kublai"),
+                assigned_to=agent_name(agent),
                 priority="high",
                 domain="review",
                 source=source,
@@ -118,105 +119,47 @@ def launch_pipeline(store: TaskStore, dry_run: bool = False,
         review_ids.append(tid)
     task_ids["review"] = review_ids
 
-    # Phase 2.5: Post-review — 2 tasks, BLOCKED on all 6 reviews
-    post_review_ids = []
-    for name, cmd, timeout in [
-        ("anomaly-scan", "python3 reflection_anomaly_scanner.py", 60),
-        ("rule-compliance", "python3 parse_rule_compliance.py", 30),
-    ]:
-        tid = f"{pid}-{name}"
+    # Phase 3: Proposals — 6 tasks, BLOCKED on all reviews
+    propose_ids = []
+    for agent in AGENTS:
+        tid = f"{pid}-propose-{agent}"
         if not dry_run:
             store.create_task(
                 task_id=tid,
-                title=f"Post-review: {name}",
-                prompt=cmd,
-                assigned_to=agent_name("kublai"),
-                priority="normal",
-                domain="analysis",
+                title=f"Write proposal: {agent}",
+                prompt=f"python3 proposal_generator.py --agent {agent} --pipeline {pid}",
+                assigned_to=agent_name(agent),
+                priority="high",
+                domain="proposal",
                 source=source,
                 depends_on=review_ids,
                 pipeline_id=pid,
-                phase=2.5,
-                timeout_s=timeout,
-                max_retries=1,
-            )
-        post_review_ids.append(tid)
-    task_ids["post_review"] = post_review_ids
-
-    # Phase 3 Tier 1: Downstream scoring — 6 parallel tasks, BLOCKED on post-review
-    tier1_scripts = [
-        ("memory-audit", "python3 memory_audit.py --fix", 30),
-        ("cross-agent-rules", "python3 cross_agent_rules.py", 30),
-        ("route-quality", "python3 route_quality_tracker.py", 30),
-        ("routing-audit", "python3 routing_audit_action.py", 30),
-        ("neo4j-scorer", "python3 neo4j_v2_scorer.py --update-all", 30),
-        ("action-scorer", "python3 action_scorer.py", 30),
-    ]
-    tier1_ids = []
-    for name, cmd, timeout in tier1_scripts:
-        tid = f"{pid}-{name}"
-        if not dry_run:
-            store.create_task(
-                task_id=tid,
-                title=f"Downstream: {name}",
-                prompt=cmd,
-                assigned_to=agent_name("kublai"),
-                priority="normal",
-                domain="scoring",
-                source=source,
-                depends_on=post_review_ids,
-                pipeline_id=pid,
                 phase=3,
-                timeout_s=timeout,
+                timeout_s=300,
                 max_retries=1,
             )
-        tier1_ids.append(tid)
-    task_ids["tier1"] = tier1_ids
+        propose_ids.append(tid)
+    task_ids["propose"] = propose_ids
 
-    # Phase 3 Tier 2: Skill stats — BLOCKED on all Tier 1
-    tier2_tid = f"{pid}-skill-stats"
+    # Phase 3.5: Voting launcher sentinel — runs AFTER all proposals complete
+    # Deferred: creates voting tasks only after proposals are verified (quality-gated)
+    sentinel_tid = f"{pid}-launch-voting"
     if not dry_run:
         store.create_task(
-            task_id=tier2_tid,
-            title="Downstream: update-skill-stats",
-            prompt="python3 update_skill_stats.py",
-            assigned_to=agent_name("kublai"),
-            priority="normal",
-            domain="scoring",
+            task_id=sentinel_tid,
+            title="Launch voting phase (deferred)",
+            prompt=f"python3 launch_voting_phase.py --pipeline {pid}",
+            assigned_to=agent_name("ogedei"),
+            priority="high",
+            domain="pipeline-control",
             source=source,
-            depends_on=tier1_ids,
+            depends_on=propose_ids,   # BLOCKED until all 6 proposals complete
             pipeline_id=pid,
             phase=3.5,
-            timeout_s=30,
+            timeout_s=120,
             max_retries=1,
         )
-    task_ids["tier2"] = [tier2_tid]
-
-    # Phase 3 Tier 3: Final reports — BLOCKED on Tier 2
-    tier3_scripts = [
-        ("kublai-actions", "python3 kublai-actions.py --trigger kurultai", 60),
-        ("daily-report", "python3 generate_hourly_report.py", 60),
-    ]
-    tier3_ids = []
-    for name, cmd, timeout in tier3_scripts:
-        tid = f"{pid}-{name}"
-        if not dry_run:
-            store.create_task(
-                task_id=tid,
-                title=f"Final: {name}",
-                prompt=cmd,
-                assigned_to=agent_name("kublai"),
-                priority="normal",
-                domain="reporting",
-                source=source,
-                depends_on=[tier2_tid],
-                pipeline_id=pid,
-                phase=4,
-                timeout_s=timeout,
-                max_retries=1,
-            )
-        tier3_ids.append(tid)
-    task_ids["tier3"] = tier3_ids
+    task_ids["voting_launcher"] = [sentinel_tid]
 
     return task_ids
 
@@ -263,6 +206,8 @@ def main():
     parser.add_argument("--shadow", action="store_true",
                         help="Shadow mode: create non-claimable pipeline tasks alongside bash orchestrator")
     parser.add_argument("--force", action="store_true", help="Override dedup guard")
+    parser.add_argument("--launch", action="store_true",
+                        help="Manual launch from UI (alias for --force with clearer intent)")
     args = parser.parse_args()
 
     store = TaskStore()
@@ -281,8 +226,10 @@ def main():
             print(f"Cleaned up pipeline {args.cleanup}: {deleted} tasks deleted")
 
         else:
+            # Treat --launch the same as --force (override dedup guard)
+            force = args.force or args.launch
             result = launch_pipeline(store, dry_run=args.dry_run,
-                                     shadow=args.shadow, force=args.force)
+                                     shadow=args.shadow, force=force)
             if result.get("skipped"):
                 return
 

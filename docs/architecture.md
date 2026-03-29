@@ -1,7 +1,7 @@
 # Kurultai Architecture Documentation
 
-**Version:** 2.6
-**Date:** 2026-03-20
+**Version:** 2.7
+**Date:** 2026-03-23
 **Author:** Chagatai (Kurultai Content Specialist), updated by Kublai (swarm audit)
 **Status:** Production Documentation
 
@@ -667,35 +667,40 @@ Record in logs/task-watcher-state.json
 
 ## Heartbeat System (Cron)
 
-The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monitoring loops that ensure system health, agent productivity, and continuous self-improvement:
+> **Updated 2026-03-23** — Cron consolidation. Tock and hourly reflection tiers removed. Task lifecycle simplified to single-writer components.
+
+The Kurultai operates on a **consolidated heartbeat pipeline** centered on Tier 1 (Tick) for infrastructure monitoring, with task execution and orphan recovery handled by dedicated single-writer components:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    HEARTBEAT PIPELINE                                │
+│                    HEARTBEAT PIPELINE (Post-Consolidation)           │
 │                                                                     │
-│   TICK (5 min)           TOCK (30 min)        KURULTAI (60 min)     │
-│   watchdog-gather.sh     tock-gather.sh       hourly_reflection.sh  │
+│   TICK (5 min)              TASK LIFECYCLE            DAILY REVIEW  │
+│   watchdog-gather.sh        task-executor.py          daily-task-   │
+│                             task-reaper.py            review (7 AM) │
+│                             ogedei-watchdog.py                      │
+│   ┌──────────┐              ┌──────────────┐          ┌──────────┐  │
+│   │ Gateway  │              │ task-executor │          │ Quality  │  │
+│   │ health   │              │ (sole         │          │ review   │  │
+│   │ Errors   │              │  dispatcher)  │          │ 30%      │  │
+│   │ Services │              ├──────────────┤          │ sampling │  │
+│   │ Watchdog │              │ task-reaper   │          │ normal/  │  │
+│   │ state    │              │ (sole orphan  │          │ low pri  │  │
+│   │ reads    │              │  recovery)    │          └──────────┘  │
+│   └──────────┘              ├──────────────┤                        │
+│        │                    │ ogedei-       │                        │
+│        ▼                    │ watchdog      │                        │
+│  tick-summary.txt           │ (detect/alert │                        │
+│  ticks.jsonl                │  only, no     │                        │
+│  watchdog.log               │  recovery)    │                        │
+│                             └──────────────┘                        │
 │                                                                     │
-│   ┌──────────┐          ┌──────────┐          ┌──────────────┐      │
-│   │ Gateway  │          │ Neo4j    │          │ meta_         │      │
-│   │ health   │────┐     │ tasks    │────┐     │ reflection.py │      │
-│   │ Errors   │    │     │ Cron     │    │     │ Per-agent     │      │
-│   │ Services │    │     │ Queues   │    │     │ brainstorm    │      │
-│   │ LLM      │    │     │ Sessions │    │     │ routing audit │      │
-│   │ triage   │    │     │ LLM      │    │     │ kublai-init.  │      │
-│   └──────────┘    │     │ assess   │    │     └──────────────┘      │
-│        │          │     └──────────┘    │            │               │
-│        ▼          │          │          │            ▼               │
-│  tick-summary.txt │    tock/latest.json │   memory/YYYY-MM-DD.md    │
-│  ticks.jsonl      │    tock.log         │   brainstorm proposals    │
-│  watchdog.log     │                     │                           │
-│                   │                     │                           │
-│   COMPANIONS:     │    COMPANIONS:      │    COMPANIONS:            │
-│   stall_detector  │    neo4j-state-sync │    /horde-review (Haiku)  │
-│   agent-self-wake │    kublai-actions   │    memory_audit           │
-│   kublai-actions  │    (tock trigger)   │    route_quality_tracker  │
-│                   │                     │    neo4j_v2_scorer        │
-│   (tick trigger)  │                     │    kublai-initiative      │
+│   REMOVED (consolidated):                                           │
+│   ✗ Tock (com.openclaw.tock) — DISABLED/DELETED                     │
+│   ✗ hourly-reflection — DISABLED/DELETED                            │
+│   ✗ kurultai-reflect — DISABLED/DELETED                             │
+│   ✗ task-watcher.py — replaced by task-executor.py                  │
+│   ✗ ogedei-dispatcher — replaced by task-executor.py                │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -704,21 +709,20 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 | Job | Schedule | Agent | Script/Command | Purpose |
 |-----|----------|-------|----------------|---------|
 | **Tick (Watchdog)** | Every 5 min | main | `watchdog-gather.sh` | Infrastructure health, error counting |
-| **Tock (Telemetry)** | :01, :31 | main | `tock-gather.sh` | Agent metrics, queue audit |
-| **Kurultai Reflection** | Every 4 hours | main | `hourly_reflection.sh` | Self-improvement, routing audit |
-| **Task-Watcher** | Every 15 sec (launchd) | — | `task-watcher.py` | Immediate task execution |
-| **Daily Summary** | 7:00 AM ET | main | cron agentTurn | Progress report |
-| **Architecture Verify** | Daily | main | cron agentTurn | Doc accuracy check |
+| **Task Executor** | Continuous (launchd) | — | `task-executor.py` | Sole task dispatcher (replaces ogedei-dispatcher, task-watcher) |
+| **Task Reaper** | Every 5 min (launchd) | — | `task-reaper.py` | Sole orphan recovery (single-writer principle) |
+| **Ogedei Watchdog** | Every 5 min | ogedei | `ogedei-watchdog.py` | Stalled task detection and alerting (detect/alert only, no recovery) |
+| **Daily Task Review** | 7:00 AM ET | main | `daily-task-review` | Quality review with 30% sampling for normal/low priority tasks |
+| **Ledger Rotation** | 1:50 AM ET | main | `rotate-ledger` | Task ledger rotation (was 2:00 AM) |
+| **Calendar Reminders** | Every 120s | main | `calendar-reminders` | Calendar event reminders (was 60s interval) |
 | **Parse Conversion** | Hourly | main | `check-conversion-alerts.ts` | Conversion rate monitoring |
 | **Neo4j Prune** | Every 6 hours | main | cypher-shell | Telemetry cleanup |
 | **Weekly Review** | Sunday 3 AM | main | `task_intake.py` | the.kurult.ai audit |
 | **Uptime Monitor** | Every 5 min | ogedei | `kurultai-monitor.py` | Browser-based health |
 | **Memory Cleanup** | Sunday 2 AM | ogedei | `cleanup-working-memory.sh` | Old working-memory purge |
-| **Routing Metrics** | Hourly | main | `routing-metrics.sh` | Routing performance |
 | **Learning Weekly** | Sunday 2 AM ET | main | `kublai_learning_generator.py` | KublaiLearning nodes |
 | **Proposal Expiration** | Every 30 min | main | `proposal_expiration.py` | Expired proposal cleanup |
 | **Proposal Votes** | Every 30 min | main | `proposal_approval_handler.py` | Vote aggregation |
-| **System Health** | Hourly | main | `system-health-check.py` | Unified health check |
 | **X Daily Status** | 8 AM ET | ogedei | `x_poster.py post_status` | Twitter/X daily post |
 | **X Build Public** | 4 PM ET | ogedei | `x_poster.py post_build_public` | Twitter/X build update |
 | **X Weekly Review** | Friday 10 AM ET | ogedei | `x_poster.py post_weekly` | Twitter/X weekly thread |
@@ -732,6 +736,13 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 **Script:** `scripts/watchdog-gather.sh`
 **LLM:** Ollama qwen3.5:9b (local, ~150 tokens)
 **Lock:** `/tmp/watchdog-gather.lock` (directory-based, stale PID recovery)
+
+**Simplification (2026-03-23):** Removed 3 duplicate sub-scripts that duplicated ogedei-watchdog functionality:
+- `credential-health-monitor.py` — removed (redundant)
+- `completion-audit.py` — removed (redundant)
+- `subprocess-audit.py` — removed (redundant)
+
+Now reads ogedei-watchdog state files directly instead of running parallel audit scripts.
 
 **What it collects (9 sections):**
 
@@ -770,95 +781,35 @@ The Kurultai operates on a **3-tier heartbeat pipeline** — three nested monito
 | `logs/watchdog.log` | Append, one-liner | Human-readable audit trail |
 | `logs/watchdog-llm.log` | Append, one-liner | LLM triage decisions |
 
-**Companion scripts (triggered every tick):**
+### Task Lifecycle Components
 
-| Script | Purpose |
-|--------|---------|
-| `stall_detector.py` | Warns if a task has been active >60min with no workspace output |
-| `agent-self-wake.py` | Wakes idle agents that have blocked items in memory |
-| `kublai-actions.py --trigger tick` | Rule-based task creation from tick findings |
+After the 2026-03-23 consolidation, task lifecycle is governed by three single-purpose components with strict ownership boundaries:
 
-### Tier 2: Tock (Every 30 Minutes)
+| Component | Role | Ownership | Notes |
+|-----------|------|-----------|-------|
+| `task-executor.py` | Sole task dispatcher | Dispatches all tasks to agents | Replaces both `ogedei-dispatcher` and `task-watcher.py` |
+| `task-reaper.py` | Sole orphan recovery | Single-writer principle — only component that reclaims orphaned tasks | Independent launchd reaper (every 5 min) |
+| `ogedei-watchdog.py` | Detect and alert only | Monitors for stalled tasks, writes state files | No longer performs recovery — detect/alert only |
 
-**Script:** `scripts/tock-gather.sh`
-**LLM:** Ollama qwen3.5:9b (local, ~150 tokens)
-**Lock:** `/tmp/tock-gather.lock` (directory-based, stale PID recovery)
+This follows the **single-writer principle**: each concern (dispatch, recovery, detection) has exactly one owner, eliminating the race conditions and duplicate processing that occurred when multiple components competed for the same tasks.
 
-**What it collects (8 sections):**
+### Removed Components (Consolidated 2026-03-23)
 
-| Section | Data | Source |
-|---------|------|--------|
-| Agent Tasks (30m) | completed, failed, pending, running, retries per agent | Neo4j `Task` nodes |
-| Delegations | Cross-agent task routing in last 30m | Neo4j `Task.source != Task.agent` |
-| Error Clusters | Grouped failures with agent attribution | Neo4j failed `Task` nodes |
-| Session Usage | Session count, % context used, model per agent | `openclaw gateway call status` |
-| Cron Job Health | Healthy/erroring count, consecutive errors per job | `/Users/kublai/.openclaw/cron/jobs.json` |
-| Task Queue Depths | File-based pending count per agent | Filesystem glob `agents/*/tasks/*.md` |
-| Queue Audit | Fake/stale task detection (from ogedei-watchdog state) | `ogedei-watchdog-state.json` or inline `queue-audit.py` |
-| LLM Assessment | workload balance, bottleneck, coordination gaps, severity | Ollama qwen3.5:9b |
-
-**Output files:**
-
-| File | Format | Purpose |
-|------|--------|---------|
-| `logs/tock/{date}/{time}.json` | Full JSON snapshot | Archival, deep analysis |
-| `logs/tock/latest.json` | Symlink to most recent | Quick access for kurultai reflection |
-| `logs/tock.log` | Append, one-liner | Human-readable summary |
-
-**Companion scripts (triggered every tock):**
-
-| Script | Purpose |
-|--------|---------|
-| `neo4j-state-sync.py --apply` | Reconciles filesystem task state with Neo4j (safety net) |
-| `kublai-actions.py --trigger tock` | Rule-based task creation from tock findings |
-
-**Data dependency:** Tock reads the last tick status from `logs/watchdog.log` to include `tick_status` in its output. If tick data is stale (>10 min), tock reports `tick_status=unknown`.
-
-### Tier 3: Kurultai Reflection (Every 4 Hours)
-
-> **Detailed reference:** See [reflection-pipeline-reference.md](reflection-pipeline-reference.md) for complete script I/O contracts, data dependency graph, shared module docs, and troubleshooting guide.
-
-**Script:** `scripts/hourly_reflection.sh`
-**LLM:** Claude Code (Opus) per agent for reflections; Haiku for /horde-review
-**Mode:** Protocol-based (~800 tokens/agent vs ~6400 legacy)
-**Hard timeout:** 900s (15 min) — enforced by background watchdog process
-**Lock:** Checkpoint file `logs/reflection-status.json` emitted after core reflections
-
-**What it does (4 phases + tiered downstream):**
-
-| Phase | Script | Execution | Purpose |
-|-------|--------|-----------|---------|
-| 1. Protocol Reflection | `meta_reflection.py --protocol` | **Parallel** (all 6 Claude Code agents, excluding Tolui) | Per-agent WHEN/THEN behavioral rules, performance metrics, system health |
-| 2. Performance Review | `claude-agent --model haiku /horde-review` | **Parallel** (all 6 Claude Code agents, excluding Tolui, 120s timeout each) | Critical analysis of each agent's hourly performance |
-| 3. Downstream Tier 1 | `memory_audit.py`, `cross_agent_rules.py`, `route_quality_tracker.py`, `routing_audit_action.py`, `neo4j_v2_scorer.py`, `action_scorer.py` | **Parallel** (independent) | Memory hygiene, capability scoring, skill stats |
-| 3. Downstream Tier 2 | `update_skill_stats.py` | **Sequential** (depends on score-skills) | Aggregate skill statistics |
-| 3. Downstream Tier 3 | `kublai-actions.py --trigger kurultai`, `kublai-initiative.py`, `/kurultai-report`, `generate_hourly_report.py` | **Sequential** (depends on all above) | Task creation, initiative, reporting |
-
-**Brainstorming:** Decoupled to `run_brainstorm.sh` (separate cron job at :30, not part of this pipeline).
-
-**Execution model:** All 6 Claude Code agents (excluding Tolui, which runs on Ollama and does not participate in reflection) reflect **in parallel** (Phase 1), then all 6 undergo /horde-review **in parallel** (Phase 2). A checkpoint file is emitted after Phase 1 completes, decoupling content generation success from downstream failures. If the 900s hard timeout fires, the watchdog kills all remaining processes.
-
-**Output:** Reflections appended to `agents/{agent}/memory/YYYY-MM-DD.md`. Reviews written to `logs/reviews/{agent}-latest.md`. Step timing written to `logs/reflection-step-timing.json`.
-
-**Data dependency:** Reflection consumes `logs/tock/latest.json` for agent metrics and system state. If tock data is stale (>45 min), reflection proceeds with reduced context.
-
-### Data Flow Between Tiers
-
-```
-TICK (5m)                    TOCK (30m)                 KURULTAI (60m)
-────────                     ─────────                  ──────────────
-tick-summary.txt ──────────► tick_status field
-ticks.jsonl                  in tock output
-watchdog.log ──────────────► last tick line
-                             ─────────
-                             tock/latest.json ─────────► meta_reflection.py
-                             tock.log                    reads tock data
-                                                         for agent metrics
-```
+| Component | Was | Replaced By |
+|-----------|-----|-------------|
+| **com.openclaw.tock** (Tier 2) | 30-min telemetry gather | DISABLED/DELETED — metrics consolidated elsewhere |
+| **ai.kurultai.hourly-reflection** (Tier 3) | Hourly agent reflection | DISABLED/DELETED — daily-task-review handles quality review |
+| **ai.kurultai.kurultai-reflect** (Tier 3) | Hourly reflection variant | DISABLED/DELETED — consolidated into daily-task-review |
+| **task-watcher.py** | 15-sec task polling | Replaced by `task-executor.py` |
+| **ogedei-dispatcher** | Task dispatch | Replaced by `task-executor.py` |
+| **tock-gather.sh** | Tock data collection | DISABLED/DELETED |
+| **hourly_reflection.sh** | Reflection pipeline | DISABLED/DELETED |
+| **routing-metrics.sh** | Hourly routing metrics | Removed |
+| **system-health-check.py** | Hourly health check | Consolidated into tick |
 
 ### Concurrency Control
 
-Both tick and tock use **directory-based locks** with stale PID recovery:
+Tick uses **directory-based locks** with stale PID recovery:
 
 1. Attempt `mkdir /tmp/{script}.lock` (atomic on POSIX)
 2. If lock exists, check `pid` file inside — if process dead, reclaim lock
@@ -866,10 +817,6 @@ Both tick and tock use **directory-based locks** with stale PID recovery:
 4. On exit, `rmdir` the lock directory (via `trap EXIT`)
 
 This prevents duplicate execution after macOS sleep/wake catch-up, where cron may fire multiple overdue jobs simultaneously.
-
-### Reflection Execution Model
-
-All 6 Claude Code agents (excluding Tolui) reflect **every hour** in parallel. The original 6-hour rotation design was superseded in v1.6. Current `hourly_reflection.sh` launches all agents simultaneously, with a 420s hard timeout guarding the entire pipeline. Tolui does not participate in reflection as it runs on Ollama, not Claude Code.
 
 ---
 
@@ -1414,7 +1361,7 @@ API key source: ~/.openclaw/credentials/kurultai-api.key
 │   │   │   ├── neo4j_v2_seed.py      # Agent/Domain/Skill seeding
 │   │   │   ├── neo4j_v2_delegate.py  # Task delegation (SPAWNED)
 │   │   │   ├── neo4j_v2_reflection.py # Reflection context + writes
-│   │   │   ├── neo4j_v2_executor.py  # V2 task executor daemon
+│   │   │   ├── task_executor.py       # Unified task executor daemon
 │   │   │   ├── neo4j_task_tracker.py # V1 tracker (analytics, gates, rules)
 │   │   │   └── neo4j_calendar.py     # Calendar schema
 │   │   ├── memory/

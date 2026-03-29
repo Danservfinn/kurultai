@@ -3,7 +3,7 @@
 # Runs every 5 minutes to execute pending agent tasks
 #
 # Dispatch via auto_dispatch.py — scans queues, cleans stale tasks, dispatches to agents.
-# Fallback executor (heartbeat-task-executor.py) removed — superseded by task-watcher.py daemon.
+# Fallback executor (heartbeat-task-executor.py) removed — superseded by task_executor.py daemon.
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export NODE_PATH="/opt/homebrew/lib/node_modules"

@@ -202,18 +202,36 @@ def transition_phase(task_id: str, expected_epoch: int, new_phase: str,
                     ).single()
 
                     if diag is None:
+                        reason = "task_not_found"
                         print(f"CAS FAILED: task {task_id} not found", file=sys.stderr)
                     elif diag["status"] != "WORKING":
+                        reason = f"status_was_{diag['status']}"
                         print(f"CAS FAILED: status is {diag['status']}, not WORKING",
                               file=sys.stderr)
                     elif diag["epoch"] != expected_epoch:
+                        reason = f"epoch_mismatch_got_{diag['epoch']}"
                         print(f"CAS FAILED: epoch is {diag['epoch']}, expected {expected_epoch}",
                               file=sys.stderr)
                     else:
                         current = diag["phase"]
+                        reason = f"invalid_transition_from_{current}"
                         print(f"CAS FAILED: current phase '{current}' cannot transition "
                               f"to '{new_phase}'", file=sys.stderr)
+                        # Write compensating ledger event so the pre-write event
+                        # doesn't appear as a committed transition in audit replay.
+                        _emit_ledger("PHASE_CAS_FAILED", task_id, agent=agent, extra={
+                            "intended_phase": new_phase,
+                            "claim_epoch": expected_epoch,
+                            "reason": reason,
+                        })
                         return 2
+                    # Write compensating ledger event for any CAS failure
+                    # The ledger-first write already recorded an intent; this compensates it.
+                    _emit_ledger("PHASE_CAS_FAILED", task_id, agent=agent, extra={
+                        "intended_phase": new_phase,
+                        "claim_epoch": expected_epoch,
+                        "reason": reason,
+                    })
                     return 1
         finally:
             store.close()

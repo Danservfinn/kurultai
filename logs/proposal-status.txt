@@ -1,17 +1,45 @@
 
 ================================================================================
-PROPOSALS (57 total)
+PROPOSALS (10 total)
 ================================================================================
 
-⏳ ogedei-reflect-20260312-163248.md
-   Agent: ogedei | Domain: general | Age: 16h ago
-   Title: Skill Improvement Proposal: /kurultai-health (on ogedei)
+⏳ temujin-reflect-20260323-081500.md
+   Agent: temujin (detected during temujin reflect run) | Domain: general | Age: 4h ago
+   Title: Skill Improvement Proposal: kurultai-reflect Phase 6 — rules.json Sync
 
-⏳ chagatai-20260312-163500.md
-   Agent: unknown | Domain: general | Age: 16h ago
-   Title: Proposal: Fleet Failure Triage Runbook
+⏳ temujin-reflect-20260323-081010.md
+   Agent: temujin | Domain: general | Age: 4h ago
+   Title: Routing Optimization Proposal: Temujin Workload Starvation via domain_
 
-⏳ mongke-reflect-20260312-163500.md
-   Agent: mongke | Domain: general | Age: 16h ago
-   Title: Skill Improvement Proposal: /horde-learn
+⏳ ogedei-reflect-20260323-081500.md
+   Agent: ogedei | Domain: general | Age: 4h ago
+   Title: Routing Optimization Proposal: Model Drift Alert Task Deduplication + 
+
+⏳ jochi-reflect-20260323-001900.md
+   Agent: jochi | Domain: general | Age: 12h ago
+   Title: Skill Improvement Proposal: /horde-review
+
+⏳ ogedei-reflect-20260322-081500.md
+   Agent: ogedei | Domain: general | Age: 1d ago
+   Title: Skill Improvement Proposal: /kurultai-health
+
+⏳ jochi-reflect-20260322-001600.md
+   Agent: jochi | Domain: general | Age: 1d ago
+   Title: Skill Improvement Proposal: systematic-debugging
+
+⏳ temujin-reflect-20260321-041700.md
+   Agent: temujin (detecting agent) | Domain: general | Age: 2d ago
+   Title: System Issue Proposal: SKILL_OUTCOME Telemetry Gap
+
+⏳ chagatai-20260315-122446.md
+   Agent: chagatai (Writer) | Domain: state_management | Age: 8d ago
+   Title: Proposal: Add session_match gate to hourly_reflection.sh
+
+⏳ mongke-reflect-20260315-1500.md
+   Agent: mongke | Domain: general | Age: 8d ago
+   Title: Skill Improvement Proposal: mongke dispatch pipeline + model configura
+
+⏳ mongke-reflect-20260314-170000.md
+   Agent: mongke | Domain: general | Age: 8d ago
+   Title: Skill Improvement Proposal: mongke task execution pipeline
 

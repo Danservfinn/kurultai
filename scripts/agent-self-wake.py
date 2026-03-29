@@ -5,7 +5,7 @@ agent-self-wake.py -- Rule T7: Wake idle agents to work on blocked items.
 Detects agents that have been idle > IDLE_THRESHOLD_MIN with no active Claude
 session and no pending tasks, then scans their memory for blocked items,
 commitments, or rules. If found, creates a wake task in their queue so
-task-watcher.py picks it up within seconds.
+task_executor.py picks it up within seconds.
 
 Called from watchdog-gather.sh on every 5-minute tick cycle.
 
@@ -29,7 +29,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
-from kurultai_paths import AGENTS_DIR, WATCHER_STATE, LOGS_DIR
+from kurultai_paths import AGENTS_DIR, LOGS_DIR
+
+# Executor heartbeat file replaces old task-watcher-state.json
+EXECUTOR_HEARTBEAT = LOGS_DIR / "task-executor-heartbeat.json"
 
 # Configuration
 SCRIPTS_DIR = Path(__file__).parent
@@ -176,12 +179,12 @@ def agent_has_pending_tasks(agent):
 def get_last_activity_time(agent):
     """Get the last time this agent completed or started a task.
 
-    Sources: task-watcher state (completion times) and task file mtimes.
+    Sources: task-executor heartbeat (completion times) and task file mtimes.
     """
     latest = 0
 
-    # Check task-watcher state for last execution
-    watcher_state = locked_json_read(str(WATCHER_STATE), default={})
+    # Check task-executor heartbeat for last execution
+    watcher_state = locked_json_read(str(EXECUTOR_HEARTBEAT), default={})
     for key, val in watcher_state.items():
         if key.startswith(f"{agent}/"):
             try:
@@ -337,7 +340,7 @@ def create_kublai_routing_audit(stalled_agents):
     This implements the PRIORITY_FIX from /horde-review: kublai should proactively
     check for routing issues even when queue=0.
     """
-    tasks_dir = AGENTS_DIR / KUBLAI / "tasks"
+    tasks_dir = AGENTS_DIR / "ogedei" / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
     ts = int(time.time())
@@ -378,10 +381,10 @@ Do NOT just describe what should be done. Actually investigate and fix.
 
     task_path.write_text(content)
 
-    if create_neo4j_task(task_id, KUBLAI, "Routing Audit — Investigate Stalled Agents", content, "normal", "kublai-routing-wake"):
-        log(f"Created kublai routing audit task in Neo4j+filesystem: {filename}")
+    if create_neo4j_task(task_id, "ogedei", "Routing Audit — Investigate Stalled Agents", content, "normal", "routing-wake"):
+        log(f"Created ogedei routing audit task in Neo4j+filesystem: {filename}")
     else:
-        log(f"Created kublai routing audit task (filesystem-only): {filename}", "WARN")
+        log(f"Created ogedei routing audit task (filesystem-only): {filename}", "WARN")
 
     return str(task_path)
 

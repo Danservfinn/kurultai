@@ -114,18 +114,32 @@ CATEGORY_KEYWORDS = {
 _NO_OVERFLOW_TARGETS = {"kublai", "tolui"}
 
 # Skill capable alternates for overflow (used by find_skill_capable_alternates)
+# Updated 2026-03-23: Expanded alternates for better load distribution
+# See: routing-audit-response-guide.md, workspace/routing-audit-fix-20260323.md
 _SKILL_CAPABLE_ALTERNATES = {
-    "/horde-brainstorming": ["mongke", "jochi", "chagatai"],
-    "/horde-implement": ["ogedei"],
-    "/horde-debug": ["jochi", "ogedei"],
-    "/horde-review": ["jochi"],
-    "/horde-plan": ["mongke", "chagatai"],
-    "/kurultai-health": ["temujin"],
-    "/code-reviewer": ["temujin"],
-    "/generate-tests": ["temujin"],
-    "/content-research-writer": ["mongke", "chagatai"],
-    "/changelog-generator": ["mongke", "chagatai"],
-    "/horde-learn": ["jochi", "chagatai"],
+    # Core horde skills
+    "/horde-brainstorming": ["mongke", "jochi", "chagatai", "temujin"],  # +temujin for architecture/design
+    "/horde-implement": ["ogedei", "temujin"],  # +temujin for implementation overflow
+    "/horde-debug": ["jochi", "ogedei", "temujin"],  # +temujin for code debugging
+    "/horde-review": ["jochi", "mongke"],  # +mongke for research reviews
+    "/horde-plan": ["mongke", "chagatai", "temujin"],  # +temujin for implementation planning
+    "/horde-learn": ["jochi", "chagatai", "mongke"],  # +mongke for research extraction
+    "/horde-test": ["temujin", "jochi"],  # NEW: testing tasks
+    "/golden-horde": ["ogedei", "temujin"],  # NEW: orchestration overflow
+    # Ops skills
+    "/kurultai-health": ["temujin", "jochi"],  # +jochi for health analysis/triage
+    # Development skills
+    "/code-reviewer": ["temujin", "jochi"],  # +jochi for security review
+    "/generate-tests": ["temujin", "jochi"],  # +jochi for test generation
+    "/systematic-debugging": ["jochi", "ogedei", "temujin"],  # NEW: structured debugging
+    "/senior-architect": ["temujin", "mongke"],  # NEW: architecture tasks
+    "/senior-frontend": ["temujin", "jochi"],  # NEW: frontend tasks
+    "/senior-backend": ["temujin", "jochi"],  # NEW: backend tasks
+    "/senior-fullstack": ["temujin", "jochi"],  # NEW: fullstack tasks
+    "/senior-devops": ["ogedei", "temujin"],  # NEW: devops tasks
+    # Content skills
+    "/content-research-writer": ["mongke", "chagatai", "jochi"],  # +jochi for analysis
+    "/changelog-generator": ["mongke", "chagatai", "jochi"],  # +jochi for changelog analysis
 }
 
 # Routing log path

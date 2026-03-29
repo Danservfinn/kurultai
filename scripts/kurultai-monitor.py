@@ -179,7 +179,8 @@ def check_kurultai() -> tuple[bool, list[str], dict]:
                 try:
                     import urllib.request
                     local_req = urllib.request.Request(f"{LOCAL_URL}/health")
-                    local_resp = urllib.request.urlopen(local_req, timeout=5)
+                    # Increased timeout from 5 to 10 seconds for loopback resilience
+                    local_resp = urllib.request.urlopen(local_req, timeout=10)
                     if local_resp.status == 200:
                         metrics["local_server_healthy"] = True
                         log("Local server healthy - Cloudflare Access auth required (expected)")

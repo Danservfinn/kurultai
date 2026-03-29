@@ -82,6 +82,7 @@ _SYSTEM_SOURCES = frozenset({
     "signal", "api", "direct-mention", "kurultai-delegate",
     "jochi-debug",
     "daily-task-review",
+    "proposal-extractor",
 })
 
 
@@ -582,7 +583,7 @@ def create_task(title, body, priority="normal", source="task_intake",
                 print(f"  V2_ROUTE_FALLBACK: {_v2_err}")
                 agent, _route_metadata = route_with_queue_penalty(title)
             if agent == "subagent":
-                agent = "kublai"  # Default fallback
+                agent = "ogedei"  # Default fallback (kublai is not dispatchable)
     else:
         # Caller provided an explicit agent — check if keyword routing disagrees
         # FIX (2026-03-11): Reduce explicit routing by checking keyword matches
@@ -597,7 +598,7 @@ def create_task(title, body, priority="normal", source="task_intake",
                 # Get keyword-based suggestion
                 kw_agent, kw_metadata = route_with_queue_penalty(title)
                 if kw_agent == "subagent":
-                    kw_agent = "kublai"
+                    kw_agent = "ogedei"  # kublai is not dispatchable
 
                 # Check if keyword router strongly disagrees (score >= 2)
                 kw_scores = kw_metadata.get("penalized_scores", {})
@@ -690,7 +691,7 @@ def create_task(title, body, priority="normal", source="task_intake",
         agent not in DOMAIN_AGENT_COMPATIBILITY[_task_domain]):
 
         _compatible_agents = DOMAIN_AGENT_COMPATIBILITY[_task_domain]
-        _suggested = _compatible_agents[0] if _compatible_agents else "kublai"
+        _suggested = _compatible_agents[0] if _compatible_agents else "ogedei"
 
         print(f"DOMAIN_MISMATCH: agent='{agent}' cannot handle domain='{_task_domain}'")
         print(f"  Task: '{title[:80]}'")
@@ -763,7 +764,7 @@ def create_task(title, body, priority="normal", source="task_intake",
 
         if not _skip_title_conflict_check:
             _compatible_for_title = DOMAIN_AGENT_COMPATIBILITY[_title_keywords_domain]
-            _suggested_for_title = _compatible_for_title[0] if _compatible_for_title else "kublai"
+            _suggested_for_title = _compatible_for_title[0] if _compatible_for_title else "ogedei"
 
             print(f"TITLE_DOMAIN_CONFLICT: title suggests '{_title_keywords_domain}' but classified as '{_task_domain}'")
             print(f"  Task: '{title[:80]}'")
@@ -793,21 +794,9 @@ def create_task(title, body, priority="normal", source="task_intake",
 
             return None  # Reject task creation
 
-    # 2.5.3. Kublai self-absorption: when router is overloaded but idle, absorb coordination tasks
-    # This fixes the "router cannot route to itself" failure mode where kublai's queue grows
-    # without bound because it never takes tasks for itself.
-    if agent != "kublai" and not mention_agent and not _skill_locked_agent:
-        if should_kublai_self_absorb(title):
-            original_agent = agent
-            agent = "kublai"
-            print(f"KUBLAI_SELF_ABSORB: {original_agent} -> kublai (queue={get_queue_depth('kublai')}, idle={int(_get_kublai_idle_minutes())}min)")
-            _log_routing_decision(
-                title=title,
-                dest="kublai",
-                method="self_absorb",
-                original_agent=original_agent,
-                domain=_task_domain,
-            )
+    # 2.5.3. REMOVED: Kublai self-absorption was dead code — kublai is not in
+    # DISPATCH_AGENTS so tasks assigned to it were never picked up by the executor.
+    # The neo4j_v2_core guard now remaps kublai -> ogedei as a safety net.
 
     # 2.5.4. EARLY FLEET-WIDE CREDENTIAL CHECK — fail fast before expensive routing
     # Check all dispatch agents upfront. If ALL have invalid credentials, stop immediately.

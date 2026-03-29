@@ -314,13 +314,13 @@ class EntityResolver:
                 WITH ids_transferred, kt_out + kt_in AS connections_transferred, keep, absorb
 
                 // Transfer Messages
-                OPTIONAL MATCH (absorb)<-[r:SENT]-(m:Message)
+                OPTIONAL MATCH (absorb)<-[r:SENT_BY]-(m:Message)
                 SET m.humanId = $keep_id
                 DELETE r
                 WITH ids_transferred, connections_transferred, keep, absorb, count(m) AS msgs_transferred
                 OPTIONAL MATCH (m:Message {humanId: $keep_id})
-                WHERE NOT exists((m)-[:SENT]->())
-                MERGE (m)-[:SENT]->(keep)
+                WHERE NOT exists((m)-[:SENT_BY]->())
+                MERGE (m)-[:SENT_BY]->(keep)
                 WITH ids_transferred, connections_transferred, msgs_transferred, keep, absorb
 
                 // Transfer consent

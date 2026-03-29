@@ -621,7 +621,7 @@ class AutoresearchApproval:
                 body=f"Autoresearch request {request_id} from {request.agent} has been pending for over 2 hours.\n\nTask: {request.task_id}\nTitle: {request.title}",
                 priority="high",
                 source="autoresearch-escalation",
-                agent="kublai",
+                agent="ogedei",  # kublai is not dispatchable
             )
         except ImportError:
             pass

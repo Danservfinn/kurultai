@@ -740,10 +740,13 @@ def main():
 
     parser = argparse.ArgumentParser(description="OpenClaw X Poster")
     parser.add_argument("command", choices=[
-        "status", "post_status", "post_build_public", "post_weekly",
+        "status", "context", "post", "post_status", "post_build_public", "post_weekly",
         "approve", "list_pending", "pause", "resume", "process_scheduled",
         "milestone", "feature", "thread"
     ], help="Command to run")
+    parser.add_argument("--text", help="Post text (for 'post' command)")
+    parser.add_argument("--thread-items", help="JSON array of thread tweets (for 'post' command)")
+    parser.add_argument("--category", default="status", help="Post category (for 'post' command)")
     parser.add_argument("--post-id", help="Post ID for approval")
     parser.add_argument("--milestone-type", help="Milestone type")
     parser.add_argument("--milestone-value", type=int, help="Milestone value")
@@ -767,6 +770,119 @@ def main():
             print(f"Draft: {status['draft']}")
             print(f"Approved: {status['approved']}")
             print(f"Scheduled: {status['scheduled']}")
+
+    elif args.command == "context":
+        # Print context for agent-driven posting
+        try:
+            generator = ContentGenerator()
+            stats = generator._collect_metrics()
+            all_time = generator._get_all_time_stats()
+        except Exception:
+            stats = {}
+            all_time = {}
+
+        queue = PostQueue(DB_PATH)
+        recent = queue.get_posts(limit=5)
+        is_paused = poster.is_paused()
+
+        print("=== X/Twitter Posting Context ===\n")
+        print(f"Status: {'PAUSED' if is_paused else 'Active'}")
+        print()
+
+        # Today's metrics
+        print("## Task Metrics (24h)")
+        if stats:
+            print(f"  Completed: {stats.get('completed', 0)}")
+            print(f"  Failed: {stats.get('failed', 0)}")
+            print(f"  Success rate: {stats.get('success_rate', 0)}%")
+            print(f"  Queue depth: {stats.get('queue_depth', 0)}")
+            by_agent = stats.get('by_agent', {})
+            if by_agent:
+                print(f"  By agent: {', '.join(f'{a}:{c}' for a, c in sorted(by_agent.items(), key=lambda x: -x[1]))}")
+        else:
+            print("  (no metrics available)")
+        print()
+
+        # All-time stats
+        if all_time:
+            print("## All-Time Stats")
+            for k, v in all_time.items():
+                print(f"  {k}: {v}")
+            print()
+
+        # Recent posts (to avoid repeating)
+        print("## Recent Posts (don't repeat these)")
+        if recent:
+            for p in recent[:5]:
+                ts = getattr(p, 'posted_at', None) or getattr(p, 'created_at', '?')
+                text = getattr(p, 'text', '')[:80]
+                print(f"  [{ts}] {text}")
+        else:
+            print("  (no recent posts)")
+        print()
+
+        # Weekly highlights for thread context
+        try:
+            highlights = generator._get_weekly_highlights()
+            if highlights:
+                print("## Weekly Highlights")
+                for k, v in highlights.items():
+                    print(f"  {k}: {v}")
+                print()
+        except Exception:
+            pass
+
+        print("## Guidelines")
+        print("  - Max 280 chars per tweet")
+        print("  - Use 1-2 hashtags: #BuildInPublic #AIAgents #OpenClaw")
+        print("  - Be genuine, reference specific achievements")
+        print("  - Check recent posts above to avoid repeating yourself")
+
+    elif args.command == "post":
+        # Agent-driven posting: accept text directly
+        text = args.text
+        if not text:
+            print("Error: --text required for 'post' command")
+            sys.exit(1)
+
+        if is_paused := poster.is_paused():
+            print("Error: X posting is paused. Use 'resume' first.")
+            sys.exit(1)
+
+        thread_items = None
+        if args.thread_items:
+            try:
+                thread_items = json.loads(args.thread_items)
+            except json.JSONDecodeError:
+                print("Error: --thread-items must be valid JSON array")
+                sys.exit(1)
+
+        category = args.category or "status"
+
+        if args.dry_run:
+            print(f"DRY RUN: Would post ({category}):")
+            print(f"  {text}")
+            if thread_items:
+                for i, item in enumerate(thread_items, 2):
+                    print(f"  [{i}] {item}")
+            sys.exit(0)
+
+        # Add to queue and post
+        post_id = poster.queue.add_post(text=text, category=category, thread_items=thread_items)
+        if post_id:
+            poster.queue.approve_post(post_id)
+            if thread_items:
+                success = poster._post_thread(post_id, [text] + thread_items)
+            else:
+                success = poster._post_queued(post_id)
+            if success:
+                print(f"POSTED: {text[:60]}...")
+            else:
+                print(f"FAILED: Could not post. Check logs at {LOG_PATH}")
+                sys.exit(1)
+        else:
+            print("Error: Failed to add post to queue")
+            sys.exit(1)
 
     elif args.command == "post_status":
         success = poster.post_status_update(dry_run=args.dry_run)

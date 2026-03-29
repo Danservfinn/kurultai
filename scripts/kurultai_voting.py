@@ -9,6 +9,8 @@ PHASE 1: Individual Agent Proposals
 PHASE 2: Presentation to Kurultai
 PHASE 3: Voting (Consensus Required)
 PHASE 4: Implementation (Only After Consensus)
+  - Phase 4a: Check consensus (moves to approved/ or rejected/)
+  - Phase 4b: Create tasks for approved (CRITICAL - creates Neo4j Task nodes)
 PHASE 5: Tally Results
 PHASE 6: Report Results
 
@@ -17,9 +19,15 @@ In the authentic Mongolian Kurultai, the Great Khans could only make decisions
 through consensus among all Khans. No single Khan could act unilaterally.
 This system honors that tradition.
 
+INCIDENT FIX (2026-03-23):
+Phase 4b (phase4_create_tasks_for_approved) was missing from run_full_cycle(),
+causing 81+ approved proposals to stall without creating Neo4j Task nodes.
+Added call after phase4_check_consensus() in run_full_cycle().
+
 Usage:
     python3 kurultai_voting.py --phase <1-6>
     python3 kurultai_voting.py --full-cycle
+    python3 kurultai_voting.py --create-tasks  # Run phase 4b only
     python3 kurultai_voting.py --status
 """
 
@@ -991,6 +999,10 @@ def run_full_cycle(simulate: bool = False) -> dict:
     # Phase 4: Check consensus
     results["phases"]["4"] = phase4_check_consensus()
 
+    # Phase 4b: Create tasks for approved proposals
+    # CRITICAL: This was missing, causing 175+ proposals to stall
+    results["phases"]["4b_tasks"] = phase4_create_tasks_for_approved()
+
     # Phase 5: Tally results
     results["phases"]["5"] = phase5_tally_results()
 
@@ -1052,6 +1064,8 @@ def main():
                        help="Run voting diagnostics to understand why votes may be 0/6")
     parser.add_argument("--cast-votes", action="store_true",
                        help="Cast votes for all agents on proposals from last 24h")
+    parser.add_argument("--create-tasks", action="store_true",
+                       help="Create Neo4j tasks for all approved proposals (Phase 4b)")
 
     args = parser.parse_args()
 
@@ -1091,6 +1105,18 @@ def main():
         print("\n" + "="*60)
         print("VOTING COMPLETE")
         print(f"Proposals voted: {len(results)}")
+        print("="*60 + "\n")
+
+    elif args.create_tasks:
+        print("\n" + "="*60)
+        print("CREATING TASKS FROM APPROVED PROPOSALS (Phase 4b)")
+        print("="*60 + "\n")
+
+        tasks_created = phase4_create_tasks_for_approved()
+
+        print("\n" + "="*60)
+        print("TASK CREATION COMPLETE")
+        print(f"Tasks created: {len(tasks_created)}")
         print("="*60 + "\n")
 
     elif args.phase:

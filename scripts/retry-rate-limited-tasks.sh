@@ -65,13 +65,11 @@ if state_file.exists():
 print("State file updated")
 PYTHON_EOF
 
-# Restart task watcher
-echo "[$(date -Iseconds)] Restarting task watcher..."
-pkill -f "task-watcher.py --daemon" 2>/dev/null || true
-sleep 2
-nohup python3 "$HOME/.openclaw/agents/main/scripts/task-watcher.py" --daemon --poll-interval 10 > "$HOME/.openclaw/agents/main/logs/task-watcher.log" 2>&1 &
+# Restart unified task executor (replaced task-watcher as of 2026-03-22)
+echo "[$(date -Iseconds)] Restarting task executor..."
+launchctl kickstart -k "gui/$(id -u)/com.kurultai.task-executor" 2>/dev/null || true
 
-echo "[$(date -Iseconds)] Task watcher restarted. Pending tasks will be processed."
+echo "[$(date -Iseconds)] Task executor restarted. Pending tasks will be processed."
 
 # Clean up
 rmdir "$PENDING_DIR" 2>/dev/null || true

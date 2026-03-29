@@ -154,7 +154,7 @@ class ConversationIngester:
                     extractionStatus: 'PENDING',
                     createdAt: datetime()
                 })
-                CREATE (m)-[:SENT]->(h)
+                CREATE (m)-[:SENT_BY]->(h)
                 """,
                 human_id=human_id,
                 msg_id=message_id,
@@ -246,7 +246,7 @@ class ConversationIngester:
             result = session.run(
                 """
                 MATCH (t:Thread {humanId: $human_id, status: 'ACTIVE'})
-                WHERE t.scope = $scope OR (t.scope IS NULL AND $scope = 'dm')
+                WHERE t.scope = $scope
                 OPTIONAL MATCH (m:Message)-[:IN_THREAD]->(t)
                 WITH t, max(m.timestamp) AS lastMsg
                 ORDER BY lastMsg DESC
@@ -379,7 +379,7 @@ class ConversationIngester:
         scope_filter = ""
         params = {"human_id": human_id}
         if scope:
-            scope_filter = "AND (m.scope = $scope OR (m.scope IS NULL AND $scope = 'dm'))"
+            scope_filter = "AND m.scope = $scope"
             params["scope"] = scope
 
         with self.driver.session() as session:

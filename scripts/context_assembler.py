@@ -86,6 +86,12 @@ class ContextAssembler:
             # Phase 4: Active thread messages — scoped
             thread_messages = self._get_active_thread(session, human_id, scope)
 
+            # Phase 4b: Group-wide recent messages (all senders, not just this human)
+            # Provides shared conversational context so follow-ups work across speakers
+            group_recent = []
+            if group_id:
+                group_recent = self._get_group_recent_messages(session, group_id, human_id)
+
             # Phase 5: Vector-similar messages — scoped
             similar_messages = []
             if current_embedding:
@@ -130,6 +136,7 @@ class ContextAssembler:
             "bridge_topics": bridges[:5],
             "drift_signals": drift,
             "thread_messages": thread_messages[:20],
+            "group_recent_messages": group_recent[:15],
             "similar_messages": similar_messages[:10],
             "inferences": inferences[:10],
             "social_context": social,
@@ -147,7 +154,7 @@ class ContextAssembler:
             MATCH (h:Human {id: $human_id})-[d:DISCUSSED]->(t:Topic)
             WHERE EXISTS {
                 MATCH (m:Message {humanId: $human_id})-[:HAS_TOPIC]->(t)
-                WHERE m.scope = $scope OR (m.scope IS NULL AND $scope = 'dm')
+                WHERE m.scope = $scope
             }
             RETURN t.label AS label, t.domain AS domain,
                    coalesce(d.pagerank_score, toFloat(d.count)/10.0) AS score,
@@ -168,7 +175,7 @@ class ContextAssembler:
             WHERE d.communityId IS NOT NULL
               AND EXISTS {
                   MATCH (m:Message {humanId: $human_id})-[:HAS_TOPIC]->(t)
-                  WHERE m.scope = $scope OR (m.scope IS NULL AND $scope = 'dm')
+                  WHERE m.scope = $scope
               }
             WITH d.communityId AS cid, collect(t.label) AS topics, avg(coalesce(d.pagerank_score, 0)) AS avgScore
             RETURN cid AS communityId, topics, avgScore
@@ -188,7 +195,7 @@ class ContextAssembler:
             WHERE t.betweenness_score IS NOT NULL AND t.betweenness_score > 0
               AND EXISTS {
                   MATCH (m:Message {humanId: $human_id})-[:HAS_TOPIC]->(t)
-                  WHERE m.scope = $scope OR (m.scope IS NULL AND $scope = 'dm')
+                  WHERE m.scope = $scope
               }
             RETURN t.label AS label, t.betweenness_score AS score
             ORDER BY t.betweenness_score DESC
@@ -219,7 +226,7 @@ class ContextAssembler:
         result = session.run(
             """
             MATCH (t:Thread {humanId: $human_id, status: 'ACTIVE'})
-            WHERE t.scope = $scope OR (t.scope IS NULL AND $scope = 'dm')
+            WHERE t.scope = $scope
             MATCH (m:Message)-[:IN_THREAD]->(t)
             RETURN m.contentScrubbed AS text, m.direction AS direction,
                    toString(m.timestamp) AS timestamp,
@@ -229,6 +236,38 @@ class ContextAssembler:
             """,
             human_id=human_id,
             scope=scope,
+        )
+        return [dict(r) for r in result]
+
+    def _get_group_recent_messages(
+        self, session, group_id: str, exclude_human_id: str
+    ) -> List[Dict[str, Any]]:
+        """Get recent messages from ALL senders in a group (shared conversational context).
+
+        This provides group-wide context so follow-up questions work across speakers.
+        For example, if Kublai posts a calendar event and someone asks "who's going",
+        the LLM sees the calendar message even though it was sent by a different human_id.
+
+        Excludes the current human's messages (those are already in thread_messages).
+        Only returns scrubbed content — no PII leakage.
+        """
+        scope = f"group:{group_id}"
+        result = session.run(
+            """
+            MATCH (m:Message)
+            WHERE m.scope = $scope
+              AND m.humanId <> $exclude_human_id
+              AND m.timestamp > datetime() - duration('PT4H')
+            OPTIONAL MATCH (m)-[:SENT_BY]->(h:Human)
+            RETURN m.contentScrubbed AS text, m.direction AS direction,
+                   toString(m.timestamp) AS timestamp,
+                   m.summary AS summary,
+                   coalesce(h.displayName, 'Kublai') AS sender
+            ORDER BY m.timestamp DESC
+            LIMIT 15
+            """,
+            scope=scope,
+            exclude_human_id=exclude_human_id,
         )
         return [dict(r) for r in result]
 
@@ -249,7 +288,7 @@ class ContextAssembler:
                 CALL db.index.vector.queryNodes('message_embedding', $internal_k, $embedding)
                 YIELD node AS m, score
                 WHERE m.humanId = $human_id
-                  AND (m.scope = $scope OR (m.scope IS NULL AND $scope = 'dm'))
+                  AND m.scope = $scope
                 RETURN m.contentScrubbed AS text, m.direction AS direction,
                        toString(m.timestamp) AS timestamp,
                        m.summary AS summary,
@@ -274,6 +313,7 @@ class ContextAssembler:
             """
             MATCH (i:Inference {humanId: $human_id})
             WHERE i.confidence > 0.6
+              AND NOT coalesce(i.superseded, false)
             RETURN i.type AS type, i.content AS content,
                    i.confidence AS confidence,
                    toString(i.createdAt) AS createdAt

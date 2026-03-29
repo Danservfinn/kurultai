@@ -242,7 +242,7 @@ class MigrationV2:
                             extractionStatus: $ext_status,
                             createdAt: datetime()
                         })
-                        CREATE (m)-[:SENT]->(h)
+                        CREATE (m)-[:SENT_BY]->(h)
                         """,
                         human_id=human_id,
                         msg_id=msg_id,

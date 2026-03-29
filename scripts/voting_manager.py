@@ -43,8 +43,24 @@ LOGS_DIR = KURULTAI_ROOT / "logs"
 # All Khans who participate in voting
 ALL_KHANS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
-# Voting window in minutes
+# Voting window in minutes (legacy default)
 VOTING_WINDOW_MINUTES = 60
+
+# Tier-specific voting windows (minutes)
+TIER_VOTING_WINDOWS = {
+    "T0": 0,     # no voting — auto-approved
+    "T1": 0,     # no voting — auto-approved (self-scoped)
+    "T2": 240,   # 4 hours
+    "T3": 720,   # 12 hours
+}
+
+# Tier-specific approval thresholds
+TIER_THRESHOLDS = {
+    "T0": {"min_yes": 0},
+    "T1": {"min_yes": 0},
+    "T2": {"min_yes": 4},   # 4/6 majority
+    "T3": {"min_yes": 5},   # 5/6 supermajority
+}
 
 
 class Vote(Enum):
@@ -155,10 +171,12 @@ def start_voting(proposal_id: str) -> Tuple[bool, str]:
     proposal_file = proposal_files[0]
     proposal = parse_proposal_file(proposal_file)
 
-    # Update frontmatter
+    # Update frontmatter — use tier-specific voting window if available
     content = proposal["content"]
     now = datetime.now()
-    deadline = now + timedelta(minutes=VOTING_WINDOW_MINUTES)
+    tier = proposal.get("frontmatter", {}).get("tier", "T2")
+    window = TIER_VOTING_WINDOWS.get(tier, VOTING_WINDOW_MINUTES)
+    deadline = now + timedelta(minutes=window)
 
     # Add voting timestamps to frontmatter
     if content.startswith("---"):
@@ -265,29 +283,37 @@ def check_voting_complete(proposal_id: str) -> Tuple[bool, str]:
 
     tally = get_vote_tally(proposal_id)
 
+    # Determine tier and threshold
+    tier = "T2"  # default for legacy proposals
+    # Try to read tier from proposal file frontmatter
+    for d in [VOTING_DIR, PENDING_DIR]:
+        for f in d.glob(f"{proposal_id}*.md"):
+            p = parse_proposal_file(f)
+            tier = p.get("frontmatter", {}).get("tier", "T2")
+            break
+
+    threshold = TIER_THRESHOLDS.get(tier, {"min_yes": len(ALL_KHANS)})
+
     # Check for any REJECT votes (veto)
     if tally["REJECT"] > 0:
         return finalize_proposal(proposal_id, "rejected", f"Vetoed with {tally['REJECT']} REJECT vote(s)")
 
-    # Check for unanimous approval
-    if tally["APPROVE"] == len(ALL_KHANS):
-        return finalize_proposal(proposal_id, "approved", "Unanimous consent (6/6 APPROVE)")
+    # Check for tier-specific approval threshold
+    if tally["APPROVE"] >= threshold["min_yes"]:
+        return finalize_proposal(proposal_id, "approved",
+            f"Tier {tier} threshold met ({tally['APPROVE']}/{len(ALL_KHANS)} APPROVE)")
 
     # Check if voting window has closed
     if status.voting_deadline:
         deadline = datetime.fromisoformat(status.voting_deadline)
         if datetime.now() > deadline:
-            if tally["NOT_VOTED"] > 0:
-                # Incomplete voting - extend or fail
-                return False, f"Voting incomplete: {tally['NOT_VOTED']} agents haven't voted"
-            elif tally["APPROVE"] < len(ALL_KHANS):
-                # Not unanimous - fail
+            if tally["APPROVE"] < threshold["min_yes"]:
                 return finalize_proposal(proposal_id, "rejected",
-                    f"Failed to achieve unanimous consent: {tally['APPROVE']}/6 APPROVE, {tally['ABSTAIN']} ABSTAIN")
+                    f"Failed {tier} threshold: {tally['APPROVE']}/{threshold['min_yes']} APPROVE needed")
 
     # Voting still in progress
     votes_remaining = tally["NOT_VOTED"]
-    return False, f"Voting in progress: {tally['APPROVE']}/6 APPROVE, {votes_remaining} votes remaining"
+    return False, f"Voting in progress ({tier}): {tally['APPROVE']}/{threshold['min_yes']} needed, {votes_remaining} votes remaining"
 
 
 def finalize_proposal(proposal_id: str, result: str, reason: str) -> Tuple[bool, str]:

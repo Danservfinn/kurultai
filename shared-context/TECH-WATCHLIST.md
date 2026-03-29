@@ -122,4 +122,4 @@ Adaptive web scraping framework with anti-bot bypass and MCP server support.
 
 ---
 
-*Last updated: 2026-03-10*
+*Last updated: 2026-03-10* — ⚠️ **Needs re-verification** (13 days since last check as of 2026-03-23). ANE entry last verified 2026-03-10. Discovery cron status unknown — verify cron jobs are still running.

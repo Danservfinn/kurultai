@@ -24,12 +24,14 @@ Endpoints:
     GET  /api/admin/privacy-requests              - List privacy requests
 
 Usage:
-    uvicorn conversation_api_fastapi:app --reload --port 8080
-    python3 conversation_api_fastapi.py --port 8080
+    uvicorn conversation_api:app --reload --port 8080
+    python3 conversation_api.py --port 8080
 """
 
 import os
 import sys
+import hmac
+import hashlib
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
@@ -45,19 +47,30 @@ from conversation_privacy import ConversationPrivacy
 
 # Configuration
 PORT = int(os.getenv("CONVERSATION_API_PORT", "8080"))
-ADMIN_TOKEN = os.getenv("CONVERSATION_API_ADMIN_TOKEN", "dev-admin-token")
+ADMIN_TOKEN = os.getenv("CONVERSATION_API_ADMIN_TOKEN")
+if not ADMIN_TOKEN:
+    # Fail gracefully - admin endpoints will return 403
+    print("WARNING: CONVERSATION_API_ADMIN_TOKEN not set - admin endpoints disabled")
+SIGNING_KEY = os.getenv("CONVERSATION_API_SIGNING_KEY")
+if not SIGNING_KEY:
+    raise ValueError(
+        "CONVERSATION_API_SIGNING_KEY environment variable must be set for token validation. "
+        "Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+    )
 HOST = os.getenv("CONVERSATION_API_HOST", "127.0.0.1")
 
 # Security
 security = HTTPBearer()
 
-# FastAPI app
+# FastAPI app - disable docs in production
+ENABLE_DOCS = os.getenv("ENABLE_SWAGGER_DOCS", "false").lower() == "true"
+
 app = FastAPI(
     title="Kurultai Conversation API",
     description="Private conversation storage with privacy controls",
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/docs" if ENABLE_DOCS else None,
+    redoc_url="/redoc" if ENABLE_DOCS else None
 )
 
 # Instances
@@ -172,21 +185,47 @@ class ErrorResponse(BaseModel):
 
 
 # Authentication
+def generate_signature(phone_number: str, key: str) -> str:
+    """Generate HMAC-SHA256 signature for phone number."""
+    return hmac.new(
+        key.encode('utf-8') if key else b'',
+        phone_number.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    """Verify Bearer token and return phone number."""
+    """Verify Bearer token and return phone number.
+
+    Token format: phone:signature (HMAC-SHA256)
+    - phone: E.164 format phone number (e.g., +15165643945)
+    - signature: HMAC-SHA256 signature using SIGNING_KEY
+
+    Admin token (if configured): raw string match to ADMIN_TOKEN
+    """
     token = credentials.credentials
 
-    # Check for admin token
-    if token == ADMIN_TOKEN:
+    # Check for admin token (only if configured)
+    if ADMIN_TOKEN and token == ADMIN_TOKEN:
         return "+15165643945"  # Admin phone
 
-    # Token format: phone:signature (simplified for now)
-    # In production, decode JWT token
+    # Token format: phone:signature
     if ":" in token:
-        phone_number = token.split(":")[0]
+        parts = token.split(":", 1)  # Split only on first colon
+        phone_number = parts[0]
+        provided_signature = parts[1]
+
+        # Validate signature - SIGNING_KEY is now required
+        expected_signature = generate_signature(phone_number, SIGNING_KEY)
+        if not hmac.compare_digest(provided_signature, expected_signature):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid signature"
+            )
+
         return phone_number
 
-    raise HTTPException(status_code=401, detail="Invalid token")
+    raise HTTPException(status_code=401, detail="Invalid token format. Expected: phone:signature")
 
 
 def verify_admin(phone_number: str) -> None:
@@ -200,29 +239,28 @@ def get_phone_from_header(x_phone: Optional[str] = Header(None)) -> Optional[str
     return x_phone
 
 
-# CORS middleware will be configured via middleware
+# CORS middleware - strict origin validation
 @app.middleware("http")
 async def add_cors_middleware(request, call_next):
-    """Add CORS headers to all responses."""
+    """Add CORS headers to all responses with strict origin validation."""
     response = await call_next(request)
 
-    # Get origin from environment
-    allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+    # Get allowed origins from environment - never default to wildcard
+    # Reject "*" entirely for security - explicit origins only
+    cors_origins_env = os.getenv("CORS_ORIGINS", "")
+    allowed_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
 
     origin = request.headers.get("origin")
-    if origin in allowed_origins or "*" in allowed_origins:
-        response.headers["Access-Control-Allow-Origin"] = origin if origin in allowed_origins else "*"
 
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Phone"
+    # Only set CORS headers if origin is explicitly allowed
+    # "*" wildcard is explicitly rejected for security
+    if origin and allowed_origins and origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Phone"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
-
-
-@app.options("/{path:path}")
-async def options_handler():
-    """Handle CORS preflight requests."""
-    return {"ok": True}
 
 
 # Health check
@@ -254,14 +292,11 @@ async def get_my_conversations(
     limit: int = Query(50, ge=1, le=100, description="Maximum conversations to return"),
     context_filter: Optional[str] = Query(None, description="Filter by context"),
     sentiment_filter: Optional[str] = Query(None, description="Filter by sentiment"),
-    x_phone: Optional[str] = Header(None, description="User's phone number"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Get my recent conversations."""
-    phone_number = x_phone or verify_token(credentials)
-
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="X-Phone header required")
+    # Always use authenticated phone from Bearer token - X-Phone cannot override
+    phone_number = verify_token(credentials)
 
     # Verify self-access
     if not privacy.can_access(phone_number, phone_number):
@@ -291,16 +326,13 @@ async def search_my_conversations(
     limit: int = Query(20, ge=1, le=100, description="Maximum results"),
     context_filter: Optional[str] = Query(None, description="Filter by context"),
     sentiment_filter: Optional[str] = Query(None, description="Filter by sentiment"),
-    x_phone: Optional[str] = Header(None, description="User's phone number"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Search my conversations."""
     from conversation_search import ConversationSearch
 
-    phone_number = x_phone or verify_token(credentials)
-
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="X-Phone header required")
+    # Always use authenticated phone from Bearer token
+    phone_number = verify_token(credentials)
 
     search = ConversationSearch()
     results = search.search_user(
@@ -321,14 +353,11 @@ async def search_my_conversations(
 
 @app.get("/api/conversations/my/stats", response_model=StatsResponse)
 async def get_my_stats(
-    x_phone: Optional[str] = Header(None, description="User's phone number"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Get my conversation statistics."""
-    phone_number = x_phone or verify_token(credentials)
-
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="X-Phone header required")
+    # Always use authenticated phone from Bearer token
+    phone_number = verify_token(credentials)
 
     if not privacy.can_access(phone_number, phone_number):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -345,14 +374,11 @@ async def get_my_stats(
 @app.get("/api/conversations/my/action-items", response_model=ActionItemsResponse)
 async def get_my_action_items(
     pending_only: bool = Query(True, description="Only show pending items"),
-    x_phone: Optional[str] = Header(None, description="User's phone number"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Get my action items."""
-    phone_number = x_phone or verify_token(credentials)
-
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="X-Phone header required")
+    # Always use authenticated phone from Bearer token
+    phone_number = verify_token(credentials)
 
     if not privacy.can_access(phone_number, phone_number):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -415,19 +441,17 @@ async def search_all_conversations(
     context_filter: Optional[str] = Query(None, description="Filter by context"),
     sentiment_filter: Optional[str] = Query(None, description="Filter by sentiment"),
     all_users: bool = Query(False, description="Search across all users (admin only)"),
-    x_phone: Optional[str] = Header(None, description="User's phone number"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Search conversations."""
     from conversation_search import ConversationSearch
 
     search = ConversationSearch()
-    phone_number = x_phone or verify_token(credentials)
+    authenticated_phone = verify_token(credentials)
 
     if all_users:
         # Admin search across all users
-        admin_phone = verify_token(credentials)
-        verify_admin(admin_phone)
+        verify_admin(authenticated_phone)
 
         results = search.search_all(
             q,
@@ -435,17 +459,15 @@ async def search_all_conversations(
             sentiment_filter=sentiment_filter,
             total_limit=limit
         )
-    elif phone_number:
-        # User search
+    else:
+        # User search - always search authenticated user's conversations
         results = search.search_user(
-            phone_number,
+            authenticated_phone,
             q,
             context_filter=context_filter,
             sentiment_filter=sentiment_filter,
             limit=limit
         )
-    else:
-        raise HTTPException(status_code=400, detail="X-Phone header required or use all_users=true with admin access")
 
     return {
         "ok": True,
@@ -480,10 +502,16 @@ async def delete_user_conversations(
     return result
 
 
-# Logging Endpoints
+# Logging Endpoints - All require Bearer token authentication
 @app.post("/api/conversations/log", response_model=LogResponse)
-async def log_conversation(request: LogConversationRequest):
-    """Log a conversation."""
+async def log_conversation(
+    request: LogConversationRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Log a conversation (requires authentication)."""
+    # Verify token - raise 401 if invalid
+    verify_token(credentials)
+
     success = logger.log_human_conversation(
         phone_number=request.phone,
         direction=request.direction,
@@ -507,8 +535,14 @@ async def log_conversation(request: LogConversationRequest):
 
 
 @app.post("/api/conversations/link-event", response_model=LinkResponse)
-async def link_event(request: LinkEventRequest):
-    """Link conversation to event."""
+async def link_event(
+    request: LinkEventRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Link conversation to event (requires authentication)."""
+    # Verify token - raise 401 if invalid
+    verify_token(credentials)
+
     success = logger.link_to_event(request.phone, request.conversation_date, request.event_name)
 
     return {
@@ -518,8 +552,14 @@ async def link_event(request: LinkEventRequest):
 
 
 @app.post("/api/conversations/link-task", response_model=LinkResponse)
-async def link_task(request: LinkTaskRequest):
-    """Link conversation to task."""
+async def link_task(
+    request: LinkTaskRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Link conversation to task (requires authentication)."""
+    # Verify token - raise 401 if invalid
+    verify_token(credentials)
+
     success = logger.link_to_task(request.phone, request.conversation_date, request.task_id)
 
     return {
@@ -531,16 +571,14 @@ async def link_task(request: LinkTaskRequest):
 @app.post("/api/conversations/export", response_model=ExportResponse)
 async def export_conversations(
     request: Dict[str, Any],
-    x_phone: Optional[str] = Header(None, description="User's phone number"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Export user data (GDPR)."""
-    phone = request.get("phone") or x_phone or verify_token(credentials)
+    # Always use authenticated user from Bearer token
+    requesting_user = verify_token(credentials)
 
-    if not phone:
-        raise HTTPException(status_code=400, detail="phone required")
-
-    requesting_user = x_phone or verify_token(credentials) or phone
+    # Export either requested phone or own data
+    phone = request.get("phone") or requesting_user
 
     data = privacy.export_user_data(phone, requesting_user)
 
@@ -592,7 +630,7 @@ if __name__ == "__main__":
     print(f"ReDoc: http://{args.host}:{args.port}/redoc")
 
     uvicorn.run(
-        "conversation_api_fastapi:app",
+        "conversation_api:app",
         host=args.host,
         port=args.port,
         reload=args.reload

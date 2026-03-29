@@ -103,7 +103,7 @@ def identify_knowledge_gaps(human_id: str) -> List[Dict]:
             result = session.run(
                 """
                 MATCH (h:Human {id: $hid})
-                OPTIONAL MATCH (h)-[:IDENTIFIED_BY]->(i:Identifier {type: 'PHONE'})
+                OPTIONAL MATCH (h)-[:IDENTIFIED_BY]->(i:Identifier {type: 'SIGNAL_PHONE'})
                 RETURN h.timezone AS timezone,
                        h.displayName AS displayName,
                        h.status AS status,
@@ -408,6 +408,39 @@ def generate_curiosity_question(human_id: str) -> Optional[Dict]:
     }
 
 
+def _is_valid_signal_phone(phone: str) -> bool:
+    """Reject obviously fake/test phone numbers."""
+    if not phone or len(phone) < 10:
+        return False
+    # Remove spaces, dashes, parentheses for validation
+    clean_phone = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+
+    # Test prefixes and patterns used in dev/seed data
+    test_patterns = [
+        "+1999", "+15550", "+15551",  # Test prefixes
+        "+8111",  # Suspicious long numbers starting with +81
+        "+000",   # Invalid country code
+    ]
+    for pattern in test_patterns:
+        if clean_phone.startswith(pattern):
+            return False
+
+    # Reject numbers that are too long (real E.164 numbers are max 15 digits including +)
+    if len(clean_phone) > 16:
+        return False
+
+    # Reject the specific fake number from logs
+    if clean_phone == "+81114726038927336915312281070740144024408":
+        return False
+
+    # Reject obviously fake patterns (all same digit, sequential)
+    digits_only = clean_phone.replace("+", "")
+    if len(set(digits_only)) <= 2:  # Too few unique digits
+        return False
+
+    return True
+
+
 def send_curiosity_question(human_id: str) -> bool:
     """End-to-end: identify gap -> check rate limits -> create PendingQuestion -> send via Signal.
 
@@ -420,6 +453,33 @@ def send_curiosity_question(human_id: str) -> bool:
     try:
         from pending_question import create_question
 
+        # Pre-flight: fetch human profile and phone before creating the question
+        with neo4j_session() as session:
+            result = session.run(
+                """
+                MATCH (h:Human {id: $hid})
+                OPTIONAL MATCH (h)-[:IDENTIFIED_BY]->(i:Identifier {type: 'SIGNAL_PHONE'})
+                RETURN h.displayName AS displayName, i.value AS phone
+                """,
+                hid=human_id,
+            )
+            record = result.single()
+            if not record:
+                return False
+
+            phone = record["phone"]
+            display_name = record["displayName"]
+
+            # Skip humans without a display name (unidentified contacts)
+            if not display_name:
+                logger.info(f"Skipping curiosity for {human_id[:8]}: no displayName")
+                return False
+
+            # Skip fake/test phone numbers
+            if not phone or not _is_valid_signal_phone(phone):
+                logger.info(f"Skipping curiosity for {human_id[:8]}: invalid phone {phone}")
+                return False
+
         # Create the PendingQuestion node
         qid = create_question(
             human_id=human_id,
@@ -430,30 +490,30 @@ def send_curiosity_question(human_id: str) -> bool:
             ttl_minutes=60 * 24,  # 24 hours for curiosity questions
         )
 
-        # Get the human's phone number to send
+        # Send via Signal JSON-RPC
+        sent = _send_signal_dm(phone, question_data["question"])
+
+        if not sent:
+            # Mark question as SEND_FAILED so it doesn't sit PENDING for 24h
+            with neo4j_session() as session:
+                session.run(
+                    """
+                    MATCH (pq:PendingQuestion {id: $qid})
+                    WHERE pq.status = 'PENDING'
+                    SET pq.status = 'SEND_FAILED', pq.answeredAt = datetime()
+                    """,
+                    qid=qid,
+                )
+            logger.warning(f"Signal send failed for {human_id[:8]}, marked SEND_FAILED")
+            return False
+
+        # Update lastProactiveAt on success only
         with neo4j_session() as session:
-            result = session.run(
-                """
-                MATCH (h:Human {id: $hid})-[:IDENTIFIED_BY]->(i:Identifier {type: 'PHONE'})
-                RETURN i.value AS phone
-                """,
-                hid=human_id,
-            )
-            record = result.single()
-            if not record or not record["phone"]:
-                logger.warning(f"No phone found for human {human_id}")
-                return False
-
-            phone = record["phone"]
-
-            # Update lastProactiveAt on the Human node
             session.run(
                 "MATCH (h:Human {id: $hid}) SET h.lastProactiveAt = datetime()",
                 hid=human_id,
             )
 
-        # Send via Signal JSON-RPC
-        _send_signal_dm(phone, question_data["question"])
         logger.info(f"Sent curiosity question to {human_id[:8]}: {question_data['field']}")
         return True
 

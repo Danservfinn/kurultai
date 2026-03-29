@@ -7,17 +7,18 @@
   "low_review_score:jochi": 1773369928.689078,
   "credential_crisis:temujin_chagatai": 1773045213.15984,
   "unanalyzed_failures:kublai": 1773313884.3610082,
-  "unanalyzed_failures:ogedei": 1773403283.308574,
+  "unanalyzed_failures:ogedei": 1774313042.9928372,
   "unanalyzed_failures:tolui": 1773086586.6209831,
   "system_wide_low_scores:system": 1773353901.300632,
   "low_review_score:mongke": 1773369928.672705,
   "low_review_score:ogedei": 1773344109.119947,
   "low_review_score:kublai": 1773339023.209225,
   "unanalyzed_failures:chagatai": 1773377497.7372642,
-  "reflection_gap:chagatai": 1773406881.3756921,
+  "reflection_gap:chagatai": 1774313042.938299,
   "reflection_gap:mongke": 1773400923.6065412,
   "reflection_gap:ogedei": 1773403283.323093,
-  "reflection_gap:kublai": 1773405274.182994,
+  "reflection_gap:kublai": 1774313042.913578,
   "reflection_gap:jochi": 1773406881.407792,
-  "reflection_gap:temujin": 1773405274.172976
+  "reflection_gap:temujin": 1773405274.172976,
+  "extraction_stall:ogedei": 1774313348.889195
 }

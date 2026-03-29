@@ -52,12 +52,43 @@ def _extract_section(text: str, header: str) -> str:
     return ""
 
 
-def validate_completion(output: str) -> tuple[bool, dict]:
+def _has_delivery_receipt(output: str) -> bool:
+    """Check for a Signal Delivery section with exit_code: 0.
+
+    Looks for patterns like:
+        ## Signal Delivery
+        ...
+        exit_code: 0
+    or
+        **Signal Delivery**: ... exit_code: 0
+    """
+    # Find ## Signal Delivery section
+    delivery_match = re.search(
+        r'##\s*Signal\s+Delivery\b(.+?)(?=\n##|\Z)',
+        output,
+        re.DOTALL | re.IGNORECASE
+    )
+    if delivery_match:
+        section = delivery_match.group(1)
+        if re.search(r'exit_code\s*:\s*0\b', section):
+            return True
+    # Also accept inline bold format
+    inline_match = re.search(
+        r'\*\*Signal\s+Delivery\*\*[^*]*exit_code\s*:\s*0',
+        output,
+        re.IGNORECASE | re.DOTALL
+    )
+    return bool(inline_match)
+
+
+def validate_completion(output: str, require_delivery_section: bool = False) -> tuple[bool, dict]:
     """Validate task completion output.
 
     Checks:
     1. Output is non-empty and substantive
     2. Contains Problem, Solution, and Rationale sections
+    3. If require_delivery_section=True, also requires a ## Signal Delivery
+       section with exit_code: 0 (used for delivery tasks)
 
     Returns:
         (is_valid, parsed_or_error) tuple.
@@ -66,6 +97,10 @@ def validate_completion(output: str) -> tuple[bool, dict]:
     """
     if not output or len(output.strip()) < MIN_OUTPUT_LENGTH:
         return False, {"reason": f"empty or too short ({len(output.strip()) if output else 0} chars, min {MIN_OUTPUT_LENGTH})"}
+
+    # Delivery section check runs before everything else — no bypasses apply
+    if require_delivery_section and not _has_delivery_receipt(output):
+        return False, {"reason": "delivery task requires ## Signal Delivery section with exit_code: 0"}
 
     problem = _extract_section(output, "Problem")
     solution = _extract_section(output, "Solution")
@@ -81,8 +116,10 @@ def validate_completion(output: str) -> tuple[bool, dict]:
 
     if missing:
         # Fallback: if output is very long and substantive, accept it
-        # even without explicit sections (handles legacy output formats)
-        if len(output.strip()) > 500 and output.count('\n') > 10:
+        # even without explicit sections (handles legacy output formats).
+        # NOTE: This bypass does NOT apply to delivery tasks — those require
+        # explicit sections AND a verified delivery receipt.
+        if len(output.strip()) > 500 and output.count('\n') > 10 and not require_delivery_section:
             logger.info("Output lacks sections but is substantive — auto-extracting")
             lines = output.strip().split('\n')
             # Use first paragraph as problem, middle as solution, last as rationale

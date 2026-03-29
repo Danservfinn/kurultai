@@ -629,8 +629,8 @@ class ProfileSync:
         count = 0
 
         for profile in profiles:
-            human_id = profile["human_id"]
-            if self.sync_to_file(human_id):
+            phone_e164 = profile["phone_e164"]
+            if self.sync_to_file(phone_e164):
                 count += 1
 
         return count

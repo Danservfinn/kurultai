@@ -49,7 +49,7 @@ CATEGORY_ROUTING = {
     "investigation": "jochi",
     "documentation": "chagatai",
     "research": "mongke",
-    "coordination": "kublai",
+    "coordination": "ogedei",
     "monitoring": "ogedei",
     "security": "jochi",
     "writing": "chagatai",
@@ -57,7 +57,7 @@ CATEGORY_ROUTING = {
 }
 
 def route_by_category(category):
-    return CATEGORY_ROUTING.get(category.lower(), "kublai")
+    return CATEGORY_ROUTING.get(category.lower(), "ogedei")
 
 def route_by_text(text):
     from task_intake import route_by_text as _route
@@ -241,7 +241,7 @@ def heuristic_initiative(reflections, goals, system_state):
                     # Route using canonical router
                     agent = route_by_text(action)
                     if agent == "subagent":
-                        agent = "kublai"
+                        agent = "ogedei"
 
                     return (
                         f"ACTION: {action}\n"
@@ -257,7 +257,7 @@ def heuristic_initiative(reflections, goals, system_state):
             if "queue=" in line and "queue=0" not in line:
                 return (
                     "ACTION: Review and process pending task queue backlog\n"
-                    "AGENT: kublai\n"
+                    "AGENT: ogedei\n"
                     "PRIORITY: normal\n"
                     "RATIONALE: Tasks are queued but not being processed\n"
                     "EXPECTED_OUTCOME: Queue backlog reduced to zero"
@@ -281,7 +281,7 @@ def heuristic_initiative(reflections, goals, system_state):
          "Code quality - continuous improvement of codebase"),
         ("jochi", "Analyze recent task failures and identify patterns for prevention",
          "Quality assurance - learn from failures to prevent recurrence"),
-        ("kublai", "Review routing decisions and optimize agent load balancing",
+        ("ogedei", "Review routing decisions and optimize agent load balancing",
          "System efficiency - improve task distribution across fleet"),
         ("temujin", "Implement test coverage gap identified in recent code changes",
          "Testing rigor - fill gaps in test coverage"),
@@ -291,7 +291,7 @@ def heuristic_initiative(reflections, goals, system_state):
          "Documentation - capture knowledge while fresh"),
         ("ogedei", "Review system health metrics and address any degradation trends",
          "Preventive maintenance - address issues before they become incidents"),
-        ("kublai", "Audit active rules and proposals for relevance and completion",
+        ("ogedei", "Audit active rules and proposals for relevance and completion",
          "Process hygiene - clean up stale rules and proposals"),
     ]
 
@@ -331,7 +331,7 @@ def parse_initiative(raw_text):
                 agent = routed_agent
                 break
         else:
-            agent = "kublai"
+            agent = "ogedei"
     fields["agent"] = agent
 
     # Validate priority

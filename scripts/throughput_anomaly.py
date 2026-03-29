@@ -84,13 +84,13 @@ def count_active_claude_processes():
     return count
 
 
-def is_task_watcher_running():
-    """Check if task-watcher.py process is running.
+def is_task_executor_running():
+    """Check if task_executor.py process is running.
 
-    Uses ps aux to detect task-watcher.py process. This provides diagnostic
+    Uses ps aux to detect task_executor.py process. This provides diagnostic
     information for PENDING_NO_DISPATCH anomalies to distinguish between:
-    - task-watcher not running (needs restart)
-    - task-watcher running but not dispatching (different issue)
+    - task-executor not running (needs restart)
+    - task-executor running but not dispatching (different issue)
 
     Returns: tuple (is_running: bool, pid: int or None, details: str)
     """
@@ -103,7 +103,7 @@ def is_task_watcher_running():
         )
         if result.returncode == 0:
             for line in result.stdout.split('\n'):
-                if 'task-watcher' in line and 'python' in line:
+                if 'task_executor' in line and 'python' in line:
                     # Extract PID (second column in ps aux output)
                     parts = line.split()
                     if len(parts) >= 2:
@@ -564,24 +564,24 @@ def detect_anomalies():
         )
 
     # Anomaly 4: Tasks pending but nothing executing (dispatch starvation)
-    # Catches the gap where tasks queue up but task-watcher isn't picking them up
+    # Catches the gap where tasks queue up but task-executor isn't picking them up
     # REFLECTION-AWARE: Suppress false positives during hourly reflection cycle
     # (all agents run meta_reflection.py, causing temporary 0 executing state)
     # ACP-AWARE: Uses total_activity (executing + active_processes) because ACP sessions
     # don't create .executing.md files. Prevents false positives when work is happening.
-    # DIAGNOSTIC: Includes task-watcher process status for faster triage
+    # DIAGNOSTIC: Includes task-executor process status for faster triage
     if total_pending >= 3 and total_activity == 0:
         # Check if reflection is running before flagging anomaly
         if not is_reflection_running():
             pend_list = ", ".join(f"{a}={n}" for a, n in sorted(pending.items()))
-            # Diagnostic: Check task-watcher process status
-            tw_running, tw_pid, tw_status = is_task_watcher_running()
-            tw_info = f"task-watcher={tw_status}" if tw_status else "task-watcher status unknown"
+            # Diagnostic: Check task-executor process status
+            tw_running, tw_pid, tw_status = is_task_executor_running()
+            tw_info = f"task-executor={tw_status}" if tw_status else "task-executor status unknown"
             warnings.append(
                 f"THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — "
                 f"{total_pending} task(s) pending [{pend_list}] but "
                 f"0 executing, 0 active processes. {tw_info}. "
-                f"Action: {'check dispatch logs' if tw_running else 'restart task-watcher via launchctl'}"
+                f"Action: {'check dispatch logs' if tw_running else 'check com.kurultai.task-executor service'}"
             )
         # else: Reflection running - agents are busy reflecting, not stalled
 

@@ -17,6 +17,7 @@ Options:
 import argparse
 import json
 import os
+import random
 import sys
 import time
 from datetime import datetime, timedelta
@@ -26,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kurultai_paths import AGENTS_DIR, SCRIPTS_DIR
 
 # Agent directories to scan (Kurultai core agents)
-AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei", "tolui", "kublai"]
+AGENTS = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
 # Task file patterns that indicate completion
 DONE_SUFFIXES = [
@@ -228,11 +229,36 @@ def main():
         print(f"Done!")
         return 0
     
-    print(f"Found {len(completed)} completed task(s):")
+    print(f"Found {len(completed)} completed task(s).")
+
+    # Sampling: always include high/critical priority; sample ~30% of normal/low
+    high_critical = []
+    other = []
+    for task in completed:
+        # Determine priority from frontmatter field or filename prefix
+        priority = task.get("priority", "").lower()
+        if not priority:
+            fname = task["filename"].lower()
+            if fname.startswith("critical-") or fname.startswith("critical_"):
+                priority = "critical"
+            elif fname.startswith("high-") or fname.startswith("high_"):
+                priority = "high"
+            else:
+                priority = "normal"
+        if priority in ("high", "critical"):
+            high_critical.append(task)
+        else:
+            other.append(task)
+
+    sampled_other = [t for t in other if random.random() < 0.30]
+    completed = high_critical + sampled_other
+
+    print(f"Reviewing {len(completed)} of {len(high_critical) + len(other)} completed tasks "
+          f"(high/critical: {len(high_critical)}, sampled: {len(sampled_other)})")
     for task in completed:
         print(f"  • [{task['agent']}] {task['title']}")
     print()
-    
+
     # Create review tasks
     print(f"Creating review tasks...")
     print(f"-" * 70)

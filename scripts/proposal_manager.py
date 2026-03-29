@@ -45,13 +45,25 @@ class ProposalManager:
             close_driver()
             self.driver = None
 
+    # Tier-specific TTLs (hours). T2/T3 include 1h buffer beyond voting window.
+    TIER_TTL_HOURS = {"T0": 1, "T1": 1, "T2": 5, "T3": 14}
+
+    # Tier-specific approval thresholds
+    TIER_THRESHOLDS = {
+        "T0": {"min_yes": 0, "quorum": 0},      # bypass — auto-approved
+        "T1": {"min_yes": 0, "quorum": 0},      # auto-approved (self-scoped)
+        "T2": {"min_yes": 4, "quorum": 4},      # 4/6 majority, proposer excluded
+        "T3": {"min_yes": 5, "quorum": 5},      # 5/6 supermajority
+    }
+
     def create_proposal(self, title: str, description: str, proposing_agent: str,
                        priority: str = "normal", category: str = "feature",
-                       reflection_cycle: str = None) -> str:
-        """Create a new proposal and auto-cast YES vote from proposer."""
+                       reflection_cycle: str = None, tier: str = "T2") -> str:
+        """Create a new proposal and auto-cast YES vote from proposer (T0/T1 only)."""
         proposal_id = str(uuid.uuid4())[:12]
         now = datetime.now()
-        expires_at = now + timedelta(hours=24)
+        ttl_hours = self.TIER_TTL_HOURS.get(tier, 24)
+        expires_at = now + timedelta(hours=ttl_hours)
 
         if reflection_cycle is None:
             reflection_cycle = now.strftime("%Y-%m-%d-%H%M")
@@ -76,17 +88,22 @@ class ProposalManager:
                     vote_abstain_count: 0,
                     vote_total: 0,
                     vote_unanimous: false,
+                    vote_threshold_met: false,
+                    tier: $tier,
                     reflection_cycle: $reflection_cycle
                 })
                 CREATE (a)-[:PROPOSED {at: datetime()}]->(p)
                 RETURN p.proposal_id AS id
             """, proposal_id=proposal_id, title=title, description=description,
                 proposing_agent=proposing_agent, expires_at=expires_at.isoformat(),
-                priority=priority, category=category, reflection_cycle=reflection_cycle)
+                priority=priority, category=category, reflection_cycle=reflection_cycle,
+                tier=tier)
 
-            # Auto-cast YES vote from proposer
-            self._cast_vote(proposal_id, proposing_agent, "yes",
-                           "Proposed by me", reflection_cycle, session)
+            # Auto-cast YES vote from proposer (T0/T1 only).
+            # T2/T3 proposers are excluded from voting on their own proposals.
+            if tier in ("T0", "T1"):
+                self._cast_vote(proposal_id, proposing_agent, "yes",
+                               "Proposed by me", reflection_cycle, session)
 
         # Create file in proposals/pending/
         self._create_proposal_file(proposal_id, title, description, proposing_agent, priority, category)
@@ -149,7 +166,14 @@ class ProposalManager:
                 p.vote_no_count = coalesce(no, 0),
                 p.vote_abstain_count = coalesce(abstain, 0),
                 p.vote_total = total,
-                p.vote_unanimous = (total = 6 AND coalesce(no, 0) = 0)
+                p.vote_unanimous = (total = 6 AND coalesce(no, 0) = 0),
+                p.vote_threshold_met = CASE coalesce(p.tier, 'T2')
+                    WHEN 'T0' THEN true
+                    WHEN 'T1' THEN true
+                    WHEN 'T2' THEN (coalesce(yes, 0) >= 4)
+                    WHEN 'T3' THEN (coalesce(yes, 0) >= 5)
+                    ELSE (total = 6 AND coalesce(no, 0) = 0)
+                END
         """, proposal_id=proposal_id)
 
     def _create_proposal_file(self, proposal_id: str, title: str,
@@ -259,9 +283,9 @@ category: {category}
 
             # Update Resolution section based on final status
             resolution_text = {
-                "approved": f"APPROVED by Kurultai unanimous vote on {datetime.now().strftime('%Y-%m-%d')}. Implementation tasks created.",
-                "rejected": f"REJECTED by Kurultai vote on {datetime.now().strftime('%Y-%m-%d')}. Proposal did not receive unanimous consent.",
-                "expired": f"EXPIRED on {datetime.now().strftime('%Y-%m-%d')}. Voting deadline passed without unanimous decision.",
+                "approved": f"APPROVED by Kurultai vote on {datetime.now().strftime('%Y-%m-%d')}. Implementation tasks created.",
+                "rejected": f"REJECTED by Kurultai vote on {datetime.now().strftime('%Y-%m-%d')}. Approval threshold not met.",
+                "expired": f"EXPIRED on {datetime.now().strftime('%Y-%m-%d')}. Voting deadline passed without sufficient approval.",
                 "archived": f"ARCHIVED on {datetime.now().strftime('%Y-%m-%d')}. Proposal closed."
             }
 
@@ -321,6 +345,47 @@ category: {category}
             """)
             return [{"proposal_id": r["proposal_id"], "title": r["title"],
                     "yes_count": r["yes_count"]} for r in result]
+
+    def check_threshold_met(self) -> list:
+        """Return proposals that meet their tier's approval threshold.
+
+        Implements tiered approval:
+        - T0/T1: auto-approved (threshold 0)
+        - T2: 4/6 majority (proposer excluded)
+        - T3: 5/6 supermajority
+        Kublai NO vote on T2/T3 acts as veto (proposal excluded from results).
+        Legacy proposals (no tier) default to T2 behavior.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (p:Proposal {status: 'pending'})
+                OPTIONAL MATCH (p)<-[:FOR_PROPOSAL]-(v:Vote)
+                WITH p,
+                    count(v) AS total_votes,
+                    sum(CASE WHEN v.decision = 'yes' THEN 1 ELSE 0 END) AS yes_count,
+                    sum(CASE WHEN v.decision = 'no' THEN 1 ELSE 0 END) AS no_count,
+                    coalesce(p.tier, 'T2') AS tier
+                OPTIONAL MATCH (p)<-[:FOR_PROPOSAL]-(kv:Vote {agent: 'kublai', decision: 'no'})
+                WITH p, total_votes, yes_count, no_count, tier, kv
+                WHERE NOT (tier IN ['T2', 'T3'] AND kv IS NOT NULL)
+                RETURN p.proposal_id AS proposal_id, p.title AS title,
+                       yes_count, no_count, total_votes, tier
+            """)
+            approved = []
+            for r in result:
+                t = r["tier"]
+                threshold = self.TIER_THRESHOLDS.get(t, {"min_yes": 6, "quorum": 6})
+                if (r["yes_count"] >= threshold["min_yes"] and
+                    r["total_votes"] >= threshold["quorum"]):
+                    approved.append({
+                        "proposal_id": r["proposal_id"],
+                        "title": r["title"],
+                        "yes_count": r["yes_count"],
+                        "no_count": r["no_count"],
+                        "total_votes": r["total_votes"],
+                        "tier": t
+                    })
+            return approved
 
     def get_expired_proposals(self) -> list:
         """Return list of pending proposals past their expiration."""

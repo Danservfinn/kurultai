@@ -1,146 +1,152 @@
-{"timestamp": 1773792265.227817, "datetime": "2026-03-17T20:04:25.227817", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "kublai": 1, "chagatai": 0, "ogedei": 0, "jochi": 0, "tolui": 0, "mongke": 0}}
-{"timestamp": 1773793886.5293498, "datetime": "2026-03-17T20:31:26.529350", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "kublai": 1, "ogedei": 0, "jochi": 0, "tolui": 0, "mongke": 0, "temujin": 0}}
-{"timestamp": 1773795683.323091, "datetime": "2026-03-17T21:01:23.323091", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "mongke": 0, "ogedei": 0, "chagatai": 0, "tolui": 0, "kublai": 1, "temujin": 0}}
-{"timestamp": 1773797887.1926882, "datetime": "2026-03-17T21:38:07.192688", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "ogedei": 0, "kublai": 1, "mongke": 0, "tolui": 0, "temujin": 0, "chagatai": 0}}
-{"timestamp": 1773799285.598687, "datetime": "2026-03-17T22:01:25.598687", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "temujin": 0, "chagatai": 0, "tolui": 0, "jochi": 0, "mongke": 0, "kublai": 1}}
-{"timestamp": 1773801074.641484, "datetime": "2026-03-17T22:31:14.641484", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "tolui": 0, "temujin": 0, "kublai": 1, "mongke": 0, "ogedei": 0, "chagatai": 0}}
-{"timestamp": 1773802877.069258, "datetime": "2026-03-17T23:01:17.069258", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "chagatai": 0, "mongke": 0, "tolui": 0, "kublai": 1, "temujin": 0, "jochi": 0}}
-{"timestamp": 1773804676.35863, "datetime": "2026-03-17T23:31:16.358630", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "kublai": 1, "jochi": 0, "chagatai": 0, "tolui": 0, "mongke": 0, "temujin": 0}}
-{"timestamp": 1773806491.5731158, "datetime": "2026-03-18T00:01:31.573116", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "jochi": 0, "temujin": 0, "chagatai": 0, "mongke": 0, "tolui": 0, "ogedei": 0}}
-{"timestamp": 1773808309.494991, "datetime": "2026-03-18T00:31:49.494991", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "kublai": 1, "chagatai": 0, "mongke": 0, "ogedei": 0, "tolui": 0, "temujin": 0}}
-{"timestamp": 1773810399.288498, "datetime": "2026-03-18T01:06:39.288498", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "chagatai": 0, "jochi": 0, "temujin": 0, "kublai": 1, "ogedei": 0, "tolui": 0}}
-{"timestamp": 1773811874.0339751, "datetime": "2026-03-18T01:31:14.033975", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "ogedei": 0, "kublai": 1, "jochi": 0, "chagatai": 0, "tolui": 0, "mongke": 0}}
-{"timestamp": 1773813714.156, "datetime": "2026-03-18T02:01:54.156000", "load_factor": 0.047619047619047616, "depths": {"chagatai": 0, "temujin": 0, "kublai": 1, "ogedei": 1, "jochi": 0, "mongke": 0, "tolui": 0}}
-{"timestamp": 1773815521.882565, "datetime": "2026-03-18T02:32:01.882565", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "kublai": 1, "jochi": 0, "tolui": 0, "temujin": 0, "chagatai": 0, "mongke": 0}}
-{"timestamp": 1773817532.115318, "datetime": "2026-03-18T03:05:32.115318", "load_factor": 0.047619047619047616, "depths": {"mongke": 0, "kublai": 1, "chagatai": 0, "tolui": 0, "temujin": 0, "jochi": 0, "ogedei": 1}}
-{"timestamp": 1773819080.348972, "datetime": "2026-03-18T03:31:20.348972", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "kublai": 1, "tolui": 0, "temujin": 0, "chagatai": 0, "jochi": 0, "ogedei": 0}}
-{"timestamp": 1773820884.266486, "datetime": "2026-03-18T04:01:24.266486", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "mongke": 0, "kublai": 1, "chagatai": 0, "jochi": 0, "ogedei": 0, "temujin": 0}}
-{"timestamp": 1773822680.954907, "datetime": "2026-03-18T04:31:20.954907", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "temujin": 0, "mongke": 0, "ogedei": 0, "kublai": 1, "tolui": 0, "chagatai": 0}}
-{"timestamp": 1773824536.73321, "datetime": "2026-03-18T05:02:16.733210", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "tolui": 0, "jochi": 0, "mongke": 0, "chagatai": 0, "ogedei": 0, "kublai": 1}}
-{"timestamp": 1773826566.9451368, "datetime": "2026-03-18T05:36:06.945137", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "temujin": 0, "kublai": 1, "tolui": 0, "ogedei": 0, "mongke": 0, "jochi": 0}}
-{"timestamp": 1773828183.669678, "datetime": "2026-03-18T06:03:03.669678", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "chagatai": 0, "temujin": 0, "kublai": 1, "ogedei": 0, "tolui": 0, "jochi": 0}}
-{"timestamp": 1773829965.4359748, "datetime": "2026-03-18T06:32:45.435975", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "jochi": 0, "tolui": 0, "kublai": 1, "ogedei": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773831899.565838, "datetime": "2026-03-18T07:04:59.565838", "load_factor": 0.047619047619047616, "depths": {"mongke": 1, "temujin": 0, "chagatai": 0, "kublai": 1, "tolui": 0, "jochi": 0, "ogedei": 0}}
-{"timestamp": 1773833535.008218, "datetime": "2026-03-18T07:32:15.008218", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "chagatai": 0, "temujin": 0, "jochi": 0, "kublai": 1, "mongke": 0, "tolui": 0}}
-{"timestamp": 1773835811.527254, "datetime": "2026-03-18T08:10:11.527254", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "tolui": 0, "kublai": 1, "mongke": 0, "temujin": 0, "chagatai": 0, "jochi": 0}}
-{"timestamp": 1773837164.439424, "datetime": "2026-03-18T08:32:44.439424", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "tolui": 0, "jochi": 0, "chagatai": 0, "kublai": 1, "mongke": 0, "ogedei": 0}}
-{"timestamp": 1773838885.189733, "datetime": "2026-03-18T09:01:25.189733", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "tolui": 0, "mongke": 0, "ogedei": 0, "jochi": 0, "kublai": 1, "chagatai": 0}}
-{"timestamp": 1773840673.2377138, "datetime": "2026-03-18T09:31:13.237714", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "kublai": 1, "tolui": 0, "temujin": 0, "mongke": 0, "chagatai": 0, "ogedei": 0}}
-{"timestamp": 1773842478.1010518, "datetime": "2026-03-18T10:01:18.101052", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "chagatai": 0, "jochi": 0, "temujin": 0, "ogedei": 0, "mongke": 0, "tolui": 0}}
-{"timestamp": 1773844417.572783, "datetime": "2026-03-18T10:33:37.572783", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "tolui": 0, "kublai": 1, "mongke": 0, "temujin": 0, "chagatai": 0}}
-{"timestamp": 1773846077.80247, "datetime": "2026-03-18T11:01:17.802470", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "mongke": 0, "jochi": 0, "tolui": 0, "ogedei": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773848153.895854, "datetime": "2026-03-18T11:35:53.895854", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "ogedei": 0, "temujin": 0, "tolui": 0, "chagatai": 0, "jochi": 0, "kublai": 1}}
-{"timestamp": 1773849708.556515, "datetime": "2026-03-18T12:01:48.556515", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "kublai": 1, "mongke": 0, "temujin": 0, "ogedei": 0, "jochi": 0, "tolui": 0}}
-{"timestamp": 1773851480.200439, "datetime": "2026-03-18T12:31:20.200439", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "tolui": 0, "mongke": 0, "temujin": 0, "chagatai": 0, "kublai": 1}}
-{"timestamp": 1773853274.7513, "datetime": "2026-03-18T13:01:14.751300", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "jochi": 0, "chagatai": 0, "kublai": 1, "ogedei": 0, "mongke": 0, "tolui": 0}}
-{"timestamp": 1773855143.119254, "datetime": "2026-03-18T13:32:23.119254", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "temujin": 0, "chagatai": 0, "jochi": 0, "ogedei": 0, "tolui": 0, "kublai": 1}}
-{"timestamp": 1773856897.4732318, "datetime": "2026-03-18T14:01:37.473232", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "jochi": 0, "temujin": 0, "tolui": 0, "chagatai": 0, "mongke": 0, "ogedei": 0}}
-{"timestamp": 1773858672.757951, "datetime": "2026-03-18T14:31:12.757951", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "mongke": 0, "chagatai": 0, "temujin": 0, "tolui": 0, "kublai": 1, "ogedei": 0}}
-{"timestamp": 1773860479.3253288, "datetime": "2026-03-18T15:01:19.325329", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "kublai": 1, "temujin": 0, "mongke": 0, "jochi": 0, "ogedei": 0, "chagatai": 0}}
-{"timestamp": 1773862281.858725, "datetime": "2026-03-18T15:31:21.858725", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "tolui": 0, "mongke": 0, "kublai": 1, "ogedei": 0, "chagatai": 0, "jochi": 0}}
-{"timestamp": 1773864103.859461, "datetime": "2026-03-18T16:01:43.859461", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "ogedei": 0, "mongke": 0, "tolui": 0, "jochi": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773865879.1112761, "datetime": "2026-03-18T16:31:19.111276", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "mongke": 0, "kublai": 1, "tolui": 0, "jochi": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773867696.74627, "datetime": "2026-03-18T17:01:36.746270", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "tolui": 0, "temujin": 0, "mongke": 0, "chagatai": 0, "kublai": 1}}
-{"timestamp": 1773869480.055691, "datetime": "2026-03-18T17:31:20.055691", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "jochi": 0, "temujin": 0, "tolui": 0, "ogedei": 0, "mongke": 0, "chagatai": 0}}
-{"timestamp": 1773871693.441015, "datetime": "2026-03-18T18:08:13.441015", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "kublai": 1, "temujin": 0, "tolui": 0, "chagatai": 0, "jochi": 0, "mongke": 0}}
-{"timestamp": 1773873124.484351, "datetime": "2026-03-18T18:32:04.484351", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "ogedei": 0, "chagatai": 0, "temujin": 0, "kublai": 1, "mongke": 0, "jochi": 0}}
-{"timestamp": 1773875096.45292, "datetime": "2026-03-18T19:04:56.452920", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "tolui": 0, "mongke": 0, "kublai": 1, "temujin": 0, "chagatai": 0, "jochi": 0}}
-{"timestamp": 1773876681.720729, "datetime": "2026-03-18T19:31:21.720729", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "chagatai": 0, "tolui": 0, "temujin": 0, "kublai": 1, "jochi": 0, "mongke": 0}}
-{"timestamp": 1773878507.4350631, "datetime": "2026-03-18T20:01:47.435063", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "temujin": 0, "tolui": 0, "mongke": 0, "ogedei": 0, "chagatai": 0, "jochi": 0}}
-{"timestamp": 1773880276.03515, "datetime": "2026-03-18T20:31:16.035150", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "mongke": 0, "kublai": 1, "tolui": 0, "chagatai": 0, "temujin": 0, "ogedei": 0}}
-{"timestamp": 1773883892.564873, "datetime": "2026-03-18T21:31:32.564873", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "jochi": 0, "ogedei": 0, "temujin": 0, "kublai": 1, "chagatai": 0, "mongke": 0}}
-{"timestamp": 1773885693.990596, "datetime": "2026-03-18T22:01:33.990596", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "ogedei": 0, "mongke": 0, "tolui": 0, "jochi": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773887490.570902, "datetime": "2026-03-18T22:31:30.570902", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "tolui": 0, "chagatai": 0, "kublai": 1, "jochi": 0, "mongke": 0, "temujin": 0}}
-{"timestamp": 1773889303.625397, "datetime": "2026-03-18T23:01:43.625397", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "mongke": 0, "jochi": 0, "kublai": 1, "ogedei": 0, "temujin": 0, "chagatai": 0}}
-{"timestamp": 1773891091.1774552, "datetime": "2026-03-18T23:31:31.177455", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "kublai": 1, "jochi": 0, "mongke": 0, "ogedei": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773892907.61116, "datetime": "2026-03-19T00:01:47.611160", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "chagatai": 0, "temujin": 0, "jochi": 0, "ogedei": 0, "tolui": 0, "mongke": 0}}
-{"timestamp": 1773894726.128623, "datetime": "2026-03-19T00:32:06.128623", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "temujin": 0, "ogedei": 0, "mongke": 0, "kublai": 1, "tolui": 0, "jochi": 0}}
-{"timestamp": 1773896608.359806, "datetime": "2026-03-19T01:03:28.359806", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "kublai": 1, "tolui": 0, "temujin": 0, "mongke": 0, "chagatai": 0}}
-{"timestamp": 1773898281.281536, "datetime": "2026-03-19T01:31:21.281536", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "temujin": 0, "chagatai": 0, "ogedei": 0, "kublai": 1, "tolui": 0, "mongke": 0}}
-{"timestamp": 1773900328.147775, "datetime": "2026-03-19T02:05:28.147775", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "jochi": 0, "mongke": 0, "kublai": 1, "temujin": 0, "ogedei": 0, "tolui": 0}}
-{"timestamp": 1773901971.663558, "datetime": "2026-03-19T02:32:51.663558", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "kublai": 1, "tolui": 0, "temujin": 0, "mongke": 0, "ogedei": 0, "chagatai": 0}}
-{"timestamp": 1773945412.6341708, "datetime": "2026-03-19T14:36:52.634171", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "tolui": 0, "mongke": 0, "chagatai": 0, "kublai": 1, "temujin": 0, "jochi": 0}}
-{"timestamp": 1773946885.99684, "datetime": "2026-03-19T15:01:25.996840", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "temujin": 0, "tolui": 0, "kublai": 1, "chagatai": 0, "mongke": 0}}
-{"timestamp": 1773948677.204556, "datetime": "2026-03-19T15:31:17.204556", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "temujin": 0, "tolui": 0, "chagatai": 0, "ogedei": 0, "jochi": 0, "mongke": 0}}
-{"timestamp": 1773950497.8921459, "datetime": "2026-03-19T16:01:37.892146", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "kublai": 1, "temujin": 0, "ogedei": 0, "mongke": 0, "jochi": 0, "chagatai": 0}}
-{"timestamp": 1773952276.373291, "datetime": "2026-03-19T16:31:16.373291", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "mongke": 0, "ogedei": 0, "chagatai": 0, "kublai": 1, "temujin": 0, "jochi": 0}}
-{"timestamp": 1773954073.752032, "datetime": "2026-03-19T17:01:13.752032", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "tolui": 0, "chagatai": 0, "ogedei": 0, "mongke": 0, "jochi": 0, "kublai": 1}}
-{"timestamp": 1773955873.394731, "datetime": "2026-03-19T17:31:13.394731", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "temujin": 0, "tolui": 0, "ogedei": 0, "kublai": 1, "jochi": 0, "mongke": 0}}
-{"timestamp": 1773957711.487561, "datetime": "2026-03-19T18:01:51.487561", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "mongke": 0, "kublai": 1, "chagatai": 0, "tolui": 0, "jochi": 0, "ogedei": 0}}
-{"timestamp": 1773959493.88224, "datetime": "2026-03-19T18:31:33.882240", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "chagatai": 0, "tolui": 0, "ogedei": 0, "temujin": 0, "jochi": 0, "mongke": 0}}
-{"timestamp": 1773961460.71827, "datetime": "2026-03-19T19:04:20.718270", "load_factor": 0.023809523809523808, "depths": {"kublai": 1, "jochi": 0, "chagatai": 0, "temujin": 0, "tolui": 0, "mongke": 0, "ogedei": 0}}
-{"timestamp": 1773963077.8193438, "datetime": "2026-03-19T19:31:17.819344", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "jochi": 0, "kublai": 1, "mongke": 0, "tolui": 0, "chagatai": 0, "ogedei": 0}}
-{"timestamp": 1773964915.53738, "datetime": "2026-03-19T20:01:55.537380", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "kublai": 1, "tolui": 0, "jochi": 0, "chagatai": 0, "ogedei": 0, "temujin": 0}}
-{"timestamp": 1773966684.065203, "datetime": "2026-03-19T20:31:24.065203", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "jochi": 0, "kublai": 1, "mongke": 0, "ogedei": 0, "chagatai": 0, "temujin": 0}}
-{"timestamp": 1773968490.516056, "datetime": "2026-03-19T21:01:30.516056", "load_factor": 0.047619047619047616, "depths": {"temujin": 0, "jochi": 0, "kublai": 2, "tolui": 0, "ogedei": 0, "chagatai": 0, "mongke": 0}}
-{"timestamp": 1773970271.406477, "datetime": "2026-03-19T21:31:11.406477", "load_factor": 0.07142857142857142, "depths": {"kublai": 2, "mongke": 0, "tolui": 0, "temujin": 0, "jochi": 1, "chagatai": 0, "ogedei": 0}}
-{"timestamp": 1773972083.289691, "datetime": "2026-03-19T22:01:23.289691", "load_factor": 0.09523809523809523, "depths": {"tolui": 0, "temujin": 0, "mongke": 0, "ogedei": 0, "chagatai": 0, "kublai": 3, "jochi": 1}}
-{"timestamp": 1773973872.047488, "datetime": "2026-03-19T22:31:12.047488", "load_factor": 0.09523809523809523, "depths": {"ogedei": 0, "kublai": 3, "temujin": 0, "tolui": 0, "jochi": 1, "mongke": 0, "chagatai": 0}}
-{"timestamp": 1773975673.629739, "datetime": "2026-03-19T23:01:13.629739", "load_factor": 0.14285714285714285, "depths": {"jochi": 2, "tolui": 0, "ogedei": 0, "mongke": 0, "chagatai": 0, "kublai": 4, "temujin": 0}}
-{"timestamp": 1773977475.270286, "datetime": "2026-03-19T23:31:15.270286", "load_factor": 0.16666666666666666, "depths": {"jochi": 2, "mongke": 0, "temujin": 0, "tolui": 0, "chagatai": 0, "ogedei": 0, "kublai": 5}}
-{"timestamp": 1773979309.763374, "datetime": "2026-03-20T00:01:49.763374", "load_factor": 0.19047619047619047, "depths": {"kublai": 5, "tolui": 0, "chagatai": 0, "mongke": 0, "temujin": 0, "ogedei": 0, "jochi": 3}}
-{"timestamp": 1773981076.783539, "datetime": "2026-03-20T00:31:16.783539", "load_factor": 0.07142857142857142, "depths": {"kublai": 2, "tolui": 0, "ogedei": 0, "chagatai": 0, "temujin": 0, "mongke": 0, "jochi": 1}}
-{"timestamp": 1773983095.179106, "datetime": "2026-03-20T01:04:55.179106", "load_factor": 0.11904761904761904, "depths": {"tolui": 0, "jochi": 2, "mongke": 0, "temujin": 0, "chagatai": 0, "kublai": 3, "ogedei": 0}}
-{"timestamp": 1773984796.120119, "datetime": "2026-03-20T01:33:16.120119", "load_factor": 0.16666666666666666, "depths": {"kublai": 4, "temujin": 0, "mongke": 0, "chagatai": 0, "ogedei": 1, "tolui": 0, "jochi": 2}}
-{"timestamp": "2026-03-20T01:38:00.421981", "load_factor": 0.21428571428571427}
-{"timestamp": "2026-03-20T01:48:13.012096", "load_factor": 0.21428571428571427}
-{"timestamp": "2026-03-20T01:58:00.213334", "load_factor": 0.23809523809523808}
-{"timestamp": 1773986495.259041, "datetime": "2026-03-20T02:01:35.259041", "load_factor": 0.23809523809523808, "depths": {"jochi": 4, "tolui": 0, "kublai": 4, "mongke": 0, "temujin": 0, "chagatai": 0, "ogedei": 2}}
-{"timestamp": "2026-03-20T02:08:54.155865", "load_factor": 0.23809523809523808}
-{"timestamp": 1773988615.066464, "datetime": "2026-03-20T02:36:55.066464", "load_factor": 0.23809523809523808, "depths": {"jochi": 4, "tolui": 0, "mongke": 0, "temujin": 0, "chagatai": 0, "ogedei": 2, "kublai": 4}}
-{"timestamp": 1773990077.773351, "datetime": "2026-03-20T03:01:17.773351", "load_factor": 0.3333333333333333, "depths": {"kublai": 1, "chagatai": 0, "jochi": 1, "tolui": 0, "mongke": 0, "ogedei": 2, "temujin": 10}}
-{"timestamp": 1773991874.126726, "datetime": "2026-03-20T03:31:14.126726", "load_factor": 0.4523809523809524, "depths": {"kublai": 1, "ogedei": 3, "jochi": 2, "mongke": 2, "temujin": 10, "chagatai": 1, "tolui": 0}}
-{"timestamp": 1773993678.111084, "datetime": "2026-03-20T04:01:18.111084", "load_factor": 0.47619047619047616, "depths": {"ogedei": 3, "temujin": 10, "jochi": 4, "mongke": 1, "kublai": 1, "chagatai": 1, "tolui": 0}}
-{"timestamp": 1773995475.6320698, "datetime": "2026-03-20T04:31:15.632070", "load_factor": 0.38095238095238093, "depths": {"chagatai": 1, "mongke": 3, "temujin": 8, "ogedei": 2, "jochi": 2, "kublai": 0, "tolui": 0}}
-{"timestamp": 1773997280.002244, "datetime": "2026-03-20T05:01:20.002244", "load_factor": 0.19047619047619047, "depths": {"ogedei": 5, "chagatai": 1, "kublai": 1, "jochi": 0, "tolui": 0, "mongke": 1, "temujin": 0}}
-{"timestamp": 1773999073.076468, "datetime": "2026-03-20T05:31:13.076468", "load_factor": 0.19047619047619047, "depths": {"tolui": 0, "kublai": 0, "temujin": 0, "mongke": 2, "chagatai": 1, "ogedei": 3, "jochi": 2}}
-{"timestamp": 1774000911.5096698, "datetime": "2026-03-20T06:01:51.509670", "load_factor": 0.19047619047619047, "depths": {"jochi": 2, "chagatai": 1, "mongke": 2, "temujin": 0, "kublai": 0, "ogedei": 3, "tolui": 0}}
-{"timestamp": 1774002674.524004, "datetime": "2026-03-20T06:31:14.524004", "load_factor": 0.09523809523809523, "depths": {"temujin": 1, "ogedei": 0, "mongke": 1, "chagatai": 1, "jochi": 1, "tolui": 0, "kublai": 0}}
-{"timestamp": 1774004598.904426, "datetime": "2026-03-20T07:03:18.904426", "load_factor": 0.21428571428571427, "depths": {"tolui": 0, "ogedei": 1, "jochi": 2, "kublai": 3, "temujin": 1, "chagatai": 1, "mongke": 1}}
-{"timestamp": "2026-03-20T07:06:48.317485", "load_factor": 0.16666666666666666}
-{"timestamp": 1774006273.0852532, "datetime": "2026-03-20T07:31:13.085253", "load_factor": 0.11904761904761904, "depths": {"ogedei": 1, "chagatai": 1, "kublai": 0, "tolui": 0, "jochi": 1, "temujin": 1, "mongke": 1}}
-{"timestamp": 1774009451.091624, "datetime": "2026-03-20T08:24:11.091624", "load_factor": 0.11904761904761904, "depths": {"jochi": 1, "mongke": 1, "kublai": 0, "chagatai": 1, "ogedei": 1, "temujin": 1, "tolui": 0}}
-{"timestamp": 1774009876.072693, "datetime": "2026-03-20T08:31:16.072693", "load_factor": 0.07142857142857142, "depths": {"tolui": 0, "jochi": 1, "chagatai": 0, "kublai": 0, "ogedei": 1, "mongke": 1, "temujin": 0}}
-{"timestamp": 1774011685.0263538, "datetime": "2026-03-20T09:01:25.026354", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "jochi": 0, "tolui": 0, "ogedei": 0, "kublai": 0, "chagatai": 0, "mongke": 1}}
-{"timestamp": 1774013886.0169752, "datetime": "2026-03-20T09:38:06.016975", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "tolui": 0, "chagatai": 0, "kublai": 0, "mongke": 1, "ogedei": 0, "jochi": 0}}
-{"timestamp": 1774015318.550857, "datetime": "2026-03-20T10:01:58.550857", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "kublai": 0, "mongke": 1, "temujin": 0, "tolui": 0, "ogedei": 0, "jochi": 0}}
-{"timestamp": 1774017071.413663, "datetime": "2026-03-20T10:31:11.413663", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "chagatai": 0, "ogedei": 0, "temujin": 0, "tolui": 0, "mongke": 1, "kublai": 0}}
-{"timestamp": 1774018882.960554, "datetime": "2026-03-20T11:01:22.960554", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "tolui": 0, "chagatai": 0, "mongke": 1, "ogedei": 0, "temujin": 0, "jochi": 0}}
-{"timestamp": 1774020673.816192, "datetime": "2026-03-20T11:31:13.816192", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "jochi": 0, "kublai": 0, "temujin": 0, "chagatai": 0, "mongke": 1, "ogedei": 0}}
-{"timestamp": 1774022480.353966, "datetime": "2026-03-20T12:01:20.353966", "load_factor": 0.047619047619047616, "depths": {"kublai": 0, "ogedei": 0, "tolui": 0, "jochi": 0, "chagatai": 0, "temujin": 1, "mongke": 1}}
-{"timestamp": 1774024273.482015, "datetime": "2026-03-20T12:31:13.482015", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "temujin": 0, "mongke": 1, "jochi": 0, "kublai": 0, "chagatai": 0, "ogedei": 0}}
-{"timestamp": 1774026072.6693802, "datetime": "2026-03-20T13:01:12.669380", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "ogedei": 0, "chagatai": 0, "jochi": 0, "mongke": 1, "kublai": 0, "tolui": 0}}
-{"timestamp": 1774027872.006691, "datetime": "2026-03-20T13:31:12.006691", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "jochi": 0, "ogedei": 0, "mongke": 1, "temujin": 0, "chagatai": 0, "tolui": 0}}
-{"timestamp": 1774029801.766528, "datetime": "2026-03-20T14:03:21.766528", "load_factor": 0.047619047619047616, "depths": {"ogedei": 0, "chagatai": 0, "jochi": 0, "temujin": 1, "kublai": 0, "mongke": 1, "tolui": 0}}
-{"timestamp": 1774031483.611831, "datetime": "2026-03-20T14:31:23.611831", "load_factor": 0.047619047619047616, "depths": {"chagatai": 0, "kublai": 0, "temujin": 1, "ogedei": 0, "mongke": 1, "tolui": 0, "jochi": 0}}
-{"timestamp": 1774033277.1755462, "datetime": "2026-03-20T15:01:17.175546", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "mongke": 1, "kublai": 0, "ogedei": 0, "jochi": 0, "tolui": 0, "chagatai": 0}}
-{"timestamp": 1774035072.276421, "datetime": "2026-03-20T15:31:12.276421", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "tolui": 0, "mongke": 1, "temujin": 0, "chagatai": 0, "kublai": 0}}
-{"timestamp": 1774036876.2579782, "datetime": "2026-03-20T16:01:16.257978", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "temujin": 0, "tolui": 0, "mongke": 1, "kublai": 0, "chagatai": 0}}
-{"timestamp": 1774038672.791868, "datetime": "2026-03-20T16:31:12.791868", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "kublai": 0, "ogedei": 0, "tolui": 0, "chagatai": 0, "mongke": 1, "temujin": 0}}
-{"timestamp": 1774040813.7677782, "datetime": "2026-03-20T17:06:53.767778", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "chagatai": 0, "ogedei": 0, "temujin": 0, "mongke": 1, "jochi": 0, "kublai": 0}}
-{"timestamp": 1774042386.801334, "datetime": "2026-03-20T17:33:06.801334", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "kublai": 0, "mongke": 1, "chagatai": 0, "jochi": 0, "temujin": 0, "tolui": 0}}
-{"timestamp": 1774044168.405264, "datetime": "2026-03-20T18:02:48.405264", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "mongke": 0, "tolui": 0, "chagatai": 0, "kublai": 0, "ogedei": 0, "temujin": 1}}
-{"timestamp": 1774045873.170305, "datetime": "2026-03-20T18:31:13.170305", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "temujin": 1, "jochi": 0, "mongke": 0, "ogedei": 0, "chagatai": 0, "kublai": 0}}
-{"timestamp": 1774047676.771893, "datetime": "2026-03-20T19:01:16.771893", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "tolui": 0, "ogedei": 0, "chagatai": 0, "mongke": 0, "temujin": 1, "kublai": 0}}
-{"timestamp": 1774049476.802536, "datetime": "2026-03-20T19:31:16.802536", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "temujin": 1, "jochi": 0, "mongke": 0, "kublai": 0, "chagatai": 0, "tolui": 0}}
-{"timestamp": 1774051285.3540921, "datetime": "2026-03-20T20:01:25.354092", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "chagatai": 0, "kublai": 0, "tolui": 0, "jochi": 0, "mongke": 0, "ogedei": 0}}
-{"timestamp": 1774053073.265454, "datetime": "2026-03-20T20:31:13.265454", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "kublai": 0, "chagatai": 0, "mongke": 0, "tolui": 0, "ogedei": 0, "jochi": 0}}
-{"timestamp": 1774054898.993144, "datetime": "2026-03-20T21:01:38.993144", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "mongke": 0, "jochi": 0, "temujin": 1, "kublai": 0, "ogedei": 0, "chagatai": 0}}
-{"timestamp": 1774056671.4934442, "datetime": "2026-03-20T21:31:11.493444", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "jochi": 0, "chagatai": 0, "tolui": 0, "ogedei": 0, "kublai": 0, "mongke": 0}}
-{"timestamp": 1774058477.515739, "datetime": "2026-03-20T22:01:17.515739", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "temujin": 1, "jochi": 0, "kublai": 0, "chagatai": 0, "tolui": 0, "ogedei": 0}}
-{"timestamp": 1774060272.253726, "datetime": "2026-03-20T22:31:12.253726", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "kublai": 0, "temujin": 1, "mongke": 0, "chagatai": 0, "jochi": 0, "tolui": 0}}
-{"timestamp": 1774062074.8066869, "datetime": "2026-03-20T23:01:14.806687", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "ogedei": 0, "kublai": 0, "jochi": 0, "temujin": 1, "chagatai": 0, "tolui": 0}}
-{"timestamp": 1774063880.8732202, "datetime": "2026-03-20T23:31:20.873220", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "temujin": 1, "tolui": 0, "jochi": 0, "chagatai": 0, "kublai": 0, "ogedei": 0}}
-{"timestamp": 1774066428.4818702, "datetime": "2026-03-21T00:13:48.481870", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "mongke": 0, "temujin": 1, "tolui": 0, "kublai": 0, "ogedei": 0, "chagatai": 0}}
-{"timestamp": 1774067472.5435898, "datetime": "2026-03-21T00:31:12.543590", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "temujin": 1, "ogedei": 0, "tolui": 0, "chagatai": 0, "jochi": 0, "mongke": 0}}
-{"timestamp": 1774069278.832887, "datetime": "2026-03-21T01:01:18.832887", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "ogedei": 0, "jochi": 0, "chagatai": 0, "tolui": 0, "mongke": 0, "kublai": 0}}
-{"timestamp": 1774071073.977941, "datetime": "2026-03-21T01:31:13.977941", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "chagatai": 0, "mongke": 0, "jochi": 0, "kublai": 0, "ogedei": 0, "temujin": 1}}
-{"timestamp": 1774072878.586894, "datetime": "2026-03-21T02:01:18.586894", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "temujin": 1, "kublai": 0, "chagatai": 0, "ogedei": 0, "mongke": 0, "jochi": 0}}
-{"timestamp": 1774074672.813768, "datetime": "2026-03-21T02:31:12.813768", "load_factor": 0.07142857142857142, "depths": {"jochi": 1, "mongke": 0, "temujin": 2, "ogedei": 0, "tolui": 0, "kublai": 0, "chagatai": 0}}
-{"timestamp": 1774076475.704972, "datetime": "2026-03-21T03:01:15.704972", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "mongke": 0, "ogedei": 0, "kublai": 0, "jochi": 0, "temujin": 1, "tolui": 0}}
-{"timestamp": 1774078276.354012, "datetime": "2026-03-21T03:31:16.354012", "load_factor": 0.023809523809523808, "depths": {"jochi": 0, "kublai": 0, "mongke": 0, "temujin": 1, "ogedei": 0, "chagatai": 0, "tolui": 0}}
-{"timestamp": 1774080080.0567958, "datetime": "2026-03-21T04:01:20.056796", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "jochi": 0, "temujin": 1, "ogedei": 0, "chagatai": 0, "tolui": 0, "mongke": 0}}
-{"timestamp": 1774081872.3440619, "datetime": "2026-03-21T04:31:12.344062", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "chagatai": 0, "ogedei": 0, "jochi": 0, "tolui": 0, "mongke": 0, "kublai": 0}}
-{"timestamp": 1774083686.3771431, "datetime": "2026-03-21T05:01:26.377143", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "ogedei": 0, "jochi": 0, "tolui": 0, "mongke": 0, "kublai": 0, "temujin": 1}}
-{"timestamp": 1774085472.4349802, "datetime": "2026-03-21T05:31:12.434980", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "chagatai": 0, "mongke": 0, "tolui": 0, "ogedei": 0, "kublai": 0, "jochi": 0}}
-{"timestamp": 1774087314.443906, "datetime": "2026-03-21T06:01:54.443906", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "ogedei": 0, "chagatai": 0, "tolui": 0, "jochi": 0, "mongke": 0, "kublai": 0}}
+{"timestamp": 1774155677.9671319, "datetime": "2026-03-22T01:01:17.967132", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "mongke": 0, "jochi": 0, "tolui": 0, "kublai": 0, "ogedei": 0, "temujin": 1}}
+{"timestamp": 1774157473.084343, "datetime": "2026-03-22T01:31:13.084343", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "chagatai": 0, "temujin": 1, "kublai": 0, "mongke": 0, "tolui": 0}}
+{"timestamp": 1774159283.2275279, "datetime": "2026-03-22T02:01:23.227528", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "kublai": 0, "tolui": 0, "chagatai": 0, "jochi": 0, "ogedei": 0, "mongke": 0}}
+{"timestamp": 1774161071.688054, "datetime": "2026-03-22T02:31:11.688054", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "temujin": 1, "mongke": 0, "ogedei": 0, "jochi": 0, "chagatai": 0, "tolui": 0}}
+{"timestamp": 1774162881.296962, "datetime": "2026-03-22T03:01:21.296962", "load_factor": 0.047619047619047616, "depths": {"tolui": 0, "chagatai": 0, "jochi": 0, "mongke": 0, "kublai": 0, "ogedei": 0, "temujin": 2}}
+{"timestamp": 1774164673.384064, "datetime": "2026-03-22T03:31:13.384064", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "temujin": 1, "jochi": 0, "tolui": 0, "ogedei": 0, "kublai": 0, "mongke": 0}}
+{"timestamp": 1774166477.8607712, "datetime": "2026-03-22T04:01:17.860771", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "chagatai": 0, "jochi": 0, "kublai": 0, "ogedei": 0, "temujin": 1, "mongke": 0}}
+{"timestamp": 1774168274.6893382, "datetime": "2026-03-22T04:31:14.689338", "load_factor": 0.07142857142857142, "depths": {"kublai": 0, "mongke": 1, "temujin": 1, "ogedei": 0, "tolui": 0, "chagatai": 1, "jochi": 0}}
+{"timestamp": 1774170072.455604, "datetime": "2026-03-22T05:01:12.455604", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "mongke": 0, "chagatai": 0, "jochi": 0, "kublai": 0, "tolui": 0, "temujin": 1}}
+{"timestamp": 1774171874.476091, "datetime": "2026-03-22T05:31:14.476091", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "mongke": 0, "tolui": 0, "temujin": 1, "jochi": 0, "chagatai": 0, "ogedei": 0}}
+{"timestamp": 1774173699.428056, "datetime": "2026-03-22T06:01:39.428056", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "chagatai": 0, "mongke": 0, "jochi": 0, "tolui": 0, "ogedei": 0, "kublai": 0}}
+{"timestamp": 1774175472.621024, "datetime": "2026-03-22T06:31:12.621024", "load_factor": 0.023809523809523808, "depths": {"kublai": 0, "chagatai": 0, "jochi": 0, "temujin": 1, "mongke": 0, "ogedei": 0, "tolui": 0}}
+{"timestamp": 1774177693.064574, "datetime": "2026-03-22T07:08:13.064574", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "temujin": 1, "jochi": 0, "ogedei": 0, "mongke": 0, "kublai": 0, "chagatai": 0}}
+{"timestamp": 1774179071.951471, "datetime": "2026-03-22T07:31:11.951471", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "kublai": 0, "jochi": 0, "chagatai": 0, "mongke": 0, "ogedei": 0, "temujin": 1}}
+{"timestamp": 1774180889.069087, "datetime": "2026-03-22T08:01:29.069087", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "ogedei": 0, "chagatai": 0, "temujin": 1, "jochi": 0, "kublai": 0, "tolui": 0}}
+{"timestamp": 1774184478.811774, "datetime": "2026-03-22T09:01:18.811774", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "temujin": 1, "tolui": 0, "jochi": 0, "kublai": 0, "ogedei": 0, "chagatai": 0}}
+{"timestamp": 1774186272.833354, "datetime": "2026-03-22T09:31:12.833354", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "jochi": 0, "ogedei": 0, "temujin": 1, "kublai": 0, "chagatai": 0, "mongke": 0}}
+{"timestamp": 1774188089.438477, "datetime": "2026-03-22T10:01:29.438477", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "chagatai": 0, "kublai": 0, "tolui": 0, "mongke": 0, "jochi": 0, "ogedei": 0}}
+{"timestamp": 1774189872.329132, "datetime": "2026-03-22T10:31:12.329132", "load_factor": 0.023809523809523808, "depths": {"tolui": 0, "temujin": 1, "ogedei": 0, "mongke": 0, "kublai": 0, "chagatai": 0, "jochi": 0}}
+{"timestamp": 1774191683.024042, "datetime": "2026-03-22T11:01:23.024042", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 0, "tolui": 0, "chagatai": 0, "temujin": 1, "kublai": 0, "mongke": 0}}
+{"timestamp": 1774193472.442552, "datetime": "2026-03-22T11:31:12.442552", "load_factor": 0.023809523809523808, "depths": {"temujin": 1, "tolui": 0, "chagatai": 0, "kublai": 0, "ogedei": 0, "mongke": 0, "jochi": 0}}
+{"timestamp": 1774195297.8203871, "datetime": "2026-03-22T12:01:37.820387", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "chagatai": 0, "tolui": 0, "kublai": 0, "temujin": 1, "jochi": 0, "ogedei": 0}}
+{"timestamp": 1774197072.695595, "datetime": "2026-03-22T12:31:12.695595", "load_factor": 0.047619047619047616, "depths": {"tolui": 0, "mongke": 1, "kublai": 0, "chagatai": 0, "ogedei": 0, "jochi": 0, "temujin": 1}}
+{"timestamp": 1774200672.447413, "datetime": "2026-03-22T13:31:12.447413", "load_factor": 0.07142857142857142, "depths": {"tolui": 0, "ogedei": 0, "kublai": 0, "jochi": 0, "temujin": 2, "mongke": 1, "chagatai": 0}}
+{"timestamp": 1774202481.990013, "datetime": "2026-03-22T14:01:21.990013", "load_factor": 0.09523809523809523, "depths": {"mongke": 1, "tolui": 0, "kublai": 0, "jochi": 1, "chagatai": 0, "ogedei": 0, "temujin": 2}}
+{"timestamp": 1774204271.3792279, "datetime": "2026-03-22T14:31:11.379228", "load_factor": 0.14285714285714285, "depths": {"tolui": 0, "jochi": 2, "chagatai": 0, "kublai": 1, "ogedei": 0, "mongke": 1, "temujin": 2}}
+{"timestamp": "2026-03-22T14:32:02.020808", "load_factor": 0.16666666666666666}
+{"timestamp": 1774206078.661394, "datetime": "2026-03-22T15:01:18.661394", "load_factor": 0.07142857142857142, "depths": {"jochi": 0, "temujin": 1, "tolui": 0, "kublai": 1, "mongke": 1, "chagatai": 0, "ogedei": 0}}
+{"timestamp": 1774207871.83875, "datetime": "2026-03-22T15:31:11.838750", "load_factor": 0.09523809523809523, "depths": {"tolui": 0, "chagatai": 0, "kublai": 1, "mongke": 2, "jochi": 0, "temujin": 1, "ogedei": 0}}
+{"timestamp": 1774209683.343779, "datetime": "2026-03-22T16:01:23.343779", "load_factor": 0.16666666666666666, "depths": {"tolui": 0, "chagatai": 1, "ogedei": 0, "mongke": 1, "jochi": 2, "kublai": 1, "temujin": 2}}
+{"timestamp": "2026-03-22T16:05:47.467702", "load_factor": 0.16666666666666666}
+{"timestamp": "2026-03-22T16:13:26.200462", "load_factor": 0.16666666666666666}
+{"timestamp": 1774211472.5502982, "datetime": "2026-03-22T16:31:12.550298", "load_factor": 0.16666666666666666, "depths": {"chagatai": 0, "temujin": 0, "kublai": 2, "ogedei": 0, "tolui": 0, "jochi": 4, "mongke": 1}}
+{"timestamp": 1774213277.561697, "datetime": "2026-03-22T17:01:17.561697", "load_factor": 0.21428571428571427, "depths": {"temujin": 0, "kublai": 2, "ogedei": 6, "tolui": 0, "chagatai": 0, "jochi": 0, "mongke": 1}}
+{"timestamp": 1774215074.636526, "datetime": "2026-03-22T17:31:14.636526", "load_factor": 0.09523809523809523, "depths": {"jochi": 1, "kublai": 2, "temujin": 0, "ogedei": 0, "tolui": 0, "chagatai": 0, "mongke": 1}}
+{"timestamp": 1774216912.8127491, "datetime": "2026-03-22T18:01:52.812749", "load_factor": 0.07142857142857142, "depths": {"mongke": 0, "jochi": 3, "chagatai": 0, "ogedei": 0, "kublai": 0, "temujin": 0, "tolui": 0}}
+{"timestamp": 1774218672.326968, "datetime": "2026-03-22T18:31:12.326968", "load_factor": 0.07142857142857142, "depths": {"jochi": 3, "ogedei": 0, "tolui": 0, "chagatai": 0, "temujin": 0, "kublai": 0, "mongke": 0}}
+{"timestamp": 1774220495.9814909, "datetime": "2026-03-22T19:01:35.981491", "load_factor": 0.11904761904761904, "depths": {"mongke": 0, "kublai": 2, "temujin": 0, "chagatai": 0, "tolui": 0, "ogedei": 0, "jochi": 3}}
+{"timestamp": "2026-03-22T19:06:58.804473", "load_factor": 0.11904761904761904}
+{"timestamp": 1774222283.477186, "datetime": "2026-03-22T19:31:23.477186", "load_factor": 0.047619047619047616, "depths": {"temujin": 0, "jochi": 1, "ogedei": 0, "mongke": 0, "kublai": 1, "tolui": 0, "chagatai": 0}}
+{"timestamp": 1774224092.633949, "datetime": "2026-03-22T20:01:32.633949", "load_factor": 0.07142857142857142, "depths": {"kublai": 2, "chagatai": 0, "jochi": 1, "tolui": 0, "temujin": 0, "ogedei": 0, "mongke": 0}}
+{"timestamp": 1774225877.8900821, "datetime": "2026-03-22T20:31:17.890082", "load_factor": 0.0, "depths": {"chagatai": 0, "kublai": 0, "tolui": 0, "jochi": 0, "mongke": 0, "ogedei": 0, "temujin": 0}}
+{"timestamp": 1774227682.7413461, "datetime": "2026-03-22T21:01:22.741346", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "temujin": 0, "mongke": 0, "kublai": 1, "ogedei": 0, "tolui": 0, "jochi": 0}}
+{"timestamp": 1774229471.477196, "datetime": "2026-03-22T21:31:11.477196", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "kublai": 1, "mongke": 0, "tolui": 0, "ogedei": 0, "jochi": 0, "temujin": 0}}
+{"timestamp": 1774231291.7314281, "datetime": "2026-03-22T22:01:31.731428", "load_factor": 0.023809523809523808, "depths": {"ogedei": 0, "jochi": 1, "chagatai": 0, "mongke": 0, "kublai": 0, "temujin": 0, "tolui": 0}}
+{"timestamp": 1774233075.500212, "datetime": "2026-03-22T22:31:15.500212", "load_factor": 0.047619047619047616, "depths": {"chagatai": 0, "jochi": 1, "mongke": 0, "temujin": 0, "ogedei": 0, "kublai": 1, "tolui": 0}}
+{"timestamp": 1774234872.530446, "datetime": "2026-03-22T23:01:12.530446", "load_factor": 0.023809523809523808, "depths": {"chagatai": 0, "tolui": 0, "temujin": 0, "ogedei": 0, "kublai": 1, "mongke": 0, "jochi": 0}}
+{"timestamp": 1774236677.458614, "datetime": "2026-03-22T23:31:17.458614", "load_factor": 0.023809523809523808, "depths": {"mongke": 0, "ogedei": 0, "chagatai": 0, "temujin": 0, "tolui": 0, "jochi": 0, "kublai": 1}}
+{"timestamp": 1774238489.754762, "datetime": "2026-03-23T00:01:29.754762", "load_factor": 0.023809523809523808, "depths": {"temujin": 0, "ogedei": 1, "kublai": 0, "jochi": 0, "tolui": 0, "mongke": 0, "chagatai": 0}}
+{"timestamp": 1774240475.5693598, "datetime": "2026-03-23T00:34:35.569360", "load_factor": 0.09523809523809523, "depths": {"tolui": 0, "chagatai": 0, "temujin": 0, "kublai": 0, "jochi": 1, "ogedei": 3, "mongke": 0}}
+{"timestamp": "2026-03-23T00:38:45.849062", "load_factor": 0.09523809523809523}
+{"timestamp": "2026-03-23T00:46:07.872566", "load_factor": 0.11904761904761904}
+{"timestamp": "2026-03-23T00:53:26.682705", "load_factor": 0.11904761904761904}
+{"timestamp": "2026-03-23T01:00:30.027750", "load_factor": 0.11904761904761904}
+{"timestamp": 1774242078.330648, "datetime": "2026-03-23T01:01:18.330648", "load_factor": 0.11904761904761904, "depths": {"temujin": 0, "tolui": 0, "kublai": 0, "chagatai": 0, "ogedei": 4, "mongke": 0, "jochi": 1}}
+{"timestamp": "2026-03-23T01:09:02.427106", "load_factor": 0.11904761904761904}
+{"timestamp": "2026-03-23T01:16:50.699688", "load_factor": 0.11904761904761904}
+{"timestamp": "2026-03-23T01:24:14.317662", "load_factor": 0.11904761904761904}
+{"timestamp": 1774243880.8804228, "datetime": "2026-03-23T01:31:20.880423", "load_factor": 0.11904761904761904, "depths": {"kublai": 0, "jochi": 1, "chagatai": 0, "tolui": 0, "temujin": 0, "ogedei": 4, "mongke": 0}}
+{"timestamp": "2026-03-23T01:31:21.891660", "load_factor": 0.11904761904761904}
+{"timestamp": "2026-03-23T01:38:18.330495", "load_factor": 0.14285714285714285}
+{"timestamp": "2026-03-23T02:00:28.622755", "load_factor": 0.11904761904761904}
+{"timestamp": 1774245681.728448, "datetime": "2026-03-23T02:01:21.728448", "load_factor": 0.11904761904761904, "depths": {"ogedei": 1, "chagatai": 1, "mongke": 0, "jochi": 3, "tolui": 0, "kublai": 0, "temujin": 0}}
+{"timestamp": 1774247473.231573, "datetime": "2026-03-23T02:31:13.231573", "load_factor": 0.07142857142857142, "depths": {"temujin": 0, "chagatai": 1, "ogedei": 1, "tolui": 0, "jochi": 1, "kublai": 0, "mongke": 0}}
+{"timestamp": 1774249275.2976809, "datetime": "2026-03-23T03:01:15.297681", "load_factor": 0.09523809523809523, "depths": {"chagatai": 1, "tolui": 0, "temujin": 0, "kublai": 0, "ogedei": 2, "jochi": 1, "mongke": 0}}
+{"timestamp": 1774251075.671207, "datetime": "2026-03-23T03:31:15.671207", "load_factor": 0.09523809523809523, "depths": {"mongke": 0, "jochi": 1, "ogedei": 2, "temujin": 0, "chagatai": 1, "tolui": 0, "kublai": 0}}
+{"timestamp": 1774252885.1432939, "datetime": "2026-03-23T04:01:25.143294", "load_factor": 0.09523809523809523, "depths": {"ogedei": 2, "mongke": 0, "temujin": 0, "jochi": 1, "chagatai": 1, "tolui": 0, "kublai": 0}}
+{"timestamp": 1774254673.413974, "datetime": "2026-03-23T04:31:13.413974", "load_factor": 0.09523809523809523, "depths": {"tolui": 0, "temujin": 0, "mongke": 0, "jochi": 1, "chagatai": 1, "ogedei": 2, "kublai": 0}}
+{"timestamp": "2026-03-23T04:47:11.316747", "load_factor": 0.11904761904761904}
+{"timestamp": 1774256479.349086, "datetime": "2026-03-23T05:01:19.349086", "load_factor": 0.11904761904761904, "depths": {"chagatai": 1, "tolui": 0, "kublai": 0, "temujin": 0, "jochi": 1, "mongke": 0, "ogedei": 3}}
+{"timestamp": 1774258274.935597, "datetime": "2026-03-23T05:31:14.935597", "load_factor": 0.11904761904761904, "depths": {"tolui": 0, "kublai": 0, "jochi": 1, "mongke": 0, "ogedei": 3, "chagatai": 1, "temujin": 0}}
+{"timestamp": 1774260237.974148, "datetime": "2026-03-23T06:03:57.974148", "load_factor": 0.11904761904761904, "depths": {"ogedei": 3, "jochi": 1, "kublai": 0, "temujin": 0, "chagatai": 1, "tolui": 0, "mongke": 0}}
+{"timestamp": 1774261872.447679, "datetime": "2026-03-23T06:31:12.447679", "load_factor": 0.11904761904761904, "depths": {"mongke": 0, "jochi": 1, "temujin": 0, "ogedei": 3, "chagatai": 1, "kublai": 0, "tolui": 0}}
+{"timestamp": 1774263876.857125, "datetime": "2026-03-23T07:04:36.857125", "load_factor": 0.14285714285714285, "depths": {"mongke": 0, "chagatai": 1, "temujin": 0, "kublai": 0, "ogedei": 4, "jochi": 1, "tolui": 0}}
+{"timestamp": 1774265475.923109, "datetime": "2026-03-23T07:31:15.923109", "load_factor": 0.16666666666666666, "depths": {"kublai": 0, "mongke": 0, "ogedei": 4, "tolui": 0, "jochi": 2, "temujin": 0, "chagatai": 1}}
+{"timestamp": 1774267302.7929869, "datetime": "2026-03-23T08:01:42.792987", "load_factor": 0.16666666666666666, "depths": {"chagatai": 1, "ogedei": 4, "mongke": 0, "jochi": 2, "tolui": 0, "temujin": 0, "kublai": 0}}
+{"timestamp": "2026-03-23T08:22:38.806891", "load_factor": 0.16666666666666666}
+{"timestamp": 1774269074.4578712, "datetime": "2026-03-23T08:31:14.457871", "load_factor": 0.16666666666666666, "depths": {"jochi": 2, "tolui": 0, "kublai": 0, "chagatai": 1, "mongke": 0, "ogedei": 4, "temujin": 0}}
+{"timestamp": "2026-03-23T08:53:26.486590", "load_factor": 0.14285714285714285}
+{"timestamp": 1774270874.438238, "datetime": "2026-03-23T09:01:14.438238", "load_factor": 0.14285714285714285, "depths": {"chagatai": 1, "ogedei": 2, "tolui": 0, "mongke": 0, "jochi": 3, "temujin": 0, "kublai": 0}}
+{"timestamp": 1774272675.05088, "datetime": "2026-03-23T09:31:15.050880", "load_factor": 0.14285714285714285, "depths": {"chagatai": 1, "kublai": 0, "ogedei": 2, "jochi": 3, "temujin": 0, "mongke": 0, "tolui": 0}}
+{"timestamp": 1774274471.960393, "datetime": "2026-03-23T10:01:11.960393", "load_factor": 0.14285714285714285, "depths": {"jochi": 3, "mongke": 0, "kublai": 0, "temujin": 0, "tolui": 0, "ogedei": 2, "chagatai": 1}}
+{"timestamp": 1774276273.486838, "datetime": "2026-03-23T10:31:13.486838", "load_factor": 0.14285714285714285, "depths": {"jochi": 3, "tolui": 0, "kublai": 0, "ogedei": 2, "temujin": 0, "chagatai": 1, "mongke": 0}}
+{"timestamp": 1774278074.5856168, "datetime": "2026-03-23T11:01:14.585617", "load_factor": 0.14285714285714285, "depths": {"mongke": 0, "jochi": 3, "tolui": 0, "temujin": 0, "ogedei": 2, "kublai": 0, "chagatai": 1}}
+{"timestamp": 1774279874.566439, "datetime": "2026-03-23T11:31:14.566439", "load_factor": 0.14285714285714285, "depths": {"ogedei": 2, "chagatai": 1, "jochi": 3, "kublai": 0, "mongke": 0, "temujin": 0, "tolui": 0}}
+{"timestamp": 1774281798.085261, "datetime": "2026-03-23T12:03:18.085261", "load_factor": 0.14285714285714285, "depths": {"kublai": 0, "chagatai": 1, "ogedei": 2, "mongke": 0, "jochi": 3, "temujin": 0, "tolui": 0}}
+{"timestamp": "2026-03-23T12:35:59.806352", "load_factor": 0.14285714285714285}
+{"timestamp": "2026-03-23T12:43:11.728571", "load_factor": 0.16666666666666666}
+{"timestamp": "2026-03-23T12:50:52.046036", "load_factor": 0.21428571428571427}
+{"timestamp": 1774284652.128684, "datetime": "2026-03-23T12:50:52.128684", "load_factor": 0.21428571428571427, "depths": {"kublai": 0, "mongke": 0, "chagatai": 1, "tolui": 0, "temujin": 2, "jochi": 3, "ogedei": 3}}
+{"timestamp": "2026-03-23T12:58:07.854390", "load_factor": 0.21428571428571427}
+{"timestamp": 1774285273.9376872, "datetime": "2026-03-23T13:01:13.937687", "load_factor": 0.21428571428571427, "depths": {"jochi": 3, "tolui": 0, "ogedei": 3, "chagatai": 1, "mongke": 0, "kublai": 0, "temujin": 2}}
+{"timestamp": "2026-03-23T13:18:54.324438", "load_factor": 0.23809523809523808}
+{"timestamp": "2026-03-23T13:21:30.704630", "load_factor": 0.23809523809523808}
+{"timestamp": "2026-03-23T13:29:51.632554", "load_factor": 0.23809523809523808}
+{"timestamp": 1774287074.198112, "datetime": "2026-03-23T13:31:14.198112", "load_factor": 0.23809523809523808, "depths": {"kublai": 0, "mongke": 0, "temujin": 3, "ogedei": 3, "jochi": 3, "chagatai": 1, "tolui": 0}}
+{"timestamp": "2026-03-23T13:44:52.499577", "load_factor": 0.2619047619047619}
+{"timestamp": "2026-03-23T13:45:31.457288", "load_factor": 0.2619047619047619}
+{"timestamp": "2026-03-23T13:47:15.135699", "load_factor": 0.2857142857142857}
+{"timestamp": "2026-03-23T13:49:35.725916", "load_factor": 0.30952380952380953}
+{"timestamp": 1774288876.2446651, "datetime": "2026-03-23T14:01:16.244665", "load_factor": 0.47619047619047616, "depths": {"mongke": 4, "kublai": 0, "temujin": 5, "ogedei": 5, "tolui": 0, "jochi": 3, "chagatai": 3}}
+{"timestamp": 1774290670.8995368, "datetime": "2026-03-23T14:31:10.899537", "load_factor": 0.5476190476190477, "depths": {"mongke": 0, "kublai": 0, "chagatai": 3, "tolui": 0, "temujin": 8, "jochi": 5, "ogedei": 7}}
+{"timestamp": 1774292600.2631848, "datetime": "2026-03-23T15:03:20.263185", "load_factor": 0.5476190476190477, "depths": {"kublai": 0, "ogedei": 5, "chagatai": 3, "mongke": 3, "temujin": 7, "tolui": 0, "jochi": 5}}
+{"timestamp": 1774294270.535629, "datetime": "2026-03-23T15:31:10.535629", "load_factor": 0.6190476190476191, "depths": {"tolui": 0, "kublai": 1, "chagatai": 4, "mongke": 4, "temujin": 12, "jochi": 2, "ogedei": 3}}
+{"timestamp": 1774296087.822331, "datetime": "2026-03-23T16:01:27.822331", "load_factor": 0.6904761904761905, "depths": {"kublai": 4, "temujin": 5, "jochi": 4, "chagatai": 3, "ogedei": 7, "tolui": 2, "mongke": 4}}
+{"timestamp": 1774297871.138955, "datetime": "2026-03-23T16:31:11.138955", "load_factor": 0.7619047619047619, "depths": {"ogedei": 9, "jochi": 2, "chagatai": 4, "mongke": 5, "temujin": 9, "kublai": 1, "tolui": 2}}
+{"timestamp": 1774299964.730592, "datetime": "2026-03-23T17:06:04.730592", "load_factor": 0.2619047619047619, "depths": {"tolui": 0, "kublai": 0, "ogedei": 4, "temujin": 4, "mongke": 1, "chagatai": 1, "jochi": 1}}
+{"timestamp": 1774301562.685427, "datetime": "2026-03-23T17:32:42.685427", "load_factor": 0.47619047619047616, "depths": {"kublai": 2, "chagatai": 2, "temujin": 5, "jochi": 4, "tolui": 0, "mongke": 1, "ogedei": 6}}
+{"timestamp": 1774303532.480591, "datetime": "2026-03-23T18:05:32.480591", "load_factor": 0.9761904761904762, "depths": {"ogedei": 13, "kublai": 2, "tolui": 4, "temujin": 4, "mongke": 5, "chagatai": 5, "jochi": 8}}
+{"timestamp": 1774306385.99892, "datetime": "2026-03-23T18:53:05.998920", "load_factor": 1.0, "depths": {"jochi": 8, "temujin": 13, "chagatai": 4, "tolui": 11, "kublai": 4, "ogedei": 7, "mongke": 3}}
+{"timestamp": 1774307465.105897, "datetime": "2026-03-23T19:11:05.105897", "load_factor": 1.0, "depths": {"temujin": 14, "jochi": 9, "ogedei": 11, "chagatai": 9, "mongke": 3, "tolui": 11, "kublai": 5}}
+{"timestamp": 1774307660.07198, "datetime": "2026-03-23T19:14:20.071980", "load_factor": 1.0, "depths": {"tolui": 11, "kublai": 5, "chagatai": 9, "temujin": 14, "ogedei": 11, "mongke": 3, "jochi": 8}}
+{"timestamp": 1774308702.034067, "datetime": "2026-03-23T19:31:42.034067", "load_factor": 1.0, "depths": {"tolui": 11, "kublai": 12, "temujin": 6, "ogedei": 12, "jochi": 11, "chagatai": 7, "mongke": 4}}
+{"timestamp": 1774310908.696523, "datetime": "2026-03-23T20:08:28.696523", "load_factor": 1.0, "depths": {"jochi": 6, "kublai": 12, "chagatai": 9, "temujin": 13, "tolui": 11, "mongke": 8, "ogedei": 15}}
+{"timestamp": 1774311401.194106, "datetime": "2026-03-23T20:16:41.194106", "load_factor": 1.0, "depths": {"jochi": 8, "mongke": 9, "ogedei": 16, "tolui": 11, "temujin": 13, "chagatai": 10, "kublai": 12}}
+{"timestamp": 1774312338.252979, "datetime": "2026-03-23T20:32:18.252979", "load_factor": 1.0, "depths": {"mongke": 9, "ogedei": 19, "chagatai": 11, "temujin": 15, "tolui": 11, "kublai": 12, "jochi": 8}}
+{"timestamp": 1774314475.5587862, "datetime": "2026-03-23T21:07:55.558786", "load_factor": 1.0, "depths": {"chagatai": 11, "tolui": 11, "mongke": 12, "temujin": 12, "kublai": 12, "jochi": 18, "ogedei": 23}}
+{"timestamp": 1774315870.515799, "datetime": "2026-03-23T21:31:10.515799", "load_factor": 1.0, "depths": {"kublai": 14, "chagatai": 14, "temujin": 16, "ogedei": 24, "jochi": 11, "tolui": 11, "mongke": 7}}
+{"timestamp": 1774317839.624099, "datetime": "2026-03-23T22:03:59.624099", "load_factor": 1.0, "depths": {"jochi": 11, "ogedei": 25, "temujin": 17, "mongke": 12, "tolui": 11, "kublai": 14, "chagatai": 15}}
+{"timestamp": 1774319471.783587, "datetime": "2026-03-23T22:31:11.783587", "load_factor": 1.0, "depths": {"mongke": 14, "jochi": 14, "chagatai": 16, "temujin": 18, "tolui": 11, "kublai": 11, "ogedei": 27}}
+{"timestamp": 1774321813.598167, "datetime": "2026-03-23T23:10:13.598167", "load_factor": 1.0, "depths": {"ogedei": 29, "temujin": 18, "mongke": 11, "chagatai": 16, "jochi": 16, "tolui": 11, "kublai": 11}}
+{"timestamp": 1774323088.43484, "datetime": "2026-03-23T23:31:28.434840", "load_factor": 1.0, "depths": {"kublai": 13, "jochi": 21, "mongke": 7, "chagatai": 17, "ogedei": 30, "temujin": 20, "tolui": 11}}
+{"timestamp": 1774324882.596085, "datetime": "2026-03-24T00:01:22.596085", "load_factor": 1.0, "depths": {"chagatai": 21, "temujin": 24, "ogedei": 34, "tolui": 11, "mongke": 8, "jochi": 16, "kublai": 17}}
+{"timestamp": 1774326670.942465, "datetime": "2026-03-24T00:31:10.942465", "load_factor": 1.0, "depths": {"ogedei": 36, "tolui": 11, "kublai": 17, "jochi": 16, "chagatai": 21, "temujin": 23, "mongke": 14}}
+{"timestamp": 1774328476.59627, "datetime": "2026-03-24T01:01:16.596270", "load_factor": 1.0, "depths": {"mongke": 19, "temujin": 23, "jochi": 19, "kublai": 17, "chagatai": 21, "ogedei": 38, "tolui": 11}}
+{"timestamp": 1774330303.517215, "datetime": "2026-03-24T01:31:43.517215", "load_factor": 1.0, "depths": {"tolui": 11, "ogedei": 22, "temujin": 23, "mongke": 7, "kublai": 17, "jochi": 21, "chagatai": 10}}
+{"timestamp": 1774332092.385369, "datetime": "2026-03-24T02:01:32.385369", "load_factor": 1.0, "depths": {"tolui": 11, "ogedei": 22, "jochi": 14, "kublai": 12, "chagatai": 11, "mongke": 11, "temujin": 23}}
+{"timestamp": 1774333881.183415, "datetime": "2026-03-24T02:31:21.183415", "load_factor": 1.0, "depths": {"jochi": 16, "mongke": 14, "chagatai": 14, "ogedei": 23, "kublai": 12, "tolui": 11, "temujin": 23}}
+{"timestamp": 1774336069.859282, "datetime": "2026-03-24T03:07:49.859282", "load_factor": 1.0, "depths": {"ogedei": 26, "tolui": 11, "temujin": 23, "jochi": 16, "chagatai": 17, "kublai": 12, "mongke": 17}}
+{"timestamp": 1774337479.793406, "datetime": "2026-03-24T03:31:19.793406", "load_factor": 1.0, "depths": {"kublai": 13, "chagatai": 0, "mongke": 21, "ogedei": 26, "temujin": 24, "tolui": 11, "jochi": 16}}
+{"timestamp": 1774339539.3132749, "datetime": "2026-03-24T04:05:39.313275", "load_factor": 1.0, "depths": {"mongke": 23, "ogedei": 28, "kublai": 13, "chagatai": 8, "tolui": 11, "jochi": 20, "temujin": 19}}
+{"timestamp": 1774341136.1531332, "datetime": "2026-03-24T04:32:16.153133", "load_factor": 1.0, "depths": {"jochi": 23, "kublai": 17, "chagatai": 4, "tolui": 11, "mongke": 26, "ogedei": 26, "temujin": 22}}
+{"timestamp": 1774342880.9648268, "datetime": "2026-03-24T05:01:20.964827", "load_factor": 1.0, "depths": {"mongke": 22, "temujin": 25, "tolui": 11, "ogedei": 23, "kublai": 21, "jochi": 29, "chagatai": 10}}
+{"timestamp": 1774344700.609001, "datetime": "2026-03-24T05:31:40.609001", "load_factor": 1.0, "depths": {"kublai": 22, "chagatai": 11, "jochi": 31, "temujin": 26, "ogedei": 27, "tolui": 11, "mongke": 22}}
+{"timestamp": 1774346977.140998, "datetime": "2026-03-24T06:09:37.140998", "load_factor": 1.0, "depths": {"kublai": 22, "mongke": 22, "tolui": 11, "jochi": 31, "temujin": 26, "chagatai": 17, "ogedei": 29}}
+{"timestamp": 1774348336.269414, "datetime": "2026-03-24T06:32:16.269414", "load_factor": 1.0, "depths": {"temujin": 27, "kublai": 10, "jochi": 24, "ogedei": 30, "tolui": 11, "chagatai": 21, "mongke": 22}}
+{"timestamp": 1774350562.961781, "datetime": "2026-03-24T07:09:22.961781", "load_factor": 1.0, "depths": {"temujin": 27, "chagatai": 25, "mongke": 26, "kublai": 0, "tolui": 11, "ogedei": 32, "jochi": 26}}
+{"timestamp": 1774351917.322369, "datetime": "2026-03-24T07:31:57.322369", "load_factor": 1.0, "depths": {"kublai": 11, "ogedei": 26, "tolui": 11, "jochi": 28, "temujin": 26, "mongke": 26, "chagatai": 5}}
+{"timestamp": 1774353721.833288, "datetime": "2026-03-24T08:02:01.833288", "load_factor": 1.0, "depths": {"jochi": 27, "temujin": 26, "mongke": 7, "ogedei": 25, "chagatai": 1, "tolui": 11, "kublai": 12}}
+{"timestamp": 1774355524.034375, "datetime": "2026-03-24T08:32:04.034375", "load_factor": 1.0, "depths": {"jochi": 10, "kublai": 12, "tolui": 11, "ogedei": 18, "mongke": 7, "chagatai": 9, "temujin": 11}}
+{"timestamp": 1774758675.0327182, "datetime": "2026-03-29T00:31:15.032718", "load_factor": 1.0, "depths": {"ogedei": 123, "mongke": 18, "tolui": 11, "chagatai": 12, "kublai": 12, "temujin": 26, "jochi": 16}}
+{"timestamp": 1774760479.210921, "datetime": "2026-03-29T01:01:19.210921", "load_factor": 1.0, "depths": {"tolui": 11, "mongke": 18, "chagatai": 12, "kublai": 12, "temujin": 26, "ogedei": 125, "jochi": 16}}
+{"timestamp": 1774762273.926841, "datetime": "2026-03-29T01:31:13.926841", "load_factor": 1.0, "depths": {"temujin": 27, "jochi": 19, "kublai": 12, "chagatai": 12, "tolui": 11, "mongke": 18, "ogedei": 125}}
+{"timestamp": 1774764097.609741, "datetime": "2026-03-29T02:01:37.609741", "load_factor": 1.0, "depths": {"ogedei": 127, "chagatai": 12, "mongke": 18, "kublai": 12, "jochi": 21, "tolui": 11, "temujin": 27}}
+{"timestamp": 1774765874.693793, "datetime": "2026-03-29T02:31:14.693793", "load_factor": 1.0, "depths": {"tolui": 11, "chagatai": 12, "kublai": 12, "temujin": 28, "mongke": 18, "jochi": 24, "ogedei": 127}}
+{"timestamp": 1774767667.616545, "datetime": "2026-03-29T03:01:07.616545", "load_factor": 1.0, "depths": {"kublai": 12, "ogedei": 129, "tolui": 11, "mongke": 18, "chagatai": 13, "jochi": 24, "temujin": 28}}
+{"timestamp": 1774769469.2357602, "datetime": "2026-03-29T03:31:09.235760", "load_factor": 1.0, "depths": {"temujin": 28, "chagatai": 13, "jochi": 26, "tolui": 11, "ogedei": 130, "mongke": 18, "kublai": 12}}
+{"timestamp": 1774771275.057813, "datetime": "2026-03-29T04:01:15.057813", "load_factor": 1.0, "depths": {"ogedei": 131, "temujin": 29, "kublai": 12, "mongke": 18, "chagatai": 13, "tolui": 11, "jochi": 29}}
+{"timestamp": 1774773093.14376, "datetime": "2026-03-29T04:31:33.143760", "load_factor": 1.0, "depths": {"chagatai": 14, "tolui": 11, "jochi": 31, "mongke": 18, "ogedei": 132, "kublai": 12, "temujin": 29}}
+{"timestamp": 1774775004.4393952, "datetime": "2026-03-29T05:03:24.439395", "load_factor": 1.0, "depths": {"kublai": 12, "tolui": 11, "temujin": 30, "ogedei": 134, "mongke": 18, "chagatai": 14, "jochi": 34}}
+{"timestamp": 1774776669.491261, "datetime": "2026-03-29T05:31:09.491261", "load_factor": 1.0, "depths": {"mongke": 18, "tolui": 11, "chagatai": 14, "kublai": 12, "ogedei": 135, "temujin": 30, "jochi": 36}}
+{"timestamp": 1774778502.636294, "datetime": "2026-03-29T06:01:42.636294", "load_factor": 1.0, "depths": {"tolui": 11, "mongke": 18, "jochi": 36, "kublai": 12, "temujin": 31, "ogedei": 136, "chagatai": 14}}

@@ -3,7 +3,7 @@
 Neo4j Human Profile - Graph CRUD operations for human profile storage system
 
 Schema:
-- (:HumanProfile {profile_id, human_id, display_name, timezone, ...})
+- (:HumanProfile {profile_id, phone_e164, display_name, timezone, ...})
 - (:ConsentCategory {name, description})
 - (:Tag {name, description})
 
@@ -108,7 +108,7 @@ class HumanProfileStore:
         ]
 
         indexes = [
-            "CREATE INDEX human_profile_human_id_idx IF NOT EXISTS FOR (h:HumanProfile) ON (h.human_id)",
+            "CREATE INDEX human_profile_phone_e164_idx IF NOT EXISTS FOR (h:HumanProfile) ON (h.phone_e164)",
             "CREATE INDEX human_profile_display_name_idx IF NOT EXISTS FOR (h:HumanProfile) ON (h.display_name)",
             "CREATE INDEX human_profile_privacy_idx IF NOT EXISTS FOR (h:HumanProfile) ON (h.privacy_level)",
             "CREATE INDEX human_profile_consent_idx IF NOT EXISTS FOR (h:HumanProfile) ON (h.consent_categories)",
@@ -171,7 +171,7 @@ class HumanProfileStore:
     # CRUD Operations
     # ==========================================================================
 
-    def create_profile(self, human_id: str, display_name: str,
+    def create_profile(self, phone_e164: str, display_name: str,
                        timezone: Optional[str] = None,
                        what_to_call: Optional[str] = None,
                        pronouns: Optional[str] = None,
@@ -181,7 +181,7 @@ class HumanProfileStore:
         Create a new HumanProfile linked to a Person.
 
         Args:
-            human_id: Phone number (E.164 format), links to Person
+            phone_e164: Phone number (E.164 format), links to Person
             display_name: Preferred display name
             timezone: IANA timezone (e.g., "America/New_York")
             what_to_call: How they want to be addressed
@@ -195,10 +195,10 @@ class HumanProfileStore:
         with self.driver.session() as session:
             result = session.run("""
                 // Ensure Person exists
-                MATCH (p:Person {phone_number: $human_id})
+                MATCH (p:Person {phone_number: $phone_e164})
 
                 // Create or merge HumanProfile
-                MERGE (hp:HumanProfile {human_id: $human_id})
+                MERGE (hp:HumanProfile {phone_e164: $phone_e164})
                 ON CREATE SET
                     hp.profile_id = "hp-" + randomUUID(),
                     hp.display_name = $display_name,
@@ -231,10 +231,10 @@ class HumanProfileStore:
 
                 RETURN hp.profile_id AS profile_id,
                        hp.display_name AS display_name,
-                       hp.human_id AS human_id,
+                       hp.phone_e164 AS phone_e164,
                        hp.status AS status
             """,
-            human_id=human_id,
+            phone_e164=phone_e164,
             display_name=display_name,
             what_to_call=what_to_call,
             pronouns=pronouns,
@@ -263,7 +263,7 @@ class HumanProfileStore:
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (hp:HumanProfile)
-                WHERE hp.human_id = $search_term
+                WHERE hp.phone_e164 = $search_term
                    OR toLower(hp.display_name) = toLower($search_term)
                    OR toLower(hp.what_to_call) = toLower($search_term)
                 WITH hp LIMIT 1
@@ -276,7 +276,7 @@ class HumanProfileStore:
                 OPTIONAL MATCH (hp)-[:TAGGED_AS]->(t:Tag)
 
                 RETURN hp.profile_id AS profile_id,
-                       hp.human_id AS human_id,
+                       hp.phone_e164 AS phone_e164,
                        hp.display_name AS display_name,
                        hp.what_to_call AS what_to_call,
                        hp.pronouns AS pronouns,
@@ -315,14 +315,14 @@ class HumanProfileStore:
         """Get profile by exact phone number match."""
         return self.get_profile(phone)
 
-    def update_field(self, human_id: str, field: str, value: Any,
+    def update_field(self, phone_e164: str, field: str, value: Any,
                      updated_by: Optional[str] = None,
                      source: Optional[str] = None) -> bool:
         """
         Update a specific field on a profile with audit trail.
 
         Args:
-            human_id: The phone number (human_id)
+            phone_e164: The phone number (E.164 format)
             field: Field name to update
             value: New value
             updated_by: Optional agent name for audit
@@ -339,7 +339,7 @@ class HumanProfileStore:
 
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 
                 // Capture old value before update
                 WITH hp, hp[$field] AS old_value
@@ -361,18 +361,18 @@ class HumanProfileStore:
                 )
 
                 RETURN hp.profile_id AS profile_id
-            """, human_id=human_id, field=field, value=serialized_value,
+            """, phone_e164=phone_e164, field=field, value=serialized_value,
                 updated_by=updated_by, source=source)
 
             return result.single() is not None
 
-    def update_profile(self, human_id: str, updates: Dict[str, Any],
+    def update_profile(self, phone_e164: str, updates: Dict[str, Any],
                        updated_by: Optional[str] = None) -> bool:
         """
         Update multiple fields at once.
 
         Args:
-            human_id: The phone number
+            phone_e164: The phone number (E.164 format)
             updates: Dict of field names to values
             updated_by: Optional agent name for audit
 
@@ -392,7 +392,7 @@ class HumanProfileStore:
             set_clauses.append("hp.updated_at = datetime()")
 
             cypher = f"""
-                MATCH (hp:HumanProfile {{human_id: $human_id}})
+                MATCH (hp:HumanProfile {{phone_e164: $phone_e164}})
                 SET {', '.join(set_clauses)}
 
                 WITH hp
@@ -404,7 +404,7 @@ class HumanProfileStore:
                 RETURN hp.profile_id AS profile_id
             """
 
-            params = {"human_id": human_id, "updated_by": updated_by, **updates}
+            params = {"phone_e164": phone_e164, "updated_by": updated_by, **updates}
             result = session.run(cypher, **params)
             return result.single() is not None
 
@@ -424,7 +424,7 @@ class HumanProfileStore:
                 CALL db.index.fulltext.queryNodes("human_profile_search", $search_text)
                 YIELD node AS hp, score
                 WHERE hp.status = "active"
-                RETURN hp.human_id AS human_id,
+                RETURN hp.phone_e164 AS phone_e164,
                        hp.display_name AS display_name,
                        hp.what_to_call AS what_to_call,
                        hp.notes AS notes,
@@ -451,7 +451,7 @@ class HumanProfileStore:
                     MATCH (hp:HumanProfile)
                     WHERE hp.status = "active"
                       AND hp.privacy_level = $privacy_filter
-                    RETURN hp.human_id AS human_id,
+                    RETURN hp.phone_e164 AS phone_e164,
                            hp.display_name AS display_name,
                            hp.timezone AS timezone,
                            hp.privacy_level AS privacy_level
@@ -461,7 +461,7 @@ class HumanProfileStore:
                 result = session.run("""
                     MATCH (hp:HumanProfile)
                     WHERE hp.status = "active"
-                    RETURN hp.human_id AS human_id,
+                    RETURN hp.phone_e164 AS phone_e164,
                            hp.display_name AS display_name,
                            hp.timezone AS timezone,
                            hp.privacy_level AS privacy_level
@@ -474,12 +474,12 @@ class HumanProfileStore:
     # Consent Management
     # ==========================================================================
 
-    def add_consent(self, human_id: str, category: str) -> bool:
+    def add_consent(self, phone_e164: str, category: str) -> bool:
         """
         Add a consent category for a human.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             category: Consent category name
 
         Returns:
@@ -487,7 +487,7 @@ class HumanProfileStore:
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 MATCH (c:ConsentCategory {name: $category})
 
                 MERGE (hp)-[rel:HAS_CONSENT]->(c)
@@ -504,16 +504,16 @@ class HumanProfileStore:
                     hp.updated_at = datetime()
 
                 RETURN hp.display_name AS name
-            """, human_id=human_id, category=category)
+            """, phone_e164=phone_e164, category=category)
 
             return result.single() is not None
 
-    def revoke_consent(self, human_id: str, category: str) -> bool:
+    def revoke_consent(self, phone_e164: str, category: str) -> bool:
         """
         Revoke a consent category.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             category: Consent category name
 
         Returns:
@@ -521,7 +521,7 @@ class HumanProfileStore:
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 MATCH (hp)-[rel:HAS_CONSENT]->(c:ConsentCategory {name: $category})
 
                 SET rel.revoked_at = datetime(),
@@ -531,16 +531,16 @@ class HumanProfileStore:
                     hp.updated_at = datetime()
 
                 RETURN hp.display_name AS name
-            """, human_id=human_id, category=category)
+            """, phone_e164=phone_e164, category=category)
 
             return result.single() is not None
 
-    def check_consent(self, human_id: str, category: str) -> bool:
+    def check_consent(self, phone_e164: str, category: str) -> bool:
         """
         Check if a human has consented to a category.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             category: Consent category name
 
         Returns:
@@ -548,11 +548,11 @@ class HumanProfileStore:
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 MATCH (hp)-[rel:HAS_CONSENT]->(c:ConsentCategory {name: $category})
                 WHERE rel.revoked_at IS NULL
                 RETURN c.name AS consented
-            """, human_id=human_id, category=category)
+            """, phone_e164=phone_e164, category=category)
 
             return result.single() is not None
 
@@ -570,12 +570,12 @@ class HumanProfileStore:
     # Privacy and Data Management
     # ==========================================================================
 
-    def set_privacy_level(self, human_id: str, level: str) -> bool:
+    def set_privacy_level(self, phone_e164: str, level: str) -> bool:
         """
         Set the privacy level for a profile.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             level: "public", "contacts", or "private"
 
         Returns:
@@ -584,21 +584,21 @@ class HumanProfileStore:
         if level not in ["public", "contacts", "private"]:
             raise ValueError("Invalid privacy level")
 
-        return self.update_field(human_id, "privacy_level", level)
+        return self.update_field(phone_e164, "privacy_level", level)
 
-    def anonymize_profile(self, human_id: str) -> bool:
+    def anonymize_profile(self, phone_e164: str) -> bool:
         """
         Soft delete - anonymize all personal data.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
 
         Returns:
             True if successful
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 SET hp.display_name = "Anonymous",
                     hp.what_to_call = "User",
                     hp.pronouns = null,
@@ -610,27 +610,27 @@ class HumanProfileStore:
                     hp.status = "anonymized",
                     hp.updated_at = datetime()
                 RETURN hp.profile_id AS profile_id
-            """, human_id=human_id)
+            """, phone_e164=phone_e164)
 
             return result.single() is not None
 
-    def delete_profile(self, human_id: str) -> bool:
+    def delete_profile(self, phone_e164: str) -> bool:
         """
         Hard delete - remove profile and all relationships.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
 
         Returns:
             True if successful
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 OPTIONAL MATCH (hp)-[r]-()
                 DELETE r, hp
                 RETURN count(hp) AS deleted
-            """, human_id=human_id)
+            """, phone_e164=phone_e164)
 
             record = result.single()
             return record is not None and record["deleted"] > 0
@@ -639,12 +639,12 @@ class HumanProfileStore:
     # Context Enrichment
     # ==========================================================================
 
-    def get_profiles_for_context(self, human_ids: List[str]) -> List[Dict[str, Any]]:
+    def get_profiles_for_context(self, phone_e164s: List[str]) -> List[Dict[str, Any]]:
         """
         Get minimal profiles for context enrichment (fast query).
 
         Args:
-            human_ids: List of phone numbers
+            phone_e164s: List of phone numbers (E.164 format)
 
         Returns:
             List of profile dicts with essential fields
@@ -652,9 +652,9 @@ class HumanProfileStore:
         with self.driver.session() as session:
             result = session.run("""
                 MATCH (hp:HumanProfile)
-                WHERE hp.human_id IN $human_ids
+                WHERE hp.phone_e164 IN $phone_e164s
                   AND hp.status = "active"
-                RETURN hp.human_id AS human_id,
+                RETURN hp.phone_e164 AS phone_e164,
                        hp.display_name AS display_name,
                        hp.what_to_call AS what_to_call,
                        hp.timezone AS timezone,
@@ -662,7 +662,7 @@ class HumanProfileStore:
                        hp.preferences AS preferences,
                        hp.personal_context AS personal_context,
                        hp.projects AS projects
-            """, human_ids=human_ids)
+            """, phone_e164s=phone_e164s)
 
             profiles = []
             for record in result:
@@ -678,23 +678,23 @@ class HumanProfileStore:
 
             return profiles
 
-    def get_communication_preferences(self, human_id: str) -> Optional[Dict[str, Any]]:
+    def get_communication_preferences(self, phone_e164: str) -> Optional[Dict[str, Any]]:
         """
         Get just the communication preferences for a human.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
 
         Returns:
             Communication style and preferences or None
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 RETURN hp.display_name AS display_name,
                        hp.communication_style AS communication_style,
                        hp.preferences AS preferences
-            """, human_id=human_id)
+            """, phone_e164=phone_e164)
 
             record = result.single()
             if not record:
@@ -709,13 +709,13 @@ class HumanProfileStore:
                         pass
             return prefs
 
-    def get_preference_history(self, human_id: str, field: Optional[str] = None,
+    def get_preference_history(self, phone_e164: str, field: Optional[str] = None,
                                limit: int = 20) -> List[Dict[str, Any]]:
         """
         Get preference change history for a human.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             field: Optional field name to filter by
             limit: Max results
 
@@ -725,23 +725,23 @@ class HumanProfileStore:
         with self.driver.session() as session:
             if field:
                 result = session.run("""
-                    MATCH (hp:HumanProfile {human_id: $human_id})-[r:PREFERENCE_CHANGED]->(a:Agent)
+                    MATCH (hp:HumanProfile {phone_e164: $phone_e164})-[r:PREFERENCE_CHANGED]->(a:Agent)
                     WHERE r.field = $field
                     RETURN r.at AS at, r.field AS field,
                            r.old_value AS old_value, r.new_value AS new_value,
                            r.source AS source, a.name AS changed_by
                     ORDER BY r.at DESC
                     LIMIT $limit
-                """, human_id=human_id, field=field, limit=limit)
+                """, phone_e164=phone_e164, field=field, limit=limit)
             else:
                 result = session.run("""
-                    MATCH (hp:HumanProfile {human_id: $human_id})-[r:PREFERENCE_CHANGED]->(a:Agent)
+                    MATCH (hp:HumanProfile {phone_e164: $phone_e164})-[r:PREFERENCE_CHANGED]->(a:Agent)
                     RETURN r.at AS at, r.field AS field,
                            r.old_value AS old_value, r.new_value AS new_value,
                            r.source AS source, a.name AS changed_by
                     ORDER BY r.at DESC
                     LIMIT $limit
-                """, human_id=human_id, limit=limit)
+                """, phone_e164=phone_e164, limit=limit)
 
             return [dict(record) for record in result]
 
@@ -749,12 +749,12 @@ class HumanProfileStore:
     # Tagging
     # ==========================================================================
 
-    def add_tag(self, human_id: str, tag_name: str, tagged_by: Optional[str] = None) -> bool:
+    def add_tag(self, phone_e164: str, tag_name: str, tagged_by: Optional[str] = None) -> bool:
         """
         Add a tag to a profile.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             tag_name: Tag to add
             tagged_by: Who added the tag
 
@@ -763,23 +763,23 @@ class HumanProfileStore:
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 MERGE (t:Tag {name: toLower($tag_name)})
                 MERGE (hp)-[rel:TAGGED_AS]->(t)
                 ON CREATE SET
                     rel.tagged_at = datetime(),
                     rel.tagged_by = $tagged_by
                 RETURN hp.display_name AS name
-            """, human_id=human_id, tag_name=tag_name, tagged_by=tagged_by)
+            """, phone_e164=phone_e164, tag_name=tag_name, tagged_by=tagged_by)
 
             return result.single() is not None
 
-    def remove_tag(self, human_id: str, tag_name: str) -> bool:
+    def remove_tag(self, phone_e164: str, tag_name: str) -> bool:
         """
         Remove a tag from a profile.
 
         Args:
-            human_id: Phone number
+            phone_e164: Phone number (E.164 format)
             tag_name: Tag to remove
 
         Returns:
@@ -787,11 +787,11 @@ class HumanProfileStore:
         """
         with self.driver.session() as session:
             result = session.run("""
-                MATCH (hp:HumanProfile {human_id: $human_id})
+                MATCH (hp:HumanProfile {phone_e164: $phone_e164})
                 MATCH (hp)-[rel:TAGGED_AS]->(t:Tag {name: toLower($tag_name)})
                 DELETE rel
                 RETURN count(rel) AS removed
-            """, human_id=human_id, tag_name=tag_name)
+            """, phone_e164=phone_e164, tag_name=tag_name)
 
             record = result.single()
             return record is not None and record["removed"] > 0
@@ -835,7 +835,7 @@ if __name__ == "__main__":
 
     # Create test profile
     result = store.create_profile(
-        human_id="+19999999999",
+        phone_e164="+19999999999",
         display_name="Test User",
         timezone="America/New_York",
         source="test"

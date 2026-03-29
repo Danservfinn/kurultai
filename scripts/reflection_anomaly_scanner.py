@@ -22,7 +22,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -47,10 +47,9 @@ def get_model():
 MODEL = get_model()
 
 REVIEWS_DIR = LOGS_DIR / "reviews"
-REFLECTION_LOGS_DIR = LOGS_DIR  # kurultai-reflect-*-{agent}.md files live here
 ESCALATION_COOLDOWN_FILE = LOGS_DIR / "anomaly-escalation-cooldown.json"
 ESCALATION_COOLDOWN_SECONDS = 3600  # Don't re-escalate same agent within 1h
-REFLECTION_GAP_THRESHOLD_S = 4 * 3600  # 4 hours — flag if no reflection produced
+REFLECTION_GAP_THRESHOLD_S = 28 * 3600  # 28 hours — flag if no daily reflection (4h past 6AM run)
 
 
 def parse_review_file(agent):
@@ -163,13 +162,42 @@ def is_on_cooldown(cooldowns, key):
 
 
 def get_last_reflection_age(agent):
-    """Find the age (in seconds) of the most recent kurultai-reflect file for an agent.
+    """Find the age (in seconds) of the most recent reflection for an agent.
 
-    Scans for kurultai-reflect-*-{agent}.md and kurultai-reflect-{agent}.log files.
-    Returns age in seconds, or None if no reflection file found.
+    Checks Neo4j for completed reflection tasks (new system).
+    Falls back to log files for backwards compatibility (old system).
+    Returns age in seconds, or None if no reflection found.
     """
     try:
-        # Check for both .md files (old format) and .log files (current format)
+        # NEW SYSTEM: Check Neo4j for completed reflection tasks
+        from neo4j_v2_core import TaskStore
+        store = TaskStore()
+        try:
+            with store.driver.session() as s:
+                # Use ENDS WITH with concatenated string parameter
+                suffix = f"-reflect-{agent}"
+                result = s.run("""
+                    MATCH (t:Task)
+                    WHERE t.task_id ENDS WITH $suffix
+                      AND t.status = 'COMPLETED'
+                      AND t.completed_at IS NOT NULL
+                    RETURN t.completed_at AS completed
+                    ORDER BY t.completed_at DESC
+                    LIMIT 1
+                """, suffix=suffix)
+                record = result.single()
+                if record and record["completed"]:
+                    # Convert neo4j.time.DateTime to timestamp
+                    completed_ts = record["completed"].to_native().timestamp()
+                    return time.time() - completed_ts
+        finally:
+            store.close()
+    except Exception:
+        # If Neo4j check fails, fall back to old log file check
+        pass
+
+    try:
+        # OLD SYSTEM: Check for log files (backwards compatibility)
         md_pattern = f"kurultai-reflect-*-{agent}.md"
         log_pattern = f"kurultai-reflect-{agent}.log"
 
@@ -192,6 +220,40 @@ def scan_anomalies(hours=1):
     """
     anomalies = []
     failures = get_recent_failures(hours=hours)
+
+    # Anomaly 0: Proposal extractor stall detection
+    extractor_state = LOGS_DIR / "extractor-state.json"
+    if extractor_state.exists():
+        try:
+            state = json.loads(extractor_state.read_text())
+            last_run = datetime.fromisoformat(state.get("last_run", "2000-01-01T00:00:00"))
+            # Handle timezone-aware datetimes
+            if last_run.tzinfo is not None:
+                now = datetime.now(timezone.utc)
+            else:
+                now = datetime.now()
+            hours_since = (now - last_run).total_seconds() / 3600
+            if hours_since > 8:  # 2 reflection cycles without extraction
+                anomalies.append({
+                    "type": "extraction_stall",
+                    "agent": "ogedei",
+                    "severity": "high",
+                    "title": f"Proposal extractor stalled ({hours_since:.0f}h since last run)",
+                    "body": (
+                        f"## Anomaly: Proposal Extractor Stall\n\n"
+                        f"The proposal extractor has not run in {hours_since:.0f} hours "
+                        f"(expected: every 4 hours during reflection cycle).\n\n"
+                        f"**Last run:** {state.get('last_run', 'unknown')}\n"
+                        f"**State file:** {extractor_state}\n\n"
+                        f"**Action required:** Check if Step 2.5 in hourly_reflection.sh "
+                        f"is executing. Verify the safety-net cron job is running.\n\n"
+                        f"Source: reflection_anomaly_scanner.py (extraction health check)\n"
+                        f"Model: {MODEL}"
+                    ),
+                    "route_to": "ogedei",
+                })
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"[anomaly-scanner] Warning: could not read extractor state: {e}", file=sys.stderr)
 
     for agent in VALID_AGENTS:
         review = parse_review_file(agent)
@@ -265,12 +327,11 @@ def scan_anomalies(hours=1):
                     f"**Agent:** {agent}\n"
                     f"**Last reflection:** {gap_hours}h ago\n"
                     f"**Threshold:** {REFLECTION_GAP_THRESHOLD_S // 3600}h\n\n"
-                    f"The hourly reflection pipeline has not produced output for this agent. "
-                    f"Possible causes: launchd job not firing, agent session crashed, "
-                    f"timeout during reflection, or meta_reflection.py error.\n\n"
-                    f"**Action required:** Check launchd status, reflection logs at "
-                    f"logs/kurultai-reflect-{agent}.log, and hourly_reflection.sh output. "
-                    f"Verify the agent's claude-agent process can start.\n\n"
+                    f"The daily reflection pipeline has not produced output for this agent. "
+                    f"Possible causes: launchd job not firing, pipeline not creating tasks, "
+                    f"agent not claiming task, or task execution failure.\n\n"
+                    f"**Action required:** Check launchd status (com.kurultai.daily-reflection-pipeline), "
+                    f"verify pipeline tasks are created in Neo4j, and check agent completion status.\n\n"
                     f"Source: reflection_anomaly_scanner.py (automated escalation)\n"
                     f"Model: {MODEL}"
                 ),
@@ -329,7 +390,7 @@ def _apply_flood_gate(anomalies):
                 f"Source: reflection_anomaly_scanner.py (flood gate consolidation)\n"
                 f"Model: {MODEL}"
             ),
-            "route_to": "kublai",
+            "route_to": "ogedei",
         }
         return [consolidated] + other_anomalies[:MAX_ESCALATIONS_PER_RUN - 1]
 

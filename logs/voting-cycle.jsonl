@@ -3645,3 +3645,682 @@
 {"timestamp": "2026-03-13T09:01:22.081016", "phase": 4, "message": "Consensus check complete: 0 approved, 0 vetoed", "data": {}}
 {"timestamp": "2026-03-13T09:01:22.126498", "phase": 5, "message": "Tallying final results", "data": {}}
 {"timestamp": "2026-03-13T09:01:22.126981", "phase": 5, "message": "Tally complete: 77 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-23T12:46:30.231327", "phase": 3, "message": "Starting voting for all pending proposals", "data": {}}
+{"timestamp": "2026-03-23T12:46:30.373197", "phase": 3, "message": "  Voting started for temujin-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:30.520877", "phase": 3, "message": "  Voting started for mongke-20260323-003350-skill-file-metadata-validation", "data": {}}
+{"timestamp": "2026-03-23T12:46:30.689257", "phase": 3, "message": "  Voting started for mongke-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:30.818187", "phase": 3, "message": "  Voting started for kublai-20260321-081026", "data": {}}
+{"timestamp": "2026-03-23T12:46:30.951954", "phase": 3, "message": "  Voting started for chagatai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.076401", "phase": 3, "message": "  Voting started for jochi-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.228979", "phase": 3, "message": "  Voting started for mongke-20260323-003350-skill-model-verification-preamble", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.361105", "phase": 3, "message": "  Voting started for ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.493440", "phase": 3, "message": "  Voting started for ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.641881", "phase": 3, "message": "  Voting started for temujin-reflect-20260322-0400", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.746752", "phase": 3, "message": "  Voting started for ogedei-20260323-003350-o009-reflection-stale-escalation", "data": {}}
+{"timestamp": "2026-03-23T12:46:31.877619", "phase": 3, "message": "  Voting started for kublai-20260323-041200-improve-reflection-telemetry-accuracy", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.005725", "phase": 3, "message": "  Voting started for ogedei-20260323-124630", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.144208", "phase": 3, "message": "  Voting started for kublai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.288044", "phase": 3, "message": "  Voting started for mongke-20260323-003350-skill-horde-learn-activation-gate", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.288602", "phase": 3, "message": "Voting started for 15 proposals", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.467256", "phase": 3, "message": "Casting votes for proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.469128", "phase": 3, "message": "Found 13 proposals from last 24 hours", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.469293", "phase": 3, "message": "Starting voting and refreshing deadlines...", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.610164", "phase": 3, "message": "  Voting started for temujin-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.612036", "phase": 3, "message": "  Refreshed voting deadline for temujin-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.746298", "phase": 3, "message": "  Voting started for mongke-20260323-003350-skill-file-metadata-validation", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.747259", "phase": 3, "message": "  Refreshed voting deadline for mongke-20260323-003350-skill-file-metadata-validation", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.875858", "phase": 3, "message": "  Voting started for mongke-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:32.877882", "phase": 3, "message": "  Refreshed voting deadline for mongke-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.015693", "phase": 3, "message": "  Voting started for chagatai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.016994", "phase": 3, "message": "  Refreshed voting deadline for chagatai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.144939", "phase": 3, "message": "  Voting started for jochi-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.146112", "phase": 3, "message": "  Refreshed voting deadline for jochi-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.276352", "phase": 3, "message": "  Voting started for mongke-20260323-003350-skill-model-verification-preamble", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.278091", "phase": 3, "message": "  Refreshed voting deadline for mongke-20260323-003350-skill-model-verification-preamble", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.415931", "phase": 3, "message": "  Voting started for ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.416939", "phase": 3, "message": "  Refreshed voting deadline for ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.545608", "phase": 3, "message": "  Voting started for ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.546590", "phase": 3, "message": "  Refreshed voting deadline for ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.682279", "phase": 3, "message": "  Voting started for ogedei-20260323-003350-o009-reflection-stale-escalation", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.683019", "phase": 3, "message": "  Refreshed voting deadline for ogedei-20260323-003350-o009-reflection-stale-escalation", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.805729", "phase": 3, "message": "  Voting started for kublai-20260323-041200-improve-reflection-telemetry-accuracy", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.807082", "phase": 3, "message": "  Refreshed voting deadline for kublai-20260323-041200-improve-reflection-telemetry-accuracy", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.937443", "phase": 3, "message": "  Voting started for ogedei-20260323-124630", "data": {}}
+{"timestamp": "2026-03-23T12:46:33.938405", "phase": 3, "message": "  Refreshed voting deadline for ogedei-20260323-124630", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.088919", "phase": 3, "message": "  Voting started for kublai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.090445", "phase": 3, "message": "  Refreshed voting deadline for kublai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.226138", "phase": 3, "message": "  Voting started for mongke-20260323-003350-skill-horde-learn-activation-gate", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.227840", "phase": 3, "message": "  Refreshed voting deadline for mongke-20260323-003350-skill-horde-learn-activation-gate", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.365261", "phase": 3, "message": "  kublai voted APPROVE on temujin-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.500435", "phase": 3, "message": "  temujin voted APPROVE on temujin-20260323-124629: Good ROI (impact=high, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.635287", "phase": 3, "message": "  mongke voted APPROVE on temujin-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.775570", "phase": 3, "message": "  chagatai voted APPROVE on temujin-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:34.914352", "phase": 3, "message": "  jochi voted APPROVE on temujin-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.051569", "phase": 3, "message": "  ogedei voted APPROVE on temujin-20260323-124629: Good ROI (impact=high, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.052108", "phase": 3, "message": "  temujin-20260323-124629: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.196985", "phase": 3, "message": "  kublai voted APPROVE on mongke-20260323-003350-skill-file-metadata-validation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.337592", "phase": 3, "message": "  temujin voted APPROVE on mongke-20260323-003350-skill-file-metadata-validation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.472478", "phase": 3, "message": "  mongke voted APPROVE on mongke-20260323-003350-skill-file-metadata-validation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.610743", "phase": 3, "message": "  chagatai voted APPROVE on mongke-20260323-003350-skill-file-metadata-validation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.751041", "phase": 3, "message": "  jochi voted APPROVE on mongke-20260323-003350-skill-file-metadata-validation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.882869", "phase": 3, "message": "  ogedei voted APPROVE on mongke-20260323-003350-skill-file-metadata-validation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:35.883555", "phase": 3, "message": "  mongke-20260323-003350-skill-file-metadata-validation: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.016401", "phase": 3, "message": "  kublai voted APPROVE on mongke-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.149154", "phase": 3, "message": "  temujin voted APPROVE on mongke-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.270425", "phase": 3, "message": "  mongke voted APPROVE on mongke-20260323-124629: Good ROI (impact=medium, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.400062", "phase": 3, "message": "  chagatai voted APPROVE on mongke-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.530081", "phase": 3, "message": "  jochi voted APPROVE on mongke-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.670254", "phase": 3, "message": "  ogedei voted APPROVE on mongke-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.671145", "phase": 3, "message": "  mongke-20260323-124629: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.807949", "phase": 3, "message": "  kublai voted APPROVE on chagatai-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:36.949108", "phase": 3, "message": "  temujin voted APPROVE on chagatai-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.109363", "phase": 3, "message": "  mongke voted APPROVE on chagatai-20260323-124629: Good ROI (impact=medium, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.261473", "phase": 3, "message": "  chagatai voted APPROVE on chagatai-20260323-124629: Good ROI (impact=medium, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.420145", "phase": 3, "message": "  jochi voted APPROVE on chagatai-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.583204", "phase": 3, "message": "  ogedei voted APPROVE on chagatai-20260323-124629: Good ROI (impact=medium, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.583834", "phase": 3, "message": "  chagatai-20260323-124629: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.743680", "phase": 3, "message": "  kublai voted APPROVE on jochi-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:37.880174", "phase": 3, "message": "  temujin voted APPROVE on jochi-20260323-124629: Good ROI (impact=high, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.020322", "phase": 3, "message": "  mongke voted APPROVE on jochi-20260323-124629: Good ROI (impact=high, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.162226", "phase": 3, "message": "  chagatai voted APPROVE on jochi-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.290744", "phase": 3, "message": "  jochi voted APPROVE on jochi-20260323-124629: Good ROI (impact=high, effort=low) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.414384", "phase": 3, "message": "  ogedei voted APPROVE on jochi-20260323-124629: Good ROI (impact=high, effort=low)", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.415219", "phase": 3, "message": "  jochi-20260323-124629: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.550441", "phase": 3, "message": "  kublai voted APPROVE on mongke-20260323-003350-skill-model-verification-preamble: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.680194", "phase": 3, "message": "  temujin voted APPROVE on mongke-20260323-003350-skill-model-verification-preamble: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.793311", "phase": 3, "message": "  mongke voted APPROVE on mongke-20260323-003350-skill-model-verification-preamble: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:38.914499", "phase": 3, "message": "  chagatai voted APPROVE on mongke-20260323-003350-skill-model-verification-preamble: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.038054", "phase": 3, "message": "  jochi voted APPROVE on mongke-20260323-003350-skill-model-verification-preamble: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.180427", "phase": 3, "message": "  ogedei voted APPROVE on mongke-20260323-003350-skill-model-verification-preamble: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.181343", "phase": 3, "message": "  mongke-20260323-003350-skill-model-verification-preamble: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.314808", "phase": 3, "message": "  kublai voted APPROVE on ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.452360", "phase": 3, "message": "  temujin voted APPROVE on ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.585228", "phase": 3, "message": "  mongke voted APPROVE on ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.718198", "phase": 3, "message": "  chagatai voted APPROVE on ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:39.858047", "phase": 3, "message": "  jochi voted APPROVE on ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.001618", "phase": 3, "message": "  ogedei voted APPROVE on ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.002294", "phase": 3, "message": "  ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.138609", "phase": 3, "message": "  kublai voted APPROVE on ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.272366", "phase": 3, "message": "  temujin voted APPROVE on ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.400100", "phase": 3, "message": "  mongke voted APPROVE on ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.539130", "phase": 3, "message": "  chagatai voted APPROVE on ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.677541", "phase": 3, "message": "  jochi voted APPROVE on ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.803321", "phase": 3, "message": "  ogedei voted APPROVE on ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.803988", "phase": 3, "message": "  ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:40.941692", "phase": 3, "message": "  kublai voted APPROVE on ogedei-20260323-003350-o009-reflection-stale-escalation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.105675", "phase": 3, "message": "  temujin voted APPROVE on ogedei-20260323-003350-o009-reflection-stale-escalation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.232234", "phase": 3, "message": "  mongke voted APPROVE on ogedei-20260323-003350-o009-reflection-stale-escalation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.363609", "phase": 3, "message": "  chagatai voted APPROVE on ogedei-20260323-003350-o009-reflection-stale-escalation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.494477", "phase": 3, "message": "  jochi voted APPROVE on ogedei-20260323-003350-o009-reflection-stale-escalation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.627530", "phase": 3, "message": "  ogedei voted APPROVE on ogedei-20260323-003350-o009-reflection-stale-escalation: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.628244", "phase": 3, "message": "  ogedei-20260323-003350-o009-reflection-stale-escalation: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.792137", "phase": 3, "message": "  kublai voted APPROVE on kublai-20260323-041200-improve-reflection-telemetry-accuracy: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:41.931044", "phase": 3, "message": "  temujin voted APPROVE on kublai-20260323-041200-improve-reflection-telemetry-accuracy: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.071384", "phase": 3, "message": "  mongke voted APPROVE on kublai-20260323-041200-improve-reflection-telemetry-accuracy: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.203825", "phase": 3, "message": "  chagatai voted APPROVE on kublai-20260323-041200-improve-reflection-telemetry-accuracy: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.336859", "phase": 3, "message": "  jochi voted APPROVE on kublai-20260323-041200-improve-reflection-telemetry-accuracy: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.471964", "phase": 3, "message": "  ogedei voted APPROVE on kublai-20260323-041200-improve-reflection-telemetry-accuracy: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.472675", "phase": 3, "message": "  kublai-20260323-041200-improve-reflection-telemetry-accuracy: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.615794", "phase": 3, "message": "  kublai voted APPROVE on ogedei-20260323-124630: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.739626", "phase": 3, "message": "  temujin voted APPROVE on ogedei-20260323-124630: Good ROI (impact=high, effort=medium) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:42.866338", "phase": 3, "message": "  mongke voted APPROVE on ogedei-20260323-124630: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.002499", "phase": 3, "message": "  chagatai voted APPROVE on ogedei-20260323-124630: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.135759", "phase": 3, "message": "  jochi voted APPROVE on ogedei-20260323-124630: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.264323", "phase": 3, "message": "  ogedei voted APPROVE on ogedei-20260323-124630: Good ROI (impact=high, effort=medium) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.264954", "phase": 3, "message": "  ogedei-20260323-124630: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.394798", "phase": 3, "message": "  kublai voted APPROVE on kublai-20260323-124629: Good ROI (impact=high, effort=medium) + domain alignment", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.540501", "phase": 3, "message": "  temujin voted APPROVE on kublai-20260323-124629: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.669571", "phase": 3, "message": "  mongke voted APPROVE on kublai-20260323-124629: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.813482", "phase": 3, "message": "  chagatai voted APPROVE on kublai-20260323-124629: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:43.936354", "phase": 3, "message": "  jochi voted APPROVE on kublai-20260323-124629: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.051937", "phase": 3, "message": "  ogedei voted APPROVE on kublai-20260323-124629: Good ROI (impact=high, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.052840", "phase": 3, "message": "  kublai-20260323-124629: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.183575", "phase": 3, "message": "  kublai voted APPROVE on mongke-20260323-003350-skill-horde-learn-activation-gate: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.300832", "phase": 3, "message": "  temujin voted APPROVE on mongke-20260323-003350-skill-horde-learn-activation-gate: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.431155", "phase": 3, "message": "  mongke voted APPROVE on mongke-20260323-003350-skill-horde-learn-activation-gate: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.562164", "phase": 3, "message": "  chagatai voted APPROVE on mongke-20260323-003350-skill-horde-learn-activation-gate: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.704835", "phase": 3, "message": "  jochi voted APPROVE on mongke-20260323-003350-skill-horde-learn-activation-gate: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.841847", "phase": 3, "message": "  ogedei voted APPROVE on mongke-20260323-003350-skill-horde-learn-activation-gate: Good ROI (impact=medium, effort=medium)", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.842538", "phase": 3, "message": "  mongke-20260323-003350-skill-horde-learn-activation-gate: APPROVE=6, REJECT=0, ABSTAIN=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:44.842752", "phase": 3, "message": "Voting complete: 78 votes cast across 13 proposals", "data": {}}
+{"timestamp": "2026-03-23T12:46:45.020005", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-23T12:46:45.152636", "phase": 4, "message": "  temujin-20260323-124629: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.323168", "phase": 4, "message": "  Signal DM sent to owner for temujin-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.323814", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: temujin-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.457594", "phase": 4, "message": "  mongke-20260323-003350-skill-file-metadata-validation: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.567667", "phase": 4, "message": "  Signal DM sent to owner for mongke-20260323-003350-skill-file-metadata-validation", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.568310", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: mongke-20260323-003350-skill-file-metadata-validation", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.706410", "phase": 4, "message": "  mongke-20260323-124629: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.817352", "phase": 4, "message": "  Signal DM sent to owner for mongke-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.817970", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: mongke-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:46.962981", "phase": 4, "message": "  kublai-20260321-081026: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:47.114876", "phase": 4, "message": "  chagatai-20260323-124629: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:47.233732", "phase": 4, "message": "  Signal DM sent to owner for chagatai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:47.234325", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: chagatai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:47.427708", "phase": 4, "message": "  jochi-20260323-124629: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:47.576447", "phase": 4, "message": "  Signal DM sent to owner for jochi-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:47.576936", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: jochi-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:48.487450", "phase": 4, "message": "  mongke-20260323-003350-skill-model-verification-preamble: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:48.770346", "phase": 4, "message": "  Signal DM sent to owner for mongke-20260323-003350-skill-model-verification-preamble", "data": {}}
+{"timestamp": "2026-03-23T12:46:48.770881", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: mongke-20260323-003350-skill-model-verification-preamble", "data": {}}
+{"timestamp": "2026-03-23T12:46:48.913448", "phase": 4, "message": "  ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:49.080989", "phase": 4, "message": "  Signal DM sent to owner for ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta", "data": {}}
+{"timestamp": "2026-03-23T12:46:49.081681", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: ogedei-20260323-003352-fix-ogedei-watchdog-escalation-task-inta", "data": {}}
+{"timestamp": "2026-03-23T12:46:49.353244", "phase": 4, "message": "  ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:49.653285", "phase": 4, "message": "  Signal DM sent to owner for ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass", "data": {}}
+{"timestamp": "2026-03-23T12:46:49.653910", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: ogedei-20260323-003352-resolve-prior-telemetry-gap-proposal-ass", "data": {}}
+{"timestamp": "2026-03-23T12:46:49.866883", "phase": 4, "message": "  temujin-reflect-20260322-0400: APPROVE=0/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.030930", "phase": 4, "message": "  ogedei-20260323-003350-o009-reflection-stale-escalation: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.142797", "phase": 4, "message": "  Signal DM sent to owner for ogedei-20260323-003350-o009-reflection-stale-escalation", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.143334", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: ogedei-20260323-003350-o009-reflection-stale-escalation", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.322401", "phase": 4, "message": "  kublai-20260323-041200-improve-reflection-telemetry-accuracy: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.434999", "phase": 4, "message": "  Signal DM sent to owner for kublai-20260323-041200-improve-reflection-telemetry-accuracy", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.435495", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: kublai-20260323-041200-improve-reflection-telemetry-accuracy", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.601729", "phase": 4, "message": "  ogedei-20260323-124630: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.726994", "phase": 4, "message": "  Signal DM sent to owner for ogedei-20260323-124630", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.727580", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: ogedei-20260323-124630", "data": {}}
+{"timestamp": "2026-03-23T12:46:50.886329", "phase": 4, "message": "  kublai-20260323-124629: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.006770", "phase": 4, "message": "  Signal DM sent to owner for kublai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.007575", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: kublai-20260323-124629", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.180112", "phase": 4, "message": "  mongke-20260323-003350-skill-horde-learn-activation-gate: APPROVE=6/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.292308", "phase": 4, "message": "  Signal DM sent to owner for mongke-20260323-003350-skill-horde-learn-activation-gate", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.293341", "phase": 4, "message": "  -> AWAITING HUMAN APPROVAL: mongke-20260323-003350-skill-horde-learn-activation-gate", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.293769", "phase": 4, "message": "Consensus check complete: 13 awaiting human approval, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.578692", "phase": 5, "message": "Tallying final results", "data": {}}
+{"timestamp": "2026-03-23T12:46:51.580999", "phase": 5, "message": "Tally complete: 81 approved, 0 rejected", "data": {}}
+{"timestamp": "2026-03-23T15:52:47.499307", "phase": 4, "message": "Checking consensus for all proposals in voting", "data": {}}
+{"timestamp": "2026-03-23T15:52:47.535681", "phase": 4, "message": "  kublai-20260321-081026: APPROVE=1/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T15:52:47.566197", "phase": 4, "message": "  temujin-reflect-20260322-0400: APPROVE=1/6, REJECT=0", "data": {}}
+{"timestamp": "2026-03-23T15:52:47.566363", "phase": 4, "message": "Consensus check complete: 0 awaiting human approval, 0 vetoed", "data": {}}
+{"timestamp": "2026-03-23T15:52:59.861558", "phase": 4, "message": "Creating tasks for approved proposals", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.044632", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.044895", "phase": 4, "message": "  Created task proposal-temujin-20260311-150846 for proposal temujin-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.052038", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.052151", "phase": 4, "message": "  Created task proposal-jochi-20260311-131031 for proposal jochi-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.059051", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.059188", "phase": 4, "message": "  Created task proposal-chagatai-20260311-131031 for proposal chagatai-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.065919", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.066018", "phase": 4, "message": "  Created task proposal-chagatai-20260311-111101 for proposal chagatai-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.070914", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.070996", "phase": 4, "message": "  Created task proposal-mongke-20260311-154239 for proposal mongke-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.076943", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.077061", "phase": 4, "message": "  Created task proposal-jochi-20260311-111101 for proposal jochi-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.083164", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.083266", "phase": 4, "message": "  Created task proposal-temujin-20260311-120831 for proposal temujin-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.088944", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.089060", "phase": 4, "message": "  Created task proposal-temujin-20260311-171101 for proposal temujin-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.095907", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.096002", "phase": 4, "message": "  Created task proposal-kublai-20260312-181821 for proposal kublai-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.101919", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.102030", "phase": 4, "message": "  Created task proposal-mongke-20260311-150846 for proposal mongke-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.110944", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-150314", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.111059", "phase": 4, "message": "  Created task proposal-kublai-20260310-150314 for proposal kublai-20260310-150314 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.117965", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-170315", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.118072", "phase": 4, "message": "  Created task proposal-kublai-20260310-170315 for proposal kublai-20260310-170315 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.125234", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.125351", "phase": 4, "message": "  Created task proposal-ogedei-20260311-131031 for proposal ogedei-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.133119", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.133222", "phase": 4, "message": "  Created task proposal-temujin-20260311-154239 for proposal temujin-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.140630", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.141087", "phase": 4, "message": "  Created task proposal-mongke-20260311-120831 for proposal mongke-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.149335", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.149599", "phase": 4, "message": "  Created task proposal-mongke-20260311-171101 for proposal mongke-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.157551", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.157814", "phase": 4, "message": "  Created task proposal-ogedei-20260311-111101 for proposal ogedei-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.166584", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.166986", "phase": 4, "message": "  Created task proposal-ogedei-20260311-154239 for proposal ogedei-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.175975", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.176472", "phase": 4, "message": "  Created task proposal-temujin-20260311-111101 for proposal temujin-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.186925", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.187388", "phase": 4, "message": "  Created task proposal-kublai-20260311-140927 for proposal kublai-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.198646", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.198972", "phase": 4, "message": "  Created task proposal-jochi-20260311-171101 for proposal jochi-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.207885", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.208486", "phase": 4, "message": "  Created task proposal-mongke-20260311-131030 for proposal mongke-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.219619", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.220113", "phase": 4, "message": "  Created task proposal-jochi-20260311-120831 for proposal jochi-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.232592", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-m007-m007-new", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.233127", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-m007-m007-new for proposal mongke-20260323-003350-m007-m007-new (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.244163", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.244814", "phase": 4, "message": "  Created task proposal-chagatai-20260311-171101 for proposal chagatai-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.256848", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.257334", "phase": 4, "message": "  Created task proposal-chagatai-20260311-120831 for proposal chagatai-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.268724", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174301", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.269196", "phase": 4, "message": "  Created task proposal-kublai-20260311-174301 for proposal kublai-20260311-174301 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.280690", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.281191", "phase": 4, "message": "  Created task proposal-chagatai-20260311-150846 for proposal chagatai-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.292767", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.293262", "phase": 4, "message": "  Created task proposal-jochi-20260311-150846 for proposal jochi-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.303548", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.303962", "phase": 4, "message": "  Created task proposal-chagatai-20260311-154239 for proposal chagatai-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.313883", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-180316", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.314406", "phase": 4, "message": "  Created task proposal-kublai-20260310-180316 for proposal kublai-20260310-180316 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.324968", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.325543", "phase": 4, "message": "  Created task proposal-jochi-20260311-154239 for proposal jochi-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.336523", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.336929", "phase": 4, "message": "  Created task proposal-ogedei-20260311-120831 for proposal ogedei-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.348737", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.349275", "phase": 4, "message": "  Created task proposal-ogedei-20260311-171101 for proposal ogedei-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.359680", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.360059", "phase": 4, "message": "  Created task proposal-kublai-20260311-180745 for proposal kublai-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.369577", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.369999", "phase": 4, "message": "  Created task proposal-temujin-20260311-131030 for proposal temujin-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.381770", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.382349", "phase": 4, "message": "  Created task proposal-kublai-20260311-160907 for proposal kublai-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.393617", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.394014", "phase": 4, "message": "  Created task proposal-mongke-20260311-111101 for proposal mongke-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.404858", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.405462", "phase": 4, "message": "  Created task proposal-ogedei-20260311-150846 for proposal ogedei-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.418799", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-130320", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.419441", "phase": 4, "message": "  Created task proposal-kublai-20260310-130320 for proposal kublai-20260310-130320 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.433427", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.433744", "phase": 4, "message": "  Created task proposal-chagatai-20260312-181821 for proposal chagatai-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.447028", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-111040", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.447593", "phase": 4, "message": "  Created task proposal-kublai-20260311-111040 for proposal kublai-20260311-111040 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.459069", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-111156", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.459704", "phase": 4, "message": "  Created task proposal-temujin-20260311-111156 for proposal temujin-20260311-111156 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.471849", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.472494", "phase": 4, "message": "  Created task proposal-jochi-20260312-181821 for proposal jochi-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.485007", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-211332", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.485607", "phase": 4, "message": "  Created task proposal-kublai-20260310-211332 for proposal kublai-20260310-211332 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.497952", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.498578", "phase": 4, "message": "  Created task proposal-mongke-20260311-140927 for proposal mongke-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.511184", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.511930", "phase": 4, "message": "  Created task proposal-temujin-20260311-180745 for proposal temujin-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.521575", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.522014", "phase": 4, "message": "  Created task proposal-kublai-20260311-131030 for proposal kublai-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.532380", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.532763", "phase": 4, "message": "  Created task proposal-temujin-20260311-160907 for proposal temujin-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.542559", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-201657", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.542993", "phase": 4, "message": "  Created task proposal-kublai-20260310-201657 for proposal kublai-20260310-201657 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.552363", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260323-003350-o008-drift-triggered-remediation-task", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.552714", "phase": 4, "message": "  Created task proposal-ogedei-20260323-003350-o008-drift-triggered-remediation-task for proposal ogedei-20260323-003350-o008-drift-triggered-remediation-task (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.563565", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.563993", "phase": 4, "message": "  Created task proposal-ogedei-20260312-181821 for proposal ogedei-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.575625", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-190318", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.576098", "phase": 4, "message": "  Created task proposal-kublai-20260310-190318 for proposal kublai-20260310-190318 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.586531", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-140314", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.586932", "phase": 4, "message": "  Created task proposal-kublai-20260310-140314 for proposal kublai-20260310-140314 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.597557", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174458", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.597964", "phase": 4, "message": "  Created task proposal-kublai-20260311-174458 for proposal kublai-20260311-174458 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.607664", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-m008-m008-new", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.608108", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-m008-m008-new for proposal mongke-20260323-003350-m008-m008-new (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.617442", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.617819", "phase": 4, "message": "  Created task proposal-mongke-20260311-160907 for proposal mongke-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.627467", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.627875", "phase": 4, "message": "  Created task proposal-mongke-20260311-180745 for proposal mongke-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.636503", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.636892", "phase": 4, "message": "  Created task proposal-temujin-20260311-140927 for proposal temujin-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.647374", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-160315", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.647679", "phase": 4, "message": "  Created task proposal-kublai-20260310-160315 for proposal kublai-20260310-160315 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.656233", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.656457", "phase": 4, "message": "  Created task proposal-kublai-20260311-111101 for proposal kublai-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.664183", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.664395", "phase": 4, "message": "  Created task proposal-kublai-20260311-154239 for proposal kublai-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.672344", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.672590", "phase": 4, "message": "  Created task proposal-ogedei-20260311-140927 for proposal ogedei-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.679750", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.680122", "phase": 4, "message": "  Created task proposal-jochi-20260311-160907 for proposal jochi-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.692547", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.692940", "phase": 4, "message": "  Created task proposal-jochi-20260311-180745 for proposal jochi-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.702467", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.702885", "phase": 4, "message": "  Created task proposal-chagatai-20260311-160907 for proposal chagatai-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.713384", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.713800", "phase": 4, "message": "  Created task proposal-chagatai-20260311-180745 for proposal chagatai-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.721618", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174537", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.722052", "phase": 4, "message": "  Created task proposal-kublai-20260311-174537 for proposal kublai-20260311-174537 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.732323", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.732545", "phase": 4, "message": "  Created task proposal-temujin-20260312-181821 for proposal temujin-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.741360", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-120321", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.741605", "phase": 4, "message": "  Created task proposal-kublai-20260310-120321 for proposal kublai-20260310-120321 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.750579", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.751024", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20 for proposal mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.759226", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.759432", "phase": 4, "message": "  Created task proposal-chagatai-20260311-140927 for proposal chagatai-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.768350", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.768838", "phase": 4, "message": "  Created task proposal-kublai-20260311-120831 for proposal kublai-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.779554", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.779957", "phase": 4, "message": "  Created task proposal-kublai-20260311-171101 for proposal kublai-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.789350", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.789710", "phase": 4, "message": "  Created task proposal-ogedei-20260311-160907 for proposal ogedei-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.799518", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-001324", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.799881", "phase": 4, "message": "  Created task proposal-kublai-20260311-001324 for proposal kublai-20260311-001324 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.809531", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.809970", "phase": 4, "message": "  Created task proposal-ogedei-20260311-180745 for proposal ogedei-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.819394", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.819724", "phase": 4, "message": "  Created task proposal-jochi-20260311-140927 for proposal jochi-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.828061", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.828296", "phase": 4, "message": "  Created task proposal-kublai-20260311-150846 for proposal kublai-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.836588", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-110319", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.836938", "phase": 4, "message": "  Created task proposal-kublai-20260310-110319 for proposal kublai-20260310-110319 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.850302", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.850649", "phase": 4, "message": "  Created task proposal-mongke-20260312-181821 for proposal mongke-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:53:00.850867", "phase": 4, "message": "Task creation complete: 81 tasks created", "data": {}}
+{"timestamp": "2026-03-23T15:54:16.871321", "phase": 4, "message": "Creating tasks for approved proposals", "data": {}}
+{"timestamp": "2026-03-23T15:54:16.991133", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:54:16.991246", "phase": 4, "message": "  Created task proposal-temujin-20260311-150846 for proposal temujin-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:16.998199", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T15:54:16.998260", "phase": 4, "message": "  Created task proposal-jochi-20260311-131031 for proposal jochi-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.004283", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.004356", "phase": 4, "message": "  Created task proposal-chagatai-20260311-131031 for proposal chagatai-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.011229", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.011284", "phase": 4, "message": "  Created task proposal-chagatai-20260311-111101 for proposal chagatai-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.019255", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.019323", "phase": 4, "message": "  Created task proposal-mongke-20260311-154239 for proposal mongke-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.026141", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.026183", "phase": 4, "message": "  Created task proposal-jochi-20260311-111101 for proposal jochi-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.033278", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.033336", "phase": 4, "message": "  Created task proposal-temujin-20260311-120831 for proposal temujin-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.040283", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.040336", "phase": 4, "message": "  Created task proposal-temujin-20260311-171101 for proposal temujin-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.047180", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.047238", "phase": 4, "message": "  Created task proposal-kublai-20260312-181821 for proposal kublai-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.054304", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.054363", "phase": 4, "message": "  Created task proposal-mongke-20260311-150846 for proposal mongke-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.061184", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-150314", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.061249", "phase": 4, "message": "  Created task proposal-kublai-20260310-150314 for proposal kublai-20260310-150314 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.068336", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-170315", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.068396", "phase": 4, "message": "  Created task proposal-kublai-20260310-170315 for proposal kublai-20260310-170315 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.076296", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.076372", "phase": 4, "message": "  Created task proposal-ogedei-20260311-131031 for proposal ogedei-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.083192", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.083260", "phase": 4, "message": "  Created task proposal-temujin-20260311-154239 for proposal temujin-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.090371", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.090448", "phase": 4, "message": "  Created task proposal-mongke-20260311-120831 for proposal mongke-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.098200", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.098254", "phase": 4, "message": "  Created task proposal-mongke-20260311-171101 for proposal mongke-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.106340", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.106396", "phase": 4, "message": "  Created task proposal-ogedei-20260311-111101 for proposal ogedei-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.113159", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.113240", "phase": 4, "message": "  Created task proposal-ogedei-20260311-154239 for proposal ogedei-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.120307", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.120391", "phase": 4, "message": "  Created task proposal-temujin-20260311-111101 for proposal temujin-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.127140", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.127220", "phase": 4, "message": "  Created task proposal-kublai-20260311-140927 for proposal kublai-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.134236", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.134331", "phase": 4, "message": "  Created task proposal-jochi-20260311-171101 for proposal jochi-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.141187", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.141282", "phase": 4, "message": "  Created task proposal-mongke-20260311-131030 for proposal mongke-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.149701", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.149802", "phase": 4, "message": "  Created task proposal-jochi-20260311-120831 for proposal jochi-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.157474", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-m007-m007-new", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.157762", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-m007-m007-new for proposal mongke-20260323-003350-m007-m007-new (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.165535", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.165859", "phase": 4, "message": "  Created task proposal-chagatai-20260311-171101 for proposal chagatai-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.173348", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.173570", "phase": 4, "message": "  Created task proposal-chagatai-20260311-120831 for proposal chagatai-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.180462", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174301", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.180774", "phase": 4, "message": "  Created task proposal-kublai-20260311-174301 for proposal kublai-20260311-174301 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.188399", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.188704", "phase": 4, "message": "  Created task proposal-chagatai-20260311-150846 for proposal chagatai-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.196428", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.196725", "phase": 4, "message": "  Created task proposal-jochi-20260311-150846 for proposal jochi-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.204651", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.204954", "phase": 4, "message": "  Created task proposal-chagatai-20260311-154239 for proposal chagatai-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.214626", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-180316", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.215038", "phase": 4, "message": "  Created task proposal-kublai-20260310-180316 for proposal kublai-20260310-180316 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.223535", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.223920", "phase": 4, "message": "  Created task proposal-jochi-20260311-154239 for proposal jochi-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.233713", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.234171", "phase": 4, "message": "  Created task proposal-ogedei-20260311-120831 for proposal ogedei-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.242724", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.243131", "phase": 4, "message": "  Created task proposal-ogedei-20260311-171101 for proposal ogedei-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.252553", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.253026", "phase": 4, "message": "  Created task proposal-kublai-20260311-180745 for proposal kublai-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.262579", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.262989", "phase": 4, "message": "  Created task proposal-temujin-20260311-131030 for proposal temujin-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.271696", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.272172", "phase": 4, "message": "  Created task proposal-kublai-20260311-160907 for proposal kublai-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.282777", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.283324", "phase": 4, "message": "  Created task proposal-mongke-20260311-111101 for proposal mongke-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.297789", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.298262", "phase": 4, "message": "  Created task proposal-ogedei-20260311-150846 for proposal ogedei-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.307646", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-130320", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.308072", "phase": 4, "message": "  Created task proposal-kublai-20260310-130320 for proposal kublai-20260310-130320 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.317976", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.318481", "phase": 4, "message": "  Created task proposal-chagatai-20260312-181821 for proposal chagatai-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.328738", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-111040", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.329218", "phase": 4, "message": "  Created task proposal-kublai-20260311-111040 for proposal kublai-20260311-111040 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.341892", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-111156", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.342376", "phase": 4, "message": "  Created task proposal-temujin-20260311-111156 for proposal temujin-20260311-111156 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.352820", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.353254", "phase": 4, "message": "  Created task proposal-jochi-20260312-181821 for proposal jochi-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.361768", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-211332", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.362251", "phase": 4, "message": "  Created task proposal-kublai-20260310-211332 for proposal kublai-20260310-211332 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.372739", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.373129", "phase": 4, "message": "  Created task proposal-mongke-20260311-140927 for proposal mongke-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.382803", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.383262", "phase": 4, "message": "  Created task proposal-temujin-20260311-180745 for proposal temujin-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.392840", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.393300", "phase": 4, "message": "  Created task proposal-kublai-20260311-131030 for proposal kublai-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.405823", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.406252", "phase": 4, "message": "  Created task proposal-temujin-20260311-160907 for proposal temujin-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.415688", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-201657", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.416164", "phase": 4, "message": "  Created task proposal-kublai-20260310-201657 for proposal kublai-20260310-201657 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.425621", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260323-003350-o008-drift-triggered-remediation-task", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.426027", "phase": 4, "message": "  Created task proposal-ogedei-20260323-003350-o008-drift-triggered-remediation-task for proposal ogedei-20260323-003350-o008-drift-triggered-remediation-task (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.434635", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.435090", "phase": 4, "message": "  Created task proposal-ogedei-20260312-181821 for proposal ogedei-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.445707", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-190318", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.446181", "phase": 4, "message": "  Created task proposal-kublai-20260310-190318 for proposal kublai-20260310-190318 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.455685", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-140314", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.456095", "phase": 4, "message": "  Created task proposal-kublai-20260310-140314 for proposal kublai-20260310-140314 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.465586", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174458", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.465990", "phase": 4, "message": "  Created task proposal-kublai-20260311-174458 for proposal kublai-20260311-174458 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.475744", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-m008-m008-new", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.476168", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-m008-m008-new for proposal mongke-20260323-003350-m008-m008-new (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.485713", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.486156", "phase": 4, "message": "  Created task proposal-mongke-20260311-160907 for proposal mongke-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.495751", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.496246", "phase": 4, "message": "  Created task proposal-mongke-20260311-180745 for proposal mongke-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.506694", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.507105", "phase": 4, "message": "  Created task proposal-temujin-20260311-140927 for proposal temujin-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.516591", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-160315", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.516994", "phase": 4, "message": "  Created task proposal-kublai-20260310-160315 for proposal kublai-20260310-160315 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.526516", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.526907", "phase": 4, "message": "  Created task proposal-kublai-20260311-111101 for proposal kublai-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.535591", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.536008", "phase": 4, "message": "  Created task proposal-kublai-20260311-154239 for proposal kublai-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.545539", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.545925", "phase": 4, "message": "  Created task proposal-ogedei-20260311-140927 for proposal ogedei-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.556193", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.556626", "phase": 4, "message": "  Created task proposal-jochi-20260311-160907 for proposal jochi-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.566703", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.567201", "phase": 4, "message": "  Created task proposal-jochi-20260311-180745 for proposal jochi-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.576550", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.576949", "phase": 4, "message": "  Created task proposal-chagatai-20260311-160907 for proposal chagatai-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.586676", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.587090", "phase": 4, "message": "  Created task proposal-chagatai-20260311-180745 for proposal chagatai-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.596562", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174537", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.596966", "phase": 4, "message": "  Created task proposal-kublai-20260311-174537 for proposal kublai-20260311-174537 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.606702", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.607076", "phase": 4, "message": "  Created task proposal-temujin-20260312-181821 for proposal temujin-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.616680", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-120321", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.617121", "phase": 4, "message": "  Created task proposal-kublai-20260310-120321 for proposal kublai-20260310-120321 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.626808", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.627294", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20 for proposal mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.636844", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.637261", "phase": 4, "message": "  Created task proposal-chagatai-20260311-140927 for proposal chagatai-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.646652", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.647069", "phase": 4, "message": "  Created task proposal-kublai-20260311-120831 for proposal kublai-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.657030", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.657572", "phase": 4, "message": "  Created task proposal-kublai-20260311-171101 for proposal kublai-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.672687", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.673138", "phase": 4, "message": "  Created task proposal-ogedei-20260311-160907 for proposal ogedei-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.682566", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-001324", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.682957", "phase": 4, "message": "  Created task proposal-kublai-20260311-001324 for proposal kublai-20260311-001324 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.692656", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.693112", "phase": 4, "message": "  Created task proposal-ogedei-20260311-180745 for proposal ogedei-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.702729", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.703146", "phase": 4, "message": "  Created task proposal-jochi-20260311-140927 for proposal jochi-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.712524", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.712930", "phase": 4, "message": "  Created task proposal-kublai-20260311-150846 for proposal kublai-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.722887", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-110319", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.723282", "phase": 4, "message": "  Created task proposal-kublai-20260310-110319 for proposal kublai-20260310-110319 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.731520", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.731909", "phase": 4, "message": "  Created task proposal-mongke-20260312-181821 for proposal mongke-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T15:54:17.732133", "phase": 4, "message": "Task creation complete: 81 tasks created", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.762223", "phase": 4, "message": "Creating tasks for approved proposals", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.855077", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.855194", "phase": 4, "message": "  Created task proposal-temujin-20260311-150846 for proposal temujin-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.862846", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.862923", "phase": 4, "message": "  Created task proposal-jochi-20260311-131031 for proposal jochi-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.874769", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.874829", "phase": 4, "message": "  Created task proposal-chagatai-20260311-131031 for proposal chagatai-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.881977", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.882041", "phase": 4, "message": "  Created task proposal-chagatai-20260311-111101 for proposal chagatai-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.889665", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.889718", "phase": 4, "message": "  Created task proposal-mongke-20260311-154239 for proposal mongke-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.895726", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.895771", "phase": 4, "message": "  Created task proposal-jochi-20260311-111101 for proposal jochi-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.903776", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.903824", "phase": 4, "message": "  Created task proposal-temujin-20260311-120831 for proposal temujin-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.910753", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.910800", "phase": 4, "message": "  Created task proposal-temujin-20260311-171101 for proposal temujin-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.918852", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.918911", "phase": 4, "message": "  Created task proposal-kublai-20260312-181821 for proposal kublai-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.925702", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.925753", "phase": 4, "message": "  Created task proposal-mongke-20260311-150846 for proposal mongke-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.933297", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-150314", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.933395", "phase": 4, "message": "  Created task proposal-kublai-20260310-150314 for proposal kublai-20260310-150314 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.940737", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-170315", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.940798", "phase": 4, "message": "  Created task proposal-kublai-20260310-170315 for proposal kublai-20260310-170315 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.947965", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-131031", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.948024", "phase": 4, "message": "  Created task proposal-ogedei-20260311-131031 for proposal ogedei-20260311-131031 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.954677", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.954737", "phase": 4, "message": "  Created task proposal-temujin-20260311-154239 for proposal temujin-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.961732", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.961792", "phase": 4, "message": "  Created task proposal-mongke-20260311-120831 for proposal mongke-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.968739", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.968814", "phase": 4, "message": "  Created task proposal-mongke-20260311-171101 for proposal mongke-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.975746", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.975806", "phase": 4, "message": "  Created task proposal-ogedei-20260311-111101 for proposal ogedei-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.983840", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.983908", "phase": 4, "message": "  Created task proposal-ogedei-20260311-154239 for proposal ogedei-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.990752", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.990817", "phase": 4, "message": "  Created task proposal-temujin-20260311-111101 for proposal temujin-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.996717", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T16:19:45.996796", "phase": 4, "message": "  Created task proposal-kublai-20260311-140927 for proposal kublai-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.005235", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.005308", "phase": 4, "message": "  Created task proposal-jochi-20260311-171101 for proposal jochi-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.013017", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.013092", "phase": 4, "message": "  Created task proposal-mongke-20260311-131030 for proposal mongke-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.021797", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.021883", "phase": 4, "message": "  Created task proposal-jochi-20260311-120831 for proposal jochi-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.029831", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-m007-m007-new", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.029911", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-m007-m007-new for proposal mongke-20260323-003350-m007-m007-new (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.037721", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.037805", "phase": 4, "message": "  Created task proposal-chagatai-20260311-171101 for proposal chagatai-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.044905", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.045001", "phase": 4, "message": "  Created task proposal-chagatai-20260311-120831 for proposal chagatai-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.052804", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174301", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.052903", "phase": 4, "message": "  Created task proposal-kublai-20260311-174301 for proposal kublai-20260311-174301 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.060744", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.060842", "phase": 4, "message": "  Created task proposal-chagatai-20260311-150846 for proposal chagatai-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.067821", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.068175", "phase": 4, "message": "  Created task proposal-jochi-20260311-150846 for proposal jochi-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.075826", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.076085", "phase": 4, "message": "  Created task proposal-chagatai-20260311-154239 for proposal chagatai-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.085392", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-180316", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.085779", "phase": 4, "message": "  Created task proposal-kublai-20260310-180316 for proposal kublai-20260310-180316 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.094956", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.095176", "phase": 4, "message": "  Created task proposal-jochi-20260311-154239 for proposal jochi-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.103988", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.104289", "phase": 4, "message": "  Created task proposal-ogedei-20260311-120831 for proposal ogedei-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.112595", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.112986", "phase": 4, "message": "  Created task proposal-ogedei-20260311-171101 for proposal ogedei-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.123313", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.123606", "phase": 4, "message": "  Created task proposal-kublai-20260311-180745 for proposal kublai-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.131959", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.132293", "phase": 4, "message": "  Created task proposal-temujin-20260311-131030 for proposal temujin-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.142117", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.142547", "phase": 4, "message": "  Created task proposal-kublai-20260311-160907 for proposal kublai-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.153046", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.153472", "phase": 4, "message": "  Created task proposal-mongke-20260311-111101 for proposal mongke-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.162060", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.162439", "phase": 4, "message": "  Created task proposal-ogedei-20260311-150846 for proposal ogedei-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.172074", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-130320", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.172433", "phase": 4, "message": "  Created task proposal-kublai-20260310-130320 for proposal kublai-20260310-130320 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.182624", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.183231", "phase": 4, "message": "  Created task proposal-chagatai-20260312-181821 for proposal chagatai-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.194105", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-111040", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.194498", "phase": 4, "message": "  Created task proposal-kublai-20260311-111040 for proposal kublai-20260311-111040 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.204147", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-111156", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.204591", "phase": 4, "message": "  Created task proposal-temujin-20260311-111156 for proposal temujin-20260311-111156 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.214682", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.215224", "phase": 4, "message": "  Created task proposal-jochi-20260312-181821 for proposal jochi-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.225471", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-211332", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.225871", "phase": 4, "message": "  Created task proposal-kublai-20260310-211332 for proposal kublai-20260310-211332 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.234965", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.235262", "phase": 4, "message": "  Created task proposal-mongke-20260311-140927 for proposal mongke-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.244013", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.244363", "phase": 4, "message": "  Created task proposal-temujin-20260311-180745 for proposal temujin-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.255378", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-131030", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.255892", "phase": 4, "message": "  Created task proposal-kublai-20260311-131030 for proposal kublai-20260311-131030 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.266003", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.266325", "phase": 4, "message": "  Created task proposal-temujin-20260311-160907 for proposal temujin-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.276058", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-201657", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.276498", "phase": 4, "message": "  Created task proposal-kublai-20260310-201657 for proposal kublai-20260310-201657 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.287180", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260323-003350-o008-drift-triggered-remediation-task", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.287688", "phase": 4, "message": "  Created task proposal-ogedei-20260323-003350-o008-drift-triggered-remediation-task for proposal ogedei-20260323-003350-o008-drift-triggered-remediation-task (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.297024", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.297386", "phase": 4, "message": "  Created task proposal-ogedei-20260312-181821 for proposal ogedei-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.306833", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-190318", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.307168", "phase": 4, "message": "  Created task proposal-kublai-20260310-190318 for proposal kublai-20260310-190318 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.317430", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-140314", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.317887", "phase": 4, "message": "  Created task proposal-kublai-20260310-140314 for proposal kublai-20260310-140314 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.328156", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174458", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.328630", "phase": 4, "message": "  Created task proposal-kublai-20260311-174458 for proposal kublai-20260311-174458 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.339181", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-m008-m008-new", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.339533", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-m008-m008-new for proposal mongke-20260323-003350-m008-m008-new (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.350597", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.351102", "phase": 4, "message": "  Created task proposal-mongke-20260311-160907 for proposal mongke-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.362171", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.362598", "phase": 4, "message": "  Created task proposal-mongke-20260311-180745 for proposal mongke-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.373160", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.373622", "phase": 4, "message": "  Created task proposal-temujin-20260311-140927 for proposal temujin-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.383011", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-160315", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.383658", "phase": 4, "message": "  Created task proposal-kublai-20260310-160315 for proposal kublai-20260310-160315 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.395133", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-111101", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.395611", "phase": 4, "message": "  Created task proposal-kublai-20260311-111101 for proposal kublai-20260311-111101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.404923", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-154239", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.405237", "phase": 4, "message": "  Created task proposal-kublai-20260311-154239 for proposal kublai-20260311-154239 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.414619", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.415191", "phase": 4, "message": "  Created task proposal-ogedei-20260311-140927 for proposal ogedei-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.426205", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.426621", "phase": 4, "message": "  Created task proposal-jochi-20260311-160907 for proposal jochi-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.436448", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.436810", "phase": 4, "message": "  Created task proposal-jochi-20260311-180745 for proposal jochi-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.446602", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.447203", "phase": 4, "message": "  Created task proposal-chagatai-20260311-160907 for proposal chagatai-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.458032", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.458382", "phase": 4, "message": "  Created task proposal-chagatai-20260311-180745 for proposal chagatai-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.467920", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-174537", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.468230", "phase": 4, "message": "  Created task proposal-kublai-20260311-174537 for proposal kublai-20260311-174537 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.477002", "phase": 4, "message": "  -> Neo4j entry created: proposal-temujin-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.477349", "phase": 4, "message": "  Created task proposal-temujin-20260312-181821 for proposal temujin-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.488099", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-120321", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.488480", "phase": 4, "message": "  Created task proposal-kublai-20260310-120321 for proposal kublai-20260310-120321 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.498327", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.498804", "phase": 4, "message": "  Created task proposal-mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20 for proposal mongke-20260323-003350-r15-r15-confirm-generated-prior-cycle-20 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.508700", "phase": 4, "message": "  -> Neo4j entry created: proposal-chagatai-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.509001", "phase": 4, "message": "  Created task proposal-chagatai-20260311-140927 for proposal chagatai-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.520159", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-120831", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.520667", "phase": 4, "message": "  Created task proposal-kublai-20260311-120831 for proposal kublai-20260311-120831 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.530225", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-171101", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.530719", "phase": 4, "message": "  Created task proposal-kublai-20260311-171101 for proposal kublai-20260311-171101 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.541402", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-160907", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.541773", "phase": 4, "message": "  Created task proposal-ogedei-20260311-160907 for proposal ogedei-20260311-160907 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.553097", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-001324", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.553589", "phase": 4, "message": "  Created task proposal-kublai-20260311-001324 for proposal kublai-20260311-001324 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.563074", "phase": 4, "message": "  -> Neo4j entry created: proposal-ogedei-20260311-180745", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.563440", "phase": 4, "message": "  Created task proposal-ogedei-20260311-180745 for proposal ogedei-20260311-180745 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.572356", "phase": 4, "message": "  -> Neo4j entry created: proposal-jochi-20260311-140927", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.572682", "phase": 4, "message": "  Created task proposal-jochi-20260311-140927 for proposal jochi-20260311-140927 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.582579", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260311-150846", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.583138", "phase": 4, "message": "  Created task proposal-kublai-20260311-150846 for proposal kublai-20260311-150846 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.593019", "phase": 4, "message": "  -> Neo4j entry created: proposal-kublai-20260310-110319", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.593426", "phase": 4, "message": "  Created task proposal-kublai-20260310-110319 for proposal kublai-20260310-110319 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.604002", "phase": 4, "message": "  -> Neo4j entry created: proposal-mongke-20260312-181821", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.604315", "phase": 4, "message": "  Created task proposal-mongke-20260312-181821 for proposal mongke-20260312-181821 (Neo4j)", "data": {}}
+{"timestamp": "2026-03-23T16:19:46.604533", "phase": 4, "message": "Task creation complete: 81 tasks created", "data": {}}

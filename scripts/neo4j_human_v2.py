@@ -22,8 +22,9 @@ import os
 import sys
 import uuid
 import logging
+import hashlib
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_driver
@@ -47,6 +48,59 @@ ALLOWED_HUMAN_FIELDS = {
     "lastContact", "proactiveSkipCount", "lastProactiveAt",
 }
 
+# Phone hashing configuration for PII protection
+_PHONE_HASH_SALT = os.environ.get('PHONE_HASH_SALT', '')
+if not _PHONE_HASH_SALT:
+    raise ValueError(
+        "PHONE_HASH_SALT environment variable must be set for PII protection. "
+        "Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+    )
+
+
+def hash_phone(phone: str) -> str:
+    """
+    Hash a phone number using HMAC-SHA256 with salt.
+
+    This provides one-way encryption for PII while maintaining lookup ability.
+    Same phone number will always produce the same hash (deterministic).
+
+    Args:
+        phone: Phone number in E.164 format (e.g., +1234567890)
+
+    Returns:
+        64-character hexadecimal string (SHA256 hash)
+
+    Raises:
+        ValueError: If phone is empty
+    """
+    if not phone:
+        raise ValueError("Phone number cannot be empty")
+
+    # Normalize to E.164 format if not already
+    normalized = phone.strip()
+    if not normalized.startswith('+'):
+        # Assume US number if no country code
+        normalized = '+1' + normalized
+
+    # HMAC-SHA256 hash with salt
+    import hmac
+    h = hmac.new(_PHONE_HASH_SALT.encode('utf-8'), normalized.encode('utf-8'), hashlib.sha256)
+    return h.hexdigest()
+
+
+def redact_phone(phone: str) -> str:
+    """
+    Redact phone number for API responses: +1***7890 format.
+
+    Args:
+        phone: Phone number in E.164 format (e.g., +1234567890)
+
+    Returns:
+        Redacted phone number showing only country code and last 4 digits
+    """
+    if not phone or len(phone) < 4:
+        return '***'
+    return f"{phone[:2]}***{phone[-4:]}"
 
 class HumanStoreV2:
     """CRUD operations for Human + Identifier nodes in Neo4j."""
@@ -58,6 +112,22 @@ class HumanStoreV2:
         # Don't call close_driver() — let the atexit handler manage lifecycle
         self.driver = None
 
+    @staticmethod
+    def _is_valid_uuid(id_string: str) -> bool:
+        """Check if a string is a valid UUID format.
+
+        Args:
+            id_string: String to validate
+
+        Returns:
+            True if valid UUID format, False otherwise
+        """
+        try:
+            uuid.UUID(id_string)
+            return True
+        except (ValueError, AttributeError):
+            return False
+
     # =========================================================================
     # Human CRUD
     # =========================================================================
@@ -67,9 +137,36 @@ class HumanStoreV2:
         display_name: str,
         source: str = "signal",
         confidence: float = 1.0,
+        human_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a new Human node with a UUID."""
-        human_id = str(uuid.uuid4())
+        """Create a new Human node with a UUID.
+
+        Args:
+            display_name: Display name for the human
+            source: Source system (default: "signal")
+            confidence: Confidence score (default: 1.0)
+            human_id: Optional UUID string. If provided, must be a valid UUID format.
+                      Use find_or_create_by_phone() for phone-based human creation.
+
+        Returns:
+            Dict with created human data
+
+        Raises:
+            ValueError: If human_id is provided but not a valid UUID format
+        """
+        # Validate human_id if provided (defensive measure to prevent slug-based IDs)
+        if human_id is not None:
+            if not self._is_valid_uuid(human_id):
+                raise ValueError(
+                    f"Human ID must be UUID format, got '{human_id}'. "
+                    "Use find_or_create_by_phone() to create Human nodes from phone numbers."
+                )
+            # Use the provided valid UUID
+            final_human_id = human_id
+        else:
+            # Generate new UUID (default behavior)
+            final_human_id = str(uuid.uuid4())
+
         with self.driver.session() as session:
             result = session.run(
                 """
@@ -87,7 +184,7 @@ class HumanStoreV2:
                 RETURN h.id AS id, h.displayName AS displayName,
                        h.source AS source, h.status AS status
                 """,
-                id=human_id,
+                id=final_human_id,
                 displayName=display_name,
                 confidence=confidence,
                 source=source,
@@ -95,16 +192,21 @@ class HumanStoreV2:
             record = result.single()
             human_data = dict(record) if record else {}
 
-            # Auto-grant default consent (opt-out model — humans consent by default)
+            # Auto-grant all consent categories (opt-out model — humans consent by default)
             if human_data.get("id"):
-                try:
-                    from consent_decorator import grant_consent
-                    for category in ["message_storage", "message_analysis", "external_llm_processing"]:
-                        grant_consent(human_data["id"], category, source="auto_default")
-                except Exception:
-                    pass  # Consent seeding is best-effort — don't block human creation
+                self._grant_default_consent(human_data["id"])
 
             return human_data
+
+    @staticmethod
+    def _grant_default_consent(human_id: str) -> None:
+        """Grant all consent categories to a new human (opt-out model)."""
+        try:
+            from consent_decorator import grant_consent, ALL_CATEGORIES
+            for category in ALL_CATEGORIES:
+                grant_consent(human_id, category, source="auto_default")
+        except Exception:
+            pass  # Best-effort — don't block human creation
 
     def get_human(self, human_id: str) -> Optional[Dict[str, Any]]:
         """Get a Human by UUID with all identifiers."""
@@ -173,15 +275,26 @@ class HumanStoreV2:
     def find_or_create_by_phone(
         self, phone: str, display_name: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Find existing Human by phone or create new one. Atomic via MERGE."""
+        """Find existing Human by phone or create new one. Atomic via MERGE.
+
+        Phone numbers are stored as HMAC-SHA256 hashes for PII protection.
+        The same phone number will always produce the same hash (deterministic).
+        """
+        # Hash phone before storage/lookup (PII protection)
+        phone_hash = hash_phone(phone)
+
+        # Store format hint for redaction (e.g., "+1" for US numbers)
+        phone_format = phone[:2] if phone.startswith('+') else '+1'
+
         name = display_name or phone
         new_id = str(uuid.uuid4())
 
         with self.driver.session() as session:
             result = session.run(
                 """
-                MERGE (i:Identifier {type: 'SIGNAL_PHONE', value: $phone})
-                ON CREATE SET i.verified = true, i.addedAt = datetime(), i.source = 'signal'
+                MERGE (i:Identifier {type: 'SIGNAL_PHONE', value: $phone_hash})
+                ON CREATE SET i.verified = true, i.addedAt = datetime(), i.source = 'signal',
+                              i.formatHint = $phone_format
                 WITH i
                 OPTIONAL MATCH (existing:Human)-[:IDENTIFIED_BY]->(i)
                 WITH i, existing
@@ -204,10 +317,11 @@ class HumanStoreV2:
                 WITH i
                 MATCH (h:Human)-[:IDENTIFIED_BY]->(i)
                 SET h.lastContact = datetime(), h.updatedAt = datetime()
+                WITH h
                 OPTIONAL MATCH (h)-[:IDENTIFIED_BY]->(allIds:Identifier)
                 WITH h, collect({
                     type: allIds.type, value: allIds.value,
-                    verified: allIds.verified
+                    verified: allIds.verified, formatHint: allIds.formatHint
                 }) AS identifiers
                 RETURN h.id AS id, h.displayName AS displayName,
                        h.confidence AS confidence,
@@ -217,7 +331,8 @@ class HumanStoreV2:
                        h.status AS status,
                        identifiers
                 """,
-                phone=phone,
+                phone_hash=phone_hash,
+                phone_format=phone_format,
                 new_id=new_id,
                 name=name,
             )
@@ -228,6 +343,11 @@ class HumanStoreV2:
             data["identifiers"] = [
                 i for i in data.get("identifiers", []) if i.get("type")
             ]
+
+            # Auto-grant consent for newly created humans
+            if data.get("id") == new_id:
+                self._grant_default_consent(new_id)
+
             return data
 
     def update_human(self, human_id: str, **fields) -> bool:

@@ -67,6 +67,11 @@ def format_context(
     thread = _format_thread(context.get("thread_messages", []))
     sections["current_thread"] = budget.allocate_elastic("current_thread", thread)
 
+    # 6b. Group Recent Messages (elastic, group chats only)
+    group_recent = _format_group_recent(context.get("group_recent_messages", []))
+    if group_recent:
+        sections["group_recent"] = budget.allocate_elastic("group_recent", group_recent)
+
     # 7. Semantic Matches (elastic, fills rest)
     matches = _format_semantic_matches(context.get("similar_messages", []))
     sections["semantic_matches"] = budget.allocate_elastic("semantic_matches", matches)
@@ -188,6 +193,22 @@ def _format_thread(messages: List[Dict]) -> str:
         text = msg.get("text") or msg.get("summary") or "(no content)"
         ts = msg.get("timestamp", "")[:19]
         lines.append(f"  {direction} [{ts}] {text[:200]}")
+
+    return "\n".join(lines)
+
+
+def _format_group_recent(messages: List[Dict]) -> str:
+    """Format recent messages from other group members (shared context)."""
+    if not messages:
+        return ""
+
+    lines = ["Recent group messages (from others):"]
+    for msg in reversed(messages[:10]):  # Show oldest first
+        sender = msg.get("sender", "Unknown")
+        direction = "→" if msg.get("direction") == "outbound" else "←"
+        text = msg.get("text") or msg.get("summary") or "(no content)"
+        ts = msg.get("timestamp", "")[:19]
+        lines.append(f"  {direction} [{ts}] {sender}: {text[:200]}")
 
     return "\n".join(lines)
 

@@ -47,6 +47,7 @@ from task_intake import (
     is_domain_compatible,
     should_trigger_redistribution,
     REDISTRIBUTION_TRIGGERS,
+    create_task,
 )
 from kurultai_paths import AGENTS_DIR
 
@@ -382,6 +383,27 @@ def find_movable_tasks(overloaded_agent, underutilized_agents, max_tasks=10):
                 log_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_path, 'a') as _lf:
                     _lf.write(_json.dumps(_log_entry) + '\n')
+                # Alert ogedei so quarantined tasks don't silently disappear
+                try:
+                    task_name = fpath.stem.split('.')[0]
+                    create_task(
+                        title=f"Quarantined task needs review: {task_name}",
+                        body=(
+                            f"Task `{fpath.name}` was quarantined after {effective_redispatch} "
+                            f"redistribution cycles (max={MAX_REDISPATCH_COUNT}).\n\n"
+                            f"**Quarantined path:** {quarantine_path}\n"
+                            f"**Redistribution log:** {log_path}\n\n"
+                            "Review whether to complete, reassign, cancel, or archive this task. "
+                            "If the underlying alert is stale, archive it. "
+                            "If it represents real work, dispatch it manually to an available agent."
+                        ),
+                        priority="high",
+                        source="task-redistribute",
+                        agent="ogedei",
+                        skip_duplicate_check=False,
+                    )
+                except Exception:
+                    pass  # Alert is best-effort; quarantine already succeeded
             except Exception:
                 pass  # Best-effort quarantine
             continue

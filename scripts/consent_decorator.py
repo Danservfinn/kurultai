@@ -2,7 +2,7 @@
 """
 Consent Decorator — @requires_consent for gating data-processing functions.
 
-Seven consent categories with parent→child cascade:
+Nine consent categories with parent→child cascade:
 
     message_storage           (root)
     ├── message_analysis
@@ -11,6 +11,8 @@ Seven consent categories with parent→child cascade:
     │   └── embedding_generation
     ├── external_llm_processing
     └── proactive_engagement
+        ├── general_curiosity
+        └── personal_curiosity
 
 Revoking a parent revokes all children. Granting a child does NOT
 auto-grant its parent (must be granted explicitly bottom-up).
@@ -48,7 +50,9 @@ CONSENT_HIERARCHY: Dict[str, List[str]] = {
     "conversation_memory": ["relationship_tracking"],
     "embedding_generation": [],
     "external_llm_processing": [],
-    "proactive_engagement": [],
+    "proactive_engagement": ["general_curiosity", "personal_curiosity"],
+    "general_curiosity": [],
+    "personal_curiosity": [],
     "relationship_tracking": [],
 }
 
@@ -61,6 +65,8 @@ CONSENT_DESCRIPTIONS: Dict[str, str] = {
     "embedding_generation": "Generate vector embeddings of message content",
     "external_llm_processing": "Send PII-scrubbed content to external LLMs for analysis",
     "proactive_engagement": "Allow Kublai to initiate conversations proactively",
+    "general_curiosity": "Allow Kublai to ask open-ended questions about your interests and activities",
+    "personal_curiosity": "Allow Kublai to ask about your personal life (where you're from, hobbies, etc.)",
 }
 
 ALL_CATEGORIES = set(CONSENT_HIERARCHY.keys())

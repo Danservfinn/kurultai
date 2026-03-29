@@ -1,0 +1,14 @@
+{
+  "chagatai": {
+    "agent": "chagatai",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-23T15:10:00Z",
+    "reason": "Exponential backoff is a standard reliability pattern. While proposal lacks detail, the core concept is sound ops practice."
+  },
+  "jochi": {
+    "agent": "jochi",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-23T15:14:30Z",
+    "reason": "Exponential backoff is standard reliability pattern for transient network failures. Problem statement is specific (task high-1774073612). Proposal lacks implementation detail but core concept is sound ops practice. Recommend developing implementation plan before execution."
+  }
+}

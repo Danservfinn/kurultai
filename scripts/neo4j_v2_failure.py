@@ -56,6 +56,11 @@ _PERMANENT_PATTERNS = [
     (r"(?i)file\s*not\s*found|ENOENT|no\s*such\s*file", "FILE_NOT_FOUND"),
     # Script errors
     (r"(?i)SyntaxError|ImportError|ModuleNotFoundError", "CODE_ERROR"),
+    # Process enforcement violations (FIX 2026-03-23: R008 was falling through to GENERAL_ERROR)
+    # R008_VIOLATION = required skill not invoked within timeout. Permanent: retrying won't
+    # fix a missing skill invocation; the task needs re-dispatch with correct instructions.
+    # Error format: "R008_VIOLATION: Required skill '/<name>' was not invoked within Ns"
+    (r"(?i)R008_VIOLATION|required\s+skill.*not\s+invoked", "R008_VIOLATION"),
 ]
 
 

@@ -32,9 +32,17 @@
 
 set -o pipefail
 
+# === Cron Consolidation 2026-03-23 ===
+# Removed duplicate sub-script calls now handled by ogedei-watchdog.py (30s cadence):
+# - credential-health-monitor.py -> reads credential-alerts.json
+# - completion-audit.py -> reads completion state from ogedei
+# - subprocess-audit.py -> reads subprocess state from ogedei
+
 # Single-instance lock — prevents concurrent ticks (e.g., after sleep/wake catch-up)
 LOCK_DIR="/tmp/watchdog-gather.lock"
-_cleanup_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
+# FIX 2026-03-24: Use rm -rf instead of rmdir to handle PID file inside lock directory
+# rmdir fails on non-empty directories, causing stale locks and 9-12min tick gaps
+_cleanup_lock() { rm -rf "$LOCK_DIR" 2>/dev/null; }
 trap _cleanup_lock EXIT
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
@@ -88,9 +96,9 @@ MODEL=$(python3 "$SCRIPTS/get_model.py" --agent main 2>/dev/null || echo "unknow
 # ============================================================
 # SECTION 0a: Execution Gap Detection
 # ============================================================
-# Detect if we missed scheduled runs (should run every 5min)
-# Alert if gap exceeds 8 minutes (allows for some jitter + sleep/wake)
-GAP_ALERT_THRESHOLD=480  # 8 minutes in seconds
+# Detect if we missed scheduled runs (should run every 10min)
+# Alert if gap exceeds 12 minutes (allows for some jitter + sleep/wake)
+GAP_ALERT_THRESHOLD=720  # 12 minutes in seconds (10min interval + 2min buffer)
 LAST_EPOCH=0
 GAP_DETECTED=0
 GAP_MINUTES=0
@@ -102,7 +110,7 @@ if [ -f "$LAST_TICK_FILE" ]; then
         if [ "$GAP_SECONDS" -gt "$GAP_ALERT_THRESHOLD" ]; then
             GAP_MINUTES=$((GAP_SECONDS / 60))
             GAP_DETECTED=1
-            echo "[$TS] GAP_DETECTED | missed=$((GAP_SECONDS / 300)) ticks | gap=${GAP_MINUTES}m | last_run_ts=$(date -r "$LAST_EPOCH" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')" >> "$WATCHDOG_LOG"
+            echo "[$TS] GAP_DETECTED | missed=$((GAP_SECONDS / 600)) ticks | gap=${GAP_MINUTES}m | last_run_ts=$(date -r "$LAST_EPOCH" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')" >> "$WATCHDOG_LOG"
         fi
     fi
 fi
@@ -208,6 +216,82 @@ if [ -f "$OPENCLAW_LOG" ]; then
     ERRORS_5M=${ERRORS_5M:-0}; ERRORS_1H=${ERRORS_1H:-0}; FATAL_5M=${FATAL_5M:-0}
 else
     ERRORS_5M=0; ERRORS_1H=0; FATAL_5M=0
+fi
+
+# ============================================================
+# SECTION 3b: PROACTIVE HEALTH CHECKS (New - 2026-03-23)
+# ============================================================
+# Trend prediction and anomaly detection for earlier warnings
+# Implements consensus-approved proposal: ogedei-20260323-124630
+
+TICKS_JSONL="$LOGDIR/ticks.jsonl"
+PROACTIVE_ALERTS_TRIGGERED=0
+
+# Run trend prediction to forecast when thresholds will be hit
+TREND_PREDICTION=$(python3 "$SCRIPTS_DIR/trend-predictor.py" "$TICKS_JSONL" 2>/dev/null || echo '{"error":"prediction_failed"}')
+
+# Extract trend info
+if echo "$TREND_PREDICTION" | grep -q "error"; then
+    ERR_DIRECTION="unknown"
+else
+    ERR_DIRECTION=$(echo "$TREND_PREDICTION" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('trend_direction','unknown'))" 2>/dev/null || echo "unknown")
+
+    # Check if we'll hit a threshold within 30 minutes (proactive alert!)
+    APPROACHING_THRESHOLD=$(echo "$TREND_PREDICTION" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+hits = d.get('predicted_threshold_hits', {})
+for level, info in hits.items():
+    if info.get('minutes_until', 999) < 30:
+        print(f'{level}:{info[\"minutes_until\"]}:{info[\"threshold\"]}')
+        break
+" 2>/dev/null || echo "")
+
+    if [ -n "$APPROACHING_THRESHOLD" ]; then
+        IFS=':' read -r LEVEL MINS THRESH <<< "$APPROACHING_THRESHOLD"
+        echo "[$TS] PROACTIVE_ALERT | trend_prediction | will_hit_${LEVEL}_in_${MINS}min (current=${ERRORS_1H}, threshold=${THRESH})" >> "$WATCHDOG_LOG"
+        PROACTIVE_ALERTS_TRIGGERED=$((PROACTIVE_ALERTS_TRIGGERED + 1))
+
+        # Send urgent notification
+        "$SCRIPTS_DIR/urgent-notify.sh" "HIGH" "Proactive Alert: Error Rate Rising" \
+            "Trend prediction shows error rate will hit ${LEVEL} threshold in ~${MINS} minutes.
+
+Current: ${ERRORS_1H} errors/hour
+Threshold: ${THRESH} errors/hour
+Trend: ${ERR_DIRECTION}
+
+Action recommended: Investigate error sources before threshold is breached." \
+            >> "$LOGDIR/proactive-alert-$EPOCH.log" 2>&1
+    fi
+fi
+
+# Run anomaly detection against baseline
+ANOMALY_DETECTION=$(python3 "$SCRIPTS_DIR/anomaly-detector.py" "$TICKS_JSONL" "${ERRORS_1H:-0}" 2>/dev/null || echo '{"error":"detection_failed"}')
+
+# Extract anomaly info
+if echo "$ANOMALY_DETECTION" | grep -q "error"; then
+    ANOMALY_SEVERITY="unknown"
+else
+    ANOMALY_SEVERITY=$(echo "$ANOMALY_DETECTION" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('severity','NORMAL'))" 2>/dev/null || echo "NORMAL")
+
+    # Trigger alert if anomaly detected (HIGH or CRITICAL)
+    if [ "$ANOMALY_SEVERITY" = "HIGH" ] || [ "$ANOMALY_SEVERITY" = "CRITICAL" ]; then
+        ANOMALY_ZSCORE=$(echo "$ANOMALY_DETECTION" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('z_score',0))" 2>/dev/null || echo "0")
+        ANOMALY_DEV=$(echo "$ANOMALY_DETECTION" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('deviation_from_mean',0))" 2>/dev/null || echo "0")
+
+        echo "[$TS] PROACTIVE_ALERT | anomaly_detection | severity=${ANOMALY_SEVERITY} zscore=${ANOMALY_ZSCORE} deviation=${ANOMALY_DEV}" >> "$WATCHDOG_LOG"
+        PROACTIVE_ALERTS_TRIGGERED=$((PROACTIVE_ALERTS_TRIGGERED + 1))
+
+        # Send urgent notification
+        "$SCRIPTS_DIR/urgent-notify.sh" "${ANOMALY_SEVERITY}" "Anomaly Detected: Error Rate Deviation" \
+            "Error rate is ${ANOMALY_SEVERITY}: ${ANOMALY_DEV:+${ANOMALY_DEV} }from baseline for this time of day (z-score: ${ANOMALY_ZSCORE}).
+
+Current: ${ERRORS_1H} errors/hour
+Baseline varies by time of day.
+
+Action recommended: Investigate unusual error activity." \
+            >> "$LOGDIR/anomaly-alert-$EPOCH.log" 2>&1
+    fi
 fi
 
 # ============================================================
@@ -363,11 +447,45 @@ fi
 # FIX: Capture output even when exit code 2 (crisis) is returned
 # Exit codes: 0=healthy, 1=degraded, 2=crisis — all are valid outputs
 # Use { ...; } to run in subshell and capture output before exit code propagates
-CRED_HEALTH_OUTPUT=$({ python3 "$SCRIPTS/credential-health-monitor.py" 2>&1 || true; } | tail -1)
-CRED_HEALTH_FLEET=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fleet_health','unknown'))" 2>/dev/null || echo "unknown")
-CRED_HEALTH_VALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('valid',0))" 2>/dev/null || echo "0")
-CRED_HEALTH_INVALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('invalid',0))" 2>/dev/null || echo "0")
-CRED_HEALTH_MISSING=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('missing',0))" 2>/dev/null || echo "0")
+# [COMMENTED 2026-03-23] Duplicates ogedei-watchdog.py check_credential_failures() + check_agent_credentials()
+# ogedei runs at 30s cadence and writes credential-alerts.json + agent-health-flags.json
+# CRED_HEALTH_OUTPUT=$({ python3 "$SCRIPTS/credential-health-monitor.py" 2>&1 || true; } | tail -1)
+# CRED_HEALTH_FLEET=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fleet_health','unknown'))" 2>/dev/null || echo "unknown")
+# CRED_HEALTH_VALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('valid',0))" 2>/dev/null || echo "0")
+# CRED_HEALTH_INVALID=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('invalid',0))" 2>/dev/null || echo "0")
+# CRED_HEALTH_MISSING=$(echo "$CRED_HEALTH_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',{}).get('missing',0))" 2>/dev/null || echo "0")
+
+# Credential health (was: python3 credential-health-monitor.py)
+# Now reads ogedei-watchdog's state files instead (runs at 30s cadence)
+CRED_STATE_FILE="$LOGDIR/credential-alerts.json"
+CRED_FLAGS_FILE="$LOGDIR/agent-health-flags.json"
+if [ -f "$CRED_STATE_FILE" ]; then
+    # credential-alerts.json has: {"ts": "...", "alerts": [...]}
+    CRED_ALERT_COUNT=$(python3 -c "import json; d=json.load(open('$CRED_STATE_FILE')); print(len(d.get('alerts',[])))" 2>/dev/null || echo "0")
+else
+    CRED_ALERT_COUNT="0"
+fi
+if [ -f "$CRED_FLAGS_FILE" ]; then
+    # agent-health-flags.json has per-agent failure rates and flagged status
+    CRED_HEALTH_FLEET=$(python3 -c "
+import json
+d=json.load(open('$CRED_FLAGS_FILE'))
+flags=d.get('agents',{})
+total=len(flags)
+flagged=sum(1 for f in flags.values() if f.get('flagged'))
+if flagged == 0: print('healthy')
+elif flagged == total and total > 0: print('crisis')
+else: print('degraded')
+" 2>/dev/null || echo "unknown")
+    CRED_HEALTH_VALID=$(python3 -c "import json; d=json.load(open('$CRED_FLAGS_FILE')); print(sum(1 for f in d.get('agents',{}).values() if not f.get('flagged')))" 2>/dev/null || echo "0")
+    CRED_HEALTH_INVALID=$(python3 -c "import json; d=json.load(open('$CRED_FLAGS_FILE')); print(sum(1 for f in d.get('agents',{}).values() if f.get('flagged')))" 2>/dev/null || echo "0")
+    CRED_HEALTH_MISSING="0"
+else
+    CRED_HEALTH_FLEET="unknown"
+    CRED_HEALTH_VALID="0"
+    CRED_HEALTH_INVALID="0"
+    CRED_HEALTH_MISSING="0"
+fi
 
 # ============================================================
 # SECTION 4c: Auth Heartbeat (actual authentication test)
@@ -405,12 +523,30 @@ SPAWN_COUNT=0
 # Run lightweight audit of recently completed tasks to catch fake completions
 # Integrated into heartbeat cycle (every 5 minutes) for continuous monitoring
 # LLM review provides intelligent escalation decisions
-COMPLETION_AUDIT_OUTPUT=$(python3 "$SCRIPTS/completion-audit.py" --json 2>/dev/null || echo "{}")
-COMPLETION_AUDIT_FAKE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fake_found',0))" 2>/dev/null || echo "0")
-COMPLETION_AUDIT_REQUEUED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('requeued',0))" 2>/dev/null || echo "0")
-COMPLETION_AUDIT_VERIFIED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('verified',0))" 2>/dev/null || echo "0")
-COMPLETION_AUDIT_LLM_DECISION=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_decision','IGNORE'))" 2>/dev/null || echo "IGNORE")
-COMPLETION_AUDIT_LLM_CONFIDENCE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_confidence',0))" 2>/dev/null || echo "0")
+# [COMMENTED 2026-03-23] Duplicates ogedei-watchdog.py verify_recent_completions()
+# ogedei runs at 30s cadence and tracks completion verification in its state file
+# COMPLETION_AUDIT_OUTPUT=$(python3 "$SCRIPTS/completion-audit.py" --json 2>/dev/null || echo "{}")
+# COMPLETION_AUDIT_FAKE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('fake_found',0))" 2>/dev/null || echo "0")
+# COMPLETION_AUDIT_REQUEUED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('requeued',0))" 2>/dev/null || echo "0")
+# COMPLETION_AUDIT_VERIFIED=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('verified',0))" 2>/dev/null || echo "0")
+# COMPLETION_AUDIT_LLM_DECISION=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_decision','IGNORE'))" 2>/dev/null || echo "IGNORE")
+# COMPLETION_AUDIT_LLM_CONFIDENCE=$(echo "$COMPLETION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('llm_confidence',0))" 2>/dev/null || echo "0")
+
+# Completion audit (was: python3 completion-audit.py --json)
+# Now reads ogedei-watchdog's state file instead (runs at 30s cadence)
+OGEDEI_STATE_FILE="$LOGDIR/ogedei-watchdog-state.json"
+if [ -f "$OGEDEI_STATE_FILE" ]; then
+    COMPLETION_AUDIT_FAKE=$(python3 -c "import json; d=json.load(open('$OGEDEI_STATE_FILE')); print(d.get('fake_completions_found',0))" 2>/dev/null || echo "0")
+    COMPLETION_AUDIT_VERIFIED=$(python3 -c "import json; d=json.load(open('$OGEDEI_STATE_FILE')); print(d.get('completions_verified',0))" 2>/dev/null || echo "0")
+    COMPLETION_AUDIT_REQUEUED=$(python3 -c "import json; d=json.load(open('$OGEDEI_STATE_FILE')); print(d.get('completions_requeued',0))" 2>/dev/null || echo "0")
+else
+    COMPLETION_AUDIT_FAKE="0"
+    COMPLETION_AUDIT_VERIFIED="0"
+    COMPLETION_AUDIT_REQUEUED="0"
+fi
+# LLM decision fields not available from ogedei state — default to safe values
+COMPLETION_AUDIT_LLM_DECISION="IGNORE"
+COMPLETION_AUDIT_LLM_CONFIDENCE="0"
 
 # ============================================================
 # SECTION 5c: Vote Sync (DISABLED - migrated to voting_manager.py)
@@ -439,14 +575,35 @@ VOTE_SYNC_ERRORS=0
 # ============================================================
 # Audit active claude-agent processes and correlate with executing tasks
 # Detects orphaned files, missing PID sentinels, zombie processes, stale executions
-SUBPROCESS_AUDIT_OUTPUT=$(python3 "$SCRIPTS/subprocess-audit.py" --json 2>/dev/null || echo "{}")
-SUBPROCESS_EXECUTING=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('total_executing',0))" 2>/dev/null || echo "0")
-SUBPROCESS_ALIVE=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('alive',0))" 2>/dev/null || echo "0")
-SUBPROCESS_DEAD=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('dead',0))" 2>/dev/null || echo "0")
-SUBPROCESS_STALE=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('stale',0))" 2>/dev/null || echo "0")
-SUBPROCESS_ZOMBIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='zombie_process'))" 2>/dev/null || echo "0")
-SUBPROCESS_ORPHANED=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='orphaned_executing'))" 2>/dev/null || echo "0")
-SUBPROCESS_ANOMALIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('anomaly_count',0))" 2>/dev/null || echo "0")
+# [COMMENTED 2026-03-23] Duplicates ogedei-watchdog.py process monitoring (check_stalled_tasks, check_agent_failure_rates)
+# ogedei runs at 30s cadence with tiered stall detection and PID verification
+# SUBPROCESS_AUDIT_OUTPUT=$(python3 "$SCRIPTS/subprocess-audit.py" --json 2>/dev/null || echo "{}")
+# SUBPROCESS_EXECUTING=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('total_executing',0))" 2>/dev/null || echo "0")
+# SUBPROCESS_ALIVE=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('alive',0))" 2>/dev/null || echo "0")
+# SUBPROCESS_DEAD=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('dead',0))" 2>/dev/null || echo "0")
+# SUBPROCESS_STALE=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('stale',0))" 2>/dev/null || echo "0")
+# SUBPROCESS_ZOMBIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='zombie_process'))" 2>/dev/null || echo "0")
+# SUBPROCESS_ORPHANED=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('anomalies',[]); print(sum(1 for x in a if x.get('type')=='orphaned_executing'))" 2>/dev/null || echo "0")
+# SUBPROCESS_ANOMALIES=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('summary',{}); print(s.get('anomaly_count',0))" 2>/dev/null || echo "0")
+
+# Subprocess audit (was: python3 subprocess-audit.py --json)
+# Now reads ogedei-watchdog's state file instead (runs at 30s cadence)
+# Reuse OGEDEI_STATE_FILE from completion audit section above
+if [ -f "$OGEDEI_STATE_FILE" ]; then
+    SUBPROCESS_EXECUTING=$(python3 -c "import json; d=json.load(open('$OGEDEI_STATE_FILE')); print(d.get('executing_tasks',0))" 2>/dev/null || echo "0")
+    SUBPROCESS_STALE=$(python3 -c "import json; d=json.load(open('$OGEDEI_STATE_FILE')); print(d.get('stale_tasks',0))" 2>/dev/null || echo "0")
+    SUBPROCESS_ANOMALIES=$(python3 -c "import json; d=json.load(open('$OGEDEI_STATE_FILE')); print(d.get('anomaly_count',0))" 2>/dev/null || echo "0")
+else
+    SUBPROCESS_EXECUTING="0"
+    SUBPROCESS_STALE="0"
+    SUBPROCESS_ANOMALIES="0"
+fi
+# Detailed breakdown not tracked in ogedei state — default to safe values
+# Zombie cleanup (Section 5e) still works: it reads the flag file, not SUBPROCESS_AUDIT_OUTPUT
+SUBPROCESS_ALIVE="0"
+SUBPROCESS_DEAD="0"
+SUBPROCESS_ZOMBIES="0"
+SUBPROCESS_ORPHANED="0"
 
 # ============================================================
 # SECTION 5e: Resolution Compliance Audit (task completion quality)
@@ -459,39 +616,48 @@ RESOLUTION_COMPLIANCE=$(echo "$RESOLUTION_AUDIT_OUTPUT" | python3 -c "import sys
 RESOLUTION_WITH=$(echo "$RESOLUTION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('with_resolution',0))" 2>/dev/null || echo "0")
 RESOLUTION_WITHOUT=$(echo "$RESOLUTION_AUDIT_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('without_resolution',0))" 2>/dev/null || echo "0")
 
-for agent in "${AGENTS[@]}"; do
-    TASK_DIR="$AGENT_BASE/$agent/tasks"
-    if [ ! -d "$TASK_DIR" ]; then
-        continue
-    fi
+# Query Neo4j for pending task counts (unified task executor is the source of truth)
+# File-based task tracking was deprecated in favor of Neo4j database
+TASKS_PENDING_TOTAL=0
+TASK_QUEUE_STATUS=""
+NEO4J_PENDING_QUERY=$(python3 -c "
+from neo4j import GraphDatabase
+import json
+import sys
+try:
+    driver = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'password'))
+    with driver.session() as session:
+        result = session.run('''
+            MATCH (t:Task {status: \"PENDING\"})
+            RETURN t.agent_id as agent, count(t) as count
+            ORDER BY count DESC
+        ''')
+        counts = {row['agent'] or 'unassigned': row['count'] for row in result}
+        print(json.dumps(counts))
+    driver.close()
+except Exception as e:
+    print(json.dumps({}), file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null || echo "{}")
 
-    # Count pending tasks — match ALL .md files, exclude terminal states (done/executing/completed/stale/resolved)
-    # Also exclude revision/escalation/no_output patterns which represent terminal or failed states
-    PENDING=0
-    shopt -s nullglob
-    for f in "$TASK_DIR"/*.md; do
-        case "$f" in
-            *.done*|*.executing*|*.completed*|*.stale*|*.failed*|*.obsolete*|*.cancelled*|*.resolved*|*.revision*|*.no_output*|*.loop*) continue ;;
-            *) PENDING=$((PENDING + 1)) ;;
-        esac
+if [ -n "$NEO4J_PENDING_QUERY" ]; then
+    for agent in "${AGENTS[@]}"; do
+        PENDING=$(echo "$NEO4J_PENDING_QUERY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$agent', 0))" 2>/dev/null || echo "0")
+        TASKS_PENDING_TOTAL=$((TASKS_PENDING_TOTAL + PENDING))
+        if [ "$PENDING" -gt 0 ]; then
+            TASK_QUEUE_STATUS="${TASK_QUEUE_STATUS}${agent}=${PENDING},"
+        fi
     done
-    shopt -u nullglob
+fi
 
-    TASKS_PENDING_TOTAL=$((TASKS_PENDING_TOTAL + PENDING))
-
-    if [ "$PENDING" -gt 0 ]; then
-        TASK_QUEUE_STATUS="${TASK_QUEUE_STATUS}${agent}=${PENDING},"
-    fi
-done
-
-# task-watcher.py (launchd daemon) is the sole dispatcher for all tasks and spawns
-# Read dispatch count from task-watcher state file (fixes visibility gap)
+# task-executor (launchd daemon) is the sole dispatcher for all tasks
+# Read dispatch count from task-executor heartbeat/pid (fixes visibility gap)
 TASKS_DISPATCHED=0
-if [ -f "$BASE/logs/task-watcher-dispatch.json" ]; then
+if [ -f "$BASE/logs/task-executor.pid" ]; then
     TASKS_DISPATCHED=$(python3 -c "
 import json, sys
 try:
-    d=json.load(open('$BASE/logs/task-watcher-dispatch.json'))
+    d=json.load(open('$BASE/logs/task-executor-heartbeat.json'))
     print(d.get('last_dispatch_count', 0))
 except Exception: print(0)
 " 2>/dev/null || echo "0")
@@ -670,13 +836,15 @@ elif [ -n "$RSS" ] && [ "$RSS" -gt 1048576 ] 2>/dev/null; then
     STATUS="degraded"; ACTION="warn"; REASON="high RSS $(( RSS / 1024 ))MB"; EXIT_CODE=1
 elif [ "$ERRORS_5M" -gt 100 ]; then
     STATUS="degraded"; ACTION="warn"; REASON="$ERRORS_5M errors in 5m"; EXIT_CODE=1
-elif [ "$ERRORS_1H" -gt 500 ]; then
+elif [ "$ERRORS_1H" -gt 400 ]; then
     STATUS="degraded"; ACTION="warn"; REASON="sustained errors: $ERRORS_1H in 1h"; EXIT_CODE=1
-elif [ "$ERRORS_1H" -gt 300 ] && [ "$ERR_DIRECTION" = "rising" ]; then
+elif [ "$ERRORS_1H" -gt 150 ] && [ "$ERR_DIRECTION" = "rising" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="rising errors: $ERRORS_1H in 1h (trend: rising)"; EXIT_CODE=1
-# Early warning: moderate errors with rising trend (catch before they hit 300)
-elif [ "$ERRORS_1H" -gt 100 ] && [ "$ERR_DIRECTION" = "rising" ]; then
+# Earlier warning levels (2026-03-23: proactive alerting)
+elif [ "$ERRORS_1H" -gt 75 ] && [ "$ERR_DIRECTION" = "rising" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="rising errors early warning: $ERRORS_1H in 1h (trend: rising)"; EXIT_CODE=1
+elif [ "$ERRORS_1H" -gt 50 ]; then
+    STATUS="degraded"; ACTION="warn"; REASON="elevated errors: $ERRORS_1H in 1h (monitoring)"; EXIT_CODE=1
 # Spike detection: current 5m errors far above rolling average
 elif [ "$ERRORS_5M" -gt 20 ] && [ -n "$ERR_AVG_5M" ] && [ "$(echo "$ERRORS_5M > $ERR_AVG_5M * 3 + 5" | bc -l 2>/dev/null)" = "1" ]; then
     STATUS="degraded"; ACTION="warn"; REASON="error spike: $ERRORS_5M in 5m (rolling avg: $ERR_AVG_5M)"; EXIT_CODE=1
@@ -698,18 +866,21 @@ fi
 # Logs diagnostic info when triggered (indicates logic bypass in main chain)
 if [ "$STATUS" = "healthy" ]; then
     _SAFETY_HIT=""
-    if [ "${ERRORS_1H:-0}" -gt 500 ] 2>/dev/null; then
-        _SAFETY_HIT="errors_1h=${ERRORS_1H}>500"
+    if [ "${ERRORS_1H:-0}" -gt 400 ] 2>/dev/null; then
+        _SAFETY_HIT="errors_1h=${ERRORS_1H}>400"
         STATUS="degraded"; ACTION="warn"; REASON="sustained errors: $ERRORS_1H in 1h (safety-net)"; EXIT_CODE=1
     elif [ "${ERRORS_5M:-0}" -gt 100 ] 2>/dev/null; then
         _SAFETY_HIT="errors_5m=${ERRORS_5M}>100"
         STATUS="degraded"; ACTION="warn"; REASON="$ERRORS_5M errors in 5m (safety-net)"; EXIT_CODE=1
-    elif [ "${ERRORS_1H:-0}" -gt 300 ] && [ "$ERR_DIRECTION" = "rising" ] 2>/dev/null; then
-        _SAFETY_HIT="errors_1h=${ERRORS_1H}>300+rising"
+    elif [ "${ERRORS_1H:-0}" -gt 150 ] && [ "$ERR_DIRECTION" = "rising" ] 2>/dev/null; then
+        _SAFETY_HIT="errors_1h=${ERRORS_1H}>150+rising"
         STATUS="degraded"; ACTION="warn"; REASON="rising errors: $ERRORS_1H in 1h (safety-net)"; EXIT_CODE=1
-    elif [ "${ERRORS_1H:-0}" -gt 100 ] && [ "$ERR_DIRECTION" = "rising" ] 2>/dev/null; then
-        _SAFETY_HIT="errors_1h=${ERRORS_1H}>100+rising"
+    elif [ "${ERRORS_1H:-0}" -gt 75 ] && [ "$ERR_DIRECTION" = "rising" ] 2>/dev/null; then
+        _SAFETY_HIT="errors_1h=${ERRORS_1H}>75+rising"
         STATUS="degraded"; ACTION="warn"; REASON="rising errors early warning: $ERRORS_1H in 1h (safety-net)"; EXIT_CODE=1
+    elif [ "${ERRORS_1H:-0}" -gt 50 ] 2>/dev/null; then
+        _SAFETY_HIT="errors_1h=${ERRORS_1H}>50"
+        STATUS="degraded"; ACTION="warn"; REASON="elevated errors: $ERRORS_1H in 1h (safety-net)"; EXIT_CODE=1
     fi
     # Gateway instance count check (after dedup)
     if [ "${GW_DUPLICATES_FOUND:-0}" -gt 1 ] 2>/dev/null; then
@@ -752,7 +923,7 @@ fi
 # ============================================================
 # SECTION 5e: Automatic Zombie Process Cleanup
 # ============================================================
-# Kill zombie handler processes immediately instead of waiting for task-watcher
+# Kill zombie handler processes immediately instead of waiting for task-executor
 # Prevents resource waste and false-positive "executing" status in telemetry
 #
 # FALSE-POSITIVE PREVENTION (2026-03-09):
@@ -760,9 +931,14 @@ fi
 # (within 60 seconds) to avoid killing legitimate handlers during normal shutdown.
 # See: docs/zombie-handler-research-2026-03-09.md for full analysis.
 #
+# NOTE 2026-03-23: SUBPROCESS_ZOMBIES defaults to 0 since subprocess-audit.py was replaced
+# by ogedei-watchdog.py state file reads. Zombie detection is now handled by ogedei's
+# check_stalled_tasks() with tiered recovery (Tier 2 clears locks, Tier 3 escalates).
+# This block is retained but effectively dormant — it will only fire if SUBPROCESS_ZOMBIES
+# is manually set or re-populated from a future state file field.
 if [ "${SUBPROCESS_ZOMBIES:-0}" -gt 0 ]; then
-    # Extract zombie PIDs from audit output
-    ZOMBIE_PIDS=$(echo "$SUBPROCESS_AUDIT_OUTPUT" | python3 -c "
+    # Extract zombie PIDs from audit output (legacy — needs SUBPROCESS_AUDIT_OUTPUT)
+    ZOMBIE_PIDS=$(echo "${SUBPROCESS_AUDIT_OUTPUT:-}" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -776,7 +952,7 @@ except Exception: pass
         ZOMBIES_KILLED=0
         for zombie_pid in $ZOMBIE_PIDS; do
             # Double-check this is actually a handler process (safety)
-            if [ -n "$zombie_pid" ] && ps -p "$zombie_pid" -o command= 2>/dev/null | grep -q "agent-task-handler"; then
+            if [ -n "$zombie_pid" ] && ps -p "$zombie_pid" -o command= 2>/dev/null | grep -q "task_executor"; then
                 # Graceful kill first
                 kill "$zombie_pid" 2>/dev/null
                 sleep 0.5
@@ -1138,7 +1314,7 @@ You may:
 - Escalate if the situation is worse than described"
 
     echo "[$TS] TICK_LLM | dispatching main immediately" >> "$WATCHDOG_LOG"
-    /opt/homebrew/bin/openclaw agent --agent main \
+    /Users/kublai/.local/bin/claude-agent \
         --message "$KUBLAI_MSG" \
         --thinking high \
         >> "$LOGDIR/tick-kublai-dispatch.log" 2>&1 &
@@ -1166,12 +1342,12 @@ $TICK_SUMMARY
 This anomaly has persisted too long for LLM triage to handle. Investigate root cause:
 - If HIGH_FAILURE_RATE: Check for model misconfiguration, API outage, or credential issues
 - If EXECUTING_NO_OUTPUT: Check if executing tasks are zombie processes (stale PIDs)
-- If PENDING_NO_DISPATCH: Check task-watcher is running and dispatching
+- If PENDING_NO_DISPATCH: Check task-executor is running and dispatching
 - If QUEUE_IMBALANCE: Redistribute overloaded agent queues to idle agents
 - If LOW_YIELD: Check for model execution failures or timeout patterns"
 
     echo "[$TS] THROUGHPUT_ESCALATION | severity=$THROUGHPUT_SEVERITY | type=$THROUGHPUT_ANOMALY_TYPE | consecutive=$THROUGHPUT_CONSECUTIVE | dispatching main" >> "$WATCHDOG_LOG"
-    /opt/homebrew/bin/openclaw agent --agent main \
+    /Users/kublai/.local/bin/claude-agent \
         --message "$KUBLAI_MSG" \
         --thinking high \
         >> "$LOGDIR/tick-kublai-dispatch.log" 2>&1 &
@@ -1233,7 +1409,7 @@ $TICK_SUMMARY
 Route to: ogedei (for coordination, but requires human to fix credentials)"
 
     echo "[$TS] CREDENTIAL_CRISIS | fleet=$CRED_HEALTH_FLEET valid=$CRED_HEALTH_VALID invalid=$CRED_HEALTH_INVALID | dispatching main" >> "$WATCHDOG_LOG"
-    /opt/homebrew/bin/openclaw agent --agent main \
+    /Users/kublai/.local/bin/claude-agent \
         --message "$CREDENTIAL_CRISIS_MSG" \
         --thinking high \
         >> "$LOGDIR/tick-credential-crisis-escalate.log" 2>&1 &
@@ -1242,14 +1418,15 @@ fi
 
 # ============================================================
 # ERROR_RATE_ESCALATION: Auto-escalate when errors exceed threshold with rising trend
-# Implements WHEN/THEN rule #2: auto-trigger when errors/hour > 100 with rising trend
+# Implements WHEN/THEN rule #2: auto-trigger when errors/hour > 75 with rising trend
+# Updated 2026-03-23: Lowered threshold from 100 to 75 for earlier proactive escalation
 # Bypasses LLM triage — persistent error spikes require deterministic escalation to ogedei
 # ============================================================
 ERROR_RATE_SHOULD_ESCALATE=0
 ERROR_RATE_LAST_ESCALATION="$LOGDIR/.error-rate-last-escalation"
 
-# Only escalate if errors_1h > 100 AND trend is rising
-if [ "$ERRORS_1H" -gt 100 ] && [ "$ERR_DIRECTION" = "rising" ]; then
+# Only escalate if errors_1h > 75 AND trend is rising (earlier threshold for proactive response)
+if [ "$ERRORS_1H" -gt 75 ] && [ "$ERR_DIRECTION" = "rising" ]; then
     # Check cooldown: only escalate if last escalation was > 30 minutes ago
     if [ -f "$ERROR_RATE_LAST_ESCALATION" ]; then
         LAST_ESCALATION_EPOCH=$(cat "$ERROR_RATE_LAST_ESCALATION" 2>/dev/null || echo "0")
@@ -1292,7 +1469,7 @@ This error rate spike is worsening and requires immediate intervention:
 Route to: ogedei (for credential/system health investigation)"
 
     echo "[$TS] ERROR_RATE_ESCALATION | errors_1h=$ERRORS_1H err_dir=$ERR_DIRECTION | dispatching main" >> "$WATCHDOG_LOG"
-    /opt/homebrew/bin/openclaw agent --agent main \
+    /Users/kublai/.local/bin/claude-agent \
         --message "$ERROR_RATE_MSG" \
         --thinking high \
         >> "$LOGDIR/tick-error-rate-escalate.log" 2>&1 &
@@ -1370,7 +1547,7 @@ $TICK_SUMMARY
 Route to: ogedei (for infrastructure investigation)"
 
     echo "[$TS] GAP_ESCALATION | gap_minutes=${GAP_MINUTES} severity=$GAP_SEVERITY last_epoch=$LAST_EPOCH | dispatching main" >> "$WATCHDOG_LOG"
-    /opt/homebrew/bin/openclaw agent --agent main \
+    /Users/kublai/.local/bin/claude-agent \
         --message "$GAP_MSG" \
         --thinking high \
         >> "$LOGDIR/tick-gap-escalate.log" 2>&1 &

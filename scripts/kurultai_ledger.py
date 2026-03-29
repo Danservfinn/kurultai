@@ -243,7 +243,9 @@ def read_ledger(hours: float | None = None, valid_only: bool = False) -> list:
     """
     try:
         from neo4j_v2_ledger_compat import read_ledger as _v2_read
-        return _v2_read(hours=int(hours) if hours else None, valid_only=valid_only)
+        # Use ceiling to avoid converting sub-hour values (e.g. 0.17) to 0 (falsy → no filter)
+        import math
+        return _v2_read(hours=math.ceil(hours) if hours else None, valid_only=valid_only)
     except Exception as e:
         print(f"[ledger] Neo4j read failed, falling back to JSONL: {e}", file=sys.stderr)
         # Fallback to archived JSONL if Neo4j is unavailable
@@ -251,7 +253,7 @@ def read_ledger(hours: float | None = None, valid_only: bool = False) -> list:
             return []
         cutoff = None
         if hours is not None:
-            cutoff = datetime.now() - timedelta(hours=hours)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         events = []
         try:
             with open(TASK_LEDGER, "r", encoding="utf-8") as f:
@@ -268,12 +270,10 @@ def read_ledger(hours: float | None = None, valid_only: bool = False) -> list:
                                 if ts_str:
                                     try:
                                         ev_time = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                                        if ev_time.tzinfo:
-                                            if ev_time < cutoff:
-                                                continue
-                                        else:
-                                            if ev_time < cutoff.replace(tzinfo=None):
-                                                continue
+                                        if ev_time.tzinfo is None:
+                                            ev_time = ev_time.replace(tzinfo=timezone.utc)
+                                        if ev_time < cutoff:
+                                            continue
                                     except (ValueError, TypeError):
                                         pass
                             if valid_only and not is_valid_event(ev):

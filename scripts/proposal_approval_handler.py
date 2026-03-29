@@ -35,9 +35,12 @@ class ProposalApprovalHandler:
         self.pm = ProposalManager()
         self.base = AGENTS_DIR
 
-    def check_unanimous(self) -> list:
-        """Return list of proposals with 6/6 YES votes."""
-        return self.pm.check_unanimous_approval()
+    def check_approved(self) -> list:
+        """Return proposals meeting their tier's approval threshold."""
+        return self.pm.check_threshold_met()
+
+    # Backward compatibility alias
+    check_unanimous = check_approved
 
     def parse_implementation_tasks(self, proposal: dict) -> list:
         """Parse proposal description into implementation tasks.
@@ -205,14 +208,15 @@ timeout: 7200
         filepath.write_text(content)
         return task_id
 
-    def process_all_unanimous(self) -> list:
-        """Process all unanimously approved proposals."""
-        unanimous = self.check_unanimous()
+    def process_all_approved(self) -> list:
+        """Process all proposals that meet their tier's approval threshold."""
+        approved = self.check_approved()
         results = []
 
-        for proposal in unanimous:
+        for proposal in approved:
             proposal_id = proposal["proposal_id"]
-            print(f"[PROCESSING] {proposal_id}: {proposal['title']}")
+            tier = proposal.get("tier", "T2")
+            print(f"[PROCESSING] {proposal_id} (tier={tier}): {proposal['title']}")
 
             result = self.process_approval(proposal_id)
             results.append(result)
@@ -224,6 +228,9 @@ timeout: 7200
 
         return results
 
+    # Backward compatibility alias
+    process_all_unanimous = process_all_approved
+
     def announce_approval(self, proposal: dict, tasks: list):
         """Announce approval to all agents via their notification channels."""
         announcement = f"""## Proposal Approved: {proposal['title']}
@@ -232,7 +239,7 @@ timeout: 7200
 **Category:** {proposal['category']}
 **Priority:** {proposal['priority']}
 
-**Votes:** 6/6 unanimous
+**Votes:** Approved (threshold met)
 
 **Implementation Tasks Created:** {len(tasks)}
 {chr(10).join(f"- {tid}" for tid in tasks)}
@@ -275,7 +282,7 @@ def main():
                 print("No unanimous proposals found.")
 
         elif args.process:
-            results = handler.process_all_unanimous()
+            results = handler.process_all_approved()
             print(f"\nProcessed {len(results)} proposal(s)")
             success_count = sum(1 for r in results if r.get("success"))
             print(f"Success: {success_count}, Errors: {len(results) - success_count}")

@@ -1,0 +1,14 @@
+{
+  "chagatai": {
+    "agent": "chagatai",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-23T15:10:00Z",
+    "reason": "Well-structured proposal with clear problem statement, root cause analysis, two implementation options, and measurable acceptance criteria."
+  },
+  "jochi": {
+    "agent": "jochi",
+    "vote": "APPROVE",
+    "timestamp": "2026-03-23T15:15:00Z",
+    "reason": "Excellent data-driven proposal. Specific metrics (100% drift, 0% enforcement, 10% success), clear root cause with file path, two implementation options with effort estimates, quantified impact targets, and measurable acceptance criteria. This addresses a critical gap in rule enforcement infrastructure. Recommend Option A for quick win while Option B is developed."
+  }
+}

@@ -60,10 +60,10 @@ def get_spawn_queue_depth():
 
 
 def get_dispatch_health():
-    """Check if neo4j_v2_executor daemon is running."""
+    """Check if task_executor daemon is running."""
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "neo4j_v2_executor"],
+            ["pgrep", "-f", "task_executor"],
             capture_output=True, text=True, timeout=5
         )
         running = result.returncode == 0
@@ -94,7 +94,7 @@ def system_health():
     dispatch = get_dispatch_health()
     report["dispatch"] = dispatch
     if not dispatch["running"]:
-        report["issues"].append("neo4j_v2_executor daemon not running")
+        report["issues"].append("task_executor daemon not running")
         report["status"] = "degraded"
 
     # Neo4j data

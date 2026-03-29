@@ -1,18 +1,18 @@
 {
-  "ts": "2026-03-21T02:37:58.291380",
+  "ts": "2026-03-29T06:01:12.445769",
   "agents": {
     "chagatai": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 1,
-      "success_count": 24,
+      "failure_count": 0,
+      "success_count": 82,
       "last_failure_rate": 0.0
     },
     "mongke": {
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 11,
+      "success_count": 101,
       "last_failure_rate": 0.0
     },
     "tolui": {
@@ -26,22 +26,22 @@
       "state": "CLOSED",
       "since": 0,
       "failure_count": 0,
-      "success_count": 27,
+      "success_count": 150,
       "last_failure_rate": 0.0
     },
     "ogedei": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 4,
-      "success_count": 6,
+      "failure_count": 0,
+      "success_count": 246,
       "last_failure_rate": 0.0
     },
     "temujin": {
       "state": "CLOSED",
       "since": 0,
-      "failure_count": 2,
-      "success_count": 64,
-      "last_failure_rate": 0.0
+      "failure_count": 0,
+      "success_count": 117,
+      "last_failure_rate": 0.6666666666666666
     },
     "kublai": {
       "state": "CLOSED",
@@ -291,6 +291,414 @@
       "to": "temujin",
       "task": "normal-1773990141-6a125d52.failed-exhausted.md",
       "ts": "2026-03-20T18:01:01.985590"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "high-1774319965-d793dcc0.md",
+      "ts": "2026-03-23T23:14:06.408893"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "high-1774320601-2ac7fd5d.md",
+      "ts": "2026-03-23T23:14:06.416926"
+    },
+    {
+      "from": "mongke",
+      "to": "chagatai",
+      "task": "high-1774320924-43d54179.md",
+      "ts": "2026-03-23T23:14:06.424999"
+    },
+    {
+      "from": "mongke",
+      "to": "jochi",
+      "task": "high-1774321054-364fce8b.md",
+      "ts": "2026-03-23T23:14:06.433429"
+    },
+    {
+      "from": "mongke",
+      "to": "ogedei",
+      "task": "high-1774321245-5c0c0960.md",
+      "ts": "2026-03-23T23:14:06.455036"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "high-1774321570-e75a6853.md",
+      "ts": "2026-03-23T23:14:06.462566"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "high-1774321904-92f45194.md",
+      "ts": "2026-03-23T23:14:06.468427"
+    },
+    {
+      "from": "jochi",
+      "to": "kublai",
+      "task": "normal-1774321827-fcfdcac7.md",
+      "ts": "2026-03-23T23:35:45.758331"
+    },
+    {
+      "from": "jochi",
+      "to": "temujin",
+      "task": "normal-1774321828-e5f1f6f5.md",
+      "ts": "2026-03-23T23:35:45.770576"
+    },
+    {
+      "from": "jochi",
+      "to": "chagatai",
+      "task": "normal-1774321828-03a255f7.md",
+      "ts": "2026-03-23T23:35:45.781314"
+    },
+    {
+      "from": "jochi",
+      "to": "ogedei",
+      "task": "high-1774321054-364fce8b.md",
+      "ts": "2026-03-23T23:35:45.896789"
+    },
+    {
+      "from": "jochi",
+      "to": "kublai",
+      "task": "high-1774322222-f0ebe17d.md",
+      "ts": "2026-03-23T23:35:45.906993"
+    },
+    {
+      "from": "jochi",
+      "to": "temujin",
+      "task": "normal-1774323106-4bf4ebc6.md",
+      "ts": "2026-03-23T23:35:45.942292"
+    },
+    {
+      "from": "jochi",
+      "to": "chagatai",
+      "task": "normal-1774323107-ae27f19b.md",
+      "ts": "2026-03-23T23:35:45.956698"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "high-1774322532-09f63b02.md",
+      "ts": "2026-03-23T23:50:01.100067"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "high-1774322851-04126bc1.md",
+      "ts": "2026-03-23T23:50:01.109544"
+    },
+    {
+      "from": "mongke",
+      "to": "chagatai",
+      "task": "high-1774323176-f3d185ed.md",
+      "ts": "2026-03-23T23:50:01.118925"
+    },
+    {
+      "from": "mongke",
+      "to": "ogedei",
+      "task": "high-1774323498-274b2fb6.md",
+      "ts": "2026-03-23T23:50:01.136861"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "high-1774323589-e6c8c623.md",
+      "ts": "2026-03-23T23:50:01.148333"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "high-1774323823-71ee2565.md",
+      "ts": "2026-03-23T23:50:01.156962"
+    },
+    {
+      "from": "mongke",
+      "to": "chagatai",
+      "task": "high-1774324144-fab11b14.md",
+      "ts": "2026-03-23T23:50:01.167838"
+    },
+    {
+      "from": "jochi",
+      "to": "kublai",
+      "task": "normal-1774336087-18a9637d.md",
+      "ts": "2026-03-24T03:22:04.648893"
+    },
+    {
+      "from": "jochi",
+      "to": "temujin",
+      "task": "normal-1774336087-7757e095.md",
+      "ts": "2026-03-24T03:22:04.659338"
+    },
+    {
+      "from": "jochi",
+      "to": "mongke",
+      "task": "normal-1774336087-83048f0d.md",
+      "ts": "2026-03-24T03:22:04.667543"
+    },
+    {
+      "from": "ogedei",
+      "to": "kublai",
+      "task": "ogedei-model-drift-alert-20260323-175021.md",
+      "ts": "2026-03-24T04:20:57.781963"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "ogedei-model-drift-alert-20260323-195122.md",
+      "ts": "2026-03-24T04:20:57.784157"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "escalate-blocked-proposals-20260323.md",
+      "ts": "2026-03-24T04:20:57.785726"
+    },
+    {
+      "from": "ogedei",
+      "to": "chagatai",
+      "task": "ogedei-model-drift-alert-20260323-222224.md",
+      "ts": "2026-03-24T04:20:57.786938"
+    },
+    {
+      "from": "ogedei",
+      "to": "jochi",
+      "task": "ogedei-model-drift-alert-20260324-002352.md",
+      "ts": "2026-03-24T04:20:57.788283"
+    },
+    {
+      "from": "ogedei",
+      "to": "kublai",
+      "task": "ogedei-model-drift-alert-20260324-025445.md",
+      "ts": "2026-03-24T04:20:57.789351"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "high-1774339099-bed4cc56.md",
+      "ts": "2026-03-24T04:20:57.842960"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "normal-1774339620-3aa48186.md",
+      "ts": "2026-03-24T04:20:57.853649"
+    },
+    {
+      "from": "chagatai",
+      "to": "kublai",
+      "task": "high-1774337882-fd772a58.md",
+      "ts": "2026-03-24T04:26:58.845664"
+    },
+    {
+      "from": "chagatai",
+      "to": "temujin",
+      "task": "high-1774338522-ec174f4e.md",
+      "ts": "2026-03-24T04:26:58.851914"
+    },
+    {
+      "from": "chagatai",
+      "to": "mongke",
+      "task": "selfwake-unblock-1774339000.md",
+      "ts": "2026-03-24T04:26:58.853792"
+    },
+    {
+      "from": "chagatai",
+      "to": "jochi",
+      "task": "high-1774339127-5a03ec1c.md",
+      "ts": "2026-03-24T04:26:58.861104"
+    },
+    {
+      "from": "chagatai",
+      "to": "kublai",
+      "task": "ogedei-model-drift-alert-20260323-222224.md",
+      "ts": "2026-03-24T04:26:58.861523"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "normal-1774336087-83048f0d.md",
+      "ts": "2026-03-24T04:34:32.386530"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "escalate-blocked-proposals-20260323.md",
+      "ts": "2026-03-24T04:34:32.390943"
+    },
+    {
+      "from": "mongke",
+      "to": "jochi",
+      "task": "normal-1774339620-3aa48186.md",
+      "ts": "2026-03-24T04:34:32.404148"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "selfwake-unblock-1774339000.md",
+      "ts": "2026-03-24T04:34:32.406633"
+    },
+    {
+      "from": "ogedei",
+      "to": "kublai",
+      "task": "high-1774340475-32ecca23.md",
+      "ts": "2026-03-24T04:57:09.589632"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "high-1774340148-a74c5dc7.md",
+      "ts": "2026-03-24T04:57:09.598629"
+    },
+    {
+      "from": "ogedei",
+      "to": "jochi",
+      "task": "high-1774339838-934722e6.md",
+      "ts": "2026-03-24T04:57:09.607214"
+    },
+    {
+      "from": "ogedei",
+      "to": "kublai",
+      "task": "high-1774339541-c8a8164d.md",
+      "ts": "2026-03-24T04:57:09.617579"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "high-1774339172-0f693f83.md",
+      "ts": "2026-03-24T04:57:09.625935"
+    },
+    {
+      "from": "ogedei",
+      "to": "jochi",
+      "task": "ogedei-model-drift-alert-20260324-045554.md",
+      "ts": "2026-03-24T04:57:09.627249"
+    },
+    {
+      "from": "chagatai",
+      "to": "kublai",
+      "task": "high-1774342411-899bf040.md",
+      "ts": "2026-03-24T05:05:20.364886"
+    },
+    {
+      "from": "chagatai",
+      "to": "temujin",
+      "task": "high-1774342498-4b53143e.md",
+      "ts": "2026-03-24T05:05:20.378978"
+    },
+    {
+      "from": "jochi",
+      "to": "kublai",
+      "task": "ogedei-model-drift-alert-20260324-002352.md",
+      "ts": "2026-03-24T08:33:16.543098"
+    },
+    {
+      "from": "jochi",
+      "to": "temujin",
+      "task": "ogedei-model-drift-alert-20260324-045554.md",
+      "ts": "2026-03-24T08:33:16.544514"
+    },
+    {
+      "from": "jochi",
+      "to": "mongke",
+      "task": "normal-1774353743-55db70c6.md",
+      "ts": "2026-03-24T08:33:16.604543"
+    },
+    {
+      "from": "jochi",
+      "to": "chagatai",
+      "task": "normal-1774355540-0ebc31af.md",
+      "ts": "2026-03-24T08:33:16.616173"
+    },
+    {
+      "from": "ogedei",
+      "to": "kublai",
+      "task": "ogedei-model-drift-alert-20260324-053433.md",
+      "ts": "2026-03-24T08:40:51.086799"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "ogedei-model-drift-alert-20260324-073532.md",
+      "ts": "2026-03-24T08:40:51.087564"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "normal-1774347139-9650d19b.md",
+      "ts": "2026-03-24T08:40:51.110805"
+    },
+    {
+      "from": "ogedei",
+      "to": "chagatai",
+      "task": "normal-1774348365-4882681e.md",
+      "ts": "2026-03-24T08:40:51.155530"
+    },
+    {
+      "from": "ogedei",
+      "to": "kublai",
+      "task": "high-1774352050-1f427996.md",
+      "ts": "2026-03-24T08:40:51.167727"
+    },
+    {
+      "from": "ogedei",
+      "to": "temujin",
+      "task": "normal-1774355540-0ebc31af.md",
+      "ts": "2026-03-24T08:40:51.201524"
+    },
+    {
+      "from": "ogedei",
+      "to": "mongke",
+      "task": "normal-1774353814-d6b262fb.md",
+      "ts": "2026-03-24T08:40:51.212388"
+    },
+    {
+      "from": "ogedei",
+      "to": "chagatai",
+      "task": "high-1774355821-7830d7a5.md",
+      "ts": "2026-03-24T08:40:51.222830"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "high-1774353388-918959f4.md",
+      "ts": "2026-03-24T09:02:19.396339"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "high-1774354989-0fdddbcb.md",
+      "ts": "2026-03-24T09:02:19.408908"
+    },
+    {
+      "from": "mongke",
+      "to": "chagatai",
+      "task": "normal-1774353743-55db70c6.md",
+      "ts": "2026-03-24T09:02:19.420241"
+    },
+    {
+      "from": "mongke",
+      "to": "kublai",
+      "task": "normal-1774347139-9650d19b.md",
+      "ts": "2026-03-24T09:02:19.430468"
+    },
+    {
+      "from": "mongke",
+      "to": "temujin",
+      "task": "normal-1774353814-d6b262fb.md",
+      "ts": "2026-03-24T09:02:19.438805"
+    },
+    {
+      "from": "mongke",
+      "to": "chagatai",
+      "task": "high-1774356613-56bfed3d.md",
+      "ts": "2026-03-24T09:02:19.448334"
+    },
+    {
+      "from": "jochi",
+      "to": "kublai",
+      "task": "normal-1774353743-55db70c6.md",
+      "ts": "2026-03-24T09:15:49.960107"
     }
   ]
 }

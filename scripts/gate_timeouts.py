@@ -55,7 +55,7 @@ GATE_AUDIT_TIMEOUT = timedelta(seconds=GATE_AUDIT_TIMEOUT_SECONDS)
 GATE_FOLLOWUP_TIMEOUT = timedelta(days=GATE_FOLLOWUP_TIMEOUT_DAYS)
 
 # Escalation paths
-KUBLAI_TASKS_DIR = AGENTS_DIR / "kublai" / "tasks"
+KUBLAI_TASKS_DIR = AGENTS_DIR / "ogedei" / "tasks"  # kublai is not dispatchable
 TIMEOUT_LOG_DIR = Path.home() / ".openclaw" / "agents" / "main" / "logs" / "gate-timeouts"
 TIMEOUT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -361,7 +361,7 @@ def create_kublai_timeout_task(
     # Build task frontmatter
     frontmatter_lines = [
         "---",
-        f"agent: kublai",
+        f"agent: ogedei",
         f"priority: high",
         f"created: {timestamp}",
         f"source: gate-timeout-monitor",

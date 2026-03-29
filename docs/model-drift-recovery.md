@@ -213,6 +213,11 @@ done
 
 ## Agents Currently Affected (As of 2026-03-09)
 
+> ⚠️ **STALE TABLE** — This snapshot is from 2026-03-09 (14 days ago). As of 2026-03-23:
+> - chagatai is now running **glm-5** (per auth-block alert 2026-03-23) — still drifted
+> - Run detection checklist above to verify current fleet state
+> - See `chagatai-auth-block.md` in shared-context for latest drift context
+
 | Agent | Session Model | Config Model | Status |
 |-------|---------------|--------------|--------|
 | chagatai | qwen3.5-plus | claude-opus-4-6 | 🔴 DRIFTED |

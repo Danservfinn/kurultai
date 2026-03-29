@@ -3,7 +3,7 @@
 Ogedei Watchdog — Persistent quality-assurance daemon for the Kurultai.
 
 Runs every 30 seconds between tock cycles. Seventeen checks per cycle:
-  1. check_watcher_alive()         — pgrep neo4j_v2_executor + log mtime
+  1. check_watcher_alive()         — pgrep task_executor + log mtime
   2. check_stalled_tasks()         — .executing.md files > 15 min old
   3. verify_recent_completions()   — new .done.md → check for real Claude Code execution + quality gate
   4. periodic_queue_audit()        — full queue_audit.audit() every 30 min
@@ -51,6 +51,7 @@ from threading import Event
 sys.path.insert(0, str(Path(__file__).parent))
 from json_state import locked_json_read, locked_json_update
 from kurultai_paths import AGENTS_DIR, LOGS_DIR
+from neo4j_v2_core import TaskStore
 
 
 def check_agent_credentials(agent: str) -> tuple[bool, str | None]:
@@ -141,8 +142,8 @@ sys.stderr.reconfigure(line_buffering=True)
 SCRIPTS_DIR = Path(__file__).parent
 STATE_FILE = LOGS_DIR / "ogedei-watchdog-state.json"
 LOG_FILE = LOGS_DIR / "ogedei-watchdog.log"
-WATCHER_PLIST = "com.kurultai.v2-executor"
-WATCHER_LOG = LOGS_DIR / "v2-executor.log"
+WATCHER_PLIST = "com.kurultai.task-executor"
+WATCHER_LOG = LOGS_DIR / "task-executor.log"
 
 POLL_INTERVAL = 30        # seconds
 STALE_EXECUTING_SECS = 900  # 15 minutes
@@ -152,6 +153,7 @@ QUEUE_AUDIT_INTERVAL = 1800 # 30 minutes
 MEMORY_AUDIT_INTERVAL = 1800 # 30 minutes
 STALL_WARN_COOLDOWN = 600   # 10 minutes between repeated warnings for same file
 REFLECTION_MAX_AGE = 4500   # 75 minutes — cron runs at :02, allow buffer
+REFLECTION_ESCALATION_AGE = 86400  # 24 hours — O009 escalation threshold
 REFLECTION_STATUS = LOGS_DIR / "reflection-status.json"
 REFLECTION_STEP_TIMING = LOGS_DIR / "reflection-step-timing.json"
 
@@ -234,13 +236,13 @@ except Exception as e:
 # Check 1: Is task-watcher alive?
 # ============================================================
 def check_watcher_alive(state):
-    """Verify neo4j_v2_executor is running and its log is fresh."""
+    """Verify task_executor is running and its log is fresh."""
     issues = []
 
     # Check process
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "neo4j_v2_executor"],
+            ["pgrep", "-f", "task_executor"],
             capture_output=True, text=True, timeout=5
         )
         alive = result.returncode == 0
@@ -248,8 +250,8 @@ def check_watcher_alive(state):
         alive = False
 
     if not alive:
-        log("WATCHER DOWN — attempting restart via launchctl", "WARN")
-        issues.append("neo4j_v2_executor not running")
+        log("TASK EXECUTOR DOWN — attempting restart via launchctl", "WARN")
+        issues.append("task_executor not running")
         try:
             result = subprocess.run(
                 ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{WATCHER_PLIST}"],
@@ -269,7 +271,7 @@ def check_watcher_alive(state):
         age = time.time() - WATCHER_LOG.stat().st_mtime
         if age > WATCHER_LOG_MAX_AGE:
             log(f"WATCHER LOG STALE — {age:.0f}s old (threshold: {WATCHER_LOG_MAX_AGE}s)", "WARN")
-            issues.append(f"neo4j_v2_executor log stale ({age:.0f}s)")
+            issues.append(f"task_executor log stale ({age:.0f}s)")
 
     return issues
 
@@ -310,7 +312,12 @@ def verify_process_dead(task_path: Path) -> bool:
 
 
 def recover_task(task_path: Path, agent: str, age_s: int, state: dict) -> bool:
-    """Clear locks and requeue the task."""
+    """Clear locks and requeue the task.
+
+    DEPRECATED 2026-03-23 (cron consolidation): No longer called from check_stalled_tasks().
+    task-reaper.py is the sole owner of orphan recovery (single-writer principle).
+    Retained temporarily for reference; safe to delete once task-reaper is confirmed stable.
+    """
     try:
         task_name = task_path.name
         base_name = task_name.replace(".executing.md", ".md")
@@ -328,7 +335,11 @@ def recover_task(task_path: Path, agent: str, age_s: int, state: dict) -> bool:
 
 
 def escalate_to_kublai(task_path: Path, agent: str, age_s: int) -> bool:
-    """Create high-priority task for Kublai investigation.
+    """Create high-priority task for ogedei investigation (originally kublai, but kublai is not dispatchable).
+
+    DEPRECATED 2026-03-23 (cron consolidation): No longer called from check_stalled_tasks().
+    task-reaper.py is the sole owner of orphan recovery (single-writer principle).
+    Retained because it may be referenced by other callers in the future.
 
     SAFETY CHECKS (prevents escalation loops):
     - Skip tasks with terminal state patterns (.gate-passed., .resolved., .false-positive, etc.)
@@ -340,7 +351,7 @@ def escalate_to_kublai(task_path: Path, agent: str, age_s: int) -> bool:
     - Credential crisis guard (check kublai can execute)
     """
     try:
-        workspace = Path("/Users/kublai/.openclaw/agents/kublai/tasks")
+        workspace = Path("/Users/kublai/.openclaw/agents/ogedei/tasks")
         workspace.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         task_name = task_path.name.replace(".executing.md", "")
@@ -411,18 +422,18 @@ def escalate_to_kublai(task_path: Path, agent: str, age_s: int) -> bool:
                 log(f"Cleanup failed for {agent}/{task_path.name}: {e}", "ERROR")
             return False
 
-        # SAFETY CHECK 6: Credential crisis guard — check if escalation target (kublai) has valid credentials
-        # Prevents piling up escalation tasks when kublai cannot execute them
-        kublai_creds_valid, creds_error = check_agent_credentials("kublai")
-        if not kublai_creds_valid:
-            log(f"SKIP_ESCALATION: kublai has invalid credentials ({creds_error}) — NOT escalating {agent}/{task_name}", "WARN")
-            log(f"  Reason: Escalation would create a task kublai cannot execute (credential crisis guard)", "INFO")
+        # SAFETY CHECK 6: Credential crisis guard — check if escalation target (ogedei) has valid credentials
+        # Prevents piling up escalation tasks when target cannot execute them
+        ogedei_creds_valid, creds_error = check_agent_credentials("ogedei")
+        if not ogedei_creds_valid:
+            log(f"SKIP_ESCALATION: ogedei has invalid credentials ({creds_error}) — NOT escalating {agent}/{task_name}", "WARN")
+            log(f"  Reason: Escalation would create a task ogedei cannot execute (credential crisis guard)", "INFO")
             return False
 
         escalation_file = workspace / f"ESCALATE-stale-task-{agent}-{task_name}-{timestamp}.md"
         task_content = task_path.read_text()[:500] if task_path.exists() else "(file not found)"
         escalation_content = f"""---
-agent: kublai
+agent: ogedei
 priority: critical
 created: {datetime.now().isoformat()}
 task_type: escalation
@@ -636,43 +647,20 @@ def is_task_already_completed(executing_file: Path, agent: str) -> bool:
 
 
 # ============================================================
-# Original check_stalled_tasks below (updated with tiered recovery)
+# Original check_stalled_tasks below (detection + alerting only)
 # ============================================================
 def check_stalled_tasks(state):
-    """Find and recover .executing.md files based on tiered policy.
+    # NOTE: Recovery logic removed 2026-03-23 (cron consolidation).
+    # task-reaper.py is the sole owner of orphan recovery (single-writer principle).
+    # This function only DETECTS and ALERTS on stale tasks.
+    """Detect stalled .executing.md files and log warnings.
 
-    FAST-TRACK (60s+): 0 bytes + dead PID -> immediate recovery (no wait)
-    Tier 1 (900s):  Log warning with cooldown
-    Tier 2 (1800s to escalate_threshold): Verify PID dead -> clear lock -> requeue
-    Tier 3 (escalate_threshold+): Verify PID dead + check completion -> escalate
-
-    IMPORTANT: Escalation threshold is TIMEOUT-AWARE:
-    - Extracts task timeout from frontmatter (defaults to 7200s)
-    - Escalate threshold = task_timeout * 1.5 (150% of configured timeout)
-    - Example: task with timeout=7200s escalates at 10800s (3 hours)
-
-    Before escalating (Tier 3):
-    1. Checks if PID is still alive - skips escalation if active (prevents false positives)
-    2. Checks if a corresponding .done.md file exists - cleans up stale artifact if present
-    Only escalates if PID is dead AND no completion marker exists.
+    Detection tiers (no recovery — that is task-reaper's job):
+    Tier 1 (900s):   Log warning with cooldown
+    Tier 2 (1800s+): Log warning, note PID status for diagnostics
     """
     issues = []
     now = time.time()
-
-    # Load persisted escalation timestamps to prevent re-escalation after watchdog restart
-    persisted_escalations = state.get("stall_escalations", {})
-    if persisted_escalations:
-        log(f"Loaded {len(persisted_escalations)} persisted escalation cooldown(s)", "INFO")
-    # Prune old entries (>24h) and merge into in-memory cooldowns
-    pruned = 0
-    for key, ts in list(persisted_escalations.items()):
-        if now - ts > 86400:  # Remove entries older than 24 hours
-            del persisted_escalations[key]
-            pruned += 1
-        else:
-            _recovery_cooldowns[key] = ts
-    if pruned:
-        log(f"Pruned {pruned} stale escalation cooldown(s) (>24h)", "INFO")
 
     for agent in AGENTS:
         tasks_dir = AGENTS_DIR / agent / "tasks"
@@ -729,97 +717,19 @@ def check_stalled_tasks(state):
             key = f"{agent}/{name}"
             task_path = f
 
-            # FAST-TRACK: Empty output with dead PID = immediate recovery
-            # Tasks that produce 0 bytes with a dead process are clear failures
-            # Don't wait for age thresholds - recover immediately to reduce queue blockage
-            try:
-                file_size = f.stat().st_size
-                if file_size == 0 and age >= 60:  # At least 1 min old + 0 bytes = dead
-                    if verify_process_dead(task_path):
-                        log(f"FAST-TRACK RECOVER: {key} - 0 bytes, PID dead, age={age:.0f}s", "WARN")
-                        if recover_task(task_path, agent, age, state):
-                            issues.append(f"{key} fast-track recovered (0 bytes)")
-                            state["fast_track_recovered"] = state.get("fast_track_recovered", 0) + 1
-                            continue  # Skip normal tier processing
-                        else:
-                            issues.append(f"{key} fast-track recovery failed")
-            except OSError:
-                pass
+            # Detect and alert — all recovery delegated to task-reaper.py
+            last_warned = _stall_warned_at.get(key, 0)
+            if (now - last_warned) >= STALL_WARN_COOLDOWN:
+                pid_alive = not verify_process_dead(task_path)
+                pid_status = "PID alive" if pid_alive else "PID dead"
+                task_timeout = _extract_task_timeout(task_path)
+                log(f"Stalled task detected (recovery delegated to task-reaper): {task_path} "
+                    f"- {age:.0f}s old, {pid_status}, timeout={task_timeout}s", "WARN")
+                _stall_warned_at[key] = now
+                state["stalled_warnings"] = state.get("stalled_warnings", 0) + 1
+            issues.append(f"{key} stalled {age:.0f}s")
 
-            # Extract task timeout for timeout-aware escalation
-            # Default to 7200s (2 hours) if not specified in frontmatter
-            task_timeout = _extract_task_timeout(task_path)
-            escalate_threshold = int(task_timeout * 1.5)  # 150% of configured timeout
-
-            # Tier 1 (900-1800s): Warning only
-            if age < TIER_RECOVER_S:
-                last_warned = _stall_warned_at.get(key, 0)
-                if (now - last_warned) >= STALL_WARN_COOLDOWN:
-                    log(f"STALLED: {key} - {age:.0f}s old (Tier 1, timeout={task_timeout}s)", "WARN")
-                    _stall_warned_at[key] = now
-                    state["stalled_warnings"] = state.get("stalled_warnings", 0) + 1
-                issues.append(f"{key} stalled {age:.0f}s")
-
-            # Tier 2 (1800s to escalate_threshold): Attempt recovery if PID dead
-            elif age < escalate_threshold:
-                last_recovery = _recovery_cooldowns.get(key, 0)
-                if (now - last_recovery) < STALL_WARN_COOLDOWN:
-                    issues.append(f"{key} stalled {age:.0f}s (cooldown)")
-                    continue
-
-                if verify_process_dead(task_path):
-                    log(f"RECOVERING: {key} - {age:.0f}s old (Tier 2, timeout={task_timeout}s)", "WARN")
-                    if recover_task(task_path, agent, age, state):
-                        issues.append(f"{key} recovered after {age:.0f}s")
-                        _stall_warned_at.pop(key, None)
-                    else:
-                        issues.append(f"{key} recovery failed")
-                else:
-                    log(f"STALLED: {key} - {age:.0f}s old (Tier 2: PID alive, timeout={task_timeout}s)", "WARN")
-                    issues.append(f"{key} stalled {age:.0f}s (alive)")
-
-            # Tier 3 (escalate_threshold+): Escalate to Kublai
-            # Only triggers after 150% of task's configured timeout
-            else:
-                last_esc = _recovery_cooldowns.get(f"{key}_escalation", 0)
-                if (now - last_esc) < 3600:
-                    issues.append(f"{key} stalled {age:.0f}s (escalated)")
-                    continue
-
-                # PID ALIVENESS CHECK: Skip escalation if process is still running
-                # This prevents false positive escalations for actively executing tasks
-                if not verify_process_dead(task_path):
-                    log(f"SKIP: {key} - {age:.0f}s old (Tier 3: PID alive, not escalating)", "INFO")
-                    state["stall_skips_alive"] = state.get("stall_skips_alive", 0) + 1
-                    issues.append(f"{key} stalled {age:.0f}s (alive)")
-                    continue
-
-                # Check if task is already completed before escalating
-                # This prevents false positive escalations for tasks with .done.md markers
-                if is_task_already_completed(task_path, agent):
-                    log(f"SKIP: {key} - already has .done.md marker (not escalating)", "INFO")
-                    state["stall_skips_completed"] = state.get("stall_skips_completed", 0) + 1
-                    # Optionally clean up the stale .executing.md file
-                    try:
-                        task_path.unlink()
-                        log(f"CLEANED: stale .executing.md for completed task: {key}", "INFO")
-                        state["stall_cleaned_artifacts"] = state.get("stall_cleaned_artifacts", 0) + 1
-                    except OSError:
-                        pass
-                    continue
-
-                log(f"ESCALATING: {key} - {age:.0f}s old (Tier 3, timeout={task_timeout}s, threshold={escalate_threshold}s)", "ERROR")
-                if escalate_to_kublai(task_path, agent, age):
-                    escalation_key = f"{key}_escalation"
-                    _recovery_cooldowns[escalation_key] = now
-                    # Persist to state to survive watchdog restarts
-                    state.setdefault("stall_escalations", {})[escalation_key] = now
-                    state["stall_escalated"] = state.get("stall_escalated", 0) + 1
-                    issues.append(f"{key} escalated")
-                else:
-                    issues.append(f"{key} escalation failed")
-
-    # Prune cooldown entries
+    # Prune cooldown entries for tasks that no longer exist
     for key in list(_stall_warned_at):
         parts = key.split("/", 1)
         if len(parts) == 2:
@@ -1006,6 +916,54 @@ def check_reflection_pipeline(state):
         log(f"REFLECTION STALE — {age_min}m old (threshold: {REFLECTION_MAX_AGE // 60}m, "
             f"consecutive misses: {consecutive})", "WARN")
         issues.append(f"reflection stale {age_min}m (miss #{consecutive})")
+
+        # O009: Escalate if reflection is stale >24h
+        if age > REFLECTION_ESCALATION_AGE:
+            last_escalation = state.get("last_reflection_escalation", 0)
+            # Only escalate once per day to avoid spam
+            if (now - last_escalation) > 86400:
+                log(f"REFLECTION CRITICAL: {age_min}m stale — escalating to ogedei", "ERROR")
+                try:
+                    from task_intake import create_task
+                    task_id = create_task(
+                        title=f"URGENT: Reflection pipeline stale — {age_min}m since last run",
+                        body=f"""# Reflection Pipeline Stale (>24h)
+
+**Severity:** Critical
+**Age:** {age_min}m ({age_min / 60:.1f}h)
+**Threshold:** {REFLECTION_ESCALATION_AGE // 60}m ({REFLECTION_ESCALATION_AGE // 3600}h)
+
+## Investigation Required
+- Check if hourly_reflection.sh cron job is running
+- Verify logs/agenda.logs for reflection execution
+- Check for errors in hourly_reflection.log
+- Verify Signal calendar integration is working
+- Check for MCP server connectivity issues
+
+## Context
+- Reflection should run every hour at :02
+- Stale reflection means fleet is blind to degradation
+- This escalation created by ogedei-watchdog (O009)
+
+## Next Steps
+1. Investigate root cause
+2. Fix cron/MCP issues
+3. Verify reflection resumes
+4. Update ogedei rules.json if needed""",
+                        priority="high",
+                        source="ogedei-watchdog",
+                        agent="ogedei",
+                    )
+                    if task_id:
+                        log(f"O009: Created reflection escalation task {task_id}", "INFO")
+                        state["last_reflection_escalation"] = now
+                        issues.append(f"reflection_escalation_task_created: {task_id}")
+                    else:
+                        log("O009: Failed to create reflection escalation task", "ERROR")
+                        issues.append("reflection_escalation_failed")
+                except Exception as e:
+                    log(f"O009: Escalation failed: {e}", "ERROR")
+                    issues.append(f"reflection_escalation_error: {e}")
     else:
         state["reflection_misses"] = 0
 
@@ -1269,17 +1227,31 @@ def check_model_drift(state):
 
 
 def _escalate_model_drift(drifted: list, state: dict):
-    """Create a kublai task to investigate fleet-wide model drift."""
+    """Create an ogedei task to investigate fleet-wide model drift.
+
+    Creates both a file-based task (audit trail) and a Neo4j Task node
+    (visible to the unified task executor). Dedup: skips Neo4j creation
+    if an active model-drift task already exists.
+    """
     try:
-        kublai_tasks_dir = AGENTS_DIR / "kublai" / "tasks"
-        kublai_tasks_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        task_path = kublai_tasks_dir / f"ogedei-model-drift-alert-{ts}.md"
+        task_id = f"ogedei-model-drift-{int(time.time())}"
 
         drift_lines = "\n".join(
             f"  - {d['agent']}: session={d['session_model']!r} config={d['config_model']!r}"
             for d in drifted
         )
+        body = (
+            f"{len(drifted)} agents are running under a different model than configured.\n"
+            f"This silently degrades task quality.\n\n"
+            f"## Drifted Agents\n\n{drift_lines}\n\n"
+            f"## Investigation Steps\n\n"
+            f"1. Check ~/.openclaw/agents/{{agent}}/config.json vs tock snapshot\n"
+            f"2. Verify credential provider model mapping\n"
+            f"3. Check ~/.openclaw/kurultai.json primary/fallback config\n"
+            f"4. If Z.AI fallback active, confirm model mapping"
+        )
+
         content = f"""# Task: Investigate Fleet-Wide Model Drift (O001)
 
 **Priority:** HIGH
@@ -1307,9 +1279,41 @@ This silently degrades task quality (e.g., glm-5 producing lower quality output 
 - All active agents' session models match their configured models
 - Tock snapshot shows session_match=true for all agents with active sessions
 """
+        # 1. Write file (audit trail, backward compat)
+        ogedei_tasks_dir = AGENTS_DIR / "ogedei" / "tasks"
+        ogedei_tasks_dir.mkdir(parents=True, exist_ok=True)
+        task_path = ogedei_tasks_dir / f"ogedei-model-drift-alert-{ts}.md"
         with open(str(task_path), "w") as f:
             f.write(content)
-        log(f"MODEL_DRIFT: Escalation task created → {task_path.name}", "WARN")
+        log(f"MODEL_DRIFT: Escalation file created -> {task_path.name}", "WARN")
+
+        # 2. Create Neo4j Task node (makes task visible to executor)
+        try:
+            store = TaskStore()
+            # Dedup: skip if an active model-drift task already exists
+            with store.driver.session() as sess:
+                existing = sess.run(
+                    "MATCH (t:Task) WHERE t.source = 'ogedei-watchdog' "
+                    "AND t.title STARTS WITH 'Investigate Fleet-Wide Model Drift' "
+                    "AND t.status IN ['PENDING', 'WORKING'] "
+                    "RETURN t.task_id LIMIT 1"
+                ).single()
+            if existing:
+                log(f"MODEL_DRIFT: Active task {existing['t.task_id']} exists, skipping Neo4j creation", "INFO")
+            else:
+                store.create_task(
+                    task_id=task_id,
+                    title=f"Investigate Fleet-Wide Model Drift ({len(drifted)} agents)",
+                    prompt=body,
+                    assigned_to="ogedei",
+                    priority="high",
+                    source="ogedei-watchdog",
+                    domain="operations",
+                )
+                log(f"MODEL_DRIFT: Neo4j task {task_id} created", "INFO")
+            store.close()
+        except Exception as ne:
+            log(f"MODEL_DRIFT: Neo4j task creation failed (file still exists): {ne}", "WARN")
     except Exception as e:
         log(f"MODEL_DRIFT: Failed to create escalation task: {e}", "ERROR")
 
@@ -1788,6 +1792,75 @@ def check_cascade_risk(state):
             # Log recommendations
             for rec in risk_report["recommendations"][:2]:
                 log(f"  RECOMMEND: {rec['description']}", "WARN")
+
+            # O-R020: Auto-create incident task for gateway spikes affecting ogedei
+            for pattern in risk_report["patterns"]:
+                if (pattern.get("type") == "gateway_spike" and
+                    "ogedei" in pattern.get("affected_agents", [])):
+
+                    last_gateway_escalation = state.get("last_gateway_spike_escalation", 0)
+                    # Only escalate once per hour to avoid spam
+                    if (now - last_gateway_escalation) > 3600:
+                        log(f"O-R020: Gateway spike affecting ogedei — escalating to incident task", "ERROR")
+                        try:
+                            from task_intake import create_task
+
+                            # Build evidence summary
+                            evidence = pattern.get("evidence", {})
+                            total_failures = evidence.get("total_failures", "?")
+                            expected_failures = evidence.get("expected_failures", "?")
+                            multiplier = evidence.get("multiplier", 0)
+
+                            task_id = create_task(
+                                title=f"CRITICAL: Gateway spike incident — {total_failures} failures detected",
+                                body=f"""# Gateway Spike Incident Response
+
+**Severity:** {risk_report['risk_level'].upper()}
+**Pattern:** gateway_spike
+**Affected Agents:** {', '.join(pattern.get('affected_agents', []))}
+**Total Failures:** {total_failures}
+**Baseline:** ~{expected_failures}
+**Multiplier:** {multiplier:.1f}x
+
+## Detection Details
+{pattern.get('description', 'Unknown')}
+
+## Evidence
+```json
+{json.dumps(evidence, indent=2)}
+```
+
+## Immediate Actions Required
+1. Check openclaw-gateway status
+2. Verify API credentials are valid
+3. Inspect logs/gateway.err.log for errors
+4. Check for rate limiting or quota issues
+5. Verify network connectivity
+
+## Recommendation
+{pattern.get('recommendation', 'No recommendation available')}
+
+## Context
+- Detection by cascade_detector.py
+- Auto-created by ogedei-watchdog (O-R020)
+- Risk level: {risk_report['risk_level']}
+- Lookback period: {risk_report['metrics'].get('lookback_minutes', '?')} minutes""",
+                                priority="high",
+                                source="ogedei-watchdog",
+                                agent="ogedei",
+                            )
+                            if task_id:
+                                log(f"O-R020: Created gateway spike incident task {task_id}", "INFO")
+                                state["last_gateway_spike_escalation"] = now
+                                issues.append(f"gateway_spike_escalation_task_created: {task_id}")
+                            else:
+                                log("O-R020: Failed to create gateway spike incident task", "ERROR")
+                                issues.append("gateway_spike_escalation_failed")
+                        except Exception as e:
+                            log(f"O-R020: Escalation failed: {e}", "ERROR")
+                            issues.append(f"gateway_spike_escalation_error: {e}")
+                    else:
+                        log(f"O-R020: Gateway spike escalation throttled (last: {last_gateway_spike_escalation})", "INFO")
 
             # Take preventive action for high risk
             if risk_report["risk_level"] == "high":

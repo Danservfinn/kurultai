@@ -13,14 +13,14 @@ A lock is considered stale if:
 2. The lock file is older than STALE_LOCK_AGE_SECONDS
 
 Empty task files are cleaned because they cause EXECUTING_NO_OUTPUT escalations:
-- task-watcher picks up empty .md files
-- Creates empty .executing.md and spawns agent-task-handler
+- task_executor picks up empty .md files
+- Creates empty .executing.md and spawns claude-agent
 - Agent hangs because source has no content
 - Process never completes, triggering throughput anomalies
 
 For task locks, also removes the corresponding .executing.md file.
 For experiment locks, includes timeout-based auto-release (2x expected duration).
-For empty tasks, also terminates orphaned agent-task-handler processes.
+For empty tasks, also terminates orphaned task_executor processes.
 
 Run periodically via cron or as part of heartbeat checks.
 

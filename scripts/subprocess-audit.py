@@ -6,7 +6,7 @@ Audits active claude-agent processes and correlates them with executing tasks.
 This script is called by watchdog-gather.sh (tick - 5min) and tock-gather.sh (tock - 30min).
 
 Architecture:
-    task-watcher.py → agent-task-handler.py → claude-agent --workdir ~/.openclaw/agents/{agent}/
+    task_executor.py → claude-agent --workdir ~/.openclaw/agents/{agent}/
 
 Each executing task has:
     - .executing.md file (task content + execution state)
@@ -53,7 +53,7 @@ from kurultai_paths import CLAUDE_TIMEOUT as STALE_EXECUTING_AGE_SECONDS
 ZOMBIE_GRACE_PERIOD_SECONDS = 60  # 1 minute: allow handlers to exit gracefully after task completion
 
 # Process patterns for detection
-HANDLER_PATTERN = "agent-task-handler"
+HANDLER_PATTERN = "task_executor"
 CLAUDE_PATTERN = "claude"
 
 

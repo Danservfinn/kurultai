@@ -303,6 +303,45 @@ def check_git_operations() -> tuple[bool, str, dict]:
         return False, str(e)[:100], {"status": "error"}
 
 
+def check_unregistered_tasks() -> tuple[bool, str, dict]:
+    """
+    Scan for gateway-created task files not registered in Neo4j.
+    Calls backfill_orphan_tasks.py --json and returns stats.
+    Returns (is_healthy, reason, metrics).
+    """
+    backfill_script = BASE_DIR / "scripts" / "backfill_orphan_tasks.py"
+
+    if not backfill_script.exists():
+        return True, "backfill script not found (skipped)", {}
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(backfill_script), "--json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        raw = result.stdout.strip()
+        stats = json.loads(raw) if raw else {}
+        found = stats.get("found", 0)
+        registered = stats.get("registered", 0)
+        errors = stats.get("errors", 0)
+        metrics = {"orphans_found": found, "registered": registered, "errors": errors}
+
+        if errors > 0:
+            return False, f"backfill errors: {errors} file(s) failed registration", metrics
+        if registered > 0:
+            return True, f"registered {registered} orphan task(s) from gateway", metrics
+        return True, "no orphans", metrics
+
+    except subprocess.TimeoutExpired:
+        return False, "backfill scan timed out", {}
+    except json.JSONDecodeError as e:
+        return False, f"backfill JSON parse error: {e}", {}
+    except Exception as e:
+        return False, f"backfill error: {str(e)[:80]}", {}
+
+
 def create_notification(issues: list[str], severity: str = "MEDIUM"):
     """
     Create a task for Ogedei if there are health issues.
@@ -423,6 +462,14 @@ def main():
         all_healthy = False
         issues.append(f"Git: {git_reason}")
     log(f"Git operations: {'OK' if git_healthy else 'FAIL'} - {git_reason}")
+
+    # 7. Unregistered task scan (gateway orphan backfill)
+    orphan_healthy, orphan_reason, orphan_metrics = check_unregistered_tasks()
+    metrics["unregistered_tasks"] = orphan_metrics
+    if not orphan_healthy:
+        all_healthy = False
+        issues.append(f"Orphan tasks: {orphan_reason}")
+    log(f"Orphan tasks: {'OK' if orphan_healthy else 'WARN'} - {orphan_reason}")
 
     # Summary
     log(f"=== Summary: {'HEALTHY' if all_healthy else 'ISSUES DETECTED'} ===")

@@ -331,10 +331,15 @@ def scan_session_file(agent: str, task_id: str) -> dict:
     if not sessions_dir.exists():
         return session_data
 
-    # Find most recent session file
+    # Find most recent session file (including archived .drift files from model drift cleanup)
+    # FIX: Session files may be renamed to .jsonl.drift-* before report hook runs
     try:
-        session_files = sorted(sessions_dir.glob('*.jsonl'), key=os.path.getmtime, reverse=True)
-        for sf in session_files[:3]:  # Check last 3 sessions
+        session_files = sorted(
+            list(sessions_dir.glob('*.jsonl')) +
+            list(sessions_dir.glob('*.jsonl.drift-*')),
+            key=os.path.getmtime, reverse=True
+        )
+        for sf in session_files[:5]:  # Check last 5 sessions (including drift files)
             try:
                 with open(sf, 'r') as f:
                     for line in f:

@@ -380,8 +380,19 @@ class AgentCircuitBreaker:
         for f in tasks_dir.iterdir():
             if not f.name.endswith(".md"):
                 continue
-            # Skip completed/executing/done tasks
-            if any(x in f.name for x in [".executing", ".completed", ".done"]):
+            # Skip terminal-state tasks — aligned with task-redistribute.py TERMINAL_MARKERS
+            # to prevent redistribution of tasks that are no longer actionable.
+            # Previously only filtered [".executing", ".completed", ".done"] which allowed
+            # .stale-resolved, .revision, .quarantine files to be redistributed indefinitely.
+            TERMINAL_MARKERS = (
+                '.done', '.executing', '.stale', '.failed', '.obsolete',
+                '.cancelled', '.resolved', '.revision', '.no_output', '.loop',
+                '.pending-gate', '.blocked', '.quarantine',
+            )
+            if (any(marker in f.name for marker in TERMINAL_MARKERS)
+                    or f.name.startswith('.')
+                    or 'archived' in f.name
+                    or f.name.endswith('.completed.md')):
                 continue
             if not f.is_file():
                 continue

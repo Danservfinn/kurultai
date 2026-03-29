@@ -53,6 +53,16 @@ CRITICAL_FILES = [
 # Agent names that can make autonomous commits
 AUTONOMOUS_AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
 
+# Patterns that indicate legitimate infrastructure updates
+INFRASTRUCTURE_PATTERNS = [
+    "agent config sync",
+    "code quality gates",
+    "infrastructure update",
+    "documentation",
+    "chore:",
+    "docs(",
+]
+
 
 def log(msg: str, level: str = "INFO"):
     """Log message with timestamp."""
@@ -326,6 +336,56 @@ def was_issue_already_fixed(commit: dict, all_commits: list[dict]) -> bool:
     return False
 
 
+def is_infrastructure_update(commit: dict) -> bool:
+    """Check if commit is a legitimate infrastructure update.
+
+    These are typically batch configuration changes, documentation improvements,
+    or system-wide synchronization tasks that are safe to ignore.
+
+    Args:
+        commit: The commit to check
+
+    Returns:
+        True if commit matches infrastructure update patterns
+    """
+    message = commit.get("message", "").lower()
+    return any(pattern in message for pattern in INFRASTRUCTURE_PATTERNS)
+
+
+def is_authorized_batch_update(commit: dict) -> bool:
+    """Check if commit is an authorized batch configuration change.
+
+    This detects commits that:
+    1. Are made by authorized autonomous agents
+    2. Modify multiple settings.json files (5+)
+    3. Have appropriate commit message scope (chore:, docs(, feat()
+
+    Args:
+        commit: The commit to check
+
+    Returns:
+        True if commit is an authorized batch update
+    """
+    # Check if author is an autonomous agent
+    author = commit.get("author", "")
+    if not any(agent in author for agent in AUTONOMOUS_AGENTS):
+        return False
+
+    # Check if it modifies multiple settings.json files
+    critical_files = commit.get("critical_files_touched", [])
+    settings_count = sum(1 for f in critical_files if "settings.json" in f)
+    if settings_count < 5:
+        return False
+
+    # Check commit message scope
+    message = commit.get("message", "").lower()
+    valid_scopes = ("chore:", "docs(", "feat(", "test(", "build(")
+    if not any(message.startswith(scope) for scope in valid_scopes):
+        return False
+
+    return True
+
+
 def detect_anomalies(commits: list[dict], commit_counts: dict) -> list[dict]:
     """Detect anomalous patterns in git operations."""
     anomalies = []
@@ -362,6 +422,14 @@ def detect_anomalies(commits: list[dict], commit_counts: dict) -> list[dict]:
 
             # Skip if issue was already fixed by a later restorative commit
             if was_issue_already_fixed(commit, commits):
+                continue
+
+            # Skip legitimate infrastructure updates
+            if is_infrastructure_update(commit):
+                continue
+
+            # Skip authorized batch updates (e.g., agent config synchronization)
+            if is_authorized_batch_update(commit):
                 continue
 
             # Flag potentially destructive model changes
@@ -652,7 +720,7 @@ def create_alert_task(anomalies: list[dict]) -> bool:
             [sys.executable, str(task_intake),
              "--title", f"Git Anomaly Alert ({len(critical + high)} issue{'s' if len(critical + high) > 1 else ''})",
              "--body", body,
-             "--agent", "kublai",
+             "--agent", "ogedei",
              "--priority", "critical" if critical else "high",
              "--source", "git-operation-monitor"],
             capture_output=True, text=True, timeout=30

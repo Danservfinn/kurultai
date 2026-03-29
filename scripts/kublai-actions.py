@@ -94,7 +94,7 @@ def route_by_text(text):
 
 
 def _attempt_dispatch_restart(log_fn):
-    """Directly check and restart the v2-executor (task dispatch) service.
+    """Directly check and restart the task-executor service.
 
     Called when PENDING_NO_DISPATCH is CRITICAL and investigation tasks are
     also pending (circular stall — creating more tasks won't help when the
@@ -102,7 +102,7 @@ def _attempt_dispatch_restart(log_fn):
 
     Returns: str — "restarted", "already_running", or "failed:<reason>"
     """
-    service = "com.kurultai.v2-executor"
+    service = "com.kurultai.task-executor"
     uid = os.getuid()
 
     try:
@@ -119,20 +119,20 @@ def _attempt_dispatch_restart(log_fn):
                 if service in line:
                     parts = line.split()
                     if parts and parts[0].isdigit():
-                        log_fn(f"DISPATCH_RESTART: v2-executor already running (PID={parts[0]}), "
+                        log_fn(f"DISPATCH_RESTART: task-executor already running (PID={parts[0]}), "
                                f"dispatch stall is not a launchd issue — investigate task files")
                         return "already_running"
                     break  # Found the service entry but no PID — proceed to kickstart
 
         # Service not running — attempt kickstart
-        log_fn("DISPATCH_RESTART: v2-executor not responding, attempting kickstart...")
+        log_fn("DISPATCH_RESTART: task-executor not responding, attempting kickstart...")
         kick = subprocess.run(
             ["launchctl", "kickstart", "-k", f"gui/{uid}/{service}"],
             capture_output=True, text=True, timeout=15
         )
 
         if kick.returncode == 0:
-            log_fn("DISPATCH_RESTART: SUCCESS — v2-executor restarted via launchctl kickstart")
+            log_fn("DISPATCH_RESTART: SUCCESS — task-executor restarted via launchctl kickstart")
             return "restarted"
 
         # Kickstart failed — try bootstrap from plist
@@ -143,7 +143,7 @@ def _attempt_dispatch_restart(log_fn):
                 capture_output=True, text=True, timeout=15
             )
             if boot.returncode == 0:
-                log_fn("DISPATCH_RESTART: SUCCESS — v2-executor bootstrapped via launchctl bootstrap")
+                log_fn("DISPATCH_RESTART: SUCCESS — task-executor bootstrapped via launchctl bootstrap")
                 return "restarted"
             log_fn(f"DISPATCH_RESTART: FAILED — kickstart={kick.returncode}, "
                    f"bootstrap={boot.returncode}: {kick.stderr.strip()}")
@@ -425,7 +425,8 @@ OpenClaw gateway RSS is {rss_mb:.0f}MB (threshold: 900MB).
                 cooldown_key = f"task_stall:{stalled_agent}:{task_id}"
 
                 # Route investigation away from the stalled agent
-                target = "kublai" if stalled_agent == "jochi" else "jochi"
+                # NOTE: kublai is NOT in DISPATCH_AGENTS, so never route tasks to kublai
+                target = "ogedei" if stalled_agent == "jochi" else "jochi"
 
                 # Check: not in cooldown, no existing investigation for THIS specific stalled task
                 pending_title = f"Investigate stalled task: {stalled_agent}"
@@ -889,12 +890,18 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
                         break
                 except OSError:
                     pass
-            if all_recent and fs_pending <= 3:
+            # FIX 2026-03-23: Changed AND to OR. Previous AND condition failed for bursts
+            # of 4+ tasks all <10 min old — fs_pending > 3 caused the condition to be false
+            # even when all tasks were brand-new and the agent simply hadn't had time to
+            # process them yet. OR correctly suppresses triage if EITHER all tasks are recent
+            # OR the queue is small enough (<=3) that it's likely transient, not a real stall.
+            if all_recent or fs_pending <= 3:
                 log(f"TICK: stall alert suppressed for {name} — {fs_pending} pending tasks are all <10 min old (agent hasn't had time to process)")
                 continue
 
-            # Guard: if jochi is stalled, route to kublai instead (prevent self-routing deadlock)
-            target = "kublai" if name == "jochi" else "jochi"
+            # Guard: if jochi is stalled, route to ogedei (ops agent) instead (prevent self-routing deadlock)
+            # NOTE: kublai is NOT in DISPATCH_AGENTS, so never route tasks to kublai
+            target = "ogedei" if name == "jochi" else "jochi"
 
             # FIX 2026-03-20: Dedup guard — also check if target already has ANY triage
             # task for this agent created in the last 30 minutes (prevents cascade)
@@ -1083,7 +1090,7 @@ def _route_feedback(text):
     Delegates to canonical task_router.
     """
     agent = route_by_text(text)
-    return agent if agent != "subagent" else "kublai"
+    return agent if agent != "subagent" else "ogedei"
 
 
 def main():

@@ -1,93 +1,110 @@
 {
-  "last_audit": 1774087018.6238441,
-  "cycles": 38094,
-  "last_cycle": "2026-03-21T06:02:11.361772",
-  "watcher_restarts": 122,
-  "stalled_warnings": 514,
+  "last_audit": 1774777765.6214368,
+  "cycles": 57829,
+  "last_cycle": "2026-03-29T06:01:38.062977",
+  "watcher_restarts": 1539,
+  "stalled_warnings": 515,
   "fakes_detected": 17,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 1,
+    "audited": 0,
     "fake_found": 0,
     "requeued": 0,
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1774087331.361784,
+  "last_cycle_epoch": 1774778498.062984,
   "last_issues": [
-    "reflection stale 7545m (miss #11745)"
+    "task_executor log stale (492979s)",
+    "reflection stale 7735m (miss #12976)",
+    "slow reflection step: message-extraction (120s)",
+    "slow reflection step: thread-summaries (116s)"
   ],
-  "reflection_misses": 11745,
-  "last_memory_audit": 1774087018.646386,
+  "reflection_misses": 12976,
+  "last_memory_audit": 1774777765.631579,
   "memory_audit_result": {
-    "total": 26,
+    "total": 11,
     "critical": 0,
-    "warning": 19,
-    "ts": "2026-03-21T05:56:58.706497"
+    "warning": 4,
+    "ts": "2026-03-29T05:49:25.668264"
   },
-  "last_routing_drift_check": 1774087018.710156,
+  "last_routing_drift_check": 1774777973.080843,
   "routing_drift": {
-    "total": 0,
-    "mismatches": 0,
-    "drift_pct": 0.0,
-    "ts": "2026-03-21T05:56:58.761953"
+    "total": 1,
+    "mismatches": 1,
+    "drift_pct": 100.0,
+    "top_examples": [
+      {
+        "task": "Test task from curiosity sweep",
+        "actual": "kublai",
+        "keyword_would": "jochi"
+      }
+    ],
+    "ts": "2026-03-29T05:52:53.125505"
   },
-  "memory_fixes": 776,
-  "last_failure_rate_check": 1774087158.258643,
-  "agent_failure_flags": {
-    "jochi": 0.789,
-    "temujin": 0.857,
-    "ogedei": 0.652,
-    "mongke": 0.8,
-    "chagatai": 1.0
-  },
-  "cycle_start_time": 1774087331.300239,
-  "last_queue_balance_check": 1774087158.286599,
+  "memory_fixes": 1011,
+  "last_failure_rate_check": 1774778320.478909,
+  "agent_failure_flags": {},
+  "cycle_start_time": 1774778497.9230258,
+  "last_queue_balance_check": 1774778320.5102642,
   "queue_depths": {
-    "kublai": 0,
-    "temujin": 1,
-    "mongke": 3,
-    "chagatai": 0,
-    "jochi": 0,
-    "ogedei": 0,
-    "tolui": 0
+    "kublai": 9,
+    "temujin": 29,
+    "mongke": 17,
+    "chagatai": 14,
+    "jochi": 36,
+    "ogedei": 133,
+    "tolui": 11
   },
-  "last_cascade_check": 1774086983.91617,
-  "cascade_risk": "medium",
+  "last_cascade_check": 1774778356.0838542,
+  "cascade_risk": "high",
   "cascade_metrics": {
-    "events_analyzed": 91,
-    "patterns_detected": 1,
+    "events_analyzed": 292,
+    "patterns_detected": 5,
     "agents_failing": 5,
     "failures_by_agent": {
-      "chagatai": 5,
-      "mongke": 20,
-      "jochi": 45,
-      "ogedei": 15,
-      "temujin": 6
+      "jochi": 77,
+      "ogedei": 70,
+      "temujin": 27,
+      "mongke": 82,
+      "chagatai": 36
     },
     "lookback_minutes": 30
   },
-  "last_quality_gate_check": 1774087227.3171961,
+  "last_quality_gate_check": 1774778498.034434,
   "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1774086326.357514,
+  "last_self_healing_score_check": 1774777520.9258292,
   "self_healing_score": 100.0,
   "self_healing_metrics": {
-    "auto_resolved": 3,
+    "auto_resolved": 0,
     "escalated": 0,
     "manual": 0,
-    "total": 3
+    "total": 0
   },
   "circuit_half_open_agents": [
     "ogedei",
     "jochi",
-    "temujin"
+    "temujin",
+    "chagatai"
   ],
   "circuit_report": {
-    "ts": "2026-03-21T06:02:11.361159",
+    "ts": "2026-03-29T06:01:38.061760",
     "agents": {
+      "temujin": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
+      "ogedei": {
+        "state": "CLOSED",
+        "available": true,
+        "reason": "normal",
+        "detail": null
+      },
       "jochi": {
         "state": "CLOSED",
         "available": true,
@@ -100,19 +117,7 @@
         "reason": "normal",
         "detail": null
       },
-      "temujin": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
       "chagatai": {
-        "state": "CLOSED",
-        "available": true,
-        "reason": "normal",
-        "detail": null
-      },
-      "ogedei": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -131,17 +136,18 @@
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.061232805252075195,
-  "state_file_size": 3903,
+  "last_cycle_duration": 0.13898801803588867,
+  "state_file_size": 4814,
   "tasks_recovered": 194,
-  "slow_cycles": 21,
-  "queue_balance_moves": 332,
+  "slow_cycles": 41,
+  "queue_balance_moves": 601,
   "circuit_open_agents": [
     "jochi",
-    "ogedei"
+    "ogedei",
+    "mongke"
   ],
-  "last_cred_failure_check": 1774087227.290161,
-  "last_git_operation_check": 1774087158.289118,
+  "last_cred_failure_check": 1774778392.6387289,
+  "last_git_operation_check": 1774778320.519391,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
@@ -155,10 +161,38 @@
   "stall_escalations": {},
   "stall_skips_completed": 2,
   "stall_cleaned_artifacts": 2,
-  "last_model_drift_check": 1774087018.791936,
-  "model_drift_drifted": [],
+  "last_model_drift_check": 1774777938.70489,
+  "model_drift_drifted": [
+    {
+      "agent": "mongke",
+      "session_model": "glm-5",
+      "config_model": "claude-sonnet-4-6"
+    },
+    {
+      "agent": "chagatai",
+      "session_model": "glm-5",
+      "config_model": "claude-sonnet-4-6"
+    },
+    {
+      "agent": "temujin",
+      "session_model": "glm-5",
+      "config_model": "claude-sonnet-4-6"
+    },
+    {
+      "agent": "jochi",
+      "session_model": "glm-5",
+      "config_model": "claude-sonnet-4-6"
+    },
+    {
+      "agent": "ogedei",
+      "session_model": "glm-5",
+      "config_model": "claude-sonnet-4-6"
+    }
+  ],
   "model_drift_checked": 5,
-  "model_drift_ts": "2026-03-20T17:20:45.530259",
-  "model_drift_last_escalate": 1774038014.8024802,
-  "model_drift_last_clean": "2026-03-21T05:56:58.793234"
+  "model_drift_ts": "2026-03-29T05:52:18.706156",
+  "model_drift_last_escalate": 1774774311.9559848,
+  "model_drift_last_clean": "2026-03-24T05:04:03.225176",
+  "last_gateway_spike_escalation": 1774777728.85056,
+  "last_reflection_escalation": 1774746446.902747
 }

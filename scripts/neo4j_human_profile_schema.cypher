@@ -39,8 +39,8 @@ FOR (t:Tag) REQUIRE t.name IS UNIQUE;
 // ─────────────────────────────────────────────────────────────────────────────
 
 // HumanProfile: link to Person
-CREATE INDEX human_profile_human_id_idx IF NOT EXISTS
-FOR (h:HumanProfile) ON (h.human_id);
+CREATE INDEX human_profile_phone_e164_idx IF NOT EXISTS
+FOR (h:HumanProfile) ON (h.phone_e164);
 
 // HumanProfile: quick name lookup
 CREATE INDEX human_profile_display_name_idx IF NOT EXISTS
@@ -65,11 +65,11 @@ FOR (h:HumanProfile) ON EACH [h.display_name, h.what_to_call, h.notes];
 
 // ── HumanProfile ─────────────────────────────────────────────────────────────
 // Extended profile information for humans the Kurultai interacts with.
-// Linked to Person node via human_id (which equals Person.phone_number).
+// Linked to Person node via phone_e164 (which equals Person.phone_number).
 //
 // Properties:
 //   profile_id          : String    (UUID, e.g., "hp-a1b2c3d4") — PRIMARY KEY
-//   human_id            : String    (E.164 phone, links to Person.phone_number)
+//   phone_e164          : String    (E.164 phone, links to Person.phone_number)
 //   display_name        : String    (preferred display name)
 //   what_to_call        : String    (how they want to be addressed)
 //   pronouns            : String    (optional: "they/them", "she/her", etc.)
@@ -90,7 +90,7 @@ FOR (h:HumanProfile) ON EACH [h.display_name, h.what_to_call, h.notes];
 // Example:
 // CREATE (h:HumanProfile {
 //     profile_id: "hp-" + randomUUID(),
-//     human_id: "+19194133445",
+//     phone_e164: "+19194133445",
 //     display_name: "Danny",
 //     what_to_call: "Danny",
 //     pronouns: "he/him",
@@ -236,7 +236,7 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 //
 // MATCH (hp:HumanProfile)
 // WHERE toLower(hp.display_name) CONTAINS toLower($query)
-//    OR hp.human_id = $query
+//    OR hp.phone_e164 = $query
 //    OR toLower($query) IN [x IN hp.aliases | toLower(x)]
 // WITH hp LIMIT 1
 // MATCH (hp)-[:LINKED_TO]->(p:Person)
@@ -262,19 +262,19 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 
 
 // ── Q2: "How does [person] prefer to communicate?" ───────────────────────────
-// Parameters: $human_id
+// Parameters: $phone_e164
 //
-// MATCH (hp:HumanProfile {human_id: $human_id})
+// MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 // RETURN hp.display_name,
 //        hp.communication_style,
 //        hp.preferences;
 
 
 // ── Q3: Create or update HumanProfile ─────────────────────────────────────────
-// Parameters: $human_id, $display_name, $timezone, etc.
+// Parameters: $phone_e164, $display_name, $timezone, etc.
 //
-// MATCH (p:Person {phone_number: $human_id})
-// MERGE (hp:HumanProfile {human_id: $human_id})
+// MATCH (p:Person {phone_number: $phone_e164})
+// MERGE (hp:HumanProfile {phone_e164: $phone_e164})
 // ON CREATE SET
 //     hp.profile_id = "hp-" + randomUUID(),
 //     hp.display_name = $display_name,
@@ -295,18 +295,18 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 
 
 // ── Q4: Update specific field ─────────────────────────────────────────────────
-// Parameters: $human_id, $field, $value
+// Parameters: $phone_e164, $field, $value
 //
-// MATCH (hp:HumanProfile {human_id: $human_id})
+// MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 // SET hp[$field] = $value,
 //     hp.updated_at = datetime()
 // RETURN hp.profile_id, hp[$field] AS new_value;
 
 
 // ── Q5: Add consent category ──────────────────────────────────────────────────
-// Parameters: $human_id, $category_name
+// Parameters: $phone_e164, $category_name
 //
-// MATCH (hp:HumanProfile {human_id: $human_id})
+// MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 // MATCH (c:ConsentCategory {name: $category_name})
 // MERGE (hp)-[rel:HAS_CONSENT]->(c)
 // ON CREATE SET
@@ -318,9 +318,9 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 
 
 // ── Q6: Revoke consent category ───────────────────────────────────────────────
-// Parameters: $human_id, $category_name
+// Parameters: $phone_e164, $category_name
 //
-// MATCH (hp:HumanProfile {human_id: $human_id})
+// MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 // MATCH (hp)-[rel:HAS_CONSENT]->(c:ConsentCategory {name: $category_name})
 // SET rel.revoked_at = datetime()
 // SET hp.consent_categories = [x IN hp.consent_categories WHERE x <> $category_name]
@@ -328,9 +328,9 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 
 
 // ── Q7: Privacy-filtered profile query ────────────────────────────────────────
-// Parameters: $human_id, $requester_privacy_level ("public", "contacts", "private")
+// Parameters: $phone_e164, $requester_privacy_level ("public", "contacts", "private")
 //
-// MATCH (hp:HumanProfile {human_id: $human_id})
+// MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 // WITH hp,
 //     CASE $requester_privacy_level
 //         WHEN "private" THEN ["public", "contacts", "private"]
@@ -349,13 +349,13 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 //
 // MATCH (hp:HumanProfile)-[rel:HAS_CONSENT]->(c:ConsentCategory {name: $category_name})
 // WHERE rel.revoked_at IS NULL
-// RETURN hp.display_name, hp.human_id, rel.granted_at;
+// RETURN hp.display_name, hp.phone_e164, rel.granted_at;
 
 
 // ── Q9: Soft delete (anonymize) profile ───────────────────────────────────────
-// Parameters: $human_id
+// Parameters: $phone_e164
 //
-// MATCH (hp:HumanProfile {human_id: $human_id})
+// MATCH (hp:HumanProfile {phone_e164: $phone_e164})
 // SET hp.display_name = "Anonymous",
 //     hp.what_to_call = "User",
 //     hp.pronouns = null,
@@ -370,12 +370,12 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 
 
 // ── Q10: Get profiles for context enrichment ──────────────────────────────────
-// Parameters: $human_ids (list)
+// Parameters: $phone_e164s (list)
 //
 // MATCH (hp:HumanProfile)
-// WHERE hp.human_id IN $human_ids
+// WHERE hp.phone_e164 IN $phone_e164s
 //   AND hp.status = "active"
-// RETURN hp.human_id,
+// RETURN hp.phone_e164,
 //        hp.display_name,
 //        hp.what_to_call,
 //        hp.timezone,
@@ -400,7 +400,7 @@ ON CREATE SET t4.description = "System administrator", t4.created_at = datetime(
 // CALL db.index.fulltext.queryNodes("human_profile_search", $search_text)
 // YIELD node AS hp, score
 // WHERE hp.status = "active"
-// RETURN hp.display_name, hp.human_id, hp.notes, score
+// RETURN hp.display_name, hp.phone_e164, hp.notes, score
 // ORDER BY score DESC;
 
 

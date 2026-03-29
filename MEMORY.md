@@ -210,4 +210,64 @@ When `claude-agent` wrapper is invoked for task execution, it uses a **multi-tie
 
 ---
 
+## Task Execution Architecture (2026-03-23)
+
+**Current System:** The old `task-watcher.py` + `agent-task-handler.py` has been replaced.
+
+### Components
+
+| Component | File | Role |
+|-----------|------|------|
+| **Dispatcher** | `ogedei_dispatch.py` | Async task dispatcher using asyncio and ThreadPoolExecutor |
+| **Watchdog** | `ogedei-watchdog.py` | Launchd daemon that monitors and restarts dispatcher |
+| **Pipeline** | `launch_daily_reflection_pipeline.py` | Creates 36-task pipeline in Neo4j with dependency chains |
+
+### How It Works
+
+1. **Pipeline Creation:** `launch_daily_reflection_pipeline.py --force` creates tasks in Neo4j
+2. **Task Dispatch:** `ogedei_dispatch.py` polls agent task queues and executes via subprocess
+3. **Watchdog:** `ogedei-watchdog.py` (launchd service) ensures dispatcher stays running
+4. **Execution:** Tasks run via `claude-agent` subprocess in agent workspaces
+
+### Launchd Service
+
+```xml
+~/Library/LaunchAgents/com.kurultai.ogedei-watchdog.plist
+```
+
+**Status:** Check with `launchctl list | grep ogedei`
+**Restart:** `launchctl start com.kurultai.ogedei-watchdog`
+
+### Pipeline Phases
+
+| Phase | Tasks | Description |
+|-------|-------|-------------|
+| 1 | 6 | Daily reflections (each agent) |
+| 2 | 6 | Performance reviews (ogedei) |
+| 3 | 6 | Write proposals (each agent) |
+| 4 | 6 | Vote on proposals (each agent) |
+| 5 | 1 | Consensus sentinel |
+| 6 | 6 | Awaiting approval (kanban) |
+| 7 | 11 | Downstream implementation |
+
+**Total:** 36 tasks with full dependency chains via Neo4j
+
+### Kanban Integration
+
+- **API:** `POST /api/sessions/trigger` (port 18790)
+- **Cooldown:** Disabled (was 10 min, now 0)
+- **Button:** "Run Session" triggers pipeline creation
+- **Approval Column:** "Awaiting Imperial Seal" for 6/6 APPROVE proposals
+
+### Troubleshooting
+
+| Issue | Check | Fix |
+|-------|-------|-----|
+| Tasks not executing | `ps aux \| grep ogedei` | `launchctl start com.kurultai.ogedei-watchdog` |
+| Pipeline not triggering | `grep spawnDetached ~/.openclaw/apps/the-kurultai/server.js` | Ensure no `--launch` arg |
+| Button cooldown | Check `SESSION_COOLDOWN_MS` in index.html | Set to 0 to disable |
+
+---
+
 *Last updated: 2026-03-09 (v2.2 multi-tier configuration ENABLED per user preference, Neo4j stored)*
+*Architecture updated: 2026-03-23 (quiet-napping-shannon pipeline deployed)*

@@ -388,7 +388,7 @@ VALID_MODELS = {
     # Alibaba (Tier 2 fallback)
     'qwen3.5-plus'
 }
-DEFAULT_MODEL = 'claude-opus-4-6'
+DEFAULT_MODEL = 'claude-sonnet-4-6'
 result = {}
 for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     model = None
@@ -936,16 +936,19 @@ PROVIDER_MODEL_MAP = {
     "alibaba": "qwen3.5-plus"
 }
 
-# Config model for each agent (anthropic primary)
-AGENT_CONFIG_MODELS = {
-    "kublai": "claude-opus-4-6",
-    "mongke": "claude-opus-4-6",
-    "chagatai": "claude-opus-4-6",
-    "temujin": "claude-opus-4-6",
-    "jochi": "claude-opus-4-6",
-    "ogedei": "claude-opus-4-6",
-    "tolui": "claude-opus-4-6"
-}
+# Config model for each agent — read dynamically from settings.json (avoids stale hardcoded values)
+# FIX 2026-03-23 (ogedei): was hardcoded claude-opus-4-6; dashboard changed to claude-sonnet-4-6
+# but this map wasn't updated, causing fleet_model_mismatch false positives.
+AGENT_CONFIG_MODELS = {}
+_DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+for _agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei","tolui"]:
+    _settings_path = f"{base}/{_agent}/.claude/settings.json"
+    try:
+        with open(_settings_path) as _sf:
+            _scfg = json.load(_sf)
+            AGENT_CONFIG_MODELS[_agent] = _scfg.get("env", {}).get("ANTHROPIC_MODEL", _DEFAULT_ANTHROPIC_MODEL)
+    except Exception:
+        AGENT_CONFIG_MODELS[_agent] = _DEFAULT_ANTHROPIC_MODEL
 
 cutoff = datetime.now() - timedelta(minutes=30)
 
@@ -1011,7 +1014,7 @@ for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     if agent in per_agent_providers:
         provider = per_agent_providers[agent]["provider"]
         if provider == "anthropic":
-            model = AGENT_CONFIG_MODELS.get(agent, "claude-opus-4-6")
+            model = AGENT_CONFIG_MODELS.get(agent, _DEFAULT_ANTHROPIC_MODEL)
         elif provider in PROVIDER_MODEL_MAP:
             model = PROVIDER_MODEL_MAP[provider]
 
@@ -1019,7 +1022,7 @@ for agent in ["kublai","mongke","chagatai","temujin","jochi","ogedei"]:
     # Most entries are agent="unknown", so use the global signal
     if model == "none" and dominant_provider:
         if dominant_provider == "anthropic":
-            model = AGENT_CONFIG_MODELS.get(agent, "claude-opus-4-6")
+            model = AGENT_CONFIG_MODELS.get(agent, _DEFAULT_ANTHROPIC_MODEL)
         elif dominant_provider in PROVIDER_MODEL_MAP:
             model = PROVIDER_MODEL_MAP[dominant_provider]
 
@@ -1154,7 +1157,7 @@ for name in agent_names:
     cm = config_models.get(name, {})
     # session_model already uses live data now (via session_by_agent)
     session_model = s.get("model", "none") if s else live_session_models.get(name, "none")
-    config_resolved = cm.get("resolved", "claude-opus-4-6")
+    config_resolved = cm.get("resolved", "claude-sonnet-4-6")
     # "none" and "unknown" both mean no reliable session data — not a mismatch
     model_match = session_model in ("none", "unknown") or session_model == config_resolved
     # Use filesystem queue depths as source of truth for pending/executing counts
@@ -1843,7 +1846,7 @@ See: {validation_log}
     except Exception as e:
         print(f"Failed to create escalation task: {e}")
 
-    # Also create in Neo4j so v2-executor can dispatch it
+    # Also create in Neo4j so task-executor can dispatch it
     try:
         import importlib.util
         spec = importlib.util.spec_from_file_location("neo4j_v2_core",
@@ -1889,7 +1892,7 @@ echo "[$TS] TOCK | model=$MODEL | tasks_done=$TASKS_DONE | tasks_fail=$TASKS_FAI
 # ============================================================
 # NEO4J STATE SYNC: Reconcile filesystem task state with Neo4j (safety net)
 # ============================================================
-python3 "$BASE/scripts/neo4j-state-sync.py" --apply >> "$BASE/logs/neo4j-state-sync.log" 2>&1 &
+# Removed 2026-03-22: neo4j-state-sync.py archived, drift case no longer possible with unified executor
 
 # ============================================================
 # KUBLAI ACTIONS: Create tasks based on tock findings
@@ -1902,6 +1905,11 @@ python3 "$BASE/scripts/kublai-actions.py" --trigger tock >> "$BASE/logs/kublai-a
 # Runs in background to avoid blocking tock; creates tasks for .no_output/.unverified files
 # missing resolution sections (addresses /horde-review PRIORITY_FIX)
 python3 "$BASE/scripts/fix-missing-resolutions.py" --all-agents --execute >> "$BASE/logs/fix-missing-resolutions.log" 2>&1 &
+
+# ============================================================
+# ORPHAN TASK BACKFILL: Register gateway-created task files missing from Neo4j
+# ============================================================
+python3 "$BASE/scripts/backfill_orphan_tasks.py" --json >> "$BASE/logs/backfill-orphan-tasks.log" 2>&1 &
 
 # Cleanup temp file
 rm -f "$TOCK_ASSEMBLED_TMP"

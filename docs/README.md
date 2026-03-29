@@ -2,7 +2,7 @@
 
 **The Scribe's Library** — Content, architecture, and operational knowledge for the Kurultai's Content Specialist.
 
-*Last updated: 2026-03-11 14:21 EDT*
+*Last updated: 2026-03-23 (C002 doc scan)*
 
 ---
 
@@ -43,6 +43,8 @@ Core system design, agent roles, and structural patterns.
 | [state-management-reference.md](state-management-reference.md) | Agent state tracking, persistence, and recovery patterns |
 | [human-profile-system.md](human-profile-system.md) | Structured storage for human context (Neo4j + Markdown) |
 | [NEO4J_PATTERNS.md](NEO4J_PATTERNS.md) | Graph schema, node types, relationships, and common queries |
+| [NEO4J_CONVERSATION_CONTEXT_DESIGN.md](NEO4J_CONVERSATION_CONTEXT_DESIGN.md) | Conversation context system — Neo4j-backed cross-session memory (added 2026-03-20) |
+| [PRIVACY_IDENTITY_ISOLATION_DESIGN.md](PRIVACY_IDENTITY_ISOLATION_DESIGN.md) | Privacy and identity isolation architecture for multi-user scenarios (added 2026-03-19) |
 | [reflection-pipeline-reference.md](reflection-pipeline-reference.md) | Hourly self-improvement cycle: tick, tock, kurultai phases |
 | [reflection-rules-quickref.md](reflection-rules-quickref.md) | Quick reference for reflection rules and triggers |
 
@@ -60,6 +62,7 @@ Task dispatch, routing decisions, and agent assignment.
 | [routing-idle-agent-bypass-diagnostic.md](routing-idle-agent-bypass-diagnostic.md) | Diagnosing idle agent bypass failures |
 | [routing-overflow-gap-analysis.md](routing-overflow-gap-analysis.md) | Analysis of routing overflow conditions and gaps |
 | [routing-test-prompts.md](routing-test-prompts.md) | Test cases for validating routing decisions |
+| [routing-audit-response-guide.md](routing-audit-response-guide.md) | How to respond to routing audit findings (added 2026-03-13) |
 
 ### 📊 Monitoring
 
@@ -76,6 +79,9 @@ Observability, health checks, alerting, and performance tracking.
 | [model-tracking.md](model-tracking.md) | LLM model usage tracking and cost monitoring |
 | [model-drift-recovery.md](model-drift-recovery.md) | Detecting and recovering from model quality degradation |
 | [throughput-anomaly-executing-no-output.md](throughput-anomaly-executing-no-output.md) | Diagnosing tasks that execute but produce no output |
+| [heartbeat-system.md](heartbeat-system.md) | Heartbeat system architecture: tick/tock cycle design (added 2026-03-12) |
+| [heartbeat-quickref.md](heartbeat-quickref.md) | Quick reference card for heartbeat cron commands (added 2026-03-12) |
+| [fleet-failure-triage.md](fleet-failure-triage.md) | Triage procedure for multi-agent fleet failures (added 2026-03-12) |
 
 ### 🔒 Security
 
@@ -87,6 +93,7 @@ Authentication, privacy, credentials, and access control.
 | [credential-troubleshooting.md](credential-troubleshooting.md) | API credential validation and failure diagnosis |
 | [auth-health-preflight.md](auth-health-preflight.md) | Pre-execution auth checks to prevent silent failures |
 | [session-lock-fix.md](session-lock-fix.md) | Session locking mechanism to prevent concurrent execution conflicts |
+| [auth-heartbeat-reference.md](auth-heartbeat-reference.md) | Auth token health monitoring and preflight reference (added 2026-03-11) |
 | [ESCALATION_PROTOCOL.md](ESCALATION_PROTOCOL.md) | When and how to interrupt the human operator (critical/high/medium) |
 
 ### 📜 Protocols
@@ -106,7 +113,14 @@ Operational procedures, voting, completion gates, and behavioral rules.
 | [autonomous-experiments.md](autonomous-experiments.md) | Framework for agent-driven experimentation and learning |
 | [experiment-runbook.md](experiment-runbook.md) | Step-by-step guide for running controlled experiments |
 | [ab-testing-methodology.md](ab-testing-methodology.md) | Statistical framework for prompt optimization validation |
-| [launchd-registry.md](launchd-registry.md) | macOS launchd job registry and management |
+| [launchd-registry.md](launchd-registry.md) | macOS launchd job registry and management (updated 2026-03-23) |
+| [R008_SKILL_ENFORCEMENT.md](R008_SKILL_ENFORCEMENT.md) | R008 skill enforcement rule specification (added 2026-03-12) |
+| [R008_SKILL_ENFORCEMENT_IMPLEMENTATION.md](R008_SKILL_ENFORCEMENT_IMPLEMENTATION.md) | Implementation guide for R008 skill enforcement (added 2026-03-12) |
+| [mandatory-horde-prompt.md](mandatory-horde-prompt.md) | Mandatory horde-prompt invocation protocol (added 2026-03-20) |
+| [proposal-lifecycle.md](proposal-lifecycle.md) | End-to-end lifecycle for system proposals (added 2026-03-18) |
+| [backup-restore.md](backup-restore.md) | Backup and restore procedures for Kurultai data (added 2026-03-18) |
+| [agent-manager.md](agent-manager.md) | Agent process management and operational control (added 2026-03-18) |
+| [engagement-assessment-design.md](engagement-assessment-design.md) | Design for assessing community engagement quality (added 2026-03-19) |
 
 ### 📚 Reference
 
@@ -130,6 +144,10 @@ Templates, guides, troubleshooting, and specialized knowledge.
 | [mongke-starvation-postmortem-2026-03-11.md](mongke-starvation-postmortem-2026-03-11.md) | Postmortem: Research agent task starvation incident |
 | [mongke-ai-research-routing-2026-03-11.md](mongke-ai-research-routing-2026-03-11.md) | AI research routing patterns for Mongke agent |
 | [idle-watchdog-design.md](idle-watchdog-design.md) | Design for detecting and handling idle agents |
+| [AGENT-HARNESS-DASHBOARD.md](AGENT-HARNESS-DASHBOARD.md) | Agent harness dashboard design and capabilities (added 2026-03-12) |
+| [ogedei-dispatcher-design.md](ogedei-dispatcher-design.md) | Ogedei task dispatcher architecture and design (added 2026-03-23) |
+| [runbook-hot-potato-zombie-tasks.md](runbook-hot-potato-zombie-tasks.md) | Runbook for handling zombie and hot-potato task loops (added 2026-03-23) |
+| [timeout-configuration.md](timeout-configuration.md) | Timeout settings across agents and task types (added 2026-03-11) |
 
 ---
 

@@ -142,14 +142,56 @@ results = execute_query_cypher(
 - User research
 - Product research
 
+---
+
+### M007: Model Drift Detection (NEW — 2026-03-22)
+**Priority:** 2 (HIGH)
+
+**WHEN:** Starting any research task AND active session model ≠ config_model (`claude-opus-4-6`)
+
+**THEN:** Log `TELEMETRY_ALERT("MODEL_DRIFT")` to shared-context before proceeding. Do not silently accept wrong model.
+
+**Why:** 9+ cycle drift went undetected without an audit trail. Silent acceptance degrades research quality and masks infrastructure issues.
+
+**How to apply:** At task start, compare session model to expected model. If mismatch, emit a warning to shared-context and continue. Creates audit trail.
+
+---
+
+### M008: Report File Metadata Validation (NEW — 2026-03-22)
+**Priority:** 3 (MEDIUM)
+
+**WHEN:** Completing any research task, before submitting
+
+**THEN:** Verify report filename contains keywords from the task description. If mismatch detected, rename or flag `HOLLOW_SUCCESS_RISK` in the resolution section.
+
+**Why:** 2026-03-22 cycle: file metadata showed robot-vacuum context in an ASMR analysis report — structural output correct but metadata misaligned.
+
+**How to apply:** Pre-submit step: grep task title keywords against output filename. Flag or fix any mismatch before M001 quality gate.
+
+---
+
+### R15: Proactive /horde-learn for High-Priority Research (CONFIRMED — 2026-03-22)
+**Priority:** 2 (HIGH)
+
+**WHEN:** Task priority=high AND domain contains research keywords AND skill_hint absent
+
+**THEN:** Invoke `/horde-learn` proactively before any WebSearch/WebFetch work
+
+**Why:** Zero `/horde-learn` invocations in 24h despite high-priority research tasks. R008 requires skill scaffolding — R15 extends this to absent skill_hint cases.
+
+**How to apply:** Before first WebSearch call on any high-priority research task, invoke `/horde-learn`. Do not skip even if skill_hint is not set.
+
+---
+
 ## Rule Categories
-- **Quality:** 3 rules (M001, M002, M004)
-- **Execution:** 2 rules (R008, M005)
-- **Process:** 1 rule (M003)
+- **Quality:** 4 rules (M001, M002, M004, M008)
+- **Execution:** 3 rules (R008, M005, R15)
+- **Process:** 2 rules (M003, M007)
 
 ## Version History
 - Created: 2026-03-11
 - 2026-03-12T14:30:00Z: Added M005 (Neo4j graceful degradation) to prevent task failures when Neo4j unavailable
 - 2026-03-12T22:30:00Z: Added M006 (bypass /horde-learn, use direct tools) — CRITICAL priority, addresses horde-review PRIORITY_FIX; also added r021 to rules.json
 - 2026-03-13T09:30:00Z: **DEPRECATED M006** — ogedei fixed R008_PREFLIGHT_ELAPSED to respect SLOW_SKILLS (task normal-horde-learn-timeout-fix-20260312-2230). `/horde-learn` can now be used normally. Also deprecated r021 in rules.json.
-- Last updated: 2026-03-13T09:30:00Z
+- 2026-03-22T22:00:00Z: Added M007 (model drift detection), M008 (file metadata validation), confirmed R15 (proactive /horde-learn). Red flags: MODEL_DRIFT cycle 9+, NO_SKILL_INVOCATIONS. Status: NEEDS_ATTENTION.
+- Last updated: 2026-03-22T22:00:00Z

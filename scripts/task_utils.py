@@ -104,7 +104,9 @@ def verify_task_completion(filepath: str) -> dict:
             'issues': [] if is_valid else [reason],
         }
     except ImportError:
-        # Fallback if task_verification is unavailable
+        # task_verification.py archived 2026-03-22; falling back to inline logic
+        import warnings
+        warnings.warn("task_verification module not found (archived 2026-03-22), using inline fallback", DeprecationWarning, stacklevel=2)
         pass
 
     # Minimal fallback logic (original behavior)

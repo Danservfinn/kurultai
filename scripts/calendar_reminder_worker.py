@@ -30,6 +30,13 @@ from neo4j_calendar import (
     mark_notification_sent,
 )
 
+# Ingestion for storing outbound messages in Neo4j (group context continuity)
+try:
+    from conversation_ingester import ingest_message
+    _HAS_INGESTER = True
+except ImportError:
+    _HAS_INGESTER = False
+
 # Signal configuration
 SIGNAL_ACCOUNT = os.getenv("SIGNAL_ACCOUNT", "+15165643945")
 GROUP_ID = os.getenv("SIGNAL_GROUP_ID", "BROemHVncLgSz8tReUKBz6V3BeDhDB0EXaJd+sRp6oA=")
@@ -430,6 +437,18 @@ def send_morning_digest(state: dict) -> bool:
 
     if success:
         state["last_digest_date"] = today_str
+        # Ingest the broadcast into Neo4j so follow-up questions have context
+        if _HAS_INGESTER:
+            try:
+                ingest_message(
+                    phone=SIGNAL_ACCOUNT,
+                    content=message,
+                    direction="outbound",
+                    channel="signal",
+                    group_id=GROUP_ID,
+                )
+            except Exception:
+                pass  # Don't fail the digest over ingestion errors
         return True
     else:
         # Don't log failure - we'll try again tomorrow or until attempts exhausted

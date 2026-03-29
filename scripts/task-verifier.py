@@ -3,7 +3,7 @@
 Task Verifier — Post-completion verification for Kurultai agent tasks.
 
 Checks that completed tasks actually delivered their promised outcomes.
-Runs AFTER a task is marked .completed.done.md by agent-task-handler.py.
+Runs AFTER a task is marked .completed.done.md by task_executor.py.
 
 Verification rules by task type:
   - deploy: curl URLs (expect 200), check files exist

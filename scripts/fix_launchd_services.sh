@@ -2,7 +2,7 @@
 # fix_launchd_services.sh — Ensure critical Kurultai launchd services are loaded and running
 # Part of O003: Cron/launchd reliability investigation
 #
-# Checks: heartbeat-watchdog, ogedei-watchdog, task-watcher, kurultai-monitor
+# Checks: heartbeat-watchdog, ogedei-watchdog, task-executor, kurultai-monitor
 # Actions: Bootstrap any unloaded services, log results
 #
 # Run: sudo ./fix_launchd_services.sh (for system-wide) or ./fix_launchd_services.sh (user agents)
@@ -19,7 +19,7 @@ USER_ID=$(id -u)
 CRITICAL_SERVICES=(
     "com.kurultai.heartbeat-watchdog"
     "com.kurultai.ogedei-watchdog"
-    "com.kurultai.v2-executor"
+    "com.kurultai.task-executor"
     "com.kurultai.kurultai-monitor"
     "ai.kurultai.hourly-reflection"
 )

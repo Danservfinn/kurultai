@@ -1069,8 +1069,8 @@ def get_context_for_conversation(phone_numbers: list) -> Dict[str, Dict[str, Any
 
         context = {}
         for profile in profiles:
-            human_id = profile.get("human_id")
-            if human_id:
+            phone_e164 = profile.get("phone_e164")
+            if phone_e164:
                 comm_style = profile.get("communication_style", {})
                 if not isinstance(comm_style, dict):
                     comm_style = {}

@@ -1,5 +1,12 @@
 # Kublai Agent Memory - Main Project
 
+## Quick Fixes (2026-03-23)
+
+### Curiosity Engine Scheduling Fix
+**Problem:** 0% answer rate, 19 expired questions — scheduler never ran
+**Solution:** Created `ai.kurultai.curiosity-scheduler.plist` launchd job
+**Details:** [memory/curiosity-scheduler-fix-20260323.md](curiosity-scheduler-fix-20260323.md)
+
 ## Heartbeat System (2026-03-12)
 
 ### Overview

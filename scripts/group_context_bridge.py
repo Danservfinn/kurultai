@@ -93,7 +93,7 @@ def get_bridgeable_topics(human_id: str, group_id: str) -> List[Dict]:
                 MATCH (h:Human {id: $human_id})-[:DISCUSSED]->(t:Topic)
                 WHERE EXISTS {
                     MATCH (m:Message {humanId: $hid})-[:HAS_TOPIC]->(t)
-                    WHERE m.scope = 'dm' OR m.scope IS NULL
+                    WHERE m.scope = 'dm'
                 }
                 AND EXISTS {
                     MATCH (m2:Message {humanId: $hid})-[:HAS_TOPIC]->(t)
