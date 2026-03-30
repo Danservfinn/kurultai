@@ -1,19 +1,33 @@
 {
-  "ts": "2026-03-29T18:06:57.810736",
+  "ts": "2026-03-30T00:05:07.486439",
   "window_hours": 1,
   "agents": {
-    "ogedei": {
-      "completed_1h": 1,
+    "chagatai": {
+      "completed_1h": 3,
       "failed_1h": 1,
-      "total_1h": 2,
-      "fail_rate_1h": 0.5,
+      "total_1h": 4,
+      "fail_rate_1h": 0.25,
+      "flagged": false
+    },
+    "ogedei": {
+      "completed_1h": 0,
+      "failed_1h": 1,
+      "total_1h": 1,
+      "fail_rate_1h": 1.0,
+      "flagged": false
+    },
+    "temujin": {
+      "completed_1h": 1,
+      "failed_1h": 0,
+      "total_1h": 1,
+      "fail_rate_1h": 0.0,
       "flagged": false
     },
     "jochi": {
-      "completed_1h": 2,
+      "completed_1h": 0,
       "failed_1h": 1,
-      "total_1h": 3,
-      "fail_rate_1h": 0.333,
+      "total_1h": 1,
+      "fail_rate_1h": 1.0,
       "flagged": false
     }
   }

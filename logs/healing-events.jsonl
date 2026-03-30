@@ -2030,3 +2030,10 @@
 {"ts": "2026-03-25T15:57:52.757640", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 6}}
 {"ts": "2026-03-29T15:51:34.507577", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
 {"ts": "2026-03-29T16:28:41.755434", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1774815480-d8172f3a.completed.done.md"}}
+{"ts": "2026-03-29T22:29:17.134569", "issue_type": "gateway_restart", "action": "escalated", "outcome": "failed", "agent": "", "details": {}}
+{"ts": "2026-03-29T22:38:48.654010", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1774838051-412cda2f.completed.done.md"}}
+{"ts": "2026-03-29T23:10:10.237975", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
+{"ts": "2026-03-29T23:14:50.402262", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1774839978-86a148b5.completed.done.md"}}
+{"ts": "2026-03-29T23:21:47.037155", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
+{"ts": "2026-03-29T23:35:08.462855", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1774841312-2c482622.completed.done.md"}}
+{"ts": "2026-03-29T23:39:01.547729", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}

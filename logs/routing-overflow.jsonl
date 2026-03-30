@@ -263,3 +263,7 @@
 {"ts": "2026-03-29T15:52:28.466734", "from": "temujin", "to": "chagatai", "title": "Suno-style music analysis for YouTube link", "reason": "idle-wake: temujin busy/loaded (queue=39), chagatai idle with valid creds (queue=15)"}
 {"ts": "2026-03-29T15:57:27.710611", "from": "temujin", "to": "chagatai", "title": "Suno-style music analysis via suno-clone skill", "reason": "idle-wake: temujin busy/loaded (queue=39), chagatai idle with valid creds (queue=16)"}
 {"ts": "2026-03-29T16:18:00.932771", "from": "temujin", "to": "chagatai", "title": "Suno-clone analysis for YouTube song", "reason": "idle-wake: temujin busy/loaded (queue=39), chagatai idle with valid creds (queue=17)"}
+{"ts": "2026-03-29T22:34:11.825583", "from": "temujin", "to": "chagatai", "title": "Suno analysis for YouTube song", "reason": "idle-wake: temujin busy/loaded (queue=43), chagatai idle with valid creds (queue=17)"}
+{"ts": "2026-03-29T22:44:33.046988", "from": "temujin", "to": "chagatai", "title": "Suno analysis for YouTube song", "reason": "idle-wake: temujin busy/loaded (queue=44), chagatai idle with valid creds (queue=17)"}
+{"ts": "2026-03-29T23:06:18.013259", "from": "temujin", "to": "chagatai", "title": "Suno analysis for YouTube song (re-run)", "reason": "idle-wake: temujin busy/loaded (queue=44), chagatai idle with valid creds (queue=18)"}
+{"ts": "2026-03-29T23:28:32.423075", "from": "temujin", "to": "chagatai", "title": "Suno analysis for YouTube song (re-run 2)", "reason": "idle-wake: temujin busy/loaded (queue=45), chagatai idle with valid creds (queue=18)"}
