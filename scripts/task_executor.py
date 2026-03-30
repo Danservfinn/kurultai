@@ -777,6 +777,16 @@ class Executor:
             )
             logger.info(f"Session reset for {agent}: {session_state.reason}")
 
+        # 1b. Model guard: kimi-k2.5 ignores skill routing directives.
+        # If the agent has a skill_hint and session drift was detected to kimi,
+        # the session was already archived by prepare(). But also force a reset
+        # if the agent's *configured* model is kimi (backup mode).
+        if skill_hint and not session_state.clean and "kimi" in session_state.reason.lower():
+            logger.warning(
+                f"Model guard: {agent} drifted to kimi with skill_hint={skill_hint} "
+                f"— session archived, will use primary model"
+            )
+
         # 2. Sanitize task body
         raw_body = task.get("prompt", task.get("body", task.get("title", "")))
 
@@ -985,9 +995,9 @@ class Executor:
             try:
                 ok, msg = self._store.complete_task(
                     task_id, claim_epoch,
-                    text=run_result.content[:2000],
+                    text=run_result.content[:8000],
                     problem=task.get("title", ""),
-                    solution=run_result.content[:500],
+                    solution=run_result.content[:2000],
                     rationale="",
                     output_lines=run_result.content.count("\n"),
                     duration_s=run_result.duration_s,
@@ -1039,7 +1049,7 @@ class Executor:
                     "created_at: datetime()})",
                     {
                         "tid": task_id,
-                        "text": run_result.content[:2000],
+                        "text": run_result.content[:8000],
                         "lines": run_result.content.count("\n"),
                         "dur": run_result.duration_s,
                     },
@@ -1412,6 +1422,36 @@ class Executor:
         if priority == "critical":
             budget = "minimal"
 
+        # Skill-specific optimizer directives
+        skill_directives = ""
+        if skill_hint in ("/suno-clone", "suno-clone"):
+            skill_directives = """
+## SKILL-SPECIFIC DIRECTIVE: suno-clone
+The /suno-clone skill is SELF-CONTAINED. It runs a 5-stage pipeline
+(download -> identify -> analyze -> separate -> generate) and produces its own output files.
+
+CRITICAL for the optimized prompt:
+1. Do NOT generate a custom "Output Format" section - the skill defines its own
+2. Include this step: "After pipeline completes, read claude-translation-prompt.md and use it to refine the draft Suno prompt"
+3. The skill outputs Title + Style + Structural Meta Tags - NOT a flat Genre/Mood/BPM list
+4. Keep the skill invocation instruction compact (one line, not a full page)
+"""
+
+        # Include prior failure context for continuation tasks
+        failure_context = ""
+        parent_id = task.get("parent_id")
+        if parent_id:
+            try:
+                fail_reason = self._get_fail_reason(parent_id)
+                if fail_reason:
+                    failure_context = (
+                        f"\n## Prior Failure Context\n"
+                        f"Previous run ({parent_id}) failed: {fail_reason}\n"
+                        f"Avoid repeating this failure mode.\n"
+                    )
+            except Exception:
+                pass
+
         return f"""You are a prompt optimizer for the Kurultai task execution system.
 Generate an optimized execution prompt using the /horde-prompt skill.
 
@@ -1423,7 +1463,7 @@ Generate an optimized execution prompt using the /horde-prompt skill.
 ## AGENT: {agent} (horde-prompt type: {resolved_type})
 ## SKILL HINT: {skill_hint or "none"}
 ## PRIORITY: {priority}
-
+{skill_directives}
 ## KNOWLEDGE BASE CONTEXT
 The following documentation is from the Kurultai knowledge base.
 Use ONLY the facts that are relevant to the TASK above.
@@ -1433,7 +1473,7 @@ Do NOT include irrelevant KB sections in the final prompt.
 
 ## AGENT MEMORY (recent context for this agent)
 {memory if memory else "(no recent memory)"}
-
+{failure_context}
 ## INSTRUCTIONS
 1. Invoke /horde-prompt with:
    - task: the TASK text above
@@ -1443,7 +1483,7 @@ Do NOT include irrelevant KB sections in the final prompt.
    a. Extract RELEVANT facts from KNOWLEDGE BASE CONTEXT and add them
       as a "## System Knowledge" section. Include specific details
       (schema fields, endpoint paths, config values) the agent will need.
-   b. If SKILL HINT is present, prepend the R008 mandatory invocation block.
+   b. If SKILL HINT is present, prepend a compact skill invocation instruction.
    c. Append AGENT MEMORY as "## Recent Context".
    d. Add the agent-specific execution instruction footer.
 3. Output the COMPLETE final prompt between these EXACT delimiters:

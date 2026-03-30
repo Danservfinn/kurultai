@@ -20,5 +20,6 @@
   "critical_fleet_anomaly:HIGH_FAILURE_RATE": 1773331233.64208,
   "queue_overflow_acceptance": 1774350596.89456,
   "feedback_review:None": 1773548560.680337,
-  "feedback_review:chagatai-brainstorm-1773591871": 1773591904.507125
+  "feedback_review:chagatai-brainstorm-1773591871": 1773591904.507125,
+  "agent_stalled:temujin": 1774845164.5060601
 }

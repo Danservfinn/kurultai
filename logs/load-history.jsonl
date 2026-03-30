@@ -187,3 +187,6 @@
 {"timestamp": 1774839672.171606, "datetime": "2026-03-29T23:01:12.171606", "load_factor": 1.0, "depths": {"kublai": 12, "tolui": 11, "mongke": 18, "chagatai": 18, "jochi": 99, "ogedei": 164, "temujin": 44}}
 {"timestamp": 1774841472.6059678, "datetime": "2026-03-29T23:31:12.605968", "load_factor": 1.0, "depths": {"tolui": 11, "chagatai": 19, "jochi": 102, "temujin": 45, "mongke": 18, "ogedei": 164, "kublai": 12}}
 {"timestamp": 1774843425.5626419, "datetime": "2026-03-30T00:03:45.562642", "load_factor": 1.0, "depths": {"kublai": 12, "mongke": 18, "chagatai": 18, "jochi": 102, "tolui": 11, "ogedei": 164, "temujin": 47}}
+{"timestamp": 1774845150.004643, "datetime": "2026-03-30T00:32:30.004643", "load_factor": 1.0, "depths": {"kublai": 12, "ogedei": 164, "jochi": 102, "mongke": 18, "chagatai": 18, "temujin": 49, "tolui": 11}}
+{"timestamp": 1774846937.065932, "datetime": "2026-03-30T01:02:17.065932", "load_factor": 1.0, "depths": {"jochi": 103, "ogedei": 164, "mongke": 18, "temujin": 51, "kublai": 12, "chagatai": 18, "tolui": 11}}
+{"timestamp": 1774848671.113062, "datetime": "2026-03-30T01:31:11.113062", "load_factor": 1.0, "depths": {"ogedei": 164, "kublai": 12, "tolui": 11, "temujin": 51, "mongke": 18, "chagatai": 18, "jochi": 103}}

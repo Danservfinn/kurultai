@@ -1,7 +1,7 @@
 {
-  "last_audit": 1774843240.03938,
-  "cycles": 59708,
-  "last_cycle": "2026-03-30T00:05:09.149352",
+  "last_audit": 1774850533.619833,
+  "cycles": 59920,
+  "last_cycle": "2026-03-30T02:03:22.630875",
   "watcher_restarts": 1543,
   "stalled_warnings": 515,
   "fakes_detected": 17,
@@ -13,62 +13,53 @@
     "skipped": 0,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1774843509.1493828,
+  "last_cycle_epoch": 1774850602.6308942,
   "last_issues": [
-    "task_executor log stale (557988s)",
-    "reflection stale 8819m (miss #14855)",
+    "task_executor log stale (565083s)",
+    "reflection stale 8937m (miss #15067)",
     "slow reflection step: message-extraction (120s)",
-    "slow reflection step: thread-summaries (116s)",
-    "queue_imbalance: ['ogedei', 'jochi', 'temujin', 'chagatai', 'mongke', 'tolui', 'kublai'] overloaded but no underloaded agents"
+    "slow reflection step: thread-summaries (116s)"
   ],
-  "reflection_misses": 14855,
-  "last_memory_audit": 1774843240.072576,
+  "reflection_misses": 15067,
+  "last_memory_audit": 1774850533.740072,
   "memory_audit_result": {
     "total": 11,
     "critical": 0,
     "warning": 4,
-    "ts": "2026-03-30T00:00:40.453828"
+    "ts": "2026-03-30T02:02:15.326072"
   },
-  "last_routing_drift_check": 1774843405.048587,
+  "last_routing_drift_check": 1774848845.757882,
   "routing_drift": {
     "total": 0,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "ts": "2026-03-30T00:03:25.579156"
+    "ts": "2026-03-30T01:34:05.814827"
   },
   "memory_fixes": 1011,
-  "last_failure_rate_check": 1774843507.439039,
+  "last_failure_rate_check": 1774850428.8137019,
   "agent_failure_flags": {},
-  "cycle_start_time": 1774843507.325848,
-  "last_queue_balance_check": 1774843507.488332,
+  "cycle_start_time": 1774850602.557413,
+  "last_queue_balance_check": 1774850428.830356,
   "queue_depths": {
     "kublai": 9,
-    "temujin": 45,
+    "temujin": 49,
     "mongke": 17,
     "chagatai": 18,
-    "jochi": 102,
+    "jochi": 103,
     "ogedei": 156,
     "tolui": 11
   },
-  "last_cascade_check": 1774843073.9273899,
-  "cascade_risk": "medium",
+  "last_cascade_check": 1774850498.4137568,
+  "cascade_risk": "low",
   "cascade_metrics": {
-    "events_analyzed": 3,
-    "patterns_detected": 1,
-    "agents_failing": 3,
-    "failures_by_agent": {
-      "ogedei": 1,
-      "jochi": 1,
-      "chagatai": 1
-    },
-    "lookback_minutes": 30
+    "events_analyzed": 0
   },
-  "last_quality_gate_check": 1774843339.9678268,
+  "last_quality_gate_check": 1774850569.0193338,
   "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1774842598.6695092,
+  "last_self_healing_score_check": 1774849843.919646,
   "self_healing_score": 88.9,
   "self_healing_metrics": {
     "auto_resolved": 8,
@@ -83,7 +74,7 @@
     "chagatai"
   ],
   "circuit_report": {
-    "ts": "2026-03-30T00:05:07.493500",
+    "ts": "2026-03-30T02:03:22.627594",
     "agents": {
       "jochi": {
         "state": "CLOSED",
@@ -134,8 +125,8 @@
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.1679060459136963,
-  "state_file_size": 4180,
+  "last_cycle_duration": 0.07083296775817871,
+  "state_file_size": 4004,
   "tasks_recovered": 194,
   "slow_cycles": 42,
   "queue_balance_moves": 601,
@@ -144,8 +135,8 @@
     "ogedei",
     "mongke"
   ],
-  "last_cred_failure_check": 1774843339.931635,
-  "last_git_operation_check": 1774843507.49378,
+  "last_cred_failure_check": 1774850569.002175,
+  "last_git_operation_check": 1774850428.842837,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
@@ -159,12 +150,12 @@
   "stall_escalations": {},
   "stall_skips_completed": 2,
   "stall_cleaned_artifacts": 2,
-  "last_model_drift_check": 1774843339.9656692,
+  "last_model_drift_check": 1774850602.6263402,
   "model_drift_drifted": [],
   "model_drift_checked": 5,
   "model_drift_ts": "2026-03-29T15:57:26.690784",
   "model_drift_last_escalate": 1774810622.750905,
-  "model_drift_last_clean": "2026-03-30T00:02:19.967758",
+  "model_drift_last_clean": "2026-03-30T02:03:22.627455",
   "last_gateway_spike_escalation": 1774811436.818936,
   "last_reflection_escalation": 1774832865.876141
 }

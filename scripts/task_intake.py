@@ -553,6 +553,17 @@ def create_task(title, body, priority="normal", source="task_intake",
             print(f"  Paused tasks are not routed. Use --unpause flag to resume.")
             return None
 
+    # 0.5 HARD OVERRIDE: Suno/YouTube/music analysis -> temujin + /suno-clone
+    # This runs before any LLM routing to fix kimi-k2.5 misrouting.
+    _suno_patterns = ["suno", "youtube.com", "youtu.be"]
+    _music_keywords = ["music", "song", "bpm", "analyze", "style clone", "audio analysis"]
+    _has_suno = any(p in full_text for p in _suno_patterns)
+    _has_music = any(k in full_text for k in _music_keywords)
+    if _has_suno or (_has_music and any(u in full_text for u in ["youtube.com", "youtu.be"])):
+        print(f"SUNO_OVERRIDE: Forcing temujin + /suno-clone for: '{title[:60]}'")
+        agent = "temujin"
+        skill_hint = skill_hint or "/suno-clone"
+
     # 1. Validate depth
     if depth >= MAX_TASK_DEPTH:
         print(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} for '{title[:60]}'")

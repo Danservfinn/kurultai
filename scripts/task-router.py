@@ -671,6 +671,8 @@ _SKILL_OWNER = {
     # Code review and test generation belong to jochi (2026-03-09 fix)
     "/code-reviewer": "jochi",
     "/generate-tests": "jochi",
+    # Suno-clone requires local audio analysis venv — only temujin can run it
+    "/suno-clone": "temujin",
 }
 
 # --- SKILL HINT DETECTION ---
@@ -693,6 +695,10 @@ SKILL_HINTS = {
     ("temujin", "crash"):      "/systematic-debugging",
     ("temujin", "deploy"):     "/dev-deploy",
     ("temujin", "railway"):    "/dev-deploy",
+    ("temujin", "suno"):       "/suno-clone",
+    ("temujin", "youtube"):    "/suno-clone",
+    ("temujin", "music"):      "/suno-clone",
+    ("temujin", "bpm"):        "/suno-clone",
     ("mongke", "research"):    "/horde-learn",
     ("mongke", "investigate"): "/horde-learn",
     ("mongke", "discover"):    "/horde-learn",

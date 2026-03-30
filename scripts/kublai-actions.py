@@ -57,7 +57,7 @@ COOLDOWNS = {
     "high_memory": 1800,       # 30 min
     "cron_fix": 3600,          # 1 hour
     "queue_backlog": 1800,     # 30 min
-    "agent_stalled": 3600,     # 1 hour
+    "agent_stalled": 14400,    # 4 hours (was 1h — increased to prevent triage spiral)
     "task_stall": 3600,        # 1 hour (time-to-first-action)
     "feedback_review": 7200,   # 2 hours
     "queue_audit": 1800,       # 30 min
@@ -920,6 +920,25 @@ actually executed by Claude Code. {audit_requeued} were automatically re-queued.
                             pass
             if has_recent_triage:
                 log(f"TICK: stall alert suppressed for {name} — {target} already has a recent triage task (dedup)")
+                continue
+
+            # FIX 2026-03-29: Circuit breaker — don't create triage tasks for overloaded targets.
+            # When the target agent already has a large backlog, adding another triage task
+            # makes the spiral worse (triage tasks crowd out real work).
+            target_pending = 0
+            target_task_dir_cb = f"{AGENT_DIR}/{target}/tasks"
+            if os.path.exists(target_task_dir_cb):
+                for fname_cb in os.listdir(target_task_dir_cb):
+                    if fname_cb.startswith('.'):
+                        continue
+                    if ".done" in fname_cb or fname_cb.endswith((".resolved.md", ".cancelled.md", ".obsolete.md")):
+                        continue
+                    if '.executing' in fname_cb:
+                        continue
+                    if fname_cb.endswith('.md'):
+                        target_pending += 1
+            if target_pending > 10:
+                log(f"TICK: stall alert suppressed for {name} — target {target} already has {target_pending} pending tasks (circuit breaker)")
                 continue
 
             if not is_cooled_down(f"agent_stalled:{name}") and not has_pending_task(target, f"Triage stalled agent: {name}") and actions_created < MAX_ACTIONS_PER_CYCLE:
