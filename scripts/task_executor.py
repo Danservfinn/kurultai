@@ -95,7 +95,15 @@ _SCRIPT_RE = re.compile(r'^python3?\s+(\S+\.py)\b')
 STALL_SILENCE = 900      # seconds of stdout silence before stall check
 STALL_MIN_ELAPSED = 900  # only start stall checks after this many seconds
 POLL_INTERVAL = 30       # seconds between poll cycles
-CONCURRENCY = 6          # concurrent task slots (each runs Phase 1 + Phase 2 sequentially)
+CONCURRENCY = 1          # concurrent task slots — reduced from 6 to prevent OOM on 16GB machine
+CU_LOCK_TIMEOUT = 300    # seconds to wait for Computer Use exclusivity lock
+
+# Stall escalation: after this many stall-detected failures, escalate to STALL_ESCALATED
+# instead of re-queuing.  Set via STALL_ESCALATION_THRESHOLD env var for easy tuning.
+STALL_ESCALATION_THRESHOLD = int(os.environ.get("STALL_ESCALATION_THRESHOLD", "3"))
+
+# Log file for stall escalations (proposal 3)
+STALL_ESCALATION_LOG = Path.home() / ".openclaw" / "logs" / "stall-escalations.jsonl"
 
 # Two-phase prompt generation constants
 PROMPT_GEN_TIMEOUT = 120        # Phase 1 timeout (seconds) — uses agent's configured model
@@ -259,13 +267,15 @@ class WorktreeManager:
             await self._remove_worktree(project_root, worktree_path)
 
         try:
-            # Delete branch if it already exists (from a previous failed run)
-            await asyncio.create_subprocess_exec(
+            # Delete branch if it already exists (from a previous failed run).
+            # Must await proc.wait() — fire-and-forget causes a race with worktree add.
+            del_proc = await asyncio.create_subprocess_exec(
                 "git", "-C", project_root,
                 "branch", "-D", branch_name,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
+            await asyncio.wait_for(del_proc.wait(), timeout=10)
 
             # Create branch from main and worktree
             proc = await asyncio.create_subprocess_exec(
@@ -302,6 +312,26 @@ class WorktreeManager:
                 stderr=asyncio.subprocess.DEVNULL,
             )
             await asyncio.wait_for(proc.wait(), timeout=15)
+        except Exception:
+            pass
+
+    async def cleanup_worktree(
+        self, project_root: str, worktree_path, branch_name: str
+    ):
+        """Remove the worktree directory and delete its branch.
+
+        Called after task deploy pipeline completes (or fails) to prevent
+        stale branch accumulation across tasks.
+        """
+        await self._remove_worktree(project_root, worktree_path)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "git", "-C", project_root,
+                "branch", "-D", branch_name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=10)
         except Exception:
             pass
 
@@ -384,7 +414,7 @@ class TaskRunner:
 
                     # Stall check: only after minimum elapsed time
                     if elapsed > STALL_MIN_ELAPSED and silence > STALL_SILENCE:
-                        if not await self._pid_active(proc.pid):
+                        if not await self._pid_active(proc.pid, agent):
                             stall_detected = True
                             proc.terminate()
                             try:
@@ -421,19 +451,27 @@ class TaskRunner:
             stall_detected=stall_detected,
         )
 
-    async def _pid_active(self, pid: int) -> bool:
-        """Check if a PID has recently written to any open .jsonl file.
+    async def _pid_active(self, pid: int, agent: str = "") -> bool:
+        """Check if a process group has recently written to any .jsonl file.
 
-        Uses macOS lsof to enumerate open file descriptors. Returns True if
-        any non-archived .jsonl was modified within the last 60 seconds,
-        indicating the process is still making progress.
+        Two-stage check:
+        1. lsof -g for currently OPEN .jsonl files (fast, process-group-specific).
+        2. Filesystem mtime scan of the agent's claude project directory for
+           recently MODIFIED .jsonl files. Handles claude-code's write pattern
+           of open → write → close between turns; during long Agent subagent
+           dispatches the file is closed but was recently modified.
+
+        Uses lsof -g to check the entire process group (pgid == pid when launched
+        with start_new_session=True). This catches activity from child processes
+        like the claude binary that is a grandchild of the bash wrapper script.
 
         Returns:
             True if active, False if stalled (or on any lsof error).
         """
+        # Stage 1: lsof check for currently open .jsonl files
         try:
             proc = await asyncio.create_subprocess_exec(
-                "lsof", "-p", str(pid), "-F", "n",
+                "lsof", "-g", str(pid), "-F", "n",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -448,16 +486,128 @@ class TaskRunner:
                             return True
                     except OSError:
                         pass
-            return False
         except Exception:
-            return False  # Assume stalled on any error
+            pass
+
+        # Stage 2: filesystem mtime scan for agent's claude project directory.
+        # claude-code closes its conversation .jsonl between turns, so lsof misses
+        # it when the process is idle-waiting for a subagent result. If the file
+        # was modified within the STALL_SILENCE window, the process was active
+        # recently and should not be killed. (Safe: stall check only fires while
+        # proc is still running — EOF would have exited the loop before this point.)
+        if agent:
+            workdir = str(AGENTS_DIR / agent)
+            # Claude Code encodes project paths by replacing ALL non-alphanumeric
+            # characters (including '.') with '-'.  A plain replace("/", "-") leaves
+            # dots intact, so e.g. "/.openclaw/" encodes to "-.openclaw-" instead of
+            # "--openclaw-", causing _pid_active to scan the wrong directory and
+            # always return False → every task running >15 min gets false-stall-killed.
+            encoded = re.sub(r"[^a-zA-Z0-9]", "-", workdir)
+            project_dir = Path.home() / ".claude" / "projects" / encoded
+            try:
+                for jsonl_path in project_dir.glob("*.jsonl"):
+                    try:
+                        if time.time() - jsonl_path.stat().st_mtime < STALL_SILENCE:
+                            return True
+                    except OSError:
+                        pass
+            except Exception:
+                pass
+
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Triage gate helpers (module-level, used by Executor._execute_inner)
+# ---------------------------------------------------------------------------
+
+def _find_triage_task_file(agent: str, task_id: str) -> Optional[Path]:
+    """Locate the task .md file for a given agent and task_id.
+
+    Tries the executor-standard name ({task_id}.md) first, then falls back
+    to scanning dispatch-format files that embed the task_id in their body.
+    Returns None if not found.
+    """
+    tasks_dir = AGENTS_DIR / agent / "tasks"
+    if not tasks_dir.exists():
+        return None
+    # Standard executor naming
+    candidate = tasks_dir / f"{task_id}.md"
+    if candidate.exists():
+        return candidate
+    # Fallback: scan dispatch-format files for embedded task_id
+    for f in sorted(tasks_dir.glob("*.md")):
+        try:
+            if task_id in f.read_text(encoding="utf-8", errors="replace"):
+                return f
+        except OSError:
+            pass
+    return None
+
+
+def _is_triage_task(task: dict, task_file: Optional[Path] = None) -> bool:
+    """Return True if the task qualifies as a triage task.
+
+    Priority order (first match wins):
+    1. Filename contains 'triage'
+    2. Prompt body has frontmatter: type: triage | escalation
+    3. Title contains 'triage', 'escalation', or 'investigate'
+    """
+    if task_file and "triage" in task_file.name.lower():
+        return True
+    prompt = task.get("prompt", task.get("body", ""))
+    if re.search(r"^type:\s*(triage|escalation)\s*$", prompt, re.MULTILINE | re.IGNORECASE):
+        return True
+    title = task.get("title", "").lower()
+    if any(kw in title for kw in ("triage", "escalation", "investigate")):
+        return True
+    return False
+
+
+def _update_frontmatter_key(file_path: Path, key: str, value: str) -> bool:
+    """Insert or overwrite a YAML frontmatter key in a task .md file.
+
+    Returns True on success, False if the file lacks valid frontmatter or
+    cannot be written.
+    """
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+        if not content.startswith("---"):
+            return False
+        end = content.find("\n---", 3)
+        if end == -1:
+            return False
+        frontmatter = content[3:end]
+        rest = content[end + 4:]
+        new_line = f"{key}: {value}"
+        key_pat = re.compile(rf"^{re.escape(key)}:.*$", re.MULTILINE)
+        if key_pat.search(frontmatter):
+            frontmatter = key_pat.sub(new_line, frontmatter)
+        else:
+            frontmatter = frontmatter.rstrip("\n") + f"\n{new_line}"
+        file_path.write_text(f"---{frontmatter}\n---{rest}", encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def _read_frontmatter_int(file_path: Path, key: str) -> Optional[int]:
+    """Read an integer YAML frontmatter field. Returns None if absent or on error."""
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+        m = re.search(rf"^{re.escape(key)}:\s*(\d+)", content, re.MULTILINE)
+        return int(m.group(1)) if m else None
+    except OSError:
+        return None
 
 
 # ---------------------------------------------------------------------------
 # Component 4: verify_result() and build_agent_env()
 # ---------------------------------------------------------------------------
 
-def verify_result(run_result: RunResult) -> tuple[bool, str]:
+def verify_result(
+    run_result: RunResult, skip_resolution: bool = False
+) -> tuple[bool, str]:
     """THE completion gate. The only path to COMPLETED status.
 
     Checks, in order:
@@ -465,15 +615,20 @@ def verify_result(run_result: RunResult) -> tuple[bool, str]:
       2. Non-empty output
       3. No stall flag from TaskRunner
       4. Absence of error patterns masquerading as success (short output only)
+      5. Presence of '## Resolution' heading with non-empty body content
+         (skipped when skip_resolution=True, e.g. for pipeline/script tasks)
 
     Args:
         run_result: The RunResult returned by TaskRunner.run().
+        skip_resolution: If True, skip the ## Resolution content check.
+            Use this for direct pipeline scripts whose stdout is structured
+            data rather than a human-readable completion report.
 
     Returns:
         (passed, reason) — passed=True means safe to mark COMPLETED.
         reason is "verified" on success, or a short error category string
         on failure (e.g. "exit:1", "empty_output", "stall_detected",
-        "error_in_output:rate_limited").
+        "error_in_output:rate_limited", "missing_resolution").
     """
     if not run_result.success:
         return False, f"exit:{run_result.return_code}"
@@ -500,6 +655,21 @@ def verify_result(run_result: RunResult) -> tuple[bool, str]:
         for pattern, category in error_patterns:
             if pattern in content_lower:
                 return False, f"error_in_output:{category}"
+
+    # Resolution content gate — every agent completion must include a
+    # '## Resolution' section with at least one non-empty line of content.
+    # Pipeline/script tasks are exempt (their stdout is structured data).
+    if not skip_resolution:
+        resolution_match = re.search(r"^##\s+Resolution\s*$", content, re.MULTILINE | re.IGNORECASE)
+        if resolution_match:
+            # Verify there is at least one non-empty line after the heading
+            after_heading = content[resolution_match.end():].lstrip("\n")
+            next_heading = re.search(r"^##\s+", after_heading, re.MULTILINE)
+            body = after_heading[: next_heading.start()] if next_heading else after_heading
+            if not body.strip():
+                return False, "missing_resolution_content"
+        else:
+            return False, "missing_resolution"
 
     return True, "verified"
 
@@ -591,7 +761,10 @@ class Executor:
         self._sanitizer = sanitizer
         self._agents = agents or list(DISPATCH_AGENTS)
         self._semaphore = asyncio.Semaphore(concurrency)
+        self._concurrency = concurrency
+        self._computer_use_lock = asyncio.Lock()
         self._active_tasks: set[str] = set()
+        self._active_task_epochs: dict[str, int] = {}  # task_id → claim_epoch for lease renewal
         self._executor_id = f"exec-{uuid.uuid4().hex[:8]}"
         self._driver = None  # Lazy — resolved via _get_driver()
         self._shutdown = False
@@ -603,6 +776,24 @@ class Executor:
         if self._driver is None:
             self._driver = self._store.driver
         return self._driver
+
+    def _requires_computer_use(self, task: dict) -> bool:
+        """Check if task needs exclusive Computer Use access."""
+        if task.get("requires_computer_use", False):
+            return True
+        prompt = (task.get("prompt", "") or "").lower()
+        cu_keywords = [
+            "screenshot", "click on", "open the app", "computer use",
+            "native app", "gui", "interact with the screen",
+            "open finder", "open safari", "open terminal",
+        ]
+        web_keywords = [
+            "playwright", "browser_navigate", "headless browser",
+            "web page", "browser_snapshot",
+        ]
+        if any(kw in prompt for kw in web_keywords):
+            return False
+        return any(kw in prompt for kw in cu_keywords)
 
     async def run(self):
         """Main loop: startup recovery → WAL replay → poll → dispatch → repeat."""
@@ -646,10 +837,32 @@ class Executor:
         self._recover_orphaned_working_tasks()
 
         self._poll_count = 0
+        self._last_dispatch_at: Optional[str] = None
+        _last_blocked_sweep = 0.0
+        _last_fs_sync = 0.0
+        BLOCKED_SWEEP_INTERVAL = 120   # seconds — safety net for push-based unblock misses
+        FS_SYNC_INTERVAL = 1800        # seconds — reconcile filesystem with Neo4j state
         while not self._shutdown:
             try:
                 await self._poll_and_dispatch()
                 self._write_heartbeat()
+                # Periodically sweep BLOCKED tasks whose all deps are COMPLETED
+                now = asyncio.get_event_loop().time()
+                if now - _last_blocked_sweep >= BLOCKED_SWEEP_INTERVAL:
+                    try:
+                        unblocked = self._store.sweep_blocked_tasks()
+                        if unblocked:
+                            logger.info(f"Blocked sweep recovered {len(unblocked)} stalled tasks: {unblocked}")
+                    except Exception as sweep_err:
+                        logger.warning(f"Blocked sweep error: {sweep_err}")
+                    _last_blocked_sweep = now
+                # Periodically sync filesystem state with Neo4j to clear stale .md files
+                if now - _last_fs_sync >= FS_SYNC_INTERVAL:
+                    try:
+                        self._sync_filesystem_state()
+                    except Exception as sync_err:
+                        logger.warning(f"Filesystem sync error: {sync_err}")
+                    _last_fs_sync = now
             except Exception as e:
                 logger.error(f"Poll cycle error: {e}")
             await asyncio.sleep(POLL_INTERVAL)
@@ -663,6 +876,7 @@ class Executor:
                 "executor_id": self._executor_id,
                 "poll_count": self._poll_count,
                 "active_tasks": len(self._active_tasks),
+                "last_dispatch_at": self._last_dispatch_at,
                 "status": "active" if self._active_tasks else "idle",
             }
             self._poll_count += 1
@@ -674,8 +888,9 @@ class Executor:
     def _recover_orphaned_working_tasks(self):
         """Reset WORKING tasks orphaned by previous executor crashes.
 
-        Unlike lease-based recovery (waits 30min), this checks immediately:
-        any WORKING task NOT claimed by our executor_id is orphaned.
+        Only resets tasks whose lease has expired — respects the 30-minute
+        lease window so in-flight tasks from a recently-crashed executor are
+        not re-dispatched while the original subprocess is still running.
         """
         try:
             driver = self._get_driver()
@@ -684,12 +899,18 @@ class Executor:
                     MATCH (t:Task)
                     WHERE t.status = 'WORKING'
                     AND (t.claimed_by IS NOT NULL)
+                    AND (t.lease_expires_at IS NULL OR t.lease_expires_at < datetime())
                     RETURN t.task_id, t.assigned_to, t.claimed_by
                 """)
                 orphans = []
                 for record in result:
                     task_id = record["t.task_id"]
                     orphans.append(task_id)
+                    logger.warning(
+                        f"ORPHAN_RESET: task {task_id} was WORKING (claimed_by="
+                        f"{record['t.claimed_by']}) — resetting to PENDING. "
+                        f"If this repeats, executor is crashing during Phase 1."
+                    )
                     session.run("""
                         MATCH (t:Task {task_id: $tid, status: 'WORKING'})
                         SET t.status = 'PENDING',
@@ -712,20 +933,20 @@ class Executor:
         for agent in self._agents:
             # Circuit breaker gate
             cb_status = self._cb.check_agent(agent)
-            if not cb_status.get("available", True) is False:
-                pass  # Agent is available
-            else:
+            if not cb_status.get("available", True):
                 continue
 
-            # Respect concurrency cap
-            if self._semaphore._value <= 0:
+            # Respect concurrency cap — use active_tasks count, not semaphore
+            # (semaphore._value is only updated when the async task actually runs,
+            # not when create_task() is called, causing over-claiming in one poll cycle)
+            if len(self._active_tasks) >= self._concurrency:
                 break
 
             # Attempt to claim a pending task
             try:
                 task = self._store.claim_task(agent)
             except Exception as e:
-                logger.warning(f"claim_task failed for {agent}: {e}")
+                logger.warning(f"claim_task failed for {agent}: {e}", exc_info=True)
                 continue
 
             if not task:
@@ -736,6 +957,8 @@ class Executor:
                 continue  # Already running
 
             self._active_tasks.add(task_id)
+            self._active_task_epochs[task_id] = task.get("claim_epoch", 0)
+            self._last_dispatch_at = datetime.now().isoformat()
             asyncio.create_task(self._execute_and_cleanup(task))
 
     async def _execute_and_cleanup(self, task: dict):
@@ -748,6 +971,7 @@ class Executor:
             logger.error(f"Unhandled error in task {task_id}: {e}")
         finally:
             self._active_tasks.discard(task_id)
+            self._active_task_epochs.pop(task_id, None)
 
     async def _execute_inner(self, task: dict):
         """Full execution pipeline: session → sanitize → run → verify → persist."""
@@ -756,6 +980,30 @@ class Executor:
         claim_epoch = task.get("claim_epoch", 0)
         priority = task.get("priority", "normal")
         skill_hint = task.get("skill_hint", "")
+
+        # 0. Triage gate — capture baseline byte count at claim time
+        triage_file: Optional[Path] = None
+        is_triage = False
+        triage_baseline: Optional[int] = None
+        try:
+            triage_file = _find_triage_task_file(agent, task_id)
+            is_triage = _is_triage_task(task, triage_file)
+            if is_triage and triage_file:
+                triage_baseline = os.path.getsize(triage_file)
+                if _update_frontmatter_key(
+                    triage_file, "triage_baseline_bytes", str(triage_baseline)
+                ):
+                    logger.info(
+                        f"[triage-gate] baseline={triage_baseline}B for {task_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"[triage-gate] failed to write baseline for {task_id}"
+                    )
+        except Exception as _tg_err:
+            logger.warning(
+                f"[triage-gate] baseline capture error for {task_id}: {_tg_err}"
+            )
 
         emit_event(
             self._get_driver(), "TASK_CLAIMED", task_id, agent,
@@ -801,7 +1049,14 @@ class Executor:
             logger.warning(
                 f"Threats in {task_id}: {sanitized.threats_detected}"
             )
-        # 2b. Two-phase prompt: try optimized, fallback to simple
+        # 2b. Write .executing.md sentinel NOW — before Phase 1 (prompt optimization
+        # takes up to 120s). If the executor crashes during Phase 1 the file-based
+        # re-dispatch guard sees .executing.md and skips the task, preventing
+        # double-execution when the next executor starts and resets Neo4j status.
+        # Pipeline tasks skip Phase 1 but still need the sentinel.
+        self._rename_task_file(agent, task_id, ".executing.md")
+
+        # 2c. Two-phase prompt: try optimized, fallback to simple
         # Skip optimization for pipeline tasks (deterministic scripts)
         if task.get("source", "").startswith("pipeline"):
             optimized = None
@@ -859,7 +1114,9 @@ class Executor:
                 )
 
         # 3. Build execution environment and run
-        if self._is_direct_script(task, prompt):
+        # Detect pipeline tasks before the branch so we can pass skip_resolution below.
+        is_pipeline = self._is_direct_script(task, prompt)
+        if is_pipeline:
             # Direct script execution for pipeline tasks — bypass Claude agent
             run_result = await self._execute_direct_script(task, prompt)
             emit_event(
@@ -872,7 +1129,7 @@ class Executor:
         else:
             env = build_agent_env(agent)
 
-            # 4. Execute
+            # 4. Execute — sentinel already written at step 2b above.
             emit_event(
                 self._get_driver(), "TASK_EXECUTING", task_id, agent,
                 executor_id=self._executor_id,
@@ -880,14 +1137,40 @@ class Executor:
             )
 
             timeout = self._compute_timeout(priority, skill_hint)
-            run_result = await self._runner.run(
-                agent, prompt, env,
-                timeout=timeout,
-                model=task.get("model"),
-            )
+
+            # Computer Use exclusivity — acquire lock if task needs GUI access
+            _needs_cu = self._requires_computer_use(task)
+            _cu_acquired = False
+            if _needs_cu:
+                logger.info("Task requires Computer Use — acquiring exclusive lock (agent=%s)", agent)
+                try:
+                    await asyncio.wait_for(
+                        self._computer_use_lock.acquire(),
+                        timeout=CU_LOCK_TIMEOUT,
+                    )
+                    _cu_acquired = True
+                    logger.info("Computer Use lock acquired (agent=%s)", agent)
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Computer Use lock timeout after %ds — proceeding anyway (agent=%s)",
+                        CU_LOCK_TIMEOUT, agent,
+                    )
+
+            try:
+                run_result = await self._runner.run(
+                    agent, prompt, env,
+                    timeout=timeout,
+                    model=task.get("model"),
+                )
+            finally:
+                if _cu_acquired and self._computer_use_lock.locked():
+                    self._computer_use_lock.release()
+                    logger.info("Computer Use lock released (agent=%s)", agent)
 
         # 5. Verify result — THE GATE
-        passed, reason = verify_result(run_result)
+        # Pipeline/script tasks are exempt from the ## Resolution requirement
+        # because their stdout is structured data, not a completion report.
+        passed, reason = verify_result(run_result, skip_resolution=is_pipeline)
 
         # 5b. Model fallback on rate-limit or auth failure
         if not passed and reason in (
@@ -906,7 +1189,7 @@ class Executor:
                     timeout=timeout,
                     model="claude-sonnet-4-6",
                 )
-                passed, reason = verify_result(run_result)
+                passed, reason = verify_result(run_result, skip_resolution=is_pipeline)
                 if passed:
                     emit_event(
                         self._get_driver(), "MODEL_FALLBACK_SUCCESS",
@@ -927,9 +1210,13 @@ class Executor:
             delivery_spec = classify_delivery_task(task)
             if delivery_spec:
                 workspace_dir = AGENTS_DIR / agent / "workspace"
-                # Try common naming patterns agents use
+                # Try common naming patterns agents use.
+                # IMPORTANT: _post_completion writes to {task_id}.result.md
+                # (without "task-" prefix). The legacy candidates below remain
+                # for backwards-compat with older gate-passed files.
                 candidate_names = [
-                    f"task-{task_id}.done.md",
+                    f"{task_id}.result.md",            # primary: written by _post_completion
+                    f"task-{task_id}.done.md",         # legacy: old gate-passed format
                     f"task-{task_id}.gate-passed.done.md",
                     f"task-{task_id}.md",
                 ]
@@ -990,6 +1277,55 @@ class Executor:
                     except Exception as _e:
                         logger.warning(f"Failed to stamp delivery props on {task_id}: {_e}")
 
+        # 5d. Triage gate — require investigation findings appended to task file.
+        # Runs only for triage tasks after the verify_result and delivery gates pass.
+        # Gate fails if the task file has not grown since claim time.
+        if passed and is_triage:
+            # Opt-out: check task dict property or embedded frontmatter in prompt
+            optout = str(task.get("completion_gate_optout", "")).lower() in ("true", "1", "yes")
+            if not optout:
+                optout = bool(re.search(
+                    r"^completion_gate_optout:\s*true",
+                    task.get("prompt", ""),
+                    re.MULTILINE | re.IGNORECASE,
+                ))
+            if optout:
+                logger.info(
+                    f"[triage-gate] opt-out — bypassing size check for {task_id}"
+                )
+            else:
+                gate_blocked = True
+                if triage_file and triage_file.exists():
+                    try:
+                        current_size = os.path.getsize(triage_file)
+                        baseline = triage_baseline
+                        if baseline is None:
+                            baseline = _read_frontmatter_int(
+                                triage_file, "triage_baseline_bytes"
+                            )
+                        if baseline is not None and current_size > baseline:
+                            gate_blocked = False
+                            logger.info(
+                                f"[triage-gate] PASSED for {task_id}: "
+                                f"{baseline}B → {current_size}B"
+                            )
+                    except OSError as _sz_err:
+                        logger.warning(
+                            f"[triage-gate] size check failed for {task_id}: {_sz_err}"
+                        )
+                if gate_blocked:
+                    passed = False
+                    reason = "triage_no_findings"
+                    logger.warning(
+                        f"[triage-gate] BLOCKED {task_id}: "
+                        "Triage task requires investigation findings before marking done. "
+                        "Append findings to task file first."
+                    )
+                    emit_event(
+                        self._get_driver(), "TRIAGE_GATE_BLOCKED", task_id, agent,
+                        executor_id=self._executor_id,
+                    )
+
         # 6. Persist terminal state
         if passed:
             try:
@@ -1014,6 +1350,7 @@ class Executor:
                     model=run_result.model,
                 )
                 self._cb.record_result(agent, True, task_id)
+                self._rename_task_file(agent, task_id, ".done.md")
                 await self._post_completion(task, run_result)
                 # Deploy pipeline (only if worktree was used)
                 if worktree_path and project_config:
@@ -1029,6 +1366,13 @@ class Executor:
                             self._get_driver(), "DEPLOY_FAILED",
                             task_id, agent,
                             error=str(e)[:200],
+                        )
+                    finally:
+                        # Always remove worktree + branch to prevent accumulation
+                        await self._worktree_mgr.cleanup_worktree(
+                            project_config["root"],
+                            worktree_path,
+                            f"task-{task_id[:12]}",
                         )
                 self._write_ledger(
                     "TASK_COMPLETED", task_id, agent,
@@ -1054,6 +1398,8 @@ class Executor:
                         "dur": run_result.duration_s,
                     },
                 )
+                # Still rename the filesystem file — WAL will persist Neo4j later
+                self._rename_task_file(agent, task_id, ".done.md")
                 logger.warning(
                     f"complete_task failed for {task_id}: {msg} — buffered to WAL"
                 )
@@ -1097,6 +1443,8 @@ class Executor:
                 error_msg=reason[:200],
             )
             self._cb.record_result(agent, False, task_id)
+            if not is_transient:
+                self._rename_task_file(agent, task_id, ".failed.md")
             self._write_ledger(
                 event_type, task_id, agent,
                 error=reason[:200],
@@ -1106,8 +1454,144 @@ class Executor:
                 f"FAILED {task_id}: {reason} "
                 f"(class={error_class}, transient={is_transient})"
             )
+
+            # Stall escalation gate — if a task has been stall-detected N times,
+            # stop re-queuing it and escalate to STALL_ESCALATED for manual review.
+            if reason == "stall_detected":
+                await self._maybe_escalate_stall(task_id, agent, task)
+
             # Check if agent created a plan before failing/timing out
             await self._check_continuation(task, run_result, passed=False)
+
+    # -------------------------------------------------------------------
+    # Stall Escalation — break infinite stall-triage loops
+    # -------------------------------------------------------------------
+
+    async def _maybe_escalate_stall(
+        self, task_id: str, agent: str, task: dict
+    ):
+        """Increment stall_count on the task and escalate if threshold is reached.
+
+        Called only when verify_result() returns reason="stall_detected".
+
+        Flow:
+          1. Increment t.stall_count on the Neo4j Task node (atomic)
+          2. If stall_count >= STALL_ESCALATION_THRESHOLD:
+             a. Set status = 'STALL_ESCALATED' (terminal — won't be re-claimed)
+             b. Emit STALL_ESCALATED event node (Neo4j)
+             c. Append entry to ~/.openclaw/logs/stall-escalations.jsonl (JSONL ledger)
+             d. Send Kublai notification for manual review
+        """
+        try:
+            driver = self._get_driver()
+            with driver.session() as session:
+                result = session.run(
+                    """
+                    MATCH (t:Task {task_id: $tid})
+                    SET t.stall_count = CASE
+                        WHEN t.stall_count IS NULL THEN 1
+                        ELSE t.stall_count + 1
+                    END
+                    RETURN t.stall_count AS stall_count, t.status AS status
+                    """,
+                    tid=task_id,
+                )
+                record = result.single()
+                if not record:
+                    logger.warning(f"stall escalation: task {task_id} not found in Neo4j")
+                    return
+                stall_count = record["stall_count"]
+                current_status = record["status"]
+        except Exception as e:
+            logger.warning(f"stall escalation: Neo4j increment failed for {task_id}: {e}")
+            return
+
+        logger.info(
+            f"Stall count for {task_id}: {stall_count}/{STALL_ESCALATION_THRESHOLD}"
+        )
+
+        if stall_count < STALL_ESCALATION_THRESHOLD:
+            return  # Not yet — let the normal retry / re-queue path handle it
+
+        # Threshold reached — escalate
+        logger.warning(
+            f"STALL_ESCALATED: {task_id} has stalled {stall_count} times "
+            f"(threshold={STALL_ESCALATION_THRESHOLD}), escalating for manual review"
+        )
+
+        # 1. Set terminal status in Neo4j
+        try:
+            driver = self._get_driver()
+            with driver.session() as session:
+                session.run(
+                    """
+                    MATCH (t:Task {task_id: $tid})
+                    WHERE t.status <> 'STALL_ESCALATED'
+                    SET t.status = 'STALL_ESCALATED',
+                        t.escalated_at = datetime(),
+                        t.stall_count = $stall_count
+                    """,
+                    tid=task_id,
+                    stall_count=stall_count,
+                )
+        except Exception as e:
+            logger.warning(f"stall escalation: status update failed for {task_id}: {e}")
+            self._wal.buffer(
+                "MATCH (t:Task {task_id: $tid}) "
+                "SET t.status = 'STALL_ESCALATED', t.escalated_at = datetime(), "
+                "t.stall_count = $stall_count",
+                {"tid": task_id, "stall_count": stall_count},
+            )
+
+        # 2. Emit Neo4j event node (dual-write observability)
+        emit_event(
+            self._get_driver(), "STALL_ESCALATED", task_id, agent,
+            executor_id=self._executor_id,
+            stall_count=stall_count,
+            threshold=STALL_ESCALATION_THRESHOLD,
+        )
+
+        # 3. Write to JSONL stall-escalation ledger (dual-write observability)
+        escalation_entry = {
+            "event": "STALL_ESCALATED",
+            "ts": datetime.now().isoformat(),
+            "task_id": task_id,
+            "agent": agent,
+            "stall_count": stall_count,
+            "threshold": STALL_ESCALATION_THRESHOLD,
+            "title": task.get("title", ""),
+            "priority": task.get("priority", "unknown"),
+        }
+        try:
+            STALL_ESCALATION_LOG.parent.mkdir(parents=True, exist_ok=True)
+            with open(STALL_ESCALATION_LOG, "a") as f:
+                f.write(json.dumps(escalation_entry) + "\n")
+        except Exception as e:
+            logger.warning(f"stall escalation: ledger write failed for {task_id}: {e}")
+
+        # Also write to the main task ledger for unified observability
+        self._write_ledger(
+            "STALL_ESCALATED", task_id, agent,
+            stall_count=stall_count,
+            threshold=STALL_ESCALATION_THRESHOLD,
+        )
+
+        # 4. Notify Kublai for manual review
+        try:
+            nqueue = NotificationQueue()
+            kublai_number = os.environ.get("KUBLAI_SIGNAL_NUMBER", "+19194133445")
+            msg = (
+                f"[STALL_ESCALATED] Task {task_id} stalled {stall_count} times\n"
+                f"Agent: {agent}\n"
+                f"Title: {task.get('title', 'unknown')}\n"
+                f"Priority: {task.get('priority', 'unknown')}\n"
+                f"Manual review required — task status set to STALL_ESCALATED\n"
+                f"https://the.kurult.ai/r/{task_id}"
+            )
+            nqueue.enqueue(task_id, agent, kublai_number, msg)
+            logger.info(f"Kublai notification enqueued for stall escalation: {task_id}")
+        except Exception as e:
+            logger.warning(f"stall escalation: Kublai notification failed for {task_id}: {e}")
 
     # -------------------------------------------------------------------
     # Continuation Detection — create follow-up tasks for incomplete work
@@ -1570,17 +2054,145 @@ Output NOTHING after the end delimiter."""
         return max(priority_timeout, skill_timeout)
 
     async def _renew_leases(self):
-        """Background coroutine: emit lease-renewal events every 10 minutes."""
+        """Background coroutine: extend Neo4j lease and emit events every 10 minutes."""
         while not self._shutdown:
             await asyncio.sleep(600)
-            for task_id in list(self._active_tasks):
+            for task_id, epoch in list(self._active_task_epochs.items()):
                 try:
+                    self._store.renew_lease(task_id, epoch)
                     emit_event(
                         self._get_driver(), "LEASE_RENEWED", task_id, "",
                         executor_id=self._executor_id,
                     )
                 except Exception:
                     pass
+
+    def _rename_task_file(self, agent: str, task_id: str, suffix: str) -> None:
+        """Rename a task's .md file to {name}{suffix} to reflect terminal state.
+
+        Keeps filesystem in sync with Neo4j state so queue-depth monitors
+        don't count completed/failed tasks as pending.
+
+        Handles two filename conventions:
+          - Standard:  {task_id}.md  (UUID-format task_id matches filename)
+          - Dispatch:  {priority}-{ts}-{short_id}.md  (task_id is in frontmatter,
+                       differs from filename)
+
+        For dispatch-format files, scans the tasks directory for a file whose
+        frontmatter contains `task_id: {task_id}`.
+        """
+        tasks_dir = AGENTS_DIR / agent / "tasks"
+        # Fast path: standard naming convention — check both .md and .executing.md sources
+        for src_suffix in (".md", ".executing.md"):
+            src = tasks_dir / f"{task_id}{src_suffix}"
+            if src.exists():
+                dst = tasks_dir / f"{task_id}{suffix}"
+                if not dst.exists():
+                    try:
+                        src.rename(dst)
+                    except OSError as e:
+                        logger.warning(f"Failed to rename task file {src.name} -> {dst.name}: {e}")
+                return
+
+        # Slow path: dispatch-format files where task_id is embedded in frontmatter
+        if not tasks_dir.exists():
+            return
+        try:
+            needle = f"\ntask_id: {task_id}"
+            for f in tasks_dir.iterdir():
+                fname = f.name
+                if not fname.endswith(".md"):
+                    continue
+                if any(s in fname for s in (".done.", ".cancelled.", ".failed.", ".pending-gate.")):
+                    continue
+                try:
+                    if needle in f.read_text(encoding="utf-8", errors="replace"):
+                        # Use base name only (strip all intermediate suffixes) so
+                        # e.g. normal-123.pending-gate.executing.md → normal-123.done.md
+                        base = fname.split(".")[0]
+                        new_name = base + suffix  # e.g. high-123-abc.done.md
+                        dst = tasks_dir / new_name
+                        if not dst.exists():
+                            f.rename(dst)
+                            logger.info(
+                                f"Renamed dispatch-format task file {fname} -> {new_name}"
+                            )
+                        return
+                except OSError:
+                    continue
+        except OSError as e:
+            logger.warning(f"Failed to scan tasks dir for {task_id}: {e}")
+
+    def _sync_filesystem_state(self) -> None:
+        """Reconcile filesystem task files with Neo4j terminal states.
+
+        Finds .md files that are still named as pending but whose Neo4j status
+        is COMPLETED, FAILED, CANCELLED, or STALL_ESCALATED, then renames them
+        to the correct terminal suffix (.done.md or .failed.md).
+
+        Runs every FS_SYNC_INTERVAL seconds as a background maintenance pass.
+        Prevents phantom queue-depth inflation in routing_audit and other monitors
+        that read the filesystem.
+        """
+        TERMINAL_DONE = frozenset({"COMPLETED", "STALL_ESCALATED"})
+        TERMINAL_FAILED = frozenset({"FAILED", "CANCELLED"})
+        SKIP_SUFFIXES = (".done.", ".cancelled.", ".failed.", ".executing.", ".pending-gate.")
+
+        driver = self._get_driver()
+        if driver is None:
+            return
+
+        renamed = 0
+        try:
+            with driver.session() as sess:
+                for agent in self._agents:
+                    tasks_dir = AGENTS_DIR / agent / "tasks"
+                    if not tasks_dir.exists():
+                        continue
+                    for f in tasks_dir.iterdir():
+                        fname = f.name
+                        if not fname.endswith(".md"):
+                            continue
+                        if any(s in fname for s in SKIP_SUFFIXES):
+                            continue
+                        # Extract task_id: try frontmatter first, then filename stem
+                        content = None
+                        tid = None
+                        try:
+                            content = f.read_text(encoding="utf-8", errors="replace")
+                            m = re.search(r"^task_id:\s*(\S+)", content, re.MULTILINE)
+                            if m:
+                                tid = m.group(1)
+                        except OSError:
+                            continue
+                        if not tid:
+                            tid = fname[:-3]  # strip .md
+
+                        rec = sess.run(
+                            "MATCH (t:Task {task_id: $tid}) RETURN t.status",
+                            tid=tid,
+                        ).single()
+                        if not rec:
+                            continue
+                        status = rec[0]
+                        if status in TERMINAL_DONE:
+                            new_name = fname[:-3] + ".done.md"
+                        elif status in TERMINAL_FAILED:
+                            new_name = fname[:-3] + ".failed.md"
+                        else:
+                            continue
+                        dst = tasks_dir / new_name
+                        if not dst.exists():
+                            try:
+                                f.rename(dst)
+                                renamed += 1
+                            except OSError as e:
+                                logger.warning(f"fs-sync rename {fname}: {e}")
+        except Exception as e:
+            logger.warning(f"Filesystem sync pass error: {e}")
+
+        if renamed:
+            logger.info(f"Filesystem sync: renamed {renamed} stale task files")
 
     async def _post_completion(self, task: dict, run_result: RunResult):
         """Write result file after a task completes, then send notification.
@@ -2035,13 +2647,30 @@ async def main():
     executor = build_executor()
 
     loop = asyncio.get_running_loop()
+    _signal_received: list[signal.Signals] = []
+
+    def _shutdown_handler(sig: signal.Signals = signal.SIGTERM):
+        _signal_received.append(sig)
+        executor.shutdown()
+
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, executor.shutdown)
+        loop.add_signal_handler(sig, _shutdown_handler, sig)
 
     try:
         await executor.run()
     finally:
         release_lock()
+        # Exit with code 1 if shutdown was triggered by a signal, so that
+        # launchd (KeepAlive.Crashed=true) treats it as a crash and restarts
+        # the executor automatically.  Without this, SIGTERM → clean exit
+        # (code 0) → KeepAlive.SuccessfulExit=false → launchd does NOT restart
+        # → executor stays dead until manually kicked.
+        if _signal_received:
+            logger.info(
+                f"Exiting with code 1 after signal {_signal_received[0].name} "
+                "so launchd restarts the executor."
+            )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

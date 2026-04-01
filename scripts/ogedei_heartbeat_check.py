@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from kurultai_paths import LOGS_DIR, DISPATCH_AGENTS
+from kurultai_paths import LOGS_DIR, AGENTS_DIR, DISPATCH_AGENTS
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +244,98 @@ def check_queue_starvation() -> list[str]:
     return issues
 
 
+FILE_QUEUE_STALE_THRESHOLD = 1800  # seconds (30 minutes)
+
+TERMINAL_SUFFIXES = (
+    ".executing.md",
+    ".done.md",
+    ".gate-passed.done.md",
+    ".cancelled.md",
+    ".pending-gate.md",
+)
+
+
+def check_file_queue_starvation() -> list[str]:
+    """Detect unclaimed task files sitting idle in agent task directories."""
+    issues = []
+    now = time.time()
+
+    for agent in DISPATCH_AGENTS:
+        tasks_dir = AGENTS_DIR / agent / "tasks"
+        if not tasks_dir.exists():
+            continue
+
+        for task_file in tasks_dir.iterdir():
+            if not task_file.is_file():
+                continue
+            if not task_file.name.endswith(".md"):
+                continue
+            # Skip any file that ends with a terminal suffix
+            if any(task_file.name.endswith(s) for s in TERMINAL_SUFFIXES):
+                continue
+
+            idle_seconds = now - task_file.stat().st_mtime
+            if idle_seconds >= FILE_QUEUE_STALE_THRESHOLD:
+                idle_minutes = idle_seconds / 60
+                issues.append(
+                    f"FILE_STARVATION: {agent}/{task_file.name} idle {idle_minutes:.0f}m"
+                )
+                log(
+                    f"Stale file-queue task: {agent}/{task_file.name} ({idle_minutes:.0f}m idle)",
+                    "WARN",
+                )
+
+    return issues
+
+
+EXECUTOR_LOG = LOGS_DIR / "executor.err"
+EXECUTOR_RESTART_WINDOW = 1800   # 30 minutes
+EXECUTOR_RESTART_THRESHOLD = 3   # >3 restarts in window = storm
+
+
+def check_executor_restart_storm() -> list[str]:
+    """Detect executor restart storms: >THRESHOLD restarts in 30-minute window.
+
+    Reads executor.err and counts 'Starting unified task executor...' lines
+    within the last EXECUTOR_RESTART_WINDOW seconds.  A high restart rate
+    typically means the executor is crashing on startup or being killed by
+    a watchdog, launchd throttle, or OOM event.
+    """
+    issues = []
+    if not EXECUTOR_LOG.exists():
+        return issues
+
+    cutoff = time.time() - EXECUTOR_RESTART_WINDOW
+    restart_count = 0
+    try:
+        with open(EXECUTOR_LOG, "r", errors="replace") as fh:
+            for line in fh:
+                if "Starting unified task executor" not in line:
+                    continue
+                # Parse timestamp: "2026-04-01 04:05:00,123 ..."
+                try:
+                    ts_str = line.split(",")[0].strip()
+                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").timestamp()
+                    if ts >= cutoff:
+                        restart_count += 1
+                except (ValueError, IndexError):
+                    pass
+    except OSError:
+        return issues
+
+    if restart_count > EXECUTOR_RESTART_THRESHOLD:
+        issues.append(
+            f"EXECUTOR_RESTART_STORM: {restart_count} restarts in last 30m "
+            f"(threshold={EXECUTOR_RESTART_THRESHOLD})"
+        )
+        log(
+            f"Executor restart storm detected: {restart_count} restarts in 30m",
+            "ERROR",
+        )
+
+    return issues
+
+
 def run_all_checks() -> list[str]:
     """Run all 5 checks and return combined issues."""
     all_issues = []
@@ -252,6 +344,8 @@ def run_all_checks() -> list[str]:
     all_issues.extend(check_stalled_tasks())
     all_issues.extend(check_agent_failure_rates())
     all_issues.extend(check_queue_starvation())
+    all_issues.extend(check_file_queue_starvation())
+    all_issues.extend(check_executor_restart_storm())
 
     if all_issues:
         log(f"{len(all_issues)} issues found:", "WARN")
