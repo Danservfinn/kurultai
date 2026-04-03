@@ -105,10 +105,10 @@ class PromptSanitizer:
         normalized = self._replace_homoglyphs(normalized)
 
         # Step 3: Check for base64 payloads
-        normalized = self._detect_base64_payloads(normalized)
+        normalized = self._detect_base64_payloads(normalized, threats_detected, warnings)
 
         # Step 4: Check for injection patterns
-        normalized, self._detect_injection_patterns(normalized)
+        normalized = self._detect_injection_patterns(normalized, threats_detected, warnings)
 
         # Step 5: Add immutable delimiters
         normalized = self._add_delimiters(normalized)
@@ -130,7 +130,7 @@ class PromptSanitizer:
             result = result.replace(cyrillic, latin)
         return result
 
-    def _detect_base64_payloads(self, content: str) -> str:
+    def _detect_base64_payloads(self, content: str, threats_detected: list, warnings: list) -> str:
         """Detect and warn about base64 encoded content."""
         # Look for base64-like patterns
         base64_pattern = r'[A-Za-z0-9+/]{20,}={2}'
@@ -147,7 +147,7 @@ class PromptSanitizer:
 
         return content
 
-    def _detect_injection_patterns(self, content: str) -> str:
+    def _detect_injection_patterns(self, content: str, threats_detected: list, warnings: list) -> str:
         """Detect and warn about injection patterns."""
         for pattern in self.INJECTION_PATTERNS:
             if re.search(pattern, content, re.IGNORECASE):
