@@ -1115,14 +1115,21 @@ class Executor:
 
         # 3. Build execution environment and run
         # Detect pipeline tasks before the branch so we can pass skip_resolution below.
-        is_pipeline = self._is_direct_script(task, prompt)
+        # Use the ORIGINAL task prompt (not worktree-rewritten) for script detection —
+        # worktree rewrite changes the path prefix but the python3 command stays the same.
+        # Using the rewritten path would still match _SCRIPT_RE but the script won't exist
+        # in the worktree (scripts aren't git-tracked), causing exit:127 fallbacks.
+        _original_task_body = task.get("prompt", task.get("body", task.get("title", "")))
+        is_pipeline = self._is_direct_script(task, _original_task_body)
         if is_pipeline:
-            # Direct script execution for pipeline tasks — bypass Claude agent
-            run_result = await self._execute_direct_script(task, prompt)
+            # Direct script execution for pipeline tasks — bypass Claude agent.
+            # Use original task body (not worktree-rewritten) so scripts run from their
+            # actual location; scripts aren't git-tracked and don't exist in worktrees.
+            run_result = await self._execute_direct_script(task, _original_task_body)
             emit_event(
                 self._get_driver(), "PIPELINE_SCRIPT_EXECUTED", task_id, agent,
                 executor_id=self._executor_id,
-                script=prompt.split()[1] if len(prompt.split()) > 1 else "unknown",
+                script=_original_task_body.split()[1] if len(_original_task_body.split()) > 1 else "unknown",
                 exit_code=run_result.return_code,
                 duration_s=run_result.duration_s,
             )
@@ -1163,14 +1170,16 @@ class Executor:
                     model=task.get("model"),
                 )
             finally:
-                if _cu_acquired and self._computer_use_lock.locked():
+                if _cu_acquired:
                     self._computer_use_lock.release()
                     logger.info("Computer Use lock released (agent=%s)", agent)
 
         # 5. Verify result — THE GATE
-        # Pipeline/script tasks are exempt from the ## Resolution requirement
-        # because their stdout is structured data, not a completion report.
-        passed, reason = verify_result(run_result, skip_resolution=is_pipeline)
+        # Direct pipeline scripts AND pipeline LLM tasks (e.g. vote tasks) are both
+        # exempt from the ## Resolution requirement: their outputs are structured data
+        # consumed by downstream parsers, not human-readable completion reports.
+        skip_res = is_pipeline or task.get("source", "").startswith("pipeline")
+        passed, reason = verify_result(run_result, skip_resolution=skip_res)
 
         # 5b. Model fallback on rate-limit or auth failure
         if not passed and reason in (
@@ -1189,7 +1198,7 @@ class Executor:
                     timeout=timeout,
                     model="claude-sonnet-4-6",
                 )
-                passed, reason = verify_result(run_result, skip_resolution=is_pipeline)
+                passed, reason = verify_result(run_result, skip_resolution=skip_res)
                 if passed:
                     emit_event(
                         self._get_driver(), "MODEL_FALLBACK_SUCCESS",

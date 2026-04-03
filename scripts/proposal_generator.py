@@ -522,6 +522,10 @@ def main():
         "--solution",
         help="Proposed solution"
     )
+    parser.add_argument(
+        "--pipeline",
+        help="Pipeline ID (informational, unused — context via PIPELINE_CONTEXT env var)"
+    )
 
     args = parser.parse_args()
 
