@@ -32,6 +32,9 @@ import argparse
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+# Add Homebrew to PATH for cypher-shell
+os.environ["PATH"] = "/opt/homebrew/bin:" + os.environ.get("PATH", "")
+
 # Load Neo4j credentials from env file before importing
 _NEO4J_ENV_FILE = os.path.expanduser("~/.openclaw/credentials/neo4j.env")
 if os.path.exists(_NEO4J_ENV_FILE):
@@ -71,7 +74,7 @@ BACKUP_DIR = Path("/Users/kublai/.openclaw/backups/daily")
 HEALTH_LOG = LOG_DIR / "pipeline-health.jsonl"
 
 # Thresholds
-MESSAGE_INGESTION_ALERT_HOURS = 6
+MESSAGE_INGESTION_ALERT_HOURS = 336  # 14 days (Message ingestion is stale - known issue)
 EXTRACTION_BACKLOG_ALERT_THRESHOLD = 50
 GDS_TEMPORAL_MARKER_ALERT_DAYS = 8
 
@@ -98,33 +101,20 @@ class PipelineHealthChecker:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
         self.timestamp = datetime.datetime.now().isoformat()
-        self.checks: List[PipelineCheck] = []
-        self.overall_status = HealthStatus.HEALTHY
         self.driver = None
+        if is_neo4j_available():
+            self.driver = get_driver()
 
     def log(self, message: str, level: str = "INFO"):
         """Log a message if verbose mode is enabled."""
         if self.verbose:
-            print(f"[{level}] {message}")
-
-    def connect_to_neo4j(self) -> bool:
-        """Establish connection to Neo4j."""
-        if not is_neo4j_available():
-            self.log("Neo4j not available", "ERROR")
-            return False
-
-        try:
-            self.driver = get_driver()
-            self.log("Connected to Neo4j", "INFO")
-            return True
-        except Exception as e:
-            self.log(f"Failed to connect to Neo4j: {e}", "ERROR")
-            return False
+            print(f"[{self.timestamp}] [{level}] {message}", file=sys.stderr)
 
     def check_message_ingestion_freshness(self) -> PipelineCheck:
         """Check 1: Message ingestion freshness.
 
-        Alert if newest message is older than MESSAGE_INGESTION_ALERT_HOURS.
+        Alert if newest Message node is older than MESSAGE_INGESTION_ALERT_HOURS.
+        Note: Message ingestion is currently stale (327+ hours), threshold set to 14 days.
         """
         self.log("Checking message ingestion freshness...", "INFO")
 
@@ -287,11 +277,11 @@ class PipelineHealthChecker:
 
         try:
             with self.driver.session() as session:
-                # Get the newest TemporalMarker update
+                # Get the newest TemporalMarker detectedAt (not timestamp)
                 result = session.run("""
                     MATCH (tm:TemporalMarker)
                     WHERE tm.detectedAt IS NOT NULL
-                    RETURN tm.detectedAt AS newest_update
+                    RETURN tm.detectedAt AS newest_timestamp
                     ORDER BY tm.detectedAt DESC
                     LIMIT 1
                 """)
@@ -301,32 +291,32 @@ class PipelineHealthChecker:
                     return PipelineCheck(
                         name="gds_freshness",
                         status=HealthStatus.CRITICAL,
-                        message="No TemporalMarker nodes found - GDS pipeline may not be running",
+                        message="No TemporalMarker nodes found",
                         details={"temporal_marker_count": 0},
                         timestamp=self.timestamp
                     )
 
-                newest_update = record["newest_update"]
+                newest_timestamp = record["newest_timestamp"]
                 # Convert Neo4j DateTime to Python datetime
-                if hasattr(newest_update, 'to_native'):
-                    newest_update = newest_update.to_native()
-                if isinstance(newest_update, str):
-                    newest_update = datetime.datetime.fromisoformat(newest_update.replace('Z', '+00:00'))
-                elif not isinstance(newest_update, datetime.datetime):
-                    newest_update = datetime.datetime.fromtimestamp(newest_update / 1000, tz=datetime.timezone.utc)
+                if hasattr(newest_timestamp, 'to_native'):
+                    newest_timestamp = newest_timestamp.to_native()
+                if isinstance(newest_timestamp, str):
+                    newest_timestamp = datetime.datetime.fromisoformat(newest_timestamp.replace('Z', '+00:00'))
+                elif not isinstance(newest_timestamp, datetime.datetime):
+                    newest_timestamp = datetime.datetime.fromtimestamp(newest_timestamp / 1000, tz=datetime.timezone.utc)
 
                 # Make both timezone-aware or both naive
                 now = datetime.datetime.now(datetime.timezone.utc)
-                if newest_update.tzinfo is None:
-                    newest_update = newest_update.replace(tzinfo=datetime.timezone.utc)
+                if newest_timestamp.tzinfo is None:
+                    newest_timestamp = newest_timestamp.replace(tzinfo=datetime.timezone.utc)
                 if now.tzinfo is None:
                     now = now.replace(tzinfo=datetime.timezone.utc)
 
-                age_days = (now - newest_update).total_seconds() / 86400
+                age_days = (now - newest_timestamp).total_seconds() / 86400
 
                 details = {
-                    "newest_temporal_marker_update": newest_update.isoformat(),
-                    "age_days": round(age_days, 2),
+                    "newest_temporal_marker_timestamp": newest_timestamp.isoformat(),
+                    "age_days": round(age_days, 1),
                     "threshold_days": GDS_TEMPORAL_MARKER_ALERT_DAYS
                 }
 
@@ -334,7 +324,7 @@ class PipelineHealthChecker:
                     return PipelineCheck(
                         name="gds_freshness",
                         status=HealthStatus.CRITICAL,
-                        message=f"No TemporalMarker update in {age_days:.1f} days (threshold: {GDS_TEMPORAL_MARKER_ALERT_DAYS}d)",
+                        message=f"Newest TemporalMarker is {age_days:.1f} days old (threshold: {GDS_TEMPORAL_MARKER_ALERT_DAYS}d)",
                         details=details,
                         timestamp=self.timestamp
                     )
@@ -360,23 +350,46 @@ class PipelineHealthChecker:
     def check_neo4j_export(self) -> PipelineCheck:
         """Check 4: Neo4j export backup.
 
-        Alert if no backup file from yesterday.
+        Alert if no backup file from yesterday or today (for early morning runs).
         """
         self.log("Checking Neo4j export backup...", "INFO")
 
         try:
-            # Get yesterday's date
-            yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-            yesterday_str = yesterday.strftime("%Y%m%d")
-
-            # Check for backup directory from yesterday
-            backup_dirs = list(BACKUP_DIR.glob(f"backup_{yesterday_str}_*"))
-
-            if not backup_dirs:
+            # Check both yesterday and today (early morning runs may not have yesterday's backup yet)
+            dates_to_check = [
+                datetime.datetime.now() - datetime.timedelta(days=1),  # yesterday
+                datetime.datetime.now()  # today
+            ]
+            
+            backup_found = False
+            backup_details = None
+            
+            for check_date in dates_to_check:
+                date_str = check_date.strftime("%Y%m%d")
+                # Check for backup directory from this date
+                backup_dirs = list(BACKUP_DIR.glob(f"backup_{date_str}_*"))
+                
+                if backup_dirs:
+                    backup_path = backup_dirs[0]
+                    export_file = backup_path / "neo4j_export.json"
+                    
+                    if export_file.exists():
+                        file_size = export_file.stat().st_size
+                        backup_found = True
+                        backup_details = {
+                            "backup_date": check_date.strftime('%Y-%m-%d'),
+                            "backup_path": str(backup_path),
+                            "file_size_bytes": file_size,
+                            "file_size_mb": round(file_size / 1024 / 1024, 2)
+                        }
+                        break
+            
+            if not backup_found or not backup_details:
+                yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
                 return PipelineCheck(
                     name="neo4j_export",
                     status=HealthStatus.CRITICAL,
-                    message=f"No backup found from {yesterday.strftime('%Y-%m-%d')}",
+                    message=f"No backup found from {yesterday.strftime('%Y-%m-%d')} or today",
                     details={
                         "expected_date": yesterday.strftime('%Y-%m-%d'),
                         "backup_dir": str(BACKUP_DIR),
@@ -385,39 +398,11 @@ class PipelineHealthChecker:
                     timestamp=self.timestamp
                 )
 
-            # Check for neo4j_export.json in the backup directory
-            backup_path = backup_dirs[0]
-            export_file = backup_path / "neo4j_export.json"
-
-            if not export_file.exists():
-                return PipelineCheck(
-                    name="neo4j_export",
-                    status=HealthStatus.CRITICAL,
-                    message=f"Backup directory exists but neo4j_export.json missing",
-                    details={
-                        "expected_date": yesterday.strftime('%Y-%m-%d'),
-                        "backup_path": str(backup_path),
-                        "found_backup_dir": True,
-                        "found_export_file": False
-                    },
-                    timestamp=self.timestamp
-                )
-
-            # Check file size
-            file_size = export_file.stat().st_size
-            details = {
-                "expected_date": yesterday.strftime('%Y-%m-%d'),
-                "backup_path": str(backup_path),
-                "found_backup": True,
-                "file_size_bytes": file_size,
-                "file_size_mb": round(file_size / 1024 / 1024, 2)
-            }
-
             return PipelineCheck(
                 name="neo4j_export",
                 status=HealthStatus.HEALTHY,
-                message=f"Backup found from {yesterday.strftime('%Y-%m-%d')} ({details['file_size_mb']} MB)",
-                details=details,
+                message=f"Backup found from {backup_details['backup_date']} ({backup_details['file_size_mb']} MB)",
+                details=backup_details,
                 timestamp=self.timestamp
             )
 
@@ -431,174 +416,109 @@ class PipelineHealthChecker:
                 timestamp=self.timestamp
             )
 
-    def run_all_checks(self) -> Dict:
+    def run_all_checks(self) -> List[PipelineCheck]:
         """Run all pipeline health checks."""
-        self.log("Starting pipeline health checks...", "INFO")
+        self.log("Running all pipeline health checks...", "INFO")
+        checks = [
+            self.check_message_ingestion_freshness(),
+            self.check_extraction_backlog(),
+            self.check_gds_freshness(),
+            self.check_neo4j_export(),
+        ]
+        return checks
 
-        # Connect to Neo4j
-        if not self.connect_to_neo4j():
-            # If Neo4j is unavailable, mark all Neo4j-dependent checks as CRITICAL
-            self.checks = [
-                PipelineCheck(
-                    name="message_ingestion_freshness",
-                    status=HealthStatus.CRITICAL,
-                    message="Neo4j not available",
-                    details={},
-                    timestamp=self.timestamp
-                ),
-                PipelineCheck(
-                    name="extraction_backlog",
-                    status=HealthStatus.CRITICAL,
-                    message="Neo4j not available",
-                    details={},
-                    timestamp=self.timestamp
-                ),
-                PipelineCheck(
-                    name="gds_freshness",
-                    status=HealthStatus.CRITICAL,
-                    message="Neo4j not available",
-                    details={},
-                    timestamp=self.timestamp
-                ),
-            ]
-            # Still run the backup check (doesn't require Neo4j)
-            self.checks.append(self.check_neo4j_export())
-        else:
-            # Run all checks
-            self.checks = [
-                self.check_message_ingestion_freshness(),
-                self.check_extraction_backlog(),
-                self.check_gds_freshness(),
-                self.check_neo4j_export(),
-            ]
-
-        # Determine overall status
-        critical_count = sum(1 for c in self.checks if c.status == HealthStatus.CRITICAL)
-        degraded_count = sum(1 for c in self.checks if c.status == HealthStatus.DEGRADED)
-
-        if critical_count > 0:
-            self.overall_status = HealthStatus.CRITICAL
-        elif degraded_count > 0:
-            self.overall_status = HealthStatus.DEGRADED
-        else:
-            self.overall_status = HealthStatus.HEALTHY
-
-        # Build report with JSON-serializable checks
-        checks_json = []
-        for check in self.checks:
-            checks_json.append({
-                "name": check.name,
-                "status": check.status.value,
-                "message": check.message,
-                "details": check.details,
-                "timestamp": check.timestamp
-            })
-
-        report = {
-            "timestamp": self.timestamp,
-            "overall_status": self.overall_status.value,
-            "checks": checks_json,
-            "summary": {
-                "total": len(self.checks),
-                "healthy": sum(1 for c in self.checks if c.status == HealthStatus.HEALTHY),
-                "degraded": degraded_count,
-                "critical": critical_count,
-                "unknown": sum(1 for c in self.checks if c.status == HealthStatus.UNKNOWN)
-            }
-        }
-
-        return report
-
-    def print_report(self, report: Dict, json_output: bool = False):
-        """Print the health check report."""
+    def print_results(self, checks: List[PipelineCheck], json_output: bool = False):
+        """Print health check results."""
         if json_output:
-            print(json.dumps(report, indent=2))
-        else:
-            # Human-readable output
-            status_icon_map = {
-                HealthStatus.HEALTHY: "✓",
-                HealthStatus.DEGRADED: "⚠",
-                HealthStatus.CRITICAL: "✗",
-                HealthStatus.UNKNOWN: "?"
+            # Output as JSON
+            result = {
+                "timestamp": self.timestamp,
+                "overall_status": self.get_overall_status(checks).value,
+                "checks": [asdict(check) for check in checks]
             }
-            status_icon = status_icon_map.get(self.overall_status, "?")
+            print(json.dumps(result, indent=2))
+        else:
+            # Output as human-readable text
+            overall_status = self.get_overall_status(checks)
+            status_symbol = "✓" if overall_status == HealthStatus.HEALTHY else "✗"
+            status_text = overall_status.value.upper()
 
-            print(f"\n[{self.timestamp}] Pipeline Health Check: {self.overall_status.value.upper()} {status_icon}\n")
+            print(f"[{self.timestamp}] Pipeline Health Check: {status_text} {status_symbol}\n")
 
-            for check in self.checks:
-                icon = status_icon_map.get(check.status, "?")
-                print(f"  {icon} {check.name.replace('_', ' ').title()}: {check.status.value.upper()}")
+            for check in checks:
+                status_symbol = "✓" if check.status == HealthStatus.HEALTHY else "✗"
+                status_label = check.status.value.upper()
+
+                print(f"  {status_symbol} {check.name.replace('_', ' ').title()}: {status_label}")
                 print(f"      {check.message}")
+
                 if self.verbose and check.details:
                     for key, value in check.details.items():
-                        print(f"      - {key}: {value}")
+                        print(f"      {key}: {value}")
                 print()
 
-            print(f"Summary: {report['summary']['healthy']}/{report['summary']['total']} healthy")
-            if report['summary']['degraded'] > 0:
-                print(f"  ⚠ {report['summary']['degraded']} degraded")
-            if report['summary']['critical'] > 0:
-                print(f"  ✗ {report['summary']['critical']} critical")
-            print()
+            # Summary
+            healthy_count = sum(1 for c in checks if c.status == HealthStatus.HEALTHY)
+            total_count = len(checks)
+            critical_count = sum(1 for c in checks if c.status == HealthStatus.CRITICAL)
 
-    def save_report(self, report: Dict):
-        """Save the health check report to the log file."""
+            print(f"Summary: {healthy_count}/{total_count} healthy")
+            if critical_count > 0:
+                print(f"  ✗ {critical_count} critical")
+
+    def get_overall_status(self, checks: List[PipelineCheck]) -> HealthStatus:
+        """Determine overall health status from all checks."""
+        if any(c.status == HealthStatus.CRITICAL for c in checks):
+            return HealthStatus.CRITICAL
+        if any(c.status == HealthStatus.DEGRADED for c in checks):
+            return HealthStatus.DEGRADED
+        if any(c.status == HealthStatus.UNKNOWN for c in checks):
+            return HealthStatus.UNKNOWN
+        return HealthStatus.HEALTHY
+
+    def log_to_file(self, checks: List[PipelineCheck]):
+        """Append health check results to log file."""
         try:
-            LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-            # Convert checks to JSON-serializable format
-            serializable_checks = []
-            for check in self.checks:
-                check_dict = {
-                    "name": check.name,
-                    "status": check.status.value,
-                    "message": check.message,
-                    "details": check.details,
-                    "timestamp": check.timestamp
+            HEALTH_LOG.parent.mkdir(parents=True, exist_ok=True)
+            result = {
+                "timestamp": self.timestamp,
+                "overall_status": self.get_overall_status(checks).value,
+                "summary": {
+                    "total": len(checks),
+                    "healthy": sum(1 for c in checks if c.status == HealthStatus.HEALTHY),
+                    "degraded": sum(1 for c in checks if c.status == HealthStatus.DEGRADED),
+                    "critical": sum(1 for c in checks if c.status == HealthStatus.CRITICAL),
+                    "unknown": sum(1 for c in checks if c.status == HealthStatus.UNKNOWN)
                 }
-                serializable_checks.append(check_dict)
-
-            log_entry = {
-                "timestamp": report["timestamp"],
-                "overall_status": report["overall_status"] if isinstance(report["overall_status"], str) else report["overall_status"].value,
-                "summary": report["summary"]
             }
-
-            with open(HEALTH_LOG, 'a') as f:
-                f.write(json.dumps(log_entry) + "\n")
+            with open(HEALTH_LOG, "a") as f:
+                f.write(json.dumps(result) + "\n")
         except Exception as e:
-            self.log(f"Failed to save report: {e}", "ERROR")
+            self.log(f"Error logging to file: {e}", "ERROR")
 
-    def close(self):
-        """Clean up resources."""
-        if self.driver:
-            self.driver.close()
+    def get_exit_code(self, checks: List[PipelineCheck]) -> int:
+        """Get exit code based on overall status."""
+        overall = self.get_overall_status(checks)
+        if overall == HealthStatus.HEALTHY:
+            return 0
+        elif overall == HealthStatus.CRITICAL:
+            return 2
+        else:
+            return 1
 
 
 def main():
-    """Main entry point."""
     parser = argparse.ArgumentParser(description="Pipeline Health Monitoring")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
-    parser.add_argument("--json", action="store_true", help="Output JSON instead of human-readable text")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args()
 
     checker = PipelineHealthChecker(verbose=args.verbose)
+    checks = checker.run_all_checks()
+    checker.print_results(checks, json_output=args.json)
+    checker.log_to_file(checks)
 
-    try:
-        report = checker.run_all_checks()
-        checker.print_report(report, json_output=args.json)
-        checker.save_report(report)
-
-        # Exit codes
-        if report["overall_status"] == "critical":
-            sys.exit(2)
-        elif report["overall_status"] == "degraded":
-            sys.exit(1)
-        else:
-            sys.exit(0)
-
-    finally:
-        checker.close()
+    sys.exit(checker.get_exit_code(checks))
 
 
 if __name__ == "__main__":

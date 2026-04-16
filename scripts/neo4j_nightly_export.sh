@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Add Homebrew to PATH for cypher-shell
+export PATH="/opt/homebrew/bin:$PATH"
+
 EXPORT_DIR="$HOME/.openclaw/backups/neo4j-conversations"
 mkdir -p "$EXPORT_DIR"
 DATE=$(date +%Y-%m-%d)
