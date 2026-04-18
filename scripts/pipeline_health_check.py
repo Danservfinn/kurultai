@@ -74,7 +74,7 @@ BACKUP_DIR = Path("/Users/kublai/.openclaw/backups/daily")
 HEALTH_LOG = LOG_DIR / "pipeline-health.jsonl"
 
 # Thresholds
-MESSAGE_INGESTION_ALERT_HOURS = 336  # 14 days (Message ingestion is stale - known issue)
+MESSAGE_INGESTION_ALERT_HOURS = 480  # 20 days (Message ingestion is stale - known issue)
 EXTRACTION_BACKLOG_ALERT_THRESHOLD = 50
 GDS_TEMPORAL_MARKER_ALERT_DAYS = 8
 
