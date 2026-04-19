@@ -225,8 +225,8 @@ def create_deep_task(human_id: str, human_name: str, msg_count: int,
         try:
             since_dt = datetime.fromisoformat(since_ts)
             hours = max(1, int((datetime.now(timezone.utc) - since_dt).total_seconds() / 3600))
-        except Exception:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to parse since_ts {since_ts!r}: {e}")
 
     prompt = DEEP_EXTRACTION_PROMPT.format(
         human_name=human_name,
