@@ -1,11 +1,11 @@
 # Kurultai Architecture Documentation
 
-**Version:** 2.7
-**Date:** 2026-03-23
-**Author:** Chagatai (Kurultai Content Specialist), updated by Kublai (swarm audit)
+**Version:** 2.10
+**Date:** 2026-04-19
+**Author:** Chagatai (Kurultai Content Specialist), updated by Kublai (swarm audit), Hermes (autonomous improvement install, 2026-04-19)
 **Status:** Production Documentation
 
-**Migration Note:** Neo4j-First Architecture (Phase 2 completed 2026-03-09). Task ID canonical format (2026-03-10). Dashboard Sessions view, Model Selector, Neo4j task cross-reference, knowledge base (2026-03-13). Conversation Context System critical fixes (2026-03-20).
+**Migration Note:** Neo4j-First Architecture (Phase 2 completed 2026-03-09). Task ID canonical format (2026-03-10). Dashboard Sessions view, Model Selector, Neo4j task cross-reference, knowledge base (2026-03-13). Conversation Context System critical fixes (2026-03-20). Computer Use MCP integration (2026-04-01). **Hermes (8th agent, system caretaker) installed 2026-04-16; Hermes autonomous code+content improvement capability installed 2026-04-17 through 2026-04-19** — see "Hermes Autonomous Improvement" section below.
 
 ---
 
@@ -13,7 +13,8 @@
 
 1. [Executive Summary](#executive-summary)
 2. [System Overview](#system-overview)
-3. [The Seven Agents](#the-seven-agents)
+3. [The Eight Agents](#the-eight-agents)
+3a. [Hermes Autonomous Improvement](#hermes-autonomous-improvement)
 4. [Routing Protocol](#routing-protocol)
 5. [Task Lifecycle](#task-lifecycle)
 6. [Heartbeat System (Cron)](#heartbeat-system-cron)
@@ -87,6 +88,8 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 | **Cron Scheduler** | OpenClaw Cron | Heartbeats, reflections, automation |
 | **Dashboard** | Node.js (the.kurult.ai) | Web UI: Kanban, Sessions, Reflections, Dispatch, Settings |
 | **Messaging** | Signal, Web | Human communication channels |
+| **MCP (Web)** | Playwright plugin | Headless Chromium browser automation (concurrent, per-agent) |
+| **MCP (macOS GUI)** | `computer_use_mcp.py` + cliclick | Native app interaction: screenshot, click, type, key (serialized) |
 
 ### Agent Models
 
@@ -104,7 +107,7 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 
 ---
 
-## The Seven Agents
+## The Eight Agents
 
 ### Kublai — Squad Lead / Router
 
@@ -254,6 +257,112 @@ Unlike single-agent systems (Claude Code, Pi), the Kurultai uses **specialized a
 **Directory:** `/agents/tolui/`
 
 **Key Capability:** Runs on local Ollama (not Claude Code). Dedicated gateway (port 18792) for fault isolation from main Kublai gateway
+
+---
+
+### Hermes — System Caretaker (2026-04-16)
+
+**Role:** Internal system health, quality enforcement, continuous improvement, **autonomous code + content patching** (2026-04-19)
+
+**Primary Functions:**
+- Daemon-based detection (11 checks, 60s cycle)
+- T0 auto-fix library (5 remediations: requeue_stuck_task, rotate_failing_provider, clear_bloated_session, force_refresh_reflection_bridge, reconcile_orphan_tasks)
+- **Autonomous fix engine** (as of 2026-04-19): LLM-authored unified-diff patches against code and content, gated by denylist + rate-limit + baseline-tests + AST parse + diff-size cap
+- **Signal-based revert**: operator replies `revert` / `revert <sha>` / `revert all today` to a fix DM for automated `git revert` + push + confirmation
+- Scheduled improvement sweeps (knowledge-stale, dedup-gap, bare-except)
+- Proposal pipeline integration (Neo4j `Proposal` nodes for T1/T2/T3 changes)
+- Meta-watched by Ögedei (heartbeat + PID liveness)
+
+**Symbol:** 🪽 (The Messenger)
+
+**Model:** claude-sonnet-4-6
+
+**Directory:** `/agents/hermes/`
+
+**Key Capability:** Detects system drift, autonomously authors + commits + pushes fixes, notifies operator per-change via Signal with one-tap revert. Migrated 16 of 18 checks from Ögedei; Ögedei narrowed to external infrastructure + Hermes meta-watch.
+
+**Related:** See "Hermes Autonomous Improvement" section below for the full flow.
+
+---
+
+## Hermes Autonomous Improvement
+
+Installed 2026-04-19 per plan `docs/plans/lazy-sparking-hamster.md`. Evolves Hermes from detect-and-alert into detect-fix-commit-notify.
+
+### Fix Engine (`hermes_fix_engine.py`)
+
+14-step orchestrator with an invariant: target files end in one of two states — (a) fix applied + committed + pushed + DM sent, (b) files in pre-fix state + rollback DM sent. No intermediate state.
+
+```
+detect/sweep → enqueue fix-job → hermes-fix-runner.py (cron 5m) →
+  hermes-fix-content.py | hermes-fix-code.py →
+    gates (flags, denylist, rate-limit, baseline tests, diff dry-run) →
+      apply (git apply) → post-tests → git add + commit (Hermes identity)
+      → git push → HermesCommit node + HermesAction node + Signal DM
+```
+
+### Safety Gates (each fails closed)
+
+1. **Kill-switch flags** (6-tier hierarchy, precedence high→low):
+   - `hermes-disabled.flag` — all T0 halted
+   - `hermes-risky-disabled.flag` — credential-affecting T0s only
+   - `hermes-autonomous-disabled.flag` — master autonomous kill
+   - `hermes-autonomous-fix-content-disabled.flag`
+   - `hermes-autonomous-fix-code-disabled.flag`
+   - `hermes-autonomous-sweep-disabled.flag`
+   Emergency: `bash ~/.openclaw/agents/main/scripts/hermes-panic-stop.sh`. Resume: `bash hermes-resume.sh`.
+2. **Denylist** (`hermes_denylist.py`): canonical-path matching (case-insensitive on APFS) + variant filename matching. Prevents self-modification. Re-validated at apply time (double-gated).
+3. **Rate limiter** (`hermes_rate_limit.py`): atomic `consume_slot()` — 3/hr per scope, 10/day total.
+4. **Circuit breaker** (`hermes_circuit_breaker.py`): trips at 2 apply-failures/30m, 3 rollbacks/60m, or 1 denylist violation → master flag self-engaged + operator DM.
+5. **Baseline tests**: must pass before authoring (don't pile on broken state).
+6. **Diff-size cap**: 80 lines for code, 500 for content. Larger → DIFF_TOO_BIG notify-only.
+7. **AST parse**: Python patches must parse after application (via `patch(1)` on scratch copy).
+8. **Post-apply tests**: must pass after application or automatic `git restore`.
+9. **Pre-commit hook**: re-validates denylist at commit time; revert commits bypass only when the reverted SHA is a known HermesCommit.
+10. **Import-integrity manifest**: daemon verifies sha256 of 24 tracked files at startup (Python modules + shell scripts + git hooks). Self-kill-switches on mismatch.
+11. **Prompt-injection sanitization** (`hermes_sanitize.py`): 7 injection patterns stripped from source before LLM ingestion.
+
+### Authoring Scripts
+
+- `hermes-fix-content.py` — docs/wiki/knowledge fixes
+- `hermes-fix-code.py` — `.py` fixes with baseline-test + AST + size gates
+
+### Scheduled Sweeps (`hermes_sweep_runner.py`)
+
+Each starts in `notify-only` mode (DM describes candidates, no change); graduates to `autonomous` by setting `echo autonomous > ~/.openclaw/flags/hermes-sweep-<name>-mode.flag` after 48h clean observation.
+
+| Sweep | Scope | Candidates at install |
+|-------|-------|-----------------------|
+| knowledge_stale | content | 0 (all knowledge < 90d) |
+| dedup_gap | code | 6 unwrapped `write_hermes_task` sites in `hermes-watchdog.py` (self-modification bootstrap) |
+| bare_except | code | 3 files with bare `except:` / `except Exception: pass` |
+
+### Revert via Signal Reply
+
+Intent registered in `signal_message_handler.py`. Operator DMs:
+- `revert` — undo the most recent HermesCommit
+- `revert <sha>` — undo a specific one (short or full SHA)
+- `revert all today` — undo every HermesCommit in the last 24h
+
+`hermes_revert_handler.py` verifies (a) SHA is in HermesCommit Neo4j index, (b) `git log` confirms Hermes authorship, (c) sender phone matches operator, then runs `git revert --no-edit` + push + confirmation DM.
+
+### Neo4j Schema Additions
+
+- `HermesCommit` node: `sha` (unique), `fix_id`, `repo`, `sweep`, `autonomy_level`, `subject`, `target_paths`, `diff_lines`, `created_at`, `reverted`, `revert_sha`, `reverted_at`
+- `HermesAction` node extended with: `commit_sha`, `fix_id`, `schema_version=1+`
+- Indexes: `hermes_commit_sha_unique` (constraint), `hermes_commit_sweep`, `hermes_commit_reverted`, `hermes_commit_created_at`, `hermes_action_fix_id`, `hermes_action_commit_sha`
+
+### Observability
+
+- `hermes-fix-log.py` — CLI: `list`, `show <sha>`, `stats --window 7d`, `reverted`
+- `hermes_metrics.py` — dashboard-facing summary queries (commits by sweep, outcomes, revert rate, time-to-revert, most-active targets)
+- `hermes_digest.py` — daily Signal DM with last-24h activity; falls back to writing a hermes task if Signal daemon is degraded
+
+### Current State (as of 2026-04-19)
+
+- All 3 autonomous flags still engaged — nothing fires until Phase 9 staged activation (earliest 2026-05-01, gated on install-plan Phase 8.1 14-day clean operation)
+- 52/52 Hermes-specific unit tests passing
+- End-to-end live trial completed against `/tmp/hermes-live-trial` scratch repo: LLM-authored fix applied + committed + revert round-trip verified
 
 ---
 
@@ -1354,6 +1463,9 @@ API key source: ~/.openclaw/credentials/kurultai-api.key
 │   │   │   ├── provider-fallback.md
 │   │   │   ├── agent-roster.md
 │   │   │   └── dashboard-views.md
+│   │   ├── config/
+│   │   │   ├── computer-use-mcp.json  # MCP config for Computer Use server
+│   │   │   └── computer-use-agents.txt # Agent allowlist for Computer Use
 │   │   ├── scripts/              # Python scripts (v1 + v2)
 │   │   │   ├── neo4j_v2_core.py      # Task state machine (claim, complete, fail)
 │   │   │   ├── neo4j_v2_router.py    # Graph-native routing
@@ -1362,6 +1474,9 @@ API key source: ~/.openclaw/credentials/kurultai-api.key
 │   │   │   ├── neo4j_v2_delegate.py  # Task delegation (SPAWNED)
 │   │   │   ├── neo4j_v2_reflection.py # Reflection context + writes
 │   │   │   ├── task_executor.py       # Unified task executor daemon
+│   │   │   ├── computer_use_mcp.py    # Custom Computer Use MCP server
+│   │   │   ├── chromium-reaper.sh     # Orphaned Chromium process cleanup
+│   │   │   ├── playwright-cleanup.sh  # Playwright temp directory cleanup
 │   │   │   ├── neo4j_task_tracker.py # V1 tracker (analytics, gates, rules)
 │   │   │   └── neo4j_calendar.py     # Calendar schema
 │   │   ├── memory/
@@ -1706,6 +1821,9 @@ A structured knowledge base was created (2026-03-13) to give agents quick refere
 | `provider-fallback.md` | 196 | claude-agent wrapper, mode.json, primary/backup settings |
 | `agent-roster.md` | 260 | All 7 agents: roles, domains, skills, hard rules |
 | `dashboard-views.md` | 250 | All 7 dashboard tabs: data sources, APIs, user actions |
+| `gateway-plugin.md` | -- | Notification pipeline, context assembler Phase 10, gateway capabilities |
+| `task-executor.md` | -- | Unified task executor: 6 components, constants, observability |
+| `mcp-servers.md` | -- | Two-tier MCP architecture: Playwright (web) + Computer Use (macOS GUI) |
 
 ---
 
@@ -1752,6 +1870,7 @@ A structured knowledge base was created (2026-03-13) to give agents quick refere
 | 2.4 | 2026-03-12 | Model accuracy update: (1) Corrected agent count from six to seven. (2) Updated model assignments per kurultai.json — gateway defaults to zai-coding/glm-5 for most agents, claude-opus-4-6 for Ogedei, ollama (hf.co/lukey03/Qwen3.5-9B-abliterated-GGUF) for Tolui. (3) Clarified reflection pipeline excludes Tolui (Ollama-based, does not participate in Claude Code reflection). |
 | 2.7 | 2026-03-19 | Pipeline health fixes (11 items from /horde-review audit): (1) Backfilled `assigned_to` for 73 tasks where v1 set `agent` but not `assigned_to`, making them invisible to v2 executor. (2) Fixed 4 zombie PENDING tasks with `.done` in task_id; patched `neo4j-state-sync.py` to recognize `.done-*` filenames as COMPLETED. (3) Deleted 38 orphaned TaskOutput + 25 orphaned FailureReport nodes. (4) v2 executor now writes heartbeat file (`v2-executor-heartbeat.json`, every 30s) and idle poll logging (every ~5 min). (5) v2 executor calls `promote_orphans()` + `recover_orphans()` every ~5 min (was never called). (6) v2 executor now emits EXECUTING/COMPLETED/FAILED events to `task-ledger.jsonl` with `executor: "claude-code"`. (7) Added `ORPHANED` to `STATUS_MAP` in `neo4j.js` (maps to failed column). (8) Fixed Event node schema in `neo4j-schema.md` — replaced wrong `title/date/agent` with actual `name/start_datetime/end_datetime` properties. (9) `create_task_full()` now sets `assigned_to: $agent` alongside `agent: $agent` — prevents future NULL assigned_to. (10) Backfilled `created_at` from `created` for 73 legacy tasks. (11) Dropped 3 redundant single-property indexes subsumed by v2 composites. |
 | 2.6 | 2026-03-19 | Critical review fixes (items 7-25): (1) hourly_reflection.sh timeout fixed from 7200s (bug) to 900s. (2) Dashboard API security: method-aware auth (POST to settings/mode, settings/model, tasks, queue now require API key; GET remains public), authToken stripped from GET /api/providers, rate limiter X-Forwarded-For spoofing fixed. (3) SLOW_SKILLS consolidated to single source in kurultai_paths.py. (4) claim_task() wrapped in execute_write transaction. (5) _system_sources deduplicated to module-level frozenset. (6) Agent models table corrected: all 6 agents use claude-opus-4-6 (not zai-coding/glm-5). (7) Cron table expanded from 5 to 24 jobs. (8) Stale recovery threshold corrected (12 min → ~2 hours). (9) Polling interval corrected (10s → 15s). (10) Archived script references updated (prepare_reflection_context.py → neo4j_v2_reflection.py, score_skills.py → neo4j_v2_scorer.py). (11) Provider fallback chain updated to 4-tier diagram. (12) Knowledge base: phantom endpoints removed, neo4j-schema.md reconciled, provider-fallback.md fixed. (13) neo4j-state-sync.py driver leak fixed, deprecation status updated to SOFT DEPRECATED. |
+| 2.8 | 2026-04-01 | Computer Use MCP integration: (1) Added two-tier MCP architecture to Platform Stack (Playwright for web, custom `computer_use_mcp.py` for macOS GUI). (2) Added `config/` directory to file structure with `computer-use-mcp.json` and `computer-use-agents.txt`. (3) Added `computer_use_mcp.py`, `chromium-reaper.sh`, `playwright-cleanup.sh` to scripts listing. (4) Updated Knowledge Base table with `gateway-plugin.md`, `task-executor.md`, `mcp-servers.md`. |
 | 2.5 | 2026-03-13 | Comprehensive architecture audit via 3-agent swarm. (1) Added Dashboard section: the.kurult.ai architecture, all 7 views (Kanban, Calendar, Reflections, Wrappers, Sessions, Dispatch, Settings), module breakdown (server.js, neo4j.js, middleware.js, cache.js, config.js). (2) Added Sessions view: live process detection via ps aux, Neo4j WORKING task cross-reference, model selector (ALLOWED_MODELS with full Haiku ID), routing mode toggle. (3) Added Credential & Provider System: vault at ~/.openclaw/credentials/, claude-agent primary/backup fallback chain, mode.json dispatch modes. (4) Added Neo4j Task Schema (Production): ~30 Task node properties (vs 5 in v2.4), v2 state machine with CAS claim_epoch fencing, 10 node types, 15+ relationships, graph-native router scoring. (5) Added Security Architecture: CORS, rate limiting, API key auth, security headers, path validation, CSRF infra. (6) Updated File Structure: added apps/the-kurultai/, credentials/, claude/, logs/sessions/, knowledge/. (7) Added Knowledge Base section: 6 reference files (1,148 lines) covering API endpoints, Neo4j schema, provider fallback, agent roster, dashboard views. (8) Fixed sessions data parsing bug (API returns object, not array). (9) Clarified gateway model vs Claude Code execution model distinction. |
 
 ---
