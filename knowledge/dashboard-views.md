@@ -4,7 +4,7 @@
 **URL**: `https://the.kurult.ai` (also `http://127.0.0.1:18790`)
 **Frontend**: Single-page application served from `index.html` with client-side routing
 
-The dashboard has 7 tabs, each rendering a distinct view with data from the API.
+The dashboard has 8 tabs, each rendering a distinct view with data from the API.
 
 ---
 
@@ -230,6 +230,31 @@ Manage LLM provider credentials (reads/writes `~/.openclaw/credentials/provider.
 - `PUT /api/settings/models/files?path=` -- write config file (protected)
 - `GET /api/settings/models/status` -- model health status (protected)
 - `GET /api/agents/claude-config` -- per-agent profile/model/effort
+
+---
+
+## 8. Hermes
+
+**Route**: `/hermes`
+**Added**: 2026-04-19
+
+Observability + control surface for the Hermes autonomous caretaker agent. Lazy-loaded module (`hermes-tab.js` + `hermes-tab.css`) scoped under `.hermes-tab` with shadcn-style zinc tokens; no CSS bleed into other tabs.
+
+Six zones, each capped to ≤7 visible items (Miller's Law):
+
+- **Top bar** — daemon status dot + pid/heartbeat + panic-stop button
+- **Health strip** — circuit breaker · apply-fails (30m) · rollbacks (60m) · daily ops · fix queue · Signal queue
+- **Live activity feed** — SSE-backed tail of `hermes-actions.jsonl` + `cascade-detections.jsonl`, 7 rows visible, capped 50 in DOM
+- **Recent commits** — 7 HermesCommits per page, click a row to expand inline diff + Revert button
+- **Kill switches** — 6 flag toggles in 2 groups (T0 safety + Autonomous capabilities)
+- **Sweeps** — 3 rows (knowledge_stale · dedup_gap · bare_except) with mode dropdown + "Run now"
+
+**API endpoints used** (all under `/api/hermes/*`, all authenticated — see `hermes-system.md` for the full table):
+- `GET /api/hermes/{session,status,flags,sweeps,circuit-breaker,rate-limits,queue,signal-queue,commits,commits/:sha,feed/token}`
+- `GET /api/hermes/feed/stream?t=<token>` -- SSE (single-use token)
+- `POST /api/hermes/{flags/:flag,sweeps/:name/mode,sweeps/:name/trigger,revert,circuit-breaker/reset,panic-stop/prepare,panic-stop}` (all require `X-Hermes-Confirm: <CSRF>` header)
+
+**Files**: `hermes-tab.css`, `hermes-tab.js`, `hermes-routes.js`, `tests/hermes-routes.test.js`. Full audit trail in `~/.openclaw/logs/hermes-ui-actions.jsonl`.
 
 ---
 

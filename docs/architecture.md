@@ -364,6 +364,24 @@ Intent registered in `signal_message_handler.py`. Operator DMs:
 - 52/52 Hermes-specific unit tests passing
 - End-to-end live trial completed against `/tmp/hermes-live-trial` scratch repo: LLM-authored fix applied + committed + revert round-trip verified
 
+### UI Layer (`the.kurult.ai/hermes`)
+
+Observability + control surface for Hermes. Tight-integrated tab in the existing Kurultai SPA (not a subdomain). Lazy-loaded: `hermes-tab.js` + `hermes-tab.css` injected on first navigation to `/hermes`; cleanup hook closes SSE on tab-leave. Backend is a single ES module (`hermes-routes.js`) delegated from `server.js` via `handleHermesRequest(req, res, url, ctx)` — no Express dependency.
+
+Aesthetic: scoped `.hermes-tab` namespace, shadcn-style zinc tokens (neutral zinc-950 / zinc-900 / zinc-800), `rounded-md` (0.5rem) throughout, Geist Sans body + JetBrains Mono for SHAs/timestamps/diffs. Miller's Law chunking: ≤7 visible items per zone, progressive disclosure on click.
+
+Safety layers:
+
+1. `PROTECTED_PATHS` upstream in `server.js` — Cloudflare Access JWT OR API key required on every `/api/hermes/*` endpoint (exception: `/feed/stream` carries its own single-use token)
+2. `X-Hermes-Confirm` CSRF header on every write endpoint (token minted by `/api/hermes/session`, 1h TTL, keyed to Cloudflare Access email or remote IP)
+3. Hardcoded allowlists for flag names (6) and sweep names (3) — no arbitrary filesystem writes possible
+4. Revert SHA validated `/^[0-9a-f]{7,40}$/i` before any subprocess spawn
+5. Subprocess spawns use `execFile` (no shell) with 30s timeout + 8KB buffer cap + strict argv
+6. Panic-stop is two-phase: `/panic-stop/prepare` mints a 5s single-use token, `/panic-stop` consumes it + runs `hermes-panic-stop.sh` (6 flags engaged atomically)
+7. Every write appends JSONL to `~/.openclaw/logs/hermes-ui-actions.jsonl` with timestamp + sessionId + endpoint + metadata + result
+
+Endpoints: 10 reads + 1 SSE + 6 writes + 1 panic-prepare. Test coverage: 13 integration tests in `tests/hermes-routes.test.js`.
+
 ---
 
 ## Routing Protocol

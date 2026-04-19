@@ -156,3 +156,58 @@ Intent registered in `signal_message_handler.py`: operator DM replies of `revert
 ### Integrity manifest
 
 `~/.openclaw/agents/hermes/import-manifest.json` now tracks 21 entries: original 5 + 6 Phase 0 modules + new Phase 1-8 modules + 2 shell scripts + 2 git pre-commit hooks. Daemon verifies all sha256s at startup and self-kill-switches on mismatch.
+
+## UI Tab (`the.kurult.ai/hermes`)
+
+Tight-integration dashboard tab, lazy-loaded into the existing SPA. Vanilla HTML/CSS/JS, scoped `.hermes-tab` CSS, shadcn neutral-zinc theme, Miller's Law chunking (≤7 visible items per zone).
+
+### Files
+
+- `~/.openclaw/apps/the-kurultai/hermes-tab.css` — scoped tokens + layout (~430 lines)
+- `~/.openclaw/apps/the-kurultai/hermes-tab.js` — IIFE controller, exposes `renderHermesView` + `hermesCleanup` (~600 lines)
+- `~/.openclaw/apps/the-kurultai/hermes-routes.js` — Express-free router for plain `createServer`, 10 reads + 1 SSE + 6 writes + panic-prepare (~800 lines)
+- `~/.openclaw/apps/the-kurultai/tests/hermes-routes.test.js` — 13 integration smoke tests via `node --test`
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/hermes/session` | mint CSRF token, 1h TTL, scoped to sessionId |
+| GET | `/api/hermes/status` | daemon pid/heartbeat + flags + sweeps |
+| GET | `/api/hermes/flags` | bool presence of the 6 allowlisted flag files |
+| GET | `/api/hermes/sweeps` | per-sweep mode + last-run |
+| GET | `/api/hermes/circuit-breaker` | trip state, thresholds, recent events |
+| GET | `/api/hermes/rate-limits` | per-scope hourly + daily totals |
+| GET | `/api/hermes/queue` | fix-runner queue depth |
+| GET | `/api/hermes/signal-queue` | outbound Signal DM pending count |
+| GET | `/api/hermes/commits` | paginated HermesCommit rows (Neo4j) |
+| GET | `/api/hermes/commits/:sha` | single commit + `git show` diff |
+| GET | `/api/hermes/feed/token` | single-use 60s SSE token |
+| GET | `/api/hermes/feed/stream` | SSE tail of action + cascade logs, `?t=<token>` |
+| POST | `/api/hermes/flags/:flag` | engage/disengage flag (allowlisted names) |
+| POST | `/api/hermes/sweeps/:name/mode` | `autonomous` \| `notify-only` |
+| POST | `/api/hermes/sweeps/:name/trigger` | dry-run a sweep now |
+| POST | `/api/hermes/revert` | revert a specific HermesCommit SHA |
+| POST | `/api/hermes/circuit-breaker/reset` | manual breaker reset with reason |
+| POST | `/api/hermes/panic-stop/prepare` | mint single-use 5s panic token |
+| POST | `/api/hermes/panic-stop` | consume token → engages all 6 flags |
+
+### Safety
+
+- All writes require `X-Hermes-Confirm: <CSRF>` header (minted from `/session`)
+- All writes require API key (Bearer) OR Cloudflare Access JWT (auth enforced by `server.js` `PROTECTED_PATHS`)
+- Flag + sweep names are hardcoded allowlists in `hermes-routes.js` (no arbitrary filesystem writes)
+- Revert SHA validated `/^[0-9a-f]{7,40}$/i`
+- Subprocess spawns: `execFile` only (no shell), 30s timeout, 8KB stdout cap, strict argv
+- Panic-stop is two-phase: prepare (mint 5s token) → engage (consume token + run `hermes-panic-stop.sh`)
+- SSE uses single-use 60s token so `EventSource` (no Authorization header) can authenticate
+- Every write appends JSONL to `~/.openclaw/logs/hermes-ui-actions.jsonl` (ts, endpoint, sessionId, meta, result)
+
+### Degraded modes
+
+| Failure | Behavior |
+|---|---|
+| Neo4j down | `/commits*` + `/circuit-breaker` partial returns; `/flags` + `/sweeps` still work (filesystem) |
+| Daemon heartbeat missing | `status.heartbeat_age_s = null`, UI shows "unknown" |
+| SQLite notify DB unavailable | `/signal-queue` returns `{pending: null, error: "..."}` |
+| SSE server restart | client auto-reconnects by re-minting token every 5s |
