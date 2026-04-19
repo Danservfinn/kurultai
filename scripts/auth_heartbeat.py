@@ -16,11 +16,14 @@ Output:
 """
 
 import json
+import logging
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Configuration
 AGENTS = ["kublai", "temujin", "mongke", "chagatai", "jochi", "ogedei"]
@@ -114,8 +117,8 @@ def check_agent_auth(agent: str) -> dict:
             try:
                 with open(auth_failure_log, "a") as af:
                     af.write(f'{{"timestamp": "{datetime.now().isoformat()}", "agent": "{agent}", "label": "auth_heartbeat", "script": "auth_heartbeat.py", "reason": "auth_check_failed"}}\n')
-            except Exception:
-                pass
+            except OSError as e:
+                logger.error("Failed to append auth failure log for %s: %s", agent, e)
 
             return {
                 "status": "fail",
