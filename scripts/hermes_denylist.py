@@ -177,6 +177,59 @@ def is_denied(target_path: str) -> tuple[bool, str]:
     return False, ""
 
 
+# ------------------------------------------------------------------
+# Task-source denylist (used by the task_custodian sweep).
+#
+# Different concept than is_denied — these check TASK graph records,
+# not filesystem paths. Rejects any task whose `source` field is
+# Hermes-originated or part of the scheduler/voting infrastructure,
+# so the custodian cannot delete/rewrite/reassign its own operations
+# or the core agent-routing machinery.
+# ------------------------------------------------------------------
+
+_DENIED_TASK_SOURCE_PREFIXES = (
+    "hermes_",
+    "hermes-",
+    "task_custodian",
+    "kurultai_scheduler",
+    "kurultai_voting",
+    "proposal_generator",
+    "reflection-",
+    "reflection_",
+    "kublai_router",  # core routing — fragile, stay out
+)
+
+
+def is_task_denied(task_source: str | None,
+                   task_id: str | None = None,
+                   assigned_to: str | None = None) -> tuple[bool, str]:
+    """Return (is_denied, reason) for a candidate task record.
+
+    Used by hermes_sweep_task_custodian to filter out tasks Hermes
+    itself or the scheduler core produced. A null source is allowed
+    (legacy tasks from kanban-ui etc. may have no source field set).
+
+    Defense layers (any match → denied):
+      1. source matches a denylisted prefix (hermes_, kurultai_*, ...)
+      2. task_id contains "reflect" / "hermes" / "custodian"
+         (catches pipeline-created reflection tasks)
+      3. assigned_to == "hermes" (Hermes never custodians its own work)
+    """
+    if assigned_to and assigned_to.lower() == "hermes":
+        return True, "task assigned_to hermes — self-protection"
+    if task_id:
+        tid_lower = task_id.lower()
+        for frag in ("reflect-hermes", "hermes-", "-hermes", "custodian"):
+            if frag in tid_lower:
+                return True, f"task_id contains '{frag}' — self-protection"
+    if task_source:
+        source_lower = task_source.lower()
+        for prefix in _DENIED_TASK_SOURCE_PREFIXES:
+            if source_lower.startswith(prefix):
+                return True, f"task source '{task_source}' is denylisted ({prefix})"
+    return False, ""
+
+
 if __name__ == "__main__":
     # Quick self-test when run directly
     import sys
@@ -201,4 +254,26 @@ if __name__ == "__main__":
         if denied != expected:
             failed += 1
         print(f"  {ok} is_denied({path!r}) = ({denied}, {reason!r})")
+
+    # Task-source denylist self-test
+    print("\n  Task-source denylist:")
+    task_cases = [
+        ("hermes_sweep", True),
+        ("hermes-proposal", True),
+        ("task_custodian", True),
+        ("kurultai_scheduler", True),
+        ("reflection-api-rollback", True),
+        ("kublai_router", True),
+        ("kanban-ui", False),
+        ("signal_parse", False),
+        ("signal-parse", False),
+        (None, False),
+        ("", False),
+    ]
+    for source, expected in task_cases:
+        denied, reason = is_task_denied(source)
+        ok = "✓" if denied == expected else "✗"
+        if denied != expected:
+            failed += 1
+        print(f"  {ok} is_task_denied({source!r}) = ({denied}, {reason!r})")
     sys.exit(0 if failed == 0 else 1)

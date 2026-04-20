@@ -31,7 +31,7 @@ from json_state import locked_json_update  # type: ignore
 STATE_FILE = Path.home() / ".openclaw" / "state" / "hermes_rate_limits.json"
 PER_SCOPE_HOURLY_MAX = 3
 DAILY_TOTAL_MAX = 10
-_VALID_SCOPES = ("content", "code")
+_VALID_SCOPES = ("content", "code", "task_action")
 
 
 def _now() -> float:
@@ -56,9 +56,11 @@ def allowed(scope: str) -> tuple[bool, str]:
     with locked_json_update(str(STATE_FILE)) as state:
         content = _prune(state.get("content", []), day_cutoff)
         code = _prune(state.get("code", []), day_cutoff)
+        task_action = _prune(state.get("task_action", []), day_cutoff)
         state["content"] = content
         state["code"] = code
-        total_today = len(content) + len(code)
+        state["task_action"] = task_action
+        total_today = len(content) + len(code) + len(task_action)
         if total_today >= DAILY_TOTAL_MAX:
             return False, f"daily cap: {total_today}/{DAILY_TOTAL_MAX}"
 
@@ -145,16 +147,20 @@ def current_counts() -> dict:
     hour_cutoff = now - 3600
     day_cutoff = now - 86400
     if not STATE_FILE.exists():
-        return {"content_hour": 0, "code_hour": 0, "total_day": 0}
+        return {"content_hour": 0, "code_hour": 0,
+                "task_action_hour": 0, "total_day": 0}
     with locked_json_update(str(STATE_FILE)) as state:
         content = _prune(state.get("content", []), day_cutoff)
         code = _prune(state.get("code", []), day_cutoff)
+        task_action = _prune(state.get("task_action", []), day_cutoff)
         state["content"] = content
         state["code"] = code
+        state["task_action"] = task_action
         return {
             "content_hour": sum(1 for t in content if t >= hour_cutoff),
             "code_hour": sum(1 for t in code if t >= hour_cutoff),
-            "total_day": len(content) + len(code),
+            "task_action_hour": sum(1 for t in task_action if t >= hour_cutoff),
+            "total_day": len(content) + len(code) + len(task_action),
             "caps": {
                 "per_scope_hour": PER_SCOPE_HOURLY_MAX,
                 "daily_total": DAILY_TOTAL_MAX,

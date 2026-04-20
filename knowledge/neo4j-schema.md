@@ -30,7 +30,11 @@ The primary node type. Represents a unit of work assigned to an agent.
 | `prompt` | String | Full task prompt/description (also updated for edits) |
 | `description` | String | Alternative to prompt (legacy) |
 | `result` | String | Task result/output (legacy) |
-| `status` | String | One of: `PENDING`, `WORKING`, `COMPLETED`, `FAILED`, `ORPHANED` |
+| `status` | String | One of: `PENDING`, `WORKING`, `COMPLETED`, `FAILED`, `ORPHANED`, `OBSOLETE`. `OBSOLETE` is a soft-delete written by Hermes's `task_custodian` sweep (duplicates, harmful prompts); the pre-obsolete status is preserved in `previous_status` so Signal `revert <task_id>` can restore it. |
+| `previous_status` / `previous_prompt` / `previous_agent` | String | Pre-mutation values captured by `task_custodian` mutations for revert. |
+| `obsolete_reason` / `obsolete_by` / `obsolete_at` | String / String / DateTime | Set by `mark_obsolete()`. |
+| `rewrite_reason` / `rewrite_by` / `rewritten_at` / `original_prompt` | String / String / DateTime / String | Set by `rewrite_prompt()`. `original_prompt` only captures the FIRST pre-rewrite prompt, so subsequent rewrites never lose the true operator intent. |
+| `reassign_reason` / `reassigned_by` / `reassigned_from` / `reassigned_at` | String / String / String / DateTime | Set by `reassign()`. |
 | `assigned_to` | String | Agent name (e.g., `temujin`, `kublai`). Always set on creation alongside `agent`. |
 | `agent` | String | Agent name (legacy field, kept for backward compat; `assigned_to` is canonical) |
 | `priority` | String | One of: `critical`, `high`, `normal`, `low` |

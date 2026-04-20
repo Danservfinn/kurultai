@@ -136,6 +136,25 @@ Each sweep starts in `notify-only` mode (DMs operator about candidates). Graduat
 - `knowledge_stale` — docs older than 90 days → content authoring
 - `dedup_gap` — unwrapped `write_hermes_task` in `hermes-watchdog.py` → code authoring (requires override flag)
 - `bare_except` — `except:` / `except Exception: pass` → code authoring
+- `horde_review` — operator-triggered (and daily cron) multi-agent review via the `horde-review` skill on a configured scope (directory). Candidates carry per-file autonomy level (`code`/`content`) and route through the normal fix engine. Requires `--scope <path>`.
+- `task_custodian` — scans the Kurultai Neo4j task graph for repeat failures (`TASK_FAILED` count / 24h), duplicate `PENDING` tasks (same agent + prompt prefix), and chronic orphans (`ORPHAN_RECOVERED` bounces). Emits candidates with `autonomy_level="task_action"` and a per-candidate `evidence.action_kind` of `retry` / `delete` (soft, via status `OBSOLETE`) / `rewrite_prompt` / `reassign`. Each action kind has its own per-action flag (`hermes-sweep-task_custodian-action-<kind>.flag`). Dispatches to `hermes-fix-task-action.py` which calls the matching Kurultai API endpoint and captures `previous_state` into evidence for Signal revert (`revert <task_id>`). Does NOT take a filesystem scope — triggered via the Review+Improve dropdown entry `task-pipeline`.
+
+### Scope config (daily rotation — `hermes_daily_review_scopes.json`)
+
+Each entry has a `kind` (`path` | `tasks`) and a `sweep` name. The daily review cron rotates through them round-robin. Currently:
+1. `brain-projects` (path/horde_review)
+2. `brain-concepts` (path/horde_review)
+3. `agents-scripts` (path/horde_review, forced `notify-only`)
+4. `the-kurultai` (path/horde_review)
+5. `task-pipeline` (tasks/task_custodian)
+
+### Task mutation endpoints (used by `hermes-fix-task-action.py`)
+
+- `POST /api/tasks/:agent/:filename/obsolete` — soft-delete to status `OBSOLETE` (preserves `previous_status`)
+- `POST /api/tasks/:agent/:filename/rewrite-prompt` — replace `task.prompt` (preserves `original_prompt`)
+- `POST /api/tasks/:agent/:filename/reassign` — change `assigned_to` + bump `claim_epoch`
+
+All three reject `WORKING` tasks (never clobber a mid-flight executor).
 
 ### Event-driven queue (`hermes-fix-runner.py`)
 

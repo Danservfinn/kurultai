@@ -210,6 +210,13 @@ REGISTERED_SWEEPS: dict[str, dict] = {
         "module": "hermes_sweep_horde_review",
         "requires_scope": True,
     },
+    "task_custodian": {
+        # Plugin always sets autonomy_level="task_action" per-candidate;
+        # registry default is used only if plugin omits it.
+        "autonomy_level": "task_action",
+        "module": "hermes_sweep_task_custodian",
+        "requires_scope": False,
+    },
 }
 
 
@@ -253,17 +260,28 @@ def _notify_sweep_candidate(sweep: str, target: str, reason: str,
 
 
 def _apply_candidate(sweep: str, target: str, reason: str,
-                     autonomy_level: str) -> dict:
-    """Invoke the appropriate authoring script for a candidate."""
-    script_name = f"hermes-fix-{autonomy_level}.py"
+                     autonomy_level: str,
+                     extra_env: dict | None = None) -> dict:
+    """Invoke the appropriate authoring script for a candidate.
+
+    Script name is derived from autonomy_level with underscores mapped
+    to hyphens ("task_action" -> "hermes-fix-task-action.py"). Extra
+    context (e.g. action_kind for task_custodian) is passed through the
+    subprocess environment via extra_env.
+    """
+    script_suffix = autonomy_level.replace("_", "-")
+    script_name = f"hermes-fix-{script_suffix}.py"
     script_path = Path(__file__).resolve().parent / script_name
     if not script_path.exists():
         return {"outcome": "SCRIPT_MISSING", "target": target}
+    env = os.environ.copy()
+    if extra_env:
+        env.update({k: str(v) for k, v in extra_env.items() if v is not None})
     try:
         result = subprocess.run(
             ["python3", str(script_path),
              "--target", target, "--reason", reason],
-            capture_output=True, text=True, timeout=600,
+            capture_output=True, text=True, timeout=600, env=env,
         )
     except subprocess.TimeoutExpired:
         return {"outcome": "AUTHOR_TIMEOUT", "target": target}
@@ -394,7 +412,21 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
             else:
                 _emit("apply_start", idx=i, target=target,
                       autonomy_level=cand_level, reason=reason[:200])
-                outcome = _apply_candidate(sweep_name, target, reason, cand_level)
+                # For task_action candidates, plumb the action_kind +
+                # evidence through env vars so the fix script knows
+                # which API endpoint to call and what previous-state
+                # context to preserve for revert.
+                extra_env = None
+                if cand_level == "task_action":
+                    evidence = cand.get("evidence", {}) or {}
+                    extra_env = {
+                        "HERMES_TASK_ACTION_KIND": evidence.get("action_kind", ""),
+                        "HERMES_TASK_AGENT": evidence.get("agent", ""),
+                        "HERMES_TASK_CURRENT_STATUS": evidence.get("current_status", ""),
+                        "HERMES_TASK_SOURCE": evidence.get("source", ""),
+                    }
+                outcome = _apply_candidate(sweep_name, target, reason,
+                                           cand_level, extra_env=extra_env)
                 _emit("apply_done", idx=i, target=target,
                       outcome=outcome.get("outcome") if isinstance(outcome, dict) else str(outcome),
                       commit_sha=(outcome.get("commit_sha") or
@@ -406,9 +438,10 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
                 })
 
         result["outcome"] = "ok"
-        # Log review cycles (horde_review only — other sweeps have no
-        # cycle concept; they're single-target).
-        if sweep_name == "horde_review":
+        # Log review cycles for the sweeps that operate as cycles
+        # (multi-candidate review + apply). Dashboard renders both
+        # horde_review and task_custodian cycles from the same file.
+        if sweep_name in ("horde_review", "task_custodian"):
             _log_review_cycle(result)
         # Every sweep run appends one summary row to hermes-actions.jsonl
         # so the Daily Summary card picks it up.

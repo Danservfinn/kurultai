@@ -65,12 +65,25 @@ def pick_next_scope(config: dict, state: dict) -> tuple[dict, int]:
 
 
 def run_review(scope: dict) -> dict:
-    """Invoke hermes_sweep_runner for the given scope; parse JSON output."""
+    """Invoke hermes_sweep_runner for the given scope; parse JSON output.
+
+    Scope config entries may be kind="path" (filesystem review via
+    horde_review) or kind="tasks" (Neo4j task graph review via
+    task_custodian). Path-kind entries pass --scope; tasks-kind entries
+    don't (the task_custodian plugin has no --scope requirement).
+    """
+    sweep = scope.get("sweep", "horde_review")
+    kind = scope.get("kind", "path")
+    label = scope.get("name") or scope.get("path", "?")
     args = [
         "python3", str(SWEEP_RUNNER),
-        "--sweep", "horde_review",
-        "--scope", scope["path"],
+        "--sweep", sweep,
     ]
+    if kind == "path":
+        if not scope.get("path"):
+            return {"outcome": "RUNNER_ERROR", "scope": label,
+                    "stderr_tail": "path-kind scope missing 'path' field"}
+        args += ["--scope", scope["path"]]
     if scope.get("mode_override"):
         args += ["--mode", scope["mode_override"]]
     try:
@@ -81,13 +94,13 @@ def run_review(scope: dict) -> dict:
             timeout=RUN_TIMEOUT_SECS,
         )
     except subprocess.TimeoutExpired:
-        return {"outcome": "TIMEOUT", "scope": scope["path"]}
+        return {"outcome": "TIMEOUT", "scope": label}
     try:
         return json.loads(out.stdout)
     except (json.JSONDecodeError, ValueError):
         return {
             "outcome": "RUNNER_ERROR",
-            "scope": scope["path"],
+            "scope": label,
             "stdout_tail": out.stdout[-500:],
             "stderr_tail": out.stderr[-500:],
         }
@@ -104,14 +117,34 @@ def post_digest(scope: dict, result: dict) -> None:
     applied = [a for a in result.get("actions", []) if a.get("action") == "apply"]
     notified = [a for a in result.get("actions", []) if a.get("action") == "notify-only"]
     outcome = result.get("outcome", "?")
+    kind = scope.get("kind", "path")
+    sweep = scope.get("sweep", "horde_review")
 
     body_lines = [
-        f"Hermes daily review — {scope['name']}",
-        f"Scope: {scope['path']}",
+        f"Hermes daily review — {scope['name']} ({sweep})",
+    ]
+    if kind == "path":
+        body_lines.append(f"Scope: {scope.get('path', '?')}")
+    else:
+        body_lines.append(f"Scope: {kind}")
+    body_lines.extend([
         f"Mode: {result.get('mode', '?')}",
         f"Outcome: {outcome}",
         f"Candidates found: {result.get('candidates_found', 0)}",
-    ]
+    ])
+    # Per-action breakdown is useful for task_custodian runs — the
+    # operator wants to know how many retry vs delete vs rewrite
+    if sweep == "task_custodian" and applied:
+        from collections import Counter
+        kinds = Counter(
+            (a.get("outcome", {}) or {}).get("evidence", {}).get("action_kind")
+            or (a.get("evidence") or {}).get("action_kind")
+            or "unknown"
+            for a in applied
+        )
+        body_lines.append(
+            "By action: " + ", ".join(f"{k}={v}" for k, v in kinds.items())
+        )
     if applied:
         body_lines.append(f"Applied: {len(applied)}")
     if notified:
@@ -119,7 +152,10 @@ def post_digest(scope: dict, result: dict) -> None:
     if outcome in ("RUNNER_ERROR", "TIMEOUT"):
         body_lines.append("(see logs for diagnostic detail)")
     body_lines.append("")
-    body_lines.append("Reply `revert all today` via Signal to undo any commits.")
+    if sweep == "task_custodian":
+        body_lines.append("Reply `revert <task_id>` via Signal to undo a task mutation.")
+    else:
+        body_lines.append("Reply `revert all today` via Signal to undo any commits.")
 
     body = "\n".join(body_lines)
     try:

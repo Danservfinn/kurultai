@@ -157,6 +157,125 @@ def handle_revert(sha_hint: Optional[str]) -> dict:
     }
 
 
+def _find_task_action_record(task_id: str) -> Optional[dict]:
+    """Scan hermes-actions.jsonl for the most recent task_action record
+    matching this task_id. Returns the record dict or None."""
+    import json as _json
+    from pathlib import Path as _Path
+    log_path = _Path.home() / ".openclaw" / "agents" / "main" / "logs" / "hermes-actions.jsonl"
+    if not log_path.exists():
+        return None
+    match = None
+    try:
+        with log_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                if rec.get("action_type") != "task_action":
+                    continue
+                ev = rec.get("evidence") or {}
+                if ev.get("task_id") == task_id:
+                    match = rec  # keep overwriting so last match wins
+    except OSError:
+        return None
+    return match
+
+
+def handle_revert_task_action(task_id: str) -> dict:
+    """Revert a Hermes task-pipeline mutation (custodian sweep action).
+
+    Reads the most recent task_action record for this task_id from
+    hermes-actions.jsonl, uses evidence.previous_state to restore the
+    field the mutation changed. Soft-reverts — no git commits involved.
+    """
+    rec = _find_task_action_record(task_id)
+    if rec is None:
+        return {"outcome": "NOT_FOUND", "task_id": task_id,
+                "hint": "no task_action record for this task_id"}
+
+    ev = rec.get("evidence") or {}
+    kind = ev.get("action_kind")
+    prev = ev.get("previous_state") or {}
+
+    try:
+        from neo4j_v2_core import TaskStore
+    except ImportError as e:
+        return {"outcome": "NO_NEO4J", "reason": str(e)}
+
+    store = TaskStore()
+    try:
+        if kind == "delete":
+            # previous_state.status is the pre-obsolete status
+            prev_status = prev.get("status")
+            if not prev_status:
+                return {"outcome": "NO_PREVIOUS_STATE", "task_id": task_id}
+            with store.driver.session() as session:
+                session.run("""
+                    MATCH (t:Task {task_id: $id, status: 'OBSOLETE'})
+                    SET t.status = $prev,
+                        t.obsolete_reverted_at = datetime(),
+                        t.updated_at = datetime()
+                """, id=task_id, prev=prev_status)
+            return {"outcome": "reverted", "action_kind": kind,
+                    "task_id": task_id, "restored_status": prev_status}
+        if kind == "rewrite_prompt":
+            prev_prompt = prev.get("prompt")
+            if prev_prompt is None:
+                return {"outcome": "NO_PREVIOUS_STATE", "task_id": task_id}
+            with store.driver.session() as session:
+                session.run("""
+                    MATCH (t:Task {task_id: $id})
+                    SET t.prompt = $prompt,
+                        t.rewrite_reverted_at = datetime(),
+                        t.updated_at = datetime()
+                """, id=task_id, prompt=prev_prompt)
+            return {"outcome": "reverted", "action_kind": kind,
+                    "task_id": task_id}
+        if kind == "reassign":
+            prev_agent = prev.get("assigned_to") or prev.get("agent")
+            if not prev_agent:
+                return {"outcome": "NO_PREVIOUS_STATE", "task_id": task_id}
+            with store.driver.session() as session:
+                session.run("""
+                    MATCH (t:Task {task_id: $id})
+                    SET t.assigned_to = $prev,
+                        t.agent = $prev,
+                        t.claim_epoch = coalesce(t.claim_epoch, 0) + 1,
+                        t.reassign_reverted_at = datetime(),
+                        t.updated_at = datetime()
+                """, id=task_id, prev=prev_agent)
+            return {"outcome": "reverted", "action_kind": kind,
+                    "task_id": task_id, "restored_agent": prev_agent}
+        if kind == "retry":
+            # Retries already ran — can't un-retry. Return a clear no-op.
+            return {"outcome": "noop_retry_not_revertable",
+                    "action_kind": kind, "task_id": task_id}
+        return {"outcome": "UNKNOWN_ACTION_KIND", "action_kind": kind,
+                "task_id": task_id}
+    finally:
+        try:
+            store.close()
+        except Exception:
+            pass
+
+
+def handle_revert_auto(id_hint: str) -> dict:
+    """Auto-detect whether id_hint is a task_id (task_action in
+    hermes-actions.jsonl) or a git SHA (HermesCommit). Task IDs take
+    priority because they're the operator's semantic reference."""
+    # Task IDs are slugs; SHAs are hex strings (7+ chars, base16 only).
+    # If it looks like a SHA and we find a matching HermesCommit, use
+    # git revert. Otherwise try the task-action path first.
+    if _find_task_action_record(id_hint):
+        return handle_revert_task_action(id_hint)
+    return handle_revert(id_hint)
+
+
 def handle_revert_all_today() -> dict:
     """Revert every un-reverted HermesCommit in the last 24 hours, in
     reverse chronological order. Stops on first conflict."""
@@ -225,6 +344,16 @@ def main() -> int:
     sub_sha.add_argument("sha", help="Full or short SHA")
     sub.add_parser("last", help="Revert the most recent HermesCommit")
     sub.add_parser("all-today", help="Revert all HermesCommits in last 24h")
+    sub_ta = sub.add_parser(
+        "task-action",
+        help="Revert a Hermes task-pipeline mutation by task_id",
+    )
+    sub_ta.add_argument("task_id", help="Task ID the custodian mutated")
+    sub_auto = sub.add_parser(
+        "auto",
+        help="Auto-detect task_id vs SHA; used by the Signal handler",
+    )
+    sub_auto.add_argument("id_hint", help="task_id or SHA hint")
     args = parser.parse_args()
 
     if args.cmd == "sha":
@@ -233,12 +362,18 @@ def main() -> int:
         result = handle_revert(None)
     elif args.cmd == "all-today":
         result = handle_revert_all_today()
+    elif args.cmd == "task-action":
+        result = handle_revert_task_action(args.task_id)
+    elif args.cmd == "auto":
+        result = handle_revert_auto(args.id_hint)
     else:
         parser.print_help()
         return 1
 
     print(json.dumps(result, indent=2, default=str))
-    return 0 if result.get("outcome") in ("reverted", "ok", "empty") else 2
+    return 0 if result.get("outcome") in (
+        "reverted", "ok", "empty", "noop_retry_not_revertable",
+    ) else 2
 
 
 if __name__ == "__main__":

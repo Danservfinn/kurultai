@@ -8,7 +8,7 @@ All state transitions use compare-and-swap via claim_epoch to prevent:
   - FAIL vs COMPLETE race
 
 State machine:
-    BLOCKED --(unblock_dependents, all deps COMPLETED)--> PENDING
+    BLOCKED --(unblock_dependents, all deps COMPLETED or FAILED)--> PENDING
     PENDING --(claim)--> WORKING
     WORKING --(complete)--> COMPLETED  (requires TaskOutput + no blocking children)
     WORKING --(fail transient, retries remain)--> PENDING  (carries FailureReport, retry_after backoff)
@@ -73,11 +73,12 @@ class TaskStore:
         """
         def _claim(tx):
             result = tx.run("""
-                MATCH (t:Task {assigned_to: $agent, status: 'PENDING'})
-                WHERE (t.retry_after IS NULL OR t.retry_after <= datetime())
+                MATCH (t:Task {status: 'PENDING'})
+                WHERE (t.assigned_to = $agent OR t.assigned_to IS NULL)
+                  AND (t.retry_after IS NULL OR t.retry_after <= datetime())
                   AND NOT EXISTS {
                     MATCH (t)-[:DEPENDS_ON]->(dep:Task)
-                    WHERE dep.status <> 'COMPLETED'
+                    WHERE dep.status <> 'COMPLETED' AND dep.status <> 'FAILED'
                   }
                 WITH t ORDER BY
                     CASE t.priority
@@ -92,6 +93,7 @@ class TaskStore:
                 SET t.status = 'WORKING',
                     t.claim_epoch = coalesce(t.claim_epoch, 0) + 1,
                     t.claimed_by = $agent,
+                    t.assigned_to = $agent,
                     t.started_at = datetime(),
                     t.updated_at = datetime(),
                     t.lease_expires_at = datetime() + duration({minutes: $lease_min})
@@ -215,7 +217,7 @@ class TaskStore:
                     MATCH (blocked:Task {status: 'BLOCKED'})-[:DEPENDS_ON]->(completed)
                     WHERE NOT EXISTS {
                         MATCH (blocked)-[:DEPENDS_ON]->(other:Task)
-                        WHERE other.task_id <> $id AND other.status <> 'COMPLETED'
+                        WHERE other.task_id <> $id AND other.status <> 'COMPLETED' AND other.status <> 'FAILED'
                     }
                     SET blocked.status = 'PENDING',
                         blocked.updated_at = datetime()
@@ -227,6 +229,35 @@ class TaskStore:
                 return unblocked
         except Exception as e:
             logger.warning(f"unblock_dependents({task_id}) failed: {e}")
+            return []
+
+    def sweep_blocked_tasks(self) -> list[str]:
+        """Safety-net sweep: unblock any BLOCKED tasks whose all dependencies are COMPLETED.
+
+        Called periodically as a recovery mechanism for tasks that slipped through
+        the push-based unblock_dependents() (e.g. due to silent exceptions or
+        concurrent completion races).
+
+        Returns list of task_ids that were unblocked.
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run("""
+                    MATCH (blocked:Task {status: 'BLOCKED'})
+                    WHERE NOT EXISTS {
+                        MATCH (blocked)-[:DEPENDS_ON]->(dep:Task)
+                        WHERE dep.status <> 'COMPLETED' AND dep.status <> 'FAILED'
+                    }
+                    SET blocked.status = 'PENDING',
+                        blocked.updated_at = datetime()
+                    RETURN blocked.task_id AS unblocked
+                """)
+                unblocked = [rec["unblocked"] for rec in result]
+                if unblocked:
+                    logger.info(f"BLOCKED sweep: unblocked {len(unblocked)} tasks: {unblocked}")
+                return unblocked
+        except Exception as e:
+            logger.warning(f"sweep_blocked_tasks() failed: {e}")
             return []
 
     # ------------------------------------------------------------------
@@ -391,7 +422,7 @@ class TaskStore:
                 MATCH (t:Task {status: 'BLOCKED'})
                 WHERE NOT EXISTS {
                     MATCH (t)-[:DEPENDS_ON]->(dep:Task)
-                    WHERE dep.status <> 'COMPLETED'
+                    WHERE dep.status <> 'COMPLETED' AND dep.status <> 'FAILED'
                 }
                 SET t.status = 'PENDING', t.updated_at = datetime()
                 RETURN t.task_id AS repaired
@@ -400,6 +431,100 @@ class TaskStore:
             if repaired:
                 logger.warning(f"Repaired {len(repaired)} stuck BLOCKED tasks: {repaired}")
             return repaired
+
+    # ------------------------------------------------------------------
+    # CUSTODIAN MUTATIONS (used by Hermes task_custodian sweep)
+    #
+    # All three reject WORKING tasks to avoid clobbering an executor
+    # mid-flight, and capture the prior field values into `previous_*`
+    # properties so the Signal revert-by-reply handler can restore state
+    # without needing a separate history store.
+    # ------------------------------------------------------------------
+
+    def mark_obsolete(self, task_id: str, reason: str,
+                      acting_agent: str = "hermes") -> dict:
+        """Soft-delete via status=OBSOLETE. Rejects WORKING tasks.
+
+        Returns {"ok": bool, "task_id": str, "previous_status": str}
+        or {"ok": False, "task_id": str, "error": "..."}.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $id})
+                WHERE t.status IN ['PENDING', 'FAILED', 'ORPHANED']
+                WITH t, t.status AS prev
+                SET t.previous_status = prev,
+                    t.status = 'OBSOLETE',
+                    t.obsolete_reason = $reason,
+                    t.obsolete_by = $agent,
+                    t.obsolete_at = datetime(),
+                    t.updated_at = datetime()
+                RETURN t.task_id AS id, prev AS previous_status
+            """, id=task_id, reason=reason[:500], agent=acting_agent)
+            rec = result.single()
+            if rec:
+                return {"ok": True, "task_id": rec["id"],
+                        "previous_status": rec["previous_status"]}
+            return {"ok": False, "task_id": task_id,
+                    "error": "task not found or in invalid state "
+                             "(WORKING/OBSOLETE/COMPLETED tasks rejected)"}
+
+    def rewrite_prompt(self, task_id: str, new_prompt: str, reason: str,
+                       acting_agent: str = "hermes") -> dict:
+        """Replace task.prompt. Preserves old in task.original_prompt
+        (only the first rewrite is preserved — subsequent rewrites don't
+        overwrite original_prompt). Rejects WORKING.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $id})
+                WHERE t.status IN ['PENDING', 'FAILED', 'ORPHANED']
+                WITH t, t.prompt AS prev_prompt
+                SET t.original_prompt = coalesce(t.original_prompt, prev_prompt),
+                    t.previous_prompt = prev_prompt,
+                    t.prompt = $new_prompt,
+                    t.rewrite_reason = $reason,
+                    t.rewrite_by = $agent,
+                    t.rewritten_at = datetime(),
+                    t.updated_at = datetime()
+                RETURN t.task_id AS id, prev_prompt AS previous_prompt
+            """, id=task_id, new_prompt=new_prompt,
+                 reason=reason[:500], agent=acting_agent)
+            rec = result.single()
+            if rec:
+                return {"ok": True, "task_id": rec["id"],
+                        "previous_prompt": rec["previous_prompt"]}
+            return {"ok": False, "task_id": task_id,
+                    "error": "task not found or WORKING/OBSOLETE/COMPLETED"}
+
+    def reassign(self, task_id: str, new_agent: str, reason: str,
+                 acting_agent: str = "hermes") -> dict:
+        """Change assigned_to and increment claim_epoch (bumps any stale
+        claim). Rejects WORKING.
+        """
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (t:Task {task_id: $id})
+                WHERE t.status IN ['PENDING', 'FAILED', 'ORPHANED']
+                WITH t, t.assigned_to AS prev_agent
+                SET t.previous_agent = prev_agent,
+                    t.assigned_to = $new_agent,
+                    t.agent = $new_agent,
+                    t.claim_epoch = coalesce(t.claim_epoch, 0) + 1,
+                    t.reassign_reason = $reason,
+                    t.reassigned_by = $acting,
+                    t.reassigned_from = prev_agent,
+                    t.reassigned_at = datetime(),
+                    t.updated_at = datetime()
+                RETURN t.task_id AS id, prev_agent AS previous_agent
+            """, id=task_id, new_agent=new_agent,
+                 reason=reason[:500], acting=acting_agent)
+            rec = result.single()
+            if rec:
+                return {"ok": True, "task_id": rec["id"],
+                        "previous_agent": rec["previous_agent"]}
+            return {"ok": False, "task_id": task_id,
+                    "error": "task not found or WORKING/OBSOLETE/COMPLETED"}
 
     # ------------------------------------------------------------------
     # QUERY HELPERS
