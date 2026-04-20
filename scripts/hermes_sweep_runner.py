@@ -59,6 +59,13 @@ REGISTERED_SWEEPS: dict[str, dict] = {
         "autonomy_level": "code",
         "module": "hermes_sweep_bare_except",
     },
+    "horde_review": {
+        # Plugin sets autonomy_level per-candidate (code vs content);
+        # this registry default is used as a fallback only.
+        "autonomy_level": "content",
+        "module": "hermes_sweep_horde_review",
+        "requires_scope": True,
+    },
 }
 
 
@@ -136,13 +143,17 @@ def _load_plugin(module_name: str):
 
 
 def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
-              dry_run: bool = False, mode_override: str | None = None) -> dict:
+              dry_run: bool = False, mode_override: str | None = None,
+              scope: str | None = None) -> dict:
     """Run one sweep end-to-end.
 
     dry_run: return candidates WITHOUT enqueueing or applying anything.
     mode_override: force 'autonomous' | 'notify-only' instead of reading
                    the mode flag. Use from cron when the operator has
                    graduated a sweep.
+    scope: directory path passed to the plugin via HERMES_SWEEP_SCOPE
+           env var. Required when reg["requires_scope"] is True
+           (currently only horde_review).
     """
     if sweep_name not in REGISTERED_SWEEPS:
         return {"outcome": "UNKNOWN_SWEEP", "sweep": sweep_name}
@@ -159,48 +170,77 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
     autonomy_level = reg["autonomy_level"]
     mode = mode_override or _sweep_mode(sweep_name)
 
-    # Load plugin
+    # Scope requirement check
+    if reg.get("requires_scope") and not scope:
+        return {
+            "outcome": "SCOPE_REQUIRED",
+            "sweep": sweep_name,
+            "reason": f"{sweep_name} requires --scope argument",
+        }
+
+    # Thread scope through env var (plugin reads it). Scoped so we
+    # don't pollute the parent process's env on subsequent calls.
+    prev_scope = os.environ.get("HERMES_SWEEP_SCOPE")
+    if scope:
+        os.environ["HERMES_SWEEP_SCOPE"] = scope
+
     try:
-        plugin = _load_plugin(reg["module"])
-    except RuntimeError as e:
-        return {"outcome": "PLUGIN_LOAD_FAILED", "reason": str(e)}
+        # Load plugin
+        try:
+            plugin = _load_plugin(reg["module"])
+        except RuntimeError as e:
+            return {"outcome": "PLUGIN_LOAD_FAILED", "reason": str(e)}
 
-    # Audit
-    try:
-        candidates = plugin.audit()
-    except Exception as e:
-        return {"outcome": "AUDIT_FAILED", "reason": str(e)[:400]}
+        # Audit
+        try:
+            candidates = plugin.audit()
+        except Exception as e:
+            return {"outcome": "AUDIT_FAILED", "reason": str(e)[:400]}
 
-    candidates = candidates[:max_proposals]
-    result: dict = {
-        "sweep": sweep_name,
-        "mode": mode,
-        "autonomy_level": autonomy_level,
-        "candidates_found": len(candidates),
-        "actions": [],
-    }
+        candidates = candidates[:max_proposals]
+        result: dict = {
+            "sweep": sweep_name,
+            "mode": mode,
+            "autonomy_level": autonomy_level,
+            "scope": scope,
+            "candidates_found": len(candidates),
+            "actions": [],
+        }
 
-    if dry_run:
-        result["outcome"] = "dry_run"
-        result["candidates"] = candidates
+        if dry_run:
+            result["outcome"] = "dry_run"
+            result["candidates"] = candidates
+            return result
+
+        for cand in candidates:
+            target = cand["target"]
+            reason = cand["reason"]
+            # Allow per-candidate autonomy_level override (used by
+            # horde_review which mixes code + content findings).
+            cand_level = cand.get("autonomy_level", autonomy_level)
+            if mode == "notify-only":
+                _notify_sweep_candidate(sweep_name, target, reason, cand_level)
+                result["actions"].append({
+                    "target": target, "action": "notify-only",
+                    "autonomy_level": cand_level,
+                })
+            else:
+                outcome = _apply_candidate(sweep_name, target, reason, cand_level)
+                result["actions"].append({
+                    "target": target, "action": "apply",
+                    "autonomy_level": cand_level, "outcome": outcome,
+                })
+
+        result["outcome"] = "ok"
         return result
-
-    for cand in candidates:
-        target = cand["target"]
-        reason = cand["reason"]
-        if mode == "notify-only":
-            _notify_sweep_candidate(sweep_name, target, reason, autonomy_level)
-            result["actions"].append({
-                "target": target, "action": "notify-only",
-            })
-        else:
-            outcome = _apply_candidate(sweep_name, target, reason, autonomy_level)
-            result["actions"].append({
-                "target": target, "action": "apply", "outcome": outcome,
-            })
-
-    result["outcome"] = "ok"
-    return result
+    finally:
+        # Restore env var so concurrent/subsequent sweep runs don't
+        # inherit this scope.
+        if scope:
+            if prev_scope is None:
+                os.environ.pop("HERMES_SWEEP_SCOPE", None)
+            else:
+                os.environ["HERMES_SWEEP_SCOPE"] = prev_scope
 
 
 def main() -> int:
@@ -212,10 +252,14 @@ def main() -> int:
                         help="Return audit candidates without acting on them")
     parser.add_argument("--mode", choices=["autonomous", "notify-only"],
                         help="Override the sweep's mode flag for this run")
+    parser.add_argument("--scope",
+                        help="Absolute directory path (required for "
+                             "sweeps with requires_scope=True, e.g. horde_review)")
     args = parser.parse_args()
 
     result = run_sweep(args.sweep, max_proposals=args.max,
-                       dry_run=args.dry_run, mode_override=args.mode)
+                       dry_run=args.dry_run, mode_override=args.mode,
+                       scope=args.scope)
     print(json.dumps(result, indent=2, default=str))
     return 0 if result.get("outcome") in ("ok", "dry_run") else 1
 
