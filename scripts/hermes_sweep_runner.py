@@ -68,6 +68,78 @@ def _emit(event_type: str, **kwargs) -> None:
 
 REVIEW_CYCLES_LOG = Path.home() / ".openclaw" / "logs" / "hermes-review-cycles.jsonl"
 
+# Shared action ledger — the same file hermes_auto_fix.py has always
+# written to, which the Daily Summary + improvement-scan tools read.
+# Sweep runs append a summary row here so the dashboard's summary card
+# sees cron/ad-hoc sweep activity (not just legacy auto-fix entries).
+HERMES_ACTIONS_LOG = Path.home() / ".openclaw" / "agents" / "main" / "logs" / "hermes-actions.jsonl"
+
+
+def _log_sweep_action(result: dict) -> None:
+    """Append a summary row for a completed sweep run to hermes-actions.jsonl.
+
+    One row per run, not per candidate — the Daily Summary aggregator
+    digests these to produce the plain-English narrative. Per-candidate
+    detail is still available via the evidence.actions array.
+
+    Non-fatal on IO error (logging must never break the sweep itself).
+    """
+    from datetime import datetime, timezone
+    try:
+        HERMES_ACTIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        actions = result.get("actions", []) or []
+        applied = [a for a in actions if a.get("action") == "apply"]
+        notified = [a for a in actions if a.get("action") == "notify-only"]
+        applied_ok = [
+            a for a in applied
+            if isinstance(a.get("outcome"), dict)
+            and a["outcome"].get("outcome") == "applied"
+        ]
+        commit_shas = [
+            (a.get("outcome") or {}).get("commit_sha") or
+            ((a.get("outcome") or {}).get("evidence") or {}).get("commit_sha")
+            for a in applied_ok
+            if isinstance(a.get("outcome"), dict)
+        ]
+        sweep = result.get("sweep") or "?"
+        mode = result.get("mode") or "?"
+        outcome = result.get("outcome") or "?"
+        # Map sweep outcome → action_type + top-line outcome the summary
+        # aggregator will render. Keep the action_type prefixed so the
+        # old auto-fix rows stay distinguishable.
+        if outcome in ("dry_run",):
+            top_outcome = "dry_run"
+        elif outcome == "ok":
+            if applied_ok:
+                top_outcome = "applied"
+            elif notified:
+                top_outcome = "notified"
+            else:
+                top_outcome = "no_candidates"
+        else:
+            top_outcome = outcome
+        record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "action_type": f"sweep_{sweep}",
+            "target": result.get("scope") or f"sweep:{sweep}",
+            "tier": "T1",
+            "dry_run": outcome == "dry_run",
+            "outcome": top_outcome,
+            "evidence": {
+                "sweep": sweep,
+                "mode": mode,
+                "scope": result.get("scope"),
+                "candidates_found": result.get("candidates_found", 0),
+                "applied_count": len(applied_ok),
+                "notified_count": len(notified),
+                "commit_shas": [s for s in commit_shas if s],
+            },
+        }
+        with HERMES_ACTIONS_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except OSError as e:
+        print(f"[sweep_runner] hermes-actions log write failed: {e}", file=sys.stderr)
+
 
 def _log_review_cycle(result: dict) -> None:
     """Append a review-cycle record to the cycles JSONL for operator
@@ -264,7 +336,12 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
             plugin = _load_plugin(reg["module"])
         except RuntimeError as e:
             _emit("sweep_error", stage="plugin_load", reason=str(e))
-            return {"outcome": "PLUGIN_LOAD_FAILED", "reason": str(e)}
+            err_result = {
+                "sweep": sweep_name, "scope": scope, "mode": mode,
+                "outcome": "PLUGIN_LOAD_FAILED", "reason": str(e), "actions": [],
+            }
+            _log_sweep_action(err_result)
+            return err_result
 
         # Audit
         _emit("audit_start", sweep=sweep_name, scope=scope)
@@ -272,7 +349,12 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
             candidates = plugin.audit()
         except Exception as e:
             _emit("sweep_error", stage="audit", reason=str(e)[:400])
-            return {"outcome": "AUDIT_FAILED", "reason": str(e)[:400]}
+            err_result = {
+                "sweep": sweep_name, "scope": scope, "mode": mode,
+                "outcome": "AUDIT_FAILED", "reason": str(e)[:400], "actions": [],
+            }
+            _log_sweep_action(err_result)
+            return err_result
 
         candidates = candidates[:max_proposals]
         _emit("audit_done", candidates_found=len(candidates),
@@ -291,6 +373,7 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
         if dry_run:
             result["outcome"] = "dry_run"
             result["candidates"] = candidates
+            _log_sweep_action(result)
             _emit("final", result=result)
             return result
 
@@ -327,6 +410,9 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
         # cycle concept; they're single-target).
         if sweep_name == "horde_review":
             _log_review_cycle(result)
+        # Every sweep run appends one summary row to hermes-actions.jsonl
+        # so the Daily Summary card picks it up.
+        _log_sweep_action(result)
         _emit("final", result=result)
         return result
     finally:

@@ -35,6 +35,7 @@ LLM_TIMEOUT_SECS = int(os.getenv("HERMES_SUMMARY_TIMEOUT", "120"))
 
 ACTIONS_LOG = Path.home() / ".openclaw" / "agents" / "main" / "logs" / "hermes-actions.jsonl"
 CASCADE_LOG = Path.home() / ".openclaw" / "agents" / "main" / "logs" / "cascade-detections.jsonl"
+REVIEW_CYCLES_LOG = Path.home() / ".openclaw" / "logs" / "hermes-review-cycles.jsonl"
 SUMMARY_CACHE_DIR = Path.home() / ".openclaw" / "logs" / "hermes-summaries"
 TODAY_REGEN_WINDOW_SECS = 600  # 10 min
 
@@ -60,7 +61,11 @@ def _events_for_date(target_date: date_cls, max_events: int = 100) -> list[dict]
     Apr 19 in the operator's day, not in UTC.
     """
     events: list[dict] = []
-    for path, kind in [(ACTIONS_LOG, "action"), (CASCADE_LOG, "cascade")]:
+    for path, kind in [
+        (ACTIONS_LOG, "action"),
+        (CASCADE_LOG, "cascade"),
+        (REVIEW_CYCLES_LOG, "review_cycle"),
+    ]:
         if not path.exists():
             continue
         try:
@@ -102,13 +107,37 @@ def _build_prompt(target_date: date_cls, events: list[dict]) -> str:
         for e in events:
             p = e["payload"]
             ts = (p.get("timestamp") or p.get("ts") or "")[:19]
+
+            if e["kind"] == "review_cycle":
+                # review cycle rows have a different shape than auto-fix rows
+                applied = p.get("applied", []) or []
+                notified = p.get("notified", []) or []
+                applied_ok = [a for a in applied if a.get("outcome") == "applied"]
+                commit_sha = ""
+                if applied_ok:
+                    commit_sha = (applied_ok[0].get("commit_sha") or "")[:7]
+                scope = p.get("scope") or ""
+                sweep = p.get("sweep") or "?"
+                mode = p.get("mode") or "?"
+                outcome = p.get("outcome") or "?"
+                rendered.append(
+                    f"- {ts} | review_cycle | {outcome} | sweep={sweep} · "
+                    f"scope={scope} · mode={mode} · "
+                    f"candidates={p.get('candidates_found', 0)} · "
+                    f"applied={len(applied_ok)} · notified={len(notified)}"
+                    + (f" · first_commit={commit_sha}" if commit_sha else "")
+                )
+                continue
+
             kind = p.get("action_type") or p.get("detection_type") or p.get("type") or e["kind"]
             outcome = p.get("outcome") or p.get("status") or ""
             target = p.get("target") or p.get("path") or p.get("detail") or ""
             tier = p.get("tier") or ""
             ev = p.get("evidence") or {}
             ev_bits = []
-            for k in ("sweep", "autonomy_level", "diff_lines", "commit_sha", "push_ok", "reason"):
+            for k in ("sweep", "autonomy_level", "diff_lines", "commit_sha", "push_ok",
+                      "reason", "mode", "scope", "candidates_found",
+                      "applied_count", "notified_count"):
                 if k in ev:
                     ev_bits.append(f"{k}={ev[k]}")
             extras = " · " + " · ".join(ev_bits) if ev_bits else ""
