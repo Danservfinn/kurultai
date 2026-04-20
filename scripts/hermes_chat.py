@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -133,9 +134,31 @@ def _load_history(convo_id: str) -> list[dict]:
 
 def _append_turn(convo_id: str, turn: dict) -> None:
     CONVO_DIR.mkdir(parents=True, exist_ok=True)
-    _convo_path(convo_id).open("a", encoding="utf-8").write(
-        json.dumps(turn) + "\n"
-    )
+    # Use `with` so the handle closes on every write — prevents FD leak
+    # under long sessions or high turn counts.
+    with _convo_path(convo_id).open("a", encoding="utf-8") as f:
+        f.write(json.dumps(turn) + "\n")
+
+
+_FENCE_RE = re.compile(r"```hermes-proposal[\s\S]*?```", re.MULTILINE)
+
+
+def _sanitize_replay(content: str) -> str:
+    """Strip hermes-proposal fences + suspicious ##-headers from replayed
+    assistant content so cross-turn prompt injection cannot amplify.
+
+    An attacker who got a fence planted in a prior assistant turn (via
+    an indirect-injection file read) would have the LLM re-see its own
+    "correct" proposal and repeat. Stripping the fence breaks that loop.
+    """
+    if not content:
+        return ""
+    cleaned = _FENCE_RE.sub("[proposal fence removed from replay]", content)
+    # Also neutralize any attempted ## markers that could confuse the
+    # User / Assistant boundary injection we build below.
+    cleaned = cleaned.replace("\n## User", "\n(## User)")
+    cleaned = cleaned.replace("\n## Assistant", "\n(## Assistant)")
+    return cleaned
 
 
 def _build_prompt(history: list[dict], new_message: str) -> str:
@@ -150,7 +173,7 @@ def _build_prompt(history: list[dict], new_message: str) -> str:
     lines = ["# Previous conversation\n"]
     for turn in history:
         role = turn.get("role", "?")
-        content = turn.get("content", "")
+        content = _sanitize_replay(turn.get("content", ""))
         if role == "user":
             lines.append(f"\n## User\n{content}")
         elif role == "assistant":
@@ -234,10 +257,32 @@ def _invoke(convo_id: str, prompt: str) -> int:
 
         if time.time() - start > LLM_TIMEOUT_SECS:
             proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass  # zombie; OS will reap eventually
             sys.stderr.write(f"[hermes_chat] timeout after {LLM_TIMEOUT_SECS}s\n")
+            _append_turn(
+                convo_id,
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "role": "assistant",
+                    "content": "(timed out — partial or no response)",
+                    "tool_uses": [],
+                    "model": model_used,
+                    "interrupted": True,
+                },
+            )
             return 124
 
-    rc = proc.wait(timeout=5)
+    try:
+        rc = proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            rc = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            rc = 124
 
     # Append turn to convo JSONL
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -279,7 +324,6 @@ def main() -> int:
     args = parser.parse_args()
 
     # Validate convo_id format — no path traversal
-    import re
     if not re.fullmatch(r"[a-z0-9-]{4,64}", args.convo):
         sys.stderr.write("convo id must match [a-z0-9-]{4,64}\n")
         return 2
