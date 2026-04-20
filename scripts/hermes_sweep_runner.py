@@ -46,6 +46,26 @@ FLAGS_DIR = Path.home() / ".openclaw" / "flags"
 SWEEP_DISABLED_FLAG = FLAGS_DIR / "hermes-autonomous-sweep-disabled.flag"
 DEFAULT_MAX_PROPOSALS = 3
 
+# Streaming mode emits JSON-line progress events to stdout during a run
+# instead of printing the final JSON at the end. The dashboard tails
+# these via SSE so the operator can see live progress during long
+# horde-review sessions. Activated by --stream CLI flag.
+_STREAM_MODE = False
+
+
+def _emit(event_type: str, **kwargs) -> None:
+    """Emit a JSON-line progress event to stdout, flushed immediately."""
+    if not _STREAM_MODE:
+        return
+    payload = {"type": event_type}
+    payload.update(kwargs)
+    try:
+        import time
+        payload.setdefault("ts", time.time())
+        print(json.dumps(payload), flush=True)
+    except (OSError, BrokenPipeError):
+        pass
+
 REVIEW_CYCLES_LOG = Path.home() / ".openclaw" / "logs" / "hermes-review-cycles.jsonl"
 
 
@@ -236,20 +256,29 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
     if scope:
         os.environ["HERMES_SWEEP_SCOPE"] = scope
 
+    _emit("sweep_start", sweep=sweep_name, scope=scope, mode=mode, dry_run=dry_run)
+
     try:
         # Load plugin
         try:
             plugin = _load_plugin(reg["module"])
         except RuntimeError as e:
+            _emit("sweep_error", stage="plugin_load", reason=str(e))
             return {"outcome": "PLUGIN_LOAD_FAILED", "reason": str(e)}
 
         # Audit
+        _emit("audit_start", sweep=sweep_name, scope=scope)
         try:
             candidates = plugin.audit()
         except Exception as e:
+            _emit("sweep_error", stage="audit", reason=str(e)[:400])
             return {"outcome": "AUDIT_FAILED", "reason": str(e)[:400]}
 
         candidates = candidates[:max_proposals]
+        _emit("audit_done", candidates_found=len(candidates),
+              candidates=[{"target": c.get("target"), "reason": c.get("reason", "")[:200],
+                           "autonomy_level": c.get("autonomy_level", autonomy_level)}
+                          for c in candidates])
         result: dict = {
             "sweep": sweep_name,
             "mode": mode,
@@ -262,22 +291,32 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
         if dry_run:
             result["outcome"] = "dry_run"
             result["candidates"] = candidates
+            _emit("final", result=result)
             return result
 
-        for cand in candidates:
+        for i, cand in enumerate(candidates):
             target = cand["target"]
             reason = cand["reason"]
             # Allow per-candidate autonomy_level override (used by
             # horde_review which mixes code + content findings).
             cand_level = cand.get("autonomy_level", autonomy_level)
             if mode == "notify-only":
+                _emit("candidate_notify", idx=i, target=target,
+                      autonomy_level=cand_level)
                 _notify_sweep_candidate(sweep_name, target, reason, cand_level)
                 result["actions"].append({
                     "target": target, "action": "notify-only",
                     "autonomy_level": cand_level,
                 })
             else:
+                _emit("apply_start", idx=i, target=target,
+                      autonomy_level=cand_level, reason=reason[:200])
                 outcome = _apply_candidate(sweep_name, target, reason, cand_level)
+                _emit("apply_done", idx=i, target=target,
+                      outcome=outcome.get("outcome") if isinstance(outcome, dict) else str(outcome),
+                      commit_sha=(outcome.get("commit_sha") or
+                                  (outcome.get("evidence") or {}).get("commit_sha"))
+                                 if isinstance(outcome, dict) else None)
                 result["actions"].append({
                     "target": target, "action": "apply",
                     "autonomy_level": cand_level, "outcome": outcome,
@@ -288,6 +327,7 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
         # cycle concept; they're single-target).
         if sweep_name == "horde_review":
             _log_review_cycle(result)
+        _emit("final", result=result)
         return result
     finally:
         # Restore env var so concurrent/subsequent sweep runs don't
@@ -311,12 +351,23 @@ def main() -> int:
     parser.add_argument("--scope",
                         help="Absolute directory path (required for "
                              "sweeps with requires_scope=True, e.g. horde_review)")
+    parser.add_argument("--stream", action="store_true",
+                        help="Emit JSON-line progress events to stdout instead "
+                             "of a single JSON blob at the end. Used by the "
+                             "dashboard SSE endpoint for live progress.")
     args = parser.parse_args()
+
+    global _STREAM_MODE
+    if args.stream:
+        _STREAM_MODE = True
 
     result = run_sweep(args.sweep, max_proposals=args.max,
                        dry_run=args.dry_run, mode_override=args.mode,
                        scope=args.scope)
-    print(json.dumps(result, indent=2, default=str))
+    # Non-streaming mode prints the final JSON; streaming mode has
+    # already emitted the `final` event and should not duplicate.
+    if not _STREAM_MODE:
+        print(json.dumps(result, indent=2, default=str))
     return 0 if result.get("outcome") in ("ok", "dry_run") else 1
 
 

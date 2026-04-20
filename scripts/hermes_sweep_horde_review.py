@@ -82,12 +82,28 @@ def _extract_findings(llm_output: str) -> list[dict]:
     return [f for f in parsed if isinstance(f, dict)]
 
 
+def _emit_progress(event_type: str, **kwargs) -> None:
+    """Forward a progress event through the sweep_runner's _emit if
+    streaming is active. Imported lazily to avoid a circular import
+    at module load (sweep_runner imports this module dynamically)."""
+    try:
+        import hermes_sweep_runner
+        hermes_sweep_runner._emit(event_type, **kwargs)
+    except Exception:
+        pass
+
+
 def _run_review(scope: str) -> list[dict]:
     """Spawn claude with horde-review + read-only tools on scope.
 
     Returns findings (possibly empty list). Never raises; on failure
     returns [] and lets the audit function surface an empty result.
+
+    When sweep_runner is in --stream mode, intermediate events from
+    claude's stream-json output are forwarded as `reviewer_*` progress
+    events so the dashboard can render a live log panel.
     """
+    import time
     prompt = _build_prompt(scope)
     args = [
         LLM_CMD,
@@ -99,45 +115,147 @@ def _run_review(scope: str) -> list[dict]:
         "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit",
         "--add-dir", scope,
     ]
+
+    _emit_progress("reviewer_spawn", cmd=LLM_CMD, scope=scope)
+
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             args,
-            input=prompt,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=REVIEW_TIMEOUT_SECS,
+            bufsize=1,  # line-buffered
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+    except FileNotFoundError as e:
+        _emit_progress("reviewer_error", reason=str(e))
         print(f"[horde_review] LLM invocation failed: {e}", file=sys.stderr)
         return []
 
-    if result.returncode != 0:
+    try:
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+    except (OSError, BrokenPipeError):
+        pass
+
+    final_text = ""
+    deadline = time.time() + REVIEW_TIMEOUT_SECS
+    current_tool = None
+    stderr_tail: list[str] = []
+
+    # Drain stdout line-by-line as the subprocess runs. Each line is
+    # a stream-json event. We route a small summary of each into
+    # progress events for the dashboard.
+    try:
+        while True:
+            if time.time() > deadline:
+                _emit_progress("reviewer_error", reason="timeout")
+                proc.kill()
+                break
+            line = proc.stdout.readline()
+            if not line:
+                if proc.poll() is not None:
+                    break
+                continue
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            etype = evt.get("type")
+
+            if etype == "system" and evt.get("subtype") == "init":
+                _emit_progress(
+                    "reviewer_init",
+                    model=evt.get("model"),
+                    session_id=evt.get("session_id"),
+                )
+            elif etype == "stream_event":
+                inner = evt.get("event", {}) or {}
+                delta = inner.get("delta", {}) or {}
+                if delta.get("type") == "text_delta":
+                    txt = delta.get("text", "")
+                    if txt:
+                        _emit_progress("reviewer_delta", text=txt)
+                elif delta.get("type") == "input_json_delta":
+                    _emit_progress("reviewer_tool_input", partial=delta.get("partial_json", "")[:200])
+            elif etype == "assistant":
+                msg = evt.get("message", {}) or {}
+                for block in msg.get("content", []):
+                    btype = block.get("type")
+                    if btype == "text":
+                        txt = block.get("text", "")
+                        if txt:
+                            final_text += txt
+                            _emit_progress("reviewer_text", text=txt[:500])
+                    elif btype == "tool_use":
+                        current_tool = block.get("name", "?")
+                        _emit_progress(
+                            "reviewer_tool_call",
+                            tool=current_tool,
+                            input_preview=json.dumps(block.get("input", {}), default=str)[:200],
+                        )
+            elif etype == "user":
+                # tool_result messages come back as user-role; summarize
+                msg = evt.get("message", {}) or {}
+                for block in msg.get("content", []):
+                    if block.get("type") == "tool_result":
+                        content = block.get("content")
+                        preview = ""
+                        if isinstance(content, str):
+                            preview = content[:200]
+                        elif isinstance(content, list) and content:
+                            first = content[0]
+                            if isinstance(first, dict):
+                                preview = str(first.get("text", ""))[:200]
+                        _emit_progress(
+                            "reviewer_tool_result",
+                            tool=current_tool,
+                            preview=preview,
+                        )
+            elif etype == "result":
+                result_text = evt.get("result", "") or ""
+                if result_text:
+                    final_text = result_text
+                _emit_progress(
+                    "reviewer_result",
+                    duration_ms=evt.get("duration_ms"),
+                    total_cost_usd=evt.get("total_cost_usd"),
+                    num_turns=evt.get("num_turns"),
+                )
+    except Exception as e:
+        _emit_progress("reviewer_error", reason=f"stream_parse: {e!r}"[:400])
+    finally:
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        if proc.stderr:
+            try:
+                tail = proc.stderr.read() or ""
+                stderr_tail = tail.splitlines()[-6:]
+            except Exception:
+                pass
+
+    if proc.returncode not in (0, None):
+        _emit_progress(
+            "reviewer_error",
+            reason=f"rc={proc.returncode}",
+            stderr_tail="\n".join(stderr_tail)[-400:],
+        )
         print(
-            f"[horde_review] claude returned rc={result.returncode}; "
-            f"stderr tail: {result.stderr[-400:]}",
+            f"[horde_review] claude returned rc={proc.returncode}; "
+            f"stderr tail: {' | '.join(stderr_tail)}",
             file=sys.stderr,
         )
         return []
 
-    # stream-json output: the final "result" event has .result = full text
-    final_text = ""
-    for line in result.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if evt.get("type") == "result":
-            final_text = evt.get("result", "") or final_text
-        # Also capture from assistant message content blocks as a fallback
-        if evt.get("type") == "assistant":
-            for block in evt.get("message", {}).get("content", []):
-                if block.get("type") == "text":
-                    final_text += block.get("text", "")
-
-    return _extract_findings(final_text)
+    findings = _extract_findings(final_text)
+    _emit_progress("reviewer_done", findings_count=len(findings))
+    return findings
 
 
 def audit() -> list[dict]:
