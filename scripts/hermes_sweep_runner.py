@@ -46,6 +46,58 @@ FLAGS_DIR = Path.home() / ".openclaw" / "flags"
 SWEEP_DISABLED_FLAG = FLAGS_DIR / "hermes-autonomous-sweep-disabled.flag"
 DEFAULT_MAX_PROPOSALS = 3
 
+REVIEW_CYCLES_LOG = Path.home() / ".openclaw" / "logs" / "hermes-review-cycles.jsonl"
+
+
+def _log_review_cycle(result: dict) -> None:
+    """Append a review-cycle record to the cycles JSONL for operator
+    browsing + per-cycle revert. Non-fatal on IO error.
+
+    The record includes the timestamp, scope, mode, outcome, and for
+    every applied fix, the resulting commit SHA (extracted from the
+    per-candidate outcome dict). That lets the dashboard render a
+    cycle-log table with a Revert button that iterates over the
+    stored commit SHAs.
+    """
+    import uuid
+    from datetime import datetime, timezone
+    try:
+        REVIEW_CYCLES_LOG.parent.mkdir(parents=True, exist_ok=True)
+        applied = []
+        notified = []
+        for a in result.get("actions", []) or []:
+            if a.get("action") == "apply":
+                outcome = a.get("outcome") or {}
+                applied.append({
+                    "target": a.get("target"),
+                    "autonomy_level": a.get("autonomy_level"),
+                    "outcome": outcome.get("outcome") if isinstance(outcome, dict) else str(outcome),
+                    "commit_sha": (
+                        outcome.get("commit_sha") or
+                        (outcome.get("evidence") or {}).get("commit_sha")
+                    ) if isinstance(outcome, dict) else None,
+                })
+            elif a.get("action") == "notify-only":
+                notified.append({
+                    "target": a.get("target"),
+                    "autonomy_level": a.get("autonomy_level"),
+                })
+        record = {
+            "cycle_id": "cycle-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6],
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "sweep": result.get("sweep"),
+            "scope": result.get("scope"),
+            "mode": result.get("mode"),
+            "outcome": result.get("outcome"),
+            "candidates_found": result.get("candidates_found", 0),
+            "applied": applied,
+            "notified": notified,
+        }
+        with REVIEW_CYCLES_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except OSError as e:
+        print(f"[sweep_runner] review-cycle log write failed: {e}", file=sys.stderr)
+
 REGISTERED_SWEEPS: dict[str, dict] = {
     "knowledge_stale": {
         "autonomy_level": "content",
@@ -232,6 +284,10 @@ def run_sweep(sweep_name: str, max_proposals: int = DEFAULT_MAX_PROPOSALS,
                 })
 
         result["outcome"] = "ok"
+        # Log review cycles (horde_review only — other sweeps have no
+        # cycle concept; they're single-target).
+        if sweep_name == "horde_review":
+            _log_review_cycle(result)
         return result
     finally:
         # Restore env var so concurrent/subsequent sweep runs don't
