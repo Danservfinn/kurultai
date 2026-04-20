@@ -89,16 +89,44 @@ def _build_prompt(target_rel: str, reason: str, source_excerpt: str) -> str:
     )
 
 
-def _invoke_llm(prompt: str) -> tuple[int, str, str]:
+def _invoke_llm(prompt: str, fix_id: str = "", kind: str = "fix") -> tuple[int, str, str]:
     """Invoke the Claude Code CLI with --print (one-shot) and capture stdout.
+
+    Applies the Hermes model override (if set) via ANTHROPIC_MODEL env var,
+    and records token-usage estimates to the shared ledger.
 
     Returns (returncode, stdout, stderr).
     """
     try:
+        import hermes_token_usage as _tu
+    except ImportError:
+        _tu = None
+
+    env = os.environ.copy()
+    model_used = "default"
+    if _tu is not None:
+        override = _tu.get_model()
+        if override:
+            env["ANTHROPIC_MODEL"] = override
+            model_used = override
+
+    try:
         result = subprocess.run(
             [LLM_CMD, "--print", prompt],
             capture_output=True, text=True, timeout=LLM_TIMEOUT_SECS,
+            env=env,
         )
+        if _tu is not None:
+            try:
+                _tu.record_usage(
+                    fix_id or "unknown",
+                    prompt,
+                    result.stdout or "",
+                    model_used,
+                    kind=kind,
+                )
+            except Exception as e:
+                print(f"[hermes_token_usage] record failed: {e}")
         return result.returncode, result.stdout, result.stderr
     except FileNotFoundError:
         return 127, "", f"LLM CLI '{LLM_CMD}' not found on PATH"
