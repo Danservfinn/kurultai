@@ -92,8 +92,12 @@ def _iter_entries() -> Iterable[dict]:
 
 
 def summarize(window_days: int = 7) -> dict:
-    """Return today / yesterday / N-day totals + per-day breakdown."""
-    today = datetime.now(timezone.utc).date()
+    """Return today / yesterday / N-day totals + per-day breakdown.
+
+    Day boundaries follow the operator's LOCAL timezone (matches the summary
+    card's date framing), not UTC.
+    """
+    today = datetime.now().astimezone().date()
     yesterday = today - timedelta(days=1)
     cutoff = today - timedelta(days=window_days)
 
@@ -106,7 +110,8 @@ def summarize(window_days: int = 7) -> dict:
             ts = datetime.fromisoformat(e["ts"].replace("Z", "+00:00"))
         except (KeyError, ValueError):
             continue
-        day = ts.date()
+        # Convert UTC ts → local tz before date-comparing
+        day = ts.astimezone().date()
         if day < cutoff:
             continue
         tokens = int(e.get("total_tokens_est", 0))

@@ -39,20 +39,26 @@ SUMMARY_CACHE_DIR = Path.home() / ".openclaw" / "logs" / "hermes-summaries"
 TODAY_REGEN_WINDOW_SECS = 600  # 10 min
 
 
-def _today_utc() -> date_cls:
-    return datetime.now(timezone.utc).date()
+def _today_local() -> date_cls:
+    """Today in the operator's local timezone — matches a human's sense of 'today'."""
+    return datetime.now().astimezone().date()
 
 
 def _parse_date(s: str) -> date_cls:
     if s in ("today", "now"):
-        return _today_utc()
+        return _today_local()
     if s == "yesterday":
-        return _today_utc() - timedelta(days=1)
+        return _today_local() - timedelta(days=1)
     return date_cls.fromisoformat(s)
 
 
 def _events_for_date(target_date: date_cls, max_events: int = 100) -> list[dict]:
-    """Collect actions + cascade detections for the given UTC date."""
+    """Collect actions + cascade detections for the given LOCAL date.
+
+    Log timestamps are stored as UTC ISO strings; we convert each to the
+    operator's local timezone before date-comparing, so 'Apr 19' means
+    Apr 19 in the operator's day, not in UTC.
+    """
     events: list[dict] = []
     for path, kind in [(ACTIONS_LOG, "action"), (CASCADE_LOG, "cascade")]:
         if not path.exists():
@@ -74,7 +80,8 @@ def _events_for_date(target_date: date_cls, max_events: int = 100) -> list[dict]
                         ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                     except ValueError:
                         continue
-                    if ts.astimezone(timezone.utc).date() != target_date:
+                    # Compare against the operator's LOCAL date, not UTC
+                    if ts.astimezone().date() != target_date:
                         continue
                     events.append({"kind": kind, "payload": d})
         except OSError:
@@ -146,7 +153,7 @@ def _invoke_llm(prompt: str) -> tuple[int, str, str]:
         )
         try:
             tu.record_usage(
-                f"summary-{_today_utc().isoformat()}",
+                f"summary-{_today_local().isoformat()}",
                 prompt,
                 result.stdout or "",
                 model_used,
@@ -196,7 +203,7 @@ def _regen_allowed_for_today(cache: dict | None) -> bool:
 
 def generate(target_date: date_cls, force: bool = False) -> dict:
     """Generate or return cached summary for the given date."""
-    is_today = target_date == _today_utc()
+    is_today = target_date == _today_local()
     cache = _load_cache(target_date)
 
     if cache and not force:
