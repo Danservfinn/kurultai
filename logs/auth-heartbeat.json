@@ -1,36 +1,36 @@
 {
   "jochi": {
-    "status": "ok",
-    "last_success": "2026-03-30T01:58:16.457856",
-    "error": null
+    "status": "fail",
+    "last_success": null,
+    "error": "Exit 1: [claude-agent] Mode: auto (anthropic -> zai -> alibaba)\n[claude-agent] Running with provider=anthrop"
   },
   "_meta": {
-    "last_check": "2026-03-30T01:58:21.124375",
+    "last_check": "2026-04-21T17:03:10.913955",
     "stale_threshold_seconds": 300
   },
   "kublai": {
-    "status": "ok",
-    "last_success": "2026-03-30T01:57:54.221368",
-    "error": null
+    "status": "fail",
+    "last_success": null,
+    "error": "Exit 1: [claude-agent] Mode: auto (anthropic -> zai -> alibaba)\n[claude-agent] Running with provider=anthrop"
   },
   "temujin": {
-    "status": "ok",
-    "last_success": "2026-03-30T01:57:59.690193",
-    "error": null
+    "status": "fail",
+    "last_success": null,
+    "error": "Exit 1: [claude-agent] Mode: auto (anthropic -> zai -> alibaba)\n[claude-agent] Running with provider=anthrop"
   },
   "mongke": {
-    "status": "ok",
-    "last_success": "2026-03-30T01:58:04.191018",
-    "error": null
+    "status": "fail",
+    "last_success": null,
+    "error": "Exit 1: [claude-agent] Mode: auto (anthropic -> zai -> alibaba)\n[claude-agent] Running with provider=anthrop"
   },
   "chagatai": {
-    "status": "ok",
-    "last_success": "2026-03-30T01:58:09.287050",
-    "error": null
+    "status": "fail",
+    "last_success": null,
+    "error": "Exit 1: [claude-agent] Mode: auto (anthropic -> zai -> alibaba)\n[claude-agent] Running with provider=anthrop"
   },
   "ogedei": {
-    "status": "ok",
-    "last_success": "2026-03-30T01:58:21.124313",
-    "error": null
+    "status": "fail",
+    "last_success": null,
+    "error": "Exit 1: [claude-agent] Mode: auto (anthropic -> zai -> alibaba)\n[claude-agent] Running with provider=anthrop"
   }
 }

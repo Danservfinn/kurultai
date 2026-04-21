@@ -54,13 +54,9 @@
       "lastFailureAt": 1771899806492
     },
     "anthropic:zai-proxy": {
-      "lastUsed": 1773341467129,
-      "errorCount": 1,
-      "lastFailureAt": 1774124698077,
-      "failureCounts": {
-        "auth": 1
-      },
-      "cooldownUntil": 1774124758077
+      "lastUsed": 1776805284284,
+      "errorCount": 0,
+      "lastFailureAt": 1774124698077
     },
     "google-gemini-cli:d@kurult.ai": {
       "lastUsed": 1772599765955,

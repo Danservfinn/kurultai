@@ -1,9 +1,15 @@
 {
-  "ogedei:system health alert": {
+  "hermes:quality_gate_drift": {
     "strikes": 1,
-    "last_seen": "2026-03-29T12:40:18.354129",
-    "last_title": "System Health Alert (1 issue)",
+    "last_seen": "2026-04-21T02:25:04.695211",
+    "last_title": "Quality Gate Drift: 5 tasks missing Resolution",
+    "last_source": "hermes-watchdog"
+  },
+  "ogedei:system health alert": {
+    "strikes": 10,
+    "last_seen": "2026-04-21T15:27:11.535380",
+    "last_title": "System Health Alert (2 issues)",
     "last_source": "system-health-check",
-    "last_task_id": "normal-1774802418-961c1b31"
+    "last_task_id": "normal-1776799631-e017a09e"
   }
 }

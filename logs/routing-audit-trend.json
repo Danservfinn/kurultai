@@ -1,50 +1,45 @@
 {
   "issue_streaks": {
     "kublai: # tasks pending in queue (backlog)": {
-      "consecutive": 30,
+      "consecutive": 44,
       "first_seen": "2026-03-23T19:17:46.235826",
-      "last_seen": "2026-03-30T01:04:36.098457"
+      "last_seen": "2026-04-21T17:01:18.662519"
     },
     "temujin: # tasks pending in queue (backlog)": {
-      "consecutive": 30,
+      "consecutive": 44,
       "first_seen": "2026-03-23T19:17:46.235826",
-      "last_seen": "2026-03-30T01:04:36.098457"
+      "last_seen": "2026-04-21T17:01:18.662519"
     },
     "jochi: # tasks pending in queue (backlog)": {
-      "consecutive": 30,
+      "consecutive": 44,
       "first_seen": "2026-03-23T19:17:46.235826",
-      "last_seen": "2026-03-30T01:04:36.098457"
+      "last_seen": "2026-04-21T17:01:18.662519"
     },
     "ogedei: # tasks pending in queue (backlog)": {
-      "consecutive": 30,
+      "consecutive": 44,
       "first_seen": "2026-03-23T19:17:46.235826",
-      "last_seen": "2026-03-30T01:04:36.098457"
+      "last_seen": "2026-04-21T17:01:18.662519"
     },
     "mongke: # tasks pending in queue (backlog)": {
-      "consecutive": 29,
+      "consecutive": 43,
       "first_seen": "2026-03-23T20:09:47.054645",
-      "last_seen": "2026-03-30T01:04:36.098457"
+      "last_seen": "2026-04-21T17:01:18.662519"
+    },
+    "ogedei: # task(s) routed but # executed \u2014 dispatch may be stalled": {
+      "consecutive": 14,
+      "first_seen": "2026-04-21T03:01:26.982379",
+      "last_seen": "2026-04-21T17:01:18.662519"
+    },
+    "hermes: # tasks pending in queue (backlog)": {
+      "consecutive": 14,
+      "first_seen": "2026-04-21T03:01:26.982379",
+      "last_seen": "2026-04-21T17:01:18.662519"
     },
     "chagatai: # tasks pending in queue (backlog)": {
-      "consecutive": 22,
-      "first_seen": "2026-03-29T04:03:06.086612",
-      "last_seen": "2026-03-30T01:04:36.098457"
-    },
-    "temujin: # task(s) routed but # executed \u2014 dispatch may be stalled": {
-      "consecutive": 2,
-      "first_seen": "2026-03-30T00:07:15.070231",
-      "last_seen": "2026-03-30T01:04:36.098457"
-    },
-    "High explicit routing: #/# (#%) \u2014 # from non-system sources, keyword table may be underused": {
-      "consecutive": 1,
-      "first_seen": "2026-03-30T01:04:36.098457",
-      "last_seen": "2026-03-30T01:04:36.098457"
-    },
-    "jochi: # task(s) routed but # executed \u2014 dispatch may be stalled": {
-      "consecutive": 1,
-      "first_seen": "2026-03-30T01:04:36.098457",
-      "last_seen": "2026-03-30T01:04:36.098457"
+      "consecutive": 13,
+      "first_seen": "2026-04-21T04:01:14.461686",
+      "last_seen": "2026-04-21T17:01:18.662519"
     }
   },
-  "last_run": "2026-03-30T01:04:36.098457"
+  "last_run": "2026-04-21T17:01:18.662519"
 }

@@ -31,7 +31,6 @@ Documents the rebuilt notification pipeline (direct signal_send, reply threading
 ### [mcp-servers.md](mcp-servers.md)
 Documents the two-tier MCP server architecture: Playwright MCP (web, concurrent, headless Chromium per agent) and the custom `openclaw-computer-use` MCP server (macOS GUI, serialized via asyncio.Lock). Covers tools (screenshot, click, type, key, scroll, cursor_position, open_application), the agent allowlist (5 of 7 agents), security restrictions (blocked terminal/scripting apps), the `claude-agent` injection point, the `_computer_use_lock` mutex in task_executor.py, detection heuristics, and cleanup scripts.
 
-### [hermes-system.md](hermes-system.md)
 Documents the Hermes system caretaker agent: role (internal monitoring, quality enforcement, continuous improvement), 3-layer architecture (daemon, LLM sessions, proposal pipeline), T0 auto-fix functions (requeue_stuck_task, rotate_failing_provider, clear_bloated_session, force_refresh_reflection_bridge, reconcile_orphan_tasks), rules H001-H012, kill switch, LaunchAgent, cron jobs, and the migration of 16 checks from Ogedei. **Updated 2026-04-19** with the autonomous-improvement layer: fix engine, 6-tier kill-switch hierarchy, canonical-path denylist, rate limiter + circuit breaker, 3 scheduled sweeps, event-driven queue, and Signal reply-to-revert.
 
 ---
@@ -44,7 +43,6 @@ Documents the Hermes system caretaker agent: role (internal monitoring, quality 
 | Database schema | [neo4j-schema.md](neo4j-schema.md) |
 | LLM providers and fallback | [provider-fallback.md](provider-fallback.md) |
 | Agent roles and configuration | [agent-roster.md](agent-roster.md) |
-| Hermes caretaker agent | [hermes-system.md](hermes-system.md) |
 | Dashboard UI | [dashboard-views.md](dashboard-views.md) |
 | Task execution and lifecycle | [task-executor.md](task-executor.md), [neo4j-schema.md](neo4j-schema.md), [api-endpoints.md](api-endpoints.md) |
 | Task observability (Events, Metrics) | [neo4j-schema.md](neo4j-schema.md), [task-executor.md](task-executor.md) |
@@ -57,15 +55,10 @@ Documents the Hermes system caretaker agent: role (internal monitoring, quality 
 | Reflections system | [api-endpoints.md](api-endpoints.md), [dashboard-views.md](dashboard-views.md) |
 | Proposal voting pipeline | [neo4j-schema.md](neo4j-schema.md) |
 | Tiered approval (T0-T3) | [neo4j-schema.md](neo4j-schema.md) |
-| Hermes self-healing and quality | [hermes-system.md](hermes-system.md) |
-| Hermes autonomous code + content fixes | [hermes-system.md](hermes-system.md) (Autonomous Improvement Layer) |
-| Signal revert-by-reply | [hermes-system.md](hermes-system.md) (Autonomous Improvement Layer) |
 | WAL and outage resilience | [task-executor.md](task-executor.md), [neo4j-schema.md](neo4j-schema.md) |
 
 ## Last Updated
 
-2026-04-19 -- Extended hermes-system.md with the Autonomous Improvement layer (fix engine, 6-tier flag hierarchy, denylist, rate limiter, circuit breaker, scheduled sweeps, Signal revert-by-reply). Added Hermes section and Hermes Autonomous Improvement section to architecture.md (v2.10). Autonomous mode currently disabled-by-default; flags engaged until Phase 9 activation (earliest 2026-05-01).
-2026-04-16 -- Created hermes-system.md (Hermes caretaker agent). Updated agent-roster.md with Hermes (8 agents). Updated ogedei rules.json with 7 rules migrated to Hermes.
 2026-04-01 -- Created mcp-servers.md (Computer Use MCP + Playwright two-tier architecture). Updated task-executor.md with Computer Use mutex. Updated agent-roster.md with MCP access column.
 2026-03-29 -- Created gateway-plugin.md. Updated task-executor.md with rebuilt notification pipeline (direct signal_send, reply threading, backoff, dead-letter). Added origin_message_id to Neo4j Task schema. Added Phase 10 (active_tasks) to context_assembler.
 2026-03-23 -- Added post-completion hook section to task-executor.md; updated INDEX with follow-up hook entry.

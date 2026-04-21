@@ -1,71 +1,85 @@
 {
-  "last_audit": 1774850533.619833,
-  "cycles": 59920,
-  "last_cycle": "2026-03-30T02:03:22.630875",
+  "last_audit": 1776804616.160191,
+  "cycles": 61484,
+  "last_cycle": "2026-04-21T17:12:57.396085",
   "watcher_restarts": 1543,
-  "stalled_warnings": 515,
-  "fakes_detected": 17,
+  "stalled_warnings": 585,
+  "fakes_detected": 23,
   "malformed_cleaned": 0,
   "audit_result": {
-    "audited": 0,
+    "audited": 3,
     "fake_found": 0,
     "requeued": 0,
-    "skipped": 0,
+    "skipped": 1,
     "double_suffix_fixed": 0
   },
-  "last_cycle_epoch": 1774850602.6308942,
+  "last_cycle_epoch": 1776805977.396092,
   "last_issues": [
-    "task_executor log stale (565083s)",
-    "reflection stale 8937m (miss #15067)",
+    "reflection stale 901m (miss #1436)",
     "slow reflection step: message-extraction (120s)",
     "slow reflection step: thread-summaries (116s)"
   ],
-  "reflection_misses": 15067,
-  "last_memory_audit": 1774850533.740072,
+  "reflection_misses": 1436,
+  "last_memory_audit": 1776804616.243407,
   "memory_audit_result": {
     "total": 11,
     "critical": 0,
     "warning": 4,
-    "ts": "2026-03-30T02:02:15.326072"
+    "ts": "2026-04-21T16:50:16.271074"
   },
-  "last_routing_drift_check": 1774848845.757882,
+  "last_routing_drift_check": 1776804616.273165,
   "routing_drift": {
-    "total": 0,
+    "total": 3,
     "mismatches": 0,
     "drift_pct": 0.0,
-    "ts": "2026-03-30T01:34:05.814827"
+    "top_examples": [],
+    "ts": "2026-04-21T16:50:16.326597"
   },
-  "memory_fixes": 1011,
-  "last_failure_rate_check": 1774850428.8137019,
-  "agent_failure_flags": {},
-  "cycle_start_time": 1774850602.557413,
-  "last_queue_balance_check": 1774850428.830356,
+  "memory_fixes": 1020,
+  "last_failure_rate_check": 1776805878.760562,
+  "agent_failure_flags": {
+    "kublai": 1.0,
+    "jochi": 1.0,
+    "temujin": 1.0
+  },
+  "cycle_start_time": 1776805976.711303,
+  "last_queue_balance_check": 1776805878.777698,
   "queue_depths": {
-    "kublai": 9,
-    "temujin": 49,
-    "mongke": 17,
-    "chagatai": 18,
-    "jochi": 103,
-    "ogedei": 156,
-    "tolui": 11
+    "kublai": 24,
+    "temujin": 55,
+    "mongke": 30,
+    "chagatai": 5,
+    "jochi": 21,
+    "ogedei": 6,
+    "tolui": 3
   },
-  "last_cascade_check": 1774850498.4137568,
-  "cascade_risk": "low",
+  "last_cascade_check": 1776805846.124769,
+  "cascade_risk": "high",
   "cascade_metrics": {
-    "events_analyzed": 0
+    "events_analyzed": 27,
+    "patterns_detected": 8,
+    "agents_failing": 5,
+    "failures_by_agent": {
+      "chagatai": 7,
+      "jochi": 7,
+      "mongke": 4,
+      "temujin": 5,
+      "kublai": 4
+    },
+    "lookback_minutes": 30
   },
-  "last_quality_gate_check": 1774850569.0193338,
+  "last_quality_gate_check": 1776805878.791039,
   "quality_gate_checked": 0,
   "quality_gate_failed": 0,
   "quality_gate_retried": 0,
   "quality_gate_escalated": 0,
-  "last_self_healing_score_check": 1774849843.919646,
-  "self_healing_score": 88.9,
+  "last_self_healing_score_check": 1776802506.881751,
+  "self_healing_score": 100.0,
   "self_healing_metrics": {
-    "auto_resolved": 8,
-    "escalated": 1,
+    "auto_resolved": 13,
+    "escalated": 0,
     "manual": 0,
-    "total": 9
+    "total": 13
   },
   "circuit_half_open_agents": [
     "ogedei",
@@ -74,7 +88,7 @@
     "chagatai"
   ],
   "circuit_report": {
-    "ts": "2026-03-30T02:03:22.627594",
+    "ts": "2026-04-21T17:12:57.391967",
     "agents": {
       "jochi": {
         "state": "CLOSED",
@@ -82,7 +96,7 @@
         "reason": "normal",
         "detail": null
       },
-      "chagatai": {
+      "temujin": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -100,13 +114,13 @@
         "reason": "normal",
         "detail": null
       },
-      "mongke": {
+      "chagatai": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
         "detail": null
       },
-      "temujin": {
+      "mongke": {
         "state": "CLOSED",
         "available": true,
         "reason": "normal",
@@ -125,8 +139,8 @@
     "half_open": 0
   },
   "recent_redistributions": 0,
-  "last_cycle_duration": 0.07083296775817871,
-  "state_file_size": 4004,
+  "last_cycle_duration": 0.6838219165802002,
+  "state_file_size": 4254,
   "tasks_recovered": 194,
   "slow_cycles": 42,
   "queue_balance_moves": 601,
@@ -135,8 +149,8 @@
     "ogedei",
     "mongke"
   ],
-  "last_cred_failure_check": 1774850569.002175,
-  "last_git_operation_check": 1774850428.842837,
+  "last_cred_failure_check": 1776805878.770837,
+  "last_git_operation_check": 1776805878.795578,
   "git_metrics": {
     "autonomous_commits_24h": 0,
     "autonomous_commits_1h": 0,
@@ -150,12 +164,12 @@
   "stall_escalations": {},
   "stall_skips_completed": 2,
   "stall_cleaned_artifacts": 2,
-  "last_model_drift_check": 1774850602.6263402,
+  "last_model_drift_check": 1776804616.3267012,
   "model_drift_drifted": [],
   "model_drift_checked": 5,
   "model_drift_ts": "2026-03-29T15:57:26.690784",
   "model_drift_last_escalate": 1774810622.750905,
   "model_drift_last_clean": "2026-03-30T02:03:22.627455",
-  "last_gateway_spike_escalation": 1774811436.818936,
+  "last_gateway_spike_escalation": 1776800921.198263,
   "last_reflection_escalation": 1774832865.876141
 }

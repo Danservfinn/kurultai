@@ -1,0 +1,27 @@
+{
+  "title": "Fix Circuit Breaker Cascade Logic",
+  "tier": "T1",
+  "agent": "temujin",
+  "source": "hermes-reflection-daily",
+  "author": "kublai",
+  "problem": "Circuit breaker quarantine logic is redistributing failed ops tasks to the wrong agent (temujin) repeatedly, creating an infinite failure loop that wastes compute and floods queues. Git anomaly alert (commit 6969fe48) triggered 8+ cascade failures over 2 hours, representing 80% of all failed tasks in last 24h.",
+  "solution": "Add domain-aware redispatch (ops tasks stay in ogedei), deduplication check (skip if similar task recently failed), max-redispatch limit (escalate after 3 attempts), and exponential backoff (1m → 5m → 15m delays). Implement in agent-task-handler.py circuit breaker logic.",
+  "expected_impact": "Eliminate 80% of failed tasks, reduce temujin queue flooding, ensure domain correctness, prevent infinite loops, improve response times.",
+  "implementation_phases": [
+    {"phase": 1, "task": "Add domain-aware redispatch logic", "priority": "CRITICAL"},
+    {"phase": 2, "task": "Add deduplication check", "priority": "HIGH"},
+    {"phase": 3, "task": "Add max-redispatch limit + backoff", "priority": "HIGH"},
+    {"phase": 4, "task": "Add escalation to kublai on max limit", "priority": "MEDIUM"}
+  ],
+  "estimated_effort": "2-3 hours",
+  "risk": "LOW (isolated to circuit breaker logic)",
+  "success_criteria": [
+    "Zero circuit breaker cascade loops in 48h post-deployment",
+    "Failed task rate reduced by >70%",
+    "No ops tasks routed to temujin",
+    "All max-redispatch tasks escalated to kublai"
+  ],
+  "rollback_plan": "Revert circuit breaker logic to previous version, kill executing redispatched tasks, escalate stuck tasks to kublai manually. Revert time <5 minutes.",
+  "affected_agents": ["temujin", "ogedei", "kublai"],
+  "voting_required": ["kublai", "temujin", "ogedei", "mongke", "chagatai", "jochi"]
+}

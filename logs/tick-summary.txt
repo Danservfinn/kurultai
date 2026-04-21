@@ -1,24 +1,24 @@
-TICK 2026-03-30 01:57:47
+TICK 2026-04-21 17:02:33
 MODEL: unknown (LLM triage)
 HEARTBEAT: gap_detected=0 gap_minutes=0
-GATEWAY: up pid=916,917,919,924,10953 http=200 latency=7ms uptime=3h29m instances=1
-PROCESS: cpu=0.0% mem=0.1% rss=23MB threads=2
+GATEWAY: up pid=1065,1066,1067,1084,1714 http=200 latency=1ms uptime=5d0h instances=1
+PROCESS: cpu=0.0% mem=0.1% rss=19MB threads=2
 ERRORS:  last5m=0 last1h=0 fatal=0
-SERVICES: neo4j=up redis=up cloudflared=up pid=1455
+SERVICES: neo4j=up redis=up cloudflared=up pid=1525
 RECOVERY: neo4j_attempted=0 neo4j_result=- cloudflared_attempted=0 cloudflared_result=-
-CREDENTIALS: fleet_health=healthy valid=1 invalid=0 missing=0
-AUTH_HEARTBEAT: failed_checks=0
-CIRCUIT_BREAKER: recovered=0 still_open=0
+CREDENTIALS: fleet_health=healthy valid=4 invalid=0 missing=0
+AUTH_HEARTBEAT: failed_checks=6
+CIRCUIT_BREAKER: recovered=0 still_open=1
 TASKS:   pending=0 dispatched=0 spawn=0 queues=[]
 AUDIT:   verified=0 fake=0 requeued=0 llm_decision=IGNORE llm_confidence=0%
 VOTES:   synced=0 errors=0
 SUBPROC: executing=0 alive=0 dead=0 stale=0 zombies=0 orphaned=0 anomalies=0
 RESOLUTION: compliance=100.0% (with=1 without=0)
-ROUTING: balance_idx=1.425 missed=9 accuracy=87% p95=Nones routed=5
+ROUTING: balance_idx=0.698 missed=6 accuracy=87% p95=Nones routed=7
 TRENDS:  uptime_1h=100.0% avg_cpu=0.0% err_avg_5m=0 err_direction=stable restarts_1h=0
 DECISION: degraded
 ACTION:   warn
 REASON:   throughput anomaly: PENDING_NO_DISPATCH (pending=0, consecutive=1)
 No stalled tasks
-THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — 29 task(s) pending [jochi=1, ogedei=12, temujin=5, tolui=11] but 0 executing, 0 active processes. task-executor=running (pid=54219). Action: check dispatch logs
-THROUGHPUT_ANOMALY: QUEUE_IMBALANCE — Overloaded agents [temujin=5, tolui=11] while 3 agents idle [chagatai, mongke, ogedei]. Routing may be sticky or load-balancing thresholds ineffective.
+THROUGHPUT_ANOMALY: PENDING_NO_DISPATCH — 26 task(s) pending [chagatai=5, jochi=9, mongke=4, ogedei=5, tolui=3] but 0 executing, 0 active processes. task-executor=running (pid=43354). Action: check dispatch logs
+THROUGHPUT_ANOMALY: QUEUE_IMBALANCE — Overloaded agents [ogedei=5] while 3 agents idle [mongke, temujin, tolui]. Routing may be sticky or load-balancing thresholds ineffective.

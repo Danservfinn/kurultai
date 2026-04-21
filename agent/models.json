@@ -110,7 +110,8 @@
       ]
     },
     "anthropic": {
-      "baseUrl": "https://api.anthropic.com",
+      "baseUrl": "https://api.z.ai/api/anthropic",
+      "apiKey": "b5b1f9537dda43198c640b9a3b48f79b.KnBknfXZneVL1cLG",
       "api": "anthropic-messages",
       "models": [
         {
@@ -128,8 +129,7 @@
             "cacheWrite": 15
           },
           "contextWindow": 200000,
-          "maxTokens": 8192,
-          "api": "anthropic-messages"
+          "maxTokens": 8192
         },
         {
           "id": "claude-sonnet-4-6",
@@ -146,11 +146,10 @@
             "cacheWrite": 3
           },
           "contextWindow": 200000,
-          "maxTokens": 8192,
-          "api": "anthropic-messages"
+          "maxTokens": 8192
         },
         {
-          "id": "claude-haiku-4-5",
+          "id": "claude-haiku-4-5-20251001",
           "name": "Claude Haiku 4.5",
           "reasoning": false,
           "input": [
@@ -164,11 +163,9 @@
             "cacheWrite": 1
           },
           "contextWindow": 200000,
-          "maxTokens": 8192,
-          "api": "anthropic-messages"
+          "maxTokens": 8192
         }
-      ],
-      "apiKey": "b5b1f9537dda43198c640b9a3b48f79b.KnBknfXZneVL1cLG"
+      ]
     },
     "bailian": {
       "baseUrl": "https://coding-intl.dashscope.aliyuncs.com/v1",
@@ -190,8 +187,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 1000000,
-          "maxTokens": 65536,
-          "api": "openai-completions"
+          "maxTokens": 65536
         },
         {
           "id": "qwen3-coder-next",
@@ -207,8 +203,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 262144,
-          "maxTokens": 65536,
-          "api": "openai-completions"
+          "maxTokens": 65536
         },
         {
           "id": "qwen3-coder-plus",
@@ -224,8 +219,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 1000000,
-          "maxTokens": 65536,
-          "api": "openai-completions"
+          "maxTokens": 65536
         },
         {
           "id": "MiniMax-M2.5",
@@ -241,8 +235,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 204800,
-          "maxTokens": 131072,
-          "api": "openai-completions"
+          "maxTokens": 131072
         },
         {
           "id": "kimi-k2.5",
@@ -259,8 +252,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 60000,
-          "maxTokens": 32768,
-          "api": "openai-completions"
+          "maxTokens": 32768
         }
       ]
     },
@@ -283,8 +275,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 128000,
-          "maxTokens": 8192,
-          "api": "openai-completions"
+          "maxTokens": 8192
         }
       ]
     },
@@ -308,8 +299,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 202752,
-          "maxTokens": 16384,
-          "api": "anthropic-messages"
+          "maxTokens": 16384
         },
         {
           "id": "glm-4.7",
@@ -325,8 +315,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 202752,
-          "maxTokens": 16384,
-          "api": "anthropic-messages"
+          "maxTokens": 16384
         },
         {
           "id": "glm-4.5-air",
@@ -342,8 +331,7 @@
             "cacheWrite": 0
           },
           "contextWindow": 131072,
-          "maxTokens": 8192,
-          "api": "anthropic-messages"
+          "maxTokens": 8192
         }
       ]
     },
@@ -403,6 +391,11 @@
         }
       ],
       "apiKey": "OPENROUTER_API_KEY"
+    },
+    "google": {
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "apiKey": "AIzaSyDxOXYpst40Pdl1NbhXKX61v5S4oiBIgwY",
+      "models": []
     }
   }
 }

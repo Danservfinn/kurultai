@@ -1,0 +1,28 @@
+{
+  "title": "Add Git Anomaly Whitelist and Author Check",
+  "tier": "T2",
+  "agent": "ogedei",
+  "source": "hermes-reflection-daily",
+  "author": "kublai",
+  "problem": "Git operation monitor is flagging HIGH severity alerts for routine Claude config changes (commit 6969fe48), wasting investigation cycles and desensitizing the team to real security incidents. Rules lack context awareness: any settings.json edit = HIGH, no whitelist for expected changes, no distinction between human-initiated vs unauthorized modifications.",
+  "solution": "Add commit author check (downgrade to INFO if known human), file path whitelist (whitelist agents/*/.claude/settings.json), anomaly approval UI (CLI to mark expected changes), and enhanced alert metadata (commit author, message, diff summary). Implement in git-operation-monitor skill.",
+  "expected_impact": "Reduce false positive rate by ~60%, keep HIGH severity for real incidents, faster triage via enhanced metadata, prevent repeat alerts via approval mechanism, maintain security posture.",
+  "implementation_phases": [
+    {"phase": 1, "task": "Add commit author check", "priority": "HIGH"},
+    {"phase": 2, "task": "Add file path whitelist", "priority": "HIGH"},
+    {"phase": 3, "task": "Add anomaly approval CLI", "priority": "MEDIUM"},
+    {"phase": 4, "task": "Add enhanced alert metadata", "priority": "MEDIUM"}
+  ],
+  "estimated_effort": "2-3 hours",
+  "risk": "LOW (defensive default: still alert, just lower severity for known-safe cases)",
+  "success_criteria": [
+    "Zero HIGH severity alerts for authorized human config changes",
+    "False positive rate <10%",
+    "All repeat alerts prevented via approval mechanism",
+    "Triage time reduced by >50%"
+  ],
+  "security_considerations": "Risk: Whitelist could miss real attacks if attacker compromises human git credentials. Mitigation: Keep alerting (downgrade to INFO, don't suppress), require 2FA for human git operations, monitor for suspicious patterns even in whitelisted files, audit whitelist quarterly.",
+  "rollback_plan": "Remove author check and whitelist logic, revert to original HIGH severity for all settings.json changes, monitor for missed legitimate alerts. Revert time <10 minutes.",
+  "affected_agents": ["ogedei", "jochi"],
+  "voting_required": ["kublai", "ogedei", "temujin", "mongke", "chagatai", "jochi"]
+}

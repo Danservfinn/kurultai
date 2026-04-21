@@ -2037,3 +2037,17 @@
 {"ts": "2026-03-29T23:21:47.037155", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
 {"ts": "2026-03-29T23:35:08.462855", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "temujin", "details": {"task_file": "normal-1774841312-2c482622.completed.done.md"}}
 {"ts": "2026-03-29T23:39:01.547729", "issue_type": "gateway_restart", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {}}
+{"ts": "2026-04-21T02:11:30.598698", "issue_type": "fake_completion", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1776482299-f9e0bd18.done.md"}}
+{"ts": "2026-04-21T02:11:30.615005", "issue_type": "fake_completion", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1776547171-cfad8495.done.md"}}
+{"ts": "2026-04-21T02:11:30.632914", "issue_type": "fake_completion", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "high-1776313616-84dc5e4e.done.md"}}
+{"ts": "2026-04-21T02:11:30.649236", "issue_type": "fake_completion", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1776384196-171207a1.done.md"}}
+{"ts": "2026-04-21T02:11:30.663669", "issue_type": "fake_completion", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "high-1776316063-006f7c6d.done.md"}}
+{"ts": "2026-04-21T02:11:30.745127", "issue_type": "memory_bloat", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 4}}
+{"ts": "2026-04-21T02:11:30.746884", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 1}}
+{"ts": "2026-04-21T02:25:24.937595", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1776482299-f9e0bd18.done.md"}}
+{"ts": "2026-04-21T02:25:24.941094", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1776547171-cfad8495.done.md"}}
+{"ts": "2026-04-21T02:25:24.944775", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "high-1776313616-84dc5e4e.done.md"}}
+{"ts": "2026-04-21T02:25:24.948884", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "normal-1776384196-171207a1.done.md"}}
+{"ts": "2026-04-21T02:25:24.952544", "issue_type": "quality_retry", "action": "auto_recovered", "outcome": "success", "agent": "ogedei", "details": {"task_file": "high-1776316063-006f7c6d.done.md"}}
+{"ts": "2026-04-21T02:41:50.387758", "issue_type": "memory_deprecated_rules", "action": "auto_recovered", "outcome": "success", "agent": "", "details": {"fix_count": 4}}
+{"ts": "2026-04-21T16:28:12.262215", "issue_type": "fake_completion", "action": "auto_recovered", "outcome": "success", "agent": "jochi", "details": {"task_file": "high-1776799720-ae7255fd.done.md"}}

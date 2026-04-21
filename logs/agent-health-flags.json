@@ -1,13 +1,1 @@
-{
-  "ts": "2026-03-30T01:50:08.825248",
-  "window_hours": 1,
-  "agents": {
-    "temujin": {
-      "completed_1h": 1,
-      "failed_1h": 0,
-      "total_1h": 1,
-      "fail_rate_1h": 0.0,
-      "flagged": false
-    }
-  }
-}
+{"timestamp": 1776806005.4832158, "agents": {"temujin": {"completed": 0, "failed": 4, "failure_rate": 1.0, "healthy": false}, "jochi": {"completed": 0, "failed": 4, "failure_rate": 1.0, "healthy": false}}}

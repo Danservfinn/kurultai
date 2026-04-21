@@ -1,1 +1,1 @@
-{"timestamp": "2026-03-30T02:03:26.081682", "pid": 54219, "executor_id": "exec-04c255a9", "poll_count": 162, "active_tasks": 0, "status": "idle"}
+{"timestamp": "2026-04-21T17:13:05.980608", "pid": 43354, "executor_id": "exec-4862fe6c", "poll_count": 14134, "active_tasks": 1, "last_dispatch_at": "2026-04-21T17:13:05.980140", "status": "active"}
