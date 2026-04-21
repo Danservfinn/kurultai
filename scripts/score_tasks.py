@@ -31,6 +31,23 @@ from kurultai_ledger import append_ledger as _kp_append_ledger, read_ledger, TAS
 # Lock file for preventing concurrent scoring
 SCORE_LOCK_FILE = TASK_LEDGER.parent / ".score_lock"
 
+# Terminal event types — the ledger has historically used both short and TASK_-prefixed
+# names. Both are treated as terminal for scoring; see ARCHITECTURE.md ledger-schema.
+_TERMINAL_EVENTS = {
+    "COMPLETED", "FAILED",
+    "TASK_COMPLETED", "TASK_FAILED", "TASK_FAILED_PERMANENT",
+}
+_COMPLETED_EVENTS = {"COMPLETED", "TASK_COMPLETED"}
+
+
+def _event_ts(event: dict) -> str:
+    """Return the event's timestamp, tolerating both `ts` and `timestamp` keys.
+
+    Historical events use `ts`; newer writers use `timestamp`. Falling back to
+    both prevents score_pending_time from silently returning 0 for every task.
+    """
+    return event.get("ts") or event.get("timestamp") or ""
+
 # Domain keywords for domain_match validation
 # Single source of truth: task_intake.py:AGENT_KEYWORDS
 # Previously maintained a separate copy that drifted (missing keywords caused
@@ -119,7 +136,7 @@ def score_substantive(task_events):
     0 = No execution data or empty output
     """
     details = [e for e in task_events if e.get("event") == "EXECUTION_DETAIL"]
-    completed = [e for e in task_events if e.get("event") in ("COMPLETED", "FAILED")]
+    completed = [e for e in task_events if e.get("event") in _TERMINAL_EVENTS]
 
     if not details and not completed:
         return 0
@@ -134,9 +151,18 @@ def score_substantive(task_events):
             return 2
         return 1
 
-    # Fallback to COMPLETED/FAILED events
-    if any(e.get("event") == "COMPLETED" for e in completed):
-        return 2
+    # Fallback to terminal events — also derive substantial output from COMPLETED
+    # payload's result length if available, so we don't saturate at 2/3 uniformly.
+    for ev in completed:
+        if ev.get("event") in _COMPLETED_EVENTS:
+            result_text = ev.get("result") or ev.get("output") or ""
+            if isinstance(result_text, str):
+                word_count = len(result_text.split())
+                if word_count >= 80:
+                    return 3
+                if word_count > 0:
+                    return 2
+            return 2
     return 1
 
 
@@ -154,8 +180,8 @@ def score_pending_time(task_events):
         return 0  # unmeasurable
 
     try:
-        queued_ts = datetime.fromisoformat(queued[0]["ts"])
-        executing_ts = datetime.fromisoformat(executing[0]["ts"])
+        queued_ts = datetime.fromisoformat(_event_ts(queued[0]))
+        executing_ts = datetime.fromisoformat(_event_ts(executing[0]))
         delta_s = (executing_ts - queued_ts).total_seconds()
     except (KeyError, ValueError, TypeError):
         return 0
@@ -181,11 +207,16 @@ def detect_self_route_flag(task_events):
     if agent != "kublai":
         return False
 
-    # Check if task contains specialist-domain keywords
-    specialist_keywords = ["design", "build", "implement", "research", "write",
-                          "test", "audit", "monitor", "fix", "create", "plan",
-                          "brainstorm", "payment", "protocol"]
-    return any(kw in task_summary for kw in specialist_keywords)
+    # Scoped to phrases that indicate a specialist-domain *deliverable*, not any
+    # coordination verb. A task that merely says "plan the meeting" should not
+    # be flagged; "implement the auth refactor" should. Pair each keyword with
+    # a noun-adjacent pattern so legitimate Kublai coordination doesn't trip.
+    specialist_patterns = [
+        "implement ", "build the ", "write the ", "refactor ", "add a test",
+        "audit the ", "deploy ", "brainstorm a design", "design the ",
+        "research the api", "fix the bug", "ship the ", "compose a ",
+    ]
+    return any(p in task_summary for p in specialist_patterns)
 
 
 def score_all_tasks(hours=None):
@@ -223,8 +254,9 @@ def score_all_tasks(hours=None):
         if not task_id or task_id == "unknown":
             continue
 
-        # Only score tasks that have reached COMPLETED or FAILED
-        terminal = [e for e in task_events if e.get("event") in ("COMPLETED", "FAILED")]
+        # Only score tasks that have reached a terminal event (either old- or
+        # TASK_-prefixed vocabulary).
+        terminal = [e for e in task_events if e.get("event") in _TERMINAL_EVENTS]
         if not terminal:
             continue
 

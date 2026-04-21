@@ -72,9 +72,52 @@ VALID_EVENTS = {
     "HEARTBEAT_STALE", "CREDENTIAL_REDISPATCH",
     # Notification lifecycle events
     "NOTIFICATION_QUEUED", "NOTIFICATION_SENT", "NOTIFICATION_FAILED",
+    # TASK_-prefixed vocabulary (new style — must co-exist with bare forms below)
+    "TASK_CLAIMED", "TASK_COMPLETED", "TASK_FAILED", "TASK_FAILED_PERMANENT",
+    "TASK_CONTINUATION",
+    "REFLECTION_COMPLETE",
+    # Prompt sanitizer events (2026-04-21)
+    "PROMPT_OPTIMIZED", "PROMPT_FALLBACK",
+    "PROMPT_INJECTION_BLOCKED", "PROMPT_INJECTION_BYPASSED",
+    # False-completion gate (emitted from task_executor._execute_inner)
+    "FALSE_COMPLETION_BLOCKED",
+    # Health check + deploy gate events (emitted from pipeline_health_check / deploy gates)
+    "HEALTH_CHECK_PASSED", "HEALTH_CHECK_FAILED", "DEPLOY_BLOCKED",
+    # Orphan recovery (emitted by reaper)
+    "ORPHAN_RECOVERED",
+    # PR automation events
+    "PR_CREATED", "PR_FAILED",
+    # Executor lifecycle
+    "EXECUTOR_STOPPED",
     # Test events (should not appear in production)
     "PERF_TEST", "CONCURRENT_TEST", "TEST_EVENT",
 }
+
+# Map short-name events to their TASK_-prefixed canonical form. Both forms are
+# accepted on write, but consumers should prefer the canonical form in new code.
+# See score_tasks._TERMINAL_EVENTS for the downstream matcher.
+_CANONICAL_ALIAS = {
+    "COMPLETED": "TASK_COMPLETED",
+    "FAILED": "TASK_FAILED",
+}
+
+
+def _normalize_entry(entry: dict) -> dict:
+    """Rewrite in-place to canonical schema — idempotent.
+
+    - `event_type` → `event`
+    - `timestamp` → `ts` (while leaving `timestamp` intact for backwards-compat)
+    - ISO-8601 validation is NOT done here — that happens in validate_event().
+
+    Prevents the two historical footguns found in the ledger audit: mixed
+    `event`/`event_type` keys and mixed `ts`/`timestamp` keys. New writers
+    should always produce `event` + `ts`; old callers keep working.
+    """
+    if "event" not in entry and "event_type" in entry:
+        entry["event"] = entry["event_type"]
+    if "ts" not in entry and "timestamp" in entry:
+        entry["ts"] = entry["timestamp"]
+    return entry
 
 # System-level events that don't require task_id (session, system, operational events)
 SYSTEM_EVENTS = {
@@ -106,13 +149,15 @@ def validate_event(entry: dict) -> tuple[bool, list[str]]:
     elif entry["event"] not in VALID_EVENTS:
         errors.append(f"invalid event type: {entry['event']} (valid: {', '.join(sorted(VALID_EVENTS)[:5])}...)")
 
-    if "ts" not in entry:
+    # Timestamp: accept `ts` or legacy `timestamp`. Normalization in
+    # _normalize_entry() will have already rewritten `timestamp` → `ts`, but
+    # we re-check both here so validation is usable standalone.
+    ts_str = entry.get("ts") or entry.get("timestamp") or ""
+    if not ts_str:
         errors.append("missing required field: ts")
     else:
-        # Validate timestamp format
-        ts_str = entry.get("ts", "")
         try:
-            datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
         except (ValueError, TypeError, AttributeError):
             errors.append(f"invalid timestamp format: {ts_str}")
 
@@ -187,9 +232,22 @@ def append_ledger(entry: dict, validate: bool = True) -> bool:
     so events are visible via read_ledger(). Callers like kublai_task_report.py
     rely on this for TASK_REPORT_GENERATED, MODEL_USED, etc.
 
+    If validate=True (default), the entry is normalized (event_type→event,
+    timestamp→ts) and rejected if the schema is invalid — prevents the
+    event_type/event and ts/timestamp drift found in the 2026-04 audit.
+
     Returns:
         True on success, False on failure.
     """
+    _normalize_entry(entry)
+    if validate:
+        ok, errors = validate_event(entry)
+        if not ok:
+            print(
+                f"[ledger] Rejecting invalid event: {errors} (event={entry.get('event')})",
+                file=sys.stderr,
+            )
+            return False
     try:
         from neo4j_task_tracker import TaskTracker
         with TaskTracker() as tracker:

@@ -27,9 +27,22 @@ Usage:
 import argparse
 import json
 import os
+import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+# Allowlist of binaries that --command may invoke. Any command whose argv[0]
+# (after shlex-split) is not in this set is rejected outright — prevents task
+# content from becoming a shell-injection vector when verification rules are
+# authored through the dashboard or LLM-produced task payloads.
+_VERIFY_COMMAND_ALLOWLIST = frozenset({
+    "pytest", "python", "python3", "node", "npm", "cargo", "go", "make",
+    "mypy", "pylint", "bandit", "ruff", "eslint",
+    "curl", "grep", "cat", "ls", "find", "git",
+    "neo4j-admin", "cypher-shell",
+})
 
 
 def verify_file_size(path: str, expected_size: int) -> tuple[bool, str]:
@@ -80,15 +93,38 @@ def verify_json_key(path: str, key: str, contains: str = None, equals: str = Non
 
 
 def verify_command(cmd: str, expect: str) -> tuple[bool, str]:
-    """Run command and check output contains expected string."""
+    """Run command and check output contains expected string.
+
+    `cmd` is tokenised with shlex and the binary must be in
+    _VERIFY_COMMAND_ALLOWLIST. Subprocess runs with shell=False.
+    """
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+        argv = shlex.split(cmd)
+    except ValueError as e:
+        return False, f"FAIL: Could not parse command (shlex): {e}"
+    if not argv:
+        return False, "FAIL: Empty command"
+    binary = os.path.basename(argv[0])
+    if binary not in _VERIFY_COMMAND_ALLOWLIST:
+        return False, (
+            f"FAIL: Command '{binary}' is not in verification allowlist. "
+            f"Permitted: {sorted(_VERIFY_COMMAND_ALLOWLIST)}"
+        )
+    # Resolve full path to avoid PATH injection surprises.
+    resolved = shutil.which(argv[0]) or argv[0]
+    argv[0] = resolved
+    try:
+        result = subprocess.run(
+            argv, shell=False, capture_output=True, text=True, timeout=30
+        )
         output = result.stdout + result.stderr
         if expect in output:
             return True, f"OK: Command output contains '{expect}'"
         return False, f"FAIL: Command output does not contain '{expect}'\nOutput: {output[:500]}"
     except subprocess.TimeoutExpired:
-        return False, f"FAIL: Command timed out after 30s"
+        return False, "FAIL: Command timed out after 30s"
+    except FileNotFoundError:
+        return False, f"FAIL: Binary not found: {argv[0]}"
     except Exception as e:
         return False, f"FAIL: Command error: {e}"
 

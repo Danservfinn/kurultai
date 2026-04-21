@@ -847,7 +847,7 @@ class Executor:
                 await self._poll_and_dispatch()
                 self._write_heartbeat()
                 # Periodically sweep BLOCKED tasks whose all deps are COMPLETED
-                now = asyncio.get_event_loop().time()
+                now = asyncio.get_running_loop().time()
                 if now - _last_blocked_sweep >= BLOCKED_SWEEP_INTERVAL:
                     try:
                         unblocked = self._store.sweep_blocked_tasks()
@@ -1046,9 +1046,64 @@ class Executor:
 
         sanitized = self._sanitizer.sanitize(raw_body)
         if not sanitized.safe:
-            logger.warning(
-                f"Threats in {task_id}: {sanitized.threats_detected}"
-            )
+            # HARD REJECT on prompt-injection signals. Escape hatch:
+            #   KURULTAI_SANITIZER_BYPASS=1  — operator override (logs loudly).
+            # Rationale: warning-only was the pre-existing behaviour, which let
+            # injected instructions reach the LLM. False positives are rare
+            # because INJECTION_PATTERNS are multi-word phrases.
+            threats = sanitized.threats_detected
+            bypass = os.environ.get("KURULTAI_SANITIZER_BYPASS") == "1"
+            if bypass:
+                logger.error(
+                    "SANITIZER_BYPASS active for %s — threats=%s",
+                    task_id, threats,
+                )
+                emit_event(
+                    self._get_driver(), "PROMPT_INJECTION_BYPASSED", task_id, agent,
+                    executor_id=self._executor_id,
+                    threats=str(threats)[:500],
+                )
+            else:
+                logger.error(
+                    "Hard-reject for %s — injection threats: %s", task_id, threats,
+                )
+                reject_reason = f"prompt_injection_detected: {threats[:3]}"
+                emit_event(
+                    self._get_driver(), "PROMPT_INJECTION_BLOCKED", task_id, agent,
+                    executor_id=self._executor_id,
+                    threats=str(threats)[:500],
+                )
+                try:
+                    self._store.fail_task(
+                        task_id, claim_epoch,
+                        error_class="prompt_injection",
+                        error_msg=reject_reason[:500],
+                        is_transient=False,
+                        output_snippet="",
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "fail_task failed while rejecting %s: %s", task_id, e,
+                    )
+                    self._wal.buffer(
+                        "MATCH (t:Task {task_id: $tid, status: 'WORKING'}) "
+                        "SET t.status = 'FAILED', t.updated_at = datetime()",
+                        {"tid": task_id},
+                    )
+                emit_event(
+                    self._get_driver(), "TASK_FAILED_PERMANENT", task_id, agent,
+                    executor_id=self._executor_id,
+                    error_category="prompt_injection",
+                    error_msg=reject_reason[:200],
+                )
+                self._cb.record_result(agent, False, task_id)
+                self._rename_task_file(agent, task_id, ".failed.md")
+                self._write_ledger(
+                    "TASK_FAILED_PERMANENT", task_id, agent,
+                    error=reject_reason[:200],
+                    error_class="prompt_injection",
+                )
+                return
         # 2b. Write .executing.md sentinel NOW — before Phase 1 (prompt optimization
         # takes up to 120s). If the executor crashes during Phase 1 the file-based
         # re-dispatch guard sees .executing.md and skips the task, preventing

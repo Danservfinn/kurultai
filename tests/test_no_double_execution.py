@@ -18,7 +18,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
 from neo4j_task_tracker import get_driver
-from neo4j_atomic_transitions import claim_task,from kurultai_ledger import generate_task_id
+from neo4j_atomic_transitions import claim_task
+from kurultai_ledger import generate_task_id
 
 
 def test_concurrent_claim():
@@ -59,7 +60,8 @@ def test_concurrent_claim():
 
     def try_claim(thread_num):
         session_key = f"test-thread-{thread_num}-{time.time()}"
-        barrier.wait()  # Wait for all threads to        success = claim_task(test_task_id, "test_agent", session_key)
+        barrier.wait()  # Wait for all threads to reach this point before claiming
+        success = claim_task(test_task_id, "test_agent", session_key)
         with results_lock:
             results.append((thread_num, success, session_key))
 
@@ -111,7 +113,7 @@ def test_concurrent_claim():
     if success_count == 1:
         print("\n✓ PASS: Exactly one claim succeeded (as expected)")
         return True
-    else
+    else:
         print(f"\n✗ FAIL: Expected 1 success, got {success_count}")
         print("Note: This may be due to Python threading limitations")
         print("The key invariant is: only ONE session_key is stored")
