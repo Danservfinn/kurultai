@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 neo4j_v2_failure.py — Failure classification: transient vs permanent.
 
@@ -62,6 +63,81 @@ _PERMANENT_PATTERNS = [
     # Error format: "R008_VIOLATION: Required skill '/<name>' was not invoked within Ns"
     (r"(?i)R008_VIOLATION|required\s+skill.*not\s+invoked", "R008_VIOLATION"),
 ]
+
+# --- Retry Budget by Error Class ---
+# Determines max retries for each error category.
+# Transient errors get more retries; permanent errors get 0.
+RETRY_BUDGET = {
+    # Transient: worth retrying
+    "NETWORK_ERROR": 3,
+    "SERVICE_UNAVAILABLE": 3,
+    "HTTP_ERROR": 2,
+    "RATE_LIMITED": 2,
+    "OVERLOADED": 2,
+    "STALL": 1,
+    "TIMEOUT": 2,
+    "OOM": 1,
+    "DISK_FULL": 1,
+    "DB_TRANSIENT": 3,
+    "KILLED": 2,
+    "SIGNAL": 2,
+    "GENERAL_ERROR": 1,
+    "UNKNOWN": 1,
+    # Validation (transient but limited)
+    "EMPTY_OUTPUT": 1,
+    "INCOMPLETE_REPORT": 1,
+    "VALIDATION_FAILED": 1,
+    # Permanent: don't waste retries
+    "AUTH_FAILURE": 0,
+    "INVALID_REQUEST": 0,
+    "MODEL_NOT_FOUND": 0,
+    "CONTENT_POLICY": 0,
+    "PERMISSION_DENIED": 0,
+    "FILE_NOT_FOUND": 0,
+    "CODE_ERROR": 0,
+    "R008_VIOLATION": 0,
+    "USAGE_ERROR": 0,
+    "SUCCESS": 0,
+    "prompt_injection": 0,
+}
+
+DEFAULT_RETRY_BUDGET = 1  # Default for unclassified errors
+
+
+def get_retry_budget(error_class: str) -> int:
+    """Get max retry count for a given error class.
+
+    Returns:
+        Maximum number of retries allowed for this error type.
+    """
+    return RETRY_BUDGET.get(error_class, DEFAULT_RETRY_BUDGET)
+
+
+# --- Error Category Taxonomy ---
+# Groups error classes into higher-level categories for reporting.
+ERROR_CATEGORIES = {
+    "infrastructure": {"NETWORK_ERROR", "SERVICE_UNAVAILABLE", "HTTP_ERROR",
+                       "OOM", "DISK_FULL", "DB_TRANSIENT", "KILLED", "SIGNAL"},
+    "rate_limiting": {"RATE_LIMITED", "OVERLOADED"},
+    "timeout": {"TIMEOUT", "STALL"},
+    "auth": {"AUTH_FAILURE"},
+    "code": {"CODE_ERROR", "USAGE_ERROR", "R008_VIOLATION", "FILE_NOT_FOUND"},
+    "input": {"INVALID_REQUEST", "CONTENT_POLICY", "EMPTY_OUTPUT",
+              "INCOMPLETE_REPORT", "VALIDATION_FAILED", "MODEL_NOT_FOUND"},
+    "permission": {"PERMISSION_DENIED", "prompt_injection"},
+}
+
+
+def categorize_error(error_class: str) -> str:
+    """Map an error class to its higher-level category.
+
+    Returns:
+        Category name (e.g., 'infrastructure', 'rate_limiting', 'timeout').
+    """
+    for category, classes in ERROR_CATEGORIES.items():
+        if error_class in classes:
+            return category
+    return "unknown"
 
 
 def classify_failure(return_code: int, stderr: str = "",

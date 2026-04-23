@@ -1199,7 +1199,8 @@ class Executor:
                 model=env.get("ANTHROPIC_MODEL", "default"),
             )
 
-            timeout = self._compute_timeout(priority, skill_hint)
+            timeout = self._compute_timeout(priority, skill_hint,
+                                            retry_count=task.get('retry_count', 0))
 
             # Computer Use exclusivity — acquire lock if task needs GUI access
             _needs_cu = self._requires_computer_use(task)
@@ -1576,6 +1577,9 @@ class Executor:
         )
 
         if stall_count < STALL_ESCALATION_THRESHOLD:
+            # Before threshold: try decomposition if task is decomposable
+            if await self._decompose_complex_task(task, agent, reason="stall_detected"):
+                return  # Decomposed into subtasks, stop retrying parent
             return  # Not yet — let the normal retry / re-queue path handle it
 
         # Threshold reached — escalate
@@ -1809,6 +1813,178 @@ class Executor:
             )
         except Exception as e:
             logger.warning(f"Failed to create continuation task: {e}")
+
+    # -------------------------------------------------------------------
+    # Subtask Decomposition — break complex tasks into sequential steps
+    # -------------------------------------------------------------------
+
+    # Prompt patterns that indicate decomposable multi-step tasks
+    _DECOMPOSE_PATTERNS = [
+        (r'\band\b.*\band\b.*\band\b', 3),      # "do X and Y and Z" → 3 subtasks
+        (r'\bthen\b.*\bthen\b', 3),               # "do X then Y then Z" → 3 subtasks
+        (r'\bfirst\b.*\bthen\b.*\bfinally\b', 3), # "first X then Y finally Z" → 3 subtasks
+        (r'\bsteps?:\s*\d+', 2),                   # "steps: N" → multi-step
+        (r'\bphase\s+[2-9]\b', 2),                 # mentions "phase 2+" → multi-phase
+    ]
+
+    def _should_decompose(self, task: dict, reason: str) -> bool:
+        """Check if a failed/escalated task should be decomposed into subtasks.
+
+        Only decomposes if:
+        1. Task depth < MAX_DELEGATION_DEPTH (no recursive decomposition)
+        2. Task prompt matches decomposition patterns
+        3. Failure reason is stall or timeout (not auth/code errors)
+        4. No existing subtasks from this parent
+        """
+        from kurultai_paths import MAX_DELEGATION_DEPTH
+        depth = task.get("depth", 0)
+        if depth >= MAX_DELEGATION_DEPTH:
+            return False
+
+        # Only decompose on stall/timeout, not on permanent errors
+        if reason not in ("stall_detected", "timeout", "stall_escalated"):
+            return False
+
+        # Check prompt against decomposition patterns
+        prompt = (task.get("prompt", "") or "") + " " + (task.get("title", "") or "")
+        for pattern, _ in self._DECOMPOSE_PATTERNS:
+            if re.search(pattern, prompt, re.IGNORECASE):
+                # Check no existing subtasks
+                try:
+                    with self._get_driver().session() as sess:
+                        result = sess.run("""
+                            MATCH (parent:Task {task_id: $tid})-[:SPAWNED]->(child:Task)
+                            RETURN count(child) AS n_children
+                        """, tid=task["task_id"])
+                        record = result.single()
+                        if record and record["n_children"] > 0:
+                            return False
+                except Exception:
+                    pass
+                return True
+
+        return False
+
+    async def _decompose_complex_task(
+        self, task: dict, agent: str, reason: str
+    ) -> bool:
+        """Decompose a complex task into sequential subtasks with DEPENDS_ON edges.
+
+        Creates 2-3 subtasks from the parent's prompt, linked sequentially
+        so they execute in order. The parent task is set to BLOCKED status
+        until all subtasks complete.
+
+        Returns True if decomposition was created, False otherwise.
+        """
+        import re as _re
+        task_id = task["task_id"]
+        prompt = task.get("prompt", "") or ""
+        title = task.get("title", "") or ""
+
+        # Determine number of subtasks based on pattern match
+        n_subtasks = 2  # default
+        full_text = prompt + " " + title
+        for pattern, count in self._DECOMPOSE_PATTERNS:
+            if _re.search(pattern, full_text, _re.IGNORECASE):
+                n_subtasks = count
+                break
+
+        # Generate subtask descriptions by splitting the prompt
+        # Strategy: split on sentence boundaries, group into N chunks
+        sentences = _re.split(r'(?<=[.!?])\s+', prompt)
+        if len(sentences) < n_subtasks:
+            # Can't split meaningfully, don't decompose
+            return False
+
+        chunk_size = max(1, len(sentences) // n_subtasks)
+        chunks = []
+        for i in range(n_subtasks):
+            start = i * chunk_size
+            end = start + chunk_size if i < n_subtasks - 1 else len(sentences)
+            chunks.append(" ".join(sentences[start:end]))
+
+        if not all(chunks):
+            return False
+
+        logger.info(
+            f"DECOMPOSE: {task_id} → {n_subtasks} subtasks "
+            f"(depth={task.get('depth', 0)}, reason={reason})"
+        )
+
+        # Create subtasks with sequential DEPENDS_ON edges
+        parent_depth = task.get("depth", 0)
+        child_ids = []
+        for i, chunk in enumerate(chunks):
+            child_id = generate_task_id()
+            child_title = f"[{i+1}/{n_subtasks}] {title[:40]}"
+            child_prompt = (
+                f"## Subtask {i+1} of {n_subtasks}\n\n"
+                f"Parent task: `{task_id}` — {title}\n\n"
+                f"### Your portion:\n{chunk}\n\n"
+                f"Complete this portion. The next subtask will continue from where you leave off."
+            )
+
+            depends_on = [child_ids[-1]] if child_ids else None
+
+            try:
+                self._store.create_task(
+                    task_id=child_id,
+                    title=child_title,
+                    prompt=child_prompt,
+                    assigned_to=agent,
+                    priority=task.get("priority", "normal"),
+                    domain=task.get("domain", "implementation"),
+                    skill_hint=task.get("skill_hint", ""),
+                    source="decomposition",
+                    parent_id=task_id,
+                    depth=parent_depth + 1,
+                    depends_on=depends_on,
+                )
+                child_ids.append(child_id)
+            except Exception as e:
+                logger.warning(f"DECOMPOSE failed creating subtask {i+1}: {e}")
+                # Roll back: cancel any already-created subtasks
+                for cid in child_ids:
+                    try:
+                        with self._get_driver().session() as sess:
+                            sess.run("""
+                                MATCH (t:Task {task_id: $cid})
+                                SET t.status = 'CANCELLED',
+                                    t.updated_at = datetime(),
+                                    t.cancel_reason = 'decomposition_rollback'
+                            """, cid=cid)
+                    except Exception:
+                        pass
+                return False
+
+        # Mark parent as blocked (waiting on subtasks)
+        try:
+            with self._get_driver().session() as sess:
+                sess.run("""
+                    MATCH (t:Task {task_id: $tid})
+                    SET t.status = 'BLOCKED',
+                        t.decomposed_at = datetime(),
+                        t.decomposed_into = $child_ids,
+                        t.updated_at = datetime()
+                """, tid=task_id, child_ids=child_ids)
+        except Exception as e:
+            logger.warning(f"DECOMPOSE: failed to mark parent as blocked: {e}")
+
+        emit_event(
+            self._get_driver(), "TASK_DECOMPOSED", task_id, agent,
+            executor_id=self._executor_id,
+            n_subtasks=n_subtasks,
+            child_ids=",".join(child_ids),
+        )
+        self._write_ledger(
+            "TASK_DECOMPOSED", task_id, agent,
+            n_subtasks=n_subtasks,
+            child_ids=",".join(child_ids),
+        )
+        logger.info(
+            f"DECOMPOSED {task_id} into {n_subtasks} subtasks: {child_ids}"
+        )
+        return True
 
     def _resolve_phase_context(self, task: dict) -> str:
         """Fetch outputs from all dependency tasks for context injection."""
@@ -2139,18 +2315,25 @@ Output NOTHING after the end delimiter."""
         )
         return optimized
 
-    def _compute_timeout(self, priority: str, skill_hint: str) -> int:
-        """Compute effective timeout from priority tier and skill hint.
+    def _compute_timeout(self, priority: str, skill_hint: str,
+                         retry_count: int = 0) -> int:
+        """Compute effective timeout from priority tier, skill hint, and retry count.
 
         Takes the maximum of the priority-based timeout and any skill-specific
-        extended timeout defined in SLOW_SKILLS.
+        extended timeout defined in SLOW_SKILLS. Applies escalation multiplier
+        on retries (1.5x per retry) so transient failures get more time.
 
         Returns:
             Timeout in seconds.
         """
-        priority_timeout = TIMEOUT_BY_PRIORITY.get(priority, CLAUDE_TIMEOUT)
+        from kurultai_paths import SLA_TIMEOUT_ESCALATION_MULTIPLIER
+        base = TIMEOUT_BY_PRIORITY.get(priority, CLAUDE_TIMEOUT)
         skill_timeout = SLOW_SKILLS.get(skill_hint, 0) if skill_hint else 0
-        return max(priority_timeout, skill_timeout)
+        effective = max(base, skill_timeout)
+        if retry_count > 0:
+            effective = int(effective * SLA_TIMEOUT_ESCALATION_MULTIPLIER ** retry_count)
+            effective = min(effective, 21600)  # Cap at 6 hours
+        return effective
 
     async def _renew_leases(self):
         """Background coroutine: extend Neo4j lease and emit events every 10 minutes."""

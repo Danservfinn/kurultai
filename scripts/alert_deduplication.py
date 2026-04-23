@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 alert_deduplication.py — Alert deduplication with exponential backoff.
 
@@ -54,7 +55,7 @@ ALERT_PATTERNS = [
 _ALERT_DEDUP_PATH = LOGS_DIR / "alert-dedup.json"
 
 # Backoff intervals: 1st alert=0min, 2nd=10min, 3rd=30min, 4th+=60min
-_BACKOFF_INTERVALS = [0, 10, 30, 60]
+_BACKOFF_INTERVALS = [0, 5, 15, 30]  # Tightened: 0/5/15/30 (was 0/10/30/60)
 
 
 def _get_alert_dedup_state() -> dict:
@@ -210,3 +211,60 @@ def record_alert_created(agent: str, title: str, source: str, task_id: str = Non
 
     state[key] = entry
     _save_alert_dedup_state(state)
+
+
+def auto_cancel_stale_alerts(max_age_hours: int = 24,
+                              patterns: list[str] | None = None) -> int:
+    """Cancel PENDING system-alert tasks older than max_age_hours.
+
+    System-generated alerts (health checks, watchdog, routing audit) that sit
+    PENDING for too long are stale — the condition either resolved itself or
+    was handled by a newer alert. Auto-cancel them to keep the queue clean.
+
+    Returns:
+        Number of tasks cancelled.
+    """
+    from kurultai_paths import LOGS_DIR
+    from neo4j_v2_core import TaskStore
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    if patterns is None:
+        patterns = list(ALERT_PATTERNS)
+
+    cancelled = 0
+    try:
+        store = TaskStore()
+        with store._driver.session() as sess:
+            # Find PENDING system alert tasks older than threshold
+            result = sess.run("""
+                MATCH (t:Task {status: 'PENDING'})
+                WHERE t.created_at < datetime() - duration({hours: $max_hours})
+                  AND any(pattern IN $patterns WHERE
+                      toLower(t.title) CONTAINS pattern OR
+                      toLower(t.source) CONTAINS pattern)
+                RETURN t.task_id AS tid, t.title AS title
+            """, max_hours=max_age_hours, patterns=patterns)
+
+            for record in result:
+                tid = record["tid"]
+                title = record["title"] or ""
+                try:
+                    with store._driver.session() as inner:
+                        inner.run("""
+                            MATCH (t:Task {task_id: $tid, status: 'PENDING'})
+                            SET t.status = 'CANCELLED',
+                                t.updated_at = datetime(),
+                                t.cancel_reason = 'stale_alert_auto_cancel'
+                        """, tid=tid)
+                    cancelled += 1
+                    logger.info(f"STALE_CANCEL: {tid} — '{title[:60]}'")
+                except Exception as e:
+                    logger.warning(f"Failed to cancel stale alert {tid}: {e}")
+
+        store.close()
+    except Exception as e:
+        logger.warning(f"auto_cancel_stale_alerts failed: {e}")
+
+    return cancelled

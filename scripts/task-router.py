@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 task_router.py — Core routing logic for Kurultai task routing.
 
@@ -409,6 +410,86 @@ _DISAMBIGUATION = [
 ]
 
 
+# --- LLM-Assisted Routing ---
+# When keyword matching returns zero hits, use a lightweight LLM call
+# to classify the task into the best agent. Falls back to queue-depth
+# selection if the LLM is unavailable or returns an invalid agent.
+
+_LLM_ROUTING_PROMPT = """You are a task router. Given a task description, pick the best agent.
+
+Agents:
+- ogedei: ops, devops, infrastructure, system maintenance, deployment
+- chagatai: writing, content, documentation, prose, blog posts
+- tolui: research, fact-checking, verification, web search
+- temujin: software development, coding, debugging, implementation
+- mongke: data analysis, visualization, math, structured data
+- jochi: testing, QA, quality assurance, test automation
+
+Reply with ONLY the agent name (one word, lowercase). No explanation.
+
+Task: {text}"""
+
+_LLM_ROUTE_CACHE: dict[str, tuple[str, float]] = {}
+_LLM_CACHE_TTL = 3600  # 1 hour cache for same text
+
+
+def _llm_route(text: str) -> str | None:
+    """Use LLM to route a task when keyword matching fails.
+
+    Returns agent name or None if LLM is unavailable/returns invalid.
+    """
+    import hashlib
+    import time as _time
+
+    # Check cache
+    cache_key = hashlib.md5(text.lower().strip().encode()).hexdigest()
+    now = _time.time()
+    if cache_key in _LLM_ROUTE_CACHE:
+        cached_agent, cached_time = _LLM_ROUTE_CACHE[cache_key]
+        if now - cached_time < _LLM_CACHE_TTL:
+            return cached_agent
+
+    # Try LLM via Ollama (local, fast, free)
+    try:
+        import urllib.request
+        import json as _json
+
+        prompt = _LLM_ROUTING_PROMPT.format(text=text[:500])
+        payload = _json.dumps({
+            "model": "llama3.2:1b",
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.0, "num_predict": 10}
+        }).encode()
+
+        req = urllib.request.Request(
+            "http://localhost:11434/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = _json.loads(resp.read().decode())
+            agent_text = result.get("response", "").strip().lower()
+
+        # Validate against known agents (exclude kublai — it's a router)
+        dispatch_agents = [a for a in VALID_AGENTS if a != "kublai"]
+        if agent_text in dispatch_agents:
+            _LLM_ROUTE_CACHE[cache_key] = (agent_text, now)
+            return agent_text
+
+        # Try partial match (e.g., "ogedei" from "I'd route to ogedei")
+        for agent in dispatch_agents:
+            if agent in agent_text:
+                _LLM_ROUTE_CACHE[cache_key] = (agent, now)
+                return agent
+
+    except Exception:
+        pass  # LLM unavailable — caller falls back to queue-depth
+
+    return None
+
+
 def route_by_text(text):
     """Keyword routing for programmatic task creation with disambiguation.
 
@@ -463,9 +544,14 @@ def route_by_text(text):
             else:
                 best = tied_agents[0]
         else:
-            # No keyword matches — use queue depth to decide
-            best = min(scores.keys(), key=lambda a: get_queue_depth(a))
-            print(f"NO-KEYWORD-FALLBACK: No keyword matches, selected {best} (lowest queue)")
+            # No keyword matches — try LLM routing, then fall back to queue depth
+            llm_agent = _llm_route(text)
+            if llm_agent:
+                best = llm_agent
+                print(f"LLM-ROUTE: No keyword matches, LLM selected {best}")
+            else:
+                best = min(scores.keys(), key=lambda a: get_queue_depth(a))
+                print(f"NO-KEYWORD-FALLBACK: No keyword/LLM matches, selected {best} (lowest queue)")
 
     # Apply Primary Output Test for chagatai (Rule C16 compliance)
     # Reference: docs/chagatai-routing-guide.md

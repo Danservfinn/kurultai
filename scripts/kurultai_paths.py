@@ -246,6 +246,23 @@ TIMEOUT_BY_PRIORITY = {
     'low': 7200,       # 2 hours
 }
 
+# --- SLA (Service-Level Agreement) Configuration ---
+# Maximum minutes a task should wait in PENDING before being considered overdue.
+# Used by claim_task() for aging-boost priority escalation.
+SLA_DEADLINES_MINUTES = {
+    'critical': 5,      # 5 minutes
+    'high': 30,         # 30 minutes
+    'normal': 120,      # 2 hours
+    'low': 480,         # 8 hours
+}
+
+# Aging boost: every N minutes in queue, task gets +1 priority boost
+# A "normal" task waiting 60min will have effective priority "high"
+SLA_AGING_BOOST_INTERVAL_MINUTES = 30
+
+# Timeout escalation multiplier on retry (retry 2 gets 1.5x timeout, retry 3 gets 2.25x)
+SLA_TIMEOUT_ESCALATION_MULTIPLIER = 1.5
+
 # Skills that need extra time or special handling
 SLOW_SKILLS = {
     '/horde-brainstorming': 7200,

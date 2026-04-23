@@ -80,15 +80,21 @@ class TaskStore:
                     MATCH (t)-[:DEPENDS_ON]->(dep:Task)
                     WHERE dep.status <> 'COMPLETED' AND dep.status <> 'FAILED'
                   }
-                WITH t ORDER BY
-                    CASE t.priority
-                        WHEN 'critical' THEN 0
-                        WHEN 'high' THEN 1
-                        WHEN 'normal' THEN 2
-                        WHEN 'low' THEN 3
-                        ELSE 4
-                    END ASC,
-                    t.created_at ASC
+                WITH t, CASE t.priority
+                    WHEN 'critical' THEN 0
+                    WHEN 'high' THEN 1
+                    WHEN 'normal' THEN 2
+                    WHEN 'low' THEN 3
+                    ELSE 4
+                END AS base_priority,
+                duration.inSeconds(t.created_at, datetime()).minutes AS age_minutes
+                WITH t, base_priority,
+                    CASE
+                        WHEN t.sla_deadline IS NOT NULL AND datetime() > t.sla_deadline
+                            THEN -10  // SLA breached — highest urgency
+                        ELSE base_priority - floor(age_minutes / 30.0) * 0.5
+                    END AS effective_priority
+                ORDER BY effective_priority ASC, t.created_at ASC
                 LIMIT 1
                 SET t.status = 'WORKING',
                     t.claim_epoch = coalesce(t.claim_epoch, 0) + 1,
@@ -137,12 +143,14 @@ class TaskStore:
         Creates:
             - (:TaskOutput) node linked via [:HAS_OUTPUT]
             - Sets COMPLETED status
+            - Atomically unblocks dependents in the same transaction
 
         Returns:
             (success, reason) tuple.
         """
-        with self.driver.session() as session:
-            result = session.run("""
+        def _complete_and_unblock(tx):
+            # Step 1: Complete the task (CAS + delegation gate)
+            result = tx.run("""
                 MATCH (t:Task {task_id: $id, status: 'WORKING', claim_epoch: $epoch})
                 OPTIONAL MATCH (t)-[:SPAWNED*1..5]->(child:Task)
                     WHERE child.status IN ['PENDING', 'WORKING']
@@ -166,13 +174,39 @@ class TaskStore:
                 output_lines=output_lines, duration_s=duration_s)
 
             record = result.single()
-            if record:
+            if record is None:
+                return None  # CAS failed — caller will diagnose
+
+            # Step 2: Atomically unblock dependents in the same transaction.
+            # Inlined from unblock_dependents() to guarantee atomicity:
+            # if the process crashes after SET COMPLETED but before unblock,
+            # dependents won't be stuck BLOCKED waiting for the 120s sweep.
+            unblock_result = tx.run("""
+                MATCH (completed:Task {task_id: $id, status: 'COMPLETED'})
+                MATCH (blocked:Task {status: 'BLOCKED'})-[:DEPENDS_ON]->(completed)
+                WHERE NOT EXISTS {
+                    MATCH (blocked)-[:DEPENDS_ON]->(other:Task)
+                    WHERE other.task_id <> $id
+                      AND other.status <> 'COMPLETED'
+                      AND other.status <> 'FAILED'
+                }
+                SET blocked.status = 'PENDING',
+                    blocked.updated_at = datetime()
+                RETURN blocked.task_id AS unblocked
+            """, id=task_id)
+            unblocked = [r["unblocked"] for r in unblock_result]
+            if unblocked:
+                logger.info(f"Task {task_id} completed -> unblocked {len(unblocked)} dependents: {unblocked}")
+
+            return record["tid"]
+
+        with self.driver.session() as session:
+            tid = session.execute_write(_complete_and_unblock)
+            if tid is not None:
                 logger.info(f"Task {task_id} completed")
-                # Unblock any tasks that depend on this one
-                self.unblock_dependents(task_id)
                 return True, "completed"
 
-            # Diagnose why it failed
+            # Diagnose why it failed (still needs its own session for clarity)
             ok, reason = self._diagnose_complete_failure(session, task_id, claim_epoch)
             if not ok:
                 logger.warning(f"Rejected completion for {task_id}: {reason} (stale executor?)")
@@ -631,6 +665,14 @@ class TaskStore:
                     max_retries: $max_retries,
                     timeout_s: $timeout_s,
                     created_at: datetime(),
+                    sla_deadline: datetime() + duration({
+                        minutes: CASE $priority
+                            WHEN 'critical' THEN 5
+                            WHEN 'high' THEN 30
+                            WHEN 'normal' THEN 120
+                            WHEN 'low' THEN 480
+                            ELSE 120 END
+                    }),
                     started_at: null,
                     completed_at: null,
                     updated_at: datetime()
