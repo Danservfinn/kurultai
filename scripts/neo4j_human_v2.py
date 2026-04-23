@@ -17,6 +17,7 @@ Usage:
     human = store.create_human("Danny", source="signal")
     store.add_identifier(human["id"], "SIGNAL_PHONE", "+19194133445")
 """
+from __future__ import annotations
 
 import os
 import sys

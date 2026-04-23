@@ -7,6 +7,7 @@ then dateparser for deterministic datetime resolution.
 
 Replaces previous direct OpenRouter API calls with local Claude Code sessions.
 """
+from __future__ import annotations
 
 import os
 import sys

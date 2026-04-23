@@ -22,6 +22,7 @@ Usage:
 CLI:
     python3 source_validator.py "task content or file path"
 """
+from __future__ import annotations
 
 import re
 import socket

@@ -14,6 +14,7 @@ Usage:
     python3 agent-self-wake.py --dry-run   # show what would happen
     python3 agent-self-wake.py --agent temujin  # check single agent
 """
+from __future__ import annotations
 
 import argparse
 import atexit

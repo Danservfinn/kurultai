@@ -15,6 +15,7 @@ Cascade order:
 
 Topic nodes are PRESERVED (non-PII, shared resource).
 """
+from __future__ import annotations
 
 import logging
 from typing import Dict, Any

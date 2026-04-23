@@ -4,6 +4,7 @@ GDS Social Network — Connected components on KNOWN_THROUGH/RELATED_TO graph.
 
 Finds social clusters among humans to understand group dynamics.
 """
+from __future__ import annotations
 
 import logging
 from typing import List, Dict, Any

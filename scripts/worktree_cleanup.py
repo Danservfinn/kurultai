@@ -10,6 +10,7 @@ Invoked by launchd at 3:00 AM. For each project in PROJECT_REGISTRY:
 
 Safe to run repeatedly — all operations are idempotent.
 """
+from __future__ import annotations
 
 import json
 import logging

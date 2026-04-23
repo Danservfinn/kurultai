@@ -14,6 +14,7 @@ Usage:
         # task requires delivery verification
         print(spec.channel, spec.recipient)
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass

@@ -6,6 +6,7 @@ Run: python3 test_thinking_strip.py
 
 This test ensures internal reasoning/thinking is not leaked in Signal responses.
 """
+from __future__ import annotations
 
 import re
 import sys

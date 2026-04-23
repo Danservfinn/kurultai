@@ -16,6 +16,7 @@ Safe guards:
 Usage:
     python3 scripts/queue-cleanup.py [--dry-run] [--verbose]
 """
+from __future__ import annotations
 
 import os
 import re

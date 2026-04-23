@@ -7,6 +7,7 @@ dateparser for deterministic datetime resolution.
 
 Based on: signal-calendar-nlp-pipeline-design.md
 """
+from __future__ import annotations
 
 import json
 import os

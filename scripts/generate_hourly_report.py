@@ -26,6 +26,7 @@ Usage:
     python3 generate_hourly_report.py --force      # Force regenerate, bypass hour dedup
     # Or set env var: FORCE_REGENERATE=true python3 generate_hourly_report.py
 """
+from __future__ import annotations
 
 import argparse
 import json

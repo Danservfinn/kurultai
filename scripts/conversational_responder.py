@@ -10,6 +10,7 @@ Usage:
     from conversational_responder import generate_response
     response = generate_response(human_id, message_text)
 """
+from __future__ import annotations
 
 import os
 import sys

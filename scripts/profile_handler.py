@@ -26,6 +26,7 @@ Usage (from calendar_handler or standalone):
     if result:
         send_group_message(result)
 """
+from __future__ import annotations
 
 import os
 import sys

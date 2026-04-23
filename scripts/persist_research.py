@@ -8,6 +8,7 @@ stores them via ResearchStorage for cross-session retrieval.
 
 Also provides lookup_prior_research() for pre-task context injection.
 """
+from __future__ import annotations
 
 import os
 import re

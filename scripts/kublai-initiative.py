@@ -16,6 +16,7 @@ Usage:
     python3 kublai-initiative.py
     python3 kublai-initiative.py --dry-run
 """
+from __future__ import annotations
 
 import argparse
 import json

@@ -11,6 +11,7 @@ Usage:
 Note: verify_task_completion() is deprecated here. Use task_verification.py instead:
     from task_verification import verify_task_completion
 """
+from __future__ import annotations
 
 import os
 import re

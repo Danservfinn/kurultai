@@ -10,6 +10,7 @@ Analyzes WHEN/THEN behavioral rules across all agent memories:
 Author: jochi (Analyst)
 Created: 2026-03-09
 """
+from __future__ import annotations
 
 import json
 import re

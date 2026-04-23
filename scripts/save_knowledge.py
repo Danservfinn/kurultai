@@ -14,6 +14,7 @@ Usage:
     python3 save_knowledge.py --stats
     python3 save_knowledge.py --ensure-indexes
 """
+from __future__ import annotations
 
 import argparse
 import hashlib

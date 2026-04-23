@@ -8,6 +8,7 @@ appropriate method: ask_human, web_search, neo4j_query, or agent_delegation.
 Usage:
     from research_dispatcher import dispatch, classify_method, ResearchMethod
 """
+from __future__ import annotations
 
 import json
 import logging

@@ -8,6 +8,7 @@ from task body structure and existing metadata.
 Usage:
     python3 backfill_prompt_tracking.py [--limit 100] [--dry-run]
 """
+from __future__ import annotations
 
 import argparse
 import json

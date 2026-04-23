@@ -29,6 +29,7 @@ Usage:
         # {'rule': 'DISTRESS', 'decision': 'respond', 'timing': 'instant',
         #  'depth': 'full', 'reason': 'Distress signal detected'}
 """
+from __future__ import annotations
 
 import re
 import logging

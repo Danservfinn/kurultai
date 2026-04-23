@@ -28,6 +28,7 @@ Usage:
     python3 stale-lock-cleanup.py [--dry-run] [--agent AGENT] [--experiment-only]
     python3 stale-lock-cleanup.py --check-experiment AGENT EXPERIMENT_ID  # Pre-flight check
 """
+from __future__ import annotations
 
 import argparse
 import json

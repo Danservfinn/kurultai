@@ -13,6 +13,7 @@ Usage:
     python3 memory_audit.py --json    # Machine-readable output
     python3 memory_audit.py --fix     # Auto-fix ALL issues (contamination, bloat, stale entries, old logs)
 """
+from __future__ import annotations
 
 import argparse
 import json

@@ -15,6 +15,7 @@ Usage:
     python3 task-verifier.py --task-file path/to/.completed.done.md --agent temujin
     python3 task-verifier.py --batch  # verify all recent completions
 """
+from __future__ import annotations
 
 import argparse
 import json

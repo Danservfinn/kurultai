@@ -15,6 +15,7 @@ Usage:
     from context_assembler import assemble_context
     context = assemble_context(human_id, current_message)
 """
+from __future__ import annotations
 
 import time
 import logging

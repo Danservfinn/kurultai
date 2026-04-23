@@ -14,6 +14,7 @@ Usage:
     python proposal_approval_handler.py --check    # Check for unanimous proposals
     python proposal_approval_handler.py --process  # Process all unanimous proposals
 """
+from __future__ import annotations
 
 import os
 import sys

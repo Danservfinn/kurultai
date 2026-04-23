@@ -13,6 +13,7 @@ Usage:
     python3 report_analyzer.py --agent temujin --hours 1
     python3 report_analyzer.py --all-agents --hours 1
 """
+from __future__ import annotations
 
 import argparse
 import json

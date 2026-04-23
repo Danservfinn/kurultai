@@ -16,6 +16,7 @@ Usage:
     original = scrubber.unscrub(scrubbed, token_map)
     # original = "Call Danny at +19194133445"
 """
+from __future__ import annotations
 
 import re
 import logging

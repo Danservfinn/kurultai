@@ -11,6 +11,7 @@ Detects:
 
 Usage: python3 scripts/state_consistency_check.py [--fix]
 """
+from __future__ import annotations
 
 import os
 import sys

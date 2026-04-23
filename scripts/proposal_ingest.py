@@ -11,6 +11,7 @@ Usage:
     python3 proposal_ingest.py --ingest                           # Ingest all pending proposals
     python3 proposal_ingest.py --ingest --file proposals/chagatai-20260312-223513.md  # Single file
 """
+from __future__ import annotations
 
 import os
 import sys

@@ -9,6 +9,7 @@ Usage:
     from response_guard import guard_response
     safe = guard_response(response, is_group=True)
 """
+from __future__ import annotations
 
 import json
 import re

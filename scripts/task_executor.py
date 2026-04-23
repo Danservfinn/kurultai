@@ -18,6 +18,7 @@ Architecture (6 components in one file):
 Entry point: `python task_executor.py`
 Single-instance enforced via PID-file lock at LOGS_DIR/task-executor.pid.
 """
+from __future__ import annotations
 
 import asyncio
 import json
@@ -1673,9 +1674,37 @@ class Executor:
 
         Creates a follow-up task assigned to the same agent with
         skill_hint=/horde-implement pointing at the saved plan.
+
+        Guards against spirals:
+        - Depth cap: skips if parent depth >= MAX_TASK_DEPTH
+        - Meta-task filter: skips continuation/triage tasks
+        - Title normalization: strips stacked "Continue:" prefixes
         """
         agent = task.get("assigned_to", task.get("agent", ""))
         task_id = task["task_id"]
+
+        # ── Spiral guard 1: depth cap ──────────────────────────────
+        parent_depth = task.get("depth", 0)
+        try:
+            from task_intake import MAX_TASK_DEPTH
+        except ImportError:
+            MAX_TASK_DEPTH = 3
+        if parent_depth >= MAX_TASK_DEPTH:
+            logger.info(
+                f"Continuation skipped for {task_id}: "
+                f"depth={parent_depth} >= MAX_TASK_DEPTH={MAX_TASK_DEPTH}"
+            )
+            return
+
+        # ── Spiral guard 2: skip meta/continuation/triage tasks ────
+        title = task.get("title", "")
+        source = task.get("source", "")
+        if source == "continuation":
+            logger.info(f"Continuation skipped for {task_id}: source=continuation (no recursive continuations)")
+            return
+        if "Triage stalled" in title or "triage stalled" in title.lower():
+            logger.info(f"Continuation skipped for {task_id}: triage meta-task")
+            return
         output = run_result.content or ""
 
         # Look for plan files in the agent's workspace created in the last 30 min
@@ -1736,7 +1765,12 @@ class Executor:
             return  # Implementation finished successfully, no continuation needed
 
         # Create continuation task
-        continuation_title = f"Continue: {task.get('title', task_id)[:50]}"
+        # ── Spiral guard 3: strip stacked "Continue:" prefixes ──────
+        raw_title = task.get("title", task_id)
+        import re as _re
+        # Remove all leading "Continue:" prefixes to prevent stacking
+        clean_title = _re.sub(r'^(Continue:\s*)+', '', raw_title)
+        continuation_title = f"Continue: {clean_title[:50]}"
         continuation_body = (
             f"## Continuation Task\n\n"
             f"The previous task `{task_id}` created a plan but did not complete implementation.\n"
@@ -1759,6 +1793,7 @@ class Executor:
                 skill_hint="/horde-implement",
                 source="continuation",
                 parent_id=task_id,
+                depth=parent_depth + 1,
             )
             emit_event(
                 self._get_driver(), "TASK_CONTINUATION", task_id, agent,

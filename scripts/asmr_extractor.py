@@ -32,6 +32,7 @@ Usage:
     python3 asmr_extractor.py --limit 20
     python3 asmr_extractor.py --limit 5   # smoke-test on small batch
 """
+from __future__ import annotations
 
 import os
 import sys

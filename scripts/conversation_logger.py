@@ -21,6 +21,7 @@ Usage:
     # Search conversations
     results = search_conversations("+19194133445", "authentication")
 """
+from __future__ import annotations
 
 import os
 import re

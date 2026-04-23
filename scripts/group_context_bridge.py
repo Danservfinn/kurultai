@@ -11,6 +11,7 @@ Usage:
         get_bridgeable_topics, classify_shareability, GroupSafeContextAssembler,
     )
 """
+from __future__ import annotations
 
 import re
 import logging

@@ -22,6 +22,7 @@ Key design choices
 - Window function (max() OVER ()) in Q3 requires Neo4j 5.x+.  If you are on
   4.x, replace the OVER clause with a separate aggregation subquery.
 """
+from __future__ import annotations
 
 import os
 import sys

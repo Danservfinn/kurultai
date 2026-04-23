@@ -11,6 +11,7 @@ Usage (Python):
     from neo4j_v2_delegate import delegate_task, get_task_status, get_task_output
     child_id = delegate_task(parent_id="normal-123-abc", title="...", prompt="...", to="temujin")
 """
+from __future__ import annotations
 
 import os
 import sys
