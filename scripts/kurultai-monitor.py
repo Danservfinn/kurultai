@@ -1,4 +1,5 @@
 #!/Users/kublai/.openclaw/agents/main/monitor-venv/bin/python3
+from __future__ import annotations
 """
 Kurultai Website Browser-Based Uptime Monitor
 
@@ -14,8 +15,6 @@ JavaScript syntax errors cause the page to hang forever with HTTP 200.
 Run via cron every 5 minutes.
 """
 
-# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
-from __future__ import annotations
 
 import json
 import os

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Git Branch Manager — Safe git branch operations for Kurultai autoresearch.
 
@@ -15,7 +16,6 @@ Usage:
     manager.rollback(commit_hash, "regression detected")
 """
 
-from __future__ import annotations
 
 import json
 import logging

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Ogedei Watchdog — Persistent quality-assurance daemon for the Kurultai.
 

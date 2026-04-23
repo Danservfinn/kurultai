@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Agent Rules Evaluator — Evaluates and executes agent-specific behavioral rules.
 
@@ -20,8 +21,7 @@ Architecture:
     - Cooldown mechanism prevents over-generation
 """
 
-# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
-from __future__ import annotations
+
 
 import argparse
 import json

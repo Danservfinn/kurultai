@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 backfill_orphan_tasks.py — Register gateway-created task files into Neo4j.
 

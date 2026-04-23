@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Completion Quality Gate — Post-completion quality verification.
 
@@ -10,8 +11,6 @@ Checks task completions against quality thresholds:
 Provides auto-retry with feedback and escalation to Kublai.
 """
 
-# Enable PEP 604 union syntax (X | Y) for Python < 3.10 compatibility
-from __future__ import annotations
 
 import json
 import os

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 parse_rule_compliance.py — Parse reflection outputs for rule compliance and update rule_registry.
 
