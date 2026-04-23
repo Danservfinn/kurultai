@@ -11,6 +11,7 @@ Tests cover:
 
 Location: /Users/kurultai/molt/tests/chaos/test_failure_scenarios.py
 """
+from __future__ import annotations
 
 import os
 import sys

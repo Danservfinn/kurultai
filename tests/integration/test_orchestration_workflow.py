@@ -12,6 +12,7 @@ Tests cover:
 
 Location: /Users/kurultai/molt/tests/integration/test_orchestration_workflow.py
 """
+from __future__ import annotations
 
 import os
 import sys

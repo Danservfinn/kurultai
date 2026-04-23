@@ -4,6 +4,7 @@ Agent Reflection System
 ONE agent per hour expresses wants, desires, and proposals
 Kublai reviews and decides using Gemini CLI
 """
+from __future__ import annotations
 
 import os
 import json

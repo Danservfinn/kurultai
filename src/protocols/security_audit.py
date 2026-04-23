@@ -12,6 +12,7 @@ Security Audit Procedures:
 
 Reference: /Users/kurultai/molt/data/workspace/souls/developer/SOUL.md
 """
+from __future__ import annotations
 
 import json
 import logging

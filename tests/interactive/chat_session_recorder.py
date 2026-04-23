@@ -19,6 +19,7 @@ Usage:
     findings = await recorder.validate_against_architecture()
     recorder.save_session("output.json")
 """
+from __future__ import annotations
 
 import asyncio
 import json

@@ -15,6 +15,7 @@ Dual Memory System:
 
 Location: /Users/kurultai/molt/tools/delegation_protocol.py
 """
+from __future__ import annotations
 
 import re
 import uuid

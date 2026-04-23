@@ -10,6 +10,7 @@ Tests cover:
 
 Location: /Users/kurultai/molt/tests/performance/test_load.py
 """
+from __future__ import annotations
 
 import os
 import sys

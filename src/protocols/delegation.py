@@ -7,6 +7,7 @@ via agentToAgent messaging with Neo4j-backed operational memory.
 
 Location: /Users/kurultai/molt/src/protocols/delegation.py
 """
+from __future__ import annotations
 
 import re
 import uuid

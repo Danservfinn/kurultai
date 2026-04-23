@@ -12,6 +12,7 @@ Usage:
         # proceed with threshold adjustment
         ...
 """
+from __future__ import annotations
 
 import logging
 from typing import FrozenSet

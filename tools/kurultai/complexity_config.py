@@ -11,6 +11,7 @@ Usage:
         complexity_to_team_size,
     )
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

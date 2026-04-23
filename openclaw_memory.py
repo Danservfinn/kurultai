@@ -4,6 +4,7 @@ OpenClaw Operational Memory - Neo4j-backed operational memory for the 6-agent sy
 This module provides the OperationalMemory class for managing tasks, notifications,
 rate limiting, and agent state in a Neo4j graph database.
 """
+from __future__ import annotations
 
 import logging
 import uuid

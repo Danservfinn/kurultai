@@ -19,6 +19,7 @@ Changes from original delegation.py:
 - ERROR-HANDLING-002: Log and raise on invalid status transition instead of silent False
 - SANITIZE-001: Fix overly aggressive hex pattern in sanitize_for_privacy
 """
+from __future__ import annotations
 
 import re
 import uuid
