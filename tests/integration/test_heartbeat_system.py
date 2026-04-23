@@ -107,7 +107,7 @@ class TestTwoTierHeartbeatSystem:
 
     async def test_failover_check_uses_both_heartbeats(self):
         """Verify failover protocol checks both infra_heartbeat and last_heartbeat."""
-        from src.protocols.failover import FailoverProtocol
+        from src.protocols.archived.failover import FailoverProtocol
 
         # Create mock memory
         mock_memory = MagicMock()
@@ -189,7 +189,7 @@ class TestTwoTierHeartbeatSystem:
         """
         # Check if failover.py exists and has correct thresholds
         try:
-            from src.protocols.failover import FailoverProtocol
+            from src.protocols.archived.failover import FailoverProtocol
 
             # Check for constants or verify through inspection
             has_constants = hasattr(FailoverProtocol, "MAX_MISSED_INFRA_HEARTBEATS")

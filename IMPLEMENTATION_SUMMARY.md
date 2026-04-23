@@ -238,7 +238,8 @@ if task:
 ### Security Audit
 
 ```python
-from src.protocols.security_audit import SecurityAuditProtocol
+# Archived: from src.protocols.security_audit import SecurityAuditProtocol
+# Use: from tools.security import ... (see tools/security/ package)
 
 protocol = SecurityAuditProtocol(memory)
 

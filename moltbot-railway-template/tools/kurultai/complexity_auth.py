@@ -1,3 +1,7 @@
+# NOTE [DIVERGES FROM tools/kurultai/complexity_auth.py]: This file intentionally differs from the original.
+# The moltbot-railway-template version omits some features (e.g., RQ integration, extra imports)
+# or has deployment-specific paths. Do NOT overwrite with the original without review.
+
 """
 Authentication and authorization for complexity scoring operations.
 

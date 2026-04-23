@@ -1,3 +1,7 @@
+# NOTE [DIVERGES FROM tools/kurultai/agent_tasks.py]: This file intentionally differs from the original.
+# The moltbot-railway-template version omits some features (e.g., RQ integration, extra imports)
+# or has deployment-specific paths. Do NOT overwrite with the original without review.
+
 #!/usr/bin/env python3
 """
 Agent Background Task Registry - Defines what each agent does on heartbeat.

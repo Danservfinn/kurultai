@@ -1,3 +1,7 @@
+# NOTE [DIVERGES FROM tools/kurultai/heartbeat_master.py]: This file intentionally differs from the original.
+# The moltbot-railway-template version omits some features (e.g., RQ integration, extra imports)
+# or has deployment-specific paths. Do NOT overwrite with the original without review.
+
 #!/usr/bin/env python3
 """
 Unified Heartbeat Master - Single entry point for all agent background tasks.

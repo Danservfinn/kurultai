@@ -28,7 +28,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 # Import the real implementations
 from tools.failover_monitor import FailoverMonitor, FailoverError
-from src.protocols.failover import FailoverProtocol, FailoverStatus, KublaiStatus
+from src.protocols.archived.failover import FailoverProtocol, FailoverStatus, KublaiStatus
 
 
 # =============================================================================

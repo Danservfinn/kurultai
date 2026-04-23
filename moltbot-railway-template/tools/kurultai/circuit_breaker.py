@@ -1,3 +1,7 @@
+# NOTE [DIVERGES FROM tools/kurultai/circuit_breaker.py]: This file intentionally differs from the original.
+# The moltbot-railway-template version omits some features (e.g., RQ integration, extra imports)
+# or has deployment-specific paths. Do NOT overwrite with the original without review.
+
 """
 Circuit Breaker for Complexity Scoring Operations.
 

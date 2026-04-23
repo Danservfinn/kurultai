@@ -1,3 +1,6 @@
+<!-- NOTE [DIVERGES FROM tools/kurultai/CLAUDE.md]: This file intentionally differs from the original. -->
+<!-- The moltbot version has different/less activity log entries. Do NOT overwrite without review. -->
+
 <claude-mem-context>
 # Recent Activity
 
