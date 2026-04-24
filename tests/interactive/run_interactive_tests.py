@@ -14,6 +14,8 @@ Usage:
     python run_interactive_tests.py compare <session1> <session2>
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import sys
@@ -263,7 +265,7 @@ class InteractiveTestRunner:
         sign = "+" if query_diff >= 0 else ""
         print(f"Neo4j query difference: {sign}{query_diff}")
 
-    def run_all_scenarios(self) -> create_scenario_report:
+    async def run_all_scenarios(self) -> create_scenario_report:
         """Run all scenarios sequentially.
 
         Returns:
