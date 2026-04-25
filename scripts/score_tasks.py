@@ -16,6 +16,7 @@ Usage:
     python3 score_tasks.py --hours 1          # Score tasks from last N hours
     python3 score_tasks.py --summary          # Print scorecard summary
 """
+from __future__ import annotations
 
 import json
 import os

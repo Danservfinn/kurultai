@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 # DEPRECATED: This filesystem-based proposal tracker is superseded by proposal_manager.py (Neo4j-backed).
 # Migration status: hourly_reflection.sh still imports from this file for --list and --stale queries.
 # TODO: Migrate remaining callers to proposal_manager.py, then archive this file.

@@ -5,6 +5,7 @@ GDS Shortest Path — Traces interest evolution via LED_TO edges.
 Uses Dijkstra to find how topics connect through temporal flow,
 revealing the narrative path between two topics in a human's history.
 """
+from __future__ import annotations
 
 import logging
 from typing import List, Dict, Any, Optional

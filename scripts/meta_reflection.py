@@ -10,6 +10,7 @@ Usage:
     python3 meta_reflection.py --agent temujin --hours 1 --protocol
     python3 meta_reflection.py --all-agents --hours 1 --protocol
 """
+from __future__ import annotations
 
 import argparse
 import json

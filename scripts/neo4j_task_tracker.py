@@ -13,6 +13,7 @@ Usage:
     tracker.create_task("mongke-123", "mongke", "Research X")
     tracker.update_status("mongke-123", "completed")
 """
+from __future__ import annotations
 
 import os
 import sys

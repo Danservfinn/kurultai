@@ -12,6 +12,7 @@ Usage:
     reporter.record_agent_state(agent, state_data)
     reporter.generate_task_report(task_id)
 """
+from __future__ import annotations
 
 import hashlib
 import json

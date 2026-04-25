@@ -14,6 +14,7 @@ Output:
     Writes logs/auth-heartbeat.json with last-success timestamps for each agent
     Format: {"agent": {"last_success": "2026-03-11T23:00:00", "status": "ok|fail"}}
 """
+from __future__ import annotations
 
 import json
 import logging
