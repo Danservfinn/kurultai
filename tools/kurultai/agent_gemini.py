@@ -5,6 +5,7 @@ Agent Gemini Manager for Kurultai
 Provides each agent with their own Gemini CLI context.
 All agents use Gemini 3.1 Pro Preview through separate configurations.
 """
+from __future__ import annotations
 
 import os
 import json

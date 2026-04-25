@@ -17,6 +17,7 @@ Usage:
     hb = get_heartbeat(driver)
     await register_all_tasks(hb)
 """
+from __future__ import annotations
 
 import asyncio
 import json
