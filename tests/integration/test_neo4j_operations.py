@@ -10,6 +10,7 @@ Tests Cypher queries against real Neo4j 5.x:
 Note: These tests require the testcontainers package.
 Run with: pytest tests/integration/test_neo4j_operations.py -v
 """
+from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
