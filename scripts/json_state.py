@@ -16,6 +16,7 @@ Usage:
         data['key'] = 'value'
     # File is written and fsynced when context exits.
 """
+from __future__ import annotations
 
 import fcntl
 import json

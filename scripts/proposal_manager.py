@@ -8,6 +8,7 @@ Usage:
     python proposal_manager.py approve --proposal-id <uuid>
     python proposal_manager.py expire --proposal-id <uuid>
 """
+from __future__ import annotations
 
 import uuid
 import sys

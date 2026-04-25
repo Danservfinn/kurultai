@@ -35,6 +35,7 @@ Usage:
         "summary": "Discussed new feature..."
     })
 """
+from __future__ import annotations
 
 import os
 import re

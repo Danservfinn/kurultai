@@ -6,6 +6,7 @@ and ATTENDING, CREATED_BY, AT_LOCATION relationships.
 
 Based on schema: signal-calendar-neo4j-schema.cypher
 """
+from __future__ import annotations
 
 import os
 import sys

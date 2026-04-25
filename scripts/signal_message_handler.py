@@ -16,6 +16,7 @@ Usage:
     from signal_message_handler import process_message
     process_message(raw_msg)  # called by signal_jsonrpc_server.py
 """
+from __future__ import annotations
 
 import os
 import sys

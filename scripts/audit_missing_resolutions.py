@@ -20,6 +20,7 @@ If compliance < 90%, system status is marked as degraded.
 Usage:
     python scripts/audit_missing_resolutions.py [--agent AGENT] [--recent HOURS]
 """
+from __future__ import annotations
 
 import argparse
 import json

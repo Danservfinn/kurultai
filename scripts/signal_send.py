@@ -18,6 +18,7 @@ Logs every send attempt to ~/.openclaw/logs/signal_send.log (JSON lines).
 Prints one-line summary to stdout for agent capture:
     SIGNAL_SEND SUCCESS recipient=+19193375833 ts=1742700000000
 """
+from __future__ import annotations
 
 import json
 import os

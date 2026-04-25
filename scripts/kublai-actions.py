@@ -10,6 +10,7 @@ Usage:
     python3 kublai-actions.py --trigger tock
     python3 kublai-actions.py --trigger kurultai
 """
+from __future__ import annotations
 
 import argparse
 import json

@@ -19,6 +19,7 @@ Usage:
     python3 reflection_proposal_extractor.py --dry-run
     python3 reflection_proposal_extractor.py --stats
 """
+from __future__ import annotations
 
 import argparse
 import hashlib

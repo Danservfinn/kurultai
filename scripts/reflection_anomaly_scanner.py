@@ -16,6 +16,7 @@ Anomaly types detected:
 Usage:
     python3 reflection_anomaly_scanner.py [--hours 1] [--dry-run]
 """
+from __future__ import annotations
 
 import json
 import os

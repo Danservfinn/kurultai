@@ -14,6 +14,7 @@ Usage:
     emit_event(driver, "TASK_COMPLETED", "task-123", "mongke",
                executor_id="exec-abc", duration_s=120.5)
 """
+from __future__ import annotations
 
 import logging
 import uuid

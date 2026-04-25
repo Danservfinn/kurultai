@@ -17,6 +17,7 @@ Usage:
     # CLI: prints the prompt for the agent to use
     python3 curiosity_generator.py
 """
+from __future__ import annotations
 
 import json
 import logging

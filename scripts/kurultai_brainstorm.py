@@ -23,6 +23,7 @@ Usage:
     python3 kurultai_brainstorm.py --agent jochi --dry-run
     python3 kurultai_brainstorm.py --all --domain routing_pipeline
 """
+from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError

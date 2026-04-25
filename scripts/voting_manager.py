@@ -18,6 +18,7 @@ Usage:
     python3 voting_manager.py --action cast-vote --proposal <proposal_id> --agent <agent> --vote <APPROVE|REJECT|ABSTAIN>
     python3 voting_manager.py --action check-status --proposal <proposal_id>
 """
+from __future__ import annotations
 
 import argparse
 import json

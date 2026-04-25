@@ -18,6 +18,7 @@ Exit codes:
     1: All modes failed
     2: Invalid arguments
 """
+from __future__ import annotations
 
 import argparse
 import json

@@ -23,6 +23,7 @@ Usage (CLI):
     python3 ollama_lock.py status
     python3 ollama_lock.py acquire NORMAL "tick-triage" -- curl ...
 """
+from __future__ import annotations
 
 import enum
 import fcntl

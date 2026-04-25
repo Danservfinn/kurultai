@@ -21,6 +21,7 @@ WARNING: All bypasses are logged and reviewed. Use only for emergencies.
 Design: ~/.openclaw/agents/mongke/workspace/completion-gate-design-2026-03-08.md
 Security Review: ~/.openclaw/agents/mongke/workspace/completion-gate-critical-review-2026-03-08.md
 """
+from __future__ import annotations
 
 import argparse
 import fcntl

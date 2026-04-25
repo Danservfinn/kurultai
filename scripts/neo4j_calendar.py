@@ -17,6 +17,7 @@ Relationships:
 - (Reminder)-[:REMIND]->(Person)
 - (Event)-[:INSTANCE_OF]->(RecurrenceSeries)
 """
+from __future__ import annotations
 
 import os
 import sys

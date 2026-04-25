@@ -7,6 +7,7 @@ to prevent code duplication and ensure consistent behavior.
 
 Security: All functions validate inputs and handle errors safely.
 """
+from __future__ import annotations
 
 import json
 import logging

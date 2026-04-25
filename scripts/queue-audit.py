@@ -10,6 +10,7 @@ Called by tock-gather.sh every 30 minutes, or run standalone.
 Usage:
     python3 queue-audit.py [--dry-run] [--json]
 """
+from __future__ import annotations
 
 import glob
 import json

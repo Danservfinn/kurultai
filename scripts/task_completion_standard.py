@@ -32,6 +32,7 @@ Created: 2026-03-08
 Author: Ogedei (Operations)
 Updated: 2026-03-08 - Added Resolution section requirement (Chagatai)
 """
+from __future__ import annotations
 
 import re
 from pathlib import Path

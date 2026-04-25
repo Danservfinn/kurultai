@@ -18,6 +18,7 @@ Usage:
     # Seed from existing memory files (one-time migration)
     seed_from_memory("mongke")
 """
+from __future__ import annotations
 
 import json
 import os

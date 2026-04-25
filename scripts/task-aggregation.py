@@ -15,6 +15,7 @@ Usage:
     python3 task-aggregation.py --days 7 --output workspace/weekly-analysis.md
     python3 task-aggregation.py --failure-analysis --days 7
 """
+from __future__ import annotations
 
 import argparse
 import json

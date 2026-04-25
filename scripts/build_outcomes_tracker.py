@@ -13,6 +13,7 @@ Usage:
     python3 build_outcomes_tracker.py --json    # JSON output
     python3 build_outcomes_tracker.py --agent temujin  # Specific agent
 """
+from __future__ import annotations
 
 import argparse
 import json

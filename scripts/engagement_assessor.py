@@ -10,6 +10,7 @@ Usage:
     from engagement_assessor import assess_engagement
     decision = assess_engagement(human_id, message_text)
 """
+from __future__ import annotations
 
 import os
 import sys

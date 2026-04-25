@@ -20,6 +20,7 @@ Usage:
     python3 ogedei_dispatch.py --dry-run      # Show claimable tasks
     python3 ogedei_dispatch.py --once         # Single dispatch cycle
 """
+from __future__ import annotations
 
 import asyncio
 import json

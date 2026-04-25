@@ -29,6 +29,7 @@ Exit codes:
     2 — channel daemon/service unreachable
     3 — bad arguments
 """
+from __future__ import annotations
 
 import argparse
 import json

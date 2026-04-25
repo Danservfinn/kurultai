@@ -11,6 +11,7 @@ Usage:
     service = TaskRetryService()
     result = service.retry_task("temujin", "high-1773165922.failed.done.md")
 """
+from __future__ import annotations
 
 import json
 import logging

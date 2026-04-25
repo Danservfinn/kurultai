@@ -5,6 +5,7 @@ GDS Link Prediction — Predicts next topic connections using Adamic-Adar.
 Identifies topics likely to be discussed together in the future,
 enabling proactive context preparation.
 """
+from __future__ import annotations
 
 import logging
 from typing import List, Dict, Any

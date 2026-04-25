@@ -22,6 +22,7 @@ Usage:
         agent=None,  # auto-route from title
     )
 """
+from __future__ import annotations
 
 import os
 import re

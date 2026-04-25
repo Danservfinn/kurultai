@@ -13,6 +13,7 @@ Usage:
     # Or run as a standalone worker:
     python3 async_extractor.py --limit 50 --interval 30
 """
+from __future__ import annotations
 
 import os
 import sys

@@ -12,6 +12,7 @@ Usage:
     # parsed = {"problem": "...", "solution": "...", "rationale": "..."}
     # or parsed = {"reason": "why it failed"}
 """
+from __future__ import annotations
 
 import re
 import logging

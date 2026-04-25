@@ -27,6 +27,7 @@ Usage:
     python3 asmr_deep_extractor.py --limit 5
     python3 asmr_deep_extractor.py --dry-run
 """
+from __future__ import annotations
 
 import os
 import sys

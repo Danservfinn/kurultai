@@ -14,6 +14,7 @@ Usage (via cron/launchd):
 Design: ~/.openclaw/agents/mongke/workspace/completion-gate-design-2026-03-08.md
 Task: gate-timeout-008
 """
+from __future__ import annotations
 
 import argparse
 import json

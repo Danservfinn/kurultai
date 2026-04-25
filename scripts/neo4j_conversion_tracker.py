@@ -17,6 +17,7 @@ Usage:
     tracker.track_event("+19194133445", "pricing_view", {"plan": "pro"})
     context = tracker.get_conversion_context("+19194133445")
 """
+from __future__ import annotations
 
 import os
 import sys

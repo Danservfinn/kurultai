@@ -12,6 +12,7 @@ Usage:
     mgr.refresh_projection(human_id)
     mgr.drop_projection(human_id)
 """
+from __future__ import annotations
 
 import logging
 from typing import Optional, Dict, Any, List

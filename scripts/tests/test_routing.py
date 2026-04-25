@@ -16,6 +16,7 @@ Usage:
     python test_routing.py --compare "Research competitors and design API"
     python test_routing.py --audit
 """
+from __future__ import annotations
 
 import argparse
 import json

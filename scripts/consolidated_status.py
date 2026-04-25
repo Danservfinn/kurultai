@@ -12,6 +12,7 @@ Output formats:
     json: {"neo4j": "up", "redis": "up", "gateway": "up"}
     bash: neo4j=up redis=up gateway=up (space-separated for eval)
 """
+from __future__ import annotations
 
 import argparse
 import json

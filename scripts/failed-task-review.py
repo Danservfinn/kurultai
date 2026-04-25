@@ -13,6 +13,7 @@ Usage:
     python3 failed-task-review.py --restart-all    # restart all recent failed tasks
     python3 failed-task-review.py --patterns       # show failure pattern stats
 """
+from __future__ import annotations
 
 import argparse
 import json

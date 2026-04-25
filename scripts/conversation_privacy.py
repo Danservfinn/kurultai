@@ -27,6 +27,7 @@ Usage:
     # Delete user data
     privacy.delete_user_data(phone_number)
 """
+from __future__ import annotations
 
 import os
 import json

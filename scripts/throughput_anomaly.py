@@ -24,6 +24,7 @@ Exit codes:
     0 = no anomalies
     1 = one or more anomalies detected
 """
+from __future__ import annotations
 
 import json
 import os

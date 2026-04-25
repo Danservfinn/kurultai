@@ -13,6 +13,7 @@ Output (single line, space-separated):
 Reads from end of file efficiently (last 2MB chunk) to avoid scanning
 the entire log on every tick.
 """
+from __future__ import annotations
 
 import json
 import os

@@ -11,6 +11,7 @@ Usage:
     python3 routing_audit.py --json       # JSON output
     python3 routing_audit.py --hours 2    # Look back 2 hours
 """
+from __future__ import annotations
 
 import argparse
 import json

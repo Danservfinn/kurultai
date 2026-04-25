@@ -16,6 +16,7 @@ Usage:
     if not result.can_complete:
         create_followup_tasks_v2(result, task_metadata)
 """
+from __future__ import annotations
 
 import os
 import re

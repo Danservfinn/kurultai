@@ -19,6 +19,7 @@ Usage:
     profile = store.get_profile("+19194133445")
     store.update_field("+19194133445", "timezone", "America/New_York")
 """
+from __future__ import annotations
 
 import os
 import sys

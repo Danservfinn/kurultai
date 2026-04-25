@@ -16,6 +16,7 @@ Usage:
     python3 auto_dispatch.py --dry-run    # show what would be cleaned
     python3 auto_dispatch.py --cleanup    # same as default (cleanup only)
 """
+from __future__ import annotations
 
 import argparse
 import fcntl

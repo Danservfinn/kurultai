@@ -24,6 +24,7 @@ Usage by the agent:
     # 4. Process any replies from previous sweeps
     python3 general_curiosity.py --process-answers
 """
+from __future__ import annotations
 
 import argparse
 import json

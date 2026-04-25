@@ -9,6 +9,7 @@ Usage:
     from pipeline_health import format_pipeline_health
     print(format_pipeline_health("temujin", hours=1))
 """
+from __future__ import annotations
 
 import json
 import os

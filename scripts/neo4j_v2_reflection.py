@@ -14,6 +14,7 @@ Usage:
     context = prepare_reflection(store, "temujin")
     save_reflection(store, "temujin", summary="...", insight="...")
 """
+from __future__ import annotations
 
 import os
 import sys

@@ -22,6 +22,7 @@ Usage:
     decision = engine.evaluate(experiment)
     print(decision.status)  # "merged", "discarded", or "crashed"
 """
+from __future__ import annotations
 
 import os
 import sys

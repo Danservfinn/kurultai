@@ -8,6 +8,7 @@ Usage:
     from heartbeat_task_analyzer import generate_review
     review = generate_review("temujin", hours=1)
 """
+from __future__ import annotations
 
 import json
 import os

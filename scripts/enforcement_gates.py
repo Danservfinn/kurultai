@@ -15,6 +15,7 @@ Usage:
     python3 enforcement-gates.py --check reviewGate <task_file>
     python3 enforcement-gates.py --status
 """
+from __future__ import annotations
 
 import argparse
 import json

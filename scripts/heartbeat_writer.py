@@ -14,6 +14,7 @@ Usage:
     python3 heartbeat_writer.py        # Run once
     python3 heartbeat_writer.py --loop # Run continuously
 """
+from __future__ import annotations
 
 import argparse
 import glob

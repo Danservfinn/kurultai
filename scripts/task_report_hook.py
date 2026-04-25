@@ -18,6 +18,7 @@ Usage:
     python3 task-report-hook.py --task-file /path/to/task.md --status completed
     python3 task-report-hook.py --task-id <id> --agent temujin --status failed
 """
+from __future__ import annotations
 
 import argparse
 import json

@@ -17,6 +17,7 @@ Usage:
     from neo4j_v2_router import route_task
     agent = route_task(store, "Research competitor pricing for LLM APIs", "normal")
 """
+from __future__ import annotations
 
 import os
 import sys

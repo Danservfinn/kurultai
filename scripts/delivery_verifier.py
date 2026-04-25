@@ -17,6 +17,7 @@ Expected receipt format in workspace file:
 Usage:
     from delivery_verifier import verify_delivery, parse_receipt_block
 """
+from __future__ import annotations
 
 import json
 import re

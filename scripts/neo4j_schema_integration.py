@@ -11,6 +11,7 @@ Usage:
     manager = SchemaManager()
     manager.update_skill_affinity('temujin', 'code_review', True, 45.0)
 """
+from __future__ import annotations
 
 import os
 import sys

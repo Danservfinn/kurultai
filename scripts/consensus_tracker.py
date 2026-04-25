@@ -15,6 +15,7 @@ Usage:
     python3 consensus_tracker.py --proposal <proposal_id>
     python3 consensus_tracker.py --agent <agent_name>
 """
+from __future__ import annotations
 
 import argparse
 import json

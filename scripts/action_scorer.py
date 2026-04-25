@@ -9,6 +9,8 @@ Usage:
     python3 action_scorer.py --agent temujin --hours 2
     python3 action_scorer.py --all --hours 1
 """
+from __future__ import annotations
+
 import argparse
 import json
 import os

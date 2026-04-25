@@ -10,6 +10,7 @@ Usage:
     python3 neo4j_archive_tasks.py --execute        # Archive and delete
     python3 neo4j_archive_tasks.py --execute --days 60   # Custom retention
 """
+from __future__ import annotations
 
 import os
 import sys

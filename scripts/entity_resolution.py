@@ -18,6 +18,7 @@ Usage:
     candidates = resolver.find_merge_candidates("uuid-of-human")
     resolver.auto_merge_if_confident(candidates)
 """
+from __future__ import annotations
 
 import logging
 import uuid as uuid_mod
