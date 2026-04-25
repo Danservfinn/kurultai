@@ -12,6 +12,7 @@ Test Coverage:
 4. ErrorRecoveryManager.load_runbook() functionality
 5. Content quality checks (required sections)
 """
+from __future__ import annotations
 
 import sys
 import re

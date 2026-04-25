@@ -10,6 +10,7 @@ Tests cover:
 
 Location: /Users/kurultai/molt/tests/test_priority_commands.py
 """
+from __future__ import annotations
 
 import os
 import sys

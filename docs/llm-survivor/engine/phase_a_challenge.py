@@ -3,6 +3,7 @@ Phase A: Immunity Challenge - V3.0 Hyper-Rational Override
 Agents collaborate/compete to solve ARC-style grid transformation.
 Implements DeepThink's Master Prompt Architecture.
 """
+from __future__ import annotations
 
 import sqlite3
 import json

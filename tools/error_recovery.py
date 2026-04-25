@@ -13,6 +13,7 @@ Failure Scenarios:
 - RTL-001: Rate Limit Exceeded
 - MIG-001: Database Migration Failure
 """
+from __future__ import annotations
 
 import asyncio
 import json

@@ -8,6 +8,7 @@ consolidating reflections into learnings.
 Named after the reflection and learning capabilities that enable agents to improve
 over time through self-analysis and pattern recognition.
 """
+from __future__ import annotations
 
 import hashlib
 import logging
