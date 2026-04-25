@@ -15,6 +15,7 @@ Usage:
     python3 cross_agent_rules.py
     python3 cross_agent_rules.py --dry-run
 """
+from __future__ import annotations
 
 import argparse
 import json

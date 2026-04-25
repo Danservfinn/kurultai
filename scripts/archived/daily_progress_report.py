@@ -18,6 +18,7 @@ Output format:
 - ⚠️ Blockers: [list]
 - 📍 Next: [milestone]
 """
+from __future__ import annotations
 
 import json
 import os

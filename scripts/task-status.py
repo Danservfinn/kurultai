@@ -11,6 +11,7 @@ Examples:
     python3 scripts/task-status.py --json      # Output as JSON
     python3 scripts/task-status.py --agent temujin  # Filter by agent
 """
+from __future__ import annotations
 
 import argparse
 import json

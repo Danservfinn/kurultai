@@ -13,6 +13,7 @@ Run:
     python3 test_circular_routing.py
     python3 -m pytest test_circular_routing.py -v
 """
+from __future__ import annotations
 
 import os
 import sys

@@ -10,6 +10,7 @@ Usage:
     python3 scripts/persistent-issues.py update <id> --status resolved
     python3 scripts/persistent-issues.py check-escalations
 """
+from __future__ import annotations
 
 import json
 import sys

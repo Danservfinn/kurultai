@@ -12,6 +12,7 @@ Usage:
     python3 kurultai_review.py --approve <id>      # Approve and create task
     python3 kurultai_review.py --reject <id> "reason"  # Reject with reason
 """
+from __future__ import annotations
 
 import argparse
 import json

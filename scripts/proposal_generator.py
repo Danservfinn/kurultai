@@ -16,6 +16,7 @@ Usage:
 Output:
     Creates a proposal file in proposals/pending/<agent>-<timestamp>.md
 """
+from __future__ import annotations
 
 import argparse
 import hashlib
