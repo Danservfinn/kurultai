@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Unit tests for post_completion_hook.parse_followups()."""
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 

@@ -9,6 +9,8 @@ Run periodically (via cron or on-demand) to analyze watchdog.log and measure:
 
 Output: logs/action-resolution.jsonl (append-only, one entry per action event)
 """
+from __future__ import annotations
+
 import json
 import re
 import os

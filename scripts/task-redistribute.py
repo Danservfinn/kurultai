@@ -20,6 +20,8 @@ This utility implements overflow routing for the Kurultai agent system:
 Auto mode (--auto) uses should_trigger_redistribution() to decide whether to run.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import re

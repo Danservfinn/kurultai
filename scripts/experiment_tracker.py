@@ -21,6 +21,8 @@ Usage:
     python3 experiment_tracker.py rollout exp-2026-03-08-haiku-reviews
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import json
