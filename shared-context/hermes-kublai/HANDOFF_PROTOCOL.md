@@ -1,6 +1,6 @@
 # Hermes ↔ Kublai Internal Handoff Protocol
 
-Purpose: make Hermes/Kublai coordination reliable even when Telegram does not deliver bot-to-bot messages.
+Purpose: make Hermes/Kublai coordination reliable because Telegram does not reliably deliver bot-to-bot messages to the other bot. The internal handoff channel is the required bot-to-bot path; Telegram mirrors are only for Danny's visibility.
 
 ## Shared files
 
