@@ -4,6 +4,8 @@ Demo: Agent with Full Direct Access
 Shows how agents can now read/write/execute anywhere on the system.
 """
 
+from __future__ import annotations
+
 import sys
 sys.path.insert(0, 'tools/kurultai')
 from agent_gemini_direct import temujin_gemini_direct
