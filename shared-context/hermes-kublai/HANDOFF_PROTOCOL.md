@@ -26,11 +26,13 @@ Each line is one JSON object:
 
 ## Visibility rules
 
-- `mirror: true` means Kublai should summarize the handoff in the Telegram group.
+- Telegram is the human-facing conversation layer, not the bot-to-bot coordination layer.
+- Do not automatically mirror raw handoff logs to Telegram.
 - `mirror: false` means internal-only unless Danny asks for details.
-- Mirror summaries should be brief and human-readable.
-- Decisions, blockers, explicit handoffs, and completions should usually be mirrored.
+- `mirror: true` means the visible owner may post one concise human-facing summary if it is useful to Danny.
+- Surface only owner/support decisions, blockers, material disagreements, completions/failures, or requested audit trails.
 - Routine intermediate reasoning should stay internal.
+- For the full chat behavior model, see `UNIFIED_CHAT_PROTOCOL.md`.
 
 ## Ownership rules
 

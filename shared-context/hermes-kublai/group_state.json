@@ -1,0 +1,19 @@
+{
+  "chatId": "telegram:-5287556083",
+  "mode": "internal-first-single-visible-owner",
+  "autoMirror": false,
+  "currentRequest": {
+    "summary": "Decide and execute best solution for unified Hermes/Kublai group-chat coordination",
+    "visibleOwner": "kublai",
+    "supportBot": "hermes",
+    "status": "implemented",
+    "intendedActions": [
+      "Use internal handoff before non-trivial/shared work",
+      "Maintain one visible owner per request",
+      "Keep raw handoff logs internal by default",
+      "Use concise combined updates only when useful"
+    ],
+    "nextUpdateCondition": "Only if Hermes amends internally, a blocker appears, or Danny asks for details"
+  },
+  "updatedAt": "2026-04-26T20:01:00Z"
+}
