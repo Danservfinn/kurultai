@@ -23,6 +23,8 @@ Usage:
     store.complete_task(task["task_id"], task["claim_epoch"], output={...})
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import logging
@@ -321,30 +323,37 @@ class TaskStore:
             result = session.run("""
                 MATCH (t:Task {task_id: $id, status: 'WORKING', claim_epoch: $epoch})
                 CREATE (t)-[:HAS_FAILURE]->(:FailureReport {
-                    attempt: t.retry_count + 1,
+                    attempt: coalesce(t.retry_count, 0) + 1,
                     error_class: $error_class,
                     error_msg: $error_msg,
                     is_transient: $transient,
                     output_snippet: $snippet,
                     created_at: datetime()
                 })
+                WITH t,
+                     ($transient AND coalesce(t.retry_count, 0) < coalesce(t.max_retries, 0)) AS will_retry,
+                     CASE
+                         WHEN $transient AND coalesce(t.retry_count, 0) < coalesce(t.max_retries, 0)
+                         THEN coalesce(t.retry_count, 0) + 1
+                         ELSE coalesce(t.retry_count, 0)
+                     END AS next_retry_count
                 SET t.status = CASE
-                        WHEN $transient AND t.retry_count < t.max_retries THEN 'PENDING'
+                        WHEN will_retry THEN 'PENDING'
                         ELSE 'FAILED'
                     END,
-                    t.retry_count = t.retry_count + 1,
+                    t.retry_count = next_retry_count,
                     t.retry_after = CASE
-                        WHEN $transient AND t.retry_count < t.max_retries
+                        WHEN will_retry
                         THEN datetime() + duration({seconds: CASE
-                            WHEN $backoff_base * toInteger(2 ^ toFloat(t.retry_count)) > $max_backoff THEN $max_backoff
-                            ELSE $backoff_base * toInteger(2 ^ toFloat(t.retry_count))
+                            WHEN $backoff_base * toInteger(2 ^ toFloat(coalesce(t.retry_count, 0))) > $max_backoff THEN $max_backoff
+                            ELSE $backoff_base * toInteger(2 ^ toFloat(coalesce(t.retry_count, 0)))
                         END})
                         ELSE null
                     END,
                     t.updated_at = datetime(),
                     t.lease_expires_at = null,
                     t.claimed_by = CASE
-                        WHEN $transient AND t.retry_count < t.max_retries THEN null
+                        WHEN will_retry THEN null
                         ELSE t.claimed_by
                     END
                 RETURN t.status AS new_status
