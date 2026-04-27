@@ -55,7 +55,10 @@ If a contributor does not respond, aggregator must post a visible timeout/blocke
 ## Defaults
 
 - Kublai is default aggregator for routing, status, project management, governance, proposal, protocol, and coordination questions.
-- Hermes may be aggregator for ops/execution/system-verification questions only if it explicitly claims the lock or Kublai transfers ownership.
+- Hermes may be aggregator for ops/execution/system-verification questions only if Kublai transfers ownership or the lock is unclaimed.
+- The support bot must never self-transfer aggregator ownership for an active request.
+- The support bot must never decide that aggregator timeout permits it to post a competing main-chat answer; it may only post a blocker/escalation in Kurultai Internal Coms.
+- Once lock status is `answering` or `answered`, no bot may post another substantive main-chat answer for that request.
 
 ## Support bot constraints
 

@@ -1,17 +1,19 @@
 {
-  "schema": "hermes-kublai-response-lock.v2",
-  "purpose": "Prevent duplicate answers and require actual reciprocal deliberation before a final main-chat answer.",
+  "schema": "hermes-kublai-response-lock.v3",
+  "purpose": "Prevent duplicate answers with a single aggregator, reciprocal deliberation, and no support-bot self-transfer.",
   "humanFacingChat": "telegram:-5287556083",
   "internalCommsChat": "telegram:-5161727622",
   "defaultAggregator": "kublai",
-  "requiredStatusFlow": ["claimed", "deliberating", "ready_to_answer", "answered"],
+  "requiredStatusFlow": ["claimed", "deliberating", "ready_to_answer", "answering", "answered"],
   "hardRules": [
-    "For shared/non-trivial/both-bot requests, final answer is blocked until required contributors have responded or a visible timeout/blocker is posted in Internal Coms.",
-    "Aggregator must process and synthesize received contributions before answering.",
-    "Support bot must not post separate substantive answer in main chat."
+    "Only current aggregator may post the final main-chat answer.",
+    "Support bot may not self-transfer aggregator ownership.",
+    "Support bot may not mark timeout on the aggregator; it may only post a blocker/escalation in Internal Coms.",
+    "Once status is answering or answered, no bot may post another substantive main-chat answer for the same request.",
+    "Final answer is blocked until required contributors respond or current aggregator posts visible timeout/blocker in Internal Coms."
   ],
   "current": {
-    "request": "Danny asked to require actual reciprocal communication and visible deliberation before final answers",
+    "request": "Danny reports two consolidated answers and asks why single aggregator enforcement failed",
     "aggregator": "kublai",
     "supportBot": "hermes",
     "status": "ready_to_answer",
@@ -19,26 +21,20 @@
     "receivedContributions": [
       {
         "from": "kublai",
-        "topic": "protocol-require-deliberation-before-final-answer",
-        "ts": "2026-04-27T14:38:00.775945Z",
-        "summary": "Proposed response lock contribution requirements and visible deliberation before final answers."
-      },
-      {
-        "from": "hermes",
-        "topic": "protocol-deliberation-handshake",
-        "ts": "2026-04-27T14:38:27.774629Z",
-        "summary": "Proposed mandatory two-phase handshake and status flow before final public answer."
+        "topic": "investigate-duplicate-consolidated-answers",
+        "ts": "2026-04-27T14:51:42.614990Z",
+        "summary": "Opened investigation and requested Hermes input."
       },
       {
         "from": "kublai",
-        "topic": "protocol-deliberation-handshake-ack",
-        "ts": "2026-04-27T14:38:34.808010Z",
-        "summary": "Accepted Hermes proposal and added contributor/timeout blocker rule."
+        "topic": "investigate-duplicate-consolidated-answers-timeout",
+        "ts": "2026-04-27T14:53:19.597475Z",
+        "summary": "Visible timeout: Hermes did not respond to investigation within 75 seconds."
       }
     ],
-    "processedContributions": ["kublai", "hermes"],
-    "rule": "Kublai may now post the one consolidated main-chat answer because Hermes contributed and Kublai acknowledged/processed it.",
-    "createdAt": "2026-04-27T14:38:00Z",
-    "expiresAt": "2026-04-27T15:08:00Z"
+    "processedContributions": ["kublai", "hermes-timeout"],
+    "rule": "Kublai may answer as aggregator after visible Hermes timeout; Hermes must not duplicate.",
+    "createdAt": "2026-04-27T14:51:00Z",
+    "expiresAt": "2026-04-27T15:01:00Z"
   }
 }

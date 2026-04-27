@@ -58,9 +58,12 @@ For explicitly “both of you” requests, `requiredContributors` must include b
 ## Aggregator selection
 
 - Default aggregator: Kublai for routing, status, project management, governance, proposals, protocol, and coordination questions.
-- Hermes may be aggregator for ops/execution/system-verification answers only if Hermes explicitly claims the lock or Kublai transfers ownership by handoff.
+- Hermes may be aggregator for ops/execution/system-verification answers only if Kublai transfers ownership by handoff or the lock is unclaimed.
+- The support bot must never self-transfer aggregator ownership for an active request.
+- The support bot must never decide that aggregator timeout permits it to post a competing main-chat answer; it may only post a blocker/escalation in Kurultai Internal Coms.
 - If no lock exists, create one before answering shared/non-trivial requests.
 - If the lock names the other bot as aggregator, do not answer substantively in main chat.
+- Once lock status is `answering` or `answered`, no bot may post another substantive main-chat answer for that request.
 
 ## Support bot behavior
 
