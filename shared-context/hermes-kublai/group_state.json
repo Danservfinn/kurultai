@@ -4,17 +4,17 @@
   "autoMirror": true,
   "autoReportPolicy": "all-new-handoffs-redact-obvious-secrets",
   "currentRequest": {
-    "summary": "Auto-report all raw Hermes/Kublai internal handoffs into Telegram",
+    "summary": "Ensure raw handoff reports target Kurultai Internal Coms Telegram group",
     "visibleOwner": "kublai",
     "supportBot": "hermes",
     "status": "implemented",
     "intendedActions": [
-      "Re-enable internal handoff mirror job",
-      "Report every new JSONL handoff entry, including mirror=false entries",
-      "Preserve raw fields where possible",
-      "Redact obvious secrets, tokens, passwords, and credential-looking values"
+      "Keep raw mirror enabled",
+      "Target Telegram group -5287556083 as Kurultai Internal Coms",
+      "Report every new handoff entry with obvious secret redaction"
     ],
-    "nextUpdateCondition": "Every new handoff entry is auto-reported to Telegram"
+    "nextUpdateCondition": "Every new handoff entry is auto-reported to the Kurultai Internal Coms Telegram group"
   },
-  "updatedAt": "2026-04-27T04:17:00Z"
+  "updatedAt": "2026-04-27T04:20:07.368140Z",
+  "displayName": "Kurultai Internal Coms"
 }
