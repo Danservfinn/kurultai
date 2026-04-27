@@ -1,16 +1,44 @@
 {
-  "schema": "hermes-kublai-response-lock.v1",
-  "purpose": "Prevent duplicate substantive answers in the main Kurultai chat by forcing a single aggregator response.",
+  "schema": "hermes-kublai-response-lock.v2",
+  "purpose": "Prevent duplicate answers and require actual reciprocal deliberation before a final main-chat answer.",
   "humanFacingChat": "telegram:-5287556083",
   "internalCommsChat": "telegram:-5161727622",
   "defaultAggregator": "kublai",
+  "requiredStatusFlow": ["claimed", "deliberating", "ready_to_answer", "answered"],
+  "hardRules": [
+    "For shared/non-trivial/both-bot requests, final answer is blocked until required contributors have responded or a visible timeout/blocker is posted in Internal Coms.",
+    "Aggregator must process and synthesize received contributions before answering.",
+    "Support bot must not post separate substantive answer in main chat."
+  ],
   "current": {
-    "request": "Danny asked to fix duplicate answers so Hermes and Kublai create a single answer together",
+    "request": "Danny asked to require actual reciprocal communication and visible deliberation before final answers",
     "aggregator": "kublai",
     "supportBot": "hermes",
-    "status": "claimed",
-    "rule": "support bot contributes via handoff/Internal Coms only; aggregator posts the one main-chat answer",
-    "createdAt": "2026-04-27T14:17:46Z",
-    "expiresAt": "2026-04-27T14:47:46Z"
+    "status": "ready_to_answer",
+    "requiredContributors": ["kublai", "hermes"],
+    "receivedContributions": [
+      {
+        "from": "kublai",
+        "topic": "protocol-require-deliberation-before-final-answer",
+        "ts": "2026-04-27T14:38:00.775945Z",
+        "summary": "Proposed response lock contribution requirements and visible deliberation before final answers."
+      },
+      {
+        "from": "hermes",
+        "topic": "protocol-deliberation-handshake",
+        "ts": "2026-04-27T14:38:27.774629Z",
+        "summary": "Proposed mandatory two-phase handshake and status flow before final public answer."
+      },
+      {
+        "from": "kublai",
+        "topic": "protocol-deliberation-handshake-ack",
+        "ts": "2026-04-27T14:38:34.808010Z",
+        "summary": "Accepted Hermes proposal and added contributor/timeout blocker rule."
+      }
+    ],
+    "processedContributions": ["kublai", "hermes"],
+    "rule": "Kublai may now post the one consolidated main-chat answer because Hermes contributed and Kublai acknowledged/processed it.",
+    "createdAt": "2026-04-27T14:38:00Z",
+    "expiresAt": "2026-04-27T15:08:00Z"
   }
 }

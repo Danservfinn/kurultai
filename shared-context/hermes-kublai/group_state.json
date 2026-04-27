@@ -2,23 +2,25 @@
   "chatId": "telegram:-5287556083",
   "humanFacingChat": "telegram:-5287556083",
   "internalCommsChat": "telegram:-5161727622",
-  "mode": "single-aggregator-answer",
+  "mode": "reciprocal-deliberation-single-aggregator-answer",
   "autoMirror": true,
-  "autoReportPolicy": "coordination visible in Kurultai Internal Coms; main Kurultai chat receives one aggregator-synthesized answer only",
+  "autoReportPolicy": "deliberation visible in Kurultai Internal Coms; main Kurultai chat receives one aggregator-synthesized answer only after required contributors respond or blocker/timeout is visible",
   "currentRequest": {
-    "summary": "Fix duplicate Hermes/Kublai answers by enforcing a response lock and aggregator model",
+    "summary": "Require Hermes/Kublai to wait for actual reciprocal communication and visible back-and-forth deliberation before final answers",
     "aggregator": "kublai",
     "supportBot": "hermes",
-    "answerMode": "single-synthesized-answer",
-    "status": "implemented",
+    "answerMode": "single-synthesized-answer-after-deliberation",
+    "status": "ready_to_answer",
+    "requiredContributors": ["kublai", "hermes"],
+    "receivedContributions": ["kublai proposal", "hermes handshake proposal", "kublai ack/resolution"],
     "intendedActions": [
-      "Create response_lock.json",
+      "Update response_lock schema/status requirements",
       "Update unified chat protocol",
       "Update shared handoff protocol",
       "Update Hermes local handoff protocol copy",
       "Commit Kublai shared protocol changes"
     ],
-    "nextUpdateCondition": "Kublai posts one implementation summary in main chat; Hermes stays silent unless correcting or transferring ownership"
+    "nextUpdateCondition": "Kublai posts one implementation summary in main chat after processing Hermes input"
   },
-  "updatedAt": "2026-04-27T14:17:46Z"
+  "updatedAt": "2026-04-27T14:38:34Z"
 }

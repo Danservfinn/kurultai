@@ -1,11 +1,11 @@
 # Hermes ↔ Kublai Internal Handoff Protocol
 
-Purpose: make Hermes/Kublai coordination reliable and prevent duplicate answers in the main Kurultai chat.
+Purpose: make Hermes/Kublai coordination reliable, visible in Internal Coms, and prevent duplicate or premature answers in the main Kurultai chat.
 
 ## Shared files
 
-- `handoffs.jsonl` — append-only internal handoff stream.
-- `response_lock.json` — current main-chat answer aggregator lock.
+- `handoffs.jsonl` — append-only internal handoff/deliberation stream.
+- `response_lock.json` — current main-chat answer aggregator and readiness lock.
 - `group_state.json` — current shared request/ownership state.
 - `mirror-state.json` — mirror cursor state.
 
@@ -28,19 +28,29 @@ Purpose: make Hermes/Kublai coordination reliable and prevent duplicate answers 
 
 - Main Kurultai Telegram chat (`telegram:-5287556083`) is human-facing. Do not post raw internal handoff logs there.
 - `Kurultai Internal Coms` (`telegram:-5161727622`) is the coordination/internal-comms mirror.
-- Coordination that affects Danny should be visible in Internal Coms by using `mirror: true` when appropriate.
+- Deliberation that affects Danny should be visible in Internal Coms by using `mirror: true`.
 - Redact obvious secrets, tokens, passwords, API keys, and credential-looking values before posting anywhere.
 - JSONL + lock files are bot-to-bot state; Telegram is visibility only.
 
-## Aggregator rule
+## Reciprocal deliberation rule
 
-For any non-trivial, shared, tool-using, state-changing, protocol, governance, or both-bots-relevant request:
+For any non-trivial, shared, tool-using, state-changing, protocol, governance, review, or both-bots-relevant request:
 
 1. Coordinate internally before answering.
 2. Read or create `response_lock.json`.
-3. Exactly one bot is the main-chat **aggregator**.
-4. The support bot contributes internally only.
-5. The aggregator posts one synthesized answer in the main Kurultai chat.
+3. Set/observe lock status: `claimed` -> `deliberating` -> `ready_to_answer` -> `answered`.
+4. Wait for each required contributor to actually respond in handoffs/Internal Coms.
+5. Aggregator must acknowledge/process the other bot's contribution.
+6. Only then may aggregator post one synthesized answer in the main Kurultai chat.
+
+If a contributor does not respond, aggregator must post a visible timeout/blocker in Internal Coms before answering without that contribution.
+
+## Minimum handshake
+
+1. Proposal handoff from first bot.
+2. Receiver response with additions/objections/corrections.
+3. Aggregator acknowledgment/resolution.
+4. Final single answer in main chat.
 
 ## Defaults
 
@@ -56,4 +66,4 @@ The support bot must not post a separate substantive answer in the main chat. It
 - direct coordination-audit question,
 - explicit ownership transfer.
 
-Direct mention does not override the aggregator rule for non-trivial/shared matters.
+Direct mention does not override the aggregator/deliberation rule for non-trivial/shared matters.

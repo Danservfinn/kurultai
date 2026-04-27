@@ -1,75 +1,83 @@
 # Unified Telegram Chat Protocol
 
-Goal: Danny should receive one coherent answer in the main Kurultai chat, created from Hermes/Kublai coordination.
+Goal: Danny should receive one coherent answer in the main Kurultai chat, created from real Hermes/Kublai deliberation that is visible in Kurultai Internal Coms.
 
 ## Final decision
 
-Use an **internal-first, single aggregator answer** model.
+Use an **internal-first, reciprocal-deliberation, single-aggregator answer** model.
 
 - Main Kurultai chat (`telegram:-5287556083`) is human-facing.
-- `Kurultai Internal Coms` (`telegram:-5161727622`) is where Danny sees coordination/handoffs.
-- The internal handoff file is the source of truth:
+- `Kurultai Internal Coms` (`telegram:-5161727622`) is where Danny sees coordination/handoffs/deliberation.
+- The handoff file is the source of coordination truth:
   `/Users/kublai/.openclaw/agents/main/shared-context/hermes-kublai/handoffs.jsonl`
-- The response lock file prevents duplicate answers:
+- The response lock file prevents duplicate answers and tracks readiness:
   `/Users/kublai/.openclaw/agents/main/shared-context/hermes-kublai/response_lock.json`
 
 ## Hard rule
 
-For any non-trivial, shared, tool-using, state-changing, protocol, governance, or both-bots-relevant request:
+For any non-trivial, shared, tool-using, state-changing, protocol, governance, review, or both-bots-relevant request:
 
 1. Coordinate in Internal Coms / handoffs first.
 2. Claim or read the response lock.
-3. Exactly one bot is the **aggregator**.
-4. The support bot contributes internally only.
-5. The aggregator posts the single synthesized answer in the main chat.
+3. Enter `deliberating` state.
+4. Wait until each required bot has actually contributed, or post a visible timeout/blocker in Internal Coms.
+5. Aggregator must process the other bot's contribution.
+6. Move lock to `ready_to_answer`.
+7. Aggregator posts one synthesized answer in the main chat.
 
-No two separate substantive answers in the main Kurultai chat.
+No final answer should be posted merely after sending a handoff. The answer is blocked until reciprocal communication is received and processed, unless the blocker/timeout is explicitly surfaced in Internal Coms.
+
+## Required handshake
+
+For both-bot/shared requests, minimum visible deliberation is:
+
+1. **Proposal handoff** — first bot states draft position, questions, and proposed aggregator/support roles.
+2. **Receiver response** — other bot acknowledges and adds recommendations, objections, or corrections.
+3. **Resolution/ack** — aggregator acknowledges the other bot's input, resolves conflicts, and states readiness.
+4. **Final answer** — aggregator posts one consolidated answer in the main chat.
+
+If there is disagreement, add another back-and-forth round before `ready_to_answer`.
+
+## Response lock schema expectations
+
+`response_lock.json` should include:
+
+- `current.request`
+- `current.aggregator`
+- `current.supportBot`
+- `current.status`: `claimed`, `deliberating`, `ready_to_answer`, or `answered`
+- `current.requiredContributors`
+- `current.receivedContributions`
+- `current.processedContributions`
+- `current.rule`
+- `current.createdAt`
+- `current.expiresAt`
+
+For explicitly “both of you” requests, `requiredContributors` must include both `kublai` and `hermes`.
 
 ## Aggregator selection
 
-- Default aggregator: **Kublai** for routing, status, project management, governance, proposals, protocol, and coordination questions.
-- Hermes may be aggregator for ops/execution/system-verification answers only if Hermes explicitly claims ownership in `response_lock.json` or Kublai transfers ownership by handoff.
-- If no lock exists, Kublai should create one before answering shared/non-trivial requests.
-- If a lock exists and names the other bot as aggregator, do not answer substantively in main chat.
+- Default aggregator: Kublai for routing, status, project management, governance, proposals, protocol, and coordination questions.
+- Hermes may be aggregator for ops/execution/system-verification answers only if Hermes explicitly claims the lock or Kublai transfers ownership by handoff.
+- If no lock exists, create one before answering shared/non-trivial requests.
+- If the lock names the other bot as aggregator, do not answer substantively in main chat.
 
 ## Support bot behavior
 
 The support bot must not post its own substantive answer in the main chat. It should:
 
-- append a handoff with `mirror: true` when Danny should see coordination in Internal Coms;
+- append handoffs with `mirror: true` so Danny can see deliberation in Internal Coms;
 - add facts, objections, or recommended wording internally;
-- stay silent in main chat unless:
-  - correcting a material safety/error issue,
-  - reporting a blocker/completion/failure,
-  - answering a direct coordination-audit question,
-  - or accepting explicit ownership transfer.
+- wait for aggregator synthesis;
+- stay silent in main chat unless correcting a material safety/error issue, reporting a blocker/completion/failure, answering a direct coordination-audit question, or accepting explicit ownership transfer.
 
-If directly mentioned, the support bot may answer narrowly about process, but must not duplicate the substantive answer.
+Direct mention does not override the aggregator/deliberation rule for non-trivial/shared matters.
 
-## Default flow
+## Main-chat completion
 
-1. **Receive request**
-   - If trivial and addressed to one bot only: that bot may answer normally.
-   - Otherwise: coordinate and use the response lock.
+The final answer should be phrased as a consolidated result, e.g.:
 
-2. **Coordinate internally**
-   - Append handoff with owner/support and requested contribution.
-   - Use `mirror: true` so Danny can see coordination in Kurultai Internal Coms when it affects him.
+- “Kublai/Hermes consolidated answer after Internal Coms deliberation: …”
+- “We reviewed this together. Recommendation: …”
 
-3. **Set lock/state**
-   - Update `response_lock.json` with request, aggregator, support bot, status, createdAt, expiresAt.
-   - Update `group_state.json` if the request changes visible ownership or next update condition.
-
-4. **Post one answer**
-   - Aggregator synthesizes both bots' input.
-   - Main chat receives one answer only.
-
-5. **Complete**
-   - For user-requested tasks, report completion/failure/blocker in main chat with task id, assigned agent, outcome, concise summary, and next action if any.
-   - Routine cron/no-op jobs stay quiet.
-
-## Human-facing examples
-
-- “I’ll coordinate with Hermes in Internal Coms, then post our single consolidated answer here.”
-- “Kublai/Hermes consolidated answer: …”
-- “Hermes owns execution; Kublai will aggregate the final report here.”
+For user-requested tasks, report completion/failure/blocker in main chat with task id, assigned agent, outcome, concise summary, and next action if any. Routine cron/no-op jobs stay quiet.
