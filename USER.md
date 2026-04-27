@@ -7,7 +7,7 @@
 - **Pronouns:** *(optional)*
 - **Timezone:** 
 - **Notes:**
-  - Notification preference: do not send cron job execution reports unless something is wrong or action is needed.
+  - Notification preference: do not send cron/scheduled job execution reports unless something is wrong, blocked, or needs Danny's attention.
 
 ## Context
 
