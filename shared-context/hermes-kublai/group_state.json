@@ -1,20 +1,22 @@
 {
   "chatId": "telegram:-5287556083",
-  "mode": "raw-internal-comms-auto-report",
-  "autoMirror": true,
-  "autoReportPolicy": "all-new-handoffs-redact-obvious-secrets",
+  "humanFacingChat": "telegram:-5287556083",
+  "internalCommsChat": "telegram:-5161727622",
+  "mode": "internal-first-single-visible-owner",
+  "autoMirror": false,
+  "autoReportPolicy": "raw handoffs only in Kurultai Internal Coms, never in the main Kurultai chat",
   "currentRequest": {
-    "summary": "Ensure raw handoff reports target Kurultai Internal Coms Telegram group",
+    "summary": "Investigate why Hermes and Kublai both responded instead of coordinating into one answer",
     "visibleOwner": "kublai",
     "supportBot": "hermes",
-    "status": "implemented",
+    "status": "investigating",
     "intendedActions": [
-      "Keep raw mirror enabled",
-      "Target Telegram group -5287556083 as Kurultai Internal Coms",
-      "Report every new handoff entry with obvious secret redaction"
+      "Identify protocol/config mismatches",
+      "Stop treating this main chat as the raw internal-comms mirror",
+      "Reinforce one visible owner per thread",
+      "Report one consolidated finding to Danny"
     ],
-    "nextUpdateCondition": "Every new handoff entry is auto-reported to the Kurultai Internal Coms Telegram group"
+    "nextUpdateCondition": "Kublai posts one consolidated investigation result in the main chat"
   },
-  "updatedAt": "2026-04-27T04:20:07.368140Z",
-  "displayName": "Kurultai Internal Coms"
+  "updatedAt": "2026-04-27T05:13:00Z"
 }

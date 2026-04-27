@@ -26,13 +26,12 @@ Each line is one JSON object:
 
 ## Visibility rules
 
-- Danny designated the current Kurultai Telegram group as the internal-comms mirror on 2026-04-26; Hermes sees it as target `telegram:Kurultai` and the current chat displays as Kurultai Internal Coms.
-- As of 2026-04-27, Danny wants this Telegram channel to auto-report all raw internal handoff communications.
-- Telegram is now the raw visibility feed for Hermes/Kublai handoff JSONL entries.
-- Report every new handoff entry, including `mirror: false` entries.
-- Preserve raw handoff fields where possible: `ts`, `from`, `to`, `topic`, `summary`, `detail`, `mirror`, `status`.
-- Redact obvious secrets, tokens, passwords, API keys, and credential-looking values before posting.
-- The internal handoff JSONL remains the source of truth; Telegram is the visibility mirror.
+- The main Kurultai Telegram chat (`telegram:-5287556083`) is human-facing. Do not post raw internal handoff logs there.
+- The separate `Kurultai Internal Coms` Telegram chat (`telegram:-5161727622`) is the raw internal-comms visibility mirror.
+- As of 2026-04-27, Danny wants raw handoff entries auto-reported only in `Kurultai Internal Coms`, including entries with `mirror: false`.
+- Preserve raw handoff fields where possible in the internal-comms mirror: `ts`, `from`, `to`, `topic`, `summary`, `detail`, `mirror`, `status`.
+- Redact obvious secrets, tokens, passwords, API keys, and credential-looking values before posting anywhere.
+- The internal handoff JSONL remains the source of truth; Telegram mirrors are visibility surfaces, not bot-to-bot state.
 
 ## Ownership rules
 

@@ -4,13 +4,16 @@ Goal: Danny should experience one coherent group conversation even though Hermes
 
 ## Final decision
 
+Danny designated a separate Telegram group `Kurultai Internal Coms` as the raw internal-comms mirror. Bot-to-bot state still lives in the internal handoff files, but every new handoff line may be mirrored only to `telegram:Kurultai Internal Coms` / chat id `-5161727622` with credential-looking values redacted.
+
 Use an **internal-first, single-visible-owner** model.
 
 - Internal handoffs are the bot-to-bot coordination layer.
-- Telegram is the human-facing conversation layer.
+- Main Kurultai chat (`telegram:-5287556083`) is human-facing: no raw handoff logs there.
+- `Kurultai Internal Coms` (`telegram:-5161727622`) is the raw handoff visibility mirror.
 - For non-trivial/shared work, the bots coordinate internally before action.
 - Only one bot posts the main visible answer unless the second bot has genuinely new value.
-- No automatic raw handoff mirrors. Summaries are posted only when useful to Danny.
+- Raw handoffs are mirrored to `Kurultai Internal Coms`; do not mirror credentials or secrets.
 
 ## Default flow
 
@@ -42,7 +45,7 @@ Use an **internal-first, single-visible-owner** model.
 
 ## What not to do
 
-- Do not post raw handoff logs by default.
+- Do not expose raw credentials, secrets, tokens, passwords, API keys, bot tokens, connection strings, or pairing codes in the raw internal-comms mirror.
 - Do not have both bots answer the same thing.
 - Do not rely on Telegram bot messages for bot-to-bot state.
 - Do not send “no update” messages.
