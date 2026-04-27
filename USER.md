@@ -6,7 +6,8 @@
 - **What to call them:** 
 - **Pronouns:** *(optional)*
 - **Timezone:** 
-- **Notes:** 
+- **Notes:**
+  - Notification preference: do not send cron job execution reports unless something is wrong or action is needed.
 
 ## Context
 
