@@ -33,13 +33,13 @@ Each line is one JSON object:
 - Redact obvious secrets, tokens, passwords, API keys, and credential-looking values before posting anywhere.
 - The internal handoff JSONL remains the source of truth; Telegram mirrors are visibility surfaces, not bot-to-bot state.
 
-## Coordinated-answer rules
+## Consolidated-answer rules
 
 1. For any non-trivial, shared, tool-using, state-changing, protocol, governance, or both-bots-relevant request, coordinate internally before answering.
-2. Coordination must designate lead/owner, support bot, intended action, and answer mode: `single-combined` or `individual-answers`.
-3. Danny may receive individual answers from both Hermes and Kublai after coordination, especially when he asks both bots or separate perspectives are useful.
-4. Coordination that affects Danny must be visible in `Kurultai Internal Coms` by using handoffs with `mirror: true` when appropriate.
-5. Individual answers should be clearly attributable and non-duplicative; each bot should add its own perspective rather than repeating the same substance.
-6. Direct mention can request an individual answer, but the mentioned bot must still coordinate first for non-trivial/shared matters.
-7. A bot may speak without waiting only for urgent safety containment, material correction, blocker, completion/failure, explicit ownership transfer, or a direct audit question from Danny.
-8. Failures or blockers must be reported back in the main group by the lead/owner unless ownership is transferred.
+2. Coordination must designate one visible owner, one support bot, intended action, and what support input is needed for the consolidated answer.
+3. Coordination that affects Danny must be visible in `Kurultai Internal Coms` by using handoffs with `mirror: true` when appropriate.
+4. The main Kurultai chat should receive one consolidated answer created from both bots' input.
+5. Do not provide two separate substantive answers in the main Kurultai chat.
+6. The support bot contributes internally and stays quiet unless correcting a material error, reporting a blocker/completion/failure, answering a direct coordination-audit question, or accepting explicit ownership transfer.
+7. Direct mention does not override consolidated-answer discipline for non-trivial/shared matters; coordinate first and either contribute internally or transfer ownership.
+8. Failures or blockers must be reported back in the main group by the visible owner unless ownership is transferred.

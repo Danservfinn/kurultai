@@ -1,20 +1,20 @@
 # Unified Telegram Chat Protocol
 
-Goal: Danny should experience a coherent group conversation even though Hermes and Kublai coordinate through an internal handoff system.
+Goal: Danny should experience one coherent group conversation even though Hermes and Kublai coordinate through an internal handoff system.
 
 ## Final decision
 
-Use an **internal-first, coordinated-answers** model.
+Use an **internal-first, single consolidated answer** model.
 
-Danny designated a separate Telegram group `Kurultai Internal Coms` as the raw internal-comms mirror. Bot-to-bot state still lives in the internal handoff files, but coordination that affects Danny should be visible in `telegram:Kurultai Internal Coms` / chat id `-5161727622` with credential-looking values redacted.
+Danny designated a separate Telegram group `Kurultai Internal Coms` as the raw internal-comms/coordination mirror. Bot-to-bot state lives in the internal handoff files. Coordination that affects Danny should be visible in `telegram:Kurultai Internal Coms` / chat id `-5161727622` with credential-looking values redacted.
 
 - Internal handoffs are the bot-to-bot coordination layer.
 - Main Kurultai chat (`telegram:-5287556083`) is human-facing: no raw handoff spam there.
-- `Kurultai Internal Coms` (`telegram:-5161727622`) is the raw coordination visibility mirror.
-- For any non-trivial, shared, tool-using, state-changing, or both-bots-relevant request, Hermes and Kublai coordinate internally before answering.
-- Danny may receive individual answers from both Hermes and Kublai **after** coordination.
-- The coordination must be visible in Kurultai Internal Coms before or alongside the answers.
-- Individual answers should be clearly attributable and should add distinct perspective; avoid duplicated text or parallel uncoordinated replies.
+- `Kurultai Internal Coms` (`telegram:-5161727622`) is where Danny should see Hermes/Kublai coordination.
+- For any non-trivial, shared, tool-using, state-changing, protocol, governance, or both-bots-relevant request, Hermes and Kublai coordinate internally before answering.
+- The main Kurultai chat receives **one consolidated answer created from both bots' input**.
+- Do not post two separate substantive answers in the main chat.
+- The non-owner contributes internally and stays quiet unless correcting a material error, reporting a blocker/completion/failure, or explicitly receiving ownership transfer.
 - Raw handoffs are mirrored to `Kurultai Internal Coms`; do not mirror credentials or secrets.
 
 ## Default flow
@@ -25,22 +25,22 @@ Danny designated a separate Telegram group `Kurultai Internal Coms` as the raw i
 
 2. **Coordinate internally**
    - Use `handoffs.jsonl` / `append_handoff.py`.
-   - State: proposed owner/lead, support bot, intended action, whether one combined answer or two individual answers are expected.
+   - State: proposed visible owner, support bot, intended action, and what input is needed for the consolidated answer.
    - Set `mirror: true` when Danny should see the coordination in Kurultai Internal Coms.
-   - If time-sensitive, lead may proceed after posting the handoff, but must still make the coordination visible.
+   - If time-sensitive, owner may proceed after posting the handoff, but must still make the coordination visible.
 
-3. **Choose answer mode**
-   - **Single answer** when one combined answer is clearer or when one bot has all relevant context.
-   - **Individual answers** when Danny asks both bots, when perspectives differ usefully, or when governance/review calls benefit from separate opinions.
-   - Kublai defaults to coordination, routing, project/status, governance, and group protocol.
-   - Hermes defaults to ops, execution, verification, caretaker/system observations.
+3. **Choose visible owner**
+   - Kublai leads coordination, routing, project/status, governance, and group protocol.
+   - Hermes leads ops, execution, verification, caretaker/system observations.
+   - If one bot has clearly better context, that bot leads regardless of default role.
 
 4. **Set shared state**
-   - Update `group_state.json` with active request, lead/owner, support bot, answer mode, intended actions, and next update condition.
+   - Update `group_state.json` with active request, visible owner, support bot, intended actions, and next update condition.
 
 5. **Respond in main Telegram chat**
-   - If single-answer mode: the lead posts one combined answer.
-   - If individual-answer mode: each bot may post its own concise, clearly distinct answer after coordination.
+   - The visible owner posts one consolidated answer.
+   - The answer may mention both perspectives, e.g. “Kublai/Hermes view: …”
+   - The support bot does not post a separate substantive answer.
    - Answers should not repeat the raw handoff text; Internal Coms carries coordination detail.
 
 6. **If Danny directly asks whether coordination happened**
@@ -60,14 +60,14 @@ Danny designated a separate Telegram group `Kurultai Internal Coms` as the raw i
 - Do not rely on Telegram bot messages for bot-to-bot state.
 - Do not send “no update” messages.
 - Do not post raw handoff spam in the main Kurultai chat.
-- Do not duplicate another bot’s substantive answer unless Danny explicitly asks for separate opinions and the second answer adds value.
+- Do not provide two separate substantive answers in the main Kurultai chat.
 
 ## When to surface internal coordination
 
 Surface in Kurultai Internal Coms for:
 
-- owner/support or lead/support decision for meaningful work
-- answer mode: single combined vs individual answers
+- owner/support decision for meaningful work
+- input requested from support bot for the consolidated answer
 - blockers
 - material disagreement
 - completion/failure
@@ -75,8 +75,8 @@ Surface in Kurultai Internal Coms for:
 
 ## Human-facing language examples
 
-- “I’ll coordinate with Hermes internally first, then we’ll each answer separately if useful.”
-- “Coordination is visible in Kurultai Internal Coms; my Kublai-specific answer is…”
-- “Hermes owns execution; I’ll track status and report back here.”
-- “Done — Hermes verified the path; I updated the protocol. No further action needed.”
+- “I’ll coordinate with Hermes internally first, then provide our consolidated answer here.”
+- “Coordination is visible in Kurultai Internal Coms; our consolidated answer is…”
+- “Hermes owns execution; I’ll track status and report the consolidated result here.”
+- “Done — Hermes verified the path; I updated the protocol. Result: Z.”
 - “Blocked — Hermes needs X before execution can continue.”
