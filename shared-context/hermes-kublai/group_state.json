@@ -2,13 +2,14 @@
   "chatId": "telegram:-5287556083",
   "humanFacingChat": "telegram:-5287556083",
   "internalCommsChat": "telegram:-5161727622",
-  "mode": "internal-first-single-answer",
-  "autoMirror": false,
-  "autoReportPolicy": "raw handoffs only in Kurultai Internal Coms, never in the main Kurultai chat",
+  "mode": "internal-first-coordinated-answers",
+  "autoMirror": true,
+  "autoReportPolicy": "coordination that affects Danny should be visible in Kurultai Internal Coms, never as raw handoff spam in the main Kurultai chat",
   "currentRequest": {
-    "summary": "Modify protocol so Hermes and Kublai coordinate internally and provide one single answer to Danny",
+    "summary": "Modify protocol so Hermes and Kublai coordinate first, visibly in Kurultai Internal Coms, then may each provide individual answers",
     "visibleOwner": "kublai",
     "supportBot": "hermes",
+    "answerMode": "individual-answers-allowed-after-coordination",
     "status": "implemented",
     "intendedActions": [
       "Update unified chat protocol",
@@ -16,7 +17,7 @@
       "Update Hermes local handoff protocol copy",
       "Commit Kublai shared protocol changes"
     ],
-    "nextUpdateCondition": "Kublai posts one concise implementation summary in the main chat"
+    "nextUpdateCondition": "Kublai posts one implementation summary in main chat; Hermes may add its individual answer after coordination if useful"
   },
-  "updatedAt": "2026-04-27T13:35:00Z"
+  "updatedAt": "2026-04-27T13:37:00Z"
 }
