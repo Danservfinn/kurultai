@@ -1,14 +1,23 @@
+import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
 import time
+import uuid
+from pathlib import Path
 
 import pytest
 
+from kublai.brain_service import BrainService
+from kublai.brain_service_client import call
 from kublai.telemetry import NoPendingTaskError, StaleClaimError, TelemetryStore
 from openclaw_memory import NoPendingTaskError as LegacyNoPendingTaskError
 from openclaw_memory import OperationalMemory
+
+
+NODE_BIN = shutil.which("node") or "/opt/homebrew/bin/node"
 
 
 def test_operational_memory_telemetry_mode_keeps_core_signatures(tmp_path, monkeypatch):
@@ -150,3 +159,134 @@ def test_single_host_atomicity_stress_has_no_sqlite_busy(tmp_path):
         assert len(winners) == 1
 
     assert busy_errors == []
+
+
+def test_wiki_write_failure_injection_recovers_without_duplicate_page(tmp_path, monkeypatch):
+    service = BrainService(tmp_path / "brain", tmp_path / "telemetry.db", tmp_path / "brain-index.db")
+    service.telemetry.create_task("task-1", description="recover", delegated_by="kublai")
+    claim = service.telemetry.claim_task("temujin", now_ms=1_000)
+    service.telemetry.complete_task(
+        claim.id,
+        "temujin",
+        claim.claim_token,
+        summary="recover me",
+        target_wiki_path="operations/tasks/2026/04/task-task-1.md",
+        now_ms=1_100,
+    )
+
+    original = service.knowledge.record_completed_task
+    failures = {"count": 0}
+
+    def fail_once(**kwargs):
+        failures["count"] += 1
+        if failures["count"] == 1:
+            raise OSError("injected wiki write failure")
+        return original(**kwargs)
+
+    monkeypatch.setattr(service.knowledge, "record_completed_task", fail_once)
+
+    assert service.sweep() == 0
+    with service.telemetry.connect() as conn:
+        row = conn.execute(
+            "SELECT completion_attempt_count, last_error, materialized_at FROM in_flight_tasks WHERE id = ?",
+            ("task-1",),
+        ).fetchone()
+    assert row["completion_attempt_count"] == 1
+    assert "injected wiki write failure" in row["last_error"]
+    assert row["materialized_at"] is None
+
+    assert service.sweep() == 1
+    assert service.sweep() == 0
+    task_pages = list((tmp_path / "brain" / "operations/tasks").rglob("*.md"))
+    assert len(task_pages) == 1
+
+
+def test_disk_full_injection_surfaces_materialization_alert(tmp_path, monkeypatch):
+    service = BrainService(tmp_path / "brain", tmp_path / "telemetry.db", tmp_path / "brain-index.db")
+    service.telemetry.create_task("task-1", description="disk full", delegated_by="kublai")
+    claim = service.telemetry.claim_task("temujin", now_ms=1_000)
+    service.telemetry.complete_task(
+        claim.id,
+        "temujin",
+        claim.claim_token,
+        summary="cannot write",
+        target_wiki_path="operations/tasks/2026/04/task-task-1.md",
+        now_ms=1_100,
+    )
+
+    def disk_full(*_args, **_kwargs):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(service.knowledge, "atomic_write", disk_full)
+
+    for _ in range(3):
+        assert service.sweep() == 0
+
+    health = service.health()
+    assert health["ok"] is False
+    assert health["materialization_errors"] == 1
+    assert health["materialization_alerts"] == 1
+
+
+def test_js_clients_use_local_unix_socket_for_telemetry_and_knowledge(tmp_path):
+    service = BrainService(tmp_path / "brain", tmp_path / "telemetry.db", tmp_path / "brain-index.db")
+    service.knowledge.record_reflection(agent="kublai", reflection_id="reflection-1", body="socket lookup")
+    service.reindex()
+
+    socket_path = Path("/tmp") / f"bs-phase3-{os.getpid()}-{uuid.uuid4().hex[:8]}.sock"
+    server = service.serve_socket(socket_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert call(
+            socket_path,
+            "telemetry.create_task",
+            {"task_id": "task-1", "description": "rpc", "delegated_by": "kublai"},
+        ) == {"ok": True, "result": "task-1"}
+
+        node_script = f"""
+        const telemetry = require('./kublai/telemetry-client');
+        const knowledge = require('./kublai/knowledge-client');
+        process.env.BRAIN_SERVICE_SOCKET = {json.dumps(str(socket_path))};
+
+        async function main() {{
+          const samples = [];
+          for (let i = 0; i < 20; i++) {{
+            const started = process.hrtime.bigint();
+            await telemetry.heartbeat({{agent: 'temujin', status: 'active'}});
+            samples.push(Number(process.hrtime.bigint() - started) / 1e6);
+          }}
+          const claimed = await telemetry.claimTask({{agent: 'temujin'}});
+          const found = await knowledge.get({{node_type: 'reflection', typed_id: 'reflection-1'}});
+          samples.sort((a, b) => a - b);
+          const p99 = samples[samples.length - 1];
+          console.log(JSON.stringify({{
+            claimed: claimed.id,
+            hasToken: !!claimed.claim_token,
+            reflection: found && found.typed_id,
+            p99
+          }}));
+        }}
+
+        main().catch(error => {{
+          console.error(error.stack || error.message);
+          process.exit(1);
+        }});
+        """
+        result = subprocess.run(
+            [NODE_BIN, "-e", node_script],
+            cwd=".",
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        payload = json.loads(result.stdout)
+        assert payload["claimed"] == "task-1"
+        assert payload["hasToken"] is True
+        assert payload["reflection"] == "reflection-1"
+        assert payload["p99"] < 50
+    finally:
+        server.shutdown()
+        server.server_close()
+        if socket_path.exists():
+            socket_path.unlink()
