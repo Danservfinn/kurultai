@@ -33,6 +33,12 @@ from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from neo4j_task_tracker import get_driver, close_driver
+from neo4j_v2_wal import WAL
+
+try:
+    from neo4j.exceptions import ServiceUnavailable as _Neo4jServiceUnavailable
+except ImportError:
+    _Neo4jServiceUnavailable = Exception
 
 logger = logging.getLogger(__name__)
 
@@ -77,26 +83,59 @@ class TaskStore:
             result = tx.run("""
                 MATCH (t:Task {status: 'PENDING'})
                 WHERE (t.assigned_to = $agent OR t.assigned_to IS NULL)
-                  AND (t.retry_after IS NULL OR t.retry_after <= datetime())
+                  AND (t.retry_after IS NULL OR
+                       coalesce(
+                         CASE WHEN valueType(t.retry_after) STARTS WITH 'STRING'
+                              THEN datetime(
+                                CASE WHEN t.retry_after ENDS WITH 'Z' OR t.retry_after CONTAINS '+'
+                                     THEN t.retry_after
+                                     ELSE t.retry_after + 'Z'
+                                END).epochSeconds
+                              WHEN valueType(t.retry_after) STARTS WITH 'ZONED DATETIME'
+                              THEN t.retry_after.epochSeconds
+                              ELSE NULL
+                         END - datetime().epochSeconds, 1) <= 0)
                   AND NOT EXISTS {
                     MATCH (t)-[:DEPENDS_ON]->(dep:Task)
                     WHERE dep.status <> 'COMPLETED' AND dep.status <> 'FAILED'
                   }
-                WITH t, CASE t.priority
+                WITH t,
+                CASE
+                    WHEN t.created_at IS NULL THEN datetime()
+                    WHEN valueType(t.created_at) STARTS WITH 'STRING' THEN datetime(
+                        CASE WHEN t.created_at ENDS WITH 'Z' OR t.created_at CONTAINS '+'
+                             THEN t.created_at
+                             ELSE t.created_at + 'Z'
+                        END)
+                    ELSE t.created_at
+                END AS created_dt,
+                CASE t.priority
                     WHEN 'critical' THEN 0
                     WHEN 'high' THEN 1
                     WHEN 'normal' THEN 2
                     WHEN 'low' THEN 3
                     ELSE 4
-                END AS base_priority,
-                duration.inSeconds(t.created_at, datetime()).minutes AS age_minutes
-                WITH t, base_priority,
+                END AS base_priority
+                WITH t, created_dt, base_priority,
+                toFloat(coalesce(datetime().epochSeconds - created_dt.epochSeconds, 0)) / 60.0 AS age_minutes
+                WITH t, created_dt, base_priority, age_minutes,
                     CASE
-                        WHEN t.sla_deadline IS NOT NULL AND datetime() > t.sla_deadline
+                        WHEN t.sla_deadline IS NOT NULL AND
+                             coalesce(
+                               CASE WHEN valueType(t.sla_deadline) STARTS WITH 'STRING'
+                                    THEN datetime(
+                                      CASE WHEN t.sla_deadline ENDS WITH 'Z' OR t.sla_deadline CONTAINS '+'
+                                           THEN t.sla_deadline
+                                           ELSE t.sla_deadline + 'Z'
+                                      END).epochSeconds
+                                    WHEN valueType(t.sla_deadline) STARTS WITH 'ZONED DATETIME'
+                                    THEN t.sla_deadline.epochSeconds
+                                    ELSE NULL
+                               END - datetime().epochSeconds, 1) < 0
                             THEN -10  // SLA breached — highest urgency
                         ELSE base_priority - floor(age_minutes / 30.0) * 0.5
                     END AS effective_priority
-                ORDER BY effective_priority ASC, t.created_at ASC
+                ORDER BY effective_priority ASC, created_dt ASC
                 LIMIT 1
                 SET t.status = 'WORKING',
                     t.claim_epoch = coalesce(t.claim_epoch, 0) + 1,
@@ -297,6 +336,131 @@ class TaskStore:
             return []
 
     # ------------------------------------------------------------------
+    # QUALITY GATE RESET: COMPLETED --> PENDING (revision cycle)
+    # ------------------------------------------------------------------
+
+    # Cypher for quality-gate reset — kept as a constant so the WAL fallback
+    # and the live path are guaranteed to stay identical.
+    _RESET_TO_PENDING_CYPHER = (
+        "MATCH (t:Task {task_id: $tid, status: 'COMPLETED'}) "
+        "SET t.status = 'PENDING', "
+        "    t.claimed_by = null, "
+        "    t.lease_expires_at = null, "
+        "    t.claim_epoch = coalesce(t.claim_epoch, 0) + 1, "
+        "    t.updated_at = datetime() "
+        "RETURN t.task_id AS tid"
+    )
+
+    def reset_to_pending(self, task_id: str) -> bool:
+        """Reset a COMPLETED task back to PENDING for the quality-gate revision cycle.
+
+        Only transitions from COMPLETED (guard prevents accidental overwrite of
+        WORKING tasks). Clears claimed_by, lease_expires_at, and bumps claim_epoch
+        to fence any stale executor leases — matching the invariants maintained
+        by fail_task() and promote_orphans().
+
+        On Neo4j ServiceUnavailable, buffers the reset to the WAL for replay on
+        reconnect so callers need no exception handling for the outage case.
+
+        Returns True if reset or WAL-buffered, False if task not found / wrong status.
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run(self._RESET_TO_PENDING_CYPHER, tid=task_id)
+                rec = result.single()
+                if rec:
+                    logger.info(f"Quality gate reset {task_id} COMPLETED -> PENDING")
+                    return True
+                logger.warning(
+                    f"reset_to_pending: task {task_id} not found or not COMPLETED in Neo4j"
+                )
+                return False
+        except _Neo4jServiceUnavailable as e:
+            logger.error(
+                f"reset_to_pending: Neo4j unavailable for {task_id}: {e} — buffering to WAL"
+            )
+            try:
+                WAL().buffer(self._RESET_TO_PENDING_CYPHER, {"tid": task_id})
+                logger.info(f"reset_to_pending: buffered WAL entry for {task_id}")
+                return True  # optimistic — will apply on reconnect
+            except Exception as wal_err:
+                logger.error(
+                    f"reset_to_pending: WAL buffer also failed for {task_id}: {wal_err} "
+                    "— manual recovery required"
+                )
+                return False
+
+    # Cypher for revision reset — matches COMPLETED or WORKING so the WAL-lag
+    # case (executor finished but Neo4j write was deferred) doesn't orphan the file.
+    _RESET_FOR_REVISION_CYPHER = (
+        "MATCH (t:Task {task_id: $tid}) "
+        "WHERE t.status IN ['COMPLETED', 'WORKING'] "
+        "SET t.status = 'PENDING', "
+        "    t.claimed_by = null, "
+        "    t.lease_expires_at = null, "
+        "    t.claim_epoch = coalesce(t.claim_epoch, 0) + 1, "
+        "    t.revision_count = coalesce(t.revision_count, 0) + 1, "
+        "    t.last_revision_num = $revision_num, "
+        "    t.updated_at = datetime() "
+        "RETURN t.task_id AS tid"
+    )
+
+    def reset_to_pending_for_revision(self, task_id: str, revision_num: int) -> bool:
+        """Reset a task to PENDING for a quality-gate revision cycle.
+
+        Broader than reset_to_pending(): matches COMPLETED *and* WORKING.
+        The WORKING case occurs when the executor completed the task on the
+        filesystem side but Neo4j was unavailable and the write was buffered
+        to the WAL — leaving status=WORKING while the file became .done.md.
+
+        Also records revision_count and last_revision_num on the node for
+        dashboard traceability without creating a new task_id.
+
+        On Neo4j ServiceUnavailable, buffers the reset to the WAL.
+
+        Returns True if reset or WAL-buffered, False if task not found or
+        already in a non-resettable state (FAILED, PENDING, BLOCKED, etc.).
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run(
+                    self._RESET_FOR_REVISION_CYPHER,
+                    tid=task_id, revision_num=revision_num,
+                )
+                rec = result.single()
+                if rec:
+                    logger.info(
+                        f"Quality gate revision reset {task_id} -> PENDING "
+                        f"(revision #{revision_num})"
+                    )
+                    return True
+                logger.warning(
+                    f"reset_to_pending_for_revision: task {task_id} not found "
+                    "or not in [COMPLETED, WORKING] — cannot reset"
+                )
+                return False
+        except _Neo4jServiceUnavailable as e:
+            logger.error(
+                f"reset_to_pending_for_revision: Neo4j unavailable for {task_id}: "
+                f"{e} — buffering to WAL"
+            )
+            try:
+                WAL().buffer(
+                    self._RESET_FOR_REVISION_CYPHER,
+                    {"tid": task_id, "revision_num": revision_num},
+                )
+                logger.info(
+                    f"reset_to_pending_for_revision: WAL entry buffered for {task_id}"
+                )
+                return True  # optimistic — will apply on reconnect
+            except Exception as wal_err:
+                logger.error(
+                    f"reset_to_pending_for_revision: WAL buffer also failed for "
+                    f"{task_id}: {wal_err} — manual recovery required"
+                )
+                return False
+
+    # ------------------------------------------------------------------
     # FAIL: WORKING --> FAILED or PENDING (auto-retry)
     # ------------------------------------------------------------------
 
@@ -355,6 +519,18 @@ class TaskStore:
                     t.claimed_by = CASE
                         WHEN will_retry THEN null
                         ELSE t.claimed_by
+                    END,
+                    t.failure_reason = CASE
+                        WHEN will_retry THEN t.failure_reason
+                        ELSE $error_msg
+                    END,
+                    t.completed_at = CASE
+                        WHEN NOT will_retry THEN datetime()
+                        ELSE t.completed_at
+                    END,
+                    t.error_message = CASE
+                        WHEN NOT will_retry THEN $error_msg
+                        ELSE t.error_message
                     END
                 RETURN t.status AS new_status
             """, id=task_id, epoch=claim_epoch, error_class=error_class,
@@ -366,6 +542,17 @@ class TaskStore:
             if record:
                 new_status = record["new_status"]
                 logger.info(f"Task {task_id} -> {new_status} (class={error_class}, transient={is_transient})")
+                if new_status == "FAILED":
+                    chk = session.run(
+                        "MATCH (t:Task {task_id: $id}) RETURN t.completed_at AS ca",
+                        id=task_id
+                    ).single()
+                    if chk and chk["ca"] is None:
+                        logger.warning(
+                            "INVARIANT VIOLATION: task %s reached FAILED but completed_at "
+                            "is NULL — possible concurrent write or CAS epoch mismatch",
+                            task_id
+                        )
                 return True, new_status
             return False, "cas_failed"
 
@@ -401,7 +588,14 @@ class TaskStore:
             result = session.run("""
                 MATCH (t:Task {status: 'WORKING'})
                 WHERE t.lease_expires_at IS NOT NULL
-                  AND t.lease_expires_at < datetime() - duration({minutes: $grace})
+                  AND CASE WHEN valueType(t.lease_expires_at) STARTS WITH 'STRING'
+                           THEN datetime(
+                               CASE WHEN t.lease_expires_at ENDS WITH 'Z' OR t.lease_expires_at CONTAINS '+'
+                                    THEN t.lease_expires_at
+                                    ELSE t.lease_expires_at + 'Z'
+                               END)
+                           ELSE t.lease_expires_at
+                      END < datetime() - duration({minutes: $grace})
                 CREATE (t)-[:HAS_FAILURE]->(:FailureReport {
                     attempt: t.retry_count + 1,
                     error_class: 'ORPHAN_RECOVERY',
@@ -417,6 +611,14 @@ class TaskStore:
                     t.orphaned_at = CASE
                         WHEN t.retry_count < t.max_retries THEN datetime()
                         ELSE null
+                    END,
+                    t.completed_at = CASE
+                        WHEN t.retry_count >= t.max_retries THEN datetime()
+                        ELSE t.completed_at
+                    END,
+                    t.error_message = CASE
+                        WHEN t.retry_count >= t.max_retries THEN 'Task lease expired, executor presumed dead'
+                        ELSE t.error_message
                     END,
                     t.updated_at = datetime()
                 RETURN t {.task_id, .status, .assigned_to, .retry_count} AS task
