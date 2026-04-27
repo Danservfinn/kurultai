@@ -7,15 +7,22 @@ rate limiting, and agent state in a Neo4j graph database.
 from __future__ import annotations
 
 import logging
+import json
+import os
 import uuid
 import time
 import functools
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Callable
 from contextlib import contextmanager
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+def _env_truthy(name: str) -> bool:
+    return os.getenv(name, "").lower() in {"1", "true", "yes", "sqlite", "telemetry"}
 
 # Lazy imports for neo4j to avoid numpy recursion issues during test collection
 # The neo4j driver imports numpy which can cause RecursionError when pytest's -W error is enabled
@@ -242,7 +249,15 @@ class OperationalMemory:
         Raises:
             ValueError: If password is not provided
         """
-        if password is None:
+        self._telemetry_primary = _env_truthy("KUBLAI_TELEMETRY_PRIMARY")
+        self._telemetry_store = None
+        if self._telemetry_primary:
+            from kublai.telemetry import TelemetryStore
+
+            telemetry_db = os.getenv("KUBLAI_TELEMETRY_DB", str(Path.home() / ".kublai" / "telemetry.db"))
+            self._telemetry_store = TelemetryStore(telemetry_db)
+
+        if password is None and not self._telemetry_primary:
             raise ValueError("Neo4j password is required. Provide it explicitly or via NEO4J_PASSWORD environment variable.")
 
         self.uri = uri
@@ -256,7 +271,54 @@ class OperationalMemory:
             "connection_timeout": connection_timeout,
             "max_transaction_retry_time": max_retry_time
         }
-        self._initialize_driver()
+        if not self._telemetry_primary:
+            self._initialize_driver()
+
+    def _using_telemetry(self) -> bool:
+        return self._telemetry_store is not None
+
+    @staticmethod
+    def _priority_to_int(priority: str) -> int:
+        return {"low": 1, "normal": 2, "high": 3, "critical": 4}.get(str(priority).lower(), 0)
+
+    @staticmethod
+    def _priority_from_int(priority: int | None) -> str:
+        mapping = {1: "low", 2: "normal", 3: "high", 4: "critical"}
+        return mapping.get(int(priority or 0), "normal")
+
+    @staticmethod
+    def _dt_to_ms(value: datetime) -> int:
+        return int(value.timestamp() * 1000)
+
+    @staticmethod
+    def _ms_to_dt(value: int | None) -> datetime | None:
+        if value is None:
+            return None
+        return datetime.fromtimestamp(int(value) / 1000, timezone.utc)
+
+    def _telemetry_task_to_legacy(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        results = row.get("results_json")
+        try:
+            parsed_results = json.loads(results) if results else None
+        except (TypeError, json.JSONDecodeError):
+            parsed_results = results
+        return {
+            "id": row.get("id"),
+            "type": row.get("type"),
+            "description": row.get("description"),
+            "status": row.get("status"),
+            "delegated_by": row.get("delegated_by"),
+            "assigned_to": row.get("assigned_to"),
+            "priority": self._priority_from_int(row.get("priority")),
+            "created_at": self._ms_to_dt(row.get("created_at")),
+            "claimed_at": self._ms_to_dt(row.get("claimed_at")),
+            "completed_at": self._ms_to_dt(row.get("completed_at")),
+            "claimed_by": row.get("claimed_by"),
+            "claim_token": row.get("active_claim_token"),
+            "lease_version": row.get("active_lease_version"),
+            "results": parsed_results,
+            "error_message": row.get("materialization_error"),
+        }
 
     def _initialize_driver(self) -> None:
         """Initialize Neo4j driver with connection pooling."""
@@ -351,6 +413,20 @@ class OperationalMemory:
         else:
             assigned_to_value = assigned_to
 
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            task_id = self._telemetry_store.create_task(
+                task_id,
+                type=task_type,
+                description=description,
+                delegated_by=delegated_by,
+                assigned_to=assigned_to_value,
+                priority=self._priority_to_int(priority),
+                results=kwargs,
+            )
+            logger.info(f"Telemetry task created: {task_id} (type: {task_type}, assigned_to: {assigned_to})")
+            return task_id
+
         cypher = """
         CREATE (t:Task {
             id: $task_id,
@@ -411,6 +487,23 @@ class OperationalMemory:
             RaceConditionError: If another agent claimed the task simultaneously
             NoPendingTaskError: If no pending tasks are available
         """
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            from kublai.telemetry import NoPendingTaskError as TelemetryNoPendingTaskError
+
+            try:
+                claimed = self._telemetry_store.claim_task(agent)
+                task = self._telemetry_task_to_legacy(claimed.payload)
+                task["status"] = "in_progress"
+                task["claimed_by"] = agent
+                task["claimed_at"] = self._now()
+                task["claim_token"] = claimed.claim_token
+                task["lease_version"] = claimed.lease_version
+                logger.info(f"Telemetry task claimed: {task['id']} by {agent}")
+                return task
+            except TelemetryNoPendingTaskError as exc:
+                raise NoPendingTaskError(str(exc)) from exc
+
         claimed_at = self._now()
 
         # Use explicit locking pattern for atomic claim
@@ -480,6 +573,33 @@ class OperationalMemory:
         Returns:
             True if successful
         """
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            with self._telemetry_store.connect() as conn:
+                row = conn.execute(
+                    "SELECT claimed_by, active_claim_token, delegated_by FROM in_flight_tasks WHERE id = ?",
+                    (task_id,),
+                ).fetchone()
+            if row is None or not row["claimed_by"] or not row["active_claim_token"]:
+                logger.warning(f"Telemetry task not found or not in_progress: {task_id}")
+                return False
+            self._telemetry_store.complete_task(
+                task_id,
+                row["claimed_by"],
+                row["active_claim_token"],
+                results=results,
+                summary=str(results),
+            )
+            if notify_delegator and row["delegated_by"]:
+                self.create_notification(
+                    agent=row["delegated_by"],
+                    type="task_completed",
+                    summary=f"Task {task_id} completed by {row['claimed_by']}",
+                    task_id=task_id,
+                )
+            logger.info(f"Telemetry task completed: {task_id}")
+            return True
+
         completed_at = self._now()
 
         cypher = """
@@ -727,6 +847,13 @@ class OperationalMemory:
         notification_id = self._generate_id()
         created_at = self._now()
 
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            body = summary if task_id is None else json.dumps({"summary": summary, "task_id": task_id}, sort_keys=True)
+            notification_id = self._telemetry_store.create_notification(agent, type, body)
+            logger.info(f"Telemetry notification created: {notification_id} for {agent}")
+            return notification_id
+
         cypher = """
         CREATE (n:Notification {
             id: $notification_id,
@@ -780,6 +907,19 @@ class OperationalMemory:
         Returns:
             List of notification dicts
         """
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            notifications = self._telemetry_store.list_notifications(agent, unread_only=unread_only)
+            legacy = []
+            for notification in notifications:
+                item = dict(notification)
+                item["type"] = item.pop("kind")
+                item["summary"] = item.pop("body")
+                item["read"] = item.get("read_at") is not None
+                item["created_at"] = self._ms_to_dt(item.get("created_at"))
+                legacy.append(item)
+            return legacy
+
         if unread_only:
             cypher = """
             MATCH (n:Notification {agent: $agent, read: false})
@@ -837,6 +977,15 @@ class OperationalMemory:
         Returns:
             True if successful
         """
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            with self._telemetry_store.connect() as conn:
+                row = conn.execute("SELECT id FROM notifications WHERE id = ?", (notification_id,)).fetchone()
+            if row is None:
+                return False
+            self._telemetry_store.mark_notification_read(notification_id)
+            return True
+
         cypher = """
         MATCH (n:Notification {id: $notification_id})
         SET n.read = true
@@ -868,6 +1017,13 @@ class OperationalMemory:
         Returns:
             Number of notifications marked as read
         """
+        if self._using_telemetry():
+            notifications = self.get_notifications(agent, unread_only=True)
+            for notification in notifications:
+                self.mark_notification_read(notification["id"])
+            logger.info(f"Marked {len(notifications)} telemetry notifications as read for {agent}")
+            return len(notifications)
+
         cypher = """
         MATCH (n:Notification {agent: $agent, read: false})
         SET n.read = true
@@ -924,6 +1080,22 @@ class OperationalMemory:
             reset_time = int((datetime.combine(current_date + timedelta(days=1), datetime.min.time().replace(hour=0)) - datetime(1970, 1, 1)).total_seconds())
         else:
             reset_time = int((datetime.combine(current_date, datetime.min.time().replace(hour=current_hour + 1)) - datetime(1970, 1, 1)).total_seconds())
+
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            now_ms = self._dt_to_ms(now)
+            window_ms = 3_600_000
+            bucket_start_ms = (now_ms // window_ms) * window_ms
+            with self._telemetry_store.connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT count FROM rate_limits
+                    WHERE agent = ? AND operation = ? AND window_ms = ? AND bucket_start_ms = ?
+                    """,
+                    (agent, operation, window_ms, bucket_start_ms),
+                ).fetchone()
+            count = int(row["count"]) if row else 0
+            return (count < max_requests, count, reset_time)
 
         cypher = """
         MATCH (r:RateLimit {agent: $agent, operation: $operation, date: $date, hour: $hour})
@@ -1004,6 +1176,16 @@ class OperationalMemory:
         current_date = now.date()
         current_hour = now.hour
 
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            self._telemetry_store.increment_rate_limit(
+                agent,
+                operation,
+                window_ms=3_600_000,
+                now_ms=self._dt_to_ms(now),
+            )
+            return True
+
         cypher = """
         MERGE (r:RateLimit {agent: $agent, operation: $operation, date: $date, hour: $hour})
         ON CREATE SET r.count = 1, r.last_updated = $last_updated
@@ -1052,6 +1234,12 @@ class OperationalMemory:
         """
         now = self._now()
 
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            self._telemetry_store.heartbeat(agent, status=status)
+            logger.debug(f"Telemetry agent heartbeat updated: {agent} ({status})")
+            return True
+
         cypher = """
         MERGE (a:Agent {name: $agent})
         ON CREATE SET a.created_at = $now
@@ -1091,6 +1279,19 @@ class OperationalMemory:
         Returns:
             Agent status dict if found, None otherwise
         """
+        if self._using_telemetry():
+            assert self._telemetry_store is not None
+            with self._telemetry_store.connect() as conn:
+                row = conn.execute("SELECT * FROM agent_state WHERE agent = ?", (agent,)).fetchone()
+            if not row:
+                return None
+            return {
+                "name": row["agent"],
+                "status": row["status"],
+                "last_heartbeat": self._ms_to_dt(row["last_heartbeat"]),
+                "meta": json.loads(row["meta"] or "{}"),
+            }
+
         cypher = """
         MATCH (a:Agent {name: $agent})
         RETURN a
