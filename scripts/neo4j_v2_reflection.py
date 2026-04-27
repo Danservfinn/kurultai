@@ -19,14 +19,98 @@ from __future__ import annotations
 import os
 import sys
 import logging
+import hashlib
+import json
+import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+KUBLAI_REPO = "/Users/kublai/kurultai/kublai-repo"
+if KUBLAI_REPO not in sys.path:
+    sys.path.insert(0, KUBLAI_REPO)
 
 from neo4j_v2_core import TaskStore
 from agents_config import AGENTS
+from kublai.brain_service_client import call as brain_service_call
 
 logger = logging.getLogger(__name__)
+
+
+def _knowledge_dual_write_enabled() -> bool:
+    return os.getenv("KUBLAI_KNOWLEDGE_DUAL_WRITE", "").lower() in {"1", "true", "yes"}
+
+
+def _body_without_frontmatter(text: str) -> str:
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end >= 0:
+            return text[end + 5:]
+    return text
+
+
+def _append_dual_write_log(record: dict) -> None:
+    log_path = os.getenv("BRAIN_DUAL_WRITE_LOG", "/Users/kublai/.brain-index/dual-write-reconciliation.jsonl")
+    target = Path(log_path).expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def _dual_write_reflection(
+    *,
+    agent: str,
+    reflection_id: str,
+    summary: str,
+    insight: str,
+    tasks_completed: int,
+    tasks_failed: int,
+    failure_rate: float,
+    avg_score: float,
+    period_hours: int,
+    recorded_at: str,
+) -> None:
+    if not _knowledge_dual_write_enabled():
+        return
+    body = (
+        f"# Reflection {reflection_id}\n\n"
+        f"## Summary\n\n{summary}\n\n"
+        f"## Insight\n\n{insight}\n\n"
+        f"## Metrics\n\n"
+        f"- tasks_completed: {tasks_completed}\n"
+        f"- tasks_failed: {tasks_failed}\n"
+        f"- failure_rate: {round(failure_rate, 3)}\n"
+        f"- avg_score: {round(avg_score, 3)}\n"
+        f"- period_hours: {period_hours}\n"
+    )
+    socket_path = os.getenv("BRAIN_SERVICE_SOCKET", "/Users/kublai/.kublai/brain-service.sock")
+    response = brain_service_call(
+        socket_path,
+        "knowledge.record_reflection",
+        {
+            "agent": agent,
+            "reflection_id": reflection_id,
+            "body": body,
+            "tags": ["kublai", "reflection", "dual-write"],
+        },
+    )
+    if not response.get("ok"):
+        raise RuntimeError(response.get("message") or response.get("error") or "brain-service reflection write failed")
+
+    wiki_root = Path(os.getenv("BRAIN_WIKI_ROOT", "/Users/kublai/brain")).resolve()
+    path = Path(response["result"]).resolve()
+    body_hash = hashlib.sha256(_body_without_frontmatter(path.read_text(encoding="utf-8")).encode("utf-8")).hexdigest()
+    _append_dual_write_log(
+        {
+            "operation_id": str(uuid.uuid4()),
+            "kind": "reflection",
+            "idempotency_key": f"reflection:{reflection_id}",
+            "wiki_path": path.relative_to(wiki_root).as_posix(),
+            "body_hash": body_hash,
+            "neo4j_label": "Reflection",
+            "recorded_at": recorded_at,
+        }
+    )
 
 
 def _get_recent_tasks(session, agent: str, hours: int = 1) -> list[dict]:
@@ -225,6 +309,23 @@ def save_reflection(store: TaskStore, agent: str,
         if ok:
             logger.info(f"Saved reflection for {agent}: "
                         f"{tasks_completed} completed, {tasks_failed} failed")
+            reflection_seed = f"{agent}|{now}|{summary}|{insight}"
+            reflection_id = f"{agent}-{now.replace(':', '').replace('+', 'Z')}-{hashlib.sha256(reflection_seed.encode('utf-8')).hexdigest()[:12]}"
+            try:
+                _dual_write_reflection(
+                    agent=agent,
+                    reflection_id=reflection_id,
+                    summary=summary,
+                    insight=insight,
+                    tasks_completed=tasks_completed,
+                    tasks_failed=tasks_failed,
+                    failure_rate=failure_rate,
+                    avg_score=avg_score,
+                    period_hours=period_hours,
+                    recorded_at=now,
+                )
+            except Exception as exc:
+                logger.exception(f"Knowledge dual-write failed for {agent}: {exc}")
         return ok
 
 
