@@ -26,13 +26,13 @@ Each line is one JSON object:
 
 ## Visibility rules
 
-- Telegram is the human-facing conversation layer, not the bot-to-bot coordination layer.
-- Do not automatically mirror raw handoff logs to Telegram.
-- `mirror: false` means internal-only unless Danny asks for details.
-- `mirror: true` means the visible owner may post one concise human-facing summary if it is useful to Danny.
-- Surface only owner/support decisions, blockers, material disagreements, completions/failures, or requested audit trails.
-- Routine intermediate reasoning should stay internal.
-- For the full chat behavior model, see `UNIFIED_CHAT_PROTOCOL.md`.
+- Danny designated the current Kurultai Telegram group as the internal-comms mirror on 2026-04-26; Hermes sees it as target `telegram:Kurultai` and the current chat displays as Kurultai Internal Coms.
+- As of 2026-04-27, Danny wants this Telegram channel to auto-report all raw internal handoff communications.
+- Telegram is now the raw visibility feed for Hermes/Kublai handoff JSONL entries.
+- Report every new handoff entry, including `mirror: false` entries.
+- Preserve raw handoff fields where possible: `ts`, `from`, `to`, `topic`, `summary`, `detail`, `mirror`, `status`.
+- Redact obvious secrets, tokens, passwords, API keys, and credential-looking values before posting.
+- The internal handoff JSONL remains the source of truth; Telegram is the visibility mirror.
 
 ## Ownership rules
 

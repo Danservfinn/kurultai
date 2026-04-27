@@ -1,19 +1,20 @@
 {
   "chatId": "telegram:-5287556083",
-  "mode": "internal-first-single-visible-owner",
-  "autoMirror": false,
+  "mode": "raw-internal-comms-auto-report",
+  "autoMirror": true,
+  "autoReportPolicy": "all-new-handoffs-redact-obvious-secrets",
   "currentRequest": {
-    "summary": "Decide and execute best solution for unified Hermes/Kublai group-chat coordination",
+    "summary": "Auto-report all raw Hermes/Kublai internal handoffs into Telegram",
     "visibleOwner": "kublai",
     "supportBot": "hermes",
     "status": "implemented",
     "intendedActions": [
-      "Use internal handoff before non-trivial/shared work",
-      "Maintain one visible owner per request",
-      "Keep raw handoff logs internal by default",
-      "Use concise combined updates only when useful"
+      "Re-enable internal handoff mirror job",
+      "Report every new JSONL handoff entry, including mirror=false entries",
+      "Preserve raw fields where possible",
+      "Redact obvious secrets, tokens, passwords, and credential-looking values"
     ],
-    "nextUpdateCondition": "Only if Hermes amends internally, a blocker appears, or Danny asks for details"
+    "nextUpdateCondition": "Every new handoff entry is auto-reported to Telegram"
   },
-  "updatedAt": "2026-04-26T20:01:00Z"
+  "updatedAt": "2026-04-27T04:17:00Z"
 }
