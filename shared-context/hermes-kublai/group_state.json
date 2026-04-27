@@ -2,21 +2,21 @@
   "chatId": "telegram:-5287556083",
   "humanFacingChat": "telegram:-5287556083",
   "internalCommsChat": "telegram:-5161727622",
-  "mode": "internal-first-single-visible-owner",
+  "mode": "internal-first-single-answer",
   "autoMirror": false,
   "autoReportPolicy": "raw handoffs only in Kurultai Internal Coms, never in the main Kurultai chat",
   "currentRequest": {
-    "summary": "Investigate why Hermes and Kublai both responded instead of coordinating into one answer",
+    "summary": "Modify protocol so Hermes and Kublai coordinate internally and provide one single answer to Danny",
     "visibleOwner": "kublai",
     "supportBot": "hermes",
-    "status": "investigating",
+    "status": "implemented",
     "intendedActions": [
-      "Identify protocol/config mismatches",
-      "Stop treating this main chat as the raw internal-comms mirror",
-      "Reinforce one visible owner per thread",
-      "Report one consolidated finding to Danny"
+      "Update unified chat protocol",
+      "Update shared handoff ownership rules",
+      "Update Hermes local handoff protocol copy",
+      "Commit Kublai shared protocol changes"
     ],
-    "nextUpdateCondition": "Kublai posts one consolidated investigation result in the main chat"
+    "nextUpdateCondition": "Kublai posts one concise implementation summary in the main chat"
   },
-  "updatedAt": "2026-04-27T05:13:00Z"
+  "updatedAt": "2026-04-27T13:35:00Z"
 }

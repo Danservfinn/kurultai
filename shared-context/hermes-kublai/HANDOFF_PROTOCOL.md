@@ -33,10 +33,13 @@ Each line is one JSON object:
 - Redact obvious secrets, tokens, passwords, API keys, and credential-looking values before posting anywhere.
 - The internal handoff JSONL remains the source of truth; Telegram mirrors are visibility surfaces, not bot-to-bot state.
 
-## Ownership rules
+## Single-answer ownership rules
 
-1. Direct mention owns the reply.
-2. If both bots are mentioned, the most relevant role/context leads.
-3. The second bot stays quiet unless adding new value, correcting, or accepting a handoff.
-4. Handoffs must be explicit and visible when they affect Danny.
-5. Failures or blockers must be reported back in the group.
+1. For any non-trivial, shared, tool-using, state-changing, protocol, governance, or both-bots-relevant request, coordinate internally before answering.
+2. Coordination must designate exactly one visible owner and one support bot.
+3. The visible owner provides one single combined answer to Danny.
+4. The support bot contributes internally and stays silent in the main chat.
+5. Direct mention does not override single-answer discipline if a coordinated answer already exists; the mentioned support bot should answer only narrow meta-questions about whether coordination happened.
+6. The support bot may speak only for a material correction, blocker, completion/failure, explicit ownership transfer, or direct audit question from Danny.
+7. Handoffs must be explicit and visible when they affect Danny.
+8. Failures or blockers must be reported back in the group by the visible owner unless ownership is transferred.
