@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -12,6 +13,9 @@ import pytest
 from kublai.brain_service import BrainService
 from kublai.brain_service_client import call
 from kublai.knowledge import KnowledgeStore, PathPolicyError
+
+
+NODE_BIN = shutil.which("node") or "/opt/homebrew/bin/node"
 
 
 def test_knowledge_write_is_deterministic_and_path_guarded(tmp_path):
@@ -117,13 +121,20 @@ def test_unix_socket_rpc_serves_js_clients(tmp_path):
           }});
         """
         result = subprocess.run(
-            ["node", "-e", node_script],
+            [NODE_BIN, "-e", node_script],
             cwd=".",
             text=True,
             capture_output=True,
             check=True,
         )
         assert json.loads(result.stdout) == {"id": "task-1", "token": True}
+
+        found = call(
+            socket_path,
+            "knowledge.search",
+            {"query": "rpc", "limit": 5},
+        )
+        assert found == {"ok": True, "result": []}
     finally:
         server.shutdown()
         server.server_close()
@@ -167,6 +178,9 @@ def test_brain_service_verify_index_and_replay_dual_write(tmp_path):
     service.reindex()
 
     assert service.verify_index()["ok"] is True
+    assert service.get_node("reflection", "reflection-1")["rel_path"].startswith("operations/reflections/")
+    assert service.list_nodes(node_type="reflection")[0]["typed_id"] == "reflection-1"
+    assert service.search(query="fixture", node_type="reflection")[0]["typed_id"] == "reflection-1"
 
     rel_path = page.relative_to(tmp_path / "brain").as_posix()
     body = page.read_text().split("\n---\n", 1)[1]

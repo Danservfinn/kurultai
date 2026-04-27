@@ -8,18 +8,35 @@ consolidating reflections into learnings.
 Named after the reflection and learning capabilities that enable agents to improve
 over time through self-analysis and pattern recognition.
 """
+
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import os
+import sys
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from neo4j.exceptions import Neo4jError
 
+from kublai.brain_service_client import call as brain_service_call
+from kublai.knowledge import KnowledgeStore
+
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+def _body_hash_from_page(path: Path) -> str:
+    text = path.read_text(encoding="utf-8")
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end >= 0:
+            text = text[end + 5 :]
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 class ReflectionNotFoundError(Exception):
@@ -68,6 +85,8 @@ class AgentReflectionMemory:
         # Try to load sentence-transformers for embeddings
         self._embedding_model = None
         try:
+            if "PYTEST_CURRENT_TEST" in os.environ and "sentence_transformers" not in sys.modules:
+                raise ImportError("skip real sentence-transformers model during tests")
             from sentence_transformers import SentenceTransformer
             self._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
             logger.info("Loaded sentence-transformers model for embeddings")
@@ -75,6 +94,80 @@ class AgentReflectionMemory:
             logger.warning("sentence-transformers not available, using hash-based fallback embeddings")
 
         logger.info(f"AgentReflectionMemory initialized with embedding_dimension={embedding_dimension}")
+
+    def _brain_reads_enabled(self) -> bool:
+        return os.getenv("KUBLAI_KNOWLEDGE_READS", "").lower() in {"1", "true", "brain", "brain-service"}
+
+    def _dual_write_enabled(self) -> bool:
+        return os.getenv("KUBLAI_KNOWLEDGE_DUAL_WRITE", "").lower() in {"1", "true", "yes"}
+
+    def _brain_call(self, method: str, params: Dict[str, Any]) -> Any:
+        socket_path = os.getenv("BRAIN_SERVICE_SOCKET", "/tmp/brain-service.sock")
+        response = brain_service_call(socket_path, method, params)
+        if not response.get("ok"):
+            raise ReflectionError(response.get("message") or response.get("error") or "brain-service call failed")
+        return response.get("result")
+
+    def _node_to_reflection(self, node: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not node:
+            return None
+        frontmatter = node.get("frontmatter") or {}
+        reflection = dict(frontmatter)
+        reflection.setdefault("id", frontmatter.get("reflection_id") or node.get("typed_id"))
+        reflection.setdefault("agent", node.get("agent"))
+        reflection["body"] = node.get("body_text", "")
+        return reflection
+
+    def _dual_write_reflection(
+        self,
+        *,
+        reflection_id: str,
+        agent: str,
+        mistake_type: str,
+        context: str,
+        expected_behavior: str,
+        actual_behavior: str,
+        root_cause: str,
+        lesson: str,
+    ) -> None:
+        if not self._dual_write_enabled():
+            return
+        wiki_root = Path(os.getenv("BRAIN_WIKI_ROOT", str(Path.home() / "brain")))
+        body = (
+            f"# Reflection {reflection_id}\n\n"
+            f"## Context\n\n{context}\n\n"
+            f"## Expected Behavior\n\n{expected_behavior}\n\n"
+            f"## Actual Behavior\n\n{actual_behavior}\n\n"
+            f"## Root Cause\n\n{root_cause}\n\n"
+            f"## Lesson\n\n{lesson}\n"
+        )
+        store = KnowledgeStore(wiki_root)
+        path = store.record_reflection(
+            agent=agent,
+            reflection_id=reflection_id,
+            body=body,
+            tags=["kublai", "reflection", mistake_type],
+        )
+        self._append_dual_write_log(
+            {
+                "operation_id": str(uuid.uuid4()),
+                "kind": "reflection",
+                "idempotency_key": f"reflection:{reflection_id}",
+                "wiki_path": path.relative_to(wiki_root.resolve()).as_posix(),
+                "body_hash": _body_hash_from_page(path),
+                "neo4j_label": "Reflection",
+                "recorded_at": self._now().isoformat(),
+            }
+        )
+
+    def _append_dual_write_log(self, record: Dict[str, Any]) -> None:
+        log_path = os.getenv("BRAIN_DUAL_WRITE_LOG")
+        if not log_path:
+            return
+        target = Path(log_path).expanduser()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
 
     def _generate_id(self) -> str:
         """Generate a unique ID using the memory's method or fallback to uuid."""
@@ -214,8 +307,19 @@ class AgentReflectionMemory:
                 )
                 record = result.single()
                 if record:
+                    reflection_id = record["reflection_id"]
+                    self._dual_write_reflection(
+                        reflection_id=reflection_id,
+                        agent=agent,
+                        mistake_type=mistake_type,
+                        context=context,
+                        expected_behavior=expected_behavior,
+                        actual_behavior=actual_behavior,
+                        root_cause=root_cause,
+                        lesson=lesson,
+                    )
                     logger.info(f"Reflection recorded: {reflection_id} for agent {agent}")
-                    return record["reflection_id"]
+                    return reflection_id
                 else:
                     raise ReflectionError("Reflection recording failed: no record returned")
             except Neo4jError as e:
@@ -232,6 +336,14 @@ class AgentReflectionMemory:
         Returns:
             Reflection dict if found, None otherwise
         """
+        if self._brain_reads_enabled():
+            try:
+                return self._node_to_reflection(
+                    self._brain_call("knowledge.get", {"node_type": "reflection", "typed_id": reflection_id})
+                )
+            except Exception as exc:
+                logger.warning(f"brain-service reflection read failed, falling back to Neo4j: {exc}")
+
         cypher = """
         MATCH (r:Reflection {id: $reflection_id})
         RETURN r
@@ -271,6 +383,21 @@ class AgentReflectionMemory:
         Returns:
             List of reflection dicts
         """
+        if self._brain_reads_enabled():
+            try:
+                nodes = self._brain_call(
+                    "knowledge.list",
+                    {
+                        "node_type": "reflection",
+                        "agent": agent,
+                        "status": "active" if consolidated is False else None,
+                        "limit": limit,
+                    },
+                )
+                return [r for r in (self._node_to_reflection(node) for node in nodes) if r is not None]
+            except Exception as exc:
+                logger.warning(f"brain-service reflection list failed, falling back to Neo4j: {exc}")
+
         conditions = []
         params = {"limit": limit}
 
@@ -283,6 +410,13 @@ class AgentReflectionMemory:
             params["consolidated"] = consolidated
 
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        # Skip reflections evaluated within the last 24 hours (prevents accumulation loop)
+        evaluated_filter = "(r.evaluated_at IS NULL OR r.evaluated_at < datetime() - duration('P1D'))"
+        if where_clause:
+            where_clause += f" AND {evaluated_filter}"
+        else:
+            where_clause = f"WHERE {evaluated_filter}"
 
         cypher = f"""
         MATCH (r:Reflection)
@@ -328,6 +462,25 @@ class AgentReflectionMemory:
         Returns:
             List of reflection dicts with similarity scores
         """
+        if self._brain_reads_enabled():
+            try:
+                nodes = self._brain_call(
+                    "knowledge.search",
+                    {"query": query_text, "node_type": "reflection", "limit": limit},
+                )
+                reflections = []
+                for node in nodes:
+                    reflection = self._node_to_reflection(node)
+                    if reflection is None:
+                        continue
+                    if agent and reflection.get("agent") != agent:
+                        continue
+                    reflection["similarity"] = node.get("score")
+                    reflections.append(reflection)
+                return reflections
+            except Exception as exc:
+                logger.warning(f"brain-service reflection search failed, falling back to Neo4j: {exc}")
+
         query_embedding = self._generate_embedding(query_text)
 
         # Build query with optional agent filter
@@ -378,8 +531,7 @@ class AgentReflectionMemory:
                     reflection.pop("embedding", None)
                     reflection["similarity"] = record["similarity"]
                     reflections.append(reflection)
-                if reflections:
-                    return reflections
+                return reflections  # Return even if empty — empty is a valid result
             except Neo4jError:
                 pass  # Vector index not available, fall back to manual
 

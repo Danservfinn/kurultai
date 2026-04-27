@@ -46,6 +46,10 @@ def body_hash(body: str) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def normalize_body(body: str) -> str:
+    return "\n".join(line.rstrip() for line in body.rstrip().splitlines())
+
+
 class KnowledgeStore:
     """Writes operational knowledge pages under a configured wiki root."""
 
@@ -229,9 +233,12 @@ class KnowledgeStore:
         scan_existing: bool = True,
     ) -> Path:
         target = self.resolve_allowed(rel_path)
+        content = self.render(frontmatter, body)
         if target.exists():
             parsed = self.read_frontmatter(target)
             if parsed.get(typed_field) == typed_id:
+                if target.read_text(encoding="utf-8") != content:
+                    self.atomic_write(target, content)
                 return target
             raise KnowledgeError(f"target path exists for a different {typed_field}: {target}")
         if scan_existing:
@@ -239,10 +246,11 @@ class KnowledgeStore:
             if existing is not None:
                 return existing
         target.parent.mkdir(parents=True, exist_ok=True)
-        content = self.render(frontmatter, body)
+        self.atomic_write(target, content)
+        return target
+
+    def atomic_write(self, target: Path, content: str) -> None:
         with self.write_lock():
-            if target.exists():
-                return target
             fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=str(target.parent))
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as tmp:
@@ -253,7 +261,6 @@ class KnowledgeStore:
             finally:
                 if os.path.exists(tmp_name):
                     os.unlink(tmp_name)
-        return target
 
     def resolve_allowed(self, rel_path: str | Path) -> Path:
         rel = Path(rel_path)
@@ -293,4 +300,4 @@ class KnowledgeStore:
     @staticmethod
     def render(frontmatter: dict[str, Any], body: str) -> str:
         yaml_text = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=False).strip()
-        return f"---\n{yaml_text}\n---\n\n{body.rstrip()}\n"
+        return f"---\n{yaml_text}\n---\n\n{normalize_body(body)}\n"

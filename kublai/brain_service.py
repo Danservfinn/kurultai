@@ -107,7 +107,7 @@ class BrainIndex:
                 rel_path = path.relative_to(wiki_root).as_posix()
                 fm = KnowledgeStore.read_frontmatter(path)
                 body = _body_without_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
-                node_id = path.stem
+                node_id = rel_path.removesuffix(".md")
                 typed_id = _first_present(
                     fm,
                     "task_id",
@@ -136,7 +136,7 @@ class BrainIndex:
                         typed_id,
                         str(fm.get("created", "")),
                         str(fm.get("updated", "")),
-                        json.dumps(fm, sort_keys=True),
+                        json.dumps(fm, sort_keys=True, default=str),
                         digest,
                         body,
                         path.stat().st_mtime_ns,
@@ -179,6 +179,78 @@ class BrainIndex:
             "vector_backend": backend["value"] if backend else "unknown",
         }
 
+    def get_by_typed_id(self, node_type: str, typed_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, type, rel_path, title, status, agent, typed_id,
+                       created, updated, frontmatter, body_hash, body_text
+                FROM nodes
+                WHERE type = ? AND typed_id = ?
+                LIMIT 1
+                """,
+                (node_type, typed_id),
+            ).fetchone()
+        return _node_row_to_dict(row) if row else None
+
+    def list_nodes(
+        self,
+        *,
+        node_type: str | None = None,
+        agent: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if node_type:
+            clauses.append("type = ?")
+            params.append(node_type)
+        if agent:
+            clauses.append("agent = ?")
+            params.append(agent)
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT id, type, rel_path, title, status, agent, typed_id,
+                       created, updated, frontmatter, body_hash, body_text
+                FROM nodes
+                {where}
+                ORDER BY updated DESC, node_pk DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [_node_row_to_dict(row) for row in rows]
+
+    def search(self, query: str, *, node_type: str | None = None, limit: int = 10) -> list[dict[str, Any]]:
+        clauses = ["nodes_fts MATCH ?"]
+        params: list[Any] = [query]
+        if node_type:
+            clauses.append("n.type = ?")
+            params.append(node_type)
+        params.append(limit)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT n.id, n.type, n.rel_path, n.title, n.status, n.agent, n.typed_id,
+                       n.created, n.updated, n.frontmatter, n.body_hash, n.body_text,
+                       bm25(nodes_fts) AS score
+                FROM nodes_fts
+                JOIN nodes n ON n.node_pk = nodes_fts.rowid
+                WHERE {' AND '.join(clauses)}
+                ORDER BY score
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [_node_row_to_dict(row) | {"score": float(row["score"])} for row in rows]
+
     def backup_to(self, destination: str | Path) -> Path:
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -213,6 +285,15 @@ class BrainService:
 
     def reindex(self) -> int:
         return self.index.reindex(self.wiki_root)
+
+    def get_node(self, node_type: str, typed_id: str) -> dict[str, Any] | None:
+        return self.index.get_by_typed_id(node_type, typed_id)
+
+    def list_nodes(self, **params: Any) -> list[dict[str, Any]]:
+        return self.index.list_nodes(**params)
+
+    def search(self, **params: Any) -> list[dict[str, Any]]:
+        return self.index.search(**params)
 
     def sweep(self) -> int:
         count = 0
@@ -369,6 +450,12 @@ class BrainService:
             if method == "knowledge.record_reflection":
                 path = self.knowledge.record_reflection(**params)
                 return {"ok": True, "result": str(path)}
+            if method == "knowledge.get":
+                return {"ok": True, "result": self.get_node(**params)}
+            if method == "knowledge.list":
+                return {"ok": True, "result": self.list_nodes(**params)}
+            if method == "knowledge.search":
+                return {"ok": True, "result": self.search(**params)}
             if method == "health":
                 return {"ok": True, "result": self.health()}
             raise ValueError(f"unknown method: {method}")
@@ -404,6 +491,13 @@ def _sha256(text: str) -> str:
     import hashlib
 
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _node_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    value = dict(row)
+    value["frontmatter"] = json.loads(value["frontmatter"])
+    value["body_text"] = value.pop("body_text")
+    return value
 
 
 def _first_present(data: dict[str, Any], *keys: str) -> str | None:
