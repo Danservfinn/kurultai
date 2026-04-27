@@ -2,22 +2,23 @@
   "chatId": "telegram:-5287556083",
   "humanFacingChat": "telegram:-5287556083",
   "internalCommsChat": "telegram:-5161727622",
-  "mode": "internal-first-single-consolidated-answer",
+  "mode": "single-aggregator-answer",
   "autoMirror": true,
-  "autoReportPolicy": "coordination that affects Danny should be visible in Kurultai Internal Coms; main Kurultai chat receives one consolidated answer only",
+  "autoReportPolicy": "coordination visible in Kurultai Internal Coms; main Kurultai chat receives one aggregator-synthesized answer only",
   "currentRequest": {
-    "summary": "Correct protocol: Hermes and Kublai coordinate visibly in Internal Coms, then provide one consolidated answer in main chat",
-    "visibleOwner": "kublai",
+    "summary": "Fix duplicate Hermes/Kublai answers by enforcing a response lock and aggregator model",
+    "aggregator": "kublai",
     "supportBot": "hermes",
-    "answerMode": "single-consolidated-answer",
+    "answerMode": "single-synthesized-answer",
     "status": "implemented",
     "intendedActions": [
+      "Create response_lock.json",
       "Update unified chat protocol",
       "Update shared handoff protocol",
       "Update Hermes local handoff protocol copy",
       "Commit Kublai shared protocol changes"
     ],
-    "nextUpdateCondition": "Kublai posts one consolidated correction summary in main chat"
+    "nextUpdateCondition": "Kublai posts one implementation summary in main chat; Hermes stays silent unless correcting or transferring ownership"
   },
-  "updatedAt": "2026-04-27T14:10:00Z"
+  "updatedAt": "2026-04-27T14:17:46Z"
 }

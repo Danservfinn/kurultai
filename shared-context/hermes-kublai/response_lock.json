@@ -1,0 +1,16 @@
+{
+  "schema": "hermes-kublai-response-lock.v1",
+  "purpose": "Prevent duplicate substantive answers in the main Kurultai chat by forcing a single aggregator response.",
+  "humanFacingChat": "telegram:-5287556083",
+  "internalCommsChat": "telegram:-5161727622",
+  "defaultAggregator": "kublai",
+  "current": {
+    "request": "Danny asked to fix duplicate answers so Hermes and Kublai create a single answer together",
+    "aggregator": "kublai",
+    "supportBot": "hermes",
+    "status": "claimed",
+    "rule": "support bot contributes via handoff/Internal Coms only; aggregator posts the one main-chat answer",
+    "createdAt": "2026-04-27T14:17:46Z",
+    "expiresAt": "2026-04-27T14:47:46Z"
+  }
+}
