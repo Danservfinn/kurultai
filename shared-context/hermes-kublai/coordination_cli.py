@@ -121,6 +121,19 @@ def build_parser() -> argparse.ArgumentParser:
     disclose_timeout.add_argument("--missing-contributor", action="append", default=[])
     disclose_timeout.add_argument("--actor", default="")
 
+    reserve_public_send = sub.add_parser("reserve-public-send", help="Mandatory pre-send gate for the one public answer")
+    reserve_public_send.add_argument("--lock-id", type=int, required=True)
+    reserve_public_send.add_argument("--actor", required=True)
+    reserve_public_send.add_argument("--text", required=True)
+    reserve_public_send.add_argument("--purpose", default="answer")
+
+    mark_public_sent = sub.add_parser("mark-public-sent", help="Mark the gated public answer as sent and finalize the lock")
+    mark_public_sent.add_argument("--lock-id", type=int, required=True)
+    mark_public_sent.add_argument("--actor", required=True)
+    mark_public_sent.add_argument("--send-key", required=True)
+    mark_public_sent.add_argument("--provider-message-id", required=True)
+    mark_public_sent.add_argument("--summary", default="")
+
     return parser
 
 
@@ -240,6 +253,25 @@ def main() -> int:
             args.lock_id,
             missing_contributors=args.missing_contributor,
             actor=args.actor,
+        ))
+        return 0
+
+    if args.command == "reserve-public-send":
+        print_json(store.reserve_public_answer_send(
+            args.lock_id,
+            actor=args.actor,
+            text=args.text,
+            purpose=args.purpose,
+        ))
+        return 0
+
+    if args.command == "mark-public-sent":
+        print_json(store.mark_public_answer_sent(
+            args.lock_id,
+            send_key=args.send_key,
+            provider_message_id=args.provider_message_id,
+            actor=args.actor,
+            final_summary=args.summary,
         ))
         return 0
 

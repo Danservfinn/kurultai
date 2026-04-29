@@ -38,13 +38,28 @@ def decode_json(value: str | None, default: Any) -> Any:
         return default
 
 
+class ClosingConnection(sqlite3.Connection):
+    """sqlite3 connection whose context-manager exit closes the file handle.
+
+    Python's sqlite3.Connection context manager commits/rolls back but does not
+    close; these tiny test helpers create many short-lived stores, so leaving
+    descriptors open eventually trips the macOS soft fd limit.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 class CoordinationStore:
     def __init__(self, db_path: str | Path = DEFAULT_DB):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
     def connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
+        conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None, factory=ClosingConnection)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA busy_timeout = 30000")

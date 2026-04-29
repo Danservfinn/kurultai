@@ -143,20 +143,47 @@ def send_once(
         return 2, entry
 
     store = CoordinationStore(db_path or DEFAULT_DB)
-    send_key = store.make_send_key(channel, chat_id, thread_id, str(root_message_id), owner, purpose)
-    reservation = store.enqueue_send_once(send_key, channel, chat_id, thread_id, message)
-    if not reservation.get("enqueued"):
+    why = store.explain_why(channel, chat_id, str(root_message_id), thread_id, purpose)
+    lock = why.get("lock")
+    if not lock:
         entry = {"ts": datetime.now(timezone.utc).isoformat(),
-                 "chat_id": chat_id, "status": "DEDUPED",
-                 "send_key": send_key,
-                 "existing_status": reservation.get("status")}
+                 "chat_id": chat_id, "status": "SEND_DENIED",
+                 "reason": "missing_active_lock",
+                 "root_message_id": str(root_message_id)}
         _log(entry)
-        return 0, entry
+        return 1, entry
 
+    reservation = store.reserve_public_answer_send(
+        lock_id=int(lock["lock_id"]),
+        actor=owner,
+        text=message,
+        purpose=purpose,
+    )
+    if not reservation.get("allowed"):
+        reason = reservation.get("reason")
+        if reason in {"duplicate_send_reserved", "terminal_lock"}:
+            send_purpose = f"{purpose}:v{lock.get('scope_version', 1)}"
+            send_key = store.make_send_key(channel, chat_id, thread_id, str(root_message_id), owner, send_purpose)
+            existing = store.get_outbox_item(send_key)
+            if existing:
+                entry = {"ts": datetime.now(timezone.utc).isoformat(),
+                         "chat_id": chat_id, "status": "DEDUPED",
+                         "send_key": send_key,
+                         "existing_status": existing.get("status")}
+                _log(entry)
+                return 0, entry
+        entry = {"ts": datetime.now(timezone.utc).isoformat(),
+                 "chat_id": chat_id, "status": "SEND_DENIED",
+                 "reason": reason,
+                 "owner": reservation.get("owner") or (reservation.get("lock") or {}).get("owner")}
+        _log(entry)
+        return 1, entry
+
+    send_key = reservation["send_key"]
     rc, result = send(chat_id, message, reply_to_message_id=reply_to_message_id)
     if rc == 0:
         provider_message_id = str(result.get("provider_message_id") or result.get("message_id") or "sent")
-        store.mark_send_sent(send_key, provider_message_id)
+        store.mark_public_answer_sent(int(lock["lock_id"]), send_key, provider_message_id, owner, final_summary=message[:240])
         result = dict(result)
         result["send_key"] = send_key
     return rc, result
