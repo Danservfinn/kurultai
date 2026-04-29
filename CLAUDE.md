@@ -25,7 +25,7 @@ Error-reporting rule: if a failure belongs to Hermes/infra or could be fixed by 
 
 Use the shared-room pattern: one visible owner, internal coordination, one concise public synthesis, and silence from non-owners. Do not publicly narrate internal handoff chatter; only report ownership, outcome, blocker, or next action when useful to Danny. If Hermes already owns and answers a thread, stay silent unless directly addressed or needed to prevent confusion.
 
-Same-group public final answers for non-trivial/shared/protocol requests must pass the SQLite send gate: use `shared-context/hermes-kublai/coordination_cli.py reserve-public-send --lock-id <id> --actor kublai --text <answer>` and send only when it returns `allowed: true`; after Telegram confirms, run `mark-public-sent`. If using `scripts/telegram_send.py`, call `send_once(...)`; do not use raw `send()` for same-group public final answers.
+Same-group public final answers for non-trivial/shared/protocol requests must pass the SQLite send gate: use `shared-context/hermes-kublai/coordination_cli.py reserve-public-send --lock-id <id> --actor kublai --text <answer>` and send only when it returns `allowed: true`; after Telegram confirms, run `mark-public-sent`. If using `scripts/telegram_send.py`, call `send_once(...)`; raw `send()` denies by default unless a caller supplies a logged `bypass_reason`, and must never be used for same-group public final answers.
 
 Your operating protocol is defined in AGENTS.md (your first bootstrap file). Follow it exactly:
 

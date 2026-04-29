@@ -73,7 +73,7 @@ Use the helper CLI before any same-group final answer:
   --lock-id <lock_id> --actor kublai --send-key <send_key> --provider-message-id <telegram_message_id>
 ```
 
-`reserve-public-send` is mandatory and must return `"allowed": true` before a same-group public final answer is sent. It denies non-owners, missing required processed contributions, unapproved human-approval locks, and duplicate reservations. `telegram_send.send_once()` uses the same owner-aware gate and finalizes the lock via `mark_public_answer_sent()` after Telegram success; raw `send()` is legacy/cross-chat only and is not sufficient for public answers in the same group.
+`reserve-public-send` is mandatory and must return `"allowed": true` before a same-group public final answer is sent. It denies non-owners, missing required processed contributions, unapproved human-approval locks, and duplicate reservations. `telegram_send.send_once()` uses the same owner-aware gate and finalizes the lock via `mark_public_answer_sent()` after Telegram success. Raw `telegram_send.send()` now denies by default with `RAW_SEND_DENIED` unless the caller supplies an explicit `bypass_reason`; bypasses are logged as `RAW_SEND_BYPASS` and are reserved for cross-chat/operator notifications, never same-group final answers.
 
 ## Legacy response lock schema expectations
 
