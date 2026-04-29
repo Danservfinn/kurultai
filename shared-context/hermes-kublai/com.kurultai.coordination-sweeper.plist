@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kurultai.coordination-sweeper</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/kublai/.openclaw/agents/main/shared-context/hermes-kublai/lock_sweeper.py</string>
+    </array>
+
+    <!-- Run once per minute -->
+    <key>StartInterval</key>
+    <integer>60</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/kublai/.openclaw/logs/coordination-sweeper.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/kublai/.openclaw/logs/coordination-sweeper.err</string>
+
+    <!-- Restart if it exits non-zero (e.g. DB lock contention) -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>55</integer>
+</dict>
+</plist>
+
+<!--
+REGISTRATION INSTRUCTIONS (requires operator approval — do NOT run automatically):
+
+To register the sweeper as a macOS LaunchAgent:
+
+  cp /Users/kublai/.openclaw/agents/main/shared-context/hermes-kublai/com.kurultai.coordination-sweeper.plist \
+     ~/Library/LaunchAgents/
+
+  launchctl load ~/Library/LaunchAgents/com.kurultai.coordination-sweeper.plist
+
+To verify it is running:
+  launchctl list | grep coordination-sweeper
+
+To unload:
+  launchctl unload ~/Library/LaunchAgents/com.kurultai.coordination-sweeper.plist
+
+Logs:
+  ~/.openclaw/logs/coordination-sweeper.log
+  ~/.openclaw/logs/coordination-sweeper.err
+
+Alternative — OpenClaw cron job (add to ~/.openclaw/cron/jobs.json):
+  {
+    "id": "coordination-sweeper",
+    "agentId": "hermes",
+    "name": "Coordination Lock Sweeper",
+    "schedule": { "kind": "cron", "expr": "* * * * *" },
+    "payload": {
+      "kind": "shellCommand",
+      "command": "python3 /Users/kublai/.openclaw/agents/main/shared-context/hermes-kublai/lock_sweeper.py"
+    }
+  }
+
+NOTE: Do NOT register without operator (Danny) approval. This plist is a
+prepared artifact only — it performs no side effects when present in this directory.
+-->

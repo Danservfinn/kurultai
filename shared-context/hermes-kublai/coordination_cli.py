@@ -62,6 +62,64 @@ def build_parser() -> argparse.ArgumentParser:
     why = sub.add_parser("why", help="Explain lock/contribution/event state for a message")
     add_scope_args(why)
     why.add_argument("--purpose", default="answer")
+    why.add_argument("--format", choices=["json", "telegram"], default="json",
+                     help="Output format: raw json or human-readable Telegram text")
+
+    req_contrib = sub.add_parser("request-contribution", help="Emit a contribution.requested event")
+    req_contrib.add_argument("--lock-id", type=int, required=True)
+    req_contrib.add_argument("--from-agent", required=True)
+    req_contrib.add_argument("--to-agent", required=True)
+    req_contrib.add_argument("--question", required=True)
+    req_contrib.add_argument("--deadline-at", default=None)
+
+    final_ready = sub.add_parser("final-answer-ready", help="Transition lock to ready_to_answer")
+    final_ready.add_argument("--lock-id", type=int, required=True)
+    final_ready.add_argument("--actor", required=True)
+    final_ready.add_argument("--contributors", nargs="*", default=[])
+    final_ready.add_argument("--send-key", required=True)
+    final_ready.add_argument("--timeout-disclosed", action="store_true", default=False)
+
+    req_review = sub.add_parser("request-review", help="Transition lock to reviewing status")
+    req_review.add_argument("--lock-id", type=int, required=True)
+    req_review.add_argument("--from-agent", required=True)
+    req_review.add_argument("--to-agent", required=True)
+    req_review.add_argument("--draft-id", required=True)
+    req_review.add_argument("--draft-hash", default="")
+    req_review.add_argument("--deadline-at", default=None)
+
+    submit_review = sub.add_parser("submit-review", help="Submit a draft review result")
+    submit_review.add_argument("--lock-id", type=int, required=True)
+    submit_review.add_argument("--from-agent", required=True)
+    submit_review.add_argument("--verdict", required=True,
+                               choices=["approve", "approve_with_edits", "reject", "conditional", "abstain"])
+    submit_review.add_argument("--blocking", action="store_true", default=False)
+    submit_review.add_argument("--safe-public-attribution", default="")
+
+    cancel = sub.add_parser("cancel", help="Cancel an active lock")
+    cancel.add_argument("--lock-id", type=int, required=True)
+    cancel.add_argument("--actor", required=True)
+    cancel.add_argument("--cancel-message-id", default=None)
+    cancel.add_argument("--reason", default="human_cancel")
+
+    scope = sub.add_parser("increment-scope", help="Increment scope_version on a lock")
+    scope.add_argument("--lock-id", type=int, required=True)
+    scope.add_argument("--reason", default="scope_change")
+    scope.add_argument("--actor", default="")
+
+    req_approval = sub.add_parser("require-approval", help="Mark lock as requiring human approval")
+    req_approval.add_argument("--lock-id", type=int, required=True)
+    req_approval.add_argument("--reason", required=True)
+    req_approval.add_argument("--actor", default="")
+
+    grant_approval = sub.add_parser("grant-approval", help="Record human approval on a lock")
+    grant_approval.add_argument("--lock-id", type=int, required=True)
+    grant_approval.add_argument("--by-message-id", required=True)
+    grant_approval.add_argument("--actor", default="human")
+
+    disclose_timeout = sub.add_parser("disclose-timeout", help="Record contribution timeout disclosure")
+    disclose_timeout.add_argument("--lock-id", type=int, required=True)
+    disclose_timeout.add_argument("--missing-contributor", action="append", default=[])
+    disclose_timeout.add_argument("--actor", default="")
 
     return parser
 
@@ -120,7 +178,69 @@ def main() -> int:
         return 0
 
     if args.command == "why":
-        print_json(store.explain_why(args.channel, args.chat_id, args.root_message_id, args.thread_id, args.purpose))
+        data = store.explain_why(args.channel, args.chat_id, args.root_message_id, args.thread_id, args.purpose)
+        if getattr(args, "format", "json") == "telegram":
+            print(store.format_why_for_telegram(data))
+        else:
+            print_json(data)
+        return 0
+
+    if args.command == "request-contribution":
+        print_json(store.request_contribution_event(
+            args.lock_id, args.from_agent, args.to_agent, args.question,
+            getattr(args, "deadline_at", None),
+        ))
+        return 0
+
+    if args.command == "final-answer-ready":
+        print_json(store.record_final_answer_ready(
+            args.lock_id, args.actor, args.contributors, args.send_key,
+            timeout_disclosed=args.timeout_disclosed,
+        ))
+        return 0
+
+    if args.command == "request-review":
+        print_json(store.request_draft_review(
+            args.lock_id, args.from_agent, args.to_agent,
+            args.draft_id, getattr(args, "draft_hash", ""),
+            deadline_at=getattr(args, "deadline_at", None),
+        ))
+        return 0
+
+    if args.command == "submit-review":
+        print_json(store.submit_draft_review(
+            args.lock_id, args.from_agent, args.verdict,
+            blocking=args.blocking,
+            safe_public_attribution=getattr(args, "safe_public_attribution", ""),
+        ))
+        return 0
+
+    if args.command == "cancel":
+        print_json(store.cancel_lock(
+            args.lock_id, args.actor,
+            cancel_message_id=getattr(args, "cancel_message_id", None),
+            reason=args.reason,
+        ))
+        return 0
+
+    if args.command == "increment-scope":
+        print_json(store.increment_scope_version(args.lock_id, reason=args.reason, actor=args.actor))
+        return 0
+
+    if args.command == "require-approval":
+        print_json(store.mark_human_approval_required(args.lock_id, args.reason, actor=args.actor))
+        return 0
+
+    if args.command == "grant-approval":
+        print_json(store.set_human_approved(args.lock_id, args.by_message_id, actor=args.actor))
+        return 0
+
+    if args.command == "disclose-timeout":
+        print_json(store.disclose_timeout(
+            args.lock_id,
+            missing_contributors=args.missing_contributor,
+            actor=args.actor,
+        ))
         return 0
 
     parser.error(f"unknown command: {args.command}")

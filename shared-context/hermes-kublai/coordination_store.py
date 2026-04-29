@@ -162,6 +162,14 @@ class CoordinationStore:
             ("response_locks", "support_agents_json", "TEXT NOT NULL DEFAULT '[]'"),
             ("response_locks", "received_contributors_json", "TEXT NOT NULL DEFAULT '[]'"),
             ("response_locks", "processed_contributors_json", "TEXT NOT NULL DEFAULT '[]'"),
+            # Tier 2/3 governance columns
+            ("response_locks", "contribution_deadline_at", "TEXT"),
+            ("response_locks", "review_deadline_at", "TEXT"),
+            ("response_locks", "final_deadline_at", "TEXT"),
+            ("response_locks", "human_approval_required", "INTEGER NOT NULL DEFAULT 0"),
+            ("response_locks", "human_approval_reason", "TEXT"),
+            ("response_locks", "human_approved_by", "TEXT"),
+            ("response_locks", "timeout_disclosed", "INTEGER NOT NULL DEFAULT 0"),
             ("contributions", "stance", "TEXT NOT NULL DEFAULT 'support'"),
             ("contributions", "key_points_json", "TEXT NOT NULL DEFAULT '[]'"),
             ("contributions", "objections_json", "TEXT NOT NULL DEFAULT '[]'"),
@@ -497,6 +505,322 @@ class CoordinationStore:
             events = [self._event_row_to_dict(row) for row in conn.execute("SELECT * FROM coordination_events WHERE lock_id = ? ORDER BY id", (lock["lock_id"],)).fetchall()]
             return {"lock": lock, "contributions": contributions, "events": events}
 
+    # ── Tier 2: Contribution bus helpers ──────────────────────────────────────
+
+    def request_contribution_event(
+        self,
+        lock_id: int,
+        from_agent: str,
+        to_agent: str,
+        question: str,
+        deadline_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Emit a contribution.requested event so the support agent knows to contribute."""
+        self.init_schema()
+        payload: dict[str, Any] = {
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "question": question,
+        }
+        if deadline_at:
+            payload["deadline_at"] = deadline_at
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            self._record_event(conn, lock_id, "contribution.requested", from_agent, payload)
+            conn.execute("COMMIT")
+        return {"event_type": "contribution.requested", "lock_id": lock_id, **payload}
+
+    def record_final_answer_ready(
+        self,
+        lock_id: int,
+        actor: str,
+        represented_contributors: list[str],
+        send_key: str,
+        timeout_disclosed: bool = False,
+        unresolved_disagreements: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Transition lock to ready_to_answer and emit final_answer.ready event."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET status = 'ready_to_answer', timeout_disclosed = ?, updated_at = ? WHERE id = ?",
+                (int(timeout_disclosed), now, lock_id),
+            )
+            payload: dict[str, Any] = {
+                "represented_contributors": represented_contributors,
+                "send_key": send_key,
+                "timeout_disclosed": timeout_disclosed,
+                "unresolved_disagreements": unresolved_disagreements or [],
+            }
+            self._record_event(conn, lock_id, "final_answer.ready", actor, payload)
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
+    # ── Tier 3: Draft/review gating primitives ────────────────────────────────
+
+    def request_draft_review(
+        self,
+        lock_id: int,
+        from_agent: str,
+        to_agent: str,
+        draft_id: str,
+        draft_hash: str,
+        scope: list[str] | None = None,
+        deadline_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Transition lock to 'reviewing' status and emit draft.review_requested event."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            update_args: list[Any] = [now, lock_id]
+            if deadline_at:
+                conn.execute(
+                    "UPDATE response_locks SET status = 'reviewing', review_deadline_at = ?, updated_at = ? WHERE id = ?",
+                    (deadline_at, now, lock_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE response_locks SET status = 'reviewing', updated_at = ? WHERE id = ?",
+                    (now, lock_id),
+                )
+            payload: dict[str, Any] = {
+                "from_agent": from_agent,
+                "to_agent": to_agent,
+                "draft_id": draft_id,
+                "draft_hash": draft_hash,
+                "review_scope": scope or [],
+            }
+            if deadline_at:
+                payload["deadline_at"] = deadline_at
+            self._record_event(conn, lock_id, "draft.review_requested", from_agent, payload)
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            result = self._lock_row_to_dict(row)
+            result["review_event"] = payload
+            return result
+
+    def submit_draft_review(
+        self,
+        lock_id: int,
+        from_agent: str,
+        verdict: str,
+        blocking: bool = False,
+        required_changes: list[str] | None = None,
+        suggested_changes: list[str] | None = None,
+        safe_public_attribution: str = "",
+    ) -> dict[str, Any]:
+        """Record a draft review result.
+
+        verdict: 'approve' | 'approve_with_edits' | 'reject' | 'conditional' | 'abstain'
+        If blocking=True, transitions lock to 'review_blocked' so the owner must resolve.
+        If not blocking, transitions back to 'drafting' so owner can proceed.
+        """
+        self.init_schema()
+        now = utc_now()
+        new_status = "review_blocked" if blocking else "drafting"
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET status = ?, updated_at = ? WHERE id = ?",
+                (new_status, now, lock_id),
+            )
+            payload: dict[str, Any] = {
+                "from_agent": from_agent,
+                "verdict": verdict,
+                "blocking": blocking,
+                "required_changes": required_changes or [],
+                "suggested_changes": suggested_changes or [],
+                "safe_public_attribution": safe_public_attribution,
+            }
+            self._record_event(conn, lock_id, "draft.review_submitted", from_agent, payload)
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            result = self._lock_row_to_dict(row)
+            result["review_event"] = payload
+            return result
+
+    # ── Human approval ────────────────────────────────────────────────────────
+
+    def mark_human_approval_required(
+        self,
+        lock_id: int,
+        reason: str,
+        blocked_actions: list[str] | None = None,
+        actor: str = "",
+    ) -> dict[str, Any]:
+        """Mark lock as requiring human approval before irreversible action."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET human_approval_required = 1, human_approval_reason = ?, updated_at = ? WHERE id = ?",
+                (reason, now, lock_id),
+            )
+            self._record_event(conn, lock_id, "human_approval.required", actor, {
+                "reason": reason,
+                "blocked_actions": blocked_actions or [],
+            })
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
+    def set_human_approved(self, lock_id: int, by_message_id: str, actor: str = "human") -> dict[str, Any]:
+        """Record that a human approved the action and clear the approval requirement."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET human_approval_required = 0, human_approved_by = ?, updated_at = ? WHERE id = ?",
+                (by_message_id, now, lock_id),
+            )
+            self._record_event(conn, lock_id, "human_approval.granted", actor, {"by_message_id": by_message_id})
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
+    # ── Scope and cancel helpers ──────────────────────────────────────────────
+
+    def increment_scope_version(
+        self,
+        lock_id: int,
+        reason: str = "scope_change",
+        actor: str = "",
+    ) -> dict[str, Any]:
+        """Increment scope_version (invalidates old send_keys) and record event."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET scope_version = scope_version + 1, updated_at = ? WHERE id = ?",
+                (now, lock_id),
+            )
+            row = conn.execute("SELECT scope_version FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            new_version = int(row["scope_version"])
+            self._record_event(conn, lock_id, "lock.scope_changed", actor, {
+                "reason": reason,
+                "new_scope_version": new_version,
+            })
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
+    def cancel_lock(
+        self,
+        lock_id: int,
+        actor: str,
+        cancel_message_id: str | None = None,
+        reason: str = "human_cancel",
+    ) -> dict[str, Any]:
+        """Cancel an active lock and record the event."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET status = 'cancelled', updated_at = ? WHERE id = ?",
+                (now, lock_id),
+            )
+            self._record_event(conn, lock_id, "lock.cancelled", actor, {
+                "reason": reason,
+                "cancel_message_id": cancel_message_id,
+                "terminal": True,
+            })
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
+    def disclose_timeout(self, lock_id: int, missing_contributors: list[str], actor: str = "") -> dict[str, Any]:
+        """Record that this answer is provisional because a required contributor timed out."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE response_locks SET timeout_disclosed = 1, status = 'timed_out', updated_at = ? WHERE id = ?",
+                (now, lock_id),
+            )
+            self._record_event(conn, lock_id, "collaboration.timed_out", actor, {
+                "missing_contributors": missing_contributors,
+                "fallback": "provisional_answer_with_timeout_disclosure",
+            })
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
+    # ── /why formatter ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def format_why_for_telegram(why_data: dict[str, Any]) -> str:
+        """Format explain_why() output as a human-readable Telegram message."""
+        lock = why_data.get("lock")
+        if not lock:
+            return "No coordination record found for that message."
+
+        lines: list[str] = []
+        owner = lock.get("owner", "unknown")
+        tier = lock.get("tier", "unknown")
+        status = lock.get("status", "unknown")
+        domain = lock.get("domain", "")
+        risk = lock.get("risk_level", "")
+        timeout_disclosed = bool(lock.get("timeout_disclosed"))
+
+        lines.append(f"That answer was handled by {owner}.")
+        if tier:
+            lines.append(f"Classification: {tier.replace('_', ' ')}.")
+        if domain:
+            lines.append(f"Domain: {domain.replace('_', ' ')}.")
+
+        contributions = why_data.get("contributions", [])
+        if contributions:
+            contributors = [c["contributor"] for c in contributions]
+            stances = {c["contributor"]: c.get("stance", "support") for c in contributions}
+            blocking_objectors = [c["contributor"] for c in contributions if c.get("blocking")]
+            lines.append(f"Contributors: {', '.join(contributors)}.")
+            for contrib in contributions:
+                attr = contrib.get("safe_public_attribution", "")
+                if attr:
+                    lines.append(attr)
+            if blocking_objectors:
+                lines.append(f"Blocking objections from: {', '.join(blocking_objectors)}.")
+
+        if timeout_disclosed:
+            events = why_data.get("events", [])
+            timeout_events = [e for e in events if e["event_type"] == "collaboration.timed_out"]
+            if timeout_events:
+                missing = timeout_events[-1].get("payload", {}).get("missing_contributors", [])
+                lines.append(
+                    f"Note: This was a provisional answer. "
+                    f"{', '.join(missing) if missing else 'A required contributor'} did not respond before the deadline. "
+                    "No joint consensus was claimed."
+                )
+
+        approval_required = lock.get("human_approval_required", 0)
+        human_approved_by = lock.get("human_approved_by")
+        if approval_required:
+            reason = lock.get("human_approval_reason", "unspecified reason")
+            lines.append(f"Human approval required: {reason}. Action is blocked until approved.")
+        elif human_approved_by:
+            lines.append(f"Human approval was granted (message {human_approved_by}).")
+
+        if status in ("cancelled",):
+            lines.append("The lock was cancelled before a public answer was posted.")
+        elif status in ("failed", "expired"):
+            lines.append(f"The lock ended with status: {status}.")
+
+        events = why_data.get("events", [])
+        disagreement_events = [e for e in events if "disagreement" in e.get("event_type", "")]
+        if disagreement_events:
+            lines.append("Unresolved disagreement was recorded.")
+
+        return " ".join(lines)
+
     def _record_event(self, conn: sqlite3.Connection, lock_id: int, event_type: str, actor: str, payload: dict[str, Any]) -> None:
         conn.execute(
             "INSERT INTO coordination_events (lock_id, event_type, actor, payload_json, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -535,6 +859,13 @@ class CoordinationStore:
             "ack_message_id": row["ack_message_id"] if "ack_message_id" in keys else None,
             "final_answer_message_id": row["final_answer_message_id"] if "final_answer_message_id" in keys else None,
             "reply_to_message_id": row["reply_to_message_id"] if "reply_to_message_id" in keys else None,
+            "contribution_deadline_at": row["contribution_deadline_at"] if "contribution_deadline_at" in keys else None,
+            "review_deadline_at": row["review_deadline_at"] if "review_deadline_at" in keys else None,
+            "final_deadline_at": row["final_deadline_at"] if "final_deadline_at" in keys else None,
+            "human_approval_required": bool(row["human_approval_required"]) if "human_approval_required" in keys else False,
+            "human_approval_reason": row["human_approval_reason"] if "human_approval_reason" in keys else None,
+            "human_approved_by": row["human_approved_by"] if "human_approved_by" in keys else None,
+            "timeout_disclosed": bool(row["timeout_disclosed"]) if "timeout_disclosed" in keys else False,
         }
 
     @staticmethod
