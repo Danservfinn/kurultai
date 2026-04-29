@@ -50,21 +50,39 @@ def _log(entry: dict):
 
 
 def send(chat_id: str, message: str,
-         reply_to_message_id: int = None) -> tuple[int, dict]:
+         reply_to_message_id: int = None,
+         bypass_reason: str = None) -> tuple[int, dict]:
     """
     Send a Telegram message via Bot API.
     Returns (exit_code, log_entry).
-    exit_code: 0=success, 1=delivery_failure, 2=unreachable
+    exit_code: 0=success, 1=delivery_failure/denied, 2=unreachable, 3=bad_args
+
+    bypass_reason is required. Without it, the send is denied to enforce the
+    coordination send gate. Use send_once() for public same-group answers.
+    Pass bypass_reason="operator-notification" (or similar) only for
+    cross-chat/legacy notification paths that are exempt from group locking.
 
     Long messages are chunked at CHUNK_LIMIT characters.
     The first chunk uses reply_to_message_id (threading); rest are plain.
     """
+    if not bypass_reason:
+        entry = {"ts": datetime.now(timezone.utc).isoformat(),
+                 "chat_id": chat_id, "status": "RAW_SEND_DENIED",
+                 "reason": "missing_bypass_reason"}
+        _log(entry)
+        return 1, entry
+
     if not message or not message.strip():
         entry = {"ts": datetime.now(timezone.utc).isoformat(),
                  "chat_id": chat_id, "status": "BAD_ARGS",
                  "error": "empty message"}
         _log(entry)
         return 3, entry
+
+    bypass_entry = {"ts": datetime.now(timezone.utc).isoformat(),
+                    "chat_id": chat_id, "status": "RAW_SEND_BYPASS",
+                    "bypass_reason": bypass_reason}
+    _log(bypass_entry)
 
     try:
         token = _load_token()
@@ -113,7 +131,8 @@ def send(chat_id: str, message: str,
 
     entry = {"ts": datetime.now(timezone.utc).isoformat(),
              "chat_id": chat_id, "status": "SUCCESS",
-             "message_preview": message[:80]}
+             "message_preview": message[:80],
+             "bypass_reason": bypass_reason}
     _log(entry)
     return 0, entry
 
@@ -180,7 +199,8 @@ def send_once(
         return 1, entry
 
     send_key = reservation["send_key"]
-    rc, result = send(chat_id, message, reply_to_message_id=reply_to_message_id)
+    rc, result = send(chat_id, message, reply_to_message_id=reply_to_message_id,
+                      bypass_reason=f"coordination_send_gate_reserved:{send_key}")
     if rc == 0:
         provider_message_id = str(result.get("provider_message_id") or result.get("message_id") or "sent")
         store.mark_public_answer_sent(int(lock["lock_id"]), send_key, provider_message_id, owner, final_summary=message[:240])
@@ -220,9 +240,12 @@ def message_tool_guard(
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: telegram_send.py <chat_id> <message>", file=sys.stderr)
-        sys.exit(3)
-    rc, result = send(sys.argv[1], sys.argv[2])
+    import argparse as _ap
+    _parser = _ap.ArgumentParser()
+    _parser.add_argument("chat_id")
+    _parser.add_argument("message")
+    _parser.add_argument("--bypass-reason", default=None)
+    _args = _parser.parse_args()
+    rc, result = send(_args.chat_id, _args.message, bypass_reason=_args.bypass_reason)
     print(json.dumps(result))
     sys.exit(rc)

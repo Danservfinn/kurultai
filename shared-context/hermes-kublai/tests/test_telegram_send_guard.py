@@ -32,7 +32,7 @@ def test_send_once_uses_owner_lock_gate_to_prevent_duplicate_public_sends(tmp_pa
     _claim_lock(telegram_send, db_path)
     sent_messages: list[tuple[str, str, int | None]] = []
 
-    def fake_send(chat_id: str, message: str, reply_to_message_id: int | None = None):
+    def fake_send(chat_id: str, message: str, reply_to_message_id: int | None = None, bypass_reason: str = None):
         sent_messages.append((chat_id, message, reply_to_message_id))
         return 0, {"status": "SUCCESS", "provider_message_id": "telegram-1"}
 
