@@ -493,6 +493,150 @@ class CoordinationStore:
                 raise KeyError(f"unknown send_key: {send_key}")
             return self._outbox_row_to_dict(row)
 
+    def reserve_public_answer_send(
+        self,
+        lock_id: int,
+        actor: str,
+        text: str,
+        purpose: str = "answer",
+    ) -> dict[str, Any]:
+        """Gate the single public answer before anything calls Telegram send.
+
+        Only the current lock owner may reserve a send. Collaborative locks must
+        have all required contributors processed. Human-approval locks are
+        blocked until approval is recorded. The deterministic outbox send_key is
+        derived from the lock scope, owner, purpose, and scope_version so retries
+        dedupe instead of producing a second public answer.
+        """
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            lock_row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            if not lock_row:
+                conn.execute("COMMIT")
+                return {"allowed": False, "reason": "unknown_lock", "lock_id": lock_id}
+
+            lock = self._lock_row_to_dict(lock_row)
+            if lock["status"] in TERMINAL_LOCK_STATUSES:
+                conn.execute("COMMIT")
+                return {"allowed": False, "reason": "terminal_lock", "lock": lock}
+            if lock["owner"] != actor:
+                self._record_event(conn, lock_id, "send.denied", actor, {"reason": "not_lock_owner", "owner": lock["owner"]})
+                conn.execute("COMMIT")
+                return {"allowed": False, "reason": "not_lock_owner", "owner": lock["owner"], "lock": lock}
+            if lock.get("human_approval_required") and not lock.get("human_approved_by"):
+                self._record_event(conn, lock_id, "send.denied", actor, {"reason": "human_approval_required"})
+                conn.execute("COMMIT")
+                return {"allowed": False, "reason": "human_approval_required", "lock": lock}
+
+            required = list(lock.get("required_contributors") or [])
+            processed_rows = conn.execute(
+                "SELECT payload_json FROM coordination_events WHERE lock_id = ? AND event_type = 'contribution_processed'",
+                (lock_id,),
+            ).fetchall()
+            processed_ids = {int(decode_json(row["payload_json"], {}).get("contribution_id", -1)) for row in processed_rows}
+            if required:
+                contribution_rows = conn.execute(
+                    "SELECT id, contributor FROM contributions WHERE lock_id = ?",
+                    (lock_id,),
+                ).fetchall()
+                processed_contributors = {
+                    str(row["contributor"])
+                    for row in contribution_rows
+                    if int(row["id"]) in processed_ids
+                }
+                missing = [agent for agent in required if agent not in processed_contributors]
+                if missing:
+                    self._record_event(conn, lock_id, "send.denied", actor, {
+                        "reason": "missing_required_contributors",
+                        "missing_contributors": missing,
+                    })
+                    conn.execute("COMMIT")
+                    return {
+                        "allowed": False,
+                        "reason": "missing_required_contributors",
+                        "missing_contributors": missing,
+                        "lock": lock,
+                    }
+
+            send_purpose = f"{purpose}:v{lock['scope_version']}"
+            send_key = self.make_send_key(
+                lock["channel"], lock["chat_id"], lock["thread_id"],
+                lock["root_message_id"], actor, send_purpose,
+            )
+            existing = conn.execute("SELECT * FROM send_outbox WHERE send_key = ?", (send_key,)).fetchone()
+            if existing:
+                outbox = self._outbox_row_to_dict(existing)
+                if outbox["status"] in {"pending", "sending", "sent"}:
+                    conn.execute("COMMIT")
+                    return {
+                        "allowed": False,
+                        "reason": "duplicate_send_reserved",
+                        "send_key": send_key,
+                        "outbox": outbox,
+                        "lock": lock,
+                    }
+
+            cur = conn.execute(
+                "INSERT INTO send_outbox (send_key, channel, chat_id, thread_id, text, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+                (send_key, lock["channel"], lock["chat_id"], lock["thread_id"], text, now, now),
+            )
+            conn.execute(
+                "UPDATE response_locks SET status = 'answering', updated_at = ? WHERE id = ?",
+                (now, lock_id),
+            )
+            self._record_event(conn, lock_id, "send.reserved", actor, {
+                "send_key": send_key,
+                "purpose": purpose,
+                "scope_version": lock["scope_version"],
+            })
+            row = conn.execute("SELECT * FROM send_outbox WHERE id = ?", (int(cur.lastrowid),)).fetchone()
+            lock_row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            conn.execute("COMMIT")
+            outbox = self._outbox_row_to_dict(row)
+            outbox["enqueued"] = True
+            return {"allowed": True, "reason": "reserved", "send_key": send_key, "outbox": outbox, "lock": self._lock_row_to_dict(lock_row)}
+
+    def mark_public_answer_sent(
+        self,
+        lock_id: int,
+        send_key: str,
+        provider_message_id: str,
+        actor: str,
+        final_summary: str = "",
+    ) -> dict[str, Any]:
+        """Mark the reserved public answer as sent and finalize the lock."""
+        self.init_schema()
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            lock_row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            if not lock_row:
+                conn.execute("COMMIT")
+                raise KeyError(f"unknown lock_id: {lock_id}")
+            lock = self._lock_row_to_dict(lock_row)
+            if lock["owner"] != actor:
+                self._record_event(conn, lock_id, "send.denied", actor, {"reason": "not_lock_owner", "owner": lock["owner"]})
+                conn.execute("COMMIT")
+                raise PermissionError(f"{actor} is not owner for lock {lock_id}")
+            row = conn.execute("SELECT * FROM send_outbox WHERE send_key = ?", (send_key,)).fetchone()
+            if not row:
+                conn.execute("COMMIT")
+                raise KeyError(f"unknown send_key: {send_key}")
+            conn.execute(
+                "UPDATE send_outbox SET status = 'sent', provider_message_id = ?, sent_at = ?, updated_at = ? WHERE send_key = ?",
+                (provider_message_id, now, now, send_key),
+            )
+            conn.execute(
+                "UPDATE response_locks SET status = 'answered', final_answer_message_id = ?, final_summary = ?, updated_at = ? WHERE id = ?",
+                (provider_message_id, final_summary, now, lock_id),
+            )
+            self._record_event(conn, lock_id, "send.sent", actor, {"send_key": send_key, "provider_message_id": provider_message_id})
+            conn.execute("COMMIT")
+            row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+            return self._lock_row_to_dict(row)
+
     def explain_why(self, channel: str, chat_id: str, root_message_id: str, thread_id: str = "", purpose: str = "answer") -> dict[str, Any]:
         self.init_schema()
         lock_key = self.make_lock_key(channel, chat_id, thread_id, root_message_id, purpose)
