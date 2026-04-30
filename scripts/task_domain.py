@@ -205,7 +205,7 @@ def validate_agent_model(agent):
         # "claude-code/settings" is the sentinel for claude-code executor agents and is always valid.
         if canonical_model == "claude-code/settings":
             return True, canonical_model, None
-        if canonical_model not in ("claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"):
+        if canonical_model not in ("claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"):
             # Only flag if canonical model is set to something clearly wrong
             return False, canonical_model, (
                 f"MODEL CONFIG ERROR: {agent} canonical model '{canonical_model}' "

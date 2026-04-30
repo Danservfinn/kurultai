@@ -21,7 +21,7 @@ BASE = Path.home() / ".openclaw/agents"
 # Source: memory/model-fixes.md and claude-agent wrapper
 VALID_MODELS = {
     # Anthropic (primary/Tier 0)
-    "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-haiku-4-5-20251001",
+    "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5",
     # Z.AI (Tier 1 fallback) - intentional, not drift!
     "glm-5", "kimi-k2.5", "qkimi-k2.5",
     # Alibaba (Tier 2 fallback)

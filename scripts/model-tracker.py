@@ -30,7 +30,7 @@ PROVIDER_MAPPING = {
     # Anthropic models
     "claude-opus-4-6": "anthropic",
     "claude-sonnet-4-6": "anthropic",
-    "claude-haiku-4-5-20251001": "anthropic",
+    "claude-haiku-4-5": "anthropic",
     # Bailian (Alibaba) models
     "qwen3.5-plus": "bailian",
     "qwen3-coder-next": "bailian",

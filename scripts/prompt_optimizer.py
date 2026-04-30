@@ -30,7 +30,7 @@ DEFAULT_CONFIG = {
     "cache_enabled": True,
     "cache_ttl_seconds": 3600,
     "fallback_to_original": True,  # Ignored when mandatory_mode is True
-    "model_for_optimization": "claude-haiku-4-5-20251001",
+    "model_for_optimization": "claude-haiku-4-5",
     "token_budget": "standard",
     "min_task_length": 50,  # Only optimize tasks longer than this
     "skip_skill_hints": ["systematic-debugging", "horde-debug", "verification"],  # Skip optimization for these skills
