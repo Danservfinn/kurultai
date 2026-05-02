@@ -508,6 +508,26 @@ class BrainService:
                 return {"ok": True, "result": self.telemetry.record_operator_action(**params)}
             if method == "telemetry.list_operator_actions":
                 return {"ok": True, "result": self.telemetry.list_operator_actions(**params)}
+            if method == "telemetry.list_tasks":
+                return {"ok": True, "result": self.telemetry.list_tasks(**params)}
+            if method == "telemetry.get_task":
+                return {"ok": True, "result": self.telemetry.get_task(**params)}
+            if method == "telemetry.list_task_events":
+                return {"ok": True, "result": self.telemetry.list_task_events(**params)}
+            if method == "telemetry.append_task_event":
+                return {"ok": True, "result": self.telemetry.append_task_event(**params)}
+            if method == "telemetry.list_task_outputs":
+                return {"ok": True, "result": self.telemetry.list_task_outputs(**params)}
+            if method == "telemetry.append_task_output":
+                return {"ok": True, "result": self.telemetry.append_task_output(**params)}
+            if method == "telemetry.list_task_outcomes":
+                return {"ok": True, "result": self.telemetry.list_task_outcomes(**params)}
+            if method == "telemetry.append_task_outcome":
+                return {"ok": True, "result": self.telemetry.append_task_outcome(**params)}
+            if method == "telemetry.list_failure_reports":
+                return {"ok": True, "result": self.telemetry.list_failure_reports(**params)}
+            if method == "telemetry.append_failure_report":
+                return {"ok": True, "result": self.telemetry.append_failure_report(**params)}
             if method == "humans.list":
                 return {"ok": True, "result": self.humans.list(**params)}
             if method == "humans.get":

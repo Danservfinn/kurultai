@@ -767,6 +767,267 @@ class TelemetryStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_tasks(
+        self,
+        *,
+        status: str | None = None,
+        agent: str | None = None,
+        delegated_by: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status)
+        if agent is not None:
+            clauses.append("(assigned_to = ? OR claimed_by = ?)")
+            params.append(agent)
+            params.append(agent)
+        if delegated_by is not None:
+            clauses.append("delegated_by = ?")
+            params.append(delegated_by)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        params.append(offset)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM in_flight_tasks{where}
+                ORDER BY priority DESC, created_at ASC
+                LIMIT ? OFFSET ?
+                """,
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM in_flight_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            task = dict(row)
+            lock = conn.execute(
+                "SELECT * FROM claim_locks WHERE task_id = ?",
+                (task_id,),
+            ).fetchone()
+        task["claim_lock"] = dict(lock) if lock is not None else None
+        return task
+
+    def list_task_events(
+        self,
+        *,
+        task_id: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        params.append(offset)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM task_events{where}
+                ORDER BY occurred_at DESC, created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                params,
+            ).fetchall()
+        return [self._decode_json_fields(dict(row)) for row in rows]
+
+    def append_task_event(
+        self,
+        *,
+        task_id: str,
+        event_type: str,
+        agent: str | None = None,
+        details: dict[str, Any] | None = None,
+        occurred_at: int | None = None,
+        event_id: str | None = None,
+    ) -> str:
+        eid = event_id or str(uuid.uuid4())
+        now = utc_ms()
+        occurred = occurred_at if occurred_at is not None else now
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO task_events
+                  (id, task_id, event_type, agent, details_json, occurred_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    eid, task_id, event_type, agent,
+                    json.dumps(details or {}, sort_keys=True),
+                    occurred, now,
+                ),
+            )
+        return eid
+
+    def list_task_outputs(
+        self,
+        *,
+        task_id: str,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM task_outputs
+                WHERE task_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (task_id, limit),
+            ).fetchall()
+        return [self._decode_json_fields(dict(row)) for row in rows]
+
+    def append_task_output(
+        self,
+        *,
+        task_id: str,
+        kind: str,
+        summary: str | None = None,
+        payload: dict[str, Any] | None = None,
+        artifact_paths: list[str] | None = None,
+        output_id: str | None = None,
+    ) -> str:
+        oid = output_id or str(uuid.uuid4())
+        now = utc_ms()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO task_outputs
+                  (id, task_id, kind, summary, payload_json, artifact_paths_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    oid, task_id, kind, summary,
+                    json.dumps(payload or {}, sort_keys=True),
+                    json.dumps(list(artifact_paths or []), sort_keys=True),
+                    now,
+                ),
+            )
+        return oid
+
+    def list_task_outcomes(
+        self,
+        *,
+        task_id: str,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM task_outcomes
+                WHERE task_id = ?
+                ORDER BY occurred_at DESC
+                LIMIT ?
+                """,
+                (task_id, limit),
+            ).fetchall()
+        return [self._decode_json_fields(dict(row)) for row in rows]
+
+    def append_task_outcome(
+        self,
+        *,
+        task_id: str,
+        status: str,
+        reason: str | None = None,
+        payload: dict[str, Any] | None = None,
+        occurred_at: int | None = None,
+        outcome_id: str | None = None,
+    ) -> str:
+        oid = outcome_id or str(uuid.uuid4())
+        now = utc_ms()
+        occurred = occurred_at if occurred_at is not None else now
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO task_outcomes
+                  (id, task_id, status, reason, payload_json, occurred_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    oid, task_id, status, reason,
+                    json.dumps(payload or {}, sort_keys=True),
+                    occurred, now,
+                ),
+            )
+        return oid
+
+    def list_failure_reports(
+        self,
+        *,
+        task_id: str | None = None,
+        agent: str | None = None,
+        since_ms: int | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        if agent is not None:
+            clauses.append("agent = ?")
+            params.append(agent)
+        if since_ms is not None:
+            clauses.append("occurred_at >= ?")
+            params.append(since_ms)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM failure_reports{where}
+                ORDER BY occurred_at DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [self._decode_json_fields(dict(row)) for row in rows]
+
+    def append_failure_report(
+        self,
+        *,
+        task_id: str | None = None,
+        error_class: str,
+        message: str,
+        agent: str | None = None,
+        stack: str | None = None,
+        recovery: str | None = None,
+        payload: dict[str, Any] | None = None,
+        occurred_at: int | None = None,
+        report_id: str | None = None,
+    ) -> str:
+        rid = report_id or str(uuid.uuid4())
+        now = utc_ms()
+        occurred = occurred_at if occurred_at is not None else now
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO failure_reports
+                  (id, task_id, agent, error_class, message, stack, recovery,
+                   payload_json, occurred_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rid, task_id, agent, error_class, message, stack, recovery,
+                    json.dumps(payload or {}, sort_keys=True),
+                    occurred, now,
+                ),
+            )
+        return rid
+
     def backup_to(self, destination: str | Path) -> Path:
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
