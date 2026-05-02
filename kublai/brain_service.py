@@ -22,6 +22,8 @@ from .knowledge import KnowledgeStore
 from .monitoring import health_snapshot
 from .telemetry import DEFAULT_LEASE_TTL_MS, NoPendingTaskError, StaleClaimError, TelemetryStore
 from .calendar import CalendarError, CalendarService, CalendarStore, GcalcliClient
+from .humans import HumansStore
+from .messages import MessagesStore
 
 
 class CapabilityError(RuntimeError):
@@ -260,6 +262,9 @@ class BrainIndex:
         return destination
 
 
+    def list_by_tag_in_wiki(self, knowledge_store, *, tag, privacy_scope=None, limit=50):
+        return knowledge_store.list_by_tag(tag=tag, privacy_scope=privacy_scope, limit=limit)
+
 class BrainService:
     def __init__(
         self,
@@ -288,6 +293,10 @@ class BrainService:
             telemetry=self.telemetry,
             default_calendar=cal_default,
         )
+        # Phase 2.5 Step 8: humans + messages helpers
+        self.humans = HumansStore(self.wiki_root)
+        msg_path = os.environ.get("KUBLAI_MESSAGES_JSONL", str(Path.home() / ".kublai/messages.jsonl"))
+        self.messages = MessagesStore(msg_path)
 
     def capability_check(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -479,6 +488,36 @@ class BrainService:
                 return {"ok": True, "result": self.list_nodes(**params)}
             if method == "knowledge.search":
                 return {"ok": True, "result": self.search(**params)}
+            if method == "knowledge.list_by_tag":
+                return {"ok": True, "result": self.index.list_by_tag_in_wiki(self.knowledge, **params)}
+            if method == "telemetry.list_reminders":
+                return {"ok": True, "result": self.telemetry.list_reminders(**params)}
+            if method == "telemetry.list_due_reminders":
+                return {"ok": True, "result": self.telemetry.list_due_reminders(**params)}
+            if method == "telemetry.create_reminder":
+                return {"ok": True, "result": self.telemetry.create_reminder(**params)}
+            if method == "telemetry.cancel_reminder":
+                return {"ok": True, "result": self.telemetry.cancel_reminder(**params)}
+            if method == "telemetry.mark_reminder_sent":
+                return {"ok": True, "result": self.telemetry.mark_reminder_sent(**params)}
+            if method == "telemetry.record_reminder_error":
+                return {"ok": True, "result": self.telemetry.record_reminder_error(**params)}
+            if method == "telemetry.replace_event_reminders":
+                return {"ok": True, "result": self.telemetry.replace_event_reminders(**params)}
+            if method == "telemetry.record_operator_action":
+                return {"ok": True, "result": self.telemetry.record_operator_action(**params)}
+            if method == "telemetry.list_operator_actions":
+                return {"ok": True, "result": self.telemetry.list_operator_actions(**params)}
+            if method == "humans.list":
+                return {"ok": True, "result": self.humans.list(**params)}
+            if method == "humans.get":
+                return {"ok": True, "result": self.humans.get(**params)}
+            if method == "humans.update_consent":
+                return {"ok": True, "result": self.humans.update_consent(**params)}
+            if method == "messages.list_recent":
+                return {"ok": True, "result": self.messages.list_recent(**params)}
+            if method == "messages.append":
+                return {"ok": True, "result": self.messages.append(**params)}
             if method == "calendar.list_events":
                 return {"ok": True, "result": self.calendar.list_events(**params)}
             if method == "calendar.create_event":

@@ -297,7 +297,75 @@ class KnowledgeStore:
         data = yaml.safe_load(text[4:end]) or {}
         return data if isinstance(data, dict) else {}
 
+    def list_by_tag(
+        self,
+        *,
+        tag: str,
+        privacy_scope: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
+        for md in self.wiki_root.rglob("*.md"):
+            rel = md.relative_to(self.wiki_root).as_posix()
+            is_hard = rel.startswith("hard-private/")
+            if privacy_scope == "public" and is_hard:
+                continue
+            if privacy_scope == "hard-private" and not is_hard:
+                continue
+            try:
+                fm = _read_frontmatter(md.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            tags = fm.get("tags") or []
+            if isinstance(tags, str):
+                tags = [tags]
+            if tag in tags:
+                results.append({
+                    "rel_path": rel,
+                    "title": fm.get("title") or md.stem,
+                    "type": fm.get("type"),
+                    "status": fm.get("status"),
+                    "tags": tags,
+                })
+                if len(results) >= limit:
+                    break
+        return results
+
     @staticmethod
     def render(frontmatter: dict[str, Any], body: str) -> str:
         yaml_text = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=False).strip()
         return f"---\n{yaml_text}\n---\n\n{normalize_body(body)}\n"
+
+import re as _re_kt
+
+_KT_FRONTMATTER_RE = _re_kt.compile(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", _re_kt.DOTALL)
+
+
+def _read_frontmatter(text: str) -> dict[str, Any]:
+    m = _KT_FRONTMATTER_RE.match(text)
+    if not m:
+        return {}
+    fm: dict[str, Any] = {}
+    current_key = None
+    for line in m.group(1).splitlines():
+        if not line.strip():
+            current_key = None
+            continue
+        if line.startswith(" ") and current_key is not None and line.lstrip().startswith("- "):
+            fm.setdefault(current_key, []).append(line.lstrip()[2:].strip())
+            continue
+        if ": " in line:
+            k, _, v = line.partition(": ")
+            k = k.strip()
+            v = v.strip()
+            if v == "":
+                fm[k] = []
+                current_key = k
+            elif v.startswith("[") and v.endswith("]"):
+                inner = v[1:-1].strip()
+                fm[k] = [x.strip() for x in inner.split(",")] if inner else []
+                current_key = None
+            else:
+                fm[k] = v.strip("\"\'")
+                current_key = None
+    return fm
