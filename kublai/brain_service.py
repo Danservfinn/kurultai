@@ -538,6 +538,41 @@ class BrainService:
                 return {"ok": True, "result": self.telemetry.reset_to_pending(**params)}
             if method == "telemetry.list_terminal_tasks":
                 return {"ok": True, "result": self.telemetry.list_terminal_tasks(**params)}
+            # ---- Phase 3 step 11: task CRUD RPCs (the-kurultai dashboard) ----
+            if method == "telemetry.create_task_full":
+                return {"ok": True, "result": self.telemetry.create_task_full(**params)}
+            if method == "telemetry.set_task_status":
+                return {"ok": True, "result": self.telemetry.set_task_status(**params)}
+            if method == "telemetry.retry_task":
+                return {"ok": True, "result": self.telemetry.retry_task(**params)}
+            if method == "telemetry.redo_task":
+                return {"ok": True, "result": self.telemetry.redo_task(**params)}
+            if method == "telemetry.retry_all_tasks":
+                return {"ok": True, "result": self.telemetry.retry_all_tasks(**params)}
+            if method == "telemetry.set_task_obsolete":
+                return {"ok": True, "result": self.telemetry.set_task_obsolete(**params)}
+            if method == "telemetry.revert_task_status":
+                return {"ok": True, "result": self.telemetry.revert_task_status(**params)}
+            if method == "telemetry.revert_task_prompt":
+                return {"ok": True, "result": self.telemetry.revert_task_prompt(**params)}
+            if method == "telemetry.reassign_task":
+                return {"ok": True, "result": self.telemetry.reassign_task(**params)}
+            if method == "telemetry.update_task_prompt":
+                return {"ok": True, "result": self.telemetry.update_task_prompt(**params)}
+            if method == "telemetry.delete_task":
+                return {"ok": True, "result": self.telemetry.delete_task(**params)}
+            if method == "telemetry.pause_task":
+                return {"ok": True, "result": self.telemetry.pause_task(**params)}
+            if method == "telemetry.unpause_task":
+                return {"ok": True, "result": self.telemetry.unpause_task(**params)}
+            if method == "telemetry.reorder_tasks":
+                return {"ok": True, "result": self.telemetry.reorder_tasks(**params)}
+            if method == "telemetry.move_task_to_top":
+                return {"ok": True, "result": self.telemetry.move_task_to_top(**params)}
+            if method == "telemetry.bulk_reassign_tasks":
+                return {"ok": True, "result": self.telemetry.bulk_reassign_tasks(**params)}
+            if method == "telemetry.get_task_with_output":
+                return {"ok": True, "result": self.telemetry.get_task_with_output(**params)}
             if method == "knowledge.list_proposals":
                 return {"ok": True, "result": self.knowledge.list_proposals(**params)}
             if method == "humans.list":

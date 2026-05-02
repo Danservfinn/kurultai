@@ -187,11 +187,221 @@ class TelemetryStore:
 
                 INSERT OR IGNORE INTO schema_migrations
                   VALUES (1, unixepoch() * 1000, 'initial telemetry schema');
+
+                -- Phase 3 step 1: task lifecycle audit tables (migration v4).
+                -- These tables back the append_task_event / list_task_outputs / failure_reports
+                -- RPCs and the new Phase 3 step 11 task CRUD methods. On fresh installs we
+                -- create them here so the test harness and Mac-mini cold starts see the
+                -- same schema. Idempotent on existing DBs.
+                CREATE TABLE IF NOT EXISTS task_events (
+                  id           TEXT PRIMARY KEY,
+                  task_id      TEXT NOT NULL,
+                  event_type   TEXT NOT NULL,
+                  agent        TEXT,
+                  details_json TEXT NOT NULL CHECK(json_valid(details_json)),
+                  occurred_at  INTEGER NOT NULL,
+                  created_at   INTEGER NOT NULL
+                ) STRICT;
+                CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, occurred_at);
+                CREATE INDEX IF NOT EXISTS idx_task_events_type ON task_events(event_type, occurred_at);
+
+                CREATE TABLE IF NOT EXISTS task_outputs (
+                  id                  TEXT PRIMARY KEY,
+                  task_id             TEXT NOT NULL,
+                  kind                TEXT NOT NULL,
+                  summary             TEXT,
+                  payload_json        TEXT NOT NULL CHECK(json_valid(payload_json)),
+                  artifact_paths_json TEXT NOT NULL CHECK(json_valid(artifact_paths_json)),
+                  created_at          INTEGER NOT NULL
+                ) STRICT;
+                CREATE INDEX IF NOT EXISTS idx_task_outputs_task ON task_outputs(task_id, created_at);
+
+                CREATE TABLE IF NOT EXISTS task_outcomes (
+                  id           TEXT PRIMARY KEY,
+                  task_id      TEXT NOT NULL,
+                  status       TEXT NOT NULL,
+                  reason       TEXT,
+                  payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
+                  occurred_at  INTEGER NOT NULL,
+                  created_at   INTEGER NOT NULL
+                ) STRICT;
+                CREATE INDEX IF NOT EXISTS idx_task_outcomes_task ON task_outcomes(task_id, occurred_at);
+
+                CREATE TABLE IF NOT EXISTS failure_reports (
+                  id           TEXT PRIMARY KEY,
+                  task_id      TEXT,
+                  agent        TEXT,
+                  error_class  TEXT NOT NULL,
+                  message      TEXT NOT NULL,
+                  stack        TEXT,
+                  recovery     TEXT,
+                  payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
+                  occurred_at  INTEGER NOT NULL,
+                  created_at   INTEGER NOT NULL
+                ) STRICT;
+                CREATE INDEX IF NOT EXISTS idx_failure_reports_task ON failure_reports(task_id, occurred_at);
+                CREATE INDEX IF NOT EXISTS idx_failure_reports_agent ON failure_reports(agent, occurred_at);
+
+                INSERT OR IGNORE INTO schema_migrations
+                  VALUES (4, unixepoch() * 1000, 'phase 3 step 1 task lifecycle audit tables');
                 """
             )
             self._ensure_column(conn, "in_flight_tasks", "trace_id", "TEXT")
             self._ensure_column(conn, "in_flight_tasks", "reliability_state", "TEXT NOT NULL DEFAULT 'pending'")
             self._ensure_column(conn, "in_flight_tasks", "retry_count", "INTEGER NOT NULL DEFAULT 0")
+            self._apply_migration_5_if_needed(conn)
+
+    # Phase 3 step 11: extend in_flight_tasks with dashboard columns + widen status CHECK.
+    # SQLite STRICT tables forbid altering CHECK in place, so this runs the table-recreate
+    # procedure on existing v4 databases. Fresh installs hit this same path right after
+    # _ensure_column finishes (it's idempotent because the migration check looks at
+    # schema_migrations).
+    _MIGRATION_5_DESC = "phase 3 step 11 in_flight_tasks extended"
+    _MIGRATION_5_SQL = """
+        DROP INDEX IF EXISTS idx_inflight_tasks_assigned_status;
+        DROP INDEX IF EXISTS idx_inflight_tasks_status_priority;
+        DROP INDEX IF EXISTS idx_inflight_tasks_pipeline;
+        DROP INDEX IF EXISTS idx_inflight_tasks_parent;
+        DROP INDEX IF EXISTS idx_inflight_tasks_paused;
+        DROP INDEX IF EXISTS idx_in_flight_tasks_dashboard;
+
+        ALTER TABLE in_flight_tasks RENAME TO _in_flight_tasks_v4_pre_phase_3;
+
+        CREATE TABLE in_flight_tasks (
+          id                          TEXT PRIMARY KEY,
+          type                        TEXT NOT NULL,
+          description                 TEXT NOT NULL,
+          delegated_by                TEXT NOT NULL,
+          assigned_to                 TEXT,
+          priority                    INTEGER NOT NULL,
+          status                      TEXT NOT NULL CHECK(status IN (
+                                        'pending','in_progress','completed','failed','cancelled',
+                                        'PENDING','WORKING','COMPLETED','FAILED','ORPHANED',
+                                        'OBSOLETE','DONE','STALE','CANCELLED','IN_PROGRESS'
+                                      )),
+          claimed_by                  TEXT,
+          claimed_at                  INTEGER,
+          active_claim_token          TEXT,
+          active_lease_version        INTEGER,
+          completed_at                INTEGER,
+          failed_at                   INTEGER,
+          results_json                TEXT CHECK(results_json IS NULL OR json_valid(results_json)),
+          completion_summary          TEXT,
+          completion_body_hash        TEXT,
+          target_wiki_path            TEXT,
+          wiki_path                   TEXT,
+          materialized_at             INTEGER,
+          completion_attempt_count    INTEGER NOT NULL DEFAULT 0,
+          last_error                  TEXT,
+          created_at                  INTEGER NOT NULL,
+          updated_at                  INTEGER NOT NULL,
+          trace_id                    TEXT,
+          reliability_state           TEXT NOT NULL DEFAULT 'pending',
+          retry_count                 INTEGER NOT NULL DEFAULT 0,
+          title                       TEXT,
+          prompt                      TEXT,
+          domain                      TEXT,
+          source                      TEXT,
+          parent_task                 TEXT,
+          reflection_id               TEXT,
+          pipeline_id                 TEXT,
+          sort_order                  INTEGER,
+          paused                      INTEGER NOT NULL DEFAULT 0,
+          paused_at                   INTEGER,
+          dispatch_phase              TEXT,
+          max_retries                 INTEGER NOT NULL DEFAULT 3,
+          timeout_s                   INTEGER,
+          depth                       INTEGER NOT NULL DEFAULT 0,
+          requires_computer_use       INTEGER NOT NULL DEFAULT 0,
+          skill_hint                  TEXT,
+          reassigned_from             TEXT,
+          previous_status             TEXT,
+          previous_agent              TEXT,
+          original_prompt             TEXT,
+          previous_prompt             TEXT,
+          cancelled_at                INTEGER,
+          started_at                  INTEGER,
+          claim_epoch                 INTEGER,
+          score                       REAL,
+          obsolete_reason             TEXT,
+          obsolete_by                 TEXT,
+          obsolete_at                 INTEGER,
+          rewrite_reason              TEXT,
+          rewrite_by                  TEXT,
+          rewritten_at                INTEGER,
+          reassign_reason             TEXT,
+          reassigned_by               TEXT,
+          reassigned_at               INTEGER,
+          optimized_prompt            TEXT
+        ) STRICT;
+
+        INSERT INTO in_flight_tasks (
+          id, type, description, delegated_by, assigned_to, priority, status,
+          claimed_by, claimed_at, active_claim_token, active_lease_version,
+          completed_at, failed_at, results_json, completion_summary, completion_body_hash,
+          target_wiki_path, wiki_path, materialized_at, completion_attempt_count, last_error,
+          created_at, updated_at, trace_id, reliability_state, retry_count
+        )
+        SELECT
+          id, type, description, delegated_by, assigned_to, priority, status,
+          claimed_by, claimed_at, active_claim_token, active_lease_version,
+          completed_at, failed_at, results_json, completion_summary, completion_body_hash,
+          target_wiki_path, wiki_path, materialized_at, completion_attempt_count, last_error,
+          created_at, updated_at, trace_id, reliability_state, retry_count
+        FROM _in_flight_tasks_v4_pre_phase_3;
+
+        DROP TABLE _in_flight_tasks_v4_pre_phase_3;
+
+        CREATE INDEX IF NOT EXISTS idx_inflight_tasks_assigned_status
+          ON in_flight_tasks(assigned_to, status);
+        CREATE INDEX IF NOT EXISTS idx_inflight_tasks_status_priority
+          ON in_flight_tasks(status, priority, created_at);
+        CREATE INDEX IF NOT EXISTS idx_inflight_tasks_pipeline
+          ON in_flight_tasks(pipeline_id);
+        CREATE INDEX IF NOT EXISTS idx_inflight_tasks_parent
+          ON in_flight_tasks(parent_task);
+        CREATE INDEX IF NOT EXISTS idx_inflight_tasks_paused
+          ON in_flight_tasks(paused, status);
+        CREATE INDEX IF NOT EXISTS idx_in_flight_tasks_dashboard
+          ON in_flight_tasks(status, sort_order DESC, priority, created_at DESC);
+    """
+
+    def _apply_migration_5_if_needed(self, conn: sqlite3.Connection) -> None:
+        row = conn.execute(
+            "SELECT 1 FROM schema_migrations WHERE version = 5"
+        ).fetchone()
+        if row is not None:
+            return
+        # Detect whether the live in_flight_tasks already has the new columns. If
+        # someone applied migration-5 SQL directly (dashboard cutover path), we
+        # only need to record the migration row.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(in_flight_tasks)").fetchall()}
+        already_extended = "title" in cols and "dispatch_phase" in cols and "paused" in cols
+        if already_extended:
+            conn.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version, applied_at, description) VALUES (5, unixepoch() * 1000, ?)",
+                (self._MIGRATION_5_DESC,),
+            )
+            return
+        # SQLite rewrites FK references during ALTER RENAME; recreating the parent
+        # leaves claim_locks FK'd to the renamed table, which we then drop. The
+        # standard 12-step recreate procedure for FK-targeted tables requires
+        # foreign_keys = OFF for the duration. Restore after.
+        prev_fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+        try:
+            conn.execute("PRAGMA foreign_keys = OFF")
+            conn.executescript("BEGIN IMMEDIATE;" + self._MIGRATION_5_SQL + "COMMIT;")
+            # Verify integrity (catches dangling FKs in claim_locks).
+            problems = list(conn.execute("PRAGMA foreign_key_check"))
+            if problems:
+                raise RuntimeError(f"foreign_key_check failed after migration v5: {problems}")
+        finally:
+            if prev_fk:
+                conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at, description) VALUES (5, unixepoch() * 1000, ?)",
+            (self._MIGRATION_5_DESC,),
+        )
 
     def create_task(
         self,
@@ -783,16 +993,38 @@ class TelemetryStore:
         self,
         *,
         status: str | None = None,
+        status_in: list[str] | None = None,
         agent: str | None = None,
         delegated_by: str | None = None,
+        pipeline_id: str | None = None,
+        parent_task: str | None = None,
+        paused: bool | None = None,
+        order_by: str = "priority_created",
         limit: int = 100,
         offset: int = 0,
-    ) -> list[dict[str, Any]]:
+        include_total: bool = False,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        """List tasks with optional filters.
+
+        New params (Phase 3 step 11):
+          - status_in: list of statuses (OR semantics, complements scalar status)
+          - pipeline_id, parent_task, paused: dashboard filters
+          - order_by: 'priority_created' (default, legacy) | 'dashboard'
+            ('dashboard' uses sort_order DESC, priority bucket, created_at DESC
+            to match the Kanban GET in server.js)
+          - include_total: when true, returns {items, total} instead of bare list
+
+        Existing callers using the original scalar params keep working unchanged.
+        """
         clauses: list[str] = []
         params: list[Any] = []
         if status is not None:
             clauses.append("status = ?")
             params.append(status)
+        if status_in:
+            placeholders = ",".join(["?"] * len(status_in))
+            clauses.append(f"status IN ({placeholders})")
+            params.extend(status_in)
         if agent is not None:
             clauses.append("(assigned_to = ? OR claimed_by = ?)")
             params.append(agent)
@@ -800,19 +1032,39 @@ class TelemetryStore:
         if delegated_by is not None:
             clauses.append("delegated_by = ?")
             params.append(delegated_by)
+        if pipeline_id is not None:
+            clauses.append("pipeline_id = ?")
+            params.append(pipeline_id)
+        if parent_task is not None:
+            clauses.append("parent_task = ?")
+            params.append(parent_task)
+        if paused is not None:
+            clauses.append("paused = ?")
+            params.append(1 if paused else 0)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        params.append(limit)
-        params.append(offset)
+        if order_by == "dashboard":
+            # Kanban uses string priority labels stored in 'priority' (text) for new
+            # rows but the legacy in_flight_tasks.priority is INTEGER. Order by
+            # sort_order DESC, then numeric priority DESC, then created_at DESC.
+            order_sql = "ORDER BY coalesce(sort_order, 0) DESC, priority DESC, created_at DESC"
+        else:
+            order_sql = "ORDER BY priority DESC, created_at ASC"
         with self.connect() as conn:
+            if include_total:
+                count_row = conn.execute(
+                    f"SELECT count(*) AS c FROM in_flight_tasks{where}",
+                    params,
+                ).fetchone()
+                total = int(count_row["c"]) if count_row else 0
+            page_params = list(params) + [limit, offset]
             rows = conn.execute(
-                f"""
-                SELECT * FROM in_flight_tasks{where}
-                ORDER BY priority DESC, created_at ASC
-                LIMIT ? OFFSET ?
-                """,
-                params,
+                f"SELECT * FROM in_flight_tasks{where} {order_sql} LIMIT ? OFFSET ?",
+                page_params,
             ).fetchall()
-        return [dict(row) for row in rows]
+        items = [dict(row) for row in rows]
+        if include_total:
+            return {"items": items, "total": total}
+        return items
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
@@ -1391,6 +1643,748 @@ class TelemetryStore:
                 params,
             ).fetchall()
         return [dict(row) for row in rows]
+
+    # ------------------------------------------------------------------
+    # Phase 3 step 11: task CRUD RPCs called by the-kurultai dashboard.
+    # These complement (do not replace) create_task / claim_task / complete_task,
+    # which are still used by the Mac-mini executor on the wiki materialization
+    # path. Every mutation appends a task_event row for audit / revert support.
+    # ------------------------------------------------------------------
+
+    _ALLOWED_STATUSES = (
+        "pending", "in_progress", "completed", "failed", "cancelled",
+        "PENDING", "WORKING", "COMPLETED", "FAILED", "ORPHANED",
+        "OBSOLETE", "DONE", "STALE", "CANCELLED", "IN_PROGRESS",
+    )
+
+    def _validate_status(self, status: str) -> str:
+        if status not in self._ALLOWED_STATUSES:
+            raise ValueError(
+                f"invalid status {status!r}; must be one of {self._ALLOWED_STATUSES}"
+            )
+        return status
+
+    def _coerce_priority(self, priority: Any) -> int:
+        # The dashboard sends string priorities (critical/high/normal/low). Map
+        # them to the integer column. Numeric inputs pass through unchanged.
+        if priority is None:
+            return 0
+        if isinstance(priority, int):
+            return priority
+        if isinstance(priority, str):
+            mapping = {"critical": 100, "high": 50, "normal": 10, "low": 1}
+            try:
+                return int(priority)
+            except ValueError:
+                return mapping.get(priority.lower(), 10)
+        try:
+            return int(priority)
+        except (TypeError, ValueError):
+            return 0
+
+    def create_task_full(
+        self,
+        *,
+        task_id: str | None = None,
+        title: str | None = None,
+        prompt: str | None = None,
+        description: str | None = None,
+        delegated_by: str = "system",
+        assigned_to: str | None = None,
+        priority: Any = "normal",
+        status: str = "PENDING",
+        type: str = "task",
+        domain: str | None = None,
+        source: str | None = None,
+        parent_task: str | None = None,
+        reflection_id: str | None = None,
+        pipeline_id: str | None = None,
+        sort_order: int | None = None,
+        dispatch_phase: str | None = None,
+        max_retries: int = 3,
+        timeout_s: int | None = None,
+        depth: int = 0,
+        requires_computer_use: bool = False,
+        skill_hint: str | None = None,
+        score: float | None = None,
+        results: dict[str, Any] | None = None,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a task with the full Phase 3 column set (no claim).
+
+        Distinct from create_task: takes the dashboard's string priorities,
+        sets PENDING (uppercase) by default, and accepts every column the
+        the-kurultai Kanban UI exposes.
+        """
+        self._validate_status(status)
+        now = utc_ms()
+        tid = task_id or f"task-{uuid.uuid4()}"
+        trace_id = trace_id or new_trace_id()
+        prio = self._coerce_priority(priority)
+        desc = description or title or prompt or tid
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO in_flight_tasks (
+                  id, type, description, delegated_by, assigned_to, priority, status,
+                  results_json, trace_id, reliability_state, retry_count,
+                  created_at, updated_at,
+                  title, prompt, domain, source, parent_task, reflection_id,
+                  pipeline_id, sort_order, dispatch_phase, max_retries, timeout_s,
+                  depth, requires_computer_use, skill_hint, score, original_prompt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?,
+                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tid, type, desc, delegated_by, assigned_to, prio, status,
+                    json.dumps(results or {}, sort_keys=True), trace_id, now, now,
+                    title, prompt, domain, source, parent_task, reflection_id,
+                    pipeline_id, sort_order, dispatch_phase, max_retries, timeout_s,
+                    depth, 1 if requires_computer_use else 0, skill_hint, score,
+                    prompt,
+                ),
+            )
+            self._append_event_inline(
+                conn, task_id=tid, event_type="created", agent=delegated_by,
+                details={"status": status, "title": title, "source": source},
+                now=now,
+            )
+        return {"task_id": tid}
+
+    def _append_event_inline(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        task_id: str,
+        event_type: str,
+        agent: str | None,
+        details: dict[str, Any] | None,
+        now: int,
+    ) -> str:
+        eid = str(uuid.uuid4())
+        conn.execute(
+            """
+            INSERT INTO task_events (id, task_id, event_type, agent, details_json, occurred_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (eid, task_id, event_type, agent, json.dumps(details or {}, sort_keys=True), now, now),
+        )
+        return eid
+
+    def set_task_status(
+        self,
+        *,
+        task_id: str,
+        status: str,
+        agent: str | None = None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        self._validate_status(status)
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT status FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            prev = row["status"]
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_status = ?, status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (prev, status, now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="status_change", agent=agent,
+                details={"previous_status": prev, "status": status, "reason": reason},
+                now=now,
+            )
+        return {"task_id": task_id, "previous_status": prev, "status": status}
+
+    def retry_task(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT status, claim_epoch, retry_count FROM in_flight_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            new_epoch = (row["claim_epoch"] or 0) + 1
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_status = status,
+                    status = 'PENDING',
+                    retry_count = 0,
+                    claim_epoch = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (new_epoch, now, task_id),
+            )
+            conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (task_id,))
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="retry", agent=agent,
+                details={"previous_status": row["status"], "claim_epoch": new_epoch},
+                now=now,
+            )
+        return {"task_id": task_id, "claim_epoch": new_epoch, "previous_status": row["status"]}
+
+    def redo_task(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+        new_prompt: str | None = None,
+        new_task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Clone the task with a fresh task_id at PENDING. Optionally override prompt."""
+        now = utc_ms()
+        with self.connect() as conn:
+            src = conn.execute(
+                "SELECT * FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if src is None:
+                raise ValueError(f"task {task_id} not found")
+            new_tid = new_task_id or f"task-{uuid.uuid4()}"
+            prompt = new_prompt if new_prompt is not None else src["prompt"]
+            trace_id = new_trace_id()
+            conn.execute(
+                """
+                INSERT INTO in_flight_tasks (
+                  id, type, description, delegated_by, assigned_to, priority, status,
+                  results_json, trace_id, reliability_state, retry_count,
+                  created_at, updated_at,
+                  title, prompt, domain, source, parent_task, reflection_id,
+                  pipeline_id, dispatch_phase, max_retries, timeout_s,
+                  depth, requires_computer_use, skill_hint, score, original_prompt
+                ) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', '{}', ?, 'pending', 0, ?, ?,
+                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_tid, src["type"], src["description"], src["delegated_by"],
+                    src["assigned_to"], src["priority"], trace_id, now, now,
+                    src["title"], prompt, src["domain"], src["source"],
+                    src["parent_task"], src["reflection_id"], src["pipeline_id"],
+                    src["dispatch_phase"], src["max_retries"], src["timeout_s"],
+                    src["depth"], src["requires_computer_use"], src["skill_hint"],
+                    src["score"], src["prompt"],
+                ),
+            )
+            self._append_event_inline(
+                conn, task_id=new_tid, event_type="redo", agent=agent,
+                details={"source_task_id": task_id, "new_prompt": new_prompt is not None},
+                now=now,
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="redo_source", agent=agent,
+                details={"new_task_id": new_tid}, now=now,
+            )
+        return {"new_task_id": new_tid, "source_task_id": task_id}
+
+    def retry_all_tasks(
+        self,
+        *,
+        status: str | None = "FAILED",
+        agent: str | None = None,
+        pipeline_id: str | None = None,
+        limit: int = 50,
+        acting_agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        clauses: list[str] = []
+        params: list[Any] = []
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status)
+        if agent is not None:
+            clauses.append("assigned_to = ?")
+            params.append(agent)
+        if pipeline_id is not None:
+            clauses.append("pipeline_id = ?")
+            params.append(pipeline_id)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"SELECT id, status, claim_epoch FROM in_flight_tasks{where} LIMIT ?",
+                params,
+            ).fetchall()
+            retried: list[str] = []
+            for r in rows:
+                new_epoch = (r["claim_epoch"] or 0) + 1
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET previous_status = status, status = 'PENDING',
+                        retry_count = 0, claim_epoch = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (new_epoch, now, r["id"]),
+                )
+                conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (r["id"],))
+                self._append_event_inline(
+                    conn, task_id=r["id"], event_type="retry",
+                    agent=acting_agent or agent,
+                    details={"previous_status": r["status"], "claim_epoch": new_epoch, "bulk": True},
+                    now=now,
+                )
+                retried.append(r["id"])
+        return {"retried": retried, "count": len(retried), "skipped": 0, "ids": retried}
+
+    def set_task_obsolete(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+        reason: str | None = None,
+        acting_agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT status FROM in_flight_tasks WHERE id = ? AND (assigned_to = ? OR ? IS NULL)",
+                (task_id, agent, agent),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found (or assigned_to mismatch)")
+            prev = row["status"]
+            if prev not in ("PENDING", "FAILED", "ORPHANED", "pending", "failed"):
+                raise ValueError(
+                    f"task {task_id} cannot transition to OBSOLETE from {prev!r}"
+                )
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_status = ?, status = 'OBSOLETE',
+                    obsolete_reason = ?, obsolete_by = ?, obsolete_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (prev, reason, acting_agent, now, now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="status_change",
+                agent=acting_agent or agent,
+                details={"previous_status": prev, "status": "OBSOLETE", "reason": reason},
+                now=now,
+            )
+        return {"task_id": task_id, "previous_status": prev, "status": "OBSOLETE"}
+
+    def revert_task_status(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT status FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            cur_status = row["status"]
+            event = conn.execute(
+                """
+                SELECT details_json FROM task_events
+                WHERE task_id = ? AND event_type = 'status_change'
+                ORDER BY occurred_at DESC, created_at DESC LIMIT 1
+                """,
+                (task_id,),
+            ).fetchone()
+            if event is None:
+                raise ValueError(f"no prior status_change event for task {task_id}")
+            details = json.loads(event["details_json"]) if event["details_json"] else {}
+            prev = details.get("previous_status")
+            if not prev:
+                raise ValueError(f"prior status_change event for task {task_id} has no previous_status")
+            self._validate_status(prev)
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_status = ?, status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (cur_status, prev, now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="status_change", agent=agent,
+                details={"previous_status": cur_status, "status": prev, "reason": "revert"},
+                now=now,
+            )
+        return {"task_id": task_id, "status": prev, "reverted_from": cur_status}
+
+    def revert_task_prompt(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT prompt FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            cur_prompt = row["prompt"]
+            event = conn.execute(
+                """
+                SELECT details_json FROM task_events
+                WHERE task_id = ? AND event_type = 'prompt_change'
+                ORDER BY occurred_at DESC, created_at DESC LIMIT 1
+                """,
+                (task_id,),
+            ).fetchone()
+            if event is None:
+                raise ValueError(f"no prior prompt_change event for task {task_id}")
+            details = json.loads(event["details_json"]) if event["details_json"] else {}
+            prev = details.get("previous_prompt")
+            if prev is None:
+                raise ValueError(f"prior prompt_change event for task {task_id} has no previous_prompt")
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_prompt = ?, prompt = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (cur_prompt, prev, now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="prompt_change", agent=agent,
+                details={"previous_prompt": cur_prompt, "prompt": prev, "reason": "revert"},
+                now=now,
+            )
+        return {"task_id": task_id, "prompt": prev}
+
+    def reassign_task(
+        self,
+        *,
+        task_id: str,
+        new_agent: str,
+        prev_agent: str | None = None,
+        reason: str | None = None,
+        acting_agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT assigned_to, claim_epoch, claimed_by FROM in_flight_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            actual_prev = row["assigned_to"]
+            if prev_agent is not None and actual_prev != prev_agent:
+                raise ValueError(
+                    f"prev_agent mismatch: db has {actual_prev!r}, caller said {prev_agent!r}"
+                )
+            new_epoch = (row["claim_epoch"] or 0) + 1
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_agent = ?, assigned_to = ?, reassigned_from = ?,
+                    reassign_reason = ?, reassigned_by = ?, reassigned_at = ?,
+                    claim_epoch = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    actual_prev, new_agent, actual_prev, reason, acting_agent, now,
+                    new_epoch, now, task_id,
+                ),
+            )
+            if row["claimed_by"] == actual_prev:
+                conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (task_id,))
+                conn.execute(
+                    "UPDATE in_flight_tasks SET claimed_by = NULL, claimed_at = NULL, active_claim_token = NULL WHERE id = ?",
+                    (task_id,),
+                )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="reassign",
+                agent=acting_agent,
+                details={
+                    "previous_agent": actual_prev, "new_agent": new_agent,
+                    "claim_epoch": new_epoch, "reason": reason,
+                },
+                now=now,
+            )
+        return {"task_id": task_id, "previous_agent": actual_prev, "new_agent": new_agent}
+
+    def update_task_prompt(
+        self,
+        *,
+        task_id: str,
+        new_prompt: str,
+        agent: str | None = None,
+        reason: str | None = None,
+        acting_agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT prompt, original_prompt, assigned_to FROM in_flight_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            if agent is not None and row["assigned_to"] != agent:
+                raise ValueError(
+                    f"task {task_id} not assigned to {agent!r} (assigned_to={row['assigned_to']!r})"
+                )
+            prev_prompt = row["prompt"]
+            original = row["original_prompt"] if row["original_prompt"] is not None else prev_prompt
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="prompt_change",
+                agent=acting_agent or agent,
+                details={"previous_prompt": prev_prompt, "prompt": new_prompt, "reason": reason},
+                now=now,
+            )
+            conn.execute(
+                """
+                UPDATE in_flight_tasks
+                SET previous_prompt = ?, prompt = ?, original_prompt = ?,
+                    rewrite_reason = ?, rewrite_by = ?, rewritten_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (prev_prompt, new_prompt, original, reason, acting_agent, now, now, task_id),
+            )
+        return {"task_id": task_id, "previous_prompt": prev_prompt}
+
+    def delete_task(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        cascaded = 0
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id, assigned_to FROM in_flight_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            if agent is not None and row["assigned_to"] != agent:
+                raise ValueError(
+                    f"task {task_id} not assigned to {agent!r} (assigned_to={row['assigned_to']!r})"
+                )
+            for table in ("task_events", "task_outputs", "task_outcomes", "failure_reports"):
+                cur = conn.execute(f"DELETE FROM {table} WHERE task_id = ?", (task_id,))
+                cascaded += cur.rowcount or 0
+            cur = conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (task_id,))
+            cascaded += cur.rowcount or 0
+            cur = conn.execute("DELETE FROM in_flight_tasks WHERE id = ?", (task_id,))
+            cascaded += cur.rowcount or 0
+            conn.execute(
+                """
+                INSERT INTO audit_events (id, trace_id, actor, action, decision, resource, details_json, created_at)
+                VALUES (?, NULL, ?, 'task.delete', 'allow', ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()), agent or "system", task_id,
+                    json.dumps({"task_id": task_id, "cascaded_rows": cascaded}, sort_keys=True),
+                    now,
+                ),
+            )
+        return {"deleted": True, "cascaded_rows": cascaded}
+
+    def pause_task(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT status, paused FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            if row["paused"]:
+                return {"task_id": task_id, "paused": True, "already_paused": True}
+            if row["status"] not in ("PENDING", "pending"):
+                raise ValueError(
+                    f"task {task_id} not pending (status={row['status']!r}); can only pause PENDING tasks"
+                )
+            conn.execute(
+                "UPDATE in_flight_tasks SET paused = 1, paused_at = ?, updated_at = ? WHERE id = ?",
+                (now, now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="pause", agent=agent,
+                details={}, now=now,
+            )
+        return {"task_id": task_id, "paused": True}
+
+    def unpause_task(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT paused FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            if not row["paused"]:
+                raise ValueError(f"task {task_id} is not paused")
+            conn.execute(
+                "UPDATE in_flight_tasks SET paused = 0, paused_at = NULL, updated_at = ? WHERE id = ?",
+                (now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="unpause", agent=agent,
+                details={}, now=now,
+            )
+        return {"task_id": task_id, "paused": False}
+
+    def reorder_tasks(
+        self,
+        *,
+        task_ids: list[str],
+        sort_orders: list[int] | None = None,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        """Bulk SET sort_order. If sort_orders omitted, assigns descending order
+        (first task gets highest, last gets 1) so the first id appears at the top
+        of a DESC-by-sort_order Kanban view."""
+        now = utc_ms()
+        if sort_orders is None:
+            sort_orders = list(range(len(task_ids), 0, -1))
+        if len(sort_orders) != len(task_ids):
+            raise ValueError("task_ids and sort_orders must be the same length")
+        updated = 0
+        with self.connect() as conn:
+            for tid, order in zip(task_ids, sort_orders):
+                cur = conn.execute(
+                    "UPDATE in_flight_tasks SET sort_order = ?, updated_at = ? WHERE id = ?",
+                    (order, now, tid),
+                )
+                if cur.rowcount:
+                    updated += 1
+                    self._append_event_inline(
+                        conn, task_id=tid, event_type="reorder", agent=agent,
+                        details={"sort_order": order}, now=now,
+                    )
+        return {"updated": updated, "task_ids": list(task_ids)}
+
+    def move_task_to_top(
+        self,
+        *,
+        task_id: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"task {task_id} not found")
+            max_row = conn.execute(
+                "SELECT max(coalesce(sort_order, 0)) AS m FROM in_flight_tasks"
+            ).fetchone()
+            new_order = (int(max_row["m"]) if max_row and max_row["m"] is not None else 0) + 1
+            conn.execute(
+                "UPDATE in_flight_tasks SET sort_order = ?, updated_at = ? WHERE id = ?",
+                (new_order, now, task_id),
+            )
+            self._append_event_inline(
+                conn, task_id=task_id, event_type="reorder", agent=agent,
+                details={"sort_order": new_order, "move_to_top": True}, now=now,
+            )
+        return {"task_id": task_id, "sort_order": new_order}
+
+    def bulk_reassign_tasks(
+        self,
+        *,
+        task_ids: list[str],
+        new_agent: str,
+        prev_agent: str | None = None,
+        reason: str | None = None,
+        acting_agent: str | None = None,
+    ) -> dict[str, Any]:
+        moved: list[str] = []
+        skipped: list[str] = []
+        for tid in task_ids:
+            try:
+                self.reassign_task(
+                    task_id=tid, new_agent=new_agent,
+                    prev_agent=prev_agent, reason=reason, acting_agent=acting_agent,
+                )
+                moved.append(tid)
+            except ValueError:
+                skipped.append(tid)
+        return {"moved": moved, "skipped": skipped, "count": len(moved)}
+
+    def get_task_with_output(
+        self,
+        *,
+        task_id: str,
+        events_limit: int = 20,
+        failures_limit: int = 10,
+    ) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM in_flight_tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            task = dict(row)
+            outputs = [
+                self._decode_json_fields(dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM task_outputs WHERE task_id = ? ORDER BY created_at DESC",
+                    (task_id,),
+                ).fetchall()
+            ]
+            outcomes = [
+                self._decode_json_fields(dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM task_outcomes WHERE task_id = ? ORDER BY occurred_at DESC",
+                    (task_id,),
+                ).fetchall()
+            ]
+            events = [
+                self._decode_json_fields(dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM task_events WHERE task_id = ? ORDER BY occurred_at DESC LIMIT ?",
+                    (task_id, events_limit),
+                ).fetchall()
+            ]
+            failure_reports = [
+                self._decode_json_fields(dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM failure_reports WHERE task_id = ? ORDER BY occurred_at DESC LIMIT ?",
+                    (task_id, failures_limit),
+                ).fetchall()
+            ]
+            lock = conn.execute(
+                "SELECT * FROM claim_locks WHERE task_id = ?", (task_id,)
+            ).fetchone()
+        task["claim_lock"] = dict(lock) if lock is not None else None
+        return {
+            "task": task,
+            "outputs": outputs,
+            "outcomes": outcomes,
+            "events": events,
+            "failure_reports": failure_reports,
+        }
 
     def backup_to(self, destination: str | Path) -> Path:
         destination = Path(destination)
