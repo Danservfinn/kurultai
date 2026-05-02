@@ -2,7 +2,7 @@
 
 Registry of all launchd services for the Kurultai multi-agent system.
 
-## Active Services (17 total)
+## Active Services (18 total)
 
 ### Persistent Services (KeepAlive daemons)
 
@@ -14,8 +14,9 @@ Registry of all launchd services for the Kurultai multi-agent system.
 | `com.kurultai.signal-jsonrpc` | `signal_jsonrpc_server.py --port 8080` | Signal messaging JSONRPC server |
 | `com.kurultai.task-executor` | `task_executor.py` | Task execution daemon (claims + executes tasks) |
 | `com.kurultai.ogedei-watchdog` | `ogedei-watchdog.py --daemon` | Quality assurance daemon (18 checks at 30s cadence, detect-only for stalled tasks) |
-| `com.kurultai.heartbeat-writer` | `heartbeat_writer.py` | Writes Agent.infra_heartbeat to Neo4j every 30s |
+| `com.kurultai.heartbeat-writer` | `heartbeat_writer.py` | Writes infra heartbeats via brain-service (telemetry.heartbeat -> agent_state in telemetry.db) every 30s. Migrated 2026-05-02 (Phase 5 Neo4j decommission). |
 | `com.kurultai.experiment-pool` | `experiment-pool.py` | Bounded experiment subprocess pool (max 3) |
+| `com.kurultai.fs-indexer` | `fs_indexer.py --interval 30` | QUARANTINED 2026-05-02 (Phase 5 Neo4j decommission). Plist disabled. See `docs/fs-indexer-retired-20260502.md`. Re-implementation deferred to the Phase 3 task-lifecycle carveout. |
 | `com.cloudflared.kublai` | `cloudflared tunnel run` | Cloudflare tunnel |
 
 ### Scheduled/Interval Jobs
@@ -52,6 +53,7 @@ All plists are located in `~/Library/LaunchAgents/`:
 ~/Library/LaunchAgents/com.kurultai.ogedei-watchdog.plist
 ~/Library/LaunchAgents/com.kurultai.heartbeat-writer.plist
 ~/Library/LaunchAgents/com.kurultai.experiment-pool.plist
+~/Library/LaunchAgents/com.kurultai.fs-indexer.plist.disabled-2026-05-02  # quarantined; see docs/fs-indexer-retired-20260502.md
 ~/Library/LaunchAgents/com.cloudflared.kublai.plist
 ~/Library/LaunchAgents/com.kurultai.heartbeat-watchdog.plist
 ~/Library/LaunchAgents/com.kurultai.task-reaper.plist
@@ -86,6 +88,7 @@ Located in `~/Library/LaunchAgents/_disabled/`:
 | Label | Reason |
 |-------|--------|
 | `com.kurultai.squad-chat` | Exit code 2 crash loop (missing websockets/aiohttp). Fix or delete. |
+| `com.kurultai.fs-indexer` | Quarantined 2026-05-02 for Phase 5 Neo4j decommission. Plist renamed to `.disabled-2026-05-02` (still in `~/Library/LaunchAgents/`, not `_disabled/`). Re-implementation deferred to Phase 3 task-lifecycle carveout. See `docs/fs-indexer-retired-20260502.md`. |
 
 ## Deleted/Archived (2026-03-23 cron consolidation)
 
@@ -110,7 +113,7 @@ Located in `~/Library/LaunchAgents/_disabled/`:
 1. **Single-writer orphan recovery**: `task-reaper.py` is the sole owner of orphan recovery and executor restart. `ogedei-watchdog.py` detects and alerts but does NOT recover.
 2. **watchdog-gather.sh simplified**: Removed 3 duplicate sub-scripts (credential-health-monitor, completion-audit, subprocess-audit). Now reads ogedei-watchdog state files instead.
 3. **Schedule stagger**: rotate-ledger at 1:50 AM, backup at 2:00 AM (no collision).
-4. **heartbeat-writer stays separate**: ogedei-watchdog is file-based (no Neo4j dependency), so heartbeat-writer remains its own daemon for writing Agent.infra_heartbeat to Neo4j.
+4. **heartbeat-writer stays separate**: ogedei-watchdog is file-based, so heartbeat-writer remains its own daemon. As of 2026-05-02 it writes via brain-service (`telemetry.heartbeat` RPC -> `agent_state` row in `~/.kublai/telemetry.db`) instead of Neo4j (Phase 5 migration). Backups: `~/backups/neo4j-pre-migration/2026-05-02/heartbeat_writer.py.pre-phase-5`.
 
 ## Service Dependencies
 
@@ -122,7 +125,8 @@ ogedei-watchdog (continuous, 30s cadence)
     └── Requires: filesystem only (no Neo4j)
 
 heartbeat-writer (continuous, 30s cadence)
-    └── Requires: Neo4j
+    └── Requires: brain-service (Unix socket /Users/kublai/.kublai/brain-service.sock)
+        # Migrated off Neo4j 2026-05-02 (Phase 5)
 
 task-reaper (5 min)
     └── Requires: Neo4j, Redis
@@ -145,4 +149,4 @@ gateway (continuous)
 
 ---
 
-Last Updated: 2026-03-23
+Last Updated: 2026-05-02
