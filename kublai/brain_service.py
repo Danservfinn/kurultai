@@ -21,6 +21,7 @@ from typing import Any
 from .knowledge import KnowledgeStore
 from .monitoring import health_snapshot
 from .telemetry import DEFAULT_LEASE_TTL_MS, NoPendingTaskError, StaleClaimError, TelemetryStore
+from .calendar import CalendarError, CalendarService, CalendarStore, GcalcliClient
 
 
 class CapabilityError(RuntimeError):
@@ -260,11 +261,33 @@ class BrainIndex:
 
 
 class BrainService:
-    def __init__(self, wiki_root: str | Path, telemetry_db: str | Path, index_db: str | Path):
+    def __init__(
+        self,
+        wiki_root: str | Path,
+        telemetry_db: str | Path,
+        index_db: str | Path,
+        *,
+        gcalcli_path: str | Path | None = None,
+        default_calendar: str | None = None,
+    ):
         self.wiki_root = Path(wiki_root).expanduser().resolve()
         self.telemetry = TelemetryStore(telemetry_db)
         self.knowledge = KnowledgeStore(self.wiki_root)
         self.index = BrainIndex(index_db)
+        # Phase 2.5 Step 6: gcalcli-backed CalendarService.
+        cal_store = CalendarStore(telemetry_db)
+        gcalcli_bin = (
+            str(gcalcli_path)
+            if gcalcli_path
+            else os.environ.get("GCALCLI_PATH", "/Users/kublai/.brain-migration-venv/bin/gcalcli")
+        )
+        cal_default = default_calendar or os.environ.get("GCALCLI_DEFAULT_CALENDAR")
+        cal_client = GcalcliClient(gcalcli_path=gcalcli_bin, default_calendar=cal_default)
+        self.calendar = CalendarService(
+            cal_store, cal_client,
+            telemetry=self.telemetry,
+            default_calendar=cal_default,
+        )
 
     def capability_check(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -456,10 +479,22 @@ class BrainService:
                 return {"ok": True, "result": self.list_nodes(**params)}
             if method == "knowledge.search":
                 return {"ok": True, "result": self.search(**params)}
+            if method == "calendar.list_events":
+                return {"ok": True, "result": self.calendar.list_events(**params)}
+            if method == "calendar.create_event":
+                return {"ok": True, "result": self.calendar.create_event(**params)}
+            if method == "calendar.update_event":
+                return {"ok": True, "result": self.calendar.update_event(**params)}
+            if method == "calendar.cancel_event":
+                return {"ok": True, "result": self.calendar.cancel_event(**params)}
+            if method == "calendar.list_due_reminders":
+                return {"ok": True, "result": self.calendar.list_due_reminders(**params)}
+            if method == "calendar.health":
+                return {"ok": True, "result": self.calendar.health()}
             if method == "health":
                 return {"ok": True, "result": self.health()}
             raise ValueError(f"unknown method: {method}")
-        except (NoPendingTaskError, StaleClaimError, ValueError) as exc:
+        except (NoPendingTaskError, StaleClaimError, ValueError, CalendarError) as exc:
             return {"ok": False, "error": type(exc).__name__, "message": str(exc)}
 
     def serve_socket(self, socket_path: str | Path) -> socketserver.UnixStreamServer:
