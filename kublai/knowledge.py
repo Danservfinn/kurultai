@@ -297,6 +297,61 @@ class KnowledgeStore:
         data = yaml.safe_load(text[4:end]) or {}
         return data if isinstance(data, dict) else {}
 
+    def list_proposals(
+        self,
+        *,
+        status: str | None = None,
+        since_ms: int | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List wiki pages that represent proposals.
+
+        Proposals live as wiki pages with frontmatter ``type: proposal`` (or
+        with ``proposal`` in the tags list as a legacy fallback). Optional
+        ``status`` filters on frontmatter ``status``; ``since_ms`` filters by
+        page mtime so callers can poll for recent activity. Returns a flat
+        list of ``{rel_path, title, type, status, tags, updated, created,
+        mtime_ms}`` summaries — no body, intentionally light.
+
+        Replaces the LLM-emitted ``MATCH (p:Proposal) ...`` Cypher path used
+        by ``kurultai-proposal-decree-review/SKILL.md``.
+        """
+        results: list[dict[str, Any]] = []
+        for md in self.wiki_root.rglob("*.md"):
+            rel = md.relative_to(self.wiki_root).as_posix()
+            if rel.startswith("hard-private/"):
+                continue
+            try:
+                fm = _read_frontmatter(md.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            tags = fm.get("tags") or []
+            if isinstance(tags, str):
+                tags = [tags]
+            is_proposal = (fm.get("type") == "proposal") or ("proposal" in tags)
+            if not is_proposal:
+                continue
+            if status is not None and fm.get("status") != status:
+                continue
+            try:
+                mtime_ms = int(md.stat().st_mtime * 1000)
+            except OSError:
+                continue
+            if since_ms is not None and mtime_ms < since_ms:
+                continue
+            results.append({
+                "rel_path": rel,
+                "title": fm.get("title") or md.stem,
+                "type": fm.get("type"),
+                "status": fm.get("status"),
+                "tags": tags,
+                "updated": fm.get("updated"),
+                "created": fm.get("created"),
+                "mtime_ms": mtime_ms,
+            })
+        results.sort(key=lambda r: r["mtime_ms"], reverse=True)
+        return results[:limit]
+
     def list_by_tag(
         self,
         *,

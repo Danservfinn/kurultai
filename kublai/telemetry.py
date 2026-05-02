@@ -37,6 +37,18 @@ def utc_ms() -> int:
     return int(time.time() * 1000)
 
 
+def _percentile(values: list[int] | list[float], pct: float) -> float:
+    """Nearest-rank percentile on a presorted ascending list (no numpy dep)."""
+    if not values:
+        return 0.0
+    if pct <= 0:
+        return float(values[0])
+    if pct >= 1:
+        return float(values[-1])
+    rank = int(round(pct * (len(values) - 1)))
+    return float(values[rank])
+
+
 @dataclass(frozen=True)
 class ClaimedTask:
     id: str
@@ -1027,6 +1039,358 @@ class TelemetryStore:
                 ),
             )
         return rid
+
+    def task_analytics(
+        self,
+        *,
+        since_ms: int | None = None,
+        agent: str | None = None,
+        group_by: str = "status",
+    ) -> dict[str, Any]:
+        """Aggregated task statistics for Hermes pipeline-analytics queries.
+
+        Returns counts grouped by ``group_by`` (one of 'status', 'agent',
+        'retry_count'), plus duration and retry summaries across the same
+        filtered slice. Replaces the LLM-driven Cypher analytics cookbook used
+        by ``kurultai-queue-diagnostic/references/pipeline-analytics-queries.md``.
+        """
+        allowed_group_by = {"status", "agent", "retry_count"}
+        if group_by not in allowed_group_by:
+            raise ValueError(f"unsupported group_by: {group_by!r}")
+        clauses: list[str] = []
+        params: list[Any] = []
+        if since_ms is not None:
+            clauses.append("created_at >= ?")
+            params.append(since_ms)
+        if agent is not None:
+            clauses.append("(assigned_to = ? OR claimed_by = ?)")
+            params.append(agent)
+            params.append(agent)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
+        if group_by == "status":
+            group_col = "status"
+        elif group_by == "agent":
+            group_col = "COALESCE(claimed_by, assigned_to, '')"
+        else:
+            group_col = "retry_count"
+
+        with self.connect() as conn:
+            counts_rows = conn.execute(
+                f"""
+                SELECT {group_col} AS bucket, count(*) AS n
+                FROM in_flight_tasks{where}
+                GROUP BY bucket
+                ORDER BY n DESC
+                """,
+                params,
+            ).fetchall()
+            counts = {str(row["bucket"]) if row["bucket"] is not None else "": int(row["n"]) for row in counts_rows}
+
+            # Status counts (always returned, regardless of group_by)
+            status_rows = conn.execute(
+                f"SELECT status, count(*) AS n FROM in_flight_tasks{where} GROUP BY status",
+                params,
+            ).fetchall()
+            counts_by_status = {row["status"]: int(row["n"]) for row in status_rows}
+
+            # Retry summary
+            retry_rows = conn.execute(
+                f"""
+                SELECT
+                  count(*) AS total,
+                  COALESCE(sum(CASE WHEN retry_count > 0 THEN 1 ELSE 0 END), 0) AS retried,
+                  COALESCE(max(retry_count), 0) AS max_retries,
+                  COALESCE(avg(retry_count), 0.0) AS mean_retries
+                FROM in_flight_tasks{where}
+                """,
+                params,
+            ).fetchone()
+            total = int(retry_rows["total"]) if retry_rows else 0
+            retried = int(retry_rows["retried"]) if retry_rows else 0
+            failure_clauses = list(clauses)
+            failure_params = list(params)
+            failure_clauses.append("status = 'failed'")
+            failure_where = " WHERE " + " AND ".join(failure_clauses)
+            failed_count_row = conn.execute(
+                f"SELECT count(*) AS n FROM in_flight_tasks{failure_where}",
+                failure_params,
+            ).fetchone()
+            failed_count = int(failed_count_row["n"]) if failed_count_row else 0
+
+            # Durations (in_progress -> completed) using completed_at - claimed_at
+            duration_clauses = list(clauses)
+            duration_params = list(params)
+            duration_clauses.append("status = 'completed'")
+            duration_clauses.append("completed_at IS NOT NULL")
+            duration_clauses.append("claimed_at IS NOT NULL")
+            duration_where = " WHERE " + " AND ".join(duration_clauses)
+            durations = [
+                int(row["d"])
+                for row in conn.execute(
+                    f"""
+                    SELECT (completed_at - claimed_at) AS d
+                    FROM in_flight_tasks{duration_where}
+                    ORDER BY d ASC
+                    """,
+                    duration_params,
+                ).fetchall()
+                if row["d"] is not None and int(row["d"]) >= 0
+            ]
+        duration_summary: dict[str, Any] = {
+            "samples": len(durations),
+            "mean_ms": (sum(durations) / len(durations)) if durations else 0.0,
+            "p50_ms": _percentile(durations, 0.50),
+            "p90_ms": _percentile(durations, 0.90),
+        }
+        return {
+            "group_by": group_by,
+            "counts": counts,
+            "counts_by_status": counts_by_status,
+            "total_tasks": total,
+            "retried_tasks": retried,
+            "max_retries_observed": int(retry_rows["max_retries"]) if retry_rows else 0,
+            "mean_retries": float(retry_rows["mean_retries"]) if retry_rows else 0.0,
+            "failed_count": failed_count,
+            "failure_rate": (failed_count / total) if total else 0.0,
+            "duration": duration_summary,
+        }
+
+    def cap_retry_count(
+        self,
+        *,
+        task_ids: list[str],
+        max_retries: int,
+    ) -> dict[str, Any]:
+        """Cap ``retry_count`` to ``max_retries`` for the given task ids.
+
+        Returns ``{updated, ids}`` listing tasks whose retry_count exceeded
+        ``max_retries`` and were lowered. Used by the codebase-autopilot
+        retry-overshoot remediation; replaces the LLM-emitted ``SET t.retry_count
+        = toInteger(t.max_retries)`` Cypher path.
+        """
+        if not isinstance(max_retries, int) or max_retries < 0:
+            raise ValueError("max_retries must be a non-negative int")
+        if not task_ids:
+            return {"updated": 0, "ids": []}
+        now = utc_ms()
+        updated_ids: list[str] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            placeholders = ",".join("?" * len(task_ids))
+            rows = conn.execute(
+                f"""
+                SELECT id, retry_count FROM in_flight_tasks
+                WHERE id IN ({placeholders}) AND retry_count > ?
+                """,
+                (*task_ids, max_retries),
+            ).fetchall()
+            for row in rows:
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET retry_count = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (max_retries, now, row["id"]),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO task_events
+                      (id, task_id, event_type, agent, details_json, occurred_at, created_at)
+                    VALUES (?, ?, 'retry_capped', NULL, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        row["id"],
+                        json.dumps(
+                            {
+                                "previous_retry_count": int(row["retry_count"]),
+                                "capped_to": max_retries,
+                            },
+                            sort_keys=True,
+                        ),
+                        now,
+                        now,
+                    ),
+                )
+                updated_ids.append(row["id"])
+            conn.execute("COMMIT")
+        return {"updated": len(updated_ids), "ids": updated_ids}
+
+    def cancel_tasks(
+        self,
+        *,
+        task_ids: list[str],
+        reason: str,
+        agent: str | None = None,
+    ) -> dict[str, Any]:
+        """Bulk-cancel tasks. Skips already-terminal tasks.
+
+        Returns ``{cancelled, skipped}`` with per-task disposition. Each
+        cancellation appends a ``task_events`` entry of type ``cancelled``
+        with the reason and the (optional) requesting agent. Replaces the
+        LLM-emitted ``SET t.status = 'CANCELLED'`` Cypher path used by
+        ``kurultai-pipeline-stall-diagnosis`` and the daily queue patrol.
+        """
+        if not reason:
+            raise ValueError("reason is required for cancel_tasks")
+        if not task_ids:
+            return {"cancelled": 0, "skipped": []}
+        now = utc_ms()
+        cancelled: list[str] = []
+        skipped: list[dict[str, Any]] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            placeholders = ",".join("?" * len(task_ids))
+            rows = conn.execute(
+                f"SELECT id, status FROM in_flight_tasks WHERE id IN ({placeholders})",
+                tuple(task_ids),
+            ).fetchall()
+            present = {row["id"]: row["status"] for row in rows}
+            terminal = {"completed", "failed", "cancelled"}
+            for tid in task_ids:
+                status = present.get(tid)
+                if status is None:
+                    skipped.append({"id": tid, "reason": "not_found"})
+                    continue
+                if status in terminal:
+                    skipped.append({"id": tid, "reason": f"already_{status}"})
+                    continue
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET status = 'cancelled',
+                        failed_at = ?,
+                        updated_at = ?,
+                        last_error = ?
+                    WHERE id = ?
+                    """,
+                    (now, now, f"cancelled: {reason[:500]}", tid),
+                )
+                conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (tid,))
+                conn.execute(
+                    """
+                    INSERT INTO task_events
+                      (id, task_id, event_type, agent, details_json, occurred_at, created_at)
+                    VALUES (?, ?, 'cancelled', ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        tid,
+                        agent,
+                        json.dumps({"reason": reason, "previous_status": status}, sort_keys=True),
+                        now,
+                        now,
+                    ),
+                )
+                cancelled.append(tid)
+            conn.execute("COMMIT")
+        return {"cancelled": len(cancelled), "ids": cancelled, "skipped": skipped}
+
+    def reset_to_pending(
+        self,
+        *,
+        task_ids: list[str],
+        agent: str | None = None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Reset orphaned in_progress tasks back to pending and clear claims.
+
+        Used by the daily queue patrol to recover orphaned WORKING/IN_PROGRESS
+        tasks. Skips tasks already in a terminal state; only acts on tasks
+        currently ``in_progress``. Returns ``{reset, skipped}``.
+        """
+        if not task_ids:
+            return {"reset": 0, "skipped": []}
+        now = utc_ms()
+        reset_ids: list[str] = []
+        skipped: list[dict[str, Any]] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            placeholders = ",".join("?" * len(task_ids))
+            rows = conn.execute(
+                f"SELECT id, status FROM in_flight_tasks WHERE id IN ({placeholders})",
+                tuple(task_ids),
+            ).fetchall()
+            present = {row["id"]: row["status"] for row in rows}
+            for tid in task_ids:
+                status = present.get(tid)
+                if status is None:
+                    skipped.append({"id": tid, "reason": "not_found"})
+                    continue
+                if status != "in_progress":
+                    skipped.append({"id": tid, "reason": f"not_in_progress:{status}"})
+                    continue
+                conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (tid,))
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET status = 'pending',
+                        claimed_by = NULL,
+                        claimed_at = NULL,
+                        active_claim_token = NULL,
+                        active_lease_version = NULL,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, tid),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO task_events
+                      (id, task_id, event_type, agent, details_json, occurred_at, created_at)
+                    VALUES (?, ?, 'reset_to_pending', ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        tid,
+                        agent,
+                        json.dumps({"reason": reason or "orphaned-claim", "previous_status": status}, sort_keys=True),
+                        now,
+                        now,
+                    ),
+                )
+                reset_ids.append(tid)
+            conn.execute("COMMIT")
+        return {"reset": len(reset_ids), "ids": reset_ids, "skipped": skipped}
+
+    def list_terminal_tasks(
+        self,
+        *,
+        since_ms: int,
+        status_filter: list[str] | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Tasks that reached a terminal status since ``since_ms``.
+
+        Replaces the obsolete ``MATCH (t:Task) WHERE t.status IN [...]`` Cypher
+        used by ``kurultai_terminal_task_notifier.py`` (now a SQLite reader,
+        which we wrap so all Hermes consumers traverse the same RPC surface).
+        Ordered by completion/failure time, descending.
+        """
+        if status_filter is None:
+            status_filter = ["completed", "failed", "cancelled"]
+        allowed = {"completed", "failed", "cancelled"}
+        for s in status_filter:
+            if s not in allowed:
+                raise ValueError(f"unsupported status_filter value: {s!r}")
+        placeholders = ",".join("?" * len(status_filter))
+        params: list[Any] = list(status_filter)
+        params.append(since_ms)
+        params.append(limit)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM in_flight_tasks
+                WHERE status IN ({placeholders})
+                  AND COALESCE(completed_at, failed_at, updated_at) >= ?
+                ORDER BY COALESCE(completed_at, failed_at, updated_at) DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def backup_to(self, destination: str | Path) -> Path:
         destination = Path(destination)

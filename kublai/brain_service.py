@@ -528,6 +528,18 @@ class BrainService:
                 return {"ok": True, "result": self.telemetry.list_failure_reports(**params)}
             if method == "telemetry.append_failure_report":
                 return {"ok": True, "result": self.telemetry.append_failure_report(**params)}
+            if method == "telemetry.task_analytics":
+                return {"ok": True, "result": self.telemetry.task_analytics(**params)}
+            if method == "telemetry.cap_retry_count":
+                return {"ok": True, "result": self.telemetry.cap_retry_count(**params)}
+            if method == "telemetry.cancel_tasks":
+                return {"ok": True, "result": self.telemetry.cancel_tasks(**params)}
+            if method == "telemetry.reset_to_pending":
+                return {"ok": True, "result": self.telemetry.reset_to_pending(**params)}
+            if method == "telemetry.list_terminal_tasks":
+                return {"ok": True, "result": self.telemetry.list_terminal_tasks(**params)}
+            if method == "knowledge.list_proposals":
+                return {"ok": True, "result": self.knowledge.list_proposals(**params)}
             if method == "humans.list":
                 return {"ok": True, "result": self.humans.list(**params)}
             if method == "humans.get":
