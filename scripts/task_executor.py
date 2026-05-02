@@ -28,6 +28,7 @@ import re
 import shlex
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
@@ -53,16 +54,563 @@ from kurultai_paths import (
     agent_sessions_path,
     VALID_CLAUDE_MODELS,
 )
-from neo4j_v2_core import TaskStore
-from neo4j_v2_wal import WAL
-from neo4j_v2_failure import classify_failure
-from neo4j_v2_events import emit_event, emit_session_reset
+# Phase 5 migration: TaskStore + WAL + emit_event are now brain-service shims.
+# The Neo4j driver path is gone; all task lifecycle writes go via the local
+# brain-service Unix socket (sqlite-backed telemetry.db). Kept the import names
+# (TaskStore, WAL, emit_event, emit_session_reset) so existing call sites are
+# untouched — they now bind to the brain-service-backed implementations defined
+# below.
+from neo4j_v2_failure import classify_failure, classify_validation_failure
 from circuit_breaker import AgentCircuitBreaker
 from prompt_sanitizer import PromptSanitizer
 from notification_queue import NotificationQueue
 from delivery_classifier import classify_delivery_task
 from delivery_verifier import verify_delivery
 from kurultai_ledger import generate_task_id
+
+
+# ---------------------------------------------------------------------------
+# Brain-service migration shims (Phase 5)
+# ---------------------------------------------------------------------------
+# Replace neo4j_v2_core.TaskStore, neo4j_v2_wal.WAL, neo4j_v2_events.emit_event
+# with brain-service-backed equivalents. The brain-service exposes the task
+# lifecycle (claim/complete/retry/fail/etc.) over a JSON-line Unix socket at
+# BRAIN_SERVICE_SOCKET. All writes land in ~/.kublai/telemetry.db.
+#
+# Compatibility shape:
+#   - TaskStore.claim_task(agent) returns a dict with task_id, claim_epoch, etc.
+#   - claim_epoch is reused as the claim_token (UUID string) returned by the
+#     brain-service. The executor only treats it opaquely as an identifier for
+#     subsequent renew/complete/fail calls.
+#   - emit_event() writes a row to telemetry.task_events via append_task_event.
+#   - WAL is a no-op stub: brain-service is a local socket, so retry-buffering
+#     across an outage is no longer needed.
+
+import socket as _socket
+
+BRAIN_SERVICE_SOCKET = os.environ.get(
+    "BRAIN_SERVICE_SOCKET", "/Users/kublai/.kublai/brain-service.sock"
+)
+
+
+class BrainServiceError(RuntimeError):
+    """Raised when a brain-service RPC fails."""
+
+
+def brain_rpc(
+    method: str,
+    params: Optional[dict] = None,
+    socket_path: str = BRAIN_SERVICE_SOCKET,
+    timeout_s: float = 10.0,
+) -> dict:
+    """JSON-line RPC to the local brain-service Unix socket."""
+    sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+    try:
+        sock.settimeout(timeout_s)
+        sock.connect(str(socket_path))
+        payload = json.dumps({"method": method, "params": params or {}})
+        sock.sendall((payload + "\n").encode("utf-8"))
+        buf = b""
+        while not buf.endswith(b"\n"):
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+    if not buf:
+        # Server-side handler crashed (uncaught exception) — protocol can be
+        # left dangling. Treat as a recoverable error rather than poisoning
+        # the rest of the run.
+        raise BrainServiceError(f"brain-service returned empty for {method}")
+    try:
+        return json.loads(buf.decode("utf-8"))
+    except json.JSONDecodeError as e:
+        raise BrainServiceError(
+            f"brain-service returned non-JSON for {method}: {buf[:200]!r}"
+        ) from e
+
+
+def _brain_call(method: str, params: Optional[dict] = None) -> dict:
+    """Call brain-service and unwrap result, raising on protocol errors."""
+    resp = brain_rpc(method, params)
+    if not resp.get("ok", False):
+        err = resp.get("error") or "BrainServiceError"
+        msg = resp.get("message") or "(no message)"
+        raise BrainServiceError(f"{method}: {err}: {msg}")
+    return resp.get("result")
+
+
+# Status-mapping for the brain-service column constraint.
+# in_flight_tasks.status accepts both legacy lowercase and uppercase values,
+# but the live workflow (claim_task / sweep_expired_claims) only matches the
+# lowercase forms. Uppercase values were the Neo4j-mirror convention for the
+# dashboard. The executor speaks lowercase to keep claims and recovery
+# functioning.
+_BRAIN_STATUS_PENDING = "pending"
+_BRAIN_STATUS_WORKING = "in_progress"
+_BRAIN_STATUS_COMPLETED = "completed"
+_BRAIN_STATUS_FAILED = "failed"
+
+
+class _NoopSession:
+    """No-op replacement for neo4j Session; swallows .run() calls."""
+
+    def run(self, *_args, **_kwargs):
+        class _NoopResult:
+            def single(self):
+                return None
+
+            def __iter__(self):
+                return iter([])
+
+        return _NoopResult()
+
+    def execute_read(self, *_args, **_kwargs):
+        return None
+
+    def execute_write(self, *_args, **_kwargs):
+        return None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+
+class _NoopDriver:
+    """No-op replacement for neo4j Driver — used as the executor's `driver`
+    handle so legacy code paths that still call `driver.session()` succeed
+    without opening a Bolt connection."""
+
+    def session(self):
+        return _NoopSession()
+
+    def close(self):
+        pass
+
+
+class WAL:
+    """No-op WAL stub. Brain-service is local; outage buffering not needed."""
+
+    def __init__(self, *_args, **_kwargs):
+        pass
+
+    def buffer(self, _cypher, _params=None):
+        # Silently drop. The previous behavior buffered Cypher for a Neo4j
+        # outage; with brain-service over a local socket and SQLite, there's
+        # no equivalent tier to buffer to.
+        return 0
+
+    def replay(self, _driver=None, batch_size: int = 50):
+        return 0
+
+    def pending_count(self):
+        return 0
+
+    def cleanup(self, keep_days: int = 7):
+        return 0
+
+
+def emit_event(
+    _driver,
+    event_type: str,
+    task_id: str,
+    agent: str,
+    executor_id: str = "",
+    **kwargs,
+) -> Optional[str]:
+    """Brain-service-backed event emission.
+
+    Writes a row to telemetry.task_events via brain-service RPC.
+    Non-blocking: swallows all errors. Drop-in replacement for the old
+    neo4j_v2_events.emit_event signature.
+    """
+    details = {"executor_id": executor_id} if executor_id else {}
+    for key, val in kwargs.items():
+        if val is None:
+            continue
+        details[key] = val
+    # task_events.task_id is NOT NULL; system events without a task target use
+    # a synthetic id so they still land in telemetry.db rather than getting
+    # silently dropped.
+    effective_task_id = task_id or f"system:{event_type.lower()}"
+    try:
+        _brain_call(
+            "telemetry.append_task_event",
+            {
+                "task_id": effective_task_id,
+                "event_type": event_type,
+                "agent": agent or None,
+                "details": details,
+            },
+        )
+    except Exception as e:
+        logging.getLogger(__name__).debug(
+            "emit_event(%s) failed: %s", event_type, e
+        )
+        return None
+    return event_type
+
+
+def emit_session_reset(_driver, task_id: str, agent: str, executor_id: str = "", **kwargs):
+    """Backward-compat wrapper — brain-service has no AgentMetrics counters
+    (those were Neo4j-only); we only emit the SESSION_RESET task event."""
+    return emit_event(
+        None, "SESSION_RESET", task_id, agent, executor_id=executor_id, **kwargs
+    )
+
+
+class TaskStore:
+    """Brain-service-backed replacement for neo4j_v2_core.TaskStore.
+
+    Translates the legacy method surface used by task_executor.py into
+    brain-service RPCs over the Unix socket. The shape returned matches
+    what the executor expects (dict with task_id, claim_epoch, etc.).
+    """
+
+    DEFAULT_LEASE_MINUTES = 60
+
+    def __init__(self, *_args, **_kwargs):
+        # claim_token cache so complete_task / fail_task / renew_lease
+        # can pass the right token without exposing it in the call sites.
+        self._claim_tokens: dict[str, str] = {}
+        self._driver = _NoopDriver()
+
+    @property
+    def driver(self):
+        return self._driver
+
+    def close(self):
+        return None
+
+    # ----- claim ------------------------------------------------------
+    def claim_task(self, agent: str, lease_minutes: int = DEFAULT_LEASE_MINUTES) -> Optional[dict]:
+        try:
+            result = _brain_call(
+                "telemetry.claim_task",
+                {
+                    "agent": agent,
+                    "lease_ttl_ms": int(lease_minutes * 60 * 1000),
+                },
+            )
+        except BrainServiceError as e:
+            msg = str(e)
+            if "NoPendingTaskError" in msg:
+                return None
+            raise
+
+        if not result:
+            return None
+
+        task_id = result.get("id")
+        token = result.get("claim_token") or ""
+        payload = result.get("payload") or {}
+        if task_id and token:
+            self._claim_tokens[task_id] = token
+
+        # Surface the token via the same `claim_epoch` field the executor
+        # already passes through; existing code uses claim_epoch only to
+        # round-trip back into renew/complete/fail, so this remains
+        # transparent. We additionally return claim_token explicitly for
+        # any new readers.
+        out = dict(payload)
+        out["task_id"] = task_id
+        out["claim_epoch"] = token
+        out["claim_token"] = token
+        out["lease_version"] = result.get("lease_version")
+        out["lease_expires_at"] = result.get("expires_at")
+        # Map prompt/title from payload (sqlite columns) so existing call sites
+        # that read `task.get("prompt")` / `task.get("title")` keep working.
+        if "prompt" not in out and payload.get("description"):
+            out["prompt"] = payload.get("description")
+        return out
+
+    # ----- complete ---------------------------------------------------
+    def complete_task(
+        self,
+        task_id: str,
+        claim_epoch,
+        text: str,
+        problem: str,
+        solution: str,
+        rationale: str,
+        output_lines: int = 0,
+        duration_s: float = 0.0,
+    ) -> tuple[bool, str]:
+        token = self._claim_tokens.get(task_id) or claim_epoch
+        if not token:
+            return False, "no_claim_token"
+        # Pull agent from a quick get_task call so we can pass it to
+        # complete_task (brain-service requires agent + claim_token CAS).
+        agent = ""
+        try:
+            row = _brain_call("telemetry.get_task", {"task_id": task_id}) or {}
+            agent = row.get("claimed_by") or row.get("assigned_to") or ""
+        except Exception:
+            pass
+        try:
+            _brain_call(
+                "telemetry.complete_task",
+                {
+                    "task_id": task_id,
+                    "agent": agent,
+                    "claim_token": token,
+                    "summary": (solution or text or "")[:2000],
+                    "results": {
+                        "text": text[:8000] if text else "",
+                        "problem": problem,
+                        "solution": solution,
+                        "rationale": rationale,
+                        "output_lines": output_lines,
+                        "duration_s": duration_s,
+                    },
+                },
+            )
+        except BrainServiceError as e:
+            return False, f"brain_error:{e}"
+        # Append a structured TaskOutput record so dashboards that read
+        # task_outputs see the same content the legacy TaskOutput Neo4j
+        # node carried.
+        try:
+            _brain_call(
+                "telemetry.append_task_output",
+                {
+                    "task_id": task_id,
+                    "agent": agent or None,
+                    "kind": "completion",
+                    "content": text[:8000] if text else "",
+                    "details": {
+                        "problem": problem,
+                        "solution": solution,
+                        "rationale": rationale,
+                        "output_lines": output_lines,
+                        "duration_s": duration_s,
+                    },
+                },
+            )
+        except Exception:
+            pass
+        # Drop the cached token now that the lock is gone.
+        self._claim_tokens.pop(task_id, None)
+        # Best-effort status alignment: complete_task already sets
+        # status='completed', but downstream readers expect uppercase.
+        try:
+            _brain_call(
+                "telemetry.set_task_status",
+                {"task_id": task_id, "status": _BRAIN_STATUS_COMPLETED, "agent": agent or None, "reason": "completed"},
+            )
+        except Exception:
+            pass
+        return True, "completed"
+
+    # ----- fail -------------------------------------------------------
+    def fail_task(
+        self,
+        task_id: str,
+        claim_epoch,
+        error_class: str,
+        error_msg: str,
+        is_transient: bool,
+        output_snippet: str = "",
+        backoff_base_s: int = 30,
+    ) -> tuple[bool, str]:
+        token = self._claim_tokens.get(task_id) or claim_epoch
+        try:
+            row = _brain_call("telemetry.get_task", {"task_id": task_id}) or {}
+        except Exception:
+            row = {}
+        agent = row.get("claimed_by") or row.get("assigned_to") or ""
+        retry_count = int(row.get("retry_count") or 0)
+        max_retries = int(row.get("max_retries") or 0)
+        will_retry = bool(is_transient and retry_count < max_retries)
+        new_status = _BRAIN_STATUS_PENDING if will_retry else _BRAIN_STATUS_FAILED
+
+        # Append a failure_report row for analytics + drop the claim lock so
+        # the task can be reclaimed (or stays in FAILED terminal state).
+        try:
+            _brain_call(
+                "telemetry.append_failure_report",
+                {
+                    "task_id": task_id,
+                    "agent": agent or None,
+                    "error_class": error_class,
+                    "message": error_msg[:500],
+                    "payload": {
+                        "is_transient": bool(is_transient),
+                        "output_snippet": (output_snippet or "")[:2000],
+                        "attempt": retry_count + 1,
+                    },
+                },
+            )
+        except Exception:
+            pass
+
+        if will_retry:
+            # Use retry_task to bump epoch + drop claim_lock + set PENDING.
+            try:
+                _brain_call(
+                    "telemetry.retry_task",
+                    {"task_id": task_id, "agent": agent or None},
+                )
+            except Exception as e:
+                return False, f"retry_error:{e}"
+        else:
+            # Terminal FAILED: cancel any active claim then set status.
+            try:
+                _brain_call(
+                    "telemetry.cancel_tasks",
+                    {"task_ids": [task_id], "agent": agent or None, "reason": error_msg[:200]},
+                )
+            except Exception:
+                pass
+            try:
+                _brain_call(
+                    "telemetry.set_task_status",
+                    {
+                        "task_id": task_id,
+                        "status": _BRAIN_STATUS_FAILED,
+                        "agent": agent or None,
+                        "reason": error_msg[:200],
+                    },
+                )
+            except Exception as e:
+                return False, f"status_error:{e}"
+
+        self._claim_tokens.pop(task_id, None)
+        return True, new_status
+
+    # ----- renew lease -----------------------------------------------
+    def renew_lease(self, task_id: str, claim_epoch, lease_minutes: int = DEFAULT_LEASE_MINUTES) -> bool:
+        token = self._claim_tokens.get(task_id) or claim_epoch
+        if not token:
+            return False
+        try:
+            row = _brain_call("telemetry.get_task", {"task_id": task_id}) or {}
+            agent = row.get("claimed_by") or row.get("assigned_to") or ""
+        except Exception:
+            agent = ""
+        try:
+            _brain_call(
+                "telemetry.renew_claim",
+                {
+                    "task_id": task_id,
+                    "agent": agent,
+                    "claim_token": token,
+                    "lease_ttl_ms": int(lease_minutes * 60 * 1000),
+                },
+            )
+            return True
+        except Exception as e:
+            logging.getLogger(__name__).debug("renew_lease failed for %s: %s", task_id, e)
+            return False
+
+    # ----- orphan recovery -------------------------------------------
+    def recover_orphans(self, grace_minutes: int = 5) -> list[dict]:
+        # brain-service has sweep_expired_claims; it returns a count and
+        # leaves the task in 'pending'/'PENDING' state. Surface the affected
+        # tasks for logging.
+        try:
+            count = _brain_call("telemetry.sweep_expired_claims", {}) or 0
+        except Exception as e:
+            logging.getLogger(__name__).debug("sweep_expired_claims failed: %s", e)
+            return []
+        if not count:
+            return []
+        # Best-effort: list recent in_progress→pending recoveries via list_tasks.
+        try:
+            tasks = _brain_call(
+                "telemetry.list_tasks",
+                {"status": _BRAIN_STATUS_PENDING, "limit": int(count)},
+            ) or []
+            return [
+                {
+                    "task_id": t.get("id") or t.get("task_id"),
+                    "status": t.get("status"),
+                    "assigned_to": t.get("assigned_to"),
+                    "retry_count": t.get("retry_count", 0),
+                }
+                for t in tasks if t
+            ]
+        except Exception:
+            return [{"task_id": "(unknown)", "status": "PENDING"} for _ in range(int(count))]
+
+    # ----- BLOCKED sweep ---------------------------------------------
+    def sweep_blocked_tasks(self) -> list[str]:
+        # The SQLite schema does not yet model DEPENDS_ON edges, so the
+        # safety-net sweep that the Cypher version performed has no analog.
+        # Returning an empty list is safe: BLOCKED tasks now move via
+        # explicit set_task_status calls from the executor.
+        return []
+
+    # ----- create ----------------------------------------------------
+    def create_task(self, *args, **kwargs) -> dict:
+        # The legacy TaskStore.create_task accepted keyword args matching the
+        # Neo4j Task properties; one caller (line 2907) passes a single dict.
+        # Translate both shapes into telemetry.create_task_full.
+        if args and isinstance(args[0], dict) and not kwargs:
+            spec = dict(args[0])
+        else:
+            spec = dict(kwargs)
+            if args:
+                spec.setdefault("task_id", args[0])
+
+        # Map alternate field names used at call sites
+        if "body" in spec and "prompt" not in spec:
+            spec["prompt"] = spec.pop("body")
+        if "parent_task_id" in spec and "parent_task" not in spec:
+            spec["parent_task"] = spec.pop("parent_task_id")
+        if "parent_id" in spec and "parent_task" not in spec:
+            spec["parent_task"] = spec.pop("parent_id")
+        if "assigned_to" in spec and "assigned_to" not in spec:
+            pass  # already correct
+
+        # Generate task_id if omitted
+        if not spec.get("task_id"):
+            spec["task_id"] = f"task-{uuid.uuid4().hex[:12]}"
+
+        # The brain-service does not maintain DEPENDS_ON edges; we record
+        # them in the results blob for post-migration introspection but do
+        # not block the new task on them.
+        depends_on = spec.pop("depends_on", None)
+        results = spec.pop("results", None) or {}
+        if depends_on:
+            results["legacy_depends_on"] = list(depends_on)
+        if results:
+            spec["results"] = results
+
+        # Strip kwargs that telemetry.create_task_full does not accept
+        for legacy_key in ("phase",):
+            spec.pop(legacy_key, None)
+
+        # The brain-service claim_task SQL filter only matches lowercase
+        # 'pending'; uppercase 'PENDING' is dashboard-only. Force lowercase
+        # so newly-created tasks become claimable immediately.
+        if "status" not in spec or not spec.get("status"):
+            spec["status"] = _BRAIN_STATUS_PENDING
+        elif str(spec["status"]).upper() == "PENDING":
+            spec["status"] = _BRAIN_STATUS_PENDING
+
+        try:
+            res = _brain_call("telemetry.create_task_full", spec) or {}
+        except BrainServiceError as e:
+            logging.getLogger(__name__).warning(
+                "create_task brain RPC failed for %s: %s", spec.get("task_id"), e
+            )
+            raise
+        # Return shape compatible with old callers
+        return {"task_id": res.get("task_id", spec.get("task_id")), **spec}
+
+    # ----- record_execution ------------------------------------------
+    def record_execution(self, *_args, **_kwargs):
+        # Was a Neo4j EXECUTED edge for historical queries; not used by the
+        # executor's hot path. Safe no-op under brain-service.
+        return False
+
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +639,12 @@ class SessionState:
 
 # Pipeline direct-execution pattern: matches "python3 script.py" prompt prefixes
 _SCRIPT_RE = re.compile(r'^python3?\s+(\S+\.py)\b')
+
+# Telemetry DB — peer_health_check.py reads in_flight_tasks from here.
+# The executor is the primary writer; peer_health_check falls back to
+# filesystem (.done.md) only when this table is empty.
+TELEMETRY_DB = Path(os.environ.get("KUBLAI_TELEMETRY_DB", str(Path.home() / ".kublai" / "telemetry.db")))
+_TELEMETRY_PRIORITY = {"critical": 3, "high": 2, "normal": 1, "low": 0}
 
 # Module-level constants
 STALL_SILENCE = 900      # seconds of stdout silence before stall check
@@ -359,15 +913,19 @@ class TaskRunner:
         env: dict,
         timeout: int = CLAUDE_TIMEOUT,
         model: Optional[str] = None,
+        pid_file: Optional[Path] = None,
     ) -> RunResult:
         """Execute the claude agent subprocess for a given agent and prompt.
 
         Args:
-            agent:   Agent identifier used to set --workdir.
-            prompt:  Full task prompt string passed after --.
-            env:     Pre-built environment dict from build_agent_env().
-            timeout: Hard wall-clock timeout in seconds.
-            model:   Optional model override; omitted if None.
+            agent:    Agent identifier used to set --workdir.
+            prompt:   Full task prompt string passed after --.
+            env:      Pre-built environment dict from build_agent_env().
+            timeout:  Hard wall-clock timeout in seconds.
+            model:    Optional model override; omitted if None.
+            pid_file: Optional path to write the subprocess PID for health
+                      checks. Written immediately after process starts;
+                      deleted when the process exits.
 
         Returns:
             RunResult with success flag, captured stdout, return code,
@@ -396,6 +954,15 @@ class TaskRunner:
                 model=model or "default",
                 stall_detected=False,
             )
+
+        # Write PID file immediately so subprocess_health_check.py can confirm
+        # this task is actively handled and skip the "no PID file" revert path.
+        if pid_file is not None:
+            try:
+                pid_file.parent.mkdir(parents=True, exist_ok=True)
+                pid_file.write_text(str(proc.pid))
+            except Exception as _pid_err:
+                logger.warning(f"Failed to write pid_file {pid_file}: {_pid_err}")
 
         content_chunks: list[str] = []
         last_output = time.time()
@@ -443,6 +1010,14 @@ class TaskRunner:
                 pass
 
         content = "".join(content_chunks)
+
+        # Clean up the PID file now that the process has exited.
+        if pid_file is not None:
+            try:
+                pid_file.unlink(missing_ok=True)
+            except Exception:
+                pass
+
         return RunResult(
             success=proc.returncode == 0 and bool(content.strip()),
             content=content,
@@ -519,6 +1094,20 @@ class TaskRunner:
 
 
 # ---------------------------------------------------------------------------
+# Notification helpers (module-level)
+# ---------------------------------------------------------------------------
+
+def _extract_notification_summary(content: str, max_chars: int = 800) -> str:
+    import re
+    m = re.search(
+        r'^##\s+Resolution\s*$(.+?)(?=^#{1,6}\s|\Z)',
+        content, re.DOTALL | re.IGNORECASE | re.MULTILINE
+    )
+    body = m.group(1).strip() if m else content.strip()
+    return body[:max_chars] + ('…' if len(body) > max_chars else '')
+
+
+# ---------------------------------------------------------------------------
 # Triage gate helpers (module-level, used by Executor._execute_inner)
 # ---------------------------------------------------------------------------
 
@@ -552,7 +1141,7 @@ def _is_triage_task(task: dict, task_file: Optional[Path] = None) -> bool:
     Priority order (first match wins):
     1. Filename contains 'triage'
     2. Prompt body has frontmatter: type: triage | escalation
-    3. Title contains 'triage', 'escalation', or 'investigate'
+    3. Title contains 'triage' or 'escalation'
     """
     if task_file and "triage" in task_file.name.lower():
         return True
@@ -560,7 +1149,7 @@ def _is_triage_task(task: dict, task_file: Optional[Path] = None) -> bool:
     if re.search(r"^type:\s*(triage|escalation)\s*$", prompt, re.MULTILINE | re.IGNORECASE):
         return True
     title = task.get("title", "").lower()
-    if any(kw in title for kw in ("triage", "escalation", "investigate")):
+    if any(kw in title for kw in ("triage", "escalation")):
         return True
     return False
 
@@ -658,10 +1247,16 @@ def verify_result(
                 return False, f"error_in_output:{category}"
 
     # Resolution content gate — every agent completion must include a
-    # '## Resolution' section with at least one non-empty line of content.
+    # structured completion heading with at least one non-empty line of content.
+    # Accepted: ## Resolution, ## Summary, ## Result, ## Completion (case-insensitive).
+    # This matches the permissive set already accepted by completion_gate_audit and
+    # completion-gate-resolver, preventing false FAILED_PERMANENT on valid completions.
     # Pipeline/script tasks are exempt (their stdout is structured data).
     if not skip_resolution:
-        resolution_match = re.search(r"^##\s+Resolution\s*$", content, re.MULTILINE | re.IGNORECASE)
+        resolution_match = re.search(
+            r"^##\s+(Resolution|Summary|Result|Completion)\s*$",
+            content, re.MULTILINE | re.IGNORECASE
+        )
         if resolution_match:
             # Verify there is at least one non-empty line after the heading
             after_heading = content[resolution_match.end():].lstrip("\n")
@@ -773,9 +1368,12 @@ class Executor:
         self._nqueue = NotificationQueue()
 
     def _get_driver(self):
-        """Lazy driver access — uses TaskStore's property which auto-creates."""
+        """Phase 5 migration: returns a no-op driver. The Neo4j Bolt driver
+        is gone; emit_event/raw .session().run() blocks now no-op safely.
+        Real task lifecycle writes go through self._store (BrainServiceTaskStore)
+        and emit_event() (telemetry.append_task_event)."""
         if self._driver is None:
-            self._driver = self._store.driver
+            self._driver = _NoopDriver()
         return self._driver
 
     def _requires_computer_use(self, task: dict) -> bool:
@@ -900,7 +1498,15 @@ class Executor:
                     MATCH (t:Task)
                     WHERE t.status = 'WORKING'
                     AND (t.claimed_by IS NOT NULL)
-                    AND (t.lease_expires_at IS NULL OR t.lease_expires_at < datetime())
+                    AND (t.lease_expires_at IS NULL OR
+                         CASE WHEN valueType(t.lease_expires_at) STARTS WITH 'STRING'
+                              THEN datetime(
+                                  CASE WHEN t.lease_expires_at ENDS WITH 'Z' OR t.lease_expires_at CONTAINS '+'
+                                       THEN t.lease_expires_at
+                                       ELSE t.lease_expires_at + 'Z'
+                                  END)
+                              ELSE t.lease_expires_at
+                         END < datetime())
                     RETURN t.task_id, t.assigned_to, t.claimed_by
                 """)
                 orphans = []
@@ -1010,6 +1616,7 @@ class Executor:
             self._get_driver(), "TASK_CLAIMED", task_id, agent,
             executor_id=self._executor_id,
         )
+        self._telemetry_claim(task_id, agent, task, priority)
         logger.info(
             f"Executing {task_id} on {agent} (priority={priority})"
         )
@@ -1088,8 +1695,10 @@ class Executor:
                     )
                     self._wal.buffer(
                         "MATCH (t:Task {task_id: $tid, status: 'WORKING'}) "
-                        "SET t.status = 'FAILED', t.updated_at = datetime()",
-                        {"tid": task_id},
+                        "SET t.status = 'FAILED', t.updated_at = datetime(), "
+                        "t.completed_at = datetime(), t.failure_reason = $reason, "
+                        "t.error_message = $reason",
+                        {"tid": task_id, "reason": reject_reason[:500]},
                     )
                 emit_event(
                     self._get_driver(), "TASK_FAILED_PERMANENT", task_id, agent,
@@ -1111,6 +1720,11 @@ class Executor:
         # double-execution when the next executor starts and resets Neo4j status.
         # Pipeline tasks skip Phase 1 but still need the sentinel.
         self._rename_task_file(agent, task_id, ".executing.md")
+        # Compute the companion .executing.pid path so TaskRunner can write the
+        # subprocess PID immediately after process start. subprocess_health_check.py
+        # uses this file to confirm the task is actively handled and skip the
+        # "no PID file → revert" path that was incorrectly clearing jochi tasks.
+        _executing_pid_file = self._find_executing_pid_path(agent, task_id)
 
         # 2c. Two-phase prompt: try optimized, fallback to simple
         # Skip optimization for pipeline tasks (deterministic scripts)
@@ -1225,6 +1839,7 @@ class Executor:
                     agent, prompt, env,
                     timeout=timeout,
                     model=task.get("model"),
+                    pid_file=_executing_pid_file,
                 )
             finally:
                 if _cu_acquired:
@@ -1238,8 +1853,10 @@ class Executor:
         skip_res = is_pipeline or task.get("source", "").startswith("pipeline")
         passed, reason = verify_result(run_result, skip_resolution=skip_res)
 
-        # 5b. Model fallback on rate-limit or auth failure
-        if not passed and reason in (
+        # 5b. Model fallback on rate-limit or auth failure.
+        # Direct pipeline scripts bypass Claude agent execution, so they do not
+        # have the agent env/timeout variables required for model fallback.
+        if (not is_pipeline) and not passed and reason in (
             "error_in_output:rate_limited",
             "error_in_output:auth_failure",
         ):
@@ -1254,6 +1871,7 @@ class Executor:
                     agent, prompt, env,
                     timeout=timeout,
                     model="claude-sonnet-4-6",
+                    pid_file=_executing_pid_file,
                 )
                 passed, reason = verify_result(run_result, skip_resolution=skip_res)
                 if passed:
@@ -1352,7 +1970,7 @@ class Executor:
             if not optout:
                 optout = bool(re.search(
                     r"^completion_gate_optout:\s*true",
-                    task.get("prompt", ""),
+                    task.get("prompt", task.get("body", "")),
                     re.MULTILINE | re.IGNORECASE,
                 ))
             if optout:
@@ -1444,6 +2062,7 @@ class Executor:
                     "TASK_COMPLETED", task_id, agent,
                     duration_s=run_result.duration_s,
                 )
+                self._telemetry_complete(task_id)
                 logger.info(
                     f"COMPLETED {task_id} in {run_result.duration_s:.0f}s"
                 )
@@ -1466,6 +2085,7 @@ class Executor:
                 )
                 # Still rename the filesystem file — WAL will persist Neo4j later
                 self._rename_task_file(agent, task_id, ".done.md")
+                self._telemetry_complete(task_id)
                 logger.warning(
                     f"complete_task failed for {task_id}: {msg} — buffered to WAL"
                 )
@@ -1478,12 +2098,18 @@ class Executor:
                     executor_id=self._executor_id,
                 )
 
-            # Classify the failure mode
-            error_class, is_transient = classify_failure(
-                run_result.return_code,
-                stderr="",
-                stdout=run_result.content[:1000],
-            )
+            # Classify the failure mode.
+            # Validation failures (missing_resolution*) must use classify_validation_failure
+            # rather than classify_failure — classify_failure(rc=0, stderr="") returns
+            # ("SUCCESS", False) which produces FAILED_PERMANENT with 0 retries.
+            if reason.startswith("missing_resolution"):
+                error_class, is_transient = classify_validation_failure(reason)
+            else:
+                error_class, is_transient = classify_failure(
+                    run_result.return_code,
+                    stderr="",
+                    stdout=run_result.content[:1000],
+                )
 
             try:
                 ok, new_status = self._store.fail_task(
@@ -1497,8 +2123,10 @@ class Executor:
                 ok = False
                 self._wal.buffer(
                     "MATCH (t:Task {task_id: $tid, status: 'WORKING'}) "
-                    "SET t.status = 'FAILED', t.updated_at = datetime()",
-                    {"tid": task_id},
+                    "SET t.status = 'FAILED', t.updated_at = datetime(), "
+                    "t.completed_at = datetime(), t.failure_reason = $reason, "
+                    "t.error_message = $reason",
+                    {"tid": task_id, "reason": reason[:500]},
                 )
 
             event_type = "TASK_FAILED" if is_transient else "TASK_FAILED_PERMANENT"
@@ -1516,6 +2144,8 @@ class Executor:
                 error=reason[:200],
                 error_class=error_class,
             )
+            if not is_transient:
+                self._telemetry_fail(task_id, reason)
             logger.info(
                 f"FAILED {task_id}: {reason} "
                 f"(class={error_class}, transient={is_transient})"
@@ -1951,6 +2581,7 @@ class Executor:
                                 MATCH (t:Task {task_id: $cid})
                                 SET t.status = 'CANCELLED',
                                     t.updated_at = datetime(),
+                                    t.completed_at = datetime(),
                                     t.cancel_reason = 'decomposition_rollback'
                             """, cid=cid)
                     except Exception:
@@ -2405,6 +3036,30 @@ Output NOTHING after the end delimiter."""
         except OSError as e:
             logger.warning(f"Failed to scan tasks dir for {task_id}: {e}")
 
+    def _find_executing_pid_path(self, agent: str, task_id: str) -> Optional[Path]:
+        """Return the .executing.pid Path for a task that was just renamed to .executing.md.
+
+        subprocess_health_check.py reads this file to confirm a live process owns
+        the task and skips the "no PID file → revert" code path.
+        """
+        tasks_dir = AGENTS_DIR / agent / "tasks"
+        # Standard format: {task_id}.executing.md → {task_id}.executing.pid
+        standard = tasks_dir / f"{task_id}.executing.md"
+        if standard.exists():
+            return tasks_dir / f"{task_id}.executing.pid"
+        # Dispatch format: scan for the .executing.md file whose frontmatter contains task_id
+        try:
+            needle = f"\ntask_id: {task_id}"
+            for f in tasks_dir.glob("*.executing.md"):
+                try:
+                    if needle in f.read_text(encoding="utf-8", errors="replace"):
+                        return f.parent / f.name.replace(".executing.md", ".executing.pid")
+                except OSError:
+                    continue
+        except OSError:
+            pass
+        return None
+
     def _sync_filesystem_state(self) -> None:
         """Reconcile filesystem task files with Neo4j terminal states.
 
@@ -2449,6 +3104,10 @@ Output NOTHING after the end delimiter."""
                             continue
                         if not tid:
                             tid = fname[:-3]  # strip .md
+
+                        # Strip .revision-N suffix before Neo4j lookup; the
+                        # canonical task_id never includes this filesystem artifact.
+                        tid = re.sub(r"\.revision-\d+$", "", tid)
 
                         rec = sess.run(
                             "MATCH (t:Task {task_id: $tid}) RETURN t.status",
@@ -2507,9 +3166,12 @@ Output NOTHING after the end delimiter."""
 
     async def _send_notification(self, agent: str, task: dict,
                                  result_content: str):
-        """Send Signal notification directly via signal_send (no subprocess)."""
-        import signal_send
+        """Send notification via Telegram or Signal (no subprocess).
 
+        Routes based on notify_target prefix:
+          tg:<chat_id>  → telegram_send
+          +<phone>      → signal_send (with optional reply threading)
+        """
         origin_type = task.get('origin_type')
         if origin_type is not None and origin_type != 'human':
             return  # Skip system/cron/agent tasks
@@ -2522,11 +3184,14 @@ Output NOTHING after the end delimiter."""
         notify_target = task.get(
             'notify_target', task.get('origin_initiator', '')
         )
-        if not notify_target or not notify_target.startswith('+'):
+        if not notify_target or (
+            not notify_target.startswith('+') and
+            not notify_target.startswith('tg:')
+        ):
             return
 
         title = task.get('title', 'Task')
-        body = (result_content or '').strip()
+        body = _extract_notification_summary(result_content or '')
         task_id = task.get('task_id', '')
         message = (
             f"[DONE] {agent}: {title}\n\n"
@@ -2534,20 +3199,38 @@ Output NOTHING after the end delimiter."""
             f"https://the.kurult.ai/r/{task_id}"
         )
 
-        quote_ts = task.get('origin_message_id')
-        quote_author = task.get('origin_initiator') if quote_ts else None
-
         loop = asyncio.get_running_loop()
         try:
-            rc, _ = await loop.run_in_executor(
-                None, signal_send.send, notify_target, message,
-                quote_ts, quote_author,
-            )
-            if rc != 0:
+            if notify_target.startswith('tg:'):
+                import telegram_send
+                chat_id = notify_target[3:]
+                from functools import partial
+                send_telegram = partial(
+                    telegram_send.send,
+                    chat_id,
+                    message,
+                    bypass_reason=f"task-completion-notification:{task_id or 'unknown'}",
+                )
+                rc, _ = await loop.run_in_executor(None, send_telegram)
+            else:
+                import signal_send
+                quote_ts = task.get('origin_message_id')
+                quote_author = task.get('origin_initiator') if quote_ts else None
+                rc, _ = await loop.run_in_executor(
+                    None, signal_send.send, notify_target, message,
+                    quote_ts, quote_author,
+                )
+            if rc == 2:
+                # Network/unreachable failure — queue for retry
                 logger.warning(
-                    f"Direct send failed for {task_id}, enqueueing fallback"
+                    f"Direct send unreachable for {task_id}, enqueueing fallback"
                 )
                 self._nqueue.enqueue(task_id, agent, notify_target, message)
+            elif rc != 0:
+                # API rejection (rc=1) — log only, no retry (retrying won't fix it)
+                logger.warning(
+                    f"Direct send delivery failure for {task_id}: rc={rc}, not re-queuing"
+                )
         except Exception as e:
             logger.warning(f"Notification error for {task_id}: {e}, enqueueing")
             self._nqueue.enqueue(task_id, agent, notify_target, message)
@@ -2850,6 +3533,76 @@ Output NOTHING after the end delimiter."""
             spawn_path.write_text("[]")
         except (json.JSONDecodeError, OSError):
             pass
+
+    def _telemetry_claim(self, task_id: str, agent: str, task: dict, priority: str) -> None:
+        """Insert or replace an in_progress row in telemetry.db when a task is claimed.
+
+        Never raises — telemetry writes are best-effort.
+        """
+        if not TELEMETRY_DB.exists():
+            return
+        now_ms = int(time.time() * 1000)
+        priority_int = _TELEMETRY_PRIORITY.get(priority, 1)
+        try:
+            with sqlite3.connect(str(TELEMETRY_DB), timeout=3) as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO in_flight_tasks
+                        (id, type, description, delegated_by, assigned_to, priority,
+                         status, claimed_by, claimed_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?, ?)
+                    """,
+                    (
+                        task_id,
+                        task.get("source", "general"),
+                        task.get("title", task_id)[:500],
+                        self._executor_id,
+                        agent,
+                        priority_int,
+                        agent,
+                        now_ms,
+                        now_ms,
+                        now_ms,
+                    ),
+                )
+        except Exception as e:
+            logger.debug(f"telemetry_claim failed for {task_id}: {e}")
+
+    def _telemetry_complete(self, task_id: str) -> None:
+        """Update telemetry.db row to completed. Never raises."""
+        if not TELEMETRY_DB.exists():
+            return
+        now_ms = int(time.time() * 1000)
+        try:
+            with sqlite3.connect(str(TELEMETRY_DB), timeout=3) as conn:
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET status = 'completed', completed_at = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (now_ms, now_ms, task_id),
+                )
+        except Exception as e:
+            logger.debug(f"telemetry_complete failed for {task_id}: {e}")
+
+    def _telemetry_fail(self, task_id: str, reason: str) -> None:
+        """Update telemetry.db row to failed. Never raises."""
+        if not TELEMETRY_DB.exists():
+            return
+        now_ms = int(time.time() * 1000)
+        try:
+            with sqlite3.connect(str(TELEMETRY_DB), timeout=3) as conn:
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET status = 'failed', failed_at = ?, updated_at = ?, last_error = ?
+                    WHERE id = ?
+                    """,
+                    (now_ms, now_ms, reason[:500], task_id),
+                )
+        except Exception as e:
+            logger.debug(f"telemetry_fail failed for {task_id}: {e}")
 
     def _write_ledger(
         self, event_type: str, task_id: str, agent: str, **kwargs
