@@ -585,6 +585,8 @@ class BrainService:
                 return {"ok": True, "result": self.messages.list_recent(**params)}
             if method == "messages.append":
                 return {"ok": True, "result": self.messages.append(**params)}
+            if method == "messages.search":
+                return {"ok": True, "result": self.messages.search(**params)}
             if method == "calendar.list_events":
                 return {"ok": True, "result": self.calendar.list_events(**params)}
             if method == "calendar.create_event":
