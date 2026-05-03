@@ -14,6 +14,8 @@ from typing import Any
 
 import yaml
 
+from .sanitizer import classify_page
+
 ALLOWED_SUBTREES = (
     "operations/reflections",
     "operations/decisions",
@@ -322,7 +324,7 @@ class KnowledgeStore:
             if rel.startswith("hard-private/"):
                 continue
             try:
-                fm = _read_frontmatter(md.read_text(encoding="utf-8"))
+                fm = self.read_frontmatter(md)
             except Exception:
                 continue
             tags = fm.get("tags") or []
@@ -362,18 +364,20 @@ class KnowledgeStore:
         results: list[dict[str, Any]] = []
         for md in self.wiki_root.rglob("*.md"):
             rel = md.relative_to(self.wiki_root).as_posix()
-            is_hard = rel.startswith("hard-private/")
-            if privacy_scope == "public" and is_hard:
-                continue
-            if privacy_scope == "hard-private" and not is_hard:
-                continue
             try:
-                fm = _read_frontmatter(md.read_text(encoding="utf-8"))
+                fm = self.read_frontmatter(md)
             except Exception:
                 continue
             tags = fm.get("tags") or []
             if isinstance(tags, str):
                 tags = [tags]
+            if privacy_scope is None:
+                privacy_scope = "public"
+            privacy_class = classify_page(rel, fm)
+            if privacy_scope == "public" and privacy_class != "public":
+                continue
+            if privacy_scope == "hard-private" and privacy_class != "hard-private":
+                continue
             if tag in tags:
                 results.append({
                     "rel_path": rel,

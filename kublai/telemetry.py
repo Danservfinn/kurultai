@@ -242,6 +242,17 @@ class TelemetryStore:
                 CREATE INDEX IF NOT EXISTS idx_failure_reports_task ON failure_reports(task_id, occurred_at);
                 CREATE INDEX IF NOT EXISTS idx_failure_reports_agent ON failure_reports(agent, occurred_at);
 
+                CREATE TABLE IF NOT EXISTS task_dependencies (
+                  task_id            TEXT NOT NULL,
+                  depends_on_task_id TEXT NOT NULL,
+                  created_at         INTEGER NOT NULL,
+                  PRIMARY KEY (task_id, depends_on_task_id),
+                  FOREIGN KEY(task_id) REFERENCES in_flight_tasks(id) ON DELETE CASCADE,
+                  FOREIGN KEY(depends_on_task_id) REFERENCES in_flight_tasks(id) ON DELETE CASCADE
+                ) STRICT;
+                CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on
+                  ON task_dependencies(depends_on_task_id);
+
                 INSERT OR IGNORE INTO schema_migrations
                   VALUES (4, unixepoch() * 1000, 'phase 3 step 1 task lifecycle audit tables');
                 """
@@ -250,6 +261,7 @@ class TelemetryStore:
             self._ensure_column(conn, "in_flight_tasks", "reliability_state", "TEXT NOT NULL DEFAULT 'pending'")
             self._ensure_column(conn, "in_flight_tasks", "retry_count", "INTEGER NOT NULL DEFAULT 0")
             self._apply_migration_5_if_needed(conn)
+            self._repair_claim_locks_fk_if_needed(conn)
 
     # Phase 3 step 11: extend in_flight_tasks with dashboard columns + widen status CHECK.
     # SQLite STRICT tables forbid altering CHECK in place, so this runs the table-recreate
@@ -265,6 +277,11 @@ class TelemetryStore:
         DROP INDEX IF EXISTS idx_inflight_tasks_paused;
         DROP INDEX IF EXISTS idx_in_flight_tasks_dashboard;
 
+        CREATE TEMP TABLE IF NOT EXISTS _claim_locks_v4_pre_phase_3 AS
+          SELECT task_id, claimed_by, claim_token, lease_version, claimed_at, expires_at
+          FROM claim_locks;
+        DROP TABLE claim_locks;
+
         ALTER TABLE in_flight_tasks RENAME TO _in_flight_tasks_v4_pre_phase_3;
 
         CREATE TABLE in_flight_tasks (
@@ -276,6 +293,7 @@ class TelemetryStore:
           priority                    INTEGER NOT NULL,
           status                      TEXT NOT NULL CHECK(status IN (
                                         'pending','in_progress','completed','failed','cancelled',
+                                        'blocked','awaiting_approval','obsolete',
                                         'PENDING','WORKING','COMPLETED','FAILED','ORPHANED',
                                         'OBSOLETE','DONE','STALE','CANCELLED','IN_PROGRESS'
                                       )),
@@ -364,7 +382,64 @@ class TelemetryStore:
           ON in_flight_tasks(paused, status);
         CREATE INDEX IF NOT EXISTS idx_in_flight_tasks_dashboard
           ON in_flight_tasks(status, sort_order DESC, priority, created_at DESC);
+
+        CREATE TABLE claim_locks (
+          task_id TEXT PRIMARY KEY REFERENCES in_flight_tasks(id) ON DELETE CASCADE,
+          claimed_by TEXT NOT NULL,
+          claim_token TEXT NOT NULL,
+          lease_version INTEGER NOT NULL,
+          claimed_at INTEGER NOT NULL,
+          expires_at INTEGER NOT NULL
+        ) STRICT;
+        INSERT OR IGNORE INTO claim_locks (
+          task_id, claimed_by, claim_token, lease_version, claimed_at, expires_at
+        )
+        SELECT task_id, claimed_by, claim_token, lease_version, claimed_at, expires_at
+        FROM _claim_locks_v4_pre_phase_3
+        WHERE task_id IN (SELECT id FROM in_flight_tasks);
+        DROP TABLE _claim_locks_v4_pre_phase_3;
     """
+
+    def _claim_locks_fk_target(self, conn: sqlite3.Connection) -> str | None:
+        row = conn.execute("PRAGMA foreign_key_list(claim_locks)").fetchone()
+        if row is None:
+            return None
+        return row["table"] if isinstance(row, sqlite3.Row) else row[2]
+
+    def _repair_claim_locks_fk_if_needed(self, conn: sqlite3.Connection) -> None:
+        if self._claim_locks_fk_target(conn) == "in_flight_tasks":
+            return
+        prev_fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+        try:
+            conn.execute("PRAGMA foreign_keys = OFF")
+            conn.executescript(
+                """
+                BEGIN IMMEDIATE;
+                CREATE TEMP TABLE IF NOT EXISTS _claim_locks_fk_repair AS
+                  SELECT task_id, claimed_by, claim_token, lease_version, claimed_at, expires_at
+                  FROM claim_locks;
+                DROP TABLE claim_locks;
+                CREATE TABLE claim_locks (
+                  task_id TEXT PRIMARY KEY REFERENCES in_flight_tasks(id) ON DELETE CASCADE,
+                  claimed_by TEXT NOT NULL,
+                  claim_token TEXT NOT NULL,
+                  lease_version INTEGER NOT NULL,
+                  claimed_at INTEGER NOT NULL,
+                  expires_at INTEGER NOT NULL
+                ) STRICT;
+                INSERT OR IGNORE INTO claim_locks (
+                  task_id, claimed_by, claim_token, lease_version, claimed_at, expires_at
+                )
+                SELECT task_id, claimed_by, claim_token, lease_version, claimed_at, expires_at
+                FROM _claim_locks_fk_repair
+                WHERE task_id IN (SELECT id FROM in_flight_tasks);
+                DROP TABLE _claim_locks_fk_repair;
+                COMMIT;
+                """
+            )
+        finally:
+            if prev_fk:
+                conn.execute("PRAGMA foreign_keys = ON")
 
     def _apply_migration_5_if_needed(self, conn: sqlite3.Connection) -> None:
         row = conn.execute(
@@ -996,6 +1071,7 @@ class TelemetryStore:
         status_in: list[str] | None = None,
         agent: str | None = None,
         delegated_by: str | None = None,
+        source: str | None = None,
         pipeline_id: str | None = None,
         parent_task: str | None = None,
         paused: bool | None = None,
@@ -1019,9 +1095,11 @@ class TelemetryStore:
         clauses: list[str] = []
         params: list[Any] = []
         if status is not None:
+            status = self._validate_status(status)
             clauses.append("status = ?")
             params.append(status)
         if status_in:
+            status_in = [self._validate_status(item) for item in status_in]
             placeholders = ",".join(["?"] * len(status_in))
             clauses.append(f"status IN ({placeholders})")
             params.extend(status_in)
@@ -1032,6 +1110,9 @@ class TelemetryStore:
         if delegated_by is not None:
             clauses.append("delegated_by = ?")
             params.append(delegated_by)
+        if source is not None:
+            clauses.append("source = ?")
+            params.append(source)
         if pipeline_id is not None:
             clauses.append("pipeline_id = ?")
             params.append(pipeline_id)
@@ -1607,6 +1688,281 @@ class TelemetryStore:
             conn.execute("COMMIT")
         return {"reset": len(reset_ids), "ids": reset_ids, "skipped": skipped}
 
+    def recover_expired_claims(
+        self,
+        *,
+        grace_minutes: int = 10,
+        limit: int = 100,
+        agent: str | None = None,
+        reason: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Reset in-progress tasks whose claim lock has expired.
+
+        This replaces the old graph ``recover_orphans`` path used by
+        task-reaper. It returns the recovered task rows with the previous lock
+        metadata needed for logs/alerts.
+        """
+        now = utc_ms()
+        cutoff = now - max(0, int(grace_minutes)) * 60_000
+        clauses = [
+            "t.status IN ('in_progress', 'IN_PROGRESS', 'WORKING')",
+            "l.expires_at < ?",
+        ]
+        params: list[Any] = [cutoff]
+        if agent:
+            clauses.append("(t.assigned_to = ? OR t.claimed_by = ?)")
+            params.extend([agent, agent])
+        params.append(max(1, int(limit)))
+        recovered: list[dict[str, Any]] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                f"""
+                SELECT t.*, l.claimed_by AS lock_claimed_by,
+                       l.claim_token AS lock_claim_token,
+                       l.lease_version AS lock_lease_version,
+                       l.expires_at AS lock_expires_at
+                FROM in_flight_tasks t
+                JOIN claim_locks l ON l.task_id = t.id
+                WHERE {' AND '.join(clauses)}
+                ORDER BY l.expires_at ASC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+            for row in rows:
+                task = dict(row)
+                tid = task["id"]
+                prev = task["status"]
+                conn.execute("DELETE FROM claim_locks WHERE task_id = ?", (tid,))
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET previous_status = ?,
+                        status = 'pending',
+                        claimed_by = NULL,
+                        claimed_at = NULL,
+                        active_claim_token = NULL,
+                        active_lease_version = NULL,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (prev, now, tid),
+                )
+                self._append_event_inline(
+                    conn,
+                    task_id=tid,
+                    event_type="expired_claim_recovered",
+                    agent=agent or "task-reaper",
+                    details={
+                        "reason": reason or "expired_claim",
+                        "previous_status": prev,
+                        "lock_expires_at": task.get("lock_expires_at"),
+                    },
+                    now=now,
+                )
+                task["previous_status"] = prev
+                task["status"] = "pending"
+                recovered.append(task)
+            conn.execute("COMMIT")
+        return recovered
+
+    def promote_orphaned_tasks(
+        self,
+        *,
+        hold_minutes: int = 5,
+        limit: int = 100,
+        agent: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Promote legacy ORPHANED rows back to pending after a hold period."""
+        now = utc_ms()
+        cutoff = now - max(0, int(hold_minutes)) * 60_000
+        clauses = ["status = 'ORPHANED'", "updated_at < ?"]
+        params: list[Any] = [cutoff]
+        if agent:
+            clauses.append("assigned_to = ?")
+            params.append(agent)
+        params.append(max(1, int(limit)))
+        promoted: list[dict[str, Any]] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                f"""
+                SELECT * FROM in_flight_tasks
+                WHERE {' AND '.join(clauses)}
+                ORDER BY updated_at ASC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+            for row in rows:
+                task = dict(row)
+                tid = task["id"]
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET previous_status = status, status = 'pending', updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, tid),
+                )
+                self._append_event_inline(
+                    conn,
+                    task_id=tid,
+                    event_type="orphan_promoted",
+                    agent=agent or "task-reaper",
+                    details={"previous_status": task["status"]},
+                    now=now,
+                )
+                task["previous_status"] = task["status"]
+                task["status"] = "pending"
+                promoted.append(task)
+            conn.execute("COMMIT")
+        return promoted
+
+    def promote_ready_pipeline_tasks(
+        self,
+        *,
+        pipeline_id: str | None = None,
+        limit: int = 100,
+        agent: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Move blocked pipeline tasks to pending once all dependencies finish."""
+        now = utc_ms()
+        params: list[Any] = []
+        pipeline_clause = ""
+        if pipeline_id is not None:
+            pipeline_clause = "AND t.pipeline_id = ?"
+            params.append(pipeline_id)
+        params.append(max(1, int(limit)))
+        promoted: list[dict[str, Any]] = []
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                f"""
+                SELECT t.*
+                FROM in_flight_tasks t
+                WHERE t.status = 'blocked'
+                  {pipeline_clause}
+                  AND EXISTS (
+                    SELECT 1 FROM task_dependencies d WHERE d.task_id = t.id
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM task_dependencies d
+                    LEFT JOIN in_flight_tasks dep ON dep.id = d.depends_on_task_id
+                    WHERE d.task_id = t.id
+                      AND COALESCE(dep.status, 'missing') NOT IN ('completed', 'COMPLETED', 'DONE')
+                  )
+                ORDER BY t.priority DESC, t.created_at ASC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+            for row in rows:
+                task = dict(row)
+                tid = task["id"]
+                conn.execute(
+                    """
+                    UPDATE in_flight_tasks
+                    SET previous_status = status, status = 'pending', updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, tid),
+                )
+                self._append_event_inline(
+                    conn,
+                    task_id=tid,
+                    event_type="pipeline_dependencies_satisfied",
+                    agent=agent or "pipeline",
+                    details={"pipeline_id": task.get("pipeline_id")},
+                    now=now,
+                )
+                task["previous_status"] = task["status"]
+                task["status"] = "pending"
+                promoted.append(task)
+            conn.execute("COMMIT")
+        return promoted
+
+    def list_pipeline_status(self, *, pipeline_id: str) -> dict[str, Any]:
+        tasks = self.list_tasks(pipeline_id=pipeline_id, limit=500, order_by="dashboard")
+        summary: dict[str, int] = {}
+        task_ids = [task["id"] for task in tasks]
+        dependencies: dict[str, list[str]] = {tid: [] for tid in task_ids}
+        if task_ids:
+            placeholders = ",".join("?" * len(task_ids))
+            with self.connect() as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT task_id, depends_on_task_id
+                    FROM task_dependencies
+                    WHERE task_id IN ({placeholders})
+                    ORDER BY task_id, depends_on_task_id
+                    """,
+                    tuple(task_ids),
+                ).fetchall()
+            for row in rows:
+                dependencies.setdefault(row["task_id"], []).append(row["depends_on_task_id"])
+        for task in tasks:
+            status = str(task.get("status") or "")
+            summary[status] = summary.get(status, 0) + 1
+            task["depends_on"] = dependencies.get(task["id"], [])
+            task["phase"] = task.get("dispatch_phase")
+            task["agent"] = task.get("assigned_to")
+        return {"pipeline_id": pipeline_id, "tasks": tasks, "summary": summary}
+
+    def cleanup_pipeline(self, *, pipeline_id: str) -> dict[str, Any]:
+        now = utc_ms()
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            rows = conn.execute(
+                "SELECT id FROM in_flight_tasks WHERE pipeline_id = ?",
+                (pipeline_id,),
+            ).fetchall()
+            ids = [row["id"] for row in rows]
+            if ids:
+                placeholders = ",".join("?" * len(ids))
+                conn.execute(
+                    f"DELETE FROM task_dependencies WHERE task_id IN ({placeholders})",
+                    tuple(ids),
+                )
+                conn.execute(
+                    f"DELETE FROM task_dependencies WHERE depends_on_task_id IN ({placeholders})",
+                    tuple(ids),
+                )
+                conn.execute(
+                    f"DELETE FROM task_events WHERE task_id IN ({placeholders})",
+                    tuple(ids),
+                )
+                conn.execute(
+                    f"DELETE FROM task_outputs WHERE task_id IN ({placeholders})",
+                    tuple(ids),
+                )
+                conn.execute(
+                    f"DELETE FROM task_outcomes WHERE task_id IN ({placeholders})",
+                    tuple(ids),
+                )
+                conn.execute(
+                    f"DELETE FROM failure_reports WHERE task_id IN ({placeholders})",
+                    tuple(ids),
+                )
+                conn.execute(
+                    "INSERT INTO audit_events (id, actor, action, decision, resource, details_json, created_at) "
+                    "VALUES (?, 'pipeline', 'cleanup_pipeline', 'allow', ?, ?, ?)",
+                    (
+                        str(uuid.uuid4()),
+                        pipeline_id,
+                        json.dumps({"deleted_task_ids": ids}, sort_keys=True),
+                        now,
+                    ),
+                )
+                conn.execute(
+                    f"DELETE FROM in_flight_tasks WHERE id IN ({placeholders})",
+                    tuple(ids),
+                )
+            conn.execute("COMMIT")
+        return {"pipeline_id": pipeline_id, "deleted": len(ids), "ids": ids}
+
     def list_terminal_tasks(
         self,
         *,
@@ -1653,16 +2009,37 @@ class TelemetryStore:
 
     _ALLOWED_STATUSES = (
         "pending", "in_progress", "completed", "failed", "cancelled",
-        "PENDING", "WORKING", "COMPLETED", "FAILED", "ORPHANED",
-        "OBSOLETE", "DONE", "STALE", "CANCELLED", "IN_PROGRESS",
+        "blocked", "awaiting_approval", "obsolete",
     )
+    _STATUS_ALIASES = {
+        "PENDING": "pending",
+        "WORKING": "in_progress",
+        "IN_PROGRESS": "in_progress",
+        "COMPLETED": "completed",
+        "DONE": "completed",
+        "FAILED": "failed",
+        "ORPHANED": "failed",
+        "STALE": "failed",
+        "CANCELLED": "cancelled",
+        "CANCELED": "cancelled",
+        "BLOCKED": "blocked",
+        "AWAITING_APPROVAL": "awaiting_approval",
+        "OBSOLETE": "obsolete",
+    }
 
     def _validate_status(self, status: str) -> str:
-        if status not in self._ALLOWED_STATUSES:
+        normalized = self._normalize_status(status)
+        if normalized not in self._ALLOWED_STATUSES:
             raise ValueError(
                 f"invalid status {status!r}; must be one of {self._ALLOWED_STATUSES}"
             )
-        return status
+        return normalized
+
+    def _normalize_status(self, status: str) -> str:
+        if not isinstance(status, str):
+            raise ValueError(f"invalid status {status!r}; must be a string")
+        stripped = status.strip()
+        return self._STATUS_ALIASES.get(stripped, stripped.lower())
 
     def _coerce_priority(self, priority: Any) -> int:
         # The dashboard sends string priorities (critical/high/normal/low). Map
@@ -1692,7 +2069,7 @@ class TelemetryStore:
         delegated_by: str = "system",
         assigned_to: str | None = None,
         priority: Any = "normal",
-        status: str = "PENDING",
+        status: str = "pending",
         type: str = "task",
         domain: str | None = None,
         source: str | None = None,
@@ -1709,6 +2086,7 @@ class TelemetryStore:
         score: float | None = None,
         results: dict[str, Any] | None = None,
         trace_id: str | None = None,
+        depends_on: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a task with the full Phase 3 column set (no claim).
 
@@ -1716,7 +2094,10 @@ class TelemetryStore:
         sets PENDING (uppercase) by default, and accepts every column the
         the-kurultai Kanban UI exposes.
         """
-        self._validate_status(status)
+        dependencies = [str(dep) for dep in (depends_on or []) if str(dep)]
+        status = self._validate_status(status)
+        if dependencies and status == "pending":
+            status = "blocked"
         now = utc_ms()
         tid = task_id or f"task-{uuid.uuid4()}"
         trace_id = trace_id or new_trace_id()
@@ -1744,9 +2125,23 @@ class TelemetryStore:
                     prompt,
                 ),
             )
+            for dep in dependencies:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO task_dependencies
+                      (task_id, depends_on_task_id, created_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (tid, dep, now),
+                )
             self._append_event_inline(
                 conn, task_id=tid, event_type="created", agent=delegated_by,
-                details={"status": status, "title": title, "source": source},
+                details={
+                    "status": status,
+                    "title": title,
+                    "source": source,
+                    "depends_on": dependencies,
+                },
                 now=now,
             )
         return {"task_id": tid}
@@ -1779,7 +2174,7 @@ class TelemetryStore:
         agent: str | None = None,
         reason: str | None = None,
     ) -> dict[str, Any]:
-        self._validate_status(status)
+        status = self._validate_status(status)
         now = utc_ms()
         with self.connect() as conn:
             row = conn.execute(
@@ -1821,8 +2216,8 @@ class TelemetryStore:
             conn.execute(
                 """
                 UPDATE in_flight_tasks
-                SET previous_status = status,
-                    status = 'PENDING',
+                    SET previous_status = status,
+                    status = 'pending',
                     retry_count = 0,
                     claim_epoch = ?,
                     updated_at = ?
@@ -1924,7 +2319,7 @@ class TelemetryStore:
                 conn.execute(
                     """
                     UPDATE in_flight_tasks
-                    SET previous_status = status, status = 'PENDING',
+                    SET previous_status = status, status = 'pending',
                         retry_count = 0, claim_epoch = ?, updated_at = ?
                     WHERE id = ?
                     """,

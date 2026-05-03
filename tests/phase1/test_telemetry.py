@@ -79,3 +79,35 @@ def test_online_backup_restores_task_state(tmp_path):
     with restored.connect() as conn:
         row = conn.execute("SELECT id, status FROM in_flight_tasks").fetchone()
     assert dict(row) == {"id": "task-1", "status": "pending"}
+
+
+def test_dashboard_statuses_normalize_to_claimable_lowercase(tmp_path):
+    store = TelemetryStore(tmp_path / "telemetry.db")
+    created = store.create_task_full(
+        task_id="task-dashboard",
+        title="Dashboard task",
+        prompt="do work",
+        assigned_to="temujin",
+        status="PENDING",
+    )
+    assert created == {"task_id": "task-dashboard"}
+
+    with store.connect() as conn:
+        row = conn.execute("SELECT status FROM in_flight_tasks WHERE id = ?", ("task-dashboard",)).fetchone()
+    assert row["status"] == "pending"
+
+    claim = store.claim_task("temujin", lease_ttl_ms=300, now_ms=1_000)
+    assert claim.id == "task-dashboard"
+
+
+def test_retry_resets_to_claimable_lowercase_pending(tmp_path):
+    store = TelemetryStore(tmp_path / "telemetry.db")
+    store.create_task("task-retry", description="retry", delegated_by="kublai")
+    claim = store.claim_task("temujin", lease_ttl_ms=300, now_ms=1_000)
+    store.complete_task(claim.id, "temujin", claim.claim_token, summary="done", now_ms=1_010)
+
+    result = store.retry_task(task_id="task-retry", agent="temujin")
+    assert result["task_id"] == "task-retry"
+    with store.connect() as conn:
+        row = conn.execute("SELECT status FROM in_flight_tasks WHERE id = ?", ("task-retry",)).fetchone()
+    assert row["status"] == "pending"

@@ -24,10 +24,22 @@ from .telemetry import DEFAULT_LEASE_TTL_MS, NoPendingTaskError, StaleClaimError
 from .calendar import CalendarError, CalendarService, CalendarStore, GcalcliClient
 from .humans import HumansStore
 from .messages import MessagesStore
+from .sanitizer import HARD_PRIVATE_FOLDERS, HARD_PRIVATE_TAGS, HARD_PRIVATE_TYPES, DEFAULT_SANITIZER
+from .v4 import V4WorkflowService
 
 
 class CapabilityError(RuntimeError):
     """Raised when runtime prerequisites are not present."""
+
+
+def classify_page(rel_path: str, frontmatter: dict[str, Any] | None = None) -> str:
+    """Classify pages for public-index eligibility.
+
+    Public indexing must be explicit. The sanitizer defaults ambiguous pages to
+    "private"; keep that fail-closed contract here so body text is not read into
+    the public index unless a page opts in via publish/public_stub metadata.
+    """
+    return DEFAULT_SANITIZER.classify(rel_path, frontmatter)
 
 
 class BrainIndex:
@@ -93,11 +105,13 @@ class BrainIndex:
                 """
             )
 
-    def reindex(self, wiki_root: str | Path) -> int:
+    def reindex(self, wiki_root: str | Path, *, privacy_scope: str = "public") -> int:
         import hashlib
 
         from .knowledge import KnowledgeStore
 
+        if privacy_scope not in {"public", "hard-private"}:
+            raise ValueError(f"unknown privacy_scope: {privacy_scope}")
         wiki_root = Path(wiki_root).resolve()
         count = 0
         with self.connect() as conn:
@@ -109,6 +123,11 @@ class BrainIndex:
                     continue
                 rel_path = path.relative_to(wiki_root).as_posix()
                 fm = KnowledgeStore.read_frontmatter(path)
+                privacy_class = classify_page(rel_path, fm)
+                if privacy_scope == "public" and privacy_class != "public":
+                    continue
+                if privacy_scope == "hard-private" and privacy_class != "hard-private":
+                    continue
                 body = _body_without_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
                 node_id = rel_path.removesuffix(".md")
                 typed_id = _first_present(
@@ -173,12 +192,24 @@ class BrainIndex:
             nodes = conn.execute("SELECT count(*) AS n FROM nodes").fetchone()["n"]
             fts = conn.execute("SELECT count(*) AS n FROM nodes_fts").fetchone()["n"]
             vectors = conn.execute("SELECT count(*) AS n FROM node_vec").fetchone()["n"]
+            privacy_rows = conn.execute("SELECT rel_path, frontmatter FROM nodes").fetchall()
+            privacy_counts = {"public": 0, "private": 0, "hard-private": 0}
+            for privacy_row in privacy_rows:
+                try:
+                    frontmatter = json.loads(privacy_row["frontmatter"] or "{}")
+                except json.JSONDecodeError:
+                    frontmatter = {}
+                privacy_class = classify_page(privacy_row["rel_path"], frontmatter)
+                privacy_counts[privacy_class] = privacy_counts.get(privacy_class, 0) + 1
             backend = conn.execute("SELECT value FROM index_meta WHERE key = 'vector_backend'").fetchone()
         return {
             "nodes": int(nodes),
             "fts_rows": int(fts),
             "vector_rows": int(vectors),
             "vector_orphans": self.vector_orphans(),
+            "public_rows": int(privacy_counts.get("public", 0)),
+            "private_rows": int(privacy_counts.get("private", 0)),
+            "hard_private_rows": int(privacy_counts.get("hard-private", 0)),
             "vector_backend": backend["value"] if backend else "unknown",
         }
 
@@ -232,8 +263,10 @@ class BrainIndex:
         return [_node_row_to_dict(row) for row in rows]
 
     def search(self, query: str, *, node_type: str | None = None, limit: int = 10) -> list[dict[str, Any]]:
+        if not query.strip():
+            return []
         clauses = ["nodes_fts MATCH ?"]
-        params: list[Any] = [query]
+        params: list[Any] = [_fts5_phrase(query)]
         if node_type:
             clauses.append("n.type = ?")
             params.append(node_type)
@@ -262,7 +295,9 @@ class BrainIndex:
         return destination
 
 
-    def list_by_tag_in_wiki(self, knowledge_store, *, tag, privacy_scope=None, limit=50):
+    def list_by_tag_in_wiki(self, knowledge_store, *, tag, privacy_scope="public", limit=50):
+        if privacy_scope is None:
+            privacy_scope = "public"
         return knowledge_store.list_by_tag(tag=tag, privacy_scope=privacy_scope, limit=limit)
 
 class BrainService:
@@ -279,6 +314,14 @@ class BrainService:
         self.telemetry = TelemetryStore(telemetry_db)
         self.knowledge = KnowledgeStore(self.wiki_root)
         self.index = BrainIndex(index_db)
+        private_index_db = os.environ.get(
+            "BRAIN_PRIVATE_INDEX_DB",
+            str(Path.home() / ".kublai/brain-index-private/brain.db"),
+        )
+        self.private_index = BrainIndex(private_index_db)
+        self.private_access_log = Path(
+            os.environ.get("KUBLAI_PRIVATE_ACCESS_LOG", str(Path.home() / ".kublai/private-access-log.ndjson"))
+        ).expanduser()
         # Phase 2.5 Step 6: gcalcli-backed CalendarService.
         cal_store = CalendarStore(telemetry_db)
         gcalcli_bin = (
@@ -297,6 +340,7 @@ class BrainService:
         self.humans = HumansStore(self.wiki_root)
         msg_path = os.environ.get("KUBLAI_MESSAGES_JSONL", str(Path.home() / ".kublai/messages.jsonl"))
         self.messages = MessagesStore(msg_path)
+        self.v4 = V4WorkflowService(self)
 
     def capability_check(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -318,6 +362,9 @@ class BrainService:
     def reindex(self) -> int:
         return self.index.reindex(self.wiki_root)
 
+    def reindex_private(self) -> int:
+        return self.private_index.reindex(self.wiki_root, privacy_scope="hard-private")
+
     def get_node(self, node_type: str, typed_id: str) -> dict[str, Any] | None:
         return self.index.get_by_typed_id(node_type, typed_id)
 
@@ -326,6 +373,24 @@ class BrainService:
 
     def search(self, **params: Any) -> list[dict[str, Any]]:
         return self.index.search(**params)
+
+    def search_private(self, *, query: str, requester: str = "daniel-local-kublai", limit: int = 10) -> list[dict[str, Any]]:
+        if requester != "daniel-local-kublai":
+            raise ValueError("private search requires daniel-local-kublai requester")
+        rows = self.private_index.search(query=query, limit=limit)
+        self._audit_private_access("knowledge.search_private", requester, [row["rel_path"] for row in rows])
+        return rows
+
+    def _audit_private_access(self, action: str, requester: str, rel_paths: list[str]) -> None:
+        self.private_access_log.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "action": action,
+            "requester": requester,
+            "rel_paths": rel_paths,
+        }
+        with self.private_access_log.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
 
     def sweep(self) -> int:
         count = 0
@@ -373,6 +438,18 @@ class BrainService:
             stats["nodes"] == stats["fts_rows"]
             and stats["nodes"] == stats["vector_rows"]
             and stats["vector_orphans"] == 0
+            and stats["private_rows"] == 0
+            and stats["hard_private_rows"] == 0
+        )
+        return stats
+
+    def verify_private_index(self) -> dict[str, Any]:
+        stats = self.private_index.stats()
+        stats["ok"] = (
+            stats["nodes"] == stats["fts_rows"]
+            and stats["nodes"] == stats["vector_rows"]
+            and stats["vector_orphans"] == 0
+            and stats["nodes"] == stats["hard_private_rows"]
         )
         return stats
 
@@ -488,8 +565,34 @@ class BrainService:
                 return {"ok": True, "result": self.list_nodes(**params)}
             if method == "knowledge.search":
                 return {"ok": True, "result": self.search(**params)}
+            if method == "knowledge.search_private":
+                return {"ok": True, "result": self.search_private(**params)}
             if method == "knowledge.list_by_tag":
                 return {"ok": True, "result": self.index.list_by_tag_in_wiki(self.knowledge, **params)}
+            if method == "knowledge.public_search":
+                return {"ok": True, "result": self.v4.public_search(**params)}
+            if method == "knowledge.public_get":
+                return {"ok": True, "result": self.v4.public_get(**params)}
+            if method == "knowledge.public_stub_rebuild":
+                return {"ok": True, "result": self.v4.public_stub_rebuild(**params)}
+            if method == "capture.dry_run":
+                return {"ok": True, "result": self.v4.capture_dry_run(**params)}
+            if method == "capture.apply":
+                return {"ok": True, "result": self.v4.capture_apply(**params)}
+            if method == "ingest.dry_run":
+                return {"ok": True, "result": self.v4.ingest_dry_run(**params)}
+            if method == "ingest.apply":
+                return {"ok": True, "result": self.v4.ingest_apply(**params)}
+            if method == "publish.dry_run":
+                return {"ok": True, "result": self.v4.publish_dry_run(**params)}
+            if method == "publish.apply":
+                return {"ok": True, "result": self.v4.publish_apply(**params)}
+            if method == "research.public_dossier":
+                return {"ok": True, "result": self.v4.research_public_dossier(**params)}
+            if method == "audit.private_summary":
+                return {"ok": True, "result": self.v4.audit_private_summary(**params)}
+            if method == "doctor.full":
+                return {"ok": True, "result": self.v4.doctor_full(**params)}
             if method == "telemetry.list_reminders":
                 return {"ok": True, "result": self.telemetry.list_reminders(**params)}
             if method == "telemetry.list_due_reminders":
@@ -536,6 +639,16 @@ class BrainService:
                 return {"ok": True, "result": self.telemetry.cancel_tasks(**params)}
             if method == "telemetry.reset_to_pending":
                 return {"ok": True, "result": self.telemetry.reset_to_pending(**params)}
+            if method == "telemetry.recover_expired_claims":
+                return {"ok": True, "result": self.telemetry.recover_expired_claims(**params)}
+            if method == "telemetry.promote_orphaned_tasks":
+                return {"ok": True, "result": self.telemetry.promote_orphaned_tasks(**params)}
+            if method == "telemetry.promote_ready_pipeline_tasks":
+                return {"ok": True, "result": self.telemetry.promote_ready_pipeline_tasks(**params)}
+            if method == "telemetry.list_pipeline_status":
+                return {"ok": True, "result": self.telemetry.list_pipeline_status(**params)}
+            if method == "telemetry.cleanup_pipeline":
+                return {"ok": True, "result": self.telemetry.cleanup_pipeline(**params)}
             if method == "telemetry.list_terminal_tasks":
                 return {"ok": True, "result": self.telemetry.list_terminal_tasks(**params)}
             # ---- Phase 3 step 11: task CRUD RPCs (the-kurultai dashboard) ----
@@ -636,6 +749,11 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _fts5_phrase(query: str) -> str:
+    escaped = query.strip().replace('"', '""')
+    return f'"{escaped}"'
+
+
 def _node_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     value = dict(row)
     value["frontmatter"] = json.loads(value["frontmatter"])
@@ -698,7 +816,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("healthcheck")
     sub.add_parser("reindex")
+    sub.add_parser("reindex-private")
     sub.add_parser("verify-index")
+    sub.add_parser("verify-private-index")
     replay = sub.add_parser("replay-dual-write")
     replay.add_argument("--log", default=os.getenv("BRAIN_DUAL_WRITE_LOG"))
     sub.add_parser("sweep")
@@ -706,6 +826,13 @@ def build_parser() -> argparse.ArgumentParser:
     backup.add_argument("directory")
     serve = sub.add_parser("serve")
     serve.add_argument("--socket", default=os.getenv("BRAIN_SERVICE_SOCKET", "/tmp/brain-service.sock"))
+    gateway = sub.add_parser("serve-gateway")
+    gateway.add_argument("--host", default=os.getenv("KUBLAI_GATEWAY_HOST", "127.0.0.1"))
+    gateway.add_argument("--port", type=int, default=int(os.getenv("KUBLAI_GATEWAY_PORT", "8765")))
+    gateway.add_argument("--secret", default=os.getenv("KUBLAI_GATEWAY_HMAC_SECRET"))
+    gateway.add_argument("--secret-file", default=os.getenv("KUBLAI_GATEWAY_HMAC_SECRET_FILE"))
+    gateway.add_argument("--certfile", default=os.getenv("KUBLAI_GATEWAY_TLS_CERT"))
+    gateway.add_argument("--keyfile", default=os.getenv("KUBLAI_GATEWAY_TLS_KEY"))
     return parser
 
 
@@ -719,8 +846,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "reindex":
         print(json.dumps({"indexed": service.reindex()}))
         return 0
+    if args.command == "reindex-private":
+        print(json.dumps({"indexed": service.reindex_private()}))
+        return 0
     if args.command == "verify-index":
         result = service.verify_index()
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["ok"] else 1
+    if args.command == "verify-private-index":
+        result = service.verify_private_index()
         print(json.dumps(result, sort_keys=True))
         return 0 if result["ok"] else 1
     if args.command == "replay-dual-write":
@@ -747,6 +881,27 @@ def main(argv: list[str] | None = None) -> int:
             if observer is not None:
                 observer.stop()
                 observer.join(timeout=5)
+        return 0
+    if args.command == "serve-gateway":
+        from .v4_gateway import serve_gateway
+
+        secret = args.secret
+        if args.secret_file:
+            secret = Path(args.secret_file).expanduser().read_text(encoding="utf-8").strip()
+            if not secret:
+                raise ValueError("gateway secret file is empty")
+        server = serve_gateway(
+            service,
+            host=args.host,
+            port=args.port,
+            secret=secret,
+            certfile=args.certfile,
+            keyfile=args.keyfile,
+        )
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            server.shutdown()
         return 0
     return 2
 

@@ -75,7 +75,10 @@ class HumansStore:
             yield p
 
     def list(self, *, limit: int = 100, offset: int = 0,
-             search: str | None = None) -> list[dict[str, Any]]:
+             search: str | None = None,
+             include_private: bool = False,
+             include_consents: bool = False,
+             include_identifiers: bool = False) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         skipped = 0
         for p in self._iter_pages():
@@ -89,13 +92,26 @@ class HumansStore:
             if skipped < offset:
                 skipped += 1
                 continue
-            out.append({
+            item = {
                 "human_id": fm.get("human_id") or p.stem,
                 "name": display,
                 "status": fm.get("status"),
                 "social_cluster": fm.get("social_cluster"),
                 "rel_path": str(p.relative_to(self.wiki_root)),
-            })
+            }
+            if include_private or include_consents:
+                item["consents"] = fm.get("consents") or []
+            if include_private or include_identifiers:
+                for key in (
+                    "identifiers",
+                    "signal_phone",
+                    "phone",
+                    "phone_number",
+                    "timezone",
+                ):
+                    if key in fm:
+                        item[key] = fm.get(key)
+            out.append(item)
             if len(out) >= limit:
                 break
         return out
