@@ -4,6 +4,8 @@ Kurultai FastAPI - Unified Python Backend (Phase 3 v4.0)
 Replaces Express.js server with FastAPI
 """
 
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
