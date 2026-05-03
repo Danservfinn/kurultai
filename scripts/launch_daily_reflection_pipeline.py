@@ -24,6 +24,7 @@ Usage:
     python3 launch_daily_reflection_pipeline.py --force           # Override dedup guard
     python3 launch_daily_reflection_pipeline.py --launch          # Manual launch from UI (alias for --force)
 """
+from __future__ import annotations
 
 import os
 import sys

@@ -12,6 +12,7 @@ Usage:
         generate_curiosity_question, send_curiosity_question,
     )
 """
+from __future__ import annotations
 
 import logging
 import os
