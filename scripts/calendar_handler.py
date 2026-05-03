@@ -6,6 +6,8 @@ Receives messages from signal-cli, parses them with calendar_parser,
 and executes calendar operations via neo4j_calendar.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import json

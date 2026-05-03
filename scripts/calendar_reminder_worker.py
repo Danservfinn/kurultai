@@ -12,6 +12,8 @@ NOISE REDUCTION PRINCIPLES:
 4. Never retry failed sends within the same window (prevents spam)
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import subprocess
