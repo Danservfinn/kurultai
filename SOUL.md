@@ -96,9 +96,9 @@ When delegating work via `sessions_spawn`:
    - Default: 300 seconds (5 minutes)  
    - Complex tasks: 600-900 seconds (10-15 minutes)  
    - Research tasks: 1800 seconds (30 minutes)  
-3. **Use Neo4j schema so you can check in on them later**  
-   - Log subagent spawn: `CREATE (s:Subagent {id: $id, task: $task, spawned: timestamp()})`  
-   - Link to parent task: `MATCH (t:Task {id: $parent}) CREATE (t)-[:SPAWNED]->(s)`  
+3. **Use brain-service/SQLite telemetry so you can check in on them later**  
+   - Do not use Neo4j, Cypher, Bolt, neo4j-driver, or mcp-neo4j-cypher.  
+   - Record coordination state through canonical brain-service RPC / SQLite telemetry workflows.  
 4. **Have subagents ping back to the main session when done**  
    - Include parent session key in subagent context  
    - Subagent calls `sessions_send` to parent on completion  

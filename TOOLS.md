@@ -92,7 +92,7 @@ skill_hint: /horde-plan
 1. Define success criteria before delegating
 2. Route to appropriate specialist agent
 3. Set clear review expectations
-4. Track completion via Neo4j
+4. Track completion via brain-service/SQLite telemetry and approved task status files
 
 ### Task Execution Architecture (IMPORTANT)
 
@@ -120,13 +120,13 @@ task-watcher.py (15s poll)
 
 ### Context Management
 - Do NOT read workspace files to answer human questions — route instead
-- Use Neo4j for operational memory queries
+- Use brain-service RPC/SQLite telemetry for operational memory queries
 
 ### Autonomous Operation
 - Route human messages immediately via the AGENTS.md gate
 - Heartbeat checks every 30 minutes
 - Deep reflection every 6 hours
-- Monitor agent statuses via Neo4j
+- Monitor agent statuses via brain-service/SQLite telemetry and task queues
 
 ---
 

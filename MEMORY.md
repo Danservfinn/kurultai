@@ -15,6 +15,68 @@
 
 ---
 
+## Kublai Brain v4 Runtime Canon (2026-05-03)
+
+**Status:** Brain v3/v4 is implemented on the Mac Mini. Active runtime has moved off Neo4j.
+
+### Canonical Memory / Runtime
+
+- **Neo4j is eliminated from active runtime. Do not restart it, query it, or use Cypher/Bolt/neo4j-driver/mcp-neo4j-cypher.**
+- **brain-service + SQLite are canonical.**
+- Public index: `/Users/kublai/.brain-index/brain.db`
+- Private hard-private index: `/Users/kublai/.kublai/brain-index-private/brain.db`
+- Telemetry: `/Users/kublai/.kublai/telemetry.db`
+- Wiki root: `/Users/kublai/brain`
+
+### Gateway
+
+- Persistent launchd label: `ai.kurultai.brain-public-gateway`
+- Local URL: `http://127.0.0.1:8765`
+- `/health` is public-local.
+- `/api/*` requires HMAC from `/Users/kublai/.kublai/brain-public-gateway.hmac`.
+- Gateway is public-only and must never serve private or hard-private content.
+
+### Privacy Rules
+
+- Default page privacy is private.
+- Public index/publish only includes pages with `publish: true` or `public_stub: true`.
+- `hard-private/` path, `type: human-contact`, or tags `pii`/`tax`/`financial`/`legal`/`medical` always override to hard-private.
+- Private/hard-private LLM work is local-host/local-session only.
+- External LLM calls are public-context only.
+- Never send private/hard-private content, hard-private paths, canary strings, raw identifiers, secrets, tokens, or private prompts to external providers.
+
+### Commands / Checks
+
+- Doctor: `cd /Users/kublai/kurultai/kublai-repo && /Users/kublai/.brain-migration-venv/bin/python -m kublai.doctor`
+- CLI: `/Users/kublai/.brain-migration-venv/bin/python -m kublai.v4_cli --json <command>`
+- Public ask: `kublai.v4_cli --json ask "query"`
+- Public capture apply: `kublai.v4_cli --json capture --apply --publish --title "Title" --content "public-safe text"`
+- Publish dry-run: `kublai.v4_cli --json publish`
+- Publish apply: `kublai.v4_cli --json publish --apply`
+- Verify public index: `python -m kublai.brain_service --wiki-root /Users/kublai/brain --telemetry-db /Users/kublai/.kublai/telemetry.db --index-db /Users/kublai/.brain-index/brain.db verify-index`
+- Verify private index: same command with `verify-private-index`
+
+### Current Acceptance
+
+- `kublai doctor ok=true`
+- `v4_full=true`
+- `v4_gateway_health=true`
+- active graph-store lint clean
+- public index has zero hard-private rows
+- private index is healthy
+- focused tests passed
+- local commit: `9e9c1e4 feat(brain): ship v4 public gateway workflows`
+
+### Behavior Changes
+
+- Use brain-service RPC/SQLite telemetry instead of graph-store/Neo4j.
+- Treat public search as intentionally sparse.
+- Mutating workflows default to dry-run/proposal unless explicitly applying.
+- Publish must pass sanitizer before writing public output.
+- If v4 checks fail, treat it as a regression and do not bypass privacy boundaries.
+
+---
+
 ## Task Creation Protocol
 
 **When creating tasks, Kublai must:**
@@ -48,7 +110,7 @@ python3 scripts/task_intake.py --title 'Task title' --body 'Task description' --
 - Gateway heartbeats (30m) for agent check-ins
 - heartbeat_master.py daemon (5m) for continuous operation
 - Cron jobs under Kublai for high-level tasks
-- File-based memory + Neo4j operational memory
+- File-based memory + brain-service/SQLite operational memory
 - **Task execution via claude-agent subprocess** (not ACP sessions)
 
 ### Task Execution Flow
@@ -79,7 +141,7 @@ task-watcher.py (15s poll)
 
 ## What Doesn't Work
 
-- Cross-agent file writing (use Neo4j instead)
+- Cross-agent file writing (use brain-service/SQLite telemetry and approved coordination channels instead)
 - Single cron job for all reflections (broken for non-Kublai)
 - Self-answering product questions (always route to specialists)
 - ACP sessions for specialist tasks (wrong architecture — use subprocess)
@@ -206,13 +268,15 @@ When `claude-agent` wrapper is invoked for task execution, it uses a **multi-tie
 - Fallback models: glm-5 (Z.AI), qwen3.5-plus (Alibaba)
 - **Tolui is EXEMPT** (uses only abliterated model via Ollama)
 
-**Neo4j:** `Configuration:OpenClawConfig {name: 'claude-agent-fallback-chain'}`
+**Runtime note:** active runtime no longer uses Neo4j; use brain-service/SQLite telemetry for operational configuration/status checks.
 
 ---
 
-## Task Execution Architecture (2026-03-23)
+## Historical Task Execution Architecture (2026-03-23)
 
-**Current System:** The old `task-watcher.py` + `agent-task-handler.py` has been replaced.
+**Historical note:** This section describes the pre-Brain-v4 pipeline. As of 2026-05-03, Neo4j is eliminated from active runtime; do not restart or use it. Use brain-service/SQLite telemetry instead.
+
+**Previous System:** The old `task-watcher.py` + `agent-task-handler.py` had been replaced.
 
 ### Components
 
@@ -220,11 +284,11 @@ When `claude-agent` wrapper is invoked for task execution, it uses a **multi-tie
 |-----------|------|------|
 | **Dispatcher** | `ogedei_dispatch.py` | Async task dispatcher using asyncio and ThreadPoolExecutor |
 | **Watchdog** | `ogedei-watchdog.py` | Launchd daemon that monitors and restarts dispatcher |
-| **Pipeline** | `launch_daily_reflection_pipeline.py` | Creates 36-task pipeline in Neo4j with dependency chains |
+| **Pipeline** | `launch_daily_reflection_pipeline.py` | Historical 36-task pipeline; do not use Neo4j in active runtime |
 
 ### How It Works
 
-1. **Pipeline Creation:** `launch_daily_reflection_pipeline.py --force` creates tasks in Neo4j
+1. **Pipeline Creation:** Historical only; do not create active runtime tasks in Neo4j.
 2. **Task Dispatch:** `ogedei_dispatch.py` polls agent task queues and executes via subprocess
 3. **Watchdog:** `ogedei-watchdog.py` (launchd service) ensures dispatcher stays running
 4. **Execution:** Tasks run via `claude-agent` subprocess in agent workspaces
@@ -250,7 +314,7 @@ When `claude-agent` wrapper is invoked for task execution, it uses a **multi-tie
 | 6 | 6 | Awaiting approval (kanban) |
 | 7 | 11 | Downstream implementation |
 
-**Total:** 36 tasks with full dependency chains via Neo4j
+**Total:** historical 36-task flow; active dependency/state tracking should use brain-service/SQLite telemetry, not Neo4j.
 
 ### Kanban Integration
 
@@ -269,5 +333,5 @@ When `claude-agent` wrapper is invoked for task execution, it uses a **multi-tie
 
 ---
 
-*Last updated: 2026-03-09 (v2.2 multi-tier configuration ENABLED per user preference, Neo4j stored)*
-*Architecture updated: 2026-03-23 (quiet-napping-shannon pipeline deployed)*
+*Last updated: 2026-05-03 (Brain v4 canon: brain-service + SQLite, Neo4j retired from active runtime)*
+*Architecture history: 2026-03-23 quiet-napping-shannon pipeline deployed; now superseded for active runtime by Brain v4 canon*
