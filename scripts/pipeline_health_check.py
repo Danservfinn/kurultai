@@ -16,6 +16,7 @@ Exit codes:
     1 - One or more pipelines degraded
     2 - One or more pipelines critical
 """
+from __future__ import annotations
 
 import os
 import sys
