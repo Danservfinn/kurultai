@@ -55,12 +55,12 @@ from kurultai_paths import (
     VALID_CLAUDE_MODELS,
 )
 # Phase 5 migration: TaskStore + WAL + emit_event are now brain-service shims.
-# The Neo4j driver path is gone; all task lifecycle writes go via the local
+# The graph driver path is gone; all task lifecycle writes go via the local
 # brain-service Unix socket (sqlite-backed telemetry.db). Kept the import names
 # (TaskStore, WAL, emit_event, emit_session_reset) so existing call sites are
 # untouched — they now bind to the brain-service-backed implementations defined
 # below.
-from neo4j_v2_failure import classify_failure, classify_validation_failure
+from task_failure import classify_failure, classify_validation_failure
 from circuit_breaker import AgentCircuitBreaker
 from prompt_sanitizer import PromptSanitizer
 from notification_queue import NotificationQueue
@@ -72,7 +72,7 @@ from kurultai_ledger import generate_task_id
 # ---------------------------------------------------------------------------
 # Brain-service migration shims (Phase 5)
 # ---------------------------------------------------------------------------
-# Replace neo4j_v2_core.TaskStore, neo4j_v2_wal.WAL, neo4j_v2_events.emit_event
+# Replace the former graph-backed TaskStore, WAL, and emit_event adapters
 # with brain-service-backed equivalents. The brain-service exposes the task
 # lifecycle (claim/complete/retry/fail/etc.) over a JSON-line Unix socket at
 # BRAIN_SERVICE_SOCKET. All writes land in ~/.kublai/telemetry.db.
@@ -147,7 +147,7 @@ def _brain_call(method: str, params: Optional[dict] = None) -> dict:
 # Status-mapping for the brain-service column constraint.
 # in_flight_tasks.status accepts both legacy lowercase and uppercase values,
 # but the live workflow (claim_task / sweep_expired_claims) only matches the
-# lowercase forms. Uppercase values were the Neo4j-mirror convention for the
+# lowercase forms. Uppercase values were the brain-service-mirror convention for the
 # dashboard. The executor speaks lowercase to keep claims and recovery
 # functioning.
 _BRAIN_STATUS_PENDING = "pending"
@@ -157,7 +157,7 @@ _BRAIN_STATUS_FAILED = "failed"
 
 
 class _NoopSession:
-    """No-op replacement for neo4j Session; swallows .run() calls."""
+    """No-op replacement for legacy Session; swallows .run() calls."""
 
     def run(self, *_args, **_kwargs):
         class _NoopResult:
@@ -183,7 +183,7 @@ class _NoopSession:
 
 
 class _NoopDriver:
-    """No-op replacement for neo4j Driver — used as the executor's `driver`
+    """No-op replacement for the legacy driver used as the executor's `driver`
     handle so legacy code paths that still call `driver.session()` succeed
     without opening a Bolt connection."""
 
@@ -200,8 +200,8 @@ class WAL:
     def __init__(self, *_args, **_kwargs):
         pass
 
-    def buffer(self, _cypher, _params=None):
-        # Silently drop. The previous behavior buffered Cypher for a Neo4j
+    def buffer(self, _statement, _params=None):
+        # Silently drop. The previous behavior buffered graph writes for a
         # outage; with brain-service over a local socket and SQLite, there's
         # no equivalent tier to buffer to.
         return 0
@@ -216,6 +216,230 @@ class WAL:
         return 0
 
 
+def _json_object(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    if not value:
+        return {}
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _hydrate_task_payload(payload: dict) -> dict:
+    """Normalize brain-service task rows for the legacy executor.
+
+    SQLite task intake stores channel/origin metadata under
+    results_json.intake_metadata. The executor's notification path expects
+    those fields at top level, so hydrate them as the task leaves
+    brain-service and normalize nullable text columns that old filesystem-era
+    code treats as strings.
+    """
+    out = dict(payload or {})
+    results = _json_object(out.get("results_json"))
+    metadata = _json_object(results.get("intake_metadata"))
+    if metadata:
+        out["intake_metadata"] = metadata
+    for key in (
+        "notify_target",
+        "origin_type",
+        "origin_initiator",
+        "origin_message_id",
+        "origin_source",
+        "prompt_template",
+        "template_version",
+    ):
+        if metadata.get(key) is not None and out.get(key) in (None, ""):
+            out[key] = metadata[key]
+    for key in ("source", "prompt", "body", "title", "skill_hint"):
+        if out.get(key) is None:
+            out[key] = ""
+    if not out.get("prompt") and out.get("description"):
+        out["prompt"] = out.get("description") or ""
+    return out
+
+
+def _coordination_store_factory():
+    """Load the Hermes↔Kublai coordination store lazily.
+
+    The shared-context directory contains a hyphen, so it is intentionally not
+    imported at module import time. Keeping this lazy also lets unit tests pass a
+    fake store without touching the live coordination database.
+    """
+    shared_dir = Path(__file__).resolve().parents[1] / "shared-context" / "hermes-kublai"
+    if str(shared_dir) not in sys.path:
+        sys.path.insert(0, str(shared_dir))
+    from coordination_store import CoordinationStore  # type: ignore
+
+    return CoordinationStore(shared_dir / "coordination.db")
+
+
+def _coordination_snapshot(store, lock_id: int) -> dict:
+    if hasattr(store, "snapshot_lock"):
+        return store.snapshot_lock(lock_id)
+    with store.connect() as conn:
+        lock_row = conn.execute("SELECT * FROM response_locks WHERE id = ?", (lock_id,)).fetchone()
+        if not lock_row:
+            return {"lock": None, "contributions": [], "events": []}
+        contributions = [
+            store._contribution_row_to_dict(row)
+            for row in conn.execute("SELECT * FROM contributions WHERE lock_id = ? ORDER BY id", (lock_id,)).fetchall()
+        ]
+        events = [
+            store._event_row_to_dict(row)
+            for row in conn.execute("SELECT * FROM coordination_events WHERE lock_id = ? ORDER BY id", (lock_id,)).fetchall()
+        ]
+        return {"lock": store._lock_row_to_dict(lock_row), "contributions": contributions, "events": events}
+
+
+def _record_coordination_bridge_blocker(store, lock_id: int, actor: str, reason: str, details: Optional[dict] = None) -> dict:
+    if hasattr(store, "record_bridge_blocker"):
+        return store.record_bridge_blocker(lock_id, actor, reason, details or {})
+    payload = {"reason": reason}
+    payload.update(details or {})
+    try:
+        with store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            store._record_event(conn, lock_id, "coordination.bridge_blocked", actor, payload)
+            conn.execute("COMMIT")
+    except Exception as e:
+        logger.warning("coordination bridge: failed to record blocker for lock %s: %s", lock_id, e)
+    return {"ok": True, "reason": reason, "details": payload}
+
+
+def _default_send_reserved_outbox(outbox: dict) -> str:
+    """Send a pre-reserved outbox item through Telegram and return provider id."""
+    channel = str(outbox.get("channel") or "")
+    if channel != "telegram":
+        raise ValueError(f"unsupported coordination send channel: {channel!r}")
+    chat_id = str(outbox.get("chat_id") or "")
+    text = str(outbox.get("text") or "")
+    if not chat_id or not text:
+        raise ValueError("reserved coordination outbox missing chat_id or text")
+    import telegram_send
+
+    rc, result = telegram_send.send(
+        chat_id,
+        text,
+        bypass_reason=f"coordination_executor_bridge_reserved:{outbox.get('send_key') or 'unknown'}",
+    )
+    if rc != 0:
+        raise RuntimeError(f"telegram_send failed: {result}")
+    return str(result.get("provider_message_id") or result.get("message_id") or "sent")
+
+
+def _best_contribution_text(contribution: dict) -> str:
+    summary = str(contribution.get("summary") or "").strip()
+    detail = str(contribution.get("detail") or "").strip()
+    if summary and detail and detail not in summary:
+        return f"{summary}\n\n{detail}".strip()
+    return (detail or summary).strip()
+
+
+def _run_coordination_completion_bridge(
+    task: dict,
+    result_content: str,
+    *,
+    store_factory=_coordination_store_factory,
+    send_func=_default_send_reserved_outbox,
+) -> dict:
+    """Advance a completed coordination-handoff task through the public send gate.
+
+    Guardrails:
+    - only coordination-handoff tasks with intake_metadata.lock_id are handled;
+    - the lock owner (Kublai for Kublai-owned handoffs) remains the actor;
+    - owner synthesis is required when requires_owner_synthesis is true;
+    - sends go through reserve_public_answer_send + mark_public_answer_sent.
+    """
+    if (task.get("source") or "") != "coordination-handoff":
+        return {"status": "skipped", "reason": "not_coordination_handoff"}
+    metadata = _json_object(task.get("intake_metadata"))
+    if not metadata:
+        metadata = _json_object(_json_object(task.get("results_json")).get("intake_metadata"))
+    lock_id_raw = metadata.get("lock_id") or task.get("lock_id")
+    if not lock_id_raw:
+        return {"status": "skipped", "reason": "missing_lock_id"}
+    lock_id = int(lock_id_raw)
+    actor = str(metadata.get("logical_owner") or metadata.get("public_synthesizer") or "kublai")
+    requires_owner = bool(metadata.get("requires_owner_synthesis", True))
+    fallback_requires_transfer = bool(metadata.get("fallback_requires_transfer", True))
+
+    store = store_factory()
+    snapshot = _coordination_snapshot(store, lock_id)
+    lock = snapshot.get("lock") or {}
+    if not lock:
+        return {"status": "blocked", "reason": "unknown_lock", "lock_id": lock_id}
+    if lock.get("final_answer_message_id") or lock.get("status") == "answered":
+        return {"status": "skipped", "reason": "already_answered", "lock_id": lock_id}
+
+    owner = str(lock.get("owner") or actor)
+    if actor != owner:
+        if fallback_requires_transfer:
+            _record_coordination_bridge_blocker(
+                store, lock_id, actor, "logical_owner_not_lock_owner", {"lock_owner": owner}
+            )
+            return {"status": "blocked", "reason": "logical_owner_not_lock_owner", "lock_id": lock_id, "owner": owner}
+        actor = owner
+
+    contributions = list(snapshot.get("contributions") or [])
+    owner_contrib = next((c for c in contributions if str(c.get("contributor")) == actor), None)
+    if requires_owner and not owner_contrib:
+        _record_coordination_bridge_blocker(
+            store,
+            lock_id,
+            actor,
+            "missing_owner_synthesis",
+            {"required_owner": actor, "task_id": task.get("task_id")},
+        )
+        return {"status": "blocked", "reason": "missing_owner_synthesis", "lock_id": lock_id}
+
+    required = set(str(c) for c in (lock.get("required_contributors") or []))
+    for contribution in contributions:
+        contributor = str(contribution.get("contributor") or "")
+        if contribution.get("processed_at"):
+            continue
+        if required and contributor not in required and contributor != actor:
+            continue
+        store.process_contribution(
+            lock_id,
+            int(contribution["id"]),
+            actor,
+            "accepted",
+            "executor-side completion bridge",
+        )
+
+    final_text = _best_contribution_text(owner_contrib or {}) or (result_content or "").strip()
+    if not final_text:
+        _record_coordination_bridge_blocker(store, lock_id, actor, "empty_final_answer", {"task_id": task.get("task_id")})
+        return {"status": "blocked", "reason": "empty_final_answer", "lock_id": lock_id}
+    final_text = final_text[:8000]
+
+    store.finalize_lock(lock_id, "ready_to_answer", final_text[:2000], actor=actor)
+    reservation = store.reserve_public_answer_send(lock_id, actor, final_text, purpose=str(lock.get("purpose") or "answer"))
+    if not reservation.get("allowed"):
+        reason = reservation.get("reason") or "send_not_allowed"
+        if reason in {"duplicate_send_reserved", "terminal_lock"}:
+            return {"status": "skipped", "reason": reason, "lock_id": lock_id}
+        _record_coordination_bridge_blocker(store, lock_id, actor, reason, {"reservation": {"reason": reason}})
+        return {"status": "blocked", "reason": reason, "lock_id": lock_id}
+
+    outbox = dict(reservation.get("outbox") or {})
+    outbox.setdefault("send_key", reservation.get("send_key"))
+    provider_message_id = send_func(outbox)
+    store.mark_public_answer_sent(
+        lock_id,
+        str(reservation["send_key"]),
+        str(provider_message_id),
+        actor,
+        final_summary=final_text[:240],
+    )
+    return {"status": "sent", "lock_id": lock_id, "send_key": reservation.get("send_key"), "provider_message_id": provider_message_id}
+
+
 def emit_event(
     _driver,
     event_type: str,
@@ -228,7 +452,7 @@ def emit_event(
 
     Writes a row to telemetry.task_events via brain-service RPC.
     Non-blocking: swallows all errors. Drop-in replacement for the old
-    neo4j_v2_events.emit_event signature.
+    emit_event signature.
     """
     details = {"executor_id": executor_id} if executor_id else {}
     for key, val in kwargs.items():
@@ -258,15 +482,14 @@ def emit_event(
 
 
 def emit_session_reset(_driver, task_id: str, agent: str, executor_id: str = "", **kwargs):
-    """Backward-compat wrapper — brain-service has no AgentMetrics counters
-    (those were Neo4j-only); we only emit the SESSION_RESET task event."""
+    """Backward-compat wrapper: brain-service only emits the task event."""
     return emit_event(
         None, "SESSION_RESET", task_id, agent, executor_id=executor_id, **kwargs
     )
 
 
 class TaskStore:
-    """Brain-service-backed replacement for neo4j_v2_core.TaskStore.
+    """Brain-service-backed replacement for the old graph TaskStore.
 
     Translates the legacy method surface used by task_executor.py into
     brain-service RPCs over the Unix socket. The shape returned matches
@@ -318,7 +541,7 @@ class TaskStore:
         # round-trip back into renew/complete/fail, so this remains
         # transparent. We additionally return claim_token explicitly for
         # any new readers.
-        out = dict(payload)
+        out = _hydrate_task_payload(payload)
         out["task_id"] = task_id
         out["claim_epoch"] = token
         out["claim_token"] = token
@@ -374,17 +597,16 @@ class TaskStore:
         except BrainServiceError as e:
             return False, f"brain_error:{e}"
         # Append a structured TaskOutput record so dashboards that read
-        # task_outputs see the same content the legacy TaskOutput Neo4j
+        # task_outputs see the same content the legacy TaskOutput brain-service
         # node carried.
         try:
             _brain_call(
                 "telemetry.append_task_output",
                 {
                     "task_id": task_id,
-                    "agent": agent or None,
                     "kind": "completion",
-                    "content": text[:8000] if text else "",
-                    "details": {
+                    "summary": (solution or text or "")[:2000],
+                    "payload": {
                         "problem": problem,
                         "solution": solution,
                         "rationale": rationale,
@@ -542,7 +764,7 @@ class TaskStore:
     # ----- BLOCKED sweep ---------------------------------------------
     def sweep_blocked_tasks(self) -> list[str]:
         # The SQLite schema does not yet model DEPENDS_ON edges, so the
-        # safety-net sweep that the Cypher version performed has no analog.
+        # safety-net sweep that the prior graph query performed has no analog.
         # Returning an empty list is safe: BLOCKED tasks now move via
         # explicit set_task_status calls from the executor.
         return []
@@ -550,7 +772,7 @@ class TaskStore:
     # ----- create ----------------------------------------------------
     def create_task(self, *args, **kwargs) -> dict:
         # The legacy TaskStore.create_task accepted keyword args matching the
-        # Neo4j Task properties; one caller (line 2907) passes a single dict.
+        # brain-service Task properties; one caller (line 2907) passes a single dict.
         # Translate both shapes into telemetry.create_task_full.
         if args and isinstance(args[0], dict) and not kwargs:
             spec = dict(args[0])
@@ -607,7 +829,7 @@ class TaskStore:
 
     # ----- record_execution ------------------------------------------
     def record_execution(self, *_args, **_kwargs):
-        # Was a Neo4j EXECUTED edge for historical queries; not used by the
+        # Was a brain-service EXECUTED edge for historical queries; not used by the
         # executor's hot path. Safe no-op under brain-service.
         return False
 
@@ -1145,10 +1367,10 @@ def _is_triage_task(task: dict, task_file: Optional[Path] = None) -> bool:
     """
     if task_file and "triage" in task_file.name.lower():
         return True
-    prompt = task.get("prompt", task.get("body", ""))
+    prompt = task.get("prompt") or task.get("body") or ""
     if re.search(r"^type:\s*(triage|escalation)\s*$", prompt, re.MULTILINE | re.IGNORECASE):
         return True
-    title = task.get("title", "").lower()
+    title = (task.get("title") or "").lower()
     if any(kw in title for kw in ("triage", "escalation")):
         return True
     return False
@@ -1368,7 +1590,7 @@ class Executor:
         self._nqueue = NotificationQueue()
 
     def _get_driver(self):
-        """Phase 5 migration: returns a no-op driver. The Neo4j Bolt driver
+        """Phase 5 migration: returns a no-op driver. The brain-service Bolt driver
         is gone; emit_event/raw .session().run() blocks now no-op safely.
         Real task lifecycle writes go through self._store (BrainServiceTaskStore)
         and emit_event() (telemetry.append_task_event)."""
@@ -1440,7 +1662,7 @@ class Executor:
         _last_blocked_sweep = 0.0
         _last_fs_sync = 0.0
         BLOCKED_SWEEP_INTERVAL = 120   # seconds — safety net for push-based unblock misses
-        FS_SYNC_INTERVAL = 1800        # seconds — reconcile filesystem with Neo4j state
+        FS_SYNC_INTERVAL = 1800        # seconds — reconcile filesystem with brain-service state
         while not self._shutdown:
             try:
                 await self._poll_and_dispatch()
@@ -1455,7 +1677,7 @@ class Executor:
                     except Exception as sweep_err:
                         logger.warning(f"Blocked sweep error: {sweep_err}")
                     _last_blocked_sweep = now
-                # Periodically sync filesystem state with Neo4j to clear stale .md files
+                # Periodically sync filesystem state with brain-service to clear stale .md files
                 if now - _last_fs_sync >= FS_SYNC_INTERVAL:
                     try:
                         self._sync_filesystem_state()
@@ -1571,11 +1793,20 @@ class Executor:
     async def _execute_and_cleanup(self, task: dict):
         """Semaphore wrapper: acquire → execute → remove from active set."""
         task_id = task.get("task_id", "")
+        claim_epoch = task.get("claim_epoch", 0)
         try:
             async with self._semaphore:
                 await self._execute_inner(task)
         except Exception as e:
-            logger.error(f"Unhandled error in task {task_id}: {e}")
+            logger.error(f"Unhandled error in task {task_id}: {e}", exc_info=True)
+            try:
+                self._store.fail_task(
+                    task_id, claim_epoch,
+                    error_class="INTERNAL_ERROR", error_msg=str(e)[:500],
+                    is_transient=False,
+                )
+            except Exception:
+                pass
         finally:
             self._active_tasks.discard(task_id)
             self._active_task_epochs.pop(task_id, None)
@@ -1644,10 +1875,10 @@ class Executor:
             )
 
         # 2. Sanitize task body
-        raw_body = task.get("prompt", task.get("body", task.get("title", "")))
+        raw_body = task.get("prompt", task.get("body", task.get("title", ""))) or ""
 
         # Inject prior phase context for pipeline tasks that go through Claude
-        if task.get("source", "").startswith("pipeline"):
+        if (task.get("source") or "").startswith("pipeline"):
             phase_context = self._resolve_phase_context(task)
             if phase_context:
                 raw_body = phase_context + "\n\n---\n\n" + raw_body
@@ -1717,7 +1948,7 @@ class Executor:
         # 2b. Write .executing.md sentinel NOW — before Phase 1 (prompt optimization
         # takes up to 120s). If the executor crashes during Phase 1 the file-based
         # re-dispatch guard sees .executing.md and skips the task, preventing
-        # double-execution when the next executor starts and resets Neo4j status.
+        # double-execution when the next executor starts and resets brain-service status.
         # Pipeline tasks skip Phase 1 but still need the sentinel.
         self._rename_task_file(agent, task_id, ".executing.md")
         # Compute the companion .executing.pid path so TaskRunner can write the
@@ -1728,7 +1959,7 @@ class Executor:
 
         # 2c. Two-phase prompt: try optimized, fallback to simple
         # Skip optimization for pipeline tasks (deterministic scripts)
-        if task.get("source", "").startswith("pipeline"):
+        if (task.get("source") or "").startswith("pipeline"):
             optimized = None
         else:
             optimized = await self._generate_optimized_prompt(
@@ -1850,7 +2081,7 @@ class Executor:
         # Direct pipeline scripts AND pipeline LLM tasks (e.g. vote tasks) are both
         # exempt from the ## Resolution requirement: their outputs are structured data
         # consumed by downstream parsers, not human-readable completion reports.
-        skip_res = is_pipeline or task.get("source", "").startswith("pipeline")
+        skip_res = is_pipeline or (task.get("source") or "").startswith("pipeline")
         passed, reason = verify_result(run_result, skip_resolution=skip_res)
 
         # 5b. Model fallback on rate-limit or auth failure.
@@ -2036,6 +2267,17 @@ class Executor:
                 self._cb.record_result(agent, True, task_id)
                 self._rename_task_file(agent, task_id, ".done.md")
                 await self._post_completion(task, run_result)
+                try:
+                    bridge_result = _run_coordination_completion_bridge(task, run_result.content)
+                    if bridge_result.get("status") not in {"skipped", None}:
+                        logger.info("coordination completion bridge for %s: %s", task_id, bridge_result)
+                except Exception as e:
+                    logger.warning("coordination completion bridge failed for %s: %s", task_id, e, exc_info=True)
+                    emit_event(
+                        self._get_driver(), "COORDINATION_BRIDGE_FAILED",
+                        task_id, agent,
+                        error=str(e)[:200],
+                    )
                 # Deploy pipeline (only if worktree was used)
                 if worktree_path and project_config:
                     try:
@@ -2069,7 +2311,7 @@ class Executor:
                 # Check if implementation was partial despite "success"
                 await self._check_continuation(task, run_result, passed=True)
             else:
-                # CAS failed or Neo4j unavailable — buffer to WAL
+                # CAS failed or brain-service unavailable — buffer to WAL
                 self._wal.buffer(
                     "MATCH (t:Task {task_id: $tid, status: 'WORKING'}) "
                     "SET t.status = 'COMPLETED', t.completed_at = datetime() "
@@ -2083,7 +2325,7 @@ class Executor:
                         "dur": run_result.duration_s,
                     },
                 )
-                # Still rename the filesystem file — WAL will persist Neo4j later
+                # Still rename the filesystem file — WAL will persist brain-service later
                 self._rename_task_file(agent, task_id, ".done.md")
                 self._telemetry_complete(task_id)
                 logger.warning(
@@ -2102,7 +2344,7 @@ class Executor:
             # Validation failures (missing_resolution*) must use classify_validation_failure
             # rather than classify_failure — classify_failure(rc=0, stderr="") returns
             # ("SUCCESS", False) which produces FAILED_PERMANENT with 0 retries.
-            if reason.startswith("missing_resolution"):
+            if reason and reason.startswith("missing_resolution"):
                 error_class, is_transient = classify_validation_failure(reason)
             else:
                 error_class, is_transient = classify_failure(
@@ -2171,10 +2413,10 @@ class Executor:
         Called only when verify_result() returns reason="stall_detected".
 
         Flow:
-          1. Increment t.stall_count on the Neo4j Task node (atomic)
+          1. Increment t.stall_count on the brain-service Task node (atomic)
           2. If stall_count >= STALL_ESCALATION_THRESHOLD:
              a. Set status = 'STALL_ESCALATED' (terminal — won't be re-claimed)
-             b. Emit STALL_ESCALATED event node (Neo4j)
+             b. Emit STALL_ESCALATED event node (brain-service)
              c. Append entry to ~/.openclaw/logs/stall-escalations.jsonl (JSONL ledger)
              d. Send Kublai notification for manual review
         """
@@ -2194,12 +2436,12 @@ class Executor:
                 )
                 record = result.single()
                 if not record:
-                    logger.warning(f"stall escalation: task {task_id} not found in Neo4j")
+                    logger.warning(f"stall escalation: task {task_id} not found in brain-service")
                     return
                 stall_count = record["stall_count"]
                 current_status = record["status"]
         except Exception as e:
-            logger.warning(f"stall escalation: Neo4j increment failed for {task_id}: {e}")
+            logger.warning(f"stall escalation: brain-service increment failed for {task_id}: {e}")
             return
 
         logger.info(
@@ -2218,7 +2460,7 @@ class Executor:
             f"(threshold={STALL_ESCALATION_THRESHOLD}), escalating for manual review"
         )
 
-        # 1. Set terminal status in Neo4j
+        # 1. Set terminal status in brain-service
         try:
             driver = self._get_driver()
             with driver.session() as session:
@@ -2242,7 +2484,7 @@ class Executor:
                 {"tid": task_id, "stall_count": stall_count},
             )
 
-        # 2. Emit Neo4j event node (dual-write observability)
+        # 2. Emit brain-service event node (dual-write observability)
         emit_event(
             self._get_driver(), "STALL_ESCALATED", task_id, agent,
             executor_id=self._executor_id,
@@ -2655,7 +2897,7 @@ class Executor:
 
     def _is_direct_script(self, task: dict, prompt: str) -> bool:
         """Return True if this pipeline task should run as a direct subprocess."""
-        return (task.get("source", "").startswith("pipeline")
+        return ((task.get("source") or "").startswith("pipeline")
                 and bool(_SCRIPT_RE.match(prompt.strip())))
 
     async def _execute_direct_script(self, task: dict, prompt: str) -> RunResult:
@@ -2702,7 +2944,7 @@ class Executor:
             Assembled prompt string ready to pass to the claude agent.
         """
         # Pipeline tasks get raw prompt — no horde-plan/implement wrapper
-        if task.get("source", "").startswith("pipeline"):
+        if (task.get("source") or "").startswith("pipeline"):
             return task_body
 
         skill_hint = task.get("skill_hint", "")
@@ -2967,7 +3209,7 @@ Output NOTHING after the end delimiter."""
         return effective
 
     async def _renew_leases(self):
-        """Background coroutine: extend Neo4j lease and emit events every 10 minutes."""
+        """Background coroutine: extend brain-service lease and emit events every 10 minutes."""
         while not self._shutdown:
             await asyncio.sleep(600)
             for task_id, epoch in list(self._active_task_epochs.items()):
@@ -2983,7 +3225,7 @@ Output NOTHING after the end delimiter."""
     def _rename_task_file(self, agent: str, task_id: str, suffix: str) -> None:
         """Rename a task's .md file to {name}{suffix} to reflect terminal state.
 
-        Keeps filesystem in sync with Neo4j state so queue-depth monitors
+        Keeps filesystem in sync with brain-service state so queue-depth monitors
         don't count completed/failed tasks as pending.
 
         Handles two filename conventions:
@@ -3007,6 +3249,30 @@ Output NOTHING after the end delimiter."""
                         logger.warning(f"Failed to rename task file {src.name} -> {dst.name}: {e}")
                 return
 
+        # Fast path: revision-suffix format — {task_id}.revision-N.md or .revision-N.executing.md
+        # Handles tasks that went through the retry/revision routing path.
+        if tasks_dir.exists():
+            try:
+                for f in tasks_dir.iterdir():
+                    fname = f.name
+                    if not fname.startswith(task_id + "."):
+                        continue
+                    if any(s in fname for s in (".done.", ".cancelled.", ".failed.", ".pending-gate.")):
+                        continue
+                    if not fname.endswith(".md"):
+                        continue
+                    base = fname[: fname.rindex(".md")]  # strip trailing .md only
+                    dst = tasks_dir / f"{base}{suffix}"
+                    if not dst.exists():
+                        try:
+                            f.rename(dst)
+                            logger.info(f"Renamed revision-format task file {fname} -> {dst.name}")
+                        except OSError as e:
+                            logger.warning(f"Failed to rename revision-format task file {fname}: {e}")
+                    return
+            except OSError:
+                pass
+
         # Slow path: dispatch-format files where task_id is embedded in frontmatter
         if not tasks_dir.exists():
             return
@@ -3019,7 +3285,10 @@ Output NOTHING after the end delimiter."""
                 if any(s in fname for s in (".done.", ".cancelled.", ".failed.", ".pending-gate.")):
                     continue
                 try:
-                    if needle in f.read_text(encoding="utf-8", errors="replace"):
+                    content = f.read_text(encoding="utf-8", errors="replace")
+                    # Match either embedded task_id frontmatter OR filename starting with task_id
+                    # (handles council-brief style tasks that omit task_id from their content)
+                    if needle in content or fname.startswith(task_id + ".") or fname == f"{task_id}.md":
                         # Use base name only (strip all intermediate suffixes) so
                         # e.g. normal-123.pending-gate.executing.md → normal-123.done.md
                         base = fname.split(".")[0]
@@ -3061,9 +3330,9 @@ Output NOTHING after the end delimiter."""
         return None
 
     def _sync_filesystem_state(self) -> None:
-        """Reconcile filesystem task files with Neo4j terminal states.
+        """Reconcile filesystem task files with brain-service terminal states.
 
-        Finds .md files that are still named as pending but whose Neo4j status
+        Finds .md files that are still named as pending but whose brain-service status
         is COMPLETED, FAILED, CANCELLED, or STALL_ESCALATED, then renames them
         to the correct terminal suffix (.done.md or .failed.md).
 
@@ -3105,7 +3374,7 @@ Output NOTHING after the end delimiter."""
                         if not tid:
                             tid = fname[:-3]  # strip .md
 
-                        # Strip .revision-N suffix before Neo4j lookup; the
+                        # Strip .revision-N suffix before brain-service lookup; the
                         # canonical task_id never includes this filesystem artifact.
                         tid = re.sub(r"\.revision-\d+$", "", tid)
 
@@ -3155,6 +3424,14 @@ Output NOTHING after the end delimiter."""
             )
             result_file.write_text(header + run_result.content)
 
+            if (task.get("source") or "") == "coordination-handoff":
+                logger.info(
+                    "Skipping generic completion notification for coordination-handoff task %s; "
+                    "coordination bridge owns public send gating",
+                    task.get("task_id"),
+                )
+                return
+
             # Send notification directly
             asyncio.create_task(
                 self._send_notification(agent, task, run_result.content)
@@ -3172,8 +3449,17 @@ Output NOTHING after the end delimiter."""
           tg:<chat_id>  → telegram_send
           +<phone>      → signal_send (with optional reply threading)
         """
+        notify_target = task.get(
+            'notify_target', task.get('origin_initiator', '')
+        )
+        has_explicit_notify_target = bool(
+            notify_target and (
+                str(notify_target).startswith('+') or
+                str(notify_target).startswith('tg:')
+            )
+        )
         origin_type = task.get('origin_type')
-        if origin_type is not None and origin_type != 'human':
+        if origin_type is not None and origin_type != 'human' and not has_explicit_notify_target:
             return  # Skip system/cron/agent tasks
         if origin_type is None:
             logger.warning(
@@ -3181,14 +3467,12 @@ Output NOTHING after the end delimiter."""
                 "sending notification anyway"
             )
 
-        notify_target = task.get(
-            'notify_target', task.get('origin_initiator', '')
-        )
         if not notify_target or (
-            not notify_target.startswith('+') and
-            not notify_target.startswith('tg:')
+            not str(notify_target).startswith('+') and
+            not str(notify_target).startswith('tg:')
         ):
             return
+        notify_target = str(notify_target)
 
         title = task.get('title', 'Task')
         body = _extract_notification_summary(result_content or '')
@@ -3503,7 +3787,7 @@ Output NOTHING after the end delimiter."""
         return stdout.decode(errors="replace")
 
     async def _process_spawn_queue(self):
-        """Drain spawn-pending.json and create tasks in Neo4j.
+        """Drain spawn-pending.json and create tasks in brain-service.
 
         Reads the spawn queue file, creates each task via TaskStore, then
         clears the queue. Errors on individual entries are logged and skipped.
@@ -3547,23 +3831,16 @@ Output NOTHING after the end delimiter."""
             with sqlite3.connect(str(TELEMETRY_DB), timeout=3) as conn:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO in_flight_tasks
-                        (id, type, description, delegated_by, assigned_to, priority,
-                         status, claimed_by, claimed_at, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?, ?)
+                    UPDATE in_flight_tasks
+                    SET status = 'in_progress',
+                        claimed_by = COALESCE(claimed_by, ?),
+                        claimed_at = COALESCE(claimed_at, ?),
+                        assigned_to = COALESCE(assigned_to, ?),
+                        priority = COALESCE(priority, ?),
+                        updated_at = ?
+                    WHERE id = ?
                     """,
-                    (
-                        task_id,
-                        task.get("source", "general"),
-                        task.get("title", task_id)[:500],
-                        self._executor_id,
-                        agent,
-                        priority_int,
-                        agent,
-                        now_ms,
-                        now_ms,
-                        now_ms,
-                    ),
+                    (agent, now_ms, agent, priority_int, now_ms, task_id),
                 )
         except Exception as e:
             logger.debug(f"telemetry_claim failed for {task_id}: {e}")

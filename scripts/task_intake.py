@@ -7,8 +7,8 @@ Pipeline:
     2. Route via canonical router (task_router.py)
     3. Alert deduplication (exponential backoff for system alerts)
     4. Duplicate check (has_pending_task)
-    5. Create in Neo4j (primary) via create_task_full()
-    6. Write filesystem (backward compat, done by create_task_full)
+    5. Create in brain-service/SQLite (primary) via telemetry.create_task_full
+    6. Write filesystem (backward compat)
 
 Usage:
     from task_intake import create_task
@@ -35,7 +35,7 @@ from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from kurultai_paths import AGENTS_DIR, LOGS_DIR, agent_tasks_dir, VALID_AGENTS, AGENT_KEYWORDS
+from kurultai_paths import AGENTS_DIR, LOGS_DIR, agent_tasks_dir, VALID_AGENTS, AGENT_KEYWORDS, DISPATCH_AGENTS
 from kurultai_ledger import generate_task_id, validate_task_id
 
 # Ogedei failure flag state file (watchdog writes this)
@@ -50,9 +50,8 @@ VALID_TASK_EXTENSIONS = {
     '.failed.md',     # Failed tasks
 }
 
-# Import kublai-route for pause checking
 try:
-    from kublai_route import should_pause_task, mark_task_paused_in_neo4j, PAUSED_TASK_PATTERNS
+    from kublai_route import PAUSED_TASK_PATTERNS
     KUBLAI_ROUTE_AVAILABLE = True
 except ImportError:
     KUBLAI_ROUTE_AVAILABLE = False
@@ -81,6 +80,7 @@ _SYSTEM_SOURCES = frozenset({
     "idle-prevention", "heartbeat-escalation", "anomaly-scanner",
     "routing-retry", "cron-test", "test-cron", "cron-3hr-test", "cron-3hr-review",
     "signal", "api", "direct-mention", "kurultai-delegate",
+    "coordination-handoff", "coordination-council",
     "jochi-debug",
     "daily-task-review",
     "proposal-extractor",
@@ -132,6 +132,7 @@ from task_router import (
     _SKILL_OWNER, SKILL_HINTS,
     _update_kublai_dispatch_timestamp,
     _get_kublai_idle_minutes,
+    check_hard_dev_override,
 )
 
 from task_load_balancer import (
@@ -163,13 +164,97 @@ from alert_deduplication import (
 
 MAX_TASK_DEPTH = 3
 
+# =============================================================================
+# Per-Source Hourly Task Budget (2026-04-22)
+# =============================================================================
+# Prevents automated sources from flooding the pipeline during stall spirals.
+# Each source gets a maximum number of tasks it can create per hour.
+# Sources NOT in this dict are unlimited (human tasks, direct mentions, etc.).
+SOURCE_HOURLY_BUDGETS = {
+    "pipeline": 6,               # Reflection pipeline: was 19/day, most failed
+    "system-health-check": 2,    # 5-min checks: was creating 12/hr on failures
+    "kublai-actions": 6,         # tick/tock rules: was potentially 36/hr
+    "ogedei-watchdog": 4,        # 17 checks every 30s: rarely fires but unbounded
+    "stall-detector": 2,         # Per-task cooldown bypass: spiral source
+    "auto-triage": 2,            # Triage spiral source
+    "chagatai-reflection": 2,    # 89% waste rate
+    "idle-monitor": 2,           # Idle crisis tasks
+    "idle-prevention": 2,        # Idle prevention tasks
+    "anomaly-scanner": 2,        # Anomaly detection
+    "throughput_anomaly": 2,     # Throughput anomaly escalation
+    "cascade_detector": 2,       # Cascade detection
+}
+
+def _check_source_budget(source: str) -> tuple[bool, str]:
+    """Check if a source has exceeded its hourly task creation budget.
+
+    Returns (allowed, reason). If source has no budget, always allows.
+    On brain-service failure, allows creation (the final create call remains
+    fail-closed so this guard never creates filesystem-only tasks).
+    """
+    budget = SOURCE_HOURLY_BUDGETS.get(source)
+    if budget is None:
+        return True, ""  # No budget = unlimited
+
+    try:
+        from brain_service_client import brain_call
+
+        since_ms = int((datetime.now() - timedelta(hours=1)).timestamp() * 1000)
+        result = brain_call(
+            "telemetry.list_tasks",
+            {"source": source, "limit": 500, "order_by": "dashboard"},
+        )
+        items = result.get("items", result) if isinstance(result, dict) else result
+        count = sum(1 for row in (items or []) if int(row.get("created_at") or 0) >= since_ms)
+        if count >= budget:
+            return False, f"SOURCE_BUDGET: {source} hit hourly limit ({count}/{budget}/hr)"
+    except Exception as e:
+        print(f"SOURCE_BUDGET_WARN: brain-service budget check failed for {source}: {e}")
+        pass
+    return True, ""
+
+
 def has_pending_task(agent, title_prefix, full_title=None):
     """Check if an agent already has an uncompleted task with this title prefix
     or a semantically similar title (>60% keyword overlap).
 
-    FIX 2026-03-12: Exclude .done.md and .failed.md from duplicate detection.
-    Only active tasks (.md, .pending.md, .executing.md) should count.
+    Checks brain-service/SQLite (source of truth) first, then filesystem
+    (legacy fallback).
     """
+    found_in_brain_service = False
+    try:
+        from brain_service_client import brain_call
+
+        result = brain_call(
+            "telemetry.list_tasks",
+            {
+                "agent": agent,
+                "status_in": ["pending", "in_progress", "blocked", "awaiting_approval"],
+                "limit": 500,
+            },
+        )
+        items = result.get("items", result) if isinstance(result, dict) else result
+        topic_keys = _extract_topic_keys(full_title or title_prefix)
+        for row in items or []:
+            existing_title = str(row.get("title") or row.get("description") or "")
+            if existing_title.startswith(title_prefix):
+                found_in_brain_service = True
+                break
+            existing_keys = _extract_topic_keys(existing_title)
+            if existing_keys and topic_keys:
+                overlap = len(topic_keys & existing_keys)
+                smaller = min(len(topic_keys), len(existing_keys))
+                if smaller > 0 and overlap / smaller >= 0.6:
+                    print(f"DEDUP_FUZZY_BRAIN_SERVICE: '{(full_title or title_prefix)[:60]}' ≈ '{existing_title[:60]}' ({overlap}/{smaller} overlap)")
+                    found_in_brain_service = True
+                    break
+    except Exception as e:
+        print(f"DEDUP_WARN: brain-service check failed for {agent}: {e}")
+
+    if found_in_brain_service:
+        return True
+
+    # Legacy filesystem fallback
     task_dir = f"{AGENT_DIR}/{agent}/tasks"
     if not os.path.exists(task_dir):
         return False
@@ -446,7 +531,7 @@ def update_task_status(
 ) -> bool:
     """Update task status and log as conversation.
 
-    This function updates a task's status in Neo4j and logs the change
+    This function updates a task's status in brain-service and logs the change
     as a conversation for audit trail and human visibility.
 
     Args:
@@ -460,12 +545,13 @@ def update_task_status(
     Returns:
         True if update succeeded, False otherwise
     """
-    from neo4j_task_tracker import get_tracker
-
-    # Update in Neo4j
     try:
-        tracker = get_tracker()
-        tracker.update_status(task_id, status, error=error)
+        from brain_service_client import brain_call
+
+        brain_call(
+            "telemetry.set_task_status",
+            {"task_id": task_id, "status": status, "agent": agent or "task_intake", "reason": error},
+        )
         print(f"UPDATED: task {task_id} status to {status}")
     except Exception as e:
         print(f"ERROR: Failed to update task {task_id}: {e}")
@@ -570,11 +656,18 @@ def create_task(title, body, priority="normal", source="task_intake",
         print(f"REJECT: depth={depth} >= {MAX_TASK_DEPTH} for '{title[:60]}'")
         return None
 
+    # 1.5. Check per-source hourly budget
+    _budget_allowed, _budget_reason = _check_source_budget(source)
+    if not _budget_allowed:
+        print(f"REJECT: {_budget_reason} for '{title[:60]}'")
+        return None
+
     # 2. Route: check @mention first, then keyword routing
     mention_agent = None
     _caller_provided_agent = agent is not None
     _route_metadata = None  # Will be populated by queue-penalized routing
     _explicit_agent_override = False  # Tracks when caller's agent override was used
+    _dispatch_proxy_metadata = None  # Populated when logical owners are remapped to a concrete executor
 
     if agent is None:
         mention_agent, stripped_title = parse_mention(title)
@@ -583,17 +676,14 @@ def create_task(title, body, priority="normal", source="task_intake",
             title = stripped_title  # Use the message body without @mention prefix
             source = "direct-mention"
         else:
-            # v2 graph-based routing (Phase 4 cutover 2026-03-12)
-            try:
-                from neo4j_v2_router import route_task as _v2_route
-                from neo4j_v2_core import TaskStore as _V2Store
-                _v2_store = _V2Store()
-                agent = _v2_route(_v2_store, title, priority, skill_hint=skill_hint)
-                _v2_store.close()
-                _route_metadata = {"method": "v2_graph_routing"}
-                print(f"  V2_ROUTE: {title[:50]} -> {agent}")
-            except Exception as _v2_err:
-                print(f"  V2_ROUTE_FALLBACK: {_v2_err}")
+            # Priority 0: Hard dev/ops keyword override — runs before v2 graph router.
+            # Prevents LLM domain misclassification from reaching the graph query.
+            _hard_dev_agent = check_hard_dev_override(title)
+            if _hard_dev_agent:
+                agent = _hard_dev_agent
+                _route_metadata = {"method": "hard_dev_override"}
+                print(f"  HARD_DEV_OVERRIDE: {title[:50]} -> {agent}")
+            else:
                 agent, _route_metadata = route_with_queue_penalty(title)
             if agent == "subagent":
                 agent = "ogedei"  # Default fallback (kublai is not dispatchable)
@@ -608,21 +698,39 @@ def create_task(title, body, priority="normal", source="task_intake",
             # For non-system sources, check if keyword routing strongly disagrees
             mention_agent, stripped_title = parse_mention(title)
             if not mention_agent:
-                # Get keyword-based suggestion
-                kw_agent, kw_metadata = route_with_queue_penalty(title)
+                # Priority 0: Hard dev/ops keyword override — corrects LLM misroutes
+                # before the keyword-score threshold check even runs.
+                _hard_dev_agent = check_hard_dev_override(title)
+                if _hard_dev_agent and _hard_dev_agent != agent:
+                    print(f"HARD_DEV_OVERRIDE (caller): '{title[:60]}' was {agent} -> {_hard_dev_agent}")
+                    _log_routing_decision(
+                        title=title,
+                        dest=_hard_dev_agent,
+                        method="hard_dev_override",
+                        scores={agent: 0, _hard_dev_agent: 99},
+                    )
+                    agent = _hard_dev_agent
+                    _route_metadata = {"method": "hard_dev_override"}
+                    _explicit_agent_override = True
+                    _caller_provided_agent = False
+                    kw_agent, kw_metadata = None, {}  # Skip keyword override — hard dev wins
+                else:
+                    # Get keyword-based suggestion
+                    kw_agent, kw_metadata = route_with_queue_penalty(title)
                 if kw_agent == "subagent":
                     kw_agent = "ogedei"  # kublai is not dispatchable
 
                 # Check if keyword router strongly disagrees (score >= 2)
+                # Skipped when hard_dev_override already fired (kw_agent is None).
                 kw_scores = kw_metadata.get("penalized_scores", {})
                 original_scores = kw_metadata.get("original_scores", {})
-                kw_score = original_scores.get(kw_agent, 0)
+                kw_score = original_scores.get(kw_agent, 0) if kw_agent else 0
                 caller_score = original_scores.get(agent, 0)
 
                 # Use keyword routing if:
                 # 1. Keyword score >= 2 (meaningful match) AND
                 # 2. Keyword score > caller's score (caller has weak/no match)
-                if kw_score >= 2 and kw_score > caller_score:
+                if kw_agent and kw_score >= 2 and kw_score > caller_score:
                     print(f"KEYWORD_OVERRIDE: caller specified {agent} (score={caller_score}) "
                           f"but keywords suggest {kw_agent} (score={kw_score})")
                     agent = kw_agent
@@ -696,9 +804,11 @@ def create_task(title, body, priority="normal", source="task_intake",
     # Reject tasks routed to agents that cannot handle the classified domain.
     # Prevents the 8-hour stuck task issue where ogedei held a documentation task.
     # System sources and direct mentions bypass this check (they know what they're doing).
+    # FIX 2026-04-26: Removed _caller_provided_agent gate — domain check now applies to
+    # auto-routed tasks too. V2 graph router can learn incorrect domain→agent edges from
+    # historical misroutes; this check is the last guard against those propagating.
     _system_sources = _SYSTEM_SOURCES
-    if (_caller_provided_agent and
-        source not in _system_sources and
+    if (source not in _system_sources and
         not mention_agent and
         _task_domain in DOMAIN_AGENT_COMPATIBILITY and
         agent not in DOMAIN_AGENT_COMPATIBILITY[_task_domain]):
@@ -807,15 +917,76 @@ def create_task(title, body, priority="normal", source="task_intake",
 
             return None  # Reject task creation
 
-    # 2.5.3. REMOVED: Kublai self-absorption was dead code — kublai is not in
-    # DISPATCH_AGENTS so tasks assigned to it were never picked up by the executor.
-    # The neo4j_v2_core guard now remaps kublai -> ogedei as a safety net.
+    # 2.5.3. Dispatchability guard. Cross-system tasks can arrive with logical
+    # owners such as "hermes" or "kublai", but the OpenClaw executor only polls
+    # concrete dispatch agents. Route non-dispatchable owners to Ogedei so they
+    # do not sit in the queue forever. Preserve owner metadata so Ogedei executes
+    # as dispatch proxy rather than silently replacing the logical owner/chair.
+    _dispatchable_agents = {a for a in DISPATCH_AGENTS if a != "kublai"}
+    if agent not in _dispatchable_agents:
+        original_agent = agent
+        agent = "ogedei"
+        _dispatch_proxy_metadata = {
+            "original_agent": original_agent,
+            "logical_owner": original_agent,
+            "dispatch_proxy": agent,
+            "source": source,
+            "reason": "non_dispatchable_agent",
+        }
+        _lock_match = re.search(r"(?i)\block(?:[_ -]?id)?\s*[:#]?\s*`?(\d+)`?", f"{title}\n{body}")
+        if _lock_match:
+            _dispatch_proxy_metadata["lock_id"] = _lock_match.group(1)
+        _root_match = re.search(r"(?i)\broot(?:[_ -]?message(?:[_ -]?id)?)?\s*[:#]?\s*`?([A-Za-z0-9_.:@/-]{12,})`?", f"{title}\n{body}")
+        if _root_match:
+            _dispatch_proxy_metadata["root_message_id"] = _root_match.group(1)
+        if original_agent == "kublai":
+            _dispatch_proxy_metadata.update({
+                "public_synthesizer": "kublai",
+                "requires_owner_synthesis": True,
+                "owner_response_timeout_s": 900,
+                "fallback_requires_transfer": True,
+            })
+            body = (
+                "**KUBLAI DISPATCH PROXY:** This task is Kublai-owned but "
+                "Kublai is not a concrete OpenClaw dispatch executor. Ogedei is "
+                "executing as Kublai's dispatch proxy, not replacing Kublai as "
+                "logical owner or public synthesizer.\n\n"
+                "Required protocol:\n"
+                "1. Preserve `logical_owner: kublai` in all status/reporting.\n"
+                "2. Obtain/process Kublai's contribution or synthesis before any public final answer.\n"
+                "3. If Kublai does not respond within 900 seconds, post a visible blocker to Internal Coms/coordination state.\n"
+                "4. Do not let Hermes or Ogedei finalize as a substitute unless Kublai explicitly transfers ownership.\n\n"
+                "---\n\n"
+                f"{body}"
+            )
+        else:
+            body = (
+                f"**DISPATCH PROXY:** `{original_agent}` is not dispatchable by "
+                f"OpenClaw. Ogedei is executing as proxy; preserve "
+                f"`logical_owner: {original_agent}` in status/reporting.\n\n"
+                "---\n\n"
+                f"{body}"
+            )
+        print(
+            f"DISPATCH_GUARD: remapping non-dispatchable agent "
+            f"'{original_agent}' -> '{agent}' for '{title[:60]}'"
+        )
+        _log_routing_decision(
+            title=title,
+            dest=agent,
+            method="dispatch_guard_remap",
+            route_metadata=_dispatch_proxy_metadata,
+        )
+        if _route_metadata is None:
+            _route_metadata = {}
+        _route_metadata.update({"dispatch_guard_remap": _dispatch_proxy_metadata})
 
     # 2.5.4. EARLY FLEET-WIDE CREDENTIAL CHECK — fail fast before expensive routing
     # Check all dispatch agents upfront. If ALL have invalid credentials, stop immediately.
     # This prevents wasting time on load balancing/routing when the entire fleet is dead.
     # Implements behavioral rule #1: stop creating tasks when fleet is paralyzed.
-    _dispatch_agents = ["temujin", "mongke", "chagatai", "jochi", "ogedei"]
+    # kublai is orchestrator — excluded from fleet credential gate (separate failover logic)
+    _dispatch_agents = [a for a in DISPATCH_AGENTS if a != "kublai"]
     _healthy_count = 0
     _unhealthy_agents = []
 
@@ -914,6 +1085,34 @@ Multi-tier fallback: Anthropic → Z.AI → Alibaba
         if overflow_reason and agent != original_agent:
             print(f"LOAD-BALANCE: {original_agent} (queue={original_depth}) -> {agent} (queue={new_depth})")
             _log_overflow(original_agent, agent, title, overflow_reason)
+
+    # 2.6.3. POST-LOAD-BALANCE DOMAIN RE-CHECK
+    # Load balancing (IDLE_WAKE_UP path) can redirect to domain-incompatible agents.
+    # Re-verify domain compatibility after LB completes, before proceeding.
+    # This is a safety net for the case where find_best_idle_agent returns an agent
+    # that bypasses the domain filter (e.g., chagatai receiving implementation tasks).
+    if (load_balance_needed and
+        agent != original_agent and
+        source not in _system_sources and
+        not mention_agent and
+        _task_domain in DOMAIN_AGENT_COMPATIBILITY and
+        agent not in DOMAIN_AGENT_COMPATIBILITY[_task_domain]):
+
+        _compatible = DOMAIN_AGENT_COMPATIBILITY[_task_domain]
+        _fallback = original_agent if original_agent in _compatible else (_compatible[0] if _compatible else "ogedei")
+        print(f"POST_LB_DOMAIN_REVERT: LB redirected to '{agent}' (incompatible with domain '{_task_domain}'), reverting to '{_fallback}'")
+        _log_routing_decision(
+            title=title,
+            dest=_fallback,
+            method="post_lb_domain_revert",
+            domain=_task_domain,
+            route_metadata={
+                "lb_selected": agent,
+                "reverted_to": _fallback,
+                "reason": f"agent '{agent}' not in DOMAIN_AGENT_COMPATIBILITY['{_task_domain}']",
+            },
+        )
+        agent = _fallback
 
     # 2.6.1. Check if redistribution is needed (log warning if imbalance detected)
     if original_depth > _lb_thresholds['high']:
@@ -1192,42 +1391,122 @@ This is blocking ALL task execution. Fleet is paralyzed.
             print(f"SKIP: duplicate task for {agent}: '{title[:60]}'")
             return None
 
-    # 4-5. Create in Neo4j + filesystem
+    # 4-5. Create in brain-service/SQLite + filesystem compatibility file
     # Derive notify_target from origin_initiator when it's a phone number
     if notify_target is None:
         if origin_initiator and origin_initiator.startswith("+"):
             notify_target = origin_initiator
+        elif source == "gateway-router":
+            notify_target = "tg:-5287556083"
         else:
             notify_target = "+19194133445"
 
+    # Pre-compute domain and timeout (used by both optimizer and create call)
+    _domain = classify_task_domain(title, skill_hint)
+    _timeout = compute_task_timeout(priority, skill_hint)
+    use_optimization = os.environ.get("KUBLAI_TASK_OPTIMIZER", "1") != "0"
+
     try:
-        from neo4j_task_tracker import get_tracker
-        tracker = get_tracker()
-        task_id = tracker.create_task_full(
-            agent=agent,
-            title=title,
-            body=body,
-            priority=priority,
-            source=source,
-            depth=depth,
-            parent_id=parent_id,
-            skill_hint=skill_hint,
-            notify_on_complete=notify_on_complete,
-            notify_channel=notify_channel,
-            notify_target=notify_target,
-            timeout=compute_task_timeout(priority, skill_hint),
-            bucket=bucket,
-            origin_type=origin_type,
-            origin_initiator=origin_initiator,
-            origin_source=origin_source,
-            origin_message_id=origin_message_id,
+        task_id = generate_task_id(priority)
+
+        # Apply optimizer if available (preserves pre-create optimization)
+        _opt_skill_hint = skill_hint
+        _opt_template_version = None
+        _opt_prompt_template = None
+        try:
+            if use_optimization:
+                from kublai_task_optimizer import create_optimized_task
+                opt_kwargs = {"priority": priority, "task_type": _domain}
+                if skill_hint is not None:
+                    opt_kwargs["skill_hint"] = skill_hint
+                if _timeout is not None:
+                    opt_kwargs["timeout"] = _timeout
+                optimized = create_optimized_task(
+                    agent=agent, title=title, body=body, **opt_kwargs
+                )
+                if skill_hint is None:
+                    _opt_skill_hint = optimized.get("skill_hint")
+                _opt_template_version = optimized.get("template_version")
+                _opt_prompt_template = optimized.get("prompt_template")
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[task_intake] Optimization failed: {e}")
+
+        origin_type_value = origin_type or ("human" if (
+            (origin_initiator and origin_initiator.startswith("+")) or
+            source in ("signal", "api", "gateway-router")
+        ) else "agent")
+        task_metadata = {
+            "label": f"{agent}-{task_id}",
+            "bucket": {"critical": "CRITICAL", "high": "TODAY", "normal": "WEEK", "low": "BACKLOG"}.get(priority, "BACKLOG"),
+            "template_version": _opt_template_version or "unknown",
+            "prompt_template": _opt_prompt_template or "standard",
+            "origin_type": origin_type_value,
+            "origin_initiator": origin_initiator or "",
+            "origin_source": origin_source or source,
+            "origin_message_id": origin_message_id,
+            "notify_target": notify_target,
+        }
+        if _dispatch_proxy_metadata:
+            task_metadata.update({
+                "dispatch_proxy": _dispatch_proxy_metadata,
+                "logical_owner": _dispatch_proxy_metadata.get("logical_owner"),
+                "public_synthesizer": _dispatch_proxy_metadata.get("public_synthesizer"),
+                "requires_owner_synthesis": _dispatch_proxy_metadata.get("requires_owner_synthesis", False),
+                "owner_response_timeout_s": _dispatch_proxy_metadata.get("owner_response_timeout_s"),
+                "fallback_requires_transfer": _dispatch_proxy_metadata.get("fallback_requires_transfer", False),
+                "lock_id": _dispatch_proxy_metadata.get("lock_id"),
+                "root_message_id": _dispatch_proxy_metadata.get("root_message_id"),
+            })
+
+        from brain_service_client import brain_call
+
+        created = brain_call(
+            "telemetry.create_task_full",
+            {
+                "task_id": task_id,
+                "title": title,
+                "prompt": body,
+                "description": body,
+                "delegated_by": "kublai",
+                "assigned_to": agent,
+                "priority": priority,
+                "status": "pending",
+                "domain": _domain,
+                "source": source,
+                "parent_task": parent_id,
+                "max_retries": 3,
+                "timeout_s": _timeout,
+                "depth": depth,
+                "skill_hint": _opt_skill_hint or "",
+                "results": {"intake_metadata": task_metadata},
+            },
         )
-        # FIX 2026-03-14: Verify task file persisted to disk before reporting success
-        _task_file = agent_tasks_dir(agent) / f"{task_id}.md"
-        if not _task_file.exists():
-            print(f"WARNING: Task file not persisted to disk for {task_id} (expected: {_task_file})")
-        if skill_hint:
-            print(f"CREATED: {priority} task {task_id} for {agent} (skill: {skill_hint}): {title[:60]}")
+        if isinstance(created, dict) and created.get("task_id"):
+            task_id = created["task_id"]
+
+        # Filesystem write for backward compatibility
+        # (agent-task-handler.py reads .md files from disk)
+        try:
+            task_dir = agent_tasks_dir(agent)
+            task_dir.mkdir(parents=True, exist_ok=True)
+            task_file = task_dir / f"{task_id}.md"
+            task_file.write_text(
+                f"# {title}\n\n"
+                f"**Priority:** {priority}\n**Agent:** {agent}\n"
+                f"**Source:** {source}\n**Skill Hint:** {_opt_skill_hint or 'auto-detected'}\n"
+                f"**Domain:** {_domain}\n\n## Description\n\n{body}\n\n"
+                f"---\n*Created: {datetime.now().isoformat()}*\n*Task ID: {task_id}*\n"
+            )
+            if not task_file.exists() or task_file.stat().st_size == 0:
+                print(f"WARNING: Task file not persisted to disk for {task_id}")
+        except Exception as e:
+            print(f"WARNING: Task file write failed for {task_id}: {e}")
+            # Non-fatal — brain-service is source of truth
+
+        if _opt_skill_hint:
+            print(f"CREATED: {priority} task {task_id} for {agent} (skill: {_opt_skill_hint}): {title[:60]}")
         else:
             print(f"CREATED: {priority} task {task_id} for {agent}: {title[:60]}")
 
@@ -1247,44 +1526,17 @@ This is blocking ALL task execution. Fleet is paralyzed.
                 print(f"Warning: Failed to link task {task_id} to conversation: {e}")
 
         # Update kublai dispatch timestamp for self-absorption tracking
-        # FIX 2026-03-14: Call directly — function is imported at module level (line 128)
         if agent == "kublai":
             _update_kublai_dispatch_timestamp()
         # Record alert for deduplication tracking
         record_alert_created(agent, title, source, task_id)
 
-        # v2: set v2 properties on Neo4j node (Phase 4 cutover 2026-03-12)
-        # FIX 2026-03-14: Use context manager to close session and prevent connection pool leak
-        try:
-            _domain = classify_task_domain(title, skill_hint)
-            _timeout = compute_task_timeout(priority, skill_hint)
-            with tracker.driver.session() as _session:
-                _session.run("""
-                    MATCH (t:Task {task_id: $id})
-                    SET t.v2_eligible = true,
-                        t.assigned_to = t.agent,
-                        t.prompt = $body,
-                        t.domain = $domain,
-                        t.claim_epoch = 0,
-                        t.claimed_by = null,
-                        t.lease_expires_at = null,
-                        t.timeout_s = $timeout,
-                        t.created_at = coalesce(t.created_at, t.created),
-                        t.started_at = null,
-                        t.completed_at = null,
-                        t.updated_at = datetime()
-                """, id=task_id, body=body, domain=_domain, timeout=_timeout)
-        except Exception as e:
-            print(f"  V2_FLAG_WARN: Could not set v2 properties on {task_id}: {e}")
-
         return task_id
     except Exception as e:
-        # REMOVED: Filesystem-only fallback (2026-03-11)
-        # Neo4j is the source of truth. If Neo4j is unavailable, task creation
-        # MUST fail rather than create filesystem-only tasks that cause
-        # reconciliation issues and orphan cleanup race conditions.
-        print(f"ERROR: Neo4j unavailable — task creation FAILED: {e}")
-        print("ACTION REQUIRED: Check Neo4j connectivity before retrying.")
+        # brain-service is the source of truth. If it is unavailable, task
+        # creation MUST fail rather than create filesystem-only tasks.
+        print(f"ERROR: brain-service unavailable — task creation FAILED: {e}")
+        print("ACTION REQUIRED: Check brain-service connectivity before retrying.")
         raise
 
 
