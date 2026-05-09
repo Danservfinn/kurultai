@@ -715,7 +715,7 @@ class BrainService:
             if method == "health":
                 return {"ok": True, "result": self.health()}
             raise ValueError(f"unknown method: {method}")
-        except (NoPendingTaskError, StaleClaimError, ValueError, CalendarError) as exc:
+        except (NoPendingTaskError, StaleClaimError, ValueError, TypeError, CalendarError) as exc:
             return {"ok": False, "error": type(exc).__name__, "message": str(exc)}
 
     def serve_socket(self, socket_path: str | Path) -> socketserver.UnixStreamServer:
@@ -729,7 +729,10 @@ class BrainService:
                 for line in self.rfile:
                     request = json.loads(line.decode("utf-8"))
                     response = service.handle_rpc(request)
-                    self.wfile.write((json.dumps(response, sort_keys=True) + "\n").encode("utf-8"))
+                    try:
+                        self.wfile.write((json.dumps(response, sort_keys=True) + "\n").encode("utf-8"))
+                    except BrokenPipeError:
+                        return
 
         server = socketserver.ThreadingUnixStreamServer(str(socket_path), Handler)
         os.chmod(socket_path, 0o600)
