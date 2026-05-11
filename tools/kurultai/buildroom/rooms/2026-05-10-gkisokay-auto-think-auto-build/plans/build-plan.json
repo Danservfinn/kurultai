@@ -1,0 +1,39 @@
+{
+  "assignee": "kublai",
+  "build_id": "build-2026-05-10-gkisokay-auto-think-auto-build",
+  "commands_allowed": [
+    "python3 tools/kurultai/buildroom/scripts/validate_room.py"
+  ],
+  "created_at": "2026-05-11T01:17:17Z",
+  "files_expected": [
+    "tools/kurultai/buildroom/rooms/2026-05-10-gkisokay-auto-think-auto-build"
+  ],
+  "out_of_scope": [
+    "production deploy"
+  ],
+  "plan_id": "plan-2026-05-10-gkisokay-auto-think-auto-build",
+  "steps": [
+    {
+      "action": "Generate artifacts",
+      "id": "generate"
+    },
+    {
+      "action": "Validate schema chain",
+      "id": "validate"
+    },
+    {
+      "action": "Record receipt",
+      "id": "receipt"
+    }
+  ],
+  "stop_conditions": [
+    "validation failure",
+    "scope expansion"
+  ],
+  "task_refs": [
+    "buildroom://2026-05-10-gkisokay-auto-think-auto-build"
+  ],
+  "verification_commands": [
+    "python3 tools/kurultai/buildroom/scripts/validate_room.py tools/kurultai/buildroom/rooms/2026-05-10-gkisokay-auto-think-auto-build"
+  ]
+}

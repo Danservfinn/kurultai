@@ -1,0 +1,15 @@
+{
+  "artifacts_to_improve": [
+    "operator summary after follow-on work"
+  ],
+  "artifacts_to_keep": [
+    "all generated room artifacts"
+  ],
+  "artifacts_to_prune": [],
+  "rationale": "Keep as a real research-to-buildroom conversion.",
+  "recommendation": "keep",
+  "requires_human_before_destructive_action": true,
+  "retention_id": "retention-2026-05-10-gkisokay-auto-think-auto-build",
+  "reviewed_at": "2026-05-11T01:17:17Z",
+  "room_id": "2026-05-10-gkisokay-auto-think-auto-build"
+}

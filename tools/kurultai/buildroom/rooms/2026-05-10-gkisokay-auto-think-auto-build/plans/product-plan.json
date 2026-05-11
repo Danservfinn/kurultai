@@ -1,0 +1,25 @@
+{
+  "acceptance_criteria": [
+    "room validates",
+    "operator summary exists",
+    "next action is explicit"
+  ],
+  "allowed_paths": [
+    "tools/kurultai/buildroom/rooms/2026-05-10-gkisokay-auto-think-auto-build"
+  ],
+  "created_at": "2026-05-11T01:17:17Z",
+  "idea_id": "idea-2026-05-10-gkisokay-auto-think-auto-build",
+  "non_goals": [
+    "unrelated implementation"
+  ],
+  "owner": "kublai",
+  "plan_id": "plan-2026-05-10-gkisokay-auto-think-auto-build",
+  "protected_paths": [
+    "runtime state",
+    "raw sessions"
+  ],
+  "rollback_plan": "Remove the generated room or revert its commit.",
+  "rollout_plan": "Generate room, validate it, then review the summary.",
+  "user_value": "Research can become bounded work without being buried in chat history.",
+  "ux_or_operator_surface": "operator/operator-summary.json"
+}

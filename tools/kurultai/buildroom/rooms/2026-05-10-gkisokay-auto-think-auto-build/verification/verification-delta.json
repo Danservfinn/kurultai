@@ -1,0 +1,13 @@
+{
+  "build_id": "build-2026-05-10-gkisokay-auto-think-auto-build",
+  "confirmed_claims": [
+    "Generated artifacts are present."
+  ],
+  "delta_id": "delta-2026-05-10-gkisokay-auto-think-auto-build",
+  "implementation_receipt_ref": "jobs/implementation-receipt.json",
+  "next_action": "validate room and select follow-on work",
+  "regressions": [],
+  "state": "confirmed",
+  "unverified_claims": [],
+  "verification_report_ref": "verification/verification-report.json"
+}

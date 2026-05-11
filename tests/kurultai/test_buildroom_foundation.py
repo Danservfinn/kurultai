@@ -357,3 +357,38 @@ def test_failed_qa_regression_emits_investigate_trust(tmp_path: Path) -> None:
     assert "pytest regression in buildroom validation" in delta["regressions"]
     assert trust["state"] == "investigate"
     assert "Fix failed QA/regressions and rerun verifier." in trust["required_followups"]
+
+
+
+def test_research_to_buildroom_compiles_brain_artifacts(tmp_path: Path) -> None:
+    packet = tmp_path / "packet.md"
+    synthesis = tmp_path / "synthesis.md"
+    review = tmp_path / "review.md"
+    packet.write_text("---\ntitle: Example Research Packet\n---\n\nThis research packet says the system should convert useful research into bounded work.", encoding="utf-8")
+    synthesis.write_text("---\ntitle: Example Auto Think Synthesis\n---\n\nA reusable synthesis should become a buildroom room with review and operator summary.", encoding="utf-8")
+    review.write_text("---\ntitle: Example Review\n---\n\nClassification: durable-change-recommended", encoding="utf-8")
+    out = tmp_path / "rooms"
+    result = run_script(
+        "tools/kurultai/buildroom/scripts/research_to_buildroom.py",
+        "--room-id",
+        "example-research-room",
+        "--packet",
+        str(packet),
+        "--synthesis",
+        str(synthesis),
+        "--review",
+        str(review),
+        "--source-ref",
+        "https://example.com/research",
+        "--output-root",
+        str(out),
+    )
+    assert result.returncode == 0, result.stderr
+    room = out / "example-research-room"
+    assert (room / "research/research-input.json").exists()
+    assert read_json(room / "ideas/idea-contract.json")["title"] == "Example Auto Think Synthesis"
+    validate = run_script("tools/kurultai/buildroom/scripts/validate_room.py", str(room))
+    assert validate.returncode == 0, validate.stderr
+    summary = read_json(room / "operator/operator-summary.json")
+    assert summary["status"] == "watch"
+    assert "buildroom://example-research-room" in summary["links"]

@@ -1,0 +1,42 @@
+{
+  "beneficiaries": [
+    "operator",
+    "Kurultai agents"
+  ],
+  "created_at": "2026-05-11T01:17:17Z",
+  "evidence_refs": [
+    "https://x.com/gkisokay/status/2053449921554960545",
+    "https://x.com/gkisokay/status/2053467830155427942",
+    "https://x.com/gkisokay/status/2053613051182772461",
+    "brain:queue/2026-05-10-gkisokay-hermes-auto-think-auto-build.md",
+    "brain:generated/2026-05-10-gkisokay-auto-think-auto-build-synthesis.md",
+    "brain:generated/reviews/2026-05-10-gkisokay-auto-think-auto-build-review.md"
+  ],
+  "expected_artifacts": [
+    "research-input",
+    "idea-contract",
+    "intent-review",
+    "operator-summary"
+  ],
+  "idea_id": "idea-2026-05-10-gkisokay-auto-think-auto-build",
+  "non_goals": [
+    "production deployment",
+    "runtime mutation"
+  ],
+  "problem": "Useful research should move through a structured path from insight to bounded work.",
+  "proposed_by": "research-to-buildroom",
+  "proposed_owner": "kublai",
+  "risk_notes": "Review before promotion.",
+  "scope_boundaries": [
+    "curated artifacts only",
+    "separate review before implementation"
+  ],
+  "status": "candidate",
+  "suggested_workspace": "tools/kurultai/buildroom/rooms/2026-05-10-gkisokay-auto-think-auto-build",
+  "title": "gkisokay Auto Think Auto Build",
+  "verification_hint": [
+    "Validate room",
+    "Review source refs"
+  ],
+  "why_now": "The buildroom contract exists and can now accept real research inputs."
+}
