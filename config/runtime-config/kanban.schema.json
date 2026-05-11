@@ -1,0 +1,484 @@
+{
+  "note": "No task bodies, comments, chat IDs, or run outputs are exported.",
+  "schema": "kurultai.kanban-schema.v1",
+  "source": "~/.hermes/kanban.db sqlite schema only",
+  "tables": [
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "task_id",
+          "not_null": true,
+          "primary_key": true,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "platform",
+          "not_null": true,
+          "primary_key": true,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "chat_id",
+          "not_null": true,
+          "primary_key": true,
+          "type": "TEXT"
+        },
+        {
+          "default": "''",
+          "name": "thread_id",
+          "not_null": true,
+          "primary_key": true,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "user_id",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "created_at",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": "0",
+          "name": "last_event_id",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        }
+      ],
+      "name": "kanban_notify_subs",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "not_null": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "task_id",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "author",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "body",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "created_at",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        }
+      ],
+      "name": "task_comments",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "not_null": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "task_id",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "run_id",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "kind",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "payload",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "created_at",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        }
+      ],
+      "name": "task_events",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "parent_id",
+          "not_null": true,
+          "primary_key": true,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "child_id",
+          "not_null": true,
+          "primary_key": true,
+          "type": "TEXT"
+        }
+      ],
+      "name": "task_links",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "not_null": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "task_id",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "profile",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "step_key",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "status",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "claim_lock",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "claim_expires",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "worker_pid",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "max_runtime_seconds",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "last_heartbeat_at",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "started_at",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "ended_at",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "outcome",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "summary",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "metadata",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "error",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "session_id",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        }
+      ],
+      "name": "task_runs",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "not_null": false,
+          "primary_key": true,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "title",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "body",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "assignee",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "status",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": "0",
+          "name": "priority",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "created_by",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "created_at",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "started_at",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "completed_at",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": "'scratch'",
+          "name": "workspace_kind",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "workspace_path",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "claim_lock",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "claim_expires",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "tenant",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "result",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "idempotency_key",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": "0",
+          "name": "spawn_failures",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "worker_pid",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "last_spawn_error",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "max_runtime_seconds",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "last_heartbeat_at",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "current_run_id",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "workflow_template_id",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "current_step_key",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "skills",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        }
+      ],
+      "name": "tasks",
+      "type": "table"
+    }
+  ]
+}

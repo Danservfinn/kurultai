@@ -1,0 +1,135 @@
+{
+  "note": "Directory/file-count inventory only. Brain content and private indexes are not copied into this repo.",
+  "schema": "kurultai.brain-manifest.v1",
+  "top_level_directories": [
+    {
+      "markdown_files": 14,
+      "name": "_archive"
+    },
+    {
+      "markdown_files": 86,
+      "name": "analyses"
+    },
+    {
+      "markdown_files": 1,
+      "name": "apps"
+    },
+    {
+      "markdown_files": 0,
+      "name": "briefs"
+    },
+    {
+      "markdown_files": 2,
+      "name": "captures"
+    },
+    {
+      "markdown_files": 20,
+      "name": "concepts"
+    },
+    {
+      "markdown_files": 0,
+      "name": "config"
+    },
+    {
+      "markdown_files": 56,
+      "name": "content"
+    },
+    {
+      "markdown_files": 0,
+      "name": "dashboards"
+    },
+    {
+      "markdown_files": 44,
+      "name": "docs"
+    },
+    {
+      "markdown_files": 7,
+      "name": "entities"
+    },
+    {
+      "markdown_files": 1,
+      "name": "folds"
+    },
+    {
+      "markdown_files": 2,
+      "name": "generated"
+    },
+    {
+      "markdown_files": 7,
+      "name": "graphify-out"
+    },
+    {
+      "markdown_files": 38,
+      "name": "hard-private"
+    },
+    {
+      "markdown_files": 2,
+      "name": "inbox"
+    },
+    {
+      "markdown_files": 18,
+      "name": "infrastructure"
+    },
+    {
+      "markdown_files": 0,
+      "name": "knowledge"
+    },
+    {
+      "markdown_files": 1,
+      "name": "kublai"
+    },
+    {
+      "markdown_files": 0,
+      "name": "methodology"
+    },
+    {
+      "markdown_files": 0,
+      "name": "migrations"
+    },
+    {
+      "markdown_files": 1732,
+      "name": "operations"
+    },
+    {
+      "markdown_files": 45,
+      "name": "projects"
+    },
+    {
+      "markdown_files": 1,
+      "name": "proposals"
+    },
+    {
+      "markdown_files": 8,
+      "name": "published"
+    },
+    {
+      "markdown_files": 1,
+      "name": "queue"
+    },
+    {
+      "markdown_files": 32,
+      "name": "raw"
+    },
+    {
+      "markdown_files": 3,
+      "name": "receipts"
+    },
+    {
+      "markdown_files": 0,
+      "name": "research"
+    },
+    {
+      "markdown_files": 4,
+      "name": "runbooks"
+    },
+    {
+      "markdown_files": 1,
+      "name": "scripts"
+    },
+    {
+      "markdown_files": 2,
+      "name": "tests"
+    }
+  ],
+  "wiki_root": "/Users/kublai/brain"
+}

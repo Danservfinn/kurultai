@@ -1,0 +1,18 @@
+kurultai:
+  chair: kublai
+  coordination_substrate: native-hermes
+  task_router: native-kanban
+  kanban_db: "~/.hermes/kanban.db"
+  worker_profiles:
+    - temujin
+    - mongke
+    - jochi
+    - ogedei
+    - chagatai
+    - tolui
+  receipts:
+    required_for_meaningful_runtime_changes: true
+    brain_receipts_root: "/Users/kublai/brain/receipts"
+  retired_surfaces:
+    openclaw_internal_telegram_protocol: retired
+    neo4j_brain_memory: retired

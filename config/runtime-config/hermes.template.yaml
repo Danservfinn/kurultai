@@ -1,0 +1,35 @@
+runtime:
+  identity: kublai
+  default_provider: openai-codex
+  default_model: gpt-5.5
+
+security:
+  parse_screening_enabled: true
+  protected_file_flow: hermes-self-mod
+  private_value_placeholder: "[REDACTED]"
+
+memory:
+  enabled: true
+  user_profile_enabled: true
+  session_history:
+    source_of_record: "~/.hermes/sessions"
+    retrieval: session_search
+    auto_prune: false
+
+coordination:
+  substrate: native-hermes
+  kanban_db: "~/.hermes/kanban.db"
+  profiles:
+    - kublai
+    - temujin
+    - mongke
+    - jochi
+    - ogedei
+    - chagatai
+    - tolui
+
+brain:
+  wiki_root: "/Users/kublai/brain"
+  public_index: "~/.brain-index/brain.db"
+  private_index: "~/.kublai/brain-index-private/brain.db"
+  public_gateway: "127.0.0.1:8765"
