@@ -1,0 +1,146 @@
+{
+  "rooms": [
+    {
+      "artifact_links": [
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/research/research-input.json",
+          "label": "research/research-input.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/ideas/idea-contract.json",
+          "label": "ideas/idea-contract.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/reviews/intent-review.json",
+          "label": "reviews/intent-review.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/reviews/main-review.json",
+          "label": "reviews/main-review.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/plans/product-plan.json",
+          "label": "plans/product-plan.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/plans/build-plan.json",
+          "label": "plans/build-plan.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/jobs/implementation-receipt.json",
+          "label": "jobs/implementation-receipt.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/verification/verification-report.json",
+          "label": "verification/verification-report.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/verification/verification-delta.json",
+          "label": "verification/verification-delta.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/trust/trust-report.json",
+          "label": "trust/trust-report.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/retention/retention-review.json",
+          "label": "retention/retention-review.json"
+        },
+        {
+          "href": "rooms/2026-05-10-gkisokay-auto-think-auto-build/operator/operator-summary.json",
+          "label": "operator/operator-summary.json"
+        }
+      ],
+      "has_missing_evidence": false,
+      "headline": "gkisokay Auto Think Auto Build",
+      "missing_artifacts": [],
+      "needs_decision": true,
+      "next_action": "Resolve operator decision queue.",
+      "operator_decisions_needed": [
+        "Run validate_room",
+        "Review operator summary"
+      ],
+      "phase": "complete",
+      "retention": "keep",
+      "risk_score": 2,
+      "room_id": "2026-05-10-gkisokay-auto-think-auto-build",
+      "trust_state": "watch",
+      "verification_delta": "confirmed",
+      "verification_pass": true
+    },
+    {
+      "artifact_links": [
+        {
+          "href": "rooms/demo-room/research/research-input.json",
+          "label": "research/research-input.json"
+        },
+        {
+          "href": "rooms/demo-room/ideas/idea-contract.json",
+          "label": "ideas/idea-contract.json"
+        },
+        {
+          "href": "rooms/demo-room/reviews/intent-review.json",
+          "label": "reviews/intent-review.json"
+        },
+        {
+          "href": "rooms/demo-room/reviews/main-review.json",
+          "label": "reviews/main-review.json"
+        },
+        {
+          "href": "rooms/demo-room/plans/product-plan.json",
+          "label": "plans/product-plan.json"
+        },
+        {
+          "href": "rooms/demo-room/plans/build-plan.json",
+          "label": "plans/build-plan.json"
+        },
+        {
+          "href": "rooms/demo-room/jobs/implementation-receipt.json",
+          "label": "jobs/implementation-receipt.json"
+        },
+        {
+          "href": "rooms/demo-room/verification/verification-report.json",
+          "label": "verification/verification-report.json"
+        },
+        {
+          "href": "rooms/demo-room/verification/verification-delta.json",
+          "label": "verification/verification-delta.json"
+        },
+        {
+          "href": "rooms/demo-room/trust/trust-report.json",
+          "label": "trust/trust-report.json"
+        },
+        {
+          "href": "rooms/demo-room/retention/retention-review.json",
+          "label": "retention/retention-review.json"
+        },
+        {
+          "href": "rooms/demo-room/operator/operator-summary.json",
+          "label": "operator/operator-summary.json"
+        }
+      ],
+      "has_missing_evidence": false,
+      "headline": "Install a typed buildroom foundation for autonomous improvement work",
+      "missing_artifacts": [],
+      "needs_decision": false,
+      "next_action": "Ready for PR/merge monitoring or retention follow-up.",
+      "operator_decisions_needed": [],
+      "phase": "complete",
+      "retention": "keep",
+      "risk_score": 0.1,
+      "room_id": "demo-room",
+      "trust_state": "clean",
+      "verification_delta": "confirmed",
+      "verification_pass": true
+    }
+  ],
+  "summary": {
+    "generated_at": "2026-05-11T01:58:38Z",
+    "room_count": 2,
+    "rooms_needing_decision": 1,
+    "rooms_with_missing_evidence": 0,
+    "trust_clean": 1,
+    "trust_investigate": 0,
+    "trust_watch": 1
+  }
+}
