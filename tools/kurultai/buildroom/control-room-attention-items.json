@@ -1,0 +1,74 @@
+{
+  "actionable_items": [
+    {
+      "category": "operator_decision",
+      "headline": "gkisokay Auto Think Auto Build",
+      "id": "2026-05-10-gkisokay-auto-think-auto-build:operator-decisions",
+      "kanban_recommended": true,
+      "operator_decisions_needed": [
+        "Run validate_room",
+        "Review operator summary"
+      ],
+      "recommended_action": "Resolve or route the operator decision queue.",
+      "room_id": "2026-05-10-gkisokay-auto-think-auto-build",
+      "severity": "warning",
+      "summary": "Room has 2 operator decision(s) queued."
+    },
+    {
+      "category": "trust",
+      "headline": "gkisokay Auto Think Auto Build",
+      "id": "2026-05-10-gkisokay-auto-think-auto-build:trust-watch",
+      "kanban_recommended": true,
+      "recommended_action": "Refresh the operator summary and decide whether the room is clean, needs more evidence, or needs investigation.",
+      "room_id": "2026-05-10-gkisokay-auto-think-auto-build",
+      "severity": "warning",
+      "summary": "Room is in watch state."
+    }
+  ],
+  "generated_at": "2026-05-11T02:09:12Z",
+  "items": [
+    {
+      "category": "operator_decision",
+      "headline": "gkisokay Auto Think Auto Build",
+      "id": "2026-05-10-gkisokay-auto-think-auto-build:operator-decisions",
+      "kanban_recommended": true,
+      "operator_decisions_needed": [
+        "Run validate_room",
+        "Review operator summary"
+      ],
+      "recommended_action": "Resolve or route the operator decision queue.",
+      "room_id": "2026-05-10-gkisokay-auto-think-auto-build",
+      "severity": "warning",
+      "summary": "Room has 2 operator decision(s) queued."
+    },
+    {
+      "category": "trust",
+      "headline": "gkisokay Auto Think Auto Build",
+      "id": "2026-05-10-gkisokay-auto-think-auto-build:trust-watch",
+      "kanban_recommended": true,
+      "recommended_action": "Refresh the operator summary and decide whether the room is clean, needs more evidence, or needs investigation.",
+      "room_id": "2026-05-10-gkisokay-auto-think-auto-build",
+      "severity": "warning",
+      "summary": "Room is in watch state."
+    },
+    {
+      "category": "monitor",
+      "headline": "Install a typed buildroom foundation for autonomous improvement work",
+      "id": "demo-room:clean-monitor",
+      "kanban_recommended": false,
+      "recommended_action": "No immediate action; include in retention sweep.",
+      "room_id": "demo-room",
+      "severity": "info",
+      "summary": "Room is clean and complete."
+    }
+  ],
+  "summary": {
+    "actionable_item_count": 2,
+    "attention_item_count": 3,
+    "critical_count": 0,
+    "error_count": 0,
+    "info_count": 1,
+    "room_count": 2,
+    "warning_count": 2
+  }
+}

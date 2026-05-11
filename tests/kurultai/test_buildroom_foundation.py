@@ -466,3 +466,58 @@ def test_control_room_report_flags_missing_evidence(tmp_path: Path) -> None:
     assert payload["rooms"][0]["has_missing_evidence"] is True
     assert "missing" in html_output.read_text()
 
+
+
+
+def test_control_room_cron_emits_attention_and_kanban_drafts(tmp_path):
+    room = copy_demo_room(tmp_path)
+    trust_path = room / "trust/trust-report.json"
+    trust = json.loads(trust_path.read_text())
+    trust["state"] = "investigate"
+    trust_path.write_text(json.dumps(trust))
+    rooms_root = room.parent
+    attention = tmp_path / "attention.json"
+    drafts = tmp_path / "drafts.json"
+    markdown = tmp_path / "control-room.md"
+    payload = tmp_path / "control-room.json"
+    html = tmp_path / "control-room.html"
+
+    result = run_script(
+        "tools/kurultai/buildroom/scripts/control_room_cron.py",
+        "--rooms-root", rooms_root,
+        "--markdown-output", markdown,
+        "--json-output", payload,
+        "--html-output", html,
+        "--attention-output", attention,
+        "--kanban-drafts-output", drafts,
+    )
+
+    assert result.returncode == 0, result.stderr
+    attention_payload = json.loads(attention.read_text())
+    draft_payload = json.loads(drafts.read_text())
+    assert attention_payload["summary"]["room_count"] == 1
+    assert attention_payload["summary"]["critical_count"] == 1
+    assert attention_payload["summary"]["actionable_item_count"] == 1
+    assert attention_payload["items"][0]["category"] == "trust"
+    assert draft_payload["draft_count"] == 1
+    assert draft_payload["drafts"][0]["priority"] == "high"
+    assert "Buildroom follow-up" in draft_payload["drafts"][0]["title"]
+
+
+def test_control_room_cron_fail_on_actionable_exit_code(tmp_path):
+    room = copy_demo_room(tmp_path)
+    trust_path = room / "trust/trust-report.json"
+    trust = json.loads(trust_path.read_text())
+    trust["state"] = "watch"
+    trust_path.write_text(json.dumps(trust))
+    result = run_script(
+        "tools/kurultai/buildroom/scripts/control_room_cron.py",
+        "--rooms-root", room.parent,
+        "--attention-output", tmp_path / "attention.json",
+        "--kanban-drafts-output", tmp_path / "drafts.json",
+        "--markdown-output", tmp_path / "control-room.md",
+        "--json-output", tmp_path / "control-room.json",
+        "--html-output", tmp_path / "control-room.html",
+        "--fail-on-actionable",
+    )
+    assert result.returncode == 2
