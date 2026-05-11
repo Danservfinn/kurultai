@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kurultai Buildroom Control Room</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070b13; --panel:#101827; --line:#25324a; --text:#edf4ff; --muted:#9fb0ca; --green:#4ade80; --yellow:#facc15; --red:#fb7185; --blue:#60a5fa; --purple:#c084fc; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:radial-gradient(circle at top left,#1d2b4f 0,#070b13 38rem); color:var(--text); }
+    main { max-width:1180px; margin:0 auto; padding:40px 20px 64px; }
+    .hero { display:flex; justify-content:space-between; gap:24px; align-items:flex-end; margin-bottom:28px; }
+    h1 { font-size:clamp(2rem,5vw,4.5rem); line-height:.95; margin:0; letter-spacing:-.06em; }
+    .subtitle,.muted { color:var(--muted); }
+    .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin:28px 0; }
+    .stat,.room-card { background:rgba(16,24,39,.86); border:1px solid var(--line); box-shadow:0 24px 80px rgba(0,0,0,.35); border-radius:22px; }
+    .stat { padding:18px; } .stat span,.metrics span,.eyebrow { color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.12em; } .stat strong { display:block; font-size:2rem; margin-top:6px; }
+    .filters { display:flex; flex-wrap:wrap; gap:10px; margin:24px 0; }
+    button.filter { border:1px solid var(--line); background:#111a2d; color:var(--text); padding:10px 14px; border-radius:999px; cursor:pointer; } button.filter.active { border-color:var(--blue); box-shadow:0 0 0 3px rgba(96,165,250,.2); }
+    .rooms { display:grid; gap:18px; } .room-card { padding:22px; } .room-card.clean { border-color:rgba(74,222,128,.35); } .room-card.watch { border-color:rgba(250,204,21,.35); } .room-card.investigate { border-color:rgba(251,113,133,.5); }
+    .room-topline { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; } h2 { margin:.25rem 0 0; font-size:1.35rem; }
+    .badge { border-radius:999px; padding:8px 11px; font-weight:700; } .badge.clean { background:rgba(74,222,128,.15); color:var(--green); } .badge.watch { background:rgba(250,204,21,.15); color:var(--yellow); } .badge.investigate { background:rgba(251,113,133,.15); color:var(--red); }
+    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:18px 0; } .metrics div { background:#0b1220; border:1px solid var(--line); border-radius:16px; padding:12px; } .metrics strong { display:block; margin-top:5px; }
+    .details p { margin:.45rem 0; } details { margin-top:14px; } summary { cursor:pointer; color:var(--blue); } .artifact-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:12px; } .artifact-grid a { color:#bfdbfe; background:#0b1220; border:1px solid var(--line); padding:8px 10px; border-radius:10px; text-decoration:none; }
+    .empty { color:var(--muted); border:1px dashed var(--line); border-radius:18px; padding:24px; } pre { white-space:pre-wrap; color:var(--muted); font-size:.78rem; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Kurultai / Buildroom</p>
+      <h1>Control Room</h1>
+      <p class="subtitle">Generated 2026-05-11T01:58:38Z. Static, public-safe dashboard for buildroom trust and evidence.</p>
+    </div>
+  </section>
+  <section class="summary">
+    <div class="stat"><span>Rooms</span><strong>2</strong></div>
+    <div class="stat"><span>Clean</span><strong>1</strong></div>
+    <div class="stat"><span>Watch</span><strong>1</strong></div>
+    <div class="stat"><span>Investigate</span><strong>0</strong></div>
+    <div class="stat"><span>Missing evidence</span><strong>0</strong></div>
+    <div class="stat"><span>Needs decision</span><strong>1</strong></div>
+  </section>
+  <nav class="filters" aria-label="Room filters"><button class="filter" data-filter="all">All</button>
+<button class="filter" data-filter="clean">Clean</button>
+<button class="filter" data-filter="watch">Watch</button>
+<button class="filter" data-filter="investigate">Investigate</button>
+<button class="filter" data-filter="missing">Missing evidence</button>
+<button class="filter" data-filter="decision">Needs decision</button></nav>
+  <section class="rooms" id="rooms">
+<section class="room-card watch" data-flags="all watch decision">
+  <div class="room-topline">
+    <div>
+      <p class="eyebrow">2026-05-10-gkisokay-auto-think-auto-build</p>
+      <h2>gkisokay Auto Think Auto Build</h2>
+    </div>
+    <span class="badge watch">watch</span>
+  </div>
+  <div class="metrics">
+    <div><span>Phase</span><strong>complete</strong></div>
+    <div><span>Risk</span><strong>2</strong></div>
+    <div><span>Verification</span><strong>confirmed</strong></div>
+    <div><span>Retention</span><strong>keep</strong></div>
+  </div>
+  <div class="details">
+    <p><strong>Verification pass:</strong> True</p>
+    <p><strong>Missing evidence:</strong> none</p>
+    <p><strong>Operator decisions:</strong> Run validate_room, Review operator summary</p>
+    <p><strong>Next action:</strong> Resolve operator decision queue.</p>
+  </div>
+  <details>
+    <summary>Artifacts</summary>
+    <div class="artifact-grid"><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/research/research-input.json">research/research-input.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/ideas/idea-contract.json">ideas/idea-contract.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/reviews/intent-review.json">reviews/intent-review.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/reviews/main-review.json">reviews/main-review.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/plans/product-plan.json">plans/product-plan.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/plans/build-plan.json">plans/build-plan.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/jobs/implementation-receipt.json">jobs/implementation-receipt.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/verification/verification-report.json">verification/verification-report.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/verification/verification-delta.json">verification/verification-delta.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/trust/trust-report.json">trust/trust-report.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/retention/retention-review.json">retention/retention-review.json</a><a href="rooms/2026-05-10-gkisokay-auto-think-auto-build/operator/operator-summary.json">operator/operator-summary.json</a></div>
+  </details>
+</section>
+
+<section class="room-card clean" data-flags="all clean">
+  <div class="room-topline">
+    <div>
+      <p class="eyebrow">demo-room</p>
+      <h2>Install a typed buildroom foundation for autonomous improvement work</h2>
+    </div>
+    <span class="badge clean">clean</span>
+  </div>
+  <div class="metrics">
+    <div><span>Phase</span><strong>complete</strong></div>
+    <div><span>Risk</span><strong>0.1</strong></div>
+    <div><span>Verification</span><strong>confirmed</strong></div>
+    <div><span>Retention</span><strong>keep</strong></div>
+  </div>
+  <div class="details">
+    <p><strong>Verification pass:</strong> True</p>
+    <p><strong>Missing evidence:</strong> none</p>
+    <p><strong>Operator decisions:</strong> none</p>
+    <p><strong>Next action:</strong> Ready for PR/merge monitoring or retention follow-up.</p>
+  </div>
+  <details>
+    <summary>Artifacts</summary>
+    <div class="artifact-grid"><a href="rooms/demo-room/research/research-input.json">research/research-input.json</a><a href="rooms/demo-room/ideas/idea-contract.json">ideas/idea-contract.json</a><a href="rooms/demo-room/reviews/intent-review.json">reviews/intent-review.json</a><a href="rooms/demo-room/reviews/main-review.json">reviews/main-review.json</a><a href="rooms/demo-room/plans/product-plan.json">plans/product-plan.json</a><a href="rooms/demo-room/plans/build-plan.json">plans/build-plan.json</a><a href="rooms/demo-room/jobs/implementation-receipt.json">jobs/implementation-receipt.json</a><a href="rooms/demo-room/verification/verification-report.json">verification/verification-report.json</a><a href="rooms/demo-room/verification/verification-delta.json">verification/verification-delta.json</a><a href="rooms/demo-room/trust/trust-report.json">trust/trust-report.json</a><a href="rooms/demo-room/retention/retention-review.json">retention/retention-review.json</a><a href="rooms/demo-room/operator/operator-summary.json">operator/operator-summary.json</a></div>
+  </details>
+</section></section>
+  <details>
+    <summary>Embedded JSON payload</summary>
+    <pre>{
+  &quot;rooms&quot;: [
+    {
+      &quot;artifact_links&quot;: [
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/research/research-input.json&quot;,
+          &quot;label&quot;: &quot;research/research-input.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/ideas/idea-contract.json&quot;,
+          &quot;label&quot;: &quot;ideas/idea-contract.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/reviews/intent-review.json&quot;,
+          &quot;label&quot;: &quot;reviews/intent-review.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/reviews/main-review.json&quot;,
+          &quot;label&quot;: &quot;reviews/main-review.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/plans/product-plan.json&quot;,
+          &quot;label&quot;: &quot;plans/product-plan.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/plans/build-plan.json&quot;,
+          &quot;label&quot;: &quot;plans/build-plan.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/jobs/implementation-receipt.json&quot;,
+          &quot;label&quot;: &quot;jobs/implementation-receipt.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/verification/verification-report.json&quot;,
+          &quot;label&quot;: &quot;verification/verification-report.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/verification/verification-delta.json&quot;,
+          &quot;label&quot;: &quot;verification/verification-delta.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/trust/trust-report.json&quot;,
+          &quot;label&quot;: &quot;trust/trust-report.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/retention/retention-review.json&quot;,
+          &quot;label&quot;: &quot;retention/retention-review.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/2026-05-10-gkisokay-auto-think-auto-build/operator/operator-summary.json&quot;,
+          &quot;label&quot;: &quot;operator/operator-summary.json&quot;
+        }
+      ],
+      &quot;has_missing_evidence&quot;: false,
+      &quot;headline&quot;: &quot;gkisokay Auto Think Auto Build&quot;,
+      &quot;missing_artifacts&quot;: [],
+      &quot;needs_decision&quot;: true,
+      &quot;next_action&quot;: &quot;Resolve operator decision queue.&quot;,
+      &quot;operator_decisions_needed&quot;: [
+        &quot;Run validate_room&quot;,
+        &quot;Review operator summary&quot;
+      ],
+      &quot;phase&quot;: &quot;complete&quot;,
+      &quot;retention&quot;: &quot;keep&quot;,
+      &quot;risk_score&quot;: 2,
+      &quot;room_id&quot;: &quot;2026-05-10-gkisokay-auto-think-auto-build&quot;,
+      &quot;trust_state&quot;: &quot;watch&quot;,
+      &quot;verification_delta&quot;: &quot;confirmed&quot;,
+      &quot;verification_pass&quot;: true
+    },
+    {
+      &quot;artifact_links&quot;: [
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/research/research-input.json&quot;,
+          &quot;label&quot;: &quot;research/research-input.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/ideas/idea-contract.json&quot;,
+          &quot;label&quot;: &quot;ideas/idea-contract.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/reviews/intent-review.json&quot;,
+          &quot;label&quot;: &quot;reviews/intent-review.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/reviews/main-review.json&quot;,
+          &quot;label&quot;: &quot;reviews/main-review.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/plans/product-plan.json&quot;,
+          &quot;label&quot;: &quot;plans/product-plan.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/plans/build-plan.json&quot;,
+          &quot;label&quot;: &quot;plans/build-plan.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/jobs/implementation-receipt.json&quot;,
+          &quot;label&quot;: &quot;jobs/implementation-receipt.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/verification/verification-report.json&quot;,
+          &quot;label&quot;: &quot;verification/verification-report.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/verification/verification-delta.json&quot;,
+          &quot;label&quot;: &quot;verification/verification-delta.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/trust/trust-report.json&quot;,
+          &quot;label&quot;: &quot;trust/trust-report.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/retention/retention-review.json&quot;,
+          &quot;label&quot;: &quot;retention/retention-review.json&quot;
+        },
+        {
+          &quot;href&quot;: &quot;rooms/demo-room/operator/operator-summary.json&quot;,
+          &quot;label&quot;: &quot;operator/operator-summary.json&quot;
+        }
+      ],
+      &quot;has_missing_evidence&quot;: false,
+      &quot;headline&quot;: &quot;Install a typed buildroom foundation for autonomous improvement work&quot;,
+      &quot;missing_artifacts&quot;: [],
+      &quot;needs_decision&quot;: false,
+      &quot;next_action&quot;: &quot;Ready for PR/merge monitoring or retention follow-up.&quot;,
+      &quot;operator_decisions_needed&quot;: [],
+      &quot;phase&quot;: &quot;complete&quot;,
+      &quot;retention&quot;: &quot;keep&quot;,
+      &quot;risk_score&quot;: 0.1,
+      &quot;room_id&quot;: &quot;demo-room&quot;,
+      &quot;trust_state&quot;: &quot;clean&quot;,
+      &quot;verification_delta&quot;: &quot;confirmed&quot;,
+      &quot;verification_pass&quot;: true
+    }
+  ],
+  &quot;summary&quot;: {
+    &quot;generated_at&quot;: &quot;2026-05-11T01:58:38Z&quot;,
+    &quot;room_count&quot;: 2,
+    &quot;rooms_needing_decision&quot;: 1,
+    &quot;rooms_with_missing_evidence&quot;: 0,
+    &quot;trust_clean&quot;: 1,
+    &quot;trust_investigate&quot;: 0,
+    &quot;trust_watch&quot;: 1
+  }
+}</pre>
+  </details>
+</main>
+<script>
+const buttons = [...document.querySelectorAll('button.filter')];
+const cards = [...document.querySelectorAll('.room-card')];
+function applyFilter(filter) {
+  buttons.forEach(button => button.classList.toggle('active', button.dataset.filter === filter));
+  cards.forEach(card => {
+    const flags = (card.dataset.flags || '').split(' ');
+    card.hidden = filter !== 'all' && !flags.includes(filter);
+  });
+}
+buttons.forEach(button => button.addEventListener('click', () => applyFilter(button.dataset.filter)));
+applyFilter('all');
+</script>
+</body>
+</html>

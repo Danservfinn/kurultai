@@ -1,6 +1,6 @@
 # Kurultai Buildroom Control Room
 
-Generated: 2026-05-11T01:37:39Z
+Generated: 2026-05-11T01:58:38Z
 
 ## Summary
 
@@ -9,6 +9,7 @@ Generated: 2026-05-11T01:37:39Z
 - Trust watch: 1
 - Trust investigate: 0
 - Rooms with missing evidence: 0
+- Rooms needing decision: 1
 
 ## Rooms
 
@@ -22,7 +23,7 @@ Generated: 2026-05-11T01:37:39Z
 - Retention: keep
 - Missing evidence: none
 - Operator decisions needed: Run validate_room, Review operator summary
-- Next action: Review room state and refresh operator summary.
+- Next action: Resolve operator decision queue.
 
 ### demo-room
 

@@ -397,8 +397,20 @@ def test_research_to_buildroom_compiles_brain_artifacts(tmp_path: Path) -> None:
 def test_control_room_report_summarizes_rooms(tmp_path: Path) -> None:
     room = copy_demo_room(tmp_path)
     output = tmp_path / "control-room.md"
+    json_output = tmp_path / "control-room.json"
+    html_output = tmp_path / "control-room.html"
 
-    result = run_script("tools/kurultai/buildroom/scripts/control_room.py", "--rooms-root", room.parent, "--output", output)
+    result = run_script(
+        "tools/kurultai/buildroom/scripts/control_room.py",
+        "--rooms-root",
+        room.parent,
+        "--output",
+        output,
+        "--json-output",
+        json_output,
+        "--html-output",
+        html_output,
+    )
 
     assert result.returncode == 0, result.stderr
     report = output.read_text()
@@ -406,15 +418,41 @@ def test_control_room_report_summarizes_rooms(tmp_path: Path) -> None:
     assert "### room" in report
     assert "Trust: clean" in report
     assert "Missing evidence: none" in report
+    assert "Rooms needing decision: 0" in report
     assert "Next action: Ready for PR/merge monitoring or retention follow-up." in report
+
+    payload = read_json(json_output)
+    assert payload["summary"]["room_count"] == 1
+    assert payload["summary"]["trust_clean"] == 1
+    assert payload["summary"]["rooms_needing_decision"] == 0
+    assert payload["rooms"][0]["artifact_links"]
+
+    html = html_output.read_text()
+    assert "<title>Kurultai Buildroom Control Room</title>" in html
+    assert 'data-filter="clean"' in html
+    assert 'data-filter="missing"' in html
+    assert 'data-filter="decision"' in html
+    assert "rooms/room/research/research-input.json" in html
 
 
 def test_control_room_report_flags_missing_evidence(tmp_path: Path) -> None:
     room = copy_demo_room(tmp_path)
     (room / "verification/verification-report.json").unlink()
     output = tmp_path / "control-room.md"
+    json_output = tmp_path / "control-room.json"
+    html_output = tmp_path / "control-room.html"
 
-    result = run_script("tools/kurultai/buildroom/scripts/control_room.py", "--rooms-root", room.parent, "--output", output)
+    result = run_script(
+        "tools/kurultai/buildroom/scripts/control_room.py",
+        "--rooms-root",
+        room.parent,
+        "--output",
+        output,
+        "--json-output",
+        json_output,
+        "--html-output",
+        html_output,
+    )
 
     assert result.returncode == 0, result.stderr
     report = output.read_text()
@@ -422,4 +460,9 @@ def test_control_room_report_flags_missing_evidence(tmp_path: Path) -> None:
     assert "Phase: verification" in report
     assert "Missing evidence: verification/verification-report.json" in report
     assert "Next action: Fill missing artifact: verification/verification-report.json." in report
+
+    payload = read_json(json_output)
+    assert payload["summary"]["rooms_with_missing_evidence"] == 1
+    assert payload["rooms"][0]["has_missing_evidence"] is True
+    assert "missing" in html_output.read_text()
 
