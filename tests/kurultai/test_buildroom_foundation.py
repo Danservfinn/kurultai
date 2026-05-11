@@ -392,3 +392,34 @@ def test_research_to_buildroom_compiles_brain_artifacts(tmp_path: Path) -> None:
     summary = read_json(room / "operator/operator-summary.json")
     assert summary["status"] == "watch"
     assert "buildroom://example-research-room" in summary["links"]
+
+
+def test_control_room_report_summarizes_rooms(tmp_path: Path) -> None:
+    room = copy_demo_room(tmp_path)
+    output = tmp_path / "control-room.md"
+
+    result = run_script("tools/kurultai/buildroom/scripts/control_room.py", "--rooms-root", room.parent, "--output", output)
+
+    assert result.returncode == 0, result.stderr
+    report = output.read_text()
+    assert "# Kurultai Buildroom Control Room" in report
+    assert "### room" in report
+    assert "Trust: clean" in report
+    assert "Missing evidence: none" in report
+    assert "Next action: Ready for PR/merge monitoring or retention follow-up." in report
+
+
+def test_control_room_report_flags_missing_evidence(tmp_path: Path) -> None:
+    room = copy_demo_room(tmp_path)
+    (room / "verification/verification-report.json").unlink()
+    output = tmp_path / "control-room.md"
+
+    result = run_script("tools/kurultai/buildroom/scripts/control_room.py", "--rooms-root", room.parent, "--output", output)
+
+    assert result.returncode == 0, result.stderr
+    report = output.read_text()
+    assert "Rooms with missing evidence: 1" in report
+    assert "Phase: verification" in report
+    assert "Missing evidence: verification/verification-report.json" in report
+    assert "Next action: Fill missing artifact: verification/verification-report.json." in report
+
