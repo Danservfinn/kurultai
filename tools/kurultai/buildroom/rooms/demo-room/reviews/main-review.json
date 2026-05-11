@@ -1,0 +1,15 @@
+{
+  "allowed_workspaces": [
+    "tools/kurultai/buildroom"
+  ],
+  "approval_notes": "Implement foundation artifacts and demo fixture only.",
+  "blast_radius": "local",
+  "blocked_reasons": [],
+  "decision": "approved_for_planning",
+  "human_approval_required": false,
+  "idea_id": "idea-buildroom-foundation-demo",
+  "review_id": "main-demo-001",
+  "reviewed_at": "2026-05-10T17:03:00Z",
+  "reviewer": "kublai",
+  "risk_band": "low"
+}

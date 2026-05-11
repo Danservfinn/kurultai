@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/buildroom/schemas/build-plan.schema.json",
+  "title": "build-plan",
+  "type": "object",
+  "required": [
+    "build_id",
+    "plan_id",
+    "created_at",
+    "assignee",
+    "task_refs",
+    "steps",
+    "files_expected",
+    "commands_allowed",
+    "verification_commands",
+    "out_of_scope",
+    "stop_conditions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "build_id": {
+      "type": "string"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "assignee": {
+      "type": "string"
+    },
+    "task_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "files_expected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "commands_allowed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification_commands": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "out_of_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stop_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

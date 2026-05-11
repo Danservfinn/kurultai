@@ -1,0 +1,12 @@
+{
+  "decision": "needs_main_review",
+  "idea_id": "idea-buildroom-foundation-demo",
+  "reason": "Evidence is sufficient and scope is bounded/additive.",
+  "related_existing_work": [
+    "Hermes Kanban task t_faf9a811",
+    "Plan 2026-05-10 auto-think auto-build contract chain"
+  ],
+  "review_id": "intent-demo-001",
+  "reviewed_at": "2026-05-10T17:02:00Z",
+  "reviewer": "main-intent-screen"
+}

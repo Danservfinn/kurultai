@@ -1,0 +1,18 @@
+{
+  "artifacts_to_improve": [
+    "Add live adapters in downstream tasks"
+  ],
+  "artifacts_to_keep": [
+    "schemas",
+    "demo-room",
+    "scripts",
+    "docs"
+  ],
+  "artifacts_to_prune": [],
+  "rationale": "Foundation artifacts are small, public-safe after sanitization, and useful as reusable contract examples.",
+  "recommendation": "keep",
+  "requires_human_before_destructive_action": true,
+  "retention_id": "retention-demo-001",
+  "reviewed_at": "2026-05-10T17:35:00Z",
+  "room_id": "demo-room"
+}
