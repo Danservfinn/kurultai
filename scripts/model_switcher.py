@@ -10,6 +10,7 @@ Handles switching LLM models and providers for the 6-agent system:
 - Jochi (analyst): Analysis tasks
 - Ögedei (ops): Operations/emergency router
 """
+from __future__ import annotations
 
 import fcntl
 import json

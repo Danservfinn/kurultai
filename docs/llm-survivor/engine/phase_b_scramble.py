@@ -3,6 +3,7 @@ Phase B: The Scramble - V3.0 Hyper-Rational Override
 Agents use Action Points to whisper, form alliances, and plot.
 Implements DeepThink's Master Prompt Architecture.
 """
+from __future__ import annotations
 
 import sqlite3
 import json

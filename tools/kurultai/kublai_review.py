@@ -4,6 +4,7 @@ Kublai Review System
 Kublai reviews agent reflections using Gemini CLI with full context
 Decides: implement, reject, or consult human
 """
+from __future__ import annotations
 
 import os
 import json

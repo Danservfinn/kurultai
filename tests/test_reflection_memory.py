@@ -136,6 +136,35 @@ class TestAgentReflectionMemory:
         assert call_args[1]["lesson"] == "Always use hash_password()"
         assert "embedding" in call_args[1]
 
+    def test_record_mistake_dual_writes_to_brain(self, mock_memory, tmp_path, monkeypatch):
+        """Test optional Phase 2 dual-write to markdown knowledge store."""
+        memory, mock_session = mock_memory
+        mock_result = Mock()
+        mock_result.single.return_value = {"reflection_id": "test-reflection-id"}
+        mock_session.run.return_value = mock_result
+        log_path = tmp_path / "dual-write.jsonl"
+
+        monkeypatch.setenv("KUBLAI_KNOWLEDGE_DUAL_WRITE", "1")
+        monkeypatch.setenv("BRAIN_WIKI_ROOT", str(tmp_path / "brain"))
+        monkeypatch.setenv("BRAIN_DUAL_WRITE_LOG", str(log_path))
+
+        rm = AgentReflectionMemory(memory)
+        reflection_id = rm.record_mistake(
+            agent="developer",
+            mistake_type="security",
+            context="Implementing authentication",
+            expected_behavior="Password should be hashed",
+            actual_behavior="Password stored in plaintext",
+            root_cause="Forgot to call hash function",
+            lesson="Always use hash_password()"
+        )
+
+        assert reflection_id == "test-reflection-id"
+        pages = list((tmp_path / "brain" / "operations/reflections").glob("*.md"))
+        assert len(pages) == 1
+        assert "reflection_id: test-reflection-id" in pages[0].read_text()
+        assert '"idempotency_key": "reflection:test-reflection-id"' in log_path.read_text()
+
     def test_record_mistake_invalid_type(self, reflection_memory):
         """Test that invalid mistake_type raises ValueError."""
         with pytest.raises(ValueError) as exc_info:

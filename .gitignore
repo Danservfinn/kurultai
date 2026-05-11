@@ -52,3 +52,20 @@ temp/
 authentik-credentials.txt
 *.credentials
 *.secret
+*.key
+*.pem
+*.p12
+*.pfx
+*.sqlite
+*.db
+*.db-*
+*.session
+
+# Runtime-private Hermes/Kurultai/Brain artifacts
+.hermes/
+brain-index/
+brain-index-private/
+sessions/
+kanban.db
+config/runtime-config/live/
+config/runtime-config/private/

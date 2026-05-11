@@ -262,7 +262,8 @@ class Metric:
                 lines.append(f"{self.name}_count{label_str} {count}")
                 lines.append(f"{self.name}_sum{label_str} {sum_value}")
                 # Add a +Inf bucket
-                lines.append(f"{self.name}_bucket{label_str.replace('}', ',le=\"+Inf\"')} {count}")
+                bucket_label_str = label_str.replace("}", ',le="+Inf"}') if label_str else '{le="+Inf"}'
+                lines.append(f"{self.name}_bucket{bucket_label_str} {count}")
             else:
                 lines.append(f"{self.name}{label_str} {metric_value.value}")
 

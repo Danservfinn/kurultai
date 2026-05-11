@@ -1,0 +1,15 @@
+{
+  "allowed_workspaces": [
+    "tools/kurultai/buildroom"
+  ],
+  "approval_notes": "Approved for autonomous continuation.",
+  "blast_radius": "local",
+  "blocked_reasons": [],
+  "decision": "approved_for_planning",
+  "human_approval_required": false,
+  "idea_id": "idea-2026-05-10-gkisokay-auto-think-auto-build",
+  "review_id": "main-2026-05-10-gkisokay-auto-think-auto-build",
+  "reviewed_at": "2026-05-11T01:17:17Z",
+  "reviewer": "kublai",
+  "risk_band": "low"
+}

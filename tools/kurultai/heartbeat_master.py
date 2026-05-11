@@ -10,6 +10,7 @@ Usage:
     python heartbeat_master.py --cycle       # Run one heartbeat cycle
     python heartbeat_master.py --daemon      # Run continuous daemon mode
 """
+from __future__ import annotations
 
 import argparse
 import asyncio

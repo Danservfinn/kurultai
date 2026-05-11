@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/buildroom/schemas/verification-report.schema.json",
+  "title": "verification-report",
+  "type": "object",
+  "required": [
+    "verification_id",
+    "build_id",
+    "verified_by",
+    "verified_at",
+    "method",
+    "commands_run",
+    "observations",
+    "pass",
+    "failures",
+    "evidence_refs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "verification_id": {
+      "type": "string"
+    },
+    "build_id": {
+      "type": "string"
+    },
+    "verified_by": {
+      "type": "string"
+    },
+    "verified_at": {
+      "type": "string"
+    },
+    "method": {
+      "enum": [
+        "tests",
+        "manual",
+        "browser",
+        "static_analysis",
+        "receipt_review",
+        "mixed"
+      ]
+    },
+    "commands_run": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pass": {
+      "type": "boolean"
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

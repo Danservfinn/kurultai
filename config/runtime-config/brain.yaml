@@ -1,0 +1,25 @@
+brain:
+  wiki_root: "/Users/kublai/brain"
+  canonical_store: brain_service_sqlite
+  retired_graph_stack:
+    - neo4j
+    - cypher
+    - bolt
+  qmd:
+    update: "qmd update -c brain"
+    embed: "qmd embed -c brain"
+    public_index: "~/.brain-index/brain.db"
+    private_index: "~/.kublai/brain-index-private/brain.db"
+  gateway:
+    name: ai.kurultai.brain-public-gateway
+    bind: "127.0.0.1:8765"
+    exposure: public_only
+  operating_surfaces:
+    queue: "/Users/kublai/brain/queue"
+    generated: "/Users/kublai/brain/generated"
+    receipts: "/Users/kublai/brain/receipts"
+    plans: "/Users/kublai/brain/docs/plans"
+  session_learning:
+    raw_history: "~/.hermes/sessions"
+    recall: session_search
+    ingest_job: brain-ingest-hourly

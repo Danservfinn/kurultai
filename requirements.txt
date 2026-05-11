@@ -37,6 +37,8 @@ cryptography>=41.0.0
 
 # ML/Embeddings (for semantic similarity in dependency analysis)
 sentence-transformers>=2.2.0
+sqlite-vec>=0.1.9
+watchdog>=6.0.0
 
 # HTTP (used by delegation protocol)
 requests>=2.31.0

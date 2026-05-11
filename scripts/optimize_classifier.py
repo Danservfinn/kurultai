@@ -1,4 +1,6 @@
 """Optimize TeamSizeClassifier weights and thresholds via k-fold cross-validation."""
+from __future__ import annotations
+
 import sys
 sys.path.insert(0, ".")
 

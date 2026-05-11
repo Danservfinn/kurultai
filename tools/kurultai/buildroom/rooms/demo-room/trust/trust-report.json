@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-05-11T00:52:53Z",
+  "open_questions": [],
+  "reasons": [
+    "QA report passed"
+  ],
+  "required_followups": [],
+  "risk_score": 0.1,
+  "room_id": "demo-room",
+  "safe_to_archive": true,
+  "state": "clean",
+  "trust_id": "trust-buildroom-foundation-demo"
+}

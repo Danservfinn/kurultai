@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test webchat WebSocket connection with correct localStorage URL."""
+from __future__ import annotations
 
 from playwright.sync_api import sync_playwright
 import sys

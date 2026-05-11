@@ -1,0 +1,44 @@
+{
+  "beneficiaries": [
+    "operator",
+    "dreamer",
+    "coder",
+    "qa",
+    "trust",
+    "retention"
+  ],
+  "created_at": "2026-05-10T17:01:00Z",
+  "evidence_refs": [
+    "research/research-input.json"
+  ],
+  "expected_artifacts": [
+    "schemas",
+    "demo-room",
+    "validation scripts",
+    "operator summary"
+  ],
+  "idea_id": "idea-buildroom-foundation-demo",
+  "non_goals": [
+    "Dashboard integration",
+    "Kanban adapter implementation",
+    "Automated deletion"
+  ],
+  "problem": "Autonomous work loses auditability when evidence, approval, implementation, and QA live only in chat.",
+  "proposed_by": "dreamer",
+  "proposed_owner": "chagatai",
+  "risk_notes": "Low-risk additive repo mirror; privacy risk is export leakage, controlled by sanitizer.",
+  "scope_boundaries": [
+    "Additive docs/schemas/scripts/fixture only",
+    "No dispatcher replacement",
+    "No private runtime export"
+  ],
+  "status": "candidate",
+  "suggested_workspace": "tools/kurultai/buildroom",
+  "title": "Install a typed buildroom foundation for autonomous improvement work",
+  "verification_hint": [
+    "Validate demo room",
+    "Corrupt a fixture and confirm validation fails",
+    "Export sanitized bundle and scan for private paths"
+  ],
+  "why_now": "The Auto-think/Auto-build contract chain has operator approval and a bounded foundation scope."
+}

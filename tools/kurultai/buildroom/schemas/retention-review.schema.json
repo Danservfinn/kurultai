@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/buildroom/schemas/retention-review.schema.json",
+  "title": "retention-review",
+  "type": "object",
+  "required": [
+    "retention_id",
+    "room_id",
+    "reviewed_at",
+    "recommendation",
+    "rationale",
+    "artifacts_to_keep",
+    "artifacts_to_improve",
+    "artifacts_to_prune",
+    "requires_human_before_destructive_action"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "retention_id": {
+      "type": "string"
+    },
+    "room_id": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "type": "string"
+    },
+    "recommendation": {
+      "enum": [
+        "keep",
+        "improve",
+        "park",
+        "prune"
+      ]
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "artifacts_to_keep": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "artifacts_to_improve": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "artifacts_to_prune": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requires_human_before_destructive_action": {
+      "const": true
+    }
+  }
+}

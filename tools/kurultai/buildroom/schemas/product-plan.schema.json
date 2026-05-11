@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/buildroom/schemas/product-plan.schema.json",
+  "title": "product-plan",
+  "type": "object",
+  "required": [
+    "plan_id",
+    "idea_id",
+    "created_at",
+    "owner",
+    "user_value",
+    "acceptance_criteria",
+    "ux_or_operator_surface",
+    "allowed_paths",
+    "protected_paths",
+    "non_goals",
+    "rollout_plan",
+    "rollback_plan"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "plan_id": {
+      "type": "string"
+    },
+    "idea_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    },
+    "user_value": {
+      "type": "string"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ux_or_operator_surface": {
+      "type": "string"
+    },
+    "allowed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "protected_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rollout_plan": {
+      "type": "string"
+    },
+    "rollback_plan": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+profiles:
+  kublai:
+    role: caretaker_orchestrator
+    provider: openai-codex
+    model: gpt-5.5
+  temujin:
+    role: developer
+    provider: openai-codex
+    model: gpt-5.5
+  mongke:
+    role: research
+    provider: openai-codex
+    model: gpt-5.5
+  jochi:
+    role: analyst
+    provider: openai-codex
+    model: gpt-5.5
+  ogedei:
+    role: operations
+    provider: openai-codex
+    model: gpt-5.5
+  chagatai:
+    role: writer
+    provider: openai-codex
+    model: gpt-5.5
+  tolui:
+    role: local_lightweight_worker
+    provider: ollama-local
+    model: gemma3:4b
+    notes: "Local model; tool-call capability must be verified before assignment."
