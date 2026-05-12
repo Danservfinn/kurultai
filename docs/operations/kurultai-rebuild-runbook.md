@@ -1,8 +1,8 @@
 # Kurultai rebuild runbook
 
-Purpose: make this repository the non-secret rebuild contract for the current Kublai/Kurultai operating system.
+Purpose: make this repository the non-secret rebuild contract for the current Hermes + Brain based Kurultai operating system.
 
-This is not a secret backup. Live tokens, private chat targets, session logs, private indexes, and credentials stay outside Git.
+This is not a secret backup. Live tokens, private chat targets, session logs, private indexes, credentials, and private operator memory stay outside Git.
 
 ## Rebuild target
 
@@ -14,8 +14,10 @@ A rebuilt host should provide these capabilities:
 - Brain wiki at the configured path, with QMD indexing.
 - Cron jobs recreated from sanitized manifests after review.
 - Skill inventory restored from source or backups.
+- Local LLM lane configured for Tolui/lightweight triage with host-fit model selection.
+- Telegram bot/gateway configured from local secrets after BotFather token handoff.
+- macOS, Linux, and Windows-native installs supported by the fresh-install prompt.
 - Receipts and recovery directories available.
-- Retired OpenClaw internal Telegram protocol and Neo4j/Bolt/Cypher stack remain retired.
 
 ## Repository surfaces
 
@@ -30,6 +32,7 @@ A rebuilt host should provide these capabilities:
 - `scripts/export_runtime_config_manifest.py`: refreshes cron manifest.
 - `scripts/export_rebuild_manifests.py`: refreshes skills, Kanban schema, Brain inventory.
 - `scripts/bootstrap_kurultai_runtime.py`: creates a review staging area for a rebuilt host.
+- `docs/operations/fresh-install-agent-prompt.md`: pasteable Claude Code/Codex prompt for macOS, Linux, and Windows installs.
 
 ## Secret boundary
 

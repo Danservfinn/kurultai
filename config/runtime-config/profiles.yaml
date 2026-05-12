@@ -25,6 +25,10 @@ profiles:
     model: gpt-5.5
   tolui:
     role: local_lightweight_worker
-    provider: ollama-local
-    model: gemma3:4b
-    notes: "Local model; tool-call capability must be verified before assignment."
+    provider: local-auto
+    model: Jackrong/Qwen3.5-9B-DeepSeek-V4-Flash-GGUF
+    runtime_preference:
+      - ollama-hf-gguf
+      - llama.cpp-openai-compatible
+    fallback_policy: "Select the strongest local Qwen/Gemma-class model that fits host RAM/VRAM; keep triage-only until tool calls are verified."
+    notes: "Local model lane for low-cost triage/summarization/classification; no Z.AI/GLM fallback."

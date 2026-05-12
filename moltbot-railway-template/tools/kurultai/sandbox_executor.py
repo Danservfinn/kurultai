@@ -1,1 +1,0 @@
-../../../tools/kurultai/sandbox_executor.py

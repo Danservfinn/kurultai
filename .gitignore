@@ -1,71 +1,55 @@
-# Environment files
+# Secrets and local runtime state
 .env
 .env.*
 !.env.example
-
-# Signal data
-.signal-data/*.tar.gz
-.signal-data/data/
-
-# Python
-__pycache__/
-*.py[cod]
-*.so
-.Python
-*.egg-info/
-dist/
-build/
-*.egg
-.pytest_cache/
-.coverage
-htmlcov/
-.coverage.*
-coverage.xml
-*.cover
-
-# Virtual environments
-venv/
-env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Local development
-local/
-tmp/
-temp/
-
-# Credentials and secrets
-authentik-credentials.txt
 *.credentials
 *.secret
 *.key
 *.pem
 *.p12
 *.pfx
+*.session
+auth.json
+
+# Hermes / Brain private runtime artifacts
+.hermes/
+sessions/
+kanban.db
 *.sqlite
 *.db
 *.db-*
-*.session
-
-# Runtime-private Hermes/Kurultai/Brain artifacts
-.hermes/
 brain-index/
 brain-index-private/
-sessions/
-kanban.db
 config/runtime-config/live/
 config/runtime-config/private/
+
+# Dependencies and build output
+node_modules/
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+env/
+ENV/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Logs and temp files
+*.log
+logs/
+tmp/
+temp/
+local/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

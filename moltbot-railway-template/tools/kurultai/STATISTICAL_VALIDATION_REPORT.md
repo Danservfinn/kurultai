@@ -1,1 +1,0 @@
-../../../tools/kurultai/STATISTICAL_VALIDATION_REPORT.md

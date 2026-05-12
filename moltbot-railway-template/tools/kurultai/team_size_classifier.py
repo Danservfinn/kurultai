@@ -1,1 +1,0 @@
-../../../tools/kurultai/team_size_classifier.py

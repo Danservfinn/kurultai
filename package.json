@@ -1,31 +1,24 @@
 {
-  "name": "kublai-repo",
+  "name": "kurultai",
   "version": "1.0.0",
-  "description": "**Multi-agent orchestration platform with autonomous capability acquisition, graph-based operational memory, and end-to-end encrypted messaging.**",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "example": "examples",
-    "test": "tests"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "description": "Open-source Hermes Agent operating layer with native Kanban coordination and a Brain wiki rebuild contract.",
+  "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Danservfinn/kublai.git"
+    "url": "git+https://github.com/Danservfinn/kurultai.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "hermes-agent",
+    "multi-agent",
+    "kanban",
+    "brain-wiki",
+    "agentic-systems"
+  ],
+  "author": "Kurultai contributors",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Danservfinn/kublai/issues"
+    "url": "https://github.com/Danservfinn/kurultai/issues"
   },
-  "homepage": "https://github.com/Danservfinn/kublai#readme",
-  "dependencies": {
-    "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "neo4j-driver": "^6.0.1"
-  }
+  "homepage": "https://github.com/Danservfinn/kurultai#readme"
 }

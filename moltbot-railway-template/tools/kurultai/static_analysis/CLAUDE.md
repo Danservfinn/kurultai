@@ -1,1 +1,0 @@
-../../../../tools/kurultai/static_analysis/CLAUDE.md

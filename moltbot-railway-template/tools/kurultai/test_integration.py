@@ -1,1 +1,0 @@
-../../../tools/kurultai/test_integration.py

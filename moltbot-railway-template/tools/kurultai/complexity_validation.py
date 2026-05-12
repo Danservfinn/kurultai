@@ -1,1 +1,0 @@
-../../../tools/kurultai/complexity_validation.py

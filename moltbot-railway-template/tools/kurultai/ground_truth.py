@@ -1,1 +1,0 @@
-../../../tools/kurultai/ground_truth.py

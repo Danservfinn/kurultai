@@ -1,1 +1,0 @@
-../../../tools/kurultai/ticket_manager.py

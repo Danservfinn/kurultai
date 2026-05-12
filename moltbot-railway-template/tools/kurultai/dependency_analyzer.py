@@ -1,1 +1,0 @@
-../../../tools/kurultai/dependency_analyzer.py

@@ -1,1 +1,0 @@
-../../../../tools/kurultai/security/task_validator.py

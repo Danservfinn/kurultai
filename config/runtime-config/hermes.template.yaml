@@ -2,6 +2,22 @@ runtime:
   identity: kublai
   default_provider: openai-codex
   default_model: gpt-5.5
+  context_length: 1000000
+
+compression:
+  enabled: true
+  threshold: 0.25
+  rationale: "Main model context is 1M, but compression must fit the smaller auxiliary compression model context with headroom."
+
+local_llm:
+  enabled: true
+  owner_profile: tolui
+  provider: local-auto
+  preferred_model: Jackrong/Qwen3.5-9B-DeepSeek-V4-Flash-GGUF
+  runtime_preference:
+    - ollama-hf-gguf
+    - llama.cpp-openai-compatible
+  fallback_policy: "Pick the strongest local Qwen/Gemma-class model that fits host RAM/VRAM; keep no-tool-call/lightweight-only until verified."
 
 security:
   parse_screening_enabled: true
@@ -29,7 +45,7 @@ coordination:
     - tolui
 
 brain:
-  wiki_root: "/Users/kublai/brain"
+  wiki_root: "${BRAIN_ROOT}"
   public_index: "~/.brain-index/brain.db"
   private_index: "~/.kublai/brain-index-private/brain.db"
   public_gateway: "127.0.0.1:8765"

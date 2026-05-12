@@ -1,10 +1,6 @@
 brain:
-  wiki_root: "/Users/kublai/brain"
+  wiki_root: "${BRAIN_ROOT}"
   canonical_store: brain_service_sqlite
-  retired_graph_stack:
-    - neo4j
-    - cypher
-    - bolt
   qmd:
     update: "qmd update -c brain"
     embed: "qmd embed -c brain"
@@ -15,10 +11,10 @@ brain:
     bind: "127.0.0.1:8765"
     exposure: public_only
   operating_surfaces:
-    queue: "/Users/kublai/brain/queue"
-    generated: "/Users/kublai/brain/generated"
-    receipts: "/Users/kublai/brain/receipts"
-    plans: "/Users/kublai/brain/docs/plans"
+    queue: "${BRAIN_ROOT}/queue"
+    generated: "${BRAIN_ROOT}/generated"
+    receipts: "${BRAIN_ROOT}/receipts"
+    plans: "${BRAIN_ROOT}/docs/plans"
   session_learning:
     raw_history: "~/.hermes/sessions"
     recall: session_search

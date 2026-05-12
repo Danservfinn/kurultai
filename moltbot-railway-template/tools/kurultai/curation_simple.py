@@ -1,1 +1,0 @@
-../../../tools/kurultai/curation_simple.py
