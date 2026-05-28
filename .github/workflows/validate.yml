@@ -1,0 +1,17 @@
+name: validate
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: python -m pip install pyyaml pytest
+      - run: python tests/validate_public_repo.py
+      - run: python -m py_compile scripts/*.py kublai/*.py tests/*.py
+      - run: python -m pytest -q
+      - run: python scripts/bootstrap_kurultai_runtime.py --home /tmp/hermes-kurultai --brain /tmp/brain-kurultai --dry-run

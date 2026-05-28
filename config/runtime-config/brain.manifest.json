@@ -1,41 +1,147 @@
 {
-  "brain_root": "${BRAIN_ROOT}",
-  "directories": [
+  "note": "Directory/file-count inventory only. Brain content, private tiers, raw private captures, and private indexes are not copied into this repo.",
+  "schema": "kurultai.brain-manifest.v1",
+  "top_level_directories": [
     {
-      "path": "queue",
-      "purpose": "inbox and work queue artifacts"
+      "markdown_files": 14,
+      "name": "_archive"
     },
     {
-      "path": "generated",
-      "purpose": "generated summaries and reports"
+      "markdown_files": 224,
+      "name": "analyses"
     },
     {
-      "path": "receipts",
-      "purpose": "append-only operation receipts"
+      "markdown_files": 1,
+      "name": "apps"
     },
     {
-      "path": "docs/plans",
-      "purpose": "durable plans"
+      "markdown_files": 0,
+      "name": "briefs"
     },
     {
-      "path": "operations",
-      "purpose": "operational runbooks and status"
+      "markdown_files": 2,
+      "name": "captures"
     },
     {
-      "path": "analyses",
-      "purpose": "research and synthesis outputs"
+      "markdown_files": 35,
+      "name": "concepts"
     },
     {
-      "path": "content",
-      "purpose": "content operating system"
+      "markdown_files": 0,
+      "name": "config"
     },
     {
-      "path": "content/artifacts",
-      "purpose": "media and static artifacts"
+      "markdown_files": 108,
+      "name": "content"
+    },
+    {
+      "markdown_files": 0,
+      "name": "dashboards"
+    },
+    {
+      "markdown_files": 149,
+      "name": "docs"
+    },
+    {
+      "markdown_files": 8,
+      "name": "entities"
+    },
+    {
+      "markdown_files": 6,
+      "name": "experiments"
+    },
+    {
+      "markdown_files": 1,
+      "name": "folds"
+    },
+    {
+      "markdown_files": 6,
+      "name": "generated"
+    },
+    {
+      "markdown_files": 13,
+      "name": "graphify-out"
+    },
+    {
+      "markdown_files": 2,
+      "name": "inbox"
+    },
+    {
+      "markdown_files": 24,
+      "name": "infrastructure"
+    },
+    {
+      "markdown_files": 0,
+      "name": "knowledge"
+    },
+    {
+      "markdown_files": 1,
+      "name": "kublai"
+    },
+    {
+      "markdown_files": 0,
+      "name": "methodology"
+    },
+    {
+      "markdown_files": 0,
+      "name": "migrations"
+    },
+    {
+      "markdown_files": 1974,
+      "name": "operations"
+    },
+    {
+      "markdown_files": 46,
+      "name": "projects"
+    },
+    {
+      "markdown_files": 22,
+      "name": "proposals"
+    },
+    {
+      "markdown_files": 8,
+      "name": "published"
+    },
+    {
+      "markdown_files": 4,
+      "name": "queue"
+    },
+    {
+      "markdown_files": 119,
+      "name": "raw"
+    },
+    {
+      "markdown_files": 20,
+      "name": "receipts"
+    },
+    {
+      "markdown_files": 5,
+      "name": "research"
+    },
+    {
+      "markdown_files": 4,
+      "name": "runbooks"
+    },
+    {
+      "markdown_files": 1,
+      "name": "scripts"
+    },
+    {
+      "markdown_files": 5,
+      "name": "status"
+    },
+    {
+      "markdown_files": 137,
+      "name": "synthesis"
+    },
+    {
+      "markdown_files": 2,
+      "name": "tests"
+    },
+    {
+      "markdown_files": 47,
+      "name": "wiki"
     }
   ],
-  "private_indexes": [
-    "~/.brain-index/brain.db",
-    "~/.kublai/brain-index-private/brain.db"
-  ]
+  "wiki_root": "${BRAIN_ROOT}"
 }

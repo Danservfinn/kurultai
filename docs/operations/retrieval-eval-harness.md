@@ -1,6 +1,6 @@
 # Native Brain retrieval-eval harness
 
-Implemented from Brain plan `/Users/kublai/brain/docs/plans/2026-05-10-native-brain-retrieval-eval-capture-replay.md`.
+Implemented from Brain plan `${BRAIN_ROOT}/docs/plans/2026-05-10-native-brain-retrieval-eval-capture-replay.md`.
 
 ## Safety boundary
 
@@ -13,12 +13,12 @@ Implemented from Brain plan `/Users/kublai/brain/docs/plans/2026-05-10-native-br
 ## Commands
 
 ```bash
-PYTHONPATH=/Users/kublai/kurultai/kurultai-repo python -m kublai.retrieval_eval status
-PYTHONPATH=/Users/kublai/kurultai/kurultai-repo python -m kublai.retrieval_eval validate \
+PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval status
+PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval validate \
   --fixtures tests/fixtures/retrieval_eval/public-smoke.ndjson
-PYTHONPATH=/Users/kublai/kurultai/kurultai-repo python -m kublai.retrieval_eval replay \
+PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval replay \
   --fixtures tests/fixtures/retrieval_eval/public-smoke.ndjson \
-  --brain-root /Users/kublai/brain \
+  --brain-root "$BRAIN_ROOT" \
   --privacy-scope public \
   --k 10 \
   --report-json /tmp/retrieval-eval-report.json
@@ -43,7 +43,7 @@ Current local replay receipt on 2026-05-20:
 ## Verification
 
 ```bash
-/Users/kublai/.hermes/hermes-agent/venv/bin/python -m pytest tests -q
-/Users/kublai/.hermes/hermes-agent/venv/bin/python -m py_compile kublai/retrieval_eval.py kublai/__init__.py tests/test_retrieval_eval.py
+python -m pytest tests -q
+python -m py_compile kublai/retrieval_eval.py kublai/__init__.py tests/test_retrieval_eval.py
 git diff --check
 ```

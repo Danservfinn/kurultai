@@ -1,40 +1,1475 @@
 {
   "jobs": [
     {
-      "name": "brain-ingest-hourly",
-      "schedule": "every 60m",
       "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-001",
+      "name": "brain-wiki-weekly-lint",
+      "repeat": {
+        "completed": 5,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 18 * * 0",
+        "expr": "0 18 * * 0",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [
+        "brain-wiki-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-002",
+      "name": "hermes-quota-daily-check",
+      "repeat": {
+        "completed": 37,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 8 * * *",
+        "expr": "0 8 * * *",
+        "kind": "cron"
+      },
+      "script": "hermes_quota_daily_check.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-003",
+      "name": "brain-sync-drain",
+      "repeat": {
+        "completed": 145,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 */6 * * *",
+        "expr": "0 */6 * * *",
+        "kind": "cron"
+      },
+      "script": "brain_sync_drain_silent.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-004",
+      "name": "kurultai-daily-queue-action",
+      "repeat": {
+        "completed": 48,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 9 * * *",
+        "expr": "0 9 * * *",
+        "kind": "cron"
+      },
+      "script": "kurultai_daily_queue_gate.py",
+      "skills": [
+        "kurultai-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "file",
+        "terminal",
+        "skills",
+        "session_search"
+      ],
+      "job_id": "job-005",
+      "name": "brain-ingest-hourly",
+      "repeat": {
+        "completed": 737,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "brain_ingest_hourly_gate.py",
       "skills": [
         "brain-wiki-operations",
         "kurultai-retro-learn"
       ],
-      "description": "Ingest recent sessions and meaningful learnings into Brain receipts."
+      "state": "scheduled",
+      "workdir": null
     },
     {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-006",
+      "name": "kurultai-terminal-task-notifier",
+      "repeat": {
+        "completed": 8852,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "kurultai_terminal_task_notifier.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-007",
+      "name": "brain-graphify-weekly-refresh",
+      "repeat": {
+        "completed": 4,
+        "times": null
+      },
+      "schedule": {
+        "display": "30 8 * * 1",
+        "expr": "30 8 * * 1",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [
+        "brain-wiki-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-008",
+      "name": "kurultai-signal-intake-every-60m",
+      "repeat": null,
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "kurultai_signal_intake.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-009",
+      "name": "kurultai-signal-feedback-apply",
+      "repeat": null,
+      "schedule": {
+        "display": "0 20 * * *",
+        "expr": "0 20 * * *",
+        "kind": "cron"
+      },
+      "script": "kurultai_signal_feedback.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-010",
+      "name": "kurultai-signal-weekly-metrics",
+      "repeat": null,
+      "schedule": {
+        "display": "0 9 * * 1",
+        "expr": "0 9 * * 1",
+        "kind": "cron"
+      },
+      "script": "kurultai_signal_metrics.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "job_id": "job-011",
+      "name": "brain-optimizer-weekly",
+      "repeat": {
+        "completed": 3,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "0 9 * * 0",
+        "expr": "0 9 * * 0",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [
+        "brain-wiki-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-012",
+      "name": "kurultai-research-hourly-summary",
+      "repeat": {
+        "completed": 565,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "kurultai_research_hourly_urgent_silent.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "skills",
+        "cronjob",
+        "session_search"
+      ],
+      "job_id": "job-013",
+      "name": "hermes-soul-operating-contract-monthly-audit",
+      "repeat": {
+        "completed": 1,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "0 10 1 * *",
+        "expr": "0 10 1 * *",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [
+        "kurultai-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "file",
+        "terminal",
+        "skills",
+        "session_search"
+      ],
+      "job_id": "job-014",
+      "name": "brain-content-daily-brief",
+      "repeat": {
+        "completed": 23,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 6 * * *",
+        "expr": "0 6 * * *",
+        "kind": "cron"
+      },
+      "script": "content_daily_morning_context.py",
+      "skills": [
+        "brain-wiki-operations",
+        "content-os-workflows"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "file",
+        "terminal",
+        "web",
+        "skills"
+      ],
+      "job_id": "job-015",
+      "name": "brain-vault-weekly-synthesis",
+      "repeat": {
+        "completed": 3,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 9 * * 0",
+        "expr": "0 9 * * 0",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [
+        "brain-wiki-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [],
+      "job_id": "job-016",
+      "name": "polymarket-weather-paper-scan",
+      "repeat": {
+        "completed": 545,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "polymarket_weather_paper_scan_silent.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-017",
+      "name": "polymarket-weather-labeler-and-render",
+      "repeat": {
+        "completed": 79,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "polymarket_weather_labeler_silent.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "file",
+        "terminal"
+      ],
+      "job_id": "job-018",
+      "name": "subc-room-walk-v0",
+      "repeat": {
+        "completed": 79,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 */6 * * *",
+        "expr": "0 */6 * * *",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "file",
+        "terminal"
+      ],
+      "job_id": "job-019",
+      "name": "subc-digest-v0",
+      "repeat": {
+        "completed": 60,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 6,12,18 * * *",
+        "expr": "0 6,12,18 * * *",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-020",
+      "name": "kaidu-prompt-lab-review",
+      "repeat": {
+        "completed": 21,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 8 * * *",
+        "expr": "0 8 * * *",
+        "kind": "cron"
+      },
+      "script": "kaidu_prompt_lab_review.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-021",
+      "name": "fantasy-sumo-live-ingestion",
+      "repeat": {
+        "completed": 425,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "fantasy_sumo_live_ingestion_silent.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/fantasy-sumo-league-site"
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-022",
       "name": "kanban-health-monitor",
-      "schedule": "every 60m",
-      "deliver": "origin",
-      "skills": [
-        "kanban-task-lifecycle"
-      ],
-      "description": "Summarize stuck, blocked, crashed, and completed native Kanban work."
+      "repeat": {
+        "completed": 397,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "kanban_health_monitor_silent.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
     },
     {
-      "name": "compression-threshold-drift-monitor",
-      "schedule": "every 360m",
-      "deliver": "origin",
-      "no_agent": true,
-      "script": "compression_threshold_monitor.py",
-      "description": "Alert if Hermes compression settings drift from the safe runtime contract."
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-023",
+      "name": "brain-docs-hygiene-monthly",
+      "repeat": {
+        "completed": 0,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 9 1 * *",
+        "expr": "0 9 1 * *",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
     },
     {
-      "name": "workspace-integration-shepherd",
-      "schedule": "every 10m",
-      "deliver": "origin",
-      "skills": [
-        "kanban-task-lifecycle"
+      "deliver": "local",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "skills",
+        "cronjob"
       ],
-      "description": "Bounded monitor for active Kurultai/Hermes integration task graphs."
+      "job_id": "job-024",
+      "name": "monitor-first-action-learning-loop-integration",
+      "repeat": {
+        "completed": 38,
+        "times": 144
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": false,
+      "enabled_toolsets": null,
+      "job_id": "job-025",
+      "name": "monitor-agi-harness-v0-autonomous-implementation",
+      "repeat": {
+        "completed": 77,
+        "times": 96
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "agi_harness_v0_monitor.py",
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-026",
+      "name": "daily-token-efficiency-capability-proposal",
+      "repeat": {
+        "completed": 17,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "35 7 * * *",
+        "expr": "35 7 * * *",
+        "kind": "cron"
+      },
+      "script": "daily_token_efficiency_scan.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/.hermes/hermes-agent"
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-027",
+      "name": "kanban-crash-investigator",
+      "repeat": {
+        "completed": 16988,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 1m",
+        "kind": "interval",
+        "minutes": 1
+      },
+      "script": "kanban_crash_investigator.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": false,
+      "enabled_toolsets": null,
+      "job_id": "job-028",
+      "name": "brain-dreamer-v0",
+      "repeat": {
+        "completed": 3,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 5m",
+        "kind": "interval",
+        "minutes": 5
+      },
+      "script": "brain_dreamer_run_once.py",
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "skills",
+        "session_search"
+      ],
+      "job_id": "job-029",
+      "name": "brain-dreamer-frontier-review",
+      "repeat": {
+        "completed": 314,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "brain_dreamer_frontier_gate.py",
+      "skills": [
+        "brain-wiki-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-030",
+      "name": "agi-caretaker-scorecard",
+      "repeat": {
+        "completed": 56,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "agi_caretaker_scorecard.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-031",
+      "name": "dreamer-learn-rules",
+      "repeat": {
+        "completed": 56,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 */6 * * *",
+        "expr": "0 */6 * * *",
+        "kind": "cron"
+      },
+      "script": "dreamer_learn_rules.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-032",
+      "name": "dreamer-promotion-adapter",
+      "repeat": {
+        "completed": 307,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "dreamer_promote.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-033",
+      "name": "agent-health-monitor",
+      "repeat": {
+        "completed": 55,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "agent_health_report.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-034",
+      "name": "buildroom-autonomy-cycle",
+      "repeat": {
+        "completed": 217,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "buildroom_autonomy_cycle.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/kurultai/kublai-repo-autonomy-20260511"
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-035",
+      "name": "buildroom-freshness-canary",
+      "repeat": {
+        "completed": 278,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "buildroom_freshness_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/kurultai/kublai-repo-autonomy-20260511"
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-036",
+      "name": "gateway-responsiveness-canary",
+      "repeat": {
+        "completed": 2772,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 5m",
+        "kind": "interval",
+        "minutes": 5
+      },
+      "script": "gateway_responsiveness_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-037",
+      "name": "dreamer-watchdog-silent",
+      "repeat": {
+        "completed": 2562,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 5m",
+        "kind": "interval",
+        "minutes": 5
+      },
+      "script": "dreamer_watchdog.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-038",
+      "name": "tailnet-health-canary",
+      "repeat": {
+        "completed": 936,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 15m",
+        "kind": "interval",
+        "minutes": 15
+      },
+      "script": "tailnet_health_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-039",
+      "name": "tmux-session-canary",
+      "repeat": {
+        "completed": 247,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "tmux_session_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-040",
+      "name": "cross-device-foundation-canary",
+      "repeat": {
+        "completed": 936,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 15m",
+        "kind": "interval",
+        "minutes": 15
+      },
+      "script": "cross_device_foundation_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-041",
+      "name": "brain-sync-canary-silent",
+      "repeat": {
+        "completed": 482,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "brain_sync_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-042",
+      "name": "ops-repo-drift-canary-silent",
+      "repeat": {
+        "completed": 484,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "ops_repo_drift_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "web",
+        "terminal",
+        "file"
+      ],
+      "job_id": "job-043",
+      "name": "hermes-atlas-newsletter-monitor",
+      "repeat": {
+        "completed": 11,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 13 * * *",
+        "expr": "0 13 * * *",
+        "kind": "cron"
+      },
+      "script": "hermes_atlas_monitor.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": "${BRAIN_ROOT}"
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file"
+      ],
+      "job_id": "job-044",
+      "name": "weather-strategy-lab-caretaker",
+      "repeat": {
+        "completed": 41,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "weather_strategy_lab_context.py",
+      "skills": [
+        "polymarket-weather-paper-engine"
+      ],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/polymarket-weather-edge"
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-045",
+      "name": "batu-x-watchlist-scout",
+      "repeat": {
+        "completed": 39,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "batu_x_watchlist_scout.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-046",
+      "name": "batu-x-watchlist-research-dispatch",
+      "repeat": {
+        "completed": 442,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "batu_x_watchlist_research_dispatch.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-047",
+      "name": "batu-x-bookmark-scout",
+      "repeat": {
+        "completed": 222,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "batu_x_bookmark_scout.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-048",
+      "name": "batu-x-bookmark-research-dispatch",
+      "repeat": {
+        "completed": 440,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "batu_x_bookmark_research_dispatch.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-049",
+      "name": "batu-grok-x-research-canary",
+      "repeat": {
+        "completed": 10,
+        "times": null
+      },
+      "schedule": {
+        "display": "25 7 * * *",
+        "expr": "25 7 * * *",
+        "kind": "cron"
+      },
+      "script": "batu_grok_x_research_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-050",
+      "name": "cron-human-intervention-watchdog",
+      "repeat": {
+        "completed": 402,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "cron_human_intervention_watchdog.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-051",
+      "name": "buildroom-review-gate-monitor",
+      "repeat": {
+        "completed": 402,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "buildroom_review_gate_monitor.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/kurultai/kublai-repo-autonomy-20260511"
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-052",
+      "name": "ogedei-orchestrator-canary",
+      "repeat": {
+        "completed": 400,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "ogedei_orchestrator_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-053",
+      "name": "ogedei-orchestrator-optimizer",
+      "repeat": {
+        "completed": 36,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "ogedei_orchestrator_optimizer.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-054",
+      "name": "kanban-performance-metrics",
+      "repeat": {
+        "completed": 35,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "kanban_performance_metrics_cron.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-055",
+      "name": "batu-x-signal-research-dispatch",
+      "repeat": {
+        "completed": 360,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "batu_x_signal_research_dispatch.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-056",
+      "name": "research-proposal-compiler",
+      "repeat": {
+        "completed": 31,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "research_proposal_compiler_cron.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-057",
+      "name": "research-control-room",
+      "repeat": {
+        "completed": 64,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 180m",
+        "kind": "interval",
+        "minutes": 180
+      },
+      "script": "research_control_room_cron.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-058",
+      "name": "kanban-jam-classifier",
+      "repeat": {
+        "completed": 9340,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 1m",
+        "kind": "interval",
+        "minutes": 1
+      },
+      "script": "kanban_jam_classifier.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-059",
+      "name": "operator-x-bookmark-taste-profile",
+      "repeat": {
+        "completed": 29,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 360m",
+        "kind": "interval",
+        "minutes": 360
+      },
+      "script": "operator_x_bookmark_taste_profile.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-060",
+      "name": "agi-harness-observe-propose",
+      "repeat": {
+        "completed": 143,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "agi_harness_observe_propose_tick.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-061",
+      "name": "Parse production quiet canary",
+      "repeat": {
+        "completed": 187,
+        "times": null
+      },
+      "schedule": {
+        "display": "*/30 * * * *",
+        "expr": "*/30 * * * *",
+        "kind": "cron"
+      },
+      "script": "parse_production_canary.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-062",
+      "name": "Parse admin anomaly watchdog",
+      "repeat": {
+        "completed": 62,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 60m",
+        "kind": "interval",
+        "minutes": 60
+      },
+      "script": "parse_admin_anomaly_watch.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-063",
+      "name": "Parse admin daily digest",
+      "repeat": {
+        "completed": 3,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 9 * * *",
+        "expr": "0 9 * * *",
+        "kind": "cron"
+      },
+      "script": "parse_admin_daily_digest.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "web"
+      ],
+      "job_id": "job-064",
+      "name": "Parse business state morning report",
+      "repeat": {
+        "completed": 3,
+        "times": null
+      },
+      "schedule": {
+        "display": "0 8 * * *",
+        "expr": "0 8 * * *",
+        "kind": "cron"
+      },
+      "script": "parse_business_state_context.py",
+      "skills": [
+        "parse-business-state-report",
+        "parse-admin-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-065",
+      "name": "Parse support email monitor",
+      "repeat": {
+        "completed": 229,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 15m",
+        "kind": "interval",
+        "minutes": 15
+      },
+      "script": "parse_support_email_monitor.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-066",
+      "name": "Parse paid subscription purchase alert",
+      "repeat": {
+        "completed": 2814,
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 1m",
+        "kind": "interval",
+        "minutes": 1
+      },
+      "script": "parse_paid_subscription_monitor.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-067",
+      "name": "Objective Runner autonomous tick",
+      "repeat": {
+        "completed": 261,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 10m",
+        "kind": "interval",
+        "minutes": 10
+      },
+      "script": "objective_runner_tick.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-068",
+      "name": "Dreamer Kanban triage gate",
+      "repeat": {
+        "completed": 74,
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "dreamer_kanban_triage.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
     }
-  ]
+  ],
+  "schema": "kurultai.cron-manifest.v1"
 }

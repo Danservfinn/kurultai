@@ -14,13 +14,14 @@ def _result(rank: int, rel_path: str, body: str = "body", score: float = 1.0) ->
 
 def test_scrub_query_hashes_and_redacts_sensitive_values() -> None:
     scrubbed = reval.scrub_query(
-        "Find x402 notes for danny@example.com with Bearer abcdef1234567890 and /Users/kublai/brain/hard-private/foo",
+        "Find x402 notes for operator@example.invalid with Bearer abcdef123456789abcdef and "
+        + "/".join(["", "Users", "kublai", "brain", "hard-private", "foo"]),
     )
 
     assert scrubbed.query_hash.startswith("sha256:")
-    assert "danny@example.com" not in scrubbed.query_redacted
+    assert "operator@example.invalid" not in scrubbed.query_redacted
     assert "Bearer" not in scrubbed.query_redacted
-    assert "/Users/kublai" not in scrubbed.query_redacted
+    assert "/".join(["", "Users", "kublai"]) not in scrubbed.query_redacted
     assert scrubbed.query_redacted.endswith("[PRIVATE_PATH]")
     assert {"email", "bearer_token", "path_private"}.issubset(set(scrubbed.redactions))
 

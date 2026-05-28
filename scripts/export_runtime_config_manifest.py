@@ -25,7 +25,7 @@ def sanitize_string(value):
     home = str(Path.home())
     text = text.replace(home + "/brain", "${BRAIN_ROOT}")
     text = text.replace(home, "${KURULTAI_HOME}")
-    text = text.replace("Da" + "nny", "the operator").replace("Da" + "niel", "the operator")
+    text = text.replace("Da" + "nny", "the operator").replace("da" + "nny", "operator").replace("Da" + "niel", "the operator")
     if text in ("local", "origin"):
         return text
     for prefix in ("telegram:", "discord:", "slack:", "sms:", "signal:"):
@@ -34,10 +34,10 @@ def sanitize_string(value):
     return text
 
 manifest = []
-for job in load_jobs():
+for index, job in enumerate(load_jobs(), start=1):
     manifest.append({
-        "job_id": job.get("job_id") or job.get("id"),
-        "name": job.get("name"),
+        "job_id": f"job-{index:03d}",
+        "name": sanitize_string(job.get("name")),
         "schedule": job.get("schedule"),
         "repeat": job.get("repeat"),
         "deliver": sanitize_string(job.get("deliver")),
@@ -45,7 +45,7 @@ for job in load_jobs():
         "state": job.get("state"),
         "skills": job.get("skills") or ([job.get("skill")] if job.get("skill") else []),
         "enabled_toolsets": job.get("enabled_toolsets"),
-        "script": job.get("script"),
+        "script": sanitize_string(job.get("script")),
         "workdir": sanitize_string(job.get("workdir")),
     })
 

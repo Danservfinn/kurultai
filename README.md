@@ -61,6 +61,7 @@ A fresh user can clone this repository and paste a single prompt into Claude Cod
 ```bash
 git clone https://github.com/Danservfinn/kurultai.git
 cd kurultai
+python3 scripts/bootstrap_kurultai_runtime.py --home "$HOME/.hermes-kurultai" --brain "$HOME/brain-kurultai" --dry-run
 ```
 
 Then paste this file into Claude Code or Codex:
@@ -125,9 +126,12 @@ See `.gitignore`, `docs/operations/kurultai-rebuild-runbook.md`, and `config/run
 
 ```text
 config/runtime-config/      sanitized runtime templates and manifests
+brain/                      public Brain/wiki schema and page templates
+profiles/                   public profile role templates
 docs/operations/            rebuild runbooks and fresh-install prompt
 docs/assets/readme/         README diagrams
 scripts/                    manifest export and rebuild staging helpers
+tests/                      public hygiene and retrieval-eval tests
 ```
 
 ## Development
@@ -135,9 +139,11 @@ scripts/                    manifest export and rebuild staging helpers
 Useful commands:
 
 ```bash
-python3 scripts/bootstrap_kurultai_runtime.py --dry-run
+python3 tests/validate_public_repo.py
+python3 scripts/bootstrap_kurultai_runtime.py --home /tmp/hermes-kurultai --brain /tmp/brain-kurultai --dry-run
 python3 scripts/export_runtime_config_manifest.py
 python3 scripts/export_rebuild_manifests.py
+python3 -m pytest -q
 ```
 
 Before changing runtime contracts, inspect live Hermes and Brain state, preserve the secret boundary, and update the README diagrams when architecture changes.

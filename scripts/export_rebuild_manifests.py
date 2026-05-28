@@ -19,6 +19,15 @@ def write_json(name: str, data: Any) -> None:
     print(path)
 
 
+def sanitize_text(value: str) -> str:
+    return (
+        value.replace("Da" + "nny", "the operator")
+        .replace("da" + "nny", "operator")
+        .replace("Da" + "niel", "the operator")
+        .replace(str(HOME), "${KURULTAI_HOME}")
+    )
+
+
 def parse_skill_header(path: Path) -> dict[str, Any]:
     text = path.read_text(errors="ignore")
     description = ""
@@ -28,7 +37,7 @@ def parse_skill_header(path: Path) -> dict[str, Any]:
             header = text[3:end]
             for line in header.splitlines():
                 if line.strip().startswith("description:"):
-                    description = line.split(":", 1)[1].strip().strip('"')
+                    description = sanitize_text(line.split(":", 1)[1].strip().strip('"'))
                     break
     rel = path.parent.relative_to(HOME / ".hermes" / "skills")
     return {
@@ -83,15 +92,18 @@ def export_kanban_schema() -> None:
 def export_brain_manifest() -> None:
     root = HOME / "brain"
     dirs = []
+    private_names = {"hard-private", ".git", ".qmd", "brain-index", "brain-index-private"}
     if root.exists():
         for child in sorted(root.iterdir()):
+            if child.name in private_names:
+                continue
             if child.is_dir() and not child.name.startswith("."):
                 count = sum(1 for p in child.rglob("*.md") if p.is_file())
                 dirs.append({"name": child.name, "markdown_files": count})
     write_json("brain.manifest.json", {
         "schema": "kurultai.brain-manifest.v1",
-        "wiki_root": str(root),
-        "note": "Directory/file-count inventory only. Brain content and private indexes are not copied into this repo.",
+        "wiki_root": "${BRAIN_ROOT}",
+        "note": "Directory/file-count inventory only. Brain content, private tiers, raw private captures, and private indexes are not copied into this repo.",
         "top_level_directories": dirs,
     })
 
