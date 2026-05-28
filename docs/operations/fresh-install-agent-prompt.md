@@ -101,16 +101,23 @@ Phase 4 — create Brain directories and indexes
 5. If `qmd` is absent, record it as pending and keep Brain directories usable.
 6. Brain canonical storage is Brain service, SQLite-compatible receipts, and QMD-style indexes.
 
-Phase 5 — apply sanitized runtime manifests
-1. Run the bootstrap script from this repository:
+Phase 5 — apply sanitized runtime manifests and prefer the interactive installer when available
+1. If `scripts/install_kurultai.py` exists in this checkout, run its read-only checks first:
+   - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --doctor`
+   - Windows PowerShell: `py -3 scripts\install_kurultai.py --doctor` or `python scripts\install_kurultai.py --doctor`
+2. Then run its guided mode if available and appropriate:
+   - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --interactive`
+   - Windows PowerShell: `py -3 scripts\install_kurultai.py --interactive` or `python scripts\install_kurultai.py --interactive`
+3. If `scripts/install_kurultai.py` does not exist yet, implement it from `docs/operations/interactive-installer-implementation-prompt.md` or continue with the existing bootstrap script.
+4. Run the bootstrap script from this repository:
    - POSIX/macOS/Linux: `python3 scripts/bootstrap_kurultai_runtime.py --dry-run`
    - Windows PowerShell: `py -3 scripts\bootstrap_kurultai_runtime.py --dry-run` or `python scripts\bootstrap_kurultai_runtime.py --dry-run`
-2. If it looks correct, run the non-dry-run form:
+5. If it looks correct, run the non-dry-run form:
    - POSIX/macOS/Linux: `python3 scripts/bootstrap_kurultai_runtime.py`
    - Windows PowerShell: `py -3 scripts\bootstrap_kurultai_runtime.py` or `python scripts\bootstrap_kurultai_runtime.py`
-3. Review staged files under `~/.kurultai-rebuild-staging/` or Windows equivalent if the script uses the current user's home.
-4. Use `config/runtime-config/hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
-5. Do not blindly overwrite a user's existing private config. Merge non-secret settings and preserve local credentials.
+6. Review staged files under `~/.kurultai-rebuild-staging/` or Windows equivalent if the script uses the current user's home.
+7. Use `config/runtime-config/hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
+8. Do not blindly overwrite a user's existing private config. Merge non-secret settings and preserve local credentials.
 
 Phase 6 — create Kurultai Hermes profiles
 Create these Hermes profiles if missing, preserving existing profiles if present:

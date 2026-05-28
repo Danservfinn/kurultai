@@ -6,6 +6,24 @@ The agent must do the work, verify it, and leave receipts. Do not stop at advice
 
 Before acting, the agent must read and adopt `agents/hermes-install-expert.md`. That prompt is the public expertise pack for Hermes/Kurultai self-installation.
 
+Preferred installer implementation prompt:
+
+```text
+docs/operations/interactive-installer-implementation-prompt.md
+```
+
+Preferred future command surface for a completed guided installer:
+
+```bash
+python3 scripts/install_kurultai.py --doctor
+python3 scripts/install_kurultai.py --dry-run
+python3 scripts/install_kurultai.py --interactive
+python3 scripts/install_kurultai.py --resume
+python3 scripts/install_kurultai.py --write-plan
+```
+
+Until that installer exists in the checkout, use `scripts/bootstrap_kurultai_runtime.py` plus `docs/operations/fresh-install-agent-prompt.md`.
+
 ## Completion definition
 
 A host is fully installed when all of these are true:

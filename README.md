@@ -65,7 +65,13 @@ cd kurultai
 python3 scripts/bootstrap_kurultai_runtime.py --home "$HOME/.hermes-kurultai" --brain "$HOME/brain-kurultai" --dry-run
 ```
 
-Then paste this file into Claude Code or Codex:
+To implement or repair the full guided installer, paste this file into Claude Code or Codex:
+
+```text
+docs/operations/interactive-installer-implementation-prompt.md
+```
+
+For a fresh-machine install performed by a coding agent, paste this file instead:
 
 ```text
 docs/operations/fresh-install-agent-prompt.md
@@ -77,7 +83,7 @@ For best results, also give the installing agent its expert operating prompt:
 agents/hermes-install-expert.md
 ```
 
-The prompt covers:
+The install prompts cover:
 
 - macOS, Linux, and Windows-native PowerShell installation.
 - Hermes Agent installation and verification.
