@@ -47,6 +47,25 @@ Required behavior:
 - **Rebuildable configuration** — sanitized templates and manifests describe how to recreate the system without publishing secrets or live private state.
 - **Recovery loop** — canaries, drift checks, low-token monitors, and review gates keep the system moving without turning automation into recklessness.
 
+## Systems included
+
+Kurultai is not just a profile roster. The rebuild contract documents the larger operating system that has accumulated around Hermes:
+
+- **Dreamer / Subconscious (`subc`)** — background pattern-noticing over Brain, Kanban, receipts, research, and session history. It creates candidate observations, learns suppression rules from reviewer decisions, promotes approved candidates through Kublai-reviewed gates, and exposes health through watchdog/review/triage jobs.
+- **AGI caretaker harness** — a practical Observe → Propose layer for autonomous improvement. It uses script-first telemetry, canaries, scorecards, attention queues, replay evaluation, token baselines, proposal packets, and promotion ledgers before any real-world mutation authority is granted.
+- **Buildroom / Auto-build** — a research-to-build operating room system. It turns high-signal ideas into room artifacts, plans, implementation receipts, verification reports, trust/retention reviews, Control Room readouts, and bounded low-risk Kanban drafts.
+- **Auto research and signal intake** — scheduled signal capture, Batu research dispatch, bookmark/watchlist scouts, research proposal compilation, and research Control Room summaries. Retrieval stays read-only; implementation, public posting, payment, deploy, and security actions remain gated.
+- **Native Hermes Kanban** — durable task graph with owners, parent dependencies, worker dispatch, review gates, blockers, completion receipts, and Kublai synthesis.
+- **Brain memory layer** — durable wiki, receipts, proposals, research syntheses, operational pages, private/public index boundaries, retrieval evaluation harness, and Brain sync canaries.
+- **Receipts and recovery loop** — append-only evidence, canaries, watchdogs, failure classifiers, drift monitors, quarantine paths, rollback-aware repair proposals, and assisted Coder handoffs.
+- **Gateway and intake layer** — Telegram/operator gateway contracts, Ogedei operations/intake bot topology, webhook/local delivery boundaries, responsiveness canaries, and safe bot-to-bot/intake guardrails.
+- **Local model lane (`tolui`)** — low-cost local summarization/classification/triage path for token-efficient reflexes, kept separate from tool-required frontier work until verified.
+- **Agentic foundation** — Tailscale/SSH/tmux helper patterns, cross-device canaries, Brain sync checks, and ops-repo drift monitors for persistent multi-device agent work.
+- **Dashboards and control rooms** — `the.kurult.ai`, Buildroom Control Room, research Control Room, Dreamer status surfaces, Kanban/health dashboards, and public-safe readouts.
+- **Fresh install / rebuild tooling** — copy-paste installer prompts, install expert contract, sanitized runtime manifests, profile templates, cron manifests, and verification checklists.
+
+The public repository contains the safe contracts, manifests, prompts, templates, diagrams, and runbooks for these systems. It intentionally excludes live secrets, private Brain contents, live Kanban databases, sessions, chat IDs, OAuth tokens, and private runtime state.
+
 ## Native Kanban lifecycle
 
 Every meaningful piece of work gets a durable task record. The board is both the queue and the audit trail.
