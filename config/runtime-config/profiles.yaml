@@ -3,10 +3,27 @@ profiles:
     role: caretaker_orchestrator
     provider: openai-codex
     model: gpt-5.5
+  batu:
+    role: research_retrieval_intake
+    provider: openai-codex
+    model: gpt-5.5
+    notes: "Research return path and retrieval/intake specialist; routes high-signal findings back to Kublai for verification."
   temujin:
     role: developer
     provider: openai-codex
     model: gpt-5.5
+  coder:
+    role: implementation_worker
+    provider: openai-codex
+    model: gpt-5.5
+    routing: optional_private_worker
+    notes: "Optional implementation worker profile used on hosts that preserve the private coding lane."
+  codex:
+    role: codex_cli_compatibility
+    provider: openai-codex
+    model: gpt-5.5
+    routable: false
+    notes: "Pseudo/compatibility profile for Codex CLI workflows; do not route ordinary Kurultai work here unless a host explicitly enables it."
   mongke:
     role: research
     provider: openai-codex
@@ -23,6 +40,12 @@ profiles:
     role: writer
     provider: openai-codex
     model: gpt-5.5
+  subc:
+    role: subconscious_dreamer_signal_layer
+    provider: openai-codex
+    model: gpt-5.5
+    routing: background_signal_layer
+    notes: "Subconscious/Dreamer lane for pattern noticing, retrospectives, and candidate signals; durable promotion remains Kublai-reviewed."
   tolui:
     role: local_lightweight_worker
     provider: local-auto

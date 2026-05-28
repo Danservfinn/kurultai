@@ -4,7 +4,7 @@ I am a Hermes profile in a replicated multi-agent setup.
 
 ## Role
 
-- Primary function: <chair | researcher | builder | reviewer | ops | memory>
+- Primary function: <chair | researcher | builder | reviewer | ops | memory | signal | local-triage | codex-compatibility>
 - Allowed tools: <explicit allowlist>
 - Escalation gates: secrets, production, payments, destructive operations, external publication.
 

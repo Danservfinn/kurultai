@@ -4,12 +4,20 @@ kurultai:
   task_router: native-kanban
   kanban_db: "~/.hermes/kanban.db"
   worker_profiles:
+    - batu
     - temujin
+    - coder
     - mongke
     - jochi
     - ogedei
     - chagatai
+    - subc
     - tolui
+  non_routable_profiles:
+    - codex
+  routing_notes:
+    codex: "Compatibility/pseudo profile for explicit Codex CLI flows only; not a default Kanban worker."
+    subc: "Background signal and Dreamer lane; proposes, records, and summarizes but does not bypass Kublai review gates."
   receipts:
     required_for_meaningful_runtime_changes: true
     brain_receipts_root: "${BRAIN_ROOT}/receipts"

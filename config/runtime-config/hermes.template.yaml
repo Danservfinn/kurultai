@@ -37,12 +37,28 @@ coordination:
   kanban_db: "~/.hermes/kanban.db"
   profiles:
     - kublai
+    - batu
     - temujin
+    - coder
+    - codex
     - mongke
     - jochi
     - ogedei
     - chagatai
+    - subc
     - tolui
+  default_workers:
+    - batu
+    - temujin
+    - coder
+    - mongke
+    - jochi
+    - ogedei
+    - chagatai
+    - subc
+    - tolui
+  non_routable_profiles:
+    - codex
 
 brain:
   wiki_root: "${BRAIN_ROOT}"

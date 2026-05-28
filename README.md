@@ -14,7 +14,7 @@ It packages the current Kublai/Kurultai way of running Hermes: a chair profile, 
 
 - **Hermes-native multi-agent coordination** — profiles, tools, skills, sessions, gateway, cron, and native Kanban remain the runtime substrate.
 - **Kublai as chair** — Kublai routes work, keeps synthesis coherent, verifies receipts, and reports one concise operator-facing result.
-- **Specialist profiles** — Chagatai, Jochi, Temujin, Mongke, Ogedei, and Tolui handle research, analysis, implementation, review, operations, and local lightweight triage.
+- **Specialist profiles** — Batu, Chagatai, Jochi, Temujin, Coder, Mongke, Ogedei, Subc, and Tolui handle retrieval, research, analysis, implementation, review, operations, background signal detection, and local lightweight triage. `codex` is included as a non-routable compatibility profile for explicit Codex CLI flows.
 - **Brain wiki** — durable plans, receipts, research, synthesis, operations notes, and public/private index contracts.
 - **Rebuildable configuration** — sanitized templates and manifests describe how to recreate the system without publishing secrets or live private state.
 - **Recovery loop** — canaries, drift checks, low-token monitors, and review gates keep the system moving without turning automation into recklessness.
@@ -115,12 +115,16 @@ See `.gitignore`, `docs/operations/kurultai-rebuild-runbook.md`, and `config/run
 | Profile | Role | Default lane |
 |---|---|---|
 | `kublai` | caretaker / orchestrator / synthesis | frontier model |
+| `batu` | retrieval / research intake / return path | frontier model |
 | `chagatai` | research, writing, synthesis, content | frontier model |
 | `jochi` | analysis, audit, scouting, alternatives | frontier model |
 | `temujin` | implementation, tests, code repair | frontier model |
+| `coder` | optional implementation worker lane | frontier model |
 | `mongke` | review, risk, quality gates | frontier model |
 | `ogedei` | operations, integration, runbooks | frontier model |
+| `subc` | subconscious / Dreamer signal layer | frontier model or local/scheduled lane |
 | `tolui` | local lightweight triage and summarization | local model, no tool-required work until verified |
+| `codex` | Codex CLI compatibility / pseudo-profile | non-routable unless explicitly enabled |
 
 ## Repository map
 

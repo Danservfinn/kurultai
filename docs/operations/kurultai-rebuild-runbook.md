@@ -9,7 +9,7 @@ This is not a secret backup. Live tokens, private chat targets, session logs, pr
 A rebuilt host should provide these capabilities:
 
 - Hermes runtime for Kublai.
-- Kurultai Hermes profile roster.
+- Kurultai Hermes profile roster, including optional/internal agent lanes such as Batu, Coder, Subc, and non-routable Codex compatibility.
 - Native Hermes Kanban with the expected schema.
 - Brain wiki at the configured path, with QMD indexing.
 - Cron jobs recreated from sanitized manifests after review.

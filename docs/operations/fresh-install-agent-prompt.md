@@ -110,12 +110,16 @@ Phase 5 — apply sanitized runtime manifests
 Phase 6 — create Kurultai Hermes profiles
 Create these Hermes profiles if missing, preserving existing profiles if present:
 - `kublai`: caretaker/orchestrator, provider `openai-codex`, model `gpt-5.5`.
+- `batu`: retrieval/research intake and return-path compilation, provider `openai-codex`, model `gpt-5.5`.
 - `chagatai`: research/writing/content synthesis, provider `openai-codex`, model `gpt-5.5`.
 - `jochi`: analysis/audit, provider `openai-codex`, model `gpt-5.5`.
 - `temujin`: development/implementation/testing, provider `openai-codex`, model `gpt-5.5`.
+- `coder`: optional implementation worker lane, provider `openai-codex`, model `gpt-5.5`.
 - `mongke`: review/research synthesis, provider `openai-codex`, model `gpt-5.5`.
 - `ogedei`: operations/infrastructure, provider `openai-codex`, model `gpt-5.5`.
+- `subc`: Subconscious/Dreamer signal lane, provider `openai-codex`, model `gpt-5.5` unless host policy assigns local/scheduled-only duties.
 - `tolui`: local lightweight triage lane, local provider/model selected in Phase 7.
+- `codex`: non-routable compatibility/pseudo-profile for explicit Codex CLI workflows only; do not put it in the ordinary Kanban worker pool unless intentionally enabled.
 
 Use Hermes profile commands when available:
 - `hermes profile list`
