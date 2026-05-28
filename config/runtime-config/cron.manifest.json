@@ -1406,7 +1406,7 @@
       "workdir": null
     },
     {
-      "deliver": "origin",
+      "deliver": "local",
       "enabled": true,
       "enabled_toolsets": [
         "terminal",
