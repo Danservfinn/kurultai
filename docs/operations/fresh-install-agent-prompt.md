@@ -21,6 +21,8 @@ Non-negotiable constraints:
 
 Repository contract to honor:
 - Runtime manifests live in `config/runtime-config/`.
+- Install expert prompt: `agents/hermes-install-expert.md`; read it before acting.
+- Install expert manifest: `config/runtime-config/install-expert.yaml`.
 - Main rebuild guide: `docs/operations/kurultai-rebuild-runbook.md`.
 - Full completion checklist: `docs/operations/full-installation-checklist.md`.
 - Gateway contract: `config/runtime-config/gateways.yaml`; install Kublai and Ogedei as separate gateways when credentials are supplied.
@@ -28,7 +30,8 @@ Repository contract to honor:
 - Brain wiki default root: `~/brain` on POSIX, `%USERPROFILE%\brain` on Windows.
 - Hermes home default: `~/.hermes` on POSIX, `%USERPROFILE%\.hermes` on Windows unless Hermes itself reports another path.
 
-Phase 0 — detect platform and make a log
+Phase 0 — become the install expert, detect platform, and make a log
+0. Read `agents/hermes-install-expert.md` and adopt it as your operating contract for this install. Then read `config/runtime-config/install-expert.yaml` and confirm that the listed required-reading files exist.
 1. Detect OS, shell, CPU arch, RAM, GPU, Python version, Git, Node/npm, and whether the current directory is a git checkout.
 2. Create a local receipt directory outside git:
    - POSIX: `~/.kurultai-install/receipts/`

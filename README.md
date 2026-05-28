@@ -71,6 +71,12 @@ Then paste this file into Claude Code or Codex:
 docs/operations/fresh-install-agent-prompt.md
 ```
 
+For best results, also give the installing agent its expert operating prompt:
+
+```text
+agents/hermes-install-expert.md
+```
+
 The prompt covers:
 
 - macOS, Linux, and Windows-native PowerShell installation.
@@ -88,6 +94,8 @@ For the installing agent's end-to-end completion definition, see:
 ```text
 docs/operations/full-installation-checklist.md
 ```
+
+The install expert contract is declared in `config/runtime-config/install-expert.yaml`.
 
 The installer must never commit secrets.
 
@@ -138,6 +146,7 @@ See `.gitignore`, `docs/operations/kurultai-rebuild-runbook.md`, and `config/run
 
 ```text
 config/runtime-config/      sanitized runtime templates and manifests
+agents/                    installer-agent prompts and operating contracts
 brain/                      public Brain/wiki schema and page templates
 profiles/                   public profile role templates
 docs/operations/            rebuild runbooks and fresh-install prompt

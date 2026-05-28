@@ -27,6 +27,7 @@ A rebuilt host should provide these capabilities:
 - `config/runtime-config/kurultai.yaml`: native coordination contract.
 - `config/runtime-config/brain.yaml`: Brain wiki and index contract.
 - `config/runtime-config/gateways.yaml`: Kublai and Ogedei gateway contract.
+- `config/runtime-config/install-expert.yaml`: installing-agent expertise contract and required-reading manifest.
 - `config/runtime-config/cron.manifest.json`: sanitized cron manifest.
 - `config/runtime-config/skills.manifest.json`: skill names, relative paths, descriptions.
 - `config/runtime-config/kanban.schema.json`: Kanban schema only.
@@ -36,6 +37,7 @@ A rebuilt host should provide these capabilities:
 - `scripts/bootstrap_kurultai_runtime.py`: creates a review staging area for a rebuilt host.
 - `docs/operations/fresh-install-agent-prompt.md`: pasteable Claude Code/Codex prompt for macOS, Linux, and Windows installs.
 - `docs/operations/full-installation-checklist.md`: concrete completion definition and gateway install checklist for the installing agent.
+- `agents/hermes-install-expert.md`: public operating prompt that makes the local coding agent an expert in installing and configuring Hermes/Kurultai from this repo.
 
 ## Secret boundary
 

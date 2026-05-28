@@ -15,6 +15,7 @@ required = [
     'config/runtime-config/profiles.yaml',
     'config/runtime-config/brain.yaml',
     'config/runtime-config/gateways.yaml',
+    'config/runtime-config/install-expert.yaml',
     'config/runtime-config/cron.manifest.json',
     'config/runtime-config/skills.manifest.json',
     'config/runtime-config/kanban.schema.json',
@@ -24,6 +25,7 @@ required = [
     'docs/operations/kurultai-rebuild-runbook.md',
     'brain/AGENTS.md',
     'brain/templates/page.md',
+    'agents/hermes-install-expert.md',
     'profiles/templates/SOUL.profile.md',
 ]
 for rel in required:

@@ -4,6 +4,8 @@ This checklist is for the local coding agent performing a fresh install from thi
 
 The agent must do the work, verify it, and leave receipts. Do not stop at advice unless a human-only secret or permission is missing.
 
+Before acting, the agent must read and adopt `agents/hermes-install-expert.md`. That prompt is the public expertise pack for Hermes/Kurultai self-installation.
+
 ## Completion definition
 
 A host is fully installed when all of these are true:
@@ -75,7 +77,7 @@ Start with a foreground PowerShell smoke test. Only after it works, create a Sch
 
 ## Agent execution order
 
-1. Read `config/runtime-config/*.yaml`, `*.json`, this checklist, and `fresh-install-agent-prompt.md`.
+1. Read `agents/hermes-install-expert.md`, `config/runtime-config/install-expert.yaml`, `config/runtime-config/*.yaml`, `*.json`, this checklist, and `fresh-install-agent-prompt.md`.
 2. Detect host OS and write a receipt path outside git.
 3. Install prerequisites and Hermes.
 4. Configure frontier model and compression.

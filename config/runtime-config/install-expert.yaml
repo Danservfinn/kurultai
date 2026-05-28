@@ -1,0 +1,37 @@
+install_expert:
+  prompt: agents/hermes-install-expert.md
+  purpose: "Make the local coding agent an expert installer/configurator for Hermes + Kurultai from this repository."
+  required_reading:
+    - README.md
+    - docs/operations/kurultai-rebuild-runbook.md
+    - docs/operations/full-installation-checklist.md
+    - docs/operations/fresh-install-agent-prompt.md
+    - config/runtime-config/hermes.template.yaml
+    - config/runtime-config/profiles.yaml
+    - config/runtime-config/kurultai.yaml
+    - config/runtime-config/brain.yaml
+    - config/runtime-config/gateways.yaml
+    - config/runtime-config/cron.manifest.json
+    - config/runtime-config/skills.manifest.json
+    - config/runtime-config/kanban.schema.json
+    - config/runtime-config/brain.manifest.json
+  mastery_domains:
+    - hermes_installation
+    - hermes_configuration
+    - profile_creation
+    - provider_auth_boundary
+    - brain_wiki_setup
+    - native_kanban_setup
+    - skill_reconciliation
+    - cron_reconstruction
+    - local_llm_lane_selection
+    - dual_telegram_gateway_setup
+    - os_service_installation
+    - verification_receipts
+  human_only_gates:
+    - botfather_credentials
+    - oauth_browser_login
+    - payment_changes
+    - production_dns_or_public_webhook_changes
+    - destructive_private_data_overwrite
+  completion_artifact: "local receipt outside git plus final verification report"
