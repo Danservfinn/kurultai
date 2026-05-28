@@ -33,13 +33,24 @@ def sanitize_string(value):
             return prefix + "[REDACTED]"
     return text
 
+
+def sanitize_repeat(value):
+    """Keep repeat policy, not volatile runtime counters."""
+    if not isinstance(value, dict):
+        return value
+    sanitized = {}
+    if "times" in value:
+        sanitized["times"] = value.get("times")
+    return sanitized or None
+
+
 manifest = []
 for index, job in enumerate(load_jobs(), start=1):
     manifest.append({
         "job_id": f"job-{index:03d}",
         "name": sanitize_string(job.get("name")),
         "schedule": job.get("schedule"),
-        "repeat": job.get("repeat"),
+        "repeat": sanitize_repeat(job.get("repeat")),
         "deliver": sanitize_string(job.get("deliver")),
         "enabled": job.get("enabled"),
         "state": job.get("state"),

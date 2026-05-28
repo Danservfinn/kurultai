@@ -7,7 +7,6 @@
       "job_id": "job-001",
       "name": "brain-wiki-weekly-lint",
       "repeat": {
-        "completed": 5,
         "times": null
       },
       "schedule": {
@@ -31,7 +30,6 @@
       "job_id": "job-002",
       "name": "hermes-quota-daily-check",
       "repeat": {
-        "completed": 37,
         "times": null
       },
       "schedule": {
@@ -51,7 +49,6 @@
       "job_id": "job-003",
       "name": "brain-sync-drain",
       "repeat": {
-        "completed": 145,
         "times": null
       },
       "schedule": {
@@ -71,7 +68,6 @@
       "job_id": "job-004",
       "name": "kurultai-daily-queue-action",
       "repeat": {
-        "completed": 48,
         "times": null
       },
       "schedule": {
@@ -98,7 +94,6 @@
       "job_id": "job-005",
       "name": "brain-ingest-hourly",
       "repeat": {
-        "completed": 737,
         "times": null
       },
       "schedule": {
@@ -121,7 +116,6 @@
       "job_id": "job-006",
       "name": "kurultai-terminal-task-notifier",
       "repeat": {
-        "completed": 8852,
         "times": null
       },
       "schedule": {
@@ -141,7 +135,6 @@
       "job_id": "job-007",
       "name": "brain-graphify-weekly-refresh",
       "repeat": {
-        "completed": 4,
         "times": null
       },
       "schedule": {
@@ -218,7 +211,6 @@
       "job_id": "job-011",
       "name": "brain-optimizer-weekly",
       "repeat": {
-        "completed": 3,
         "times": 999999
       },
       "schedule": {
@@ -240,7 +232,6 @@
       "job_id": "job-012",
       "name": "kurultai-research-hourly-summary",
       "repeat": {
-        "completed": 565,
         "times": 999999
       },
       "schedule": {
@@ -266,7 +257,6 @@
       "job_id": "job-013",
       "name": "hermes-soul-operating-contract-monthly-audit",
       "repeat": {
-        "completed": 1,
         "times": 999999
       },
       "schedule": {
@@ -293,7 +283,6 @@
       "job_id": "job-014",
       "name": "brain-content-daily-brief",
       "repeat": {
-        "completed": 23,
         "times": null
       },
       "schedule": {
@@ -321,7 +310,6 @@
       "job_id": "job-015",
       "name": "brain-vault-weekly-synthesis",
       "repeat": {
-        "completed": 3,
         "times": null
       },
       "schedule": {
@@ -343,7 +331,6 @@
       "job_id": "job-016",
       "name": "polymarket-weather-paper-scan",
       "repeat": {
-        "completed": 545,
         "times": null
       },
       "schedule": {
@@ -365,7 +352,6 @@
       "job_id": "job-017",
       "name": "polymarket-weather-labeler-and-render",
       "repeat": {
-        "completed": 79,
         "times": null
       },
       "schedule": {
@@ -388,7 +374,6 @@
       "job_id": "job-018",
       "name": "subc-room-walk-v0",
       "repeat": {
-        "completed": 79,
         "times": null
       },
       "schedule": {
@@ -411,7 +396,6 @@
       "job_id": "job-019",
       "name": "subc-digest-v0",
       "repeat": {
-        "completed": 60,
         "times": null
       },
       "schedule": {
@@ -433,7 +417,6 @@
       "job_id": "job-020",
       "name": "kaidu-prompt-lab-review",
       "repeat": {
-        "completed": 21,
         "times": null
       },
       "schedule": {
@@ -455,7 +438,6 @@
       "job_id": "job-021",
       "name": "fantasy-sumo-live-ingestion",
       "repeat": {
-        "completed": 425,
         "times": null
       },
       "schedule": {
@@ -475,7 +457,6 @@
       "job_id": "job-022",
       "name": "kanban-health-monitor",
       "repeat": {
-        "completed": 397,
         "times": null
       },
       "schedule": {
@@ -497,7 +478,6 @@
       "job_id": "job-023",
       "name": "brain-docs-hygiene-monthly",
       "repeat": {
-        "completed": 0,
         "times": null
       },
       "schedule": {
@@ -522,7 +502,6 @@
       "job_id": "job-024",
       "name": "monitor-first-action-learning-loop-integration",
       "repeat": {
-        "completed": 38,
         "times": 144
       },
       "schedule": {
@@ -542,7 +521,6 @@
       "job_id": "job-025",
       "name": "monitor-agi-harness-v0-autonomous-implementation",
       "repeat": {
-        "completed": 77,
         "times": 96
       },
       "schedule": {
@@ -564,7 +542,6 @@
       "job_id": "job-026",
       "name": "daily-token-efficiency-capability-proposal",
       "repeat": {
-        "completed": 17,
         "times": 999999
       },
       "schedule": {
@@ -584,7 +561,6 @@
       "job_id": "job-027",
       "name": "kanban-crash-investigator",
       "repeat": {
-        "completed": 16988,
         "times": null
       },
       "schedule": {
@@ -604,7 +580,6 @@
       "job_id": "job-028",
       "name": "brain-dreamer-v0",
       "repeat": {
-        "completed": 3,
         "times": null
       },
       "schedule": {
@@ -629,7 +604,6 @@
       "job_id": "job-029",
       "name": "brain-dreamer-frontier-review",
       "repeat": {
-        "completed": 314,
         "times": null
       },
       "schedule": {
@@ -651,7 +625,6 @@
       "job_id": "job-030",
       "name": "agi-caretaker-scorecard",
       "repeat": {
-        "completed": 56,
         "times": null
       },
       "schedule": {
@@ -671,7 +644,6 @@
       "job_id": "job-031",
       "name": "dreamer-learn-rules",
       "repeat": {
-        "completed": 56,
         "times": null
       },
       "schedule": {
@@ -691,7 +663,6 @@
       "job_id": "job-032",
       "name": "dreamer-promotion-adapter",
       "repeat": {
-        "completed": 307,
         "times": null
       },
       "schedule": {
@@ -711,7 +682,6 @@
       "job_id": "job-033",
       "name": "agent-health-monitor",
       "repeat": {
-        "completed": 55,
         "times": null
       },
       "schedule": {
@@ -733,7 +703,6 @@
       "job_id": "job-034",
       "name": "buildroom-autonomy-cycle",
       "repeat": {
-        "completed": 217,
         "times": null
       },
       "schedule": {
@@ -755,7 +724,6 @@
       "job_id": "job-035",
       "name": "buildroom-freshness-canary",
       "repeat": {
-        "completed": 278,
         "times": null
       },
       "schedule": {
@@ -775,7 +743,6 @@
       "job_id": "job-036",
       "name": "gateway-responsiveness-canary",
       "repeat": {
-        "completed": 2772,
         "times": 999999
       },
       "schedule": {
@@ -795,7 +762,6 @@
       "job_id": "job-037",
       "name": "dreamer-watchdog-silent",
       "repeat": {
-        "completed": 2562,
         "times": null
       },
       "schedule": {
@@ -815,7 +781,6 @@
       "job_id": "job-038",
       "name": "tailnet-health-canary",
       "repeat": {
-        "completed": 936,
         "times": null
       },
       "schedule": {
@@ -835,7 +800,6 @@
       "job_id": "job-039",
       "name": "tmux-session-canary",
       "repeat": {
-        "completed": 247,
         "times": null
       },
       "schedule": {
@@ -855,7 +819,6 @@
       "job_id": "job-040",
       "name": "cross-device-foundation-canary",
       "repeat": {
-        "completed": 936,
         "times": null
       },
       "schedule": {
@@ -875,7 +838,6 @@
       "job_id": "job-041",
       "name": "brain-sync-canary-silent",
       "repeat": {
-        "completed": 482,
         "times": null
       },
       "schedule": {
@@ -895,7 +857,6 @@
       "job_id": "job-042",
       "name": "ops-repo-drift-canary-silent",
       "repeat": {
-        "completed": 484,
         "times": null
       },
       "schedule": {
@@ -919,7 +880,6 @@
       "job_id": "job-043",
       "name": "hermes-atlas-newsletter-monitor",
       "repeat": {
-        "completed": 11,
         "times": null
       },
       "schedule": {
@@ -942,7 +902,6 @@
       "job_id": "job-044",
       "name": "weather-strategy-lab-caretaker",
       "repeat": {
-        "completed": 41,
         "times": null
       },
       "schedule": {
@@ -966,7 +925,6 @@
       "job_id": "job-045",
       "name": "batu-x-watchlist-scout",
       "repeat": {
-        "completed": 39,
         "times": null
       },
       "schedule": {
@@ -988,7 +946,6 @@
       "job_id": "job-046",
       "name": "batu-x-watchlist-research-dispatch",
       "repeat": {
-        "completed": 442,
         "times": 999999
       },
       "schedule": {
@@ -1010,7 +967,6 @@
       "job_id": "job-047",
       "name": "batu-x-bookmark-scout",
       "repeat": {
-        "completed": 222,
         "times": 999999
       },
       "schedule": {
@@ -1032,7 +988,6 @@
       "job_id": "job-048",
       "name": "batu-x-bookmark-research-dispatch",
       "repeat": {
-        "completed": 440,
         "times": 999999
       },
       "schedule": {
@@ -1054,7 +1009,6 @@
       "job_id": "job-049",
       "name": "batu-grok-x-research-canary",
       "repeat": {
-        "completed": 10,
         "times": null
       },
       "schedule": {
@@ -1076,7 +1030,6 @@
       "job_id": "job-050",
       "name": "cron-human-intervention-watchdog",
       "repeat": {
-        "completed": 402,
         "times": 999999
       },
       "schedule": {
@@ -1098,7 +1051,6 @@
       "job_id": "job-051",
       "name": "buildroom-review-gate-monitor",
       "repeat": {
-        "completed": 402,
         "times": null
       },
       "schedule": {
@@ -1118,7 +1070,6 @@
       "job_id": "job-052",
       "name": "ogedei-orchestrator-canary",
       "repeat": {
-        "completed": 400,
         "times": null
       },
       "schedule": {
@@ -1138,7 +1089,6 @@
       "job_id": "job-053",
       "name": "ogedei-orchestrator-optimizer",
       "repeat": {
-        "completed": 36,
         "times": null
       },
       "schedule": {
@@ -1158,7 +1108,6 @@
       "job_id": "job-054",
       "name": "kanban-performance-metrics",
       "repeat": {
-        "completed": 35,
         "times": 999999
       },
       "schedule": {
@@ -1180,7 +1129,6 @@
       "job_id": "job-055",
       "name": "batu-x-signal-research-dispatch",
       "repeat": {
-        "completed": 360,
         "times": 999999
       },
       "schedule": {
@@ -1202,7 +1150,6 @@
       "job_id": "job-056",
       "name": "research-proposal-compiler",
       "repeat": {
-        "completed": 31,
         "times": null
       },
       "schedule": {
@@ -1222,7 +1169,6 @@
       "job_id": "job-057",
       "name": "research-control-room",
       "repeat": {
-        "completed": 64,
         "times": null
       },
       "schedule": {
@@ -1242,7 +1188,6 @@
       "job_id": "job-058",
       "name": "kanban-jam-classifier",
       "repeat": {
-        "completed": 9340,
         "times": null
       },
       "schedule": {
@@ -1262,7 +1207,6 @@
       "job_id": "job-059",
       "name": "operator-x-bookmark-taste-profile",
       "repeat": {
-        "completed": 29,
         "times": null
       },
       "schedule": {
@@ -1284,7 +1228,6 @@
       "job_id": "job-060",
       "name": "agi-harness-observe-propose",
       "repeat": {
-        "completed": 143,
         "times": 999999
       },
       "schedule": {
@@ -1304,7 +1247,6 @@
       "job_id": "job-061",
       "name": "Parse production quiet canary",
       "repeat": {
-        "completed": 187,
         "times": null
       },
       "schedule": {
@@ -1324,7 +1266,6 @@
       "job_id": "job-062",
       "name": "Parse admin anomaly watchdog",
       "repeat": {
-        "completed": 62,
         "times": null
       },
       "schedule": {
@@ -1344,7 +1285,6 @@
       "job_id": "job-063",
       "name": "Parse admin daily digest",
       "repeat": {
-        "completed": 3,
         "times": null
       },
       "schedule": {
@@ -1368,7 +1308,6 @@
       "job_id": "job-064",
       "name": "Parse business state morning report",
       "repeat": {
-        "completed": 3,
         "times": null
       },
       "schedule": {
@@ -1393,7 +1332,6 @@
       "job_id": "job-065",
       "name": "Parse support email monitor",
       "repeat": {
-        "completed": 229,
         "times": 999999
       },
       "schedule": {
@@ -1415,7 +1353,6 @@
       "job_id": "job-066",
       "name": "Parse paid subscription purchase alert",
       "repeat": {
-        "completed": 2814,
         "times": 999999
       },
       "schedule": {
@@ -1437,7 +1374,6 @@
       "job_id": "job-067",
       "name": "Objective Runner autonomous tick",
       "repeat": {
-        "completed": 261,
         "times": null
       },
       "schedule": {
@@ -1457,7 +1393,6 @@
       "job_id": "job-068",
       "name": "Dreamer Kanban triage gate",
       "repeat": {
-        "completed": 74,
         "times": null
       },
       "schedule": {
@@ -1469,6 +1404,32 @@
       "skills": [],
       "state": "scheduled",
       "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "job_id": "job-069",
+      "name": "kurultai-public-repo-nightly-config-sync",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "17 3 * * *",
+        "expr": "17 3 * * *",
+        "kind": "cron"
+      },
+      "script": null,
+      "skills": [
+        "kurultai-operations",
+        "github-pr-workflow"
+      ],
+      "state": "scheduled",
+      "workdir": "${KURULTAI_HOME}/kurultai/kurultai-public-canonical"
     }
   ],
   "schema": "kurultai.cron-manifest.v1"
