@@ -8,7 +8,7 @@
 
 It packages the current Kublai/Kurultai way of running Hermes: a chair profile, specialist Hermes profiles, native Hermes Kanban, a durable Brain, cron-backed continuity, reusable skills, recovery receipts, and a safe rebuild contract that keeps private runtime state out of git.
 
-![Kurultai system overview](docs/assets/readme/01-kurultai-overview.svg)
+![Kurultai system overview](docs/assets/readme/01-kurultai-overview.png)
 
 ## What Kurultai provides
 
@@ -23,7 +23,7 @@ It packages the current Kublai/Kurultai way of running Hermes: a chair profile, 
 
 Every meaningful piece of work gets a durable task record. The board is both the queue and the audit trail.
 
-![Native Kanban work lifecycle](docs/assets/readme/02-native-kanban-flow.svg)
+![Native Kanban work lifecycle](docs/assets/readme/02-native-kanban-flow.png)
 
 A normal task flow is:
 
@@ -39,7 +39,7 @@ Blocked tasks are not terminal. Kublai or an assigned resolver clears safe block
 
 Kurultai separates durable public architecture from private runtime state.
 
-![Brain memory and rebuild contract](docs/assets/readme/03-brain-memory-contract.svg)
+![Brain memory and rebuild contract](docs/assets/readme/03-brain-memory-contract.png)
 
 The Brain contains the long-term operating memory: plans, receipts, proposals, analyses, content artifacts, and status surfaces. This repository contains the **sanitized rebuild contract** for that system:
 
@@ -57,7 +57,7 @@ The Brain contains the long-term operating memory: plans, receipts, proposals, a
 
 A fresh user can clone this repository and paste a single prompt into Claude Code, Codex, or another local coding agent. That prompt performs the setup while preserving the secret boundary.
 
-![Fresh install path](docs/assets/readme/04-fresh-install-path.svg)
+![Fresh install path](docs/assets/readme/04-fresh-install-path.png)
 
 ```bash
 git clone https://github.com/Danservfinn/kurultai.git
@@ -109,7 +109,7 @@ The installer must never commit secrets.
 
 Kurultai is open source under the MIT License. The project is designed so the useful system can be inspected, forked, and rebuilt without exposing private operator state.
 
-![Open-source boundary](docs/assets/readme/05-open-source-boundary.svg)
+![Open-source boundary](docs/assets/readme/05-open-source-boundary.png)
 
 Public repository contents include:
 
