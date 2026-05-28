@@ -66,6 +66,56 @@ Kurultai is not just a profile roster. The rebuild contract documents the larger
 
 The public repository contains the safe contracts, manifests, prompts, templates, diagrams, and runbooks for these systems. It intentionally excludes live secrets, private Brain contents, live Kanban databases, sessions, chat IDs, OAuth tokens, and private runtime state.
 
+## Workflow diagram gallery
+
+### Dreamer / Subconscious
+
+![Dreamer / Subconscious workflow](docs/assets/workflows/01-dreamer-subconscious.png)
+
+### AGI caretaker harness
+
+![AGI caretaker harness workflow](docs/assets/workflows/02-agi-caretaker-harness.png)
+
+### Buildroom / Auto-build
+
+![Buildroom / Auto-build workflow](docs/assets/workflows/03-buildroom-auto-build.png)
+
+### Auto research and signal intake
+
+![Auto research and signal intake workflow](docs/assets/workflows/04-auto-research-signal-intake.png)
+
+### Native Hermes Kanban
+
+![Native Hermes Kanban workflow](docs/assets/workflows/05-native-hermes-kanban.png)
+
+### Brain memory layer
+
+![Brain memory layer workflow](docs/assets/workflows/06-brain-memory-layer.png)
+
+### Receipts and recovery loop
+
+![Receipts and recovery loop workflow](docs/assets/workflows/07-receipts-recovery-loop.png)
+
+### Gateway and intake layer
+
+![Gateway and intake layer workflow](docs/assets/workflows/08-gateway-intake-layer.png)
+
+### Local model lane / Tolui
+
+![Local model lane Tolui workflow](docs/assets/workflows/09-local-model-lane-tolui.png)
+
+### Agentic foundation
+
+![Agentic foundation workflow](docs/assets/workflows/10-agentic-foundation.png)
+
+### Dashboards and Control Rooms
+
+![Dashboards and Control Rooms workflow](docs/assets/workflows/11-dashboards-control-rooms.png)
+
+### Fresh install / rebuild tooling
+
+![Fresh install / rebuild tooling workflow](docs/assets/workflows/12-fresh-install-rebuild.png)
+
 ## Native Kanban lifecycle
 
 Every meaningful piece of work gets a durable task record. The board is both the queue and the audit trail.
