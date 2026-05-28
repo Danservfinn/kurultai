@@ -8,6 +8,34 @@
 
 It packages the current Kublai/Kurultai way of running Hermes: a chair profile, specialist Hermes profiles, native Hermes Kanban, a durable Brain, cron-backed continuity, reusable skills, recovery receipts, and a safe rebuild contract that keeps private runtime state out of git.
 
+## Copy-paste agent installation prompt
+
+If you want a coding agent to install Kurultai for you, copy this whole block into Claude Code, Codex, Hermes, or another local coding agent:
+
+```text
+You are installing Kurultai from its public rebuild repository.
+
+Goal: produce a fully functional local Kurultai/Hermes setup while preserving the repository's security boundary. Do not commit, print, or exfiltrate secrets. Do not overwrite an existing Hermes home, Brain root, profile, cron job set, Kanban database, or private config without asking first. Keep all credentials local.
+
+Repository: https://github.com/Danservfinn/kurultai
+
+Start by cloning or opening the repository, then read and follow these files in order:
+1. docs/operations/fresh-install-agent-prompt.md
+2. agents/hermes-install-expert.md
+3. docs/operations/full-installation-checklist.md
+
+If scripts/install_kurultai.py exists, prefer it and run its doctor/dry-run/interactive flow before falling back to scripts/bootstrap_kurultai_runtime.py. If the installer is missing or incomplete, use docs/operations/interactive-installer-implementation-prompt.md to implement or repair it first.
+
+Required behavior:
+- Detect macOS, Linux, or Windows and choose platform-appropriate commands.
+- Install and verify Hermes Agent.
+- Guide the human through provider auth, Telegram/BotFather setup, and any optional integration credentials.
+- Create or verify the Brain root, Kurultai profiles, native Hermes Kanban, skills, cron jobs, receipts, and gateway setup.
+- Keep private Brain contents, live Kanban data, sessions, tokens, chat IDs, OAuth credentials, cookies, and API keys out of git.
+- Run the repository validation and available tests before reporting success.
+- Finish with a concise install receipt: what was installed, what was verified, what remains gated on human auth, and exact next commands.
+```
+
 ![Kurultai system overview](docs/assets/readme/01-kurultai-overview.png)
 
 ## What Kurultai provides
