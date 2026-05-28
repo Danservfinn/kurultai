@@ -47,6 +47,7 @@ The Brain contains the long-term operating memory: plans, receipts, proposals, a
 - `config/runtime-config/profiles.yaml` — Kurultai profile roster and model map.
 - `config/runtime-config/kurultai.yaml` — native coordination contract.
 - `config/runtime-config/brain.yaml` — Brain root, index, and gateway contract.
+- `config/runtime-config/gateways.yaml` — Kublai primary gateway plus Ogedei operations/intake gateway contract.
 - `config/runtime-config/cron.manifest.json` — sanitized cron manifest.
 - `config/runtime-config/skills.manifest.json` — skill inventory without secret-bearing state.
 - `config/runtime-config/kanban.schema.json` — Kanban schema only, not live tasks.
@@ -79,7 +80,14 @@ The prompt covers:
 - Kurultai profile creation.
 - local LLM lane selection for Tolui.
 - Telegram BotFather and Hermes gateway setup.
+- second Hermes gateway setup for Ogedei operations/intake.
 - sanitized cron, skills, Kanban, receipt, and verification setup.
+
+For the installing agent's end-to-end completion definition, see:
+
+```text
+docs/operations/full-installation-checklist.md
+```
 
 The installer must never commit secrets.
 

@@ -14,6 +14,7 @@ FILES = [
     "profiles.yaml",
     "kurultai.yaml",
     "brain.yaml",
+    "gateways.yaml",
     "cron.manifest.json",
     "skills.manifest.json",
     "kanban.schema.json",

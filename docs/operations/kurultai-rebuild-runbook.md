@@ -16,6 +16,7 @@ A rebuilt host should provide these capabilities:
 - Skill inventory restored from source or backups.
 - Local LLM lane configured for Tolui/lightweight triage with host-fit model selection.
 - Telegram bot/gateway configured from local secrets after BotFather token handoff.
+- Second Hermes gateway for Ogedei operations/intake configured from a separate local BotFather credential when available.
 - macOS, Linux, and Windows-native installs supported by the fresh-install prompt.
 - Receipts and recovery directories available.
 
@@ -25,6 +26,7 @@ A rebuilt host should provide these capabilities:
 - `config/runtime-config/profiles.yaml`: Kurultai profiles and roles.
 - `config/runtime-config/kurultai.yaml`: native coordination contract.
 - `config/runtime-config/brain.yaml`: Brain wiki and index contract.
+- `config/runtime-config/gateways.yaml`: Kublai and Ogedei gateway contract.
 - `config/runtime-config/cron.manifest.json`: sanitized cron manifest.
 - `config/runtime-config/skills.manifest.json`: skill names, relative paths, descriptions.
 - `config/runtime-config/kanban.schema.json`: Kanban schema only.
@@ -33,6 +35,7 @@ A rebuilt host should provide these capabilities:
 - `scripts/export_rebuild_manifests.py`: refreshes skills, Kanban schema, Brain inventory.
 - `scripts/bootstrap_kurultai_runtime.py`: creates a review staging area for a rebuilt host.
 - `docs/operations/fresh-install-agent-prompt.md`: pasteable Claude Code/Codex prompt for macOS, Linux, and Windows installs.
+- `docs/operations/full-installation-checklist.md`: concrete completion definition and gateway install checklist for the installing agent.
 
 ## Secret boundary
 
@@ -51,7 +54,8 @@ Use placeholders and environment-variable names in repo files.
 7. Mount or clone the Brain wiki at the configured path and refresh QMD indexes.
 8. Recreate cron jobs from `cron.manifest.json`; manually restore redacted delivery targets.
 9. Restore skills from source repositories or private skill backups using `skills.manifest.json` as the checklist.
-10. Verify canaries: Hermes config check, profile startup, Kanban create/complete, Brain search/indexing, one safe cron run, receipt write/index, and repo secret scan.
+10. Configure the Kublai gateway and, if the Ogedei bot credential is available, the separate Ogedei gateway from `gateways.yaml`.
+11. Verify canaries: Hermes config check, profile startup, Kanban create/complete, Brain search/indexing, one safe cron run, Kublai gateway reply, Ogedei gateway reply when configured, receipt write/index, and repo secret scan.
 
 ## Drift rule
 

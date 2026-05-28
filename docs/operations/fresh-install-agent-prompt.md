@@ -22,6 +22,8 @@ Non-negotiable constraints:
 Repository contract to honor:
 - Runtime manifests live in `config/runtime-config/`.
 - Main rebuild guide: `docs/operations/kurultai-rebuild-runbook.md`.
+- Full completion checklist: `docs/operations/full-installation-checklist.md`.
+- Gateway contract: `config/runtime-config/gateways.yaml`; install Kublai and Ogedei as separate gateways when credentials are supplied.
 - This repo is a non-secret rebuild contract, not a private backup.
 - Brain wiki default root: `~/brain` on POSIX, `%USERPROFILE%\brain` on Windows.
 - Hermes home default: `~/.hermes` on POSIX, `%USERPROFILE%\.hermes` on Windows unless Hermes itself reports another path.
@@ -104,7 +106,7 @@ Phase 5 — apply sanitized runtime manifests
    - POSIX/macOS/Linux: `python3 scripts/bootstrap_kurultai_runtime.py`
    - Windows PowerShell: `py -3 scripts\bootstrap_kurultai_runtime.py` or `python scripts\bootstrap_kurultai_runtime.py`
 3. Review staged files under `~/.kurultai-rebuild-staging/` or Windows equivalent if the script uses the current user's home.
-4. Use `config/runtime-config/hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
+4. Use `config/runtime-config/hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
 5. Do not blindly overwrite a user's existing private config. Merge non-secret settings and preserve local credentials.
 
 Phase 6 — create Kurultai Hermes profiles
@@ -187,34 +189,40 @@ Phase 10 — recreate cron jobs from sanitized manifest
    - Compression-threshold drift monitor should verify `compression.threshold == 0.25` when main context is 1M and aux compression context is smaller.
 6. Run `hermes cron list` and save a redacted summary to the receipt.
 
-Phase 11 — Telegram bot setup and gateway configuration
-Do the setup if the user supplies the token. If they do not yet have a bot, guide them through BotFather exactly and then continue.
+Phase 11 — Telegram bot setup and dual gateway configuration
+Do the setup if the user supplies the credentials. If they do not yet have bots, guide them through BotFather exactly and then continue. The target topology is two separate Hermes gateways:
+
+- Kublai gateway: primary operator/chair interface, profile `kublai`, separate Telegram bot credential.
+- Ogedei gateway: operations/intake interface, profile `ogedei`, separate Telegram bot credential.
+
+Read `config/runtime-config/gateways.yaml` before configuring either gateway.
 
 BotFather directions for the user:
 1. Open Telegram and message `@BotFather`.
 2. Send `/newbot`.
-3. Choose display name, e.g. `Kurultai Kublai`.
-4. Choose username ending in `bot`, e.g. `your_kurultai_bot`.
-5. Copy the bot token. Treat it as a secret.
+3. Create one bot for Kublai, e.g. display name `Kurultai Kublai`, username ending in `bot`.
+4. Create a second bot for Ogedei, e.g. display name `Kurultai Ogedei`, username ending in `bot`.
+5. Copy each bot credential. Treat both as secrets. Do not paste them into the repo.
 6. Optional but recommended:
    - `/setdescription` with a short description.
    - `/setabouttext`.
    - `/setuserpic`.
    - `/setcommands` with at least: `help`, `status`, `restart`, `sethome`, `approve`, `deny`, `platforms` if Hermes supports them.
 
-Installer actions after token is available:
-1. Put the token only into Hermes's local secret store (`hermes config env-path` / `.env`) or `hermes gateway setup`; never into git.
-2. Run `hermes gateway setup` and enable Telegram, or directly set the documented Telegram config keys for this Hermes version.
-3. Prefer long polling for a private fresh install. Use webhook only if the machine has a stable public HTTPS endpoint.
-4. Start gateway:
+Installer actions after credentials are available:
+1. Put the Kublai credential only into Hermes's local secret store (`hermes config env-path` / `.env`) or `hermes gateway setup`; never into git. Suggested env name: `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`.
+2. Put the Ogedei credential only into Ogedei/profile-local secret storage or the local secret store; never into git. Suggested env name: `KURULTAI_OGEDEI_TELEGRAM_BOT_TOKEN`.
+3. Configure Telegram for profile `kublai` and profile `ogedei` separately. Use Hermes commands when available, for example `hermes --profile kublai gateway setup` and `hermes --profile ogedei gateway setup`, or directly edit the profile-local config paths after verifying them with Hermes docs/CLI.
+4. Prefer long polling for private fresh installs. Use webhook only if the machine has a stable public HTTPS endpoint and the user explicitly wants it.
+5. Start each gateway separately:
    - POSIX systemd user if available: `hermes gateway install`, then `hermes gateway start`.
    - macOS LaunchAgent if Hermes installer provides it; otherwise foreground test with `hermes gateway run` first.
    - Windows: use a PowerShell-friendly foreground test first; then create a scheduled task or NSSM/WinSW service only after the gateway works.
-5. Send `/start` to the bot from the operator's Telegram account.
-6. Send `/sethome` in the intended DM or group if Hermes supports it.
-7. Send `/platforms` or `/status` and verify the bot responds.
-8. If using a group, ensure privacy/mode/message permissions are correct in BotFather and Telegram group settings.
-9. Save only redacted Telegram status to the receipt.
+6. Send `/start` to each bot from the operator's Telegram account.
+7. Send `/sethome` in the intended DM or group for each bot if Hermes supports it.
+8. Send `/platforms`, `/status`, or `/help` to each bot and verify each responds from the correct identity.
+9. Verify the root/default gateway does not also own the Ogedei bot credential when a profile-local Ogedei gateway is installed. Avoid duplicate intake.
+10. Save only redacted Telegram status to the receipt.
 
 Phase 12 — verification canaries
 Run and record all feasible checks:
@@ -229,6 +237,8 @@ Run and record all feasible checks:
 - QMD update/embed if available.
 - Kanban create/complete/cancel smoke test if Hermes Kanban commands are available.
 - Telegram bot replies to `/status` or `/help` after gateway starts.
+- Kublai gateway replies from the Kublai bot identity.
+- Ogedei gateway replies from the Ogedei bot identity when its credential is supplied.
 - Repo secret scan: verify no API keys/tokens were written into tracked files.
 
 Phase 13 — final receipt
@@ -241,6 +251,7 @@ At the end, produce a concise report with:
 - Profiles created/verified.
 - Cron jobs created/verified.
 - Telegram status: not configured / token needed / configured and responding.
+- Kublai gateway status and Ogedei gateway status separately.
 - Any manual steps remaining.
 - Location of the local receipt file.
 

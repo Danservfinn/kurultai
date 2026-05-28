@@ -16,6 +16,7 @@ Committed files:
 - `profiles.yaml`: Kurultai profile roster and model/provider map.
 - `kurultai.yaml`: coordination contract.
 - `brain.yaml`: Brain root, index, and gateway contract.
+- `gateways.yaml`: Kublai and Ogedei Hermes gateway contract without bot credentials or chat IDs.
 - `cron.manifest.json`: sanitized cron jobs.
 - `skills.manifest.json`: skill inventory without skill bodies.
 - `kanban.schema.json`: native Kanban schema without task data.
@@ -26,6 +27,6 @@ Refresh manifests from a live host with:
 - `python3 scripts/export_runtime_config_manifest.py`
 - `python3 scripts/export_rebuild_manifests.py`
 
-For a fresh machine, paste `docs/operations/fresh-install-agent-prompt.md` into Claude Code or Codex. The prompt tells the local agent to perform the cross-platform install, including Windows-native setup, Hermes/Brain/Kurultai configuration, local LLM selection, Telegram BotFather/gateway setup, verification, and secret-safe receipts.
+For a fresh machine, paste `docs/operations/fresh-install-agent-prompt.md` into Claude Code or Codex. The prompt tells the local agent to perform the cross-platform install, including Windows-native setup, Hermes/Brain/Kurultai configuration, local LLM selection, two Telegram gateways (Kublai primary plus Ogedei operations/intake), verification, and secret-safe receipts. Use `docs/operations/full-installation-checklist.md` as the completion definition.
 
 See `docs/operations/kurultai-rebuild-runbook.md` for the full rebuild procedure.

@@ -1,0 +1,37 @@
+gateways:
+  kublai:
+    purpose: operator-facing chair gateway
+    profile: kublai
+    platforms:
+      telegram:
+        enabled: true
+        bot_secret_env: KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN
+        home_chat: redacted-local-only
+        mode: long-polling-by-default
+    install:
+      service_name: hermes-gateway-kublai
+      command: hermes --profile kublai gateway run
+      notes: "Primary operator interface. Store all bot credentials in the local Hermes secret store or .env, never in git."
+  ogedei:
+    purpose: dedicated operations/intake gateway
+    profile: ogedei
+    platforms:
+      telegram:
+        enabled: true
+        bot_secret_env: KURULTAI_OGEDEI_TELEGRAM_BOT_TOKEN
+        home_chat: redacted-local-only
+        mode: long-polling-by-default
+    install:
+      service_name: hermes-gateway-ogedei
+      command: hermes --profile ogedei gateway run
+      notes: "Second Hermes gateway for Ogedei. Use a separate BotFather bot/credential from Kublai so intake and operations traffic can be isolated."
+policy:
+  separate_bots_required: true
+  secret_boundary: "Bot credentials, chat IDs, webhook URLs, OAuth files, sessions, and logs remain local/private."
+  routing_boundary:
+    kublai: "Chair/operator synthesis and approval surface."
+    ogedei: "Operations/intake surface. It may create or route native Kanban tasks but should not bypass Kublai review gates for durable or risky actions."
+  verification:
+    - "Each gateway must pass a foreground smoke test before service installation."
+    - "Each gateway must respond from its own Telegram bot identity."
+    - "Root/default config must not duplicate the Ogedei Telegram bot when a profile-local Ogedei gateway is installed."
