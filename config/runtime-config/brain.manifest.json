@@ -7,7 +7,7 @@
       "name": "_archive"
     },
     {
-      "markdown_files": 227,
+      "markdown_files": 231,
       "name": "analyses"
     },
     {
@@ -31,7 +31,7 @@
       "name": "config"
     },
     {
-      "markdown_files": 108,
+      "markdown_files": 109,
       "name": "content"
     },
     {
@@ -39,7 +39,7 @@
       "name": "dashboards"
     },
     {
-      "markdown_files": 150,
+      "markdown_files": 151,
       "name": "docs"
     },
     {
@@ -87,7 +87,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 1976,
+      "markdown_files": 1980,
       "name": "operations"
     },
     {
@@ -95,7 +95,7 @@
       "name": "projects"
     },
     {
-      "markdown_files": 26,
+      "markdown_files": 27,
       "name": "proposals"
     },
     {
@@ -107,7 +107,7 @@
       "name": "queue"
     },
     {
-      "markdown_files": 120,
+      "markdown_files": 122,
       "name": "raw"
     },
     {
@@ -127,11 +127,11 @@
       "name": "scripts"
     },
     {
-      "markdown_files": 5,
+      "markdown_files": 6,
       "name": "status"
     },
     {
-      "markdown_files": 142,
+      "markdown_files": 151,
       "name": "synthesis"
     },
     {
