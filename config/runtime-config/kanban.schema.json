@@ -83,6 +83,68 @@
         },
         {
           "default": null,
+          "name": "filename",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "stored_path",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "content_type",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": "0",
+          "name": "size",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "uploaded_by",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "created_at",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        }
+      ],
+      "name": "task_attachments",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "default": null,
+          "name": "id",
+          "not_null": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "task_id",
+          "not_null": true,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
           "name": "author",
           "not_null": true,
           "primary_key": false,
@@ -524,6 +586,20 @@
           "not_null": false,
           "primary_key": false,
           "type": "TEXT"
+        },
+        {
+          "default": "0",
+          "name": "goal_mode",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "goal_max_turns",
+          "not_null": false,
+          "primary_key": false,
+          "type": "INTEGER"
         }
       ],
       "name": "tasks",

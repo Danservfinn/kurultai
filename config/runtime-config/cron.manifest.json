@@ -833,7 +833,7 @@
     },
     {
       "deliver": "local",
-      "enabled": true,
+      "enabled": false,
       "enabled_toolsets": null,
       "job_id": "job-041",
       "name": "brain-sync-canary-silent",
@@ -847,7 +847,7 @@
       },
       "script": "brain_sync_canary.py",
       "skills": [],
-      "state": "scheduled",
+      "state": "paused",
       "workdir": null
     },
     {
@@ -960,7 +960,7 @@
     },
     {
       "deliver": "local",
-      "enabled": true,
+      "enabled": false,
       "enabled_toolsets": [
         "terminal"
       ],
@@ -976,7 +976,7 @@
       },
       "script": "batu_x_bookmark_scout.py",
       "skills": [],
-      "state": "scheduled",
+      "state": "paused",
       "workdir": null
     },
     {
@@ -1430,6 +1430,135 @@
       ],
       "state": "scheduled",
       "workdir": "${KURULTAI_HOME}/kurultai/kurultai-public-canonical"
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "cronjob"
+      ],
+      "job_id": "job-070",
+      "name": "Shepherd Ogedei improvement Kanban graph",
+      "repeat": {
+        "times": 12
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "cronjob"
+      ],
+      "job_id": "job-071",
+      "name": "Shepherd Kanban review-required semantics graph",
+      "repeat": {
+        "times": 12
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "cronjob"
+      ],
+      "job_id": "job-072",
+      "name": "shepherd-elon-brain-native-plan",
+      "repeat": {
+        "times": 12
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal"
+      ],
+      "job_id": "job-073",
+      "name": "shepherd-p0-kurultai-audit-repairs-20260531",
+      "repeat": {
+        "times": 8
+      },
+      "schedule": {
+        "display": "every 15m",
+        "kind": "interval",
+        "minutes": 15
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-074",
+      "name": "cron-output-retention",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "cron_output_retention_cron.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "file"
+      ],
+      "job_id": "job-075",
+      "name": "shepherd-elon-kurultai-followups",
+      "repeat": {
+        "times": 12
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
     }
   ],
   "schema": "kurultai.cron-manifest.v1"

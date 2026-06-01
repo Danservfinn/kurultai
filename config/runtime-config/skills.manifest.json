@@ -323,12 +323,17 @@
       "path": "kurultai/fantasy-sumo-spoiler-fence"
     },
     {
+      "description": "Use when the operator asks Kublai/Hermes to deeply review, audit, and improve Kurultai or another system; turns a broad improvement request into evidence-backed diagnosis, prioritized recommendations, durable report artifacts, and safe next actions.",
+      "name": "improve",
+      "path": "kurultai/improve"
+    },
+    {
       "description": "Monitor Kurultai agent profile health: session activity, error rates, model config, cron status. Cross-profile visibility into all 6 agents.",
       "name": "kurultai-agent-health",
       "path": "kurultai/kurultai-agent-health"
     },
     {
-      "description": "Operate, diagnose, and improve Kurultai/OpenClaw: queues, runtime config housing (see `references/runtime-config-repo-housing.md`), routing, proposals, caretaker/improver loops, auth/rate limits, dashboards, and model policy.",
+      "description": "Operate, diagnose, and improve Kurultai/OpenClaw: queues, runtime config housing (see `references/runtime-config-repo-housing.md`), routing, proposals, caretaker/improver loops, auth/rate limits, dashboards, model policy, and separate brain-wired persona profile/gateways (see `references/persona-hermes-profile-gateways.md`).",
       "name": "kurultai-operations",
       "path": "kurultai/kurultai-operations"
     },
@@ -341,6 +346,11 @@
       "description": "Configure, upgrade, and debug OpenClaw/Hermes integration surfaces including Telegram channels, Parse screening cleanup, CLI/gateway upgrades, and imported helper workflows.",
       "name": "openclaw-operations",
       "path": "kurultai/openclaw-operations"
+    },
+    {
+      "description": "Create high-fidelity Hermes persona agents with dedicated Telegram gateways, OpenAI Codex OAuth routing, Brain wiring, profile-local voice skills, Turing-style identity/voice regressions, receipts, and rollback paths \u2014 the Elon-agent pattern generalized.",
+      "name": "persona-agent-gateway-creation",
+      "path": "kurultai/persona-agent-gateway-creation"
     },
     {
       "description": "Default workflow for turning the operator-requested article/media/social research into reusable outputs: Brain artifacts, content angles, doctrine, proposals, skills, Kanban tasks, or explicit no-op decisions.",
@@ -456,6 +466,11 @@
       "description": "Read, search, create, and edit notes in the Obsidian vault.",
       "name": "obsidian",
       "path": "note-taking/obsidian"
+    },
+    {
+      "description": "Build an Obsidian + Claude learning vault that turns study material into concept notes, non-obvious connections, active recall, spaced review, and synthesis documents.",
+      "name": "obsidian-claude-learning-vault",
+      "path": "note-taking/obsidian-claude-learning-vault"
     },
     {
       "description": "Create and maintain Obsidian vault artifacts: CLI operations, Markdown conventions, Bases views, JSON Canvas maps, and clean imported documents.",
