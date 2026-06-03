@@ -689,7 +689,7 @@
         "kind": "interval",
         "minutes": 360
       },
-      "script": "agent_health_report.py",
+      "script": "agent_health_report.sh",
       "skills": [],
       "state": "scheduled",
       "workdir": null
@@ -1103,7 +1103,7 @@
     },
     {
       "deliver": "origin",
-      "enabled": true,
+      "enabled": false,
       "enabled_toolsets": null,
       "job_id": "job-054",
       "name": "kanban-performance-metrics",
@@ -1117,7 +1117,7 @@
       },
       "script": "kanban_performance_metrics_cron.py",
       "skills": [],
-      "state": "scheduled",
+      "state": "paused",
       "workdir": null
     },
     {
@@ -1547,6 +1547,51 @@
       ],
       "job_id": "job-075",
       "name": "shepherd-elon-kurultai-followups",
+      "repeat": {
+        "times": 12
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "cronjob"
+      ],
+      "job_id": "job-076",
+      "name": "Shepherd Parse first-mile repair graph",
+      "repeat": {
+        "times": 12
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": null,
+      "skills": [],
+      "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": false,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "cronjob"
+      ],
+      "job_id": "job-077",
+      "name": "shepherd-kurultai-amended-remediation-20260601",
       "repeat": {
         "times": 12
       },

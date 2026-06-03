@@ -7,11 +7,11 @@
       "name": "_archive"
     },
     {
-      "markdown_files": 3,
+      "markdown_files": 5,
       "name": "agents"
     },
     {
-      "markdown_files": 243,
+      "markdown_files": 247,
       "name": "analyses"
     },
     {
@@ -35,7 +35,7 @@
       "name": "config"
     },
     {
-      "markdown_files": 111,
+      "markdown_files": 112,
       "name": "content"
     },
     {
@@ -43,7 +43,7 @@
       "name": "dashboards"
     },
     {
-      "markdown_files": 163,
+      "markdown_files": 166,
       "name": "docs"
     },
     {
@@ -63,7 +63,7 @@
       "name": "generated"
     },
     {
-      "markdown_files": 13,
+      "markdown_files": 17,
       "name": "graphify-out"
     },
     {
@@ -91,7 +91,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 2050,
+      "markdown_files": 2265,
       "name": "operations"
     },
     {
@@ -99,7 +99,7 @@
       "name": "projects"
     },
     {
-      "markdown_files": 32,
+      "markdown_files": 35,
       "name": "proposals"
     },
     {
@@ -111,7 +111,7 @@
       "name": "queue"
     },
     {
-      "markdown_files": 128,
+      "markdown_files": 154,
       "name": "raw"
     },
     {
@@ -123,11 +123,11 @@
       "name": "references"
     },
     {
-      "markdown_files": 7,
+      "markdown_files": 18,
       "name": "research"
     },
     {
-      "markdown_files": 4,
+      "markdown_files": 5,
       "name": "runbooks"
     },
     {
@@ -139,12 +139,16 @@
       "name": "status"
     },
     {
-      "markdown_files": 186,
+      "markdown_files": 216,
       "name": "synthesis"
     },
     {
       "markdown_files": 2,
       "name": "tests"
+    },
+    {
+      "markdown_files": 5,
+      "name": "tools"
     },
     {
       "markdown_files": 47,
