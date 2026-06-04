@@ -833,7 +833,7 @@
     },
     {
       "deliver": "local",
-      "enabled": false,
+      "enabled": true,
       "enabled_toolsets": null,
       "job_id": "job-041",
       "name": "brain-sync-canary-silent",
@@ -847,7 +847,7 @@
       },
       "script": "brain_sync_canary.py",
       "skills": [],
-      "state": "paused",
+      "state": "scheduled",
       "workdir": null
     },
     {
@@ -960,7 +960,7 @@
     },
     {
       "deliver": "local",
-      "enabled": false,
+      "enabled": true,
       "enabled_toolsets": [
         "terminal"
       ],
@@ -976,7 +976,7 @@
       },
       "script": "batu_x_bookmark_scout.py",
       "skills": [],
-      "state": "paused",
+      "state": "scheduled",
       "workdir": null
     },
     {
@@ -1603,6 +1603,25 @@
       "script": null,
       "skills": [],
       "state": "paused",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-078",
+      "name": "approve-all-followup-monitor",
+      "repeat": {
+        "times": 24
+      },
+      "schedule": {
+        "display": "every 10m",
+        "kind": "interval",
+        "minutes": 10
+      },
+      "script": "approve_all_followup_monitor.py",
+      "skills": [],
+      "state": "scheduled",
       "workdir": null
     }
   ],
