@@ -1604,25 +1604,6 @@
       "skills": [],
       "state": "paused",
       "workdir": null
-    },
-    {
-      "deliver": "origin",
-      "enabled": true,
-      "enabled_toolsets": null,
-      "job_id": "job-078",
-      "name": "approve-all-followup-monitor",
-      "repeat": {
-        "times": 24
-      },
-      "schedule": {
-        "display": "every 10m",
-        "kind": "interval",
-        "minutes": 10
-      },
-      "script": "approve_all_followup_monitor.py",
-      "skills": [],
-      "state": "scheduled",
-      "workdir": null
     }
   ],
   "schema": "kurultai.cron-manifest.v1"
