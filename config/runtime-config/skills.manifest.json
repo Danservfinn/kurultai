@@ -498,6 +498,11 @@
       "path": "productivity/copy-pasteable-code-blocks"
     },
     {
+      "description": "Prepare expense reports from banking/finance systems with strict credential hygiene, hard-private data handling, exports, receipts, and verification. Use for Mercury, bank CSVs/APIs, Expensify-ready reports, reimbursements, trip expense reconstruction, and finance data normalization.",
+      "name": "finance-expense-workflows",
+      "path": "productivity/finance-expense-workflows"
+    },
+    {
       "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
       "name": "google-workspace",
       "path": "productivity/google-workspace"
