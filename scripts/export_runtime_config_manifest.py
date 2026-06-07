@@ -44,8 +44,34 @@ def sanitize_repeat(value):
     return sanitized or None
 
 
+PRIVATE_CRON_TERMS = (
+    "birthday",
+    "phone",
+    "call",
+    "appointment",
+    "personal",
+)
+
+
+def is_public_safe_cron_job(job):
+    """Exclude ad-hoc personal reminders from the public runtime manifest.
+
+    The cron manifest is meant to document Kurultai operating-system surfaces,
+    not publish private human logistics. Keep the filter conservative and based
+    on generic reminder/logistics terms rather than individual names.
+    """
+    haystack = " ".join(
+        str(job.get(key) or "")
+        for key in ("name", "script", "description")
+    ).lower()
+    return not any(term in haystack for term in PRIVATE_CRON_TERMS)
+
+
 manifest = []
-for index, job in enumerate(load_jobs(), start=1):
+for job in load_jobs():
+    if not is_public_safe_cron_job(job):
+        continue
+    index = len(manifest) + 1
     manifest.append({
         "job_id": f"job-{index:03d}",
         "name": sanitize_string(job.get("name")),
