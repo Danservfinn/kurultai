@@ -208,12 +208,12 @@
       "path": "devops/kanban-orchestrator"
     },
     {
-      "description": "Use when the operator asks to send an implementation plan, recommendation bundle, or multi-task proposal to Hermes Kanban triage and shepherd it through. Convert the plan into native triage rows, preserve safety boundaries, verify task IDs, dispatch safe work, repair routing/decomposition mistakes, monitor progress, and close fan-in graphs with receipts.",
+      "description": "Use when the operator asks to send an implementation plan, recommendation bundle, or multi-task proposal to Hermes Kanban triage and shepherd it through.",
       "name": "kanban-plan-shepherding",
       "path": "devops/kanban-plan-shepherding"
     },
     {
-      "description": "Use when deciding whether work should become a Hermes Kanban task, choosing the right Kurultai assignee, dispatching it, monitoring it to completion, and actively managing blockers or follow-up work. For live task health checks and dead-PID crash loops, see references/running-task-crash-loop-triage.md. For orphan run-row repair, notification subscriptions, and recurring health probes, see references/kanban-health-monitoring-and-notifications.md. For gateway-origin auto-subscribe notification repair, see references/gateway-origin-notifications.md.",
+      "description": "Use when deciding whether work should become a Hermes Kanban task, choosing the right Kurultai assignee, dispatching it, monitoring it to completion, and actively managing blockers or follow-up work.",
       "name": "kanban-task-lifecycle",
       "path": "devops/kanban-task-lifecycle"
     },
@@ -293,7 +293,7 @@
       "path": "kurultai/brain-report-ingest-propose"
     },
     {
-      "description": "Operate and maintain the operator's brain wiki: context, search, save, ingest, sync, research, fold/archive, graph/API maintenance, and skill parity.",
+      "description": "Router for the operator's Brain wiki operations: context/search, durable writes, ingest, QMD/indexing, privacy boundaries, research capture, curation, and Brain-service maintenance.",
       "name": "brain-wiki-operations",
       "path": "kurultai/brain-wiki-operations"
     },
@@ -308,12 +308,12 @@
       "path": "kurultai/buildroom-operations"
     },
     {
-      "description": "Operate the operator's Content OS end-to-end: inbox processing, connection mining, brief generation, drafting, return path, and performance review.",
+      "description": "Route the operator's Content OS work: inbox processing, connection mining, briefs, drafting, publishing gates, return path, and performance review.",
       "name": "content-os-workflows",
       "path": "kurultai/content-os-workflows"
     },
     {
-      "description": "Operate, extend, and deploy the fantasy sumo league site",
+      "description": "Operate, extend, debug, and deploy the operator's fantasy sumo league site without spoilers",
       "name": "fantasy-sumo-operations",
       "path": "kurultai/fantasy-sumo-operations"
     },
@@ -323,7 +323,7 @@
       "path": "kurultai/fantasy-sumo-spoiler-fence"
     },
     {
-      "description": "Use when the operator asks Kublai/Hermes to deeply review, audit, and improve Kurultai or another system; turns a broad improvement request into evidence-backed diagnosis, prioritized recommendations, durable report artifacts, and safe next actions.",
+      "description": "Use for explicit `/improve [target]` commands or explicit deep system-improvement audits of Kurultai/Hermes/Brain/agent operating loops; routes a broad request into live evidence, durable report, prioritized safe actions, and proof metrics. Do not load for casual uses of the word \"improve\" or narrow one-file/PR edits unless framed as a system audit.",
       "name": "improve",
       "path": "kurultai/improve"
     },
@@ -333,12 +333,12 @@
       "path": "kurultai/kurultai-agent-health"
     },
     {
-      "description": "Operate, diagnose, and improve Kurultai/OpenClaw: queues, runtime config housing (see `references/runtime-config-repo-housing.md`), routing, proposals, caretaker/improver loops, auth/rate limits, dashboards, model policy, and separate brain-wired persona profile/gateways (see `references/persona-hermes-profile-gateways.md`).",
+      "description": "Router for current Kurultai/Hermes operations: diagnose live queues, Brain, cron, gateways, profiles, AGI harness, proposals, public rebuilds, and operational substrate while keeping decommissioned OpenClaw/Telegram procedures historical.",
       "name": "kurultai-operations",
       "path": "kurultai/kurultai-operations"
     },
     {
-      "description": "Run a post-task retro/learn pass that compiles meaningful work into memory, skills, Brain doctrine, Kanban follow-up, receipts, regressions, canaries, or explicit no-op rationale.",
+      "description": "Route meaningful Kurultai experience into memory, class-level skills, Brain doctrine, Kanban follow-ups, receipts/regressions/canaries, or explicit no-op rationale without creating dated skill bloat.",
       "name": "kurultai-retro-learn",
       "path": "kurultai/kurultai-retro-learn"
     },
@@ -353,7 +353,7 @@
       "path": "kurultai/persona-agent-gateway-creation"
     },
     {
-      "description": "Default workflow for turning the operator-requested article/media/social research into reusable outputs: Brain artifacts, content angles, doctrine, proposals, skills, Kanban tasks, or explicit no-op decisions.",
+      "description": "Use when the operator asks for reusable or durable research-return workflows: route substantial article/media/social/source research through Batu Kanban by default, verify/synthesize with Kublai, and turn findings into Brain artifacts, proposal dispositions, skills, tasks, reports, or explicit no-ops. Skip for casual one-off factual answers unless they become reusable research workflow work.",
       "name": "research-return-path",
       "path": "kurultai/research-return-path"
     },
