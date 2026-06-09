@@ -343,6 +343,11 @@
       "path": "kurultai/kurultai-retro-learn"
     },
     {
+      "description": "Convert broad money-dashboard security/audit bounty signals into concrete public/local research passes with ledger receipts.",
+      "name": "money-security-bounty-triage",
+      "path": "kurultai/money-security-bounty-triage"
+    },
+    {
       "description": "Configure, upgrade, and debug OpenClaw/Hermes integration surfaces including Telegram channels, Parse screening cleanup, CLI/gateway upgrades, and imported helper workflows.",
       "name": "openclaw-operations",
       "path": "kurultai/openclaw-operations"

@@ -1604,6 +1604,75 @@
       "skills": [],
       "state": "paused",
       "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-078",
+      "name": "awm-money-watchdog",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "awm_money_watchdog.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-079",
+      "name": "paid-task-watchdog",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "paid_task_watchdog.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": [
+        "terminal",
+        "file",
+        "web",
+        "skills"
+      ],
+      "job_id": "job-080",
+      "name": "money-autonomy-operator",
+      "repeat": {
+        "times": 999999
+      },
+      "schedule": {
+        "display": "every 120m",
+        "kind": "interval",
+        "minutes": 120
+      },
+      "script": "money_autonomy_context.py",
+      "skills": [
+        "github-pr-workflow",
+        "github-issues",
+        "parse-admin-operations",
+        "parse-business-state-report",
+        "content-os-workflows",
+        "kurultai-operations"
+      ],
+      "state": "scheduled",
+      "workdir": null
     }
   ],
   "schema": "kurultai.cron-manifest.v1"

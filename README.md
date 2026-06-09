@@ -146,6 +146,15 @@ Public rebuild artifacts:
 - `brain/templates/` — research and proposal page shapes.
 - `docs/assets/workflows/04-auto-research-signal-intake.png` — workflow diagram.
 
+### Opportunity and revenue scouts
+
+Kurultai can also run read-only opportunity scouts for public paid-task, grant, bounty, audit, and marketplace surfaces. These jobs convert broad public signals into ranked candidates, receipts, and follow-up tasks while preserving hard gates around accounts, KYC, wallets, payments, customer contact, security testing, submissions, publishing, and material deploys.
+
+Public rebuild artifacts:
+
+- `config/runtime-config/cron.manifest.json` — sanitized scout and operator schedules.
+- `config/runtime-config/skills.manifest.json` — public-safe triage skill inventory.
+
 ### Native Hermes Kanban
 
 ![Native Hermes Kanban workflow](docs/assets/workflows/05-native-hermes-kanban.png)
