@@ -148,12 +148,12 @@ Public rebuild artifacts:
 
 ### Opportunity and revenue scouts
 
-Kurultai can also run read-only opportunity scouts for public paid-task, grant, bounty, audit, and marketplace surfaces. These jobs convert broad public signals into ranked candidates, receipts, and follow-up tasks while preserving hard gates around accounts, KYC, wallets, payments, customer contact, security testing, submissions, publishing, and material deploys.
+Kurultai can also run read-only opportunity scouts for public paid-task, grant, bounty, audit, marketplace, and resale-arbitrage surfaces. These jobs convert broad public signals into ranked candidates, receipts, follow-up tasks, and low-risk public PR monitoring while preserving hard gates around accounts, KYC, wallets, payments, customer contact, security testing, submissions, publishing, and material deploys.
 
 Public rebuild artifacts:
 
-- `config/runtime-config/cron.manifest.json` — sanitized scout and operator schedules.
-- `config/runtime-config/skills.manifest.json` — public-safe triage skill inventory.
+- `config/runtime-config/cron.manifest.json` — sanitized scout, first-dollar operator, and PR-monitor schedules.
+- `config/runtime-config/skills.manifest.json` — public-safe triage and opportunity-research skill inventory.
 
 ### Native Hermes Kanban
 

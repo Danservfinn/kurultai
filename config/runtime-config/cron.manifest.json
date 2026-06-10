@@ -1615,9 +1615,9 @@
         "times": null
       },
       "schedule": {
-        "display": "every 30m",
+        "display": "every 5m",
         "kind": "interval",
-        "minutes": 30
+        "minutes": 5
       },
       "script": "awm_money_watchdog.py",
       "skills": [],
@@ -1634,9 +1634,9 @@
         "times": null
       },
       "schedule": {
-        "display": "every 30m",
+        "display": "every 5m",
         "kind": "interval",
-        "minutes": 30
+        "minutes": 5
       },
       "script": "paid_task_watchdog.py",
       "skills": [],
@@ -1653,24 +1653,40 @@
         "skills"
       ],
       "job_id": "job-080",
-      "name": "money-autonomy-operator",
+      "name": "money-autonomy-operator-first-dollar-continuous",
       "repeat": {
         "times": 999999
       },
       "schedule": {
-        "display": "every 120m",
+        "display": "every 5m",
         "kind": "interval",
-        "minutes": 120
+        "minutes": 5
       },
       "script": "money_autonomy_context.py",
       "skills": [
         "github-pr-workflow",
         "github-issues",
-        "parse-admin-operations",
-        "parse-business-state-report",
-        "content-os-workflows",
         "kurultai-operations"
       ],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-081",
+      "name": "money-pr-monitor",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "every 5m",
+        "kind": "interval",
+        "minutes": 5
+      },
+      "script": "money_pr_monitor.py",
+      "skills": [],
       "state": "scheduled",
       "workdir": null
     }

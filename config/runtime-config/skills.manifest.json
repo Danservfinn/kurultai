@@ -83,6 +83,11 @@
       "path": "business/parse-subscription-attribution"
     },
     {
+      "description": "Research and advise on buying limited, event, local, or collector merchandise for resale; prioritize official, scarce, low-friction inventory with live market checks, fee math, and listing tactics.",
+      "name": "resale-arbitrage-research",
+      "path": "business/resale-arbitrage-research"
+    },
+    {
       "description": "Stripe REST API workflows for customers, payments, subscriptions, refunds, and churn research with strict side-effect gates.",
       "name": "stripe",
       "path": "business/stripe"

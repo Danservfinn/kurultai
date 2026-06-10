@@ -11,7 +11,7 @@
       "name": "agents"
     },
     {
-      "markdown_files": 272,
+      "markdown_files": 275,
       "name": "analyses"
     },
     {
@@ -35,7 +35,7 @@
       "name": "config"
     },
     {
-      "markdown_files": 118,
+      "markdown_files": 119,
       "name": "content"
     },
     {
@@ -43,7 +43,7 @@
       "name": "dashboards"
     },
     {
-      "markdown_files": 184,
+      "markdown_files": 187,
       "name": "docs"
     },
     {
@@ -91,7 +91,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 2375,
+      "markdown_files": 2393,
       "name": "operations"
     },
     {
@@ -139,7 +139,7 @@
       "name": "status"
     },
     {
-      "markdown_files": 346,
+      "markdown_files": 362,
       "name": "synthesis"
     },
     {
