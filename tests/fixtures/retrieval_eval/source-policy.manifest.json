@@ -1,0 +1,9 @@
+{
+  "case_count": 2,
+  "created_at": "2026-05-22T23:30:00Z",
+  "created_by": "kublai",
+  "fixture_file": "tests/fixtures/retrieval_eval/source-policy.ndjson",
+  "privacy_scope": "public",
+  "purpose": "source-policy tier replay fixture with scrubbed source_policy metadata",
+  "schema_version": 1
+}

@@ -14,6 +14,9 @@ Implemented from Brain plan `${BRAIN_ROOT}/docs/plans/2026-05-10-native-brain-re
 
 ```bash
 PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval status
+PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval source-policy \
+  --brain-root "$BRAIN_ROOT" \
+  --report-json /tmp/brain-source-policy-report.json
 PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval validate \
   --fixtures tests/fixtures/retrieval_eval/public-smoke.ndjson
 PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval replay \
@@ -21,7 +24,8 @@ PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval replay \
   --brain-root "$BRAIN_ROOT" \
   --privacy-scope public \
   --k 10 \
-  --report-json /tmp/retrieval-eval-report.json
+  --report-json /tmp/retrieval-eval-report.json \
+  --explain-json /tmp/retrieval-eval-explain.json
 ```
 
 ## Current public smoke fixture
@@ -33,14 +37,19 @@ PYTHONPATH=/path/to/kurultai python -m kublai.retrieval_eval replay \
 - Ogedei bridge `capture_all` silent acknowledgement safety recall.
 - Parse Agents x402 + Stripe dual payment rail recall.
 
-Current local replay receipt on 2026-05-20:
+`tests/fixtures/retrieval_eval/source-policy.ndjson` covers two scrubbed public replay cases with `source_policy` tier metadata for source-aware retrieval regressions.
+
+Current local replay receipt on 2026-05-22 after source-policy enforcement:
 
 - case count: 4
-- mean Jaccard@k: 1.0
+- mean Jaccard@k: 0.5683275058275058
 - top-1 stability: 1.0
+- source policy summary: `{"tier_1": 40}`
 - failures: none
 
 ## Verification
+
+The source policy implementation lives in `kublai/retrieval_eval.py` and the source-map/page convention is documented in `docs/operations/brain-source-policy.md`.
 
 ```bash
 python -m pytest tests -q

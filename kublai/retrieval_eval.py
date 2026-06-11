@@ -43,6 +43,138 @@ class ReplayResult:
     latency_ms: float
 
 
+@dataclass(frozen=True)
+class BrainSourceClassification:
+    rel_path: str
+    tier: int
+    source_type: str
+    default_behavior: str
+    default_include: bool
+    rank_bias: float
+    reason: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "tier": self.tier,
+            "source_type": self.source_type,
+            "default_behavior": self.default_behavior,
+        }
+
+
+CANONICAL_PREFIXES = (
+    "entities/",
+    "projects/",
+    "infrastructure/",
+    "concepts/",
+    "runbooks/",
+    "status/",
+    "analyses/",
+    "docs/research/",
+    "docs/plans/",
+)
+EXPLICIT_PREFIXES = (
+    "operations/reports/",
+    "operations/tasks/",
+    "operations/verification/",
+    "operations/telemetry/",
+    "operations/runs/",
+    "content/",
+    "receipts/",
+    "synthesis/",
+    "proposals/",
+)
+FORENSIC_PREFIXES = ("raw/", "captures/", "graphify-out/")
+EXCLUDED_PREFIXES = (
+    "operations/backups/",
+    "_archive/",
+    "archive/",
+    "node_modules/",
+    ".git/",
+    ".qmd/",
+    "__pycache__/",
+)
+CANONICAL_FILES = {"index.md", "home.md", "hot.md", "log.md"}
+
+
+def _normalize_rel_path(rel_path: str | Path) -> str:
+    rel = Path(str(rel_path)).as_posix().lstrip("/")
+    if Path(rel).is_absolute() or ".." in Path(rel).parts:
+        raise ValueError(f"unsafe Brain relative path: {rel_path}")
+    return rel
+
+
+def classify_brain_source(rel_path: str | Path) -> BrainSourceClassification:
+    """Classify a Brain markdown path according to the native retrieval policy.
+
+    The classifier is intentionally deterministic and local: it makes the
+    documented [[brain-retrieval-policy]] executable for dev/eval tools without
+    changing live brain-service or QMD runtime behavior.
+    """
+
+    rel = _normalize_rel_path(rel_path)
+    if rel.startswith("hard-private/") or "/hard-private/" in rel:
+        return BrainSourceClassification(rel, 4, "hard_private", "hard_exclude", False, -1000.0, "hard-private requires explicit private retrieval")
+    if rel.startswith(EXCLUDED_PREFIXES):
+        return BrainSourceClassification(rel, 3, "excluded", "forensic_only", False, -1000.0, "backup/archive/generated dependency noise")
+    if rel in CANONICAL_FILES or rel.startswith(CANONICAL_PREFIXES):
+        return BrainSourceClassification(rel, 1, "canonical", "default", True, 100.0, "canonical Brain retrieval surface")
+    if rel.startswith(EXPLICIT_PREFIXES):
+        return BrainSourceClassification(rel, 2, "explicit", "fallback", True, 10.0, "explicit/down-ranked operational surface")
+    if rel.startswith(FORENSIC_PREFIXES):
+        return BrainSourceClassification(rel, 3, "forensic", "forensic_only", False, -50.0, "raw/generated forensic evidence surface")
+    return BrainSourceClassification(rel, 2, "explicit", "fallback", True, 0.0, "uncategorized markdown; include cautiously")
+
+
+def _source_policy_mode(filters: Mapping[str, Any] | None) -> str:
+    if not filters:
+        return "default"
+    mode = filters.get("source_policy") or filters.get("retrieval_policy") or "default"
+    return str(mode)
+
+
+def _source_allowed(classification: BrainSourceClassification, *, privacy_scope: str, mode: str) -> bool:
+    if classification.source_type == "hard_private":
+        return privacy_scope == "hard-private"
+    if privacy_scope == "hard-private":
+        return False
+    if classification.source_type == "excluded":
+        return mode in {"include-excluded", "forensic", "forensic-all"}
+    if classification.source_type == "forensic":
+        return mode in {"include-forensic", "include-excluded", "forensic", "forensic-all"}
+    return classification.default_include
+
+
+def source_policy_report(root: str | Path) -> dict[str, Any]:
+    root_path = Path(root)
+    counts: dict[str, int] = {}
+    examples: dict[str, list[str]] = {}
+    total = 0
+    default_included = 0
+    for path in root_path.rglob("*.md"):
+        if any(part in {".git", "node_modules", ".qmd", "__pycache__"} for part in path.parts):
+            continue
+        rel = path.relative_to(root_path).as_posix()
+        classification = classify_brain_source(rel)
+        key = f"tier_{classification.tier}_{classification.source_type}"
+        total += 1
+        counts[key] = counts.get(key, 0) + 1
+        examples.setdefault(key, [])
+        if len(examples[key]) < 5:
+            examples[key].append(rel)
+        if _source_allowed(classification, privacy_scope="public", mode="default"):
+            default_included += 1
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": _now_iso(),
+        "root": str(root_path),
+        "total_markdown": total,
+        "tier_counts": dict(sorted(counts.items())),
+        "default_included": default_included,
+        "default_excluded": total - default_included,
+        "examples": {key: examples[key] for key in sorted(examples)},
+    }
+
+
 def sha256_text(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
@@ -105,7 +237,15 @@ def scrub_result(result: Mapping[str, Any], fallback_rank: int) -> dict[str, Any
     rel_path = _result_rel_path(result)
     body_hash = result.get("body_hash") if isinstance(result.get("body_hash"), str) else sha256_text(_result_body(result))
     score = result.get("score") if isinstance(result.get("score"), (int, float)) else None
-    return {"rank": rank, "rel_path": rel_path, "body_hash": body_hash, "score_bucket": _score_bucket(rank, score)}
+    out = {"rank": rank, "rel_path": rel_path, "body_hash": body_hash, "score_bucket": _score_bucket(rank, score)}
+    source_policy = result.get("source_policy")
+    if isinstance(source_policy, Mapping):
+        out["source_policy"] = {
+            "tier": int(source_policy.get("tier", classify_brain_source(rel_path).tier)),
+            "source_type": str(source_policy.get("source_type", classify_brain_source(rel_path).source_type)),
+            "default_behavior": str(source_policy.get("default_behavior", classify_brain_source(rel_path).default_behavior)),
+        }
+    return out
 
 
 def capture_case(
@@ -226,11 +366,17 @@ def validate_case(case: Mapping[str, Any]) -> None:
     for result in results:
         if not isinstance(result, Mapping):
             raise ValueError("baseline.results entries must be objects")
-        allowed = {"rank", "rel_path", "body_hash", "score_bucket"}
+        allowed = {"rank", "rel_path", "body_hash", "score_bucket", "source_policy"}
         extras = set(result) - allowed
         if extras:
             raise ValueError(f"baseline result contains forbidden fields: {sorted(extras)}")
         _validate_rel_paths([result.get("rel_path")], "baseline.results.rel_path", privacy_scope)
+        source_policy = result.get("source_policy")
+        if source_policy is not None:
+            if not isinstance(source_policy, Mapping):
+                raise ValueError("baseline result source_policy must be an object")
+            if set(source_policy) - {"tier", "source_type", "default_behavior"}:
+                raise ValueError("baseline result source_policy contains forbidden fields")
         bh = result.get("body_hash")
         if not isinstance(bh, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", bh):
             raise ValueError("baseline result body_hash must be sha256:<64 hex>")
@@ -309,7 +455,7 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], replay_by_case_id: Mappin
         replay_paths = [r["rel_path"] for r in replay_scrubbed]
         kk = k or max(len(baseline_paths), len(replay_paths), 1)
         must = list(case.get("expected", {}).get("must_include_rel_paths", []))
-        missing = [p for p in must if p not in replay_paths[:kk]]
+        missing = [path for path in must if path not in replay_paths[:kk]]
         row = {
             "case_id": cid,
             "privacy_scope": case["privacy_scope"],
@@ -328,9 +474,15 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], replay_by_case_id: Mappin
     stable = [r["top_1_stable"] for r in rows]
     scopes: dict[str, int] = {}
     sources: dict[str, int] = {}
+    policy_summary: dict[str, int] = {}
     for row in rows:
         scopes[row["privacy_scope"]] = scopes.get(row["privacy_scope"], 0) + 1
         sources[row["source"]] = sources.get(row["source"], 0) + 1
+        for result in row["replay_results"]:
+            policy = result.get("source_policy") if isinstance(result, Mapping) else None
+            if isinstance(policy, Mapping):
+                key = f"tier_{policy.get('tier')}"
+                policy_summary[key] = policy_summary.get(key, 0) + 1
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": _now_iso(),
@@ -339,11 +491,26 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], replay_by_case_id: Mappin
         "fixture_count_by_source": sources,
         "mean_jaccard_at_k": statistics.fmean(jaccards) if jaccards else None,
         "median_jaccard_at_k": statistics.median(jaccards) if jaccards else None,
-        "top_1_stability_rate": (sum(1 for x in stable if x) / len(stable)) if stable else None,
+        "top_1_stability_rate": (sum(1 for x in stable) / len(stable)) if stable else None,
         "latency_delta_ms_p50": _percentile(latencies, 0.50),
         "latency_delta_ms_p95": _percentile(latencies, 0.95),
         "failures": failures,
+        "source_policy_summary": dict(sorted(policy_summary.items())),
         "cases": rows,
+    }
+
+
+def build_explain_receipt(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a compact, scrubbed source-policy explain receipt for eval reports."""
+    summary = report.get("source_policy_summary") if isinstance(report, Mapping) else {}
+    failures = report.get("failures") if isinstance(report, Mapping) else []
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": _now_iso(),
+        "case_count": int(report.get("case_count", 0)) if isinstance(report, Mapping) else 0,
+        "policy_enforced": bool(summary is not None),
+        "source_policy_summary": dict(summary) if isinstance(summary, Mapping) else {},
+        "failure_count": len(failures) if isinstance(failures, Sequence) else 0,
     }
 
 
@@ -357,18 +524,25 @@ class LocalMarkdownSearchIndex:
     def __init__(self, root: str | Path):
         self.root = Path(root)
 
-    def search(self, query: str, *, limit: int = 10, privacy_scope: str = "public", filters: Mapping[str, Any] | None = None) -> ReplayResult:
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        privacy_scope: str = "public",
+        filters: Mapping[str, Any] | None = None,
+        retrieval_mode: str | None = None,
+    ) -> ReplayResult:
         started = time.perf_counter()
         tokens = [t.lower() for t in re.findall(r"[A-Za-z0-9][A-Za-z0-9_.-]+", query) if len(t) > 1]
         rows: list[tuple[float, str, str]] = []
+        source_policy = retrieval_mode or _source_policy_mode(filters)
         for path in self.root.rglob("*.md"):
             if any(part in {".git", "node_modules", ".qmd", "__pycache__"} for part in path.parts):
                 continue
             rel = path.relative_to(self.root).as_posix()
-            is_private = rel.startswith("hard-private/") or "/hard-private/" in rel
-            if privacy_scope == "public" and is_private:
-                continue
-            if privacy_scope == "hard-private" and not is_private:
+            classification = classify_brain_source(rel)
+            if not _source_allowed(classification, privacy_scope=privacy_scope, mode=source_policy):
                 continue
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
@@ -377,18 +551,14 @@ class LocalMarkdownSearchIndex:
             hay = (rel + "\n" + text).lower()
             score = sum(hay.count(tok) for tok in tokens) if tokens else 0
             if score:
-                # Retrieval-policy shape for eval replay: canonical pages are the
-                # expected recall surface; logs/backups/raw files are evidence but
-                # should not swamp fixture stability with high-churn text volume.
-                if rel == "log.md" or rel.startswith("operations/backups/"):
-                    score *= 0.05
-                elif rel.startswith(("entities/", "projects/", "infrastructure/", "concepts/", "analyses/", "docs/plans/")):
-                    score += 50
-                rows.append((float(score), rel, text))
+                score = float(score) + classification.rank_bias
+                if classification.tier == 2:
+                    score *= 0.5
+                rows.append((float(score), rel, text, classification))
         rows.sort(key=lambda item: (-item[0], item[1]))
         results = [
-            {"rank": i + 1, "rel_path": rel, "body_text": text, "score": score}
-            for i, (score, rel, text) in enumerate(rows[:limit])
+            {"rank": i + 1, "rel_path": rel, "body_text": text, "score": score, "source_policy": classification.as_dict()}
+            for i, (score, rel, text, classification) in enumerate(rows[:limit])
         ]
         return ReplayResult(results=results, latency_ms=(time.perf_counter() - started) * 1000)
 
@@ -425,6 +595,15 @@ def _cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_source_policy(args: argparse.Namespace) -> int:
+    report = source_policy_report(args.brain_root)
+    if args.report_json:
+        Path(args.report_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.report_json).write_text(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    return 0
+
+
 def _cmd_validate(args: argparse.Namespace) -> int:
     cases = read_ndjson(args.fixtures)
     print(json.dumps({"ok": True, "case_count": len(cases), "fixtures": args.fixtures}, indent=2))
@@ -441,6 +620,10 @@ def _cmd_replay(args: argparse.Namespace) -> int:
     if args.report_json:
         Path(args.report_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report_json).write_text(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    if args.explain_json:
+        receipt = build_explain_receipt(report)
+        Path(args.explain_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.explain_json).write_text(json.dumps(receipt, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
     print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
     return 0 if not report["failures"] else 2
 
@@ -487,6 +670,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("status", help="Show safety status; capture is disabled by default")
     p.set_defaults(func=_cmd_status)
+    p = sub.add_parser("source-policy", help="Report Brain markdown source-policy tiers for a local Brain root")
+    p.add_argument("--brain-root", default=str(Path.home() / "brain"))
+    p.add_argument("--report-json")
+    p.set_defaults(func=_cmd_source_policy)
     p = sub.add_parser("validate", help="Validate a scrubbed NDJSON fixture file")
     p.add_argument("--fixtures", required=True)
     p.set_defaults(func=_cmd_validate)
@@ -494,6 +681,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--fixtures", required=True)
     p.add_argument("--brain-root", default=str(Path.home() / "brain"))
     p.add_argument("--report-json")
+    p.add_argument("--explain-json", help="Write a compact source-policy explain receipt for replay output")
     p.add_argument("--privacy-scope", choices=sorted(ALLOWED_PRIVACY_SCOPES))
     p.add_argument("--k", type=int)
     p.set_defaults(func=_cmd_replay)
