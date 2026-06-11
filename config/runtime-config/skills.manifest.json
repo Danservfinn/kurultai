@@ -3,9 +3,159 @@
   "schema": "kurultai.skills-manifest.v1",
   "skills": [
     {
+      "description": "Airtable REST API via curl. Records CRUD, filters, upserts.",
+      "name": "airtable",
+      "path": ".archive/airtable"
+    },
+    {
+      "description": "Manage Apple Notes via memo CLI: create, search, edit.",
+      "name": "apple-notes",
+      "path": ".archive/apple-notes"
+    },
+    {
+      "description": "Apple Reminders via remindctl: add, list, complete.",
+      "name": "apple-reminders",
+      "path": ".archive/apple-reminders"
+    },
+    {
+      "description": "Dark-themed SVG architecture/cloud/infra diagrams as HTML.",
+      "name": "architecture-diagram",
+      "path": ".archive/architecture-diagram"
+    },
+    {
+      "description": "Search arXiv papers by keyword, author, category, or ID.",
+      "name": "arxiv",
+      "path": ".archive/arxiv"
+    },
+    {
+      "description": "ASCII art: pyfiglet, cowsay, boxes, image-to-ascii.",
+      "name": "ascii-art",
+      "path": ".archive/ascii-art"
+    },
+    {
+      "description": "ASCII video: convert video/audio to colored ASCII MP4/GIF.",
+      "name": "ascii-video",
+      "path": ".archive/ascii-video"
+    },
+    {
+      "description": "Infographics: 21 layouts x 21 styles (\u4fe1\u606f\u56fe, \u53ef\u89c6\u5316).",
+      "name": "baoyu-infographic",
+      "path": ".archive/baoyu-infographic"
+    },
+    {
+      "description": "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.",
+      "name": "blogwatcher",
+      "path": ".archive/blogwatcher"
+    },
+    {
       "description": "Audit, optimize, prune, and safely restructure the operator's `/Users/kurultai/brain/` Obsidian wiki. Use for scheduled Hermes/Codex/Claude Code brain maintenance, retrieval-quality audits, index reconciliation, stale-page pruning, duplicate detection, canonical-page proposals, and approval-gated restructures.",
       "name": "brain-optimizer",
       "path": ".archive/brain-optimizer"
+    },
+    {
+      "description": "Delegate coding to Claude Code CLI (features, PRs).",
+      "name": "claude-code",
+      "path": ".archive/claude-code"
+    },
+    {
+      "description": "Design one-off HTML artifacts (landing, deck, prototype).",
+      "name": "claude-design",
+      "path": ".archive/claude-design"
+    },
+    {
+      "description": "Inspect codebases w/ pygount: LOC, languages, ratios.",
+      "name": "codebase-inspection",
+      "path": ".archive/codebase-inspection"
+    },
+    {
+      "description": "Delegate coding to OpenAI Codex CLI (features, PRs).",
+      "name": "codex",
+      "path": ".archive/codex"
+    },
+    {
+      "description": "Author/validate/export Google's DESIGN.md token spec files.",
+      "name": "design-md",
+      "path": ".archive/design-md"
+    },
+    {
+      "description": "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).",
+      "name": "excalidraw",
+      "path": ".archive/excalidraw"
+    },
+    {
+      "description": "Prepare expense reports from banking/finance systems with strict credential hygiene, hard-private data handling, exports, receipts, and redacted summaries.",
+      "name": "finance-expense-workflows",
+      "path": ".archive/finance-expense-workflows"
+    },
+    {
+      "description": "Track Apple devices/AirTags via FindMy.app on macOS.",
+      "name": "findmy",
+      "path": ".archive/findmy"
+    },
+    {
+      "description": "Search/download GIFs from Tenor via curl + jq.",
+      "name": "gif-search",
+      "path": ".archive/gif-search"
+    },
+    {
+      "description": "GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login.",
+      "name": "github-auth",
+      "path": ".archive/github-auth"
+    },
+    {
+      "description": "Review PRs: diffs, inline comments via gh or REST.",
+      "name": "github-code-review",
+      "path": ".archive/github-code-review"
+    },
+    {
+      "description": "Create, triage, label, assign GitHub issues via gh or REST.",
+      "name": "github-issues",
+      "path": ".archive/github-issues"
+    },
+    {
+      "description": "GitHub PR lifecycle: branch, commit, open, CI, merge.",
+      "name": "github-pr-workflow",
+      "path": ".archive/github-pr-workflow"
+    },
+    {
+      "description": "Clone/create/fork repos; manage remotes, releases.",
+      "name": "github-repo-management",
+      "path": ".archive/github-repo-management"
+    },
+    {
+      "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
+      "name": "google-workspace",
+      "path": ".archive/google-workspace"
+    },
+    {
+      "description": "HeartMuLa: Suno-like song generation from lyrics + tags.",
+      "name": "heartmula",
+      "path": ".archive/heartmula"
+    },
+    {
+      "description": "Author in-repo SKILL.md: frontmatter, validator, structure.",
+      "name": "hermes-agent-skill-authoring",
+      "path": ".archive/hermes-agent-skill-authoring"
+    },
+    {
+      "description": "Himalaya CLI: IMAP/SMTP email from terminal.",
+      "name": "himalaya",
+      "path": ".archive/himalaya"
+    },
+    {
+      "description": "HuggingFace hf CLI: search/download/upload models, datasets.",
+      "name": "huggingface-hub",
+      "path": ".archive/huggingface-hub"
+    },
+    {
+      "description": "Send and receive iMessages/SMS via the imsg CLI on macOS.",
+      "name": "imessage",
+      "path": ".archive/imessage"
+    },
+    {
+      "description": "Pitfalls, examples, and edge cases for Hermes Kanban workers. The lifecycle itself is auto-injected into every worker's system prompt as KANBAN_GUIDANCE (from agent/prompt_builder.py); this skill is what you load when you want deeper detail on specific scenarios.",
+      "name": "kanban-worker",
+      "path": ".archive/kanban-worker"
     },
     {
       "description": "Primary always-on objective. Maintain the Kurultai OpenClaw implementation. Replaces the custom Hermes custodian.",
@@ -13,39 +163,189 @@
       "path": ".archive/kurultai-caretaker"
     },
     {
-      "description": "Manage Apple Notes via memo CLI: create, search, edit.",
-      "name": "apple-notes",
-      "path": "apple/apple-notes"
+      "description": "llama.cpp local GGUF inference + HF Hub model discovery.",
+      "name": "llama-cpp",
+      "path": ".archive/llama-cpp"
     },
     {
-      "description": "Apple Reminders via remindctl: add, list, complete.",
-      "name": "apple-reminders",
-      "path": "apple/apple-reminders"
-    },
-    {
-      "description": "Track Apple devices/AirTags via FindMy.app on macOS.",
-      "name": "findmy",
-      "path": "apple/findmy"
-    },
-    {
-      "description": "Send and receive iMessages/SMS via the imsg CLI on macOS.",
-      "name": "imessage",
-      "path": "apple/imessage"
+      "description": "Karpathy's LLM Wiki: build/query interlinked markdown KB.",
+      "name": "llm-wiki",
+      "path": ".archive/llm-wiki"
     },
     {
       "description": "|",
       "name": "macos-computer-use",
-      "path": "apple/macos-computer-use"
+      "path": ".archive/macos-computer-use"
     },
     {
-      "description": "Delegate coding to Claude Code CLI (features, PRs).",
-      "name": "claude-code",
-      "path": "autonomous-ai-agents/claude-code"
+      "description": "Manim CE animations: 3Blue1Brown math/algo videos.",
+      "name": "manim-video",
+      "path": ".archive/manim-video"
     },
     {
-      "description": "Delegate coding tasks to OpenAI Codex CLI agent. Use for building features, refactoring, PR reviews, batch issue fixing, and debugging Hermes Kanban codex worker startup/profile/auth crashes. Requires the codex CLI and a git repository. See references/codex-kanban-assignee-clarification.md for the distinction between Codex as a valid Hermes Kanban assignee and persona-level routing conventions.",
-      "name": "codex",
-      "path": "autonomous-ai-agents/codex"
+      "description": "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.",
+      "name": "maps",
+      "path": ".archive/maps"
+    },
+    {
+      "description": "Edit PDF text/typos/titles via nano-pdf CLI (NL prompts).",
+      "name": "nano-pdf",
+      "path": ".archive/nano-pdf"
+    },
+    {
+      "description": "Debug Node.js via --inspect + Chrome DevTools Protocol CLI.",
+      "name": "node-inspect-debugger",
+      "path": ".archive/node-inspect-debugger"
+    },
+    {
+      "description": "Notion API + ntn CLI: pages, databases, markdown, Workers.",
+      "name": "notion",
+      "path": ".archive/notion"
+    },
+    {
+      "description": "OBLITERATUS: abliterate LLM refusals (diff-in-means).",
+      "name": "obliteratus",
+      "path": ".archive/obliteratus"
+    },
+    {
+      "description": "Extract text from PDFs/scans (pymupdf, marker-pdf).",
+      "name": "ocr-and-documents",
+      "path": ".archive/ocr-and-documents"
+    },
+    {
+      "description": "Delegate coding to OpenCode CLI (features, PR review).",
+      "name": "opencode",
+      "path": ".archive/opencode"
+    },
+    {
+      "description": "Control Philips Hue lights, scenes, rooms via OpenHue CLI.",
+      "name": "openhue",
+      "path": ".archive/openhue"
+    },
+    {
+      "description": "p5.js sketches: gen art, shaders, interactive, 3D.",
+      "name": "p5js",
+      "path": ".archive/p5js"
+    },
+    {
+      "description": "Plan mode: write an actionable markdown plan to .hermes/plans/, no execution. Bite-sized tasks, exact paths, complete code.",
+      "name": "plan",
+      "path": ".archive/plan"
+    },
+    {
+      "description": "Query Polymarket: markets, prices, orderbooks, history.",
+      "name": "polymarket",
+      "path": ".archive/polymarket"
+    },
+    {
+      "description": "54 real design systems (Stripe, Linear, Vercel) as HTML/CSS.",
+      "name": "popular-web-designs",
+      "path": ".archive/popular-web-designs"
+    },
+    {
+      "description": "Create, read, edit .pptx decks, slides, notes, templates.",
+      "name": "powerpoint",
+      "path": ".archive/powerpoint"
+    },
+    {
+      "description": "Use when building creative browser demos with @chenglou/pretext \u2014 DOM-free text layout for ASCII art, typographic flow around obstacles, text-as-geometry games, kinetic typography, and text-powered generative art. Produces single-file HTML demos by default.",
+      "name": "pretext",
+      "path": ".archive/pretext"
+    },
+    {
+      "description": "Debug Python: pdb REPL + debugpy remote (DAP).",
+      "name": "python-debugpy",
+      "path": ".archive/python-debugpy"
+    },
+    {
+      "description": "Pre-commit review: security scan, quality gates, auto-fix.",
+      "name": "requesting-code-review",
+      "path": ".archive/requesting-code-review"
+    },
+    {
+      "description": "Research and advise on buying limited, event, local, or collector merchandise for resale; prioritize official, scarce, low-friction inventory with live market comps.",
+      "name": "resale-arbitrage-research",
+      "path": ".archive/resale-arbitrage-research"
+    },
+    {
+      "description": "Write ML papers for NeurIPS/ICML/ICLR: design\u2192submit.",
+      "name": "research-paper-writing",
+      "path": ".archive/research-paper-writing"
+    },
+    {
+      "description": "Throwaway HTML mockups: 2-3 design variants to compare.",
+      "name": "sketch",
+      "path": ".archive/sketch"
+    },
+    {
+      "description": "Audio spectrograms/features (mel, chroma, MFCC) via CLI.",
+      "name": "songsee",
+      "path": ".archive/songsee"
+    },
+    {
+      "description": "Songwriting craft and Suno AI music prompts.",
+      "name": "songwriting-and-ai-music",
+      "path": ".archive/songwriting-and-ai-music"
+    },
+    {
+      "description": "Throwaway experiments to validate an idea before build.",
+      "name": "spike",
+      "path": ".archive/spike"
+    },
+    {
+      "description": "4-phase root cause debugging: understand bugs before fixing.",
+      "name": "systematic-debugging",
+      "path": ".archive/systematic-debugging"
+    },
+    {
+      "description": "Operate the Teams meeting summary pipeline via Hermes CLI \u2014 summarize meetings, inspect pipeline status, replay jobs, manage Microsoft Graph subscriptions.",
+      "name": "teams-meeting-pipeline",
+      "path": ".archive/teams-meeting-pipeline"
+    },
+    {
+      "description": "Set up and operate phone/SMS/AI voice agent integrations with Twilio, ElevenLabs, Vapi, Bland, and Hermes/Kublai bridge services.",
+      "name": "telephony-voice-agents",
+      "path": ".archive/telephony-voice-agents"
+    },
+    {
+      "description": "Read-only Tesla Fleet API workflows for OAuth setup, vehicle inventory, and vehicle-data monitoring without control commands or secret exposure.",
+      "name": "tesla-fleet-api",
+      "path": ".archive/tesla-fleet-api"
+    },
+    {
+      "description": "TDD: enforce RED-GREEN-REFACTOR, tests before code.",
+      "name": "test-driven-development",
+      "path": ".archive/test-driven-development"
+    },
+    {
+      "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
+      "name": "weights-and-biases",
+      "path": ".archive/weights-and-biases"
+    },
+    {
+      "description": "X/Twitter via xurl CLI: post, search, DM, media, v2 API.",
+      "name": "xurl",
+      "path": ".archive/xurl"
+    },
+    {
+      "description": "YouTube transcripts to summaries, threads, blogs.",
+      "name": "youtube-content",
+      "path": ".archive/youtube-content"
+    },
+    {
+      "description": "Yuanbao (\u5143\u5b9d) groups: @mention users, query info/members.",
+      "name": "yuanbao",
+      "path": ".archive/yuanbao"
+    },
+    {
+      "description": "Operate macOS Apple apps and local desktop automation: Notes, Reminders, Messages/iMessage, Find My, and background Computer Use.",
+      "name": "apple-local-automation",
+      "path": "apple/apple-local-automation"
+    },
+    {
+      "description": "Route coding work to Claude Code, Codex, OpenCode, or other CLI agents while Hermes orchestrates scope, verification, and handoff.",
+      "name": "autonomous-coding-agents",
+      "path": "autonomous-ai-agents/autonomous-coding-agents"
     },
     {
       "description": "Compact router for using and extending Hermes Agent \u2014 load when configuring, troubleshooting, developing, or operating Hermes. The full historical reference is preserved in references/full-hermes-agent-reference-2026-05-15.md; load only the focused reference needed for the task. For Bitwarden Secrets Manager setup/free-tier questions, load references/bitwarden-secrets-manager.md; for users who authenticated with normal bw CLI and ask what remains, load references/bitwarden-cli-vs-secrets-manager-2026-05-25.md. For OpenAI Codex auth vs GPT Image 2 / Hermes image_gen confusion, load references/openai-codex-auth-gpt-image2.md. For Objective Runner Telegram `/objective` operations, load references/objective-runner-telegram-operations.md.",
@@ -56,11 +356,6 @@
       "description": "Use when a Hermes Kanban worker wants to run Codex CLI as an isolated implementation lane while Hermes keeps ownership of task lifecycle, reconciliation, testing, and handoff.",
       "name": "kanban-codex-lane",
       "path": "autonomous-ai-agents/kanban-codex-lane"
-    },
-    {
-      "description": "Delegate coding to OpenCode CLI (features, PR review).",
-      "name": "opencode",
-      "path": "autonomous-ai-agents/opencode"
     },
     {
       "description": "Create executable go-to-market plans with autonomous operating loops, ICP, channels, metrics, and approval gates.",
@@ -83,29 +378,9 @@
       "path": "business/parse-subscription-attribution"
     },
     {
-      "description": "Research and advise on buying limited, event, local, or collector merchandise for resale; prioritize official, scarce, low-friction inventory with live market checks, fee math, and listing tactics.",
-      "name": "resale-arbitrage-research",
-      "path": "business/resale-arbitrage-research"
-    },
-    {
       "description": "Stripe REST API workflows for customers, payments, subscriptions, refunds, and churn research with strict side-effect gates.",
       "name": "stripe",
       "path": "business/stripe"
-    },
-    {
-      "description": "Dark-themed SVG architecture/cloud/infra diagrams as HTML.",
-      "name": "architecture-diagram",
-      "path": "creative/architecture-diagram"
-    },
-    {
-      "description": "ASCII art: pyfiglet, cowsay, boxes, image-to-ascii.",
-      "name": "ascii-art",
-      "path": "creative/ascii-art"
-    },
-    {
-      "description": "ASCII video: convert video/audio to colored ASCII MP4/GIF.",
-      "name": "ascii-video",
-      "path": "creative/ascii-video"
     },
     {
       "description": "Article illustrations: type \u00d7 style \u00d7 palette consistency.",
@@ -118,16 +393,6 @@
       "path": "creative/baoyu-comic"
     },
     {
-      "description": "Infographics: 21 layouts x 21 styles (\u4fe1\u606f\u56fe, \u53ef\u89c6\u5316).",
-      "name": "baoyu-infographic",
-      "path": "creative/baoyu-infographic"
-    },
-    {
-      "description": "Design one-off HTML artifacts (landing, deck, prototype).",
-      "name": "claude-design",
-      "path": "creative/claude-design"
-    },
-    {
       "description": "Generate images, video, and audio with ComfyUI \u2014 install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution.",
       "name": "comfyui",
       "path": "creative/comfyui"
@@ -138,29 +403,9 @@
       "path": "creative/creative-ideation"
     },
     {
-      "description": "Author/validate/export Google's DESIGN.md token spec files.",
-      "name": "design-md",
-      "path": "creative/design-md"
-    },
-    {
-      "description": "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).",
-      "name": "excalidraw",
-      "path": "creative/excalidraw"
-    },
-    {
       "description": "Humanize text: strip AI-isms and add real voice.",
       "name": "humanizer",
       "path": "creative/humanizer"
-    },
-    {
-      "description": "Manim CE animations: 3Blue1Brown math/algo videos.",
-      "name": "manim-video",
-      "path": "creative/manim-video"
-    },
-    {
-      "description": "p5.js sketches: gen art, shaders, interactive, 3D.",
-      "name": "p5js",
-      "path": "creative/p5js"
     },
     {
       "description": "Pixel art w/ era palettes (NES, Game Boy, PICO-8).",
@@ -168,29 +413,14 @@
       "path": "creative/pixel-art"
     },
     {
-      "description": "54 real design systems (Stripe, Linear, Vercel) as HTML/CSS, plus curated references for broadcast/editorial style cues.",
-      "name": "popular-web-designs",
-      "path": "creative/popular-web-designs"
-    },
-    {
-      "description": "Use when building creative browser demos with @chenglou/pretext \u2014 DOM-free text layout for ASCII art, typographic flow around obstacles, text-as-geometry games, kinetic typography, and text-powered generative art. Produces single-file HTML demos by default.",
-      "name": "pretext",
-      "path": "creative/pretext"
-    },
-    {
-      "description": "Throwaway HTML mockups: 2-3 design variants to compare.",
-      "name": "sketch",
-      "path": "creative/sketch"
-    },
-    {
-      "description": "Songwriting craft and Suno AI music prompts.",
-      "name": "songwriting-and-ai-music",
-      "path": "creative/songwriting-and-ai-music"
-    },
-    {
       "description": "Control a running TouchDesigner instance via twozero MCP \u2014 create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools.",
       "name": "touchdesigner-mcp",
       "path": "creative/touchdesigner-mcp"
+    },
+    {
+      "description": "Create visual artifacts: diagrams, infographics, HTML mockups, p5.js sketches, design-system references, Excalidraw, and design specs.",
+      "name": "visual-artifact-generation",
+      "path": "creative/visual-artifact-generation"
     },
     {
       "description": "Iterative Python via live Jupyter kernel (hamelnb).",
@@ -223,11 +453,6 @@
       "path": "devops/kanban-task-lifecycle"
     },
     {
-      "description": "Pitfalls, examples, and edge cases for Hermes Kanban workers. The lifecycle itself is auto-injected into every worker's system prompt as KANBAN_GUIDANCE (from agent/prompt_builder.py); this skill is what you load when you want deeper detail on specific scenarios.",
-      "name": "kanban-worker",
-      "path": "devops/kanban-worker"
-    },
-    {
       "description": "Webhook subscriptions: event-driven agent runs.",
       "name": "webhook-subscriptions",
       "path": "devops/webhook-subscriptions"
@@ -243,11 +468,6 @@
       "path": "dogfood"
     },
     {
-      "description": "Himalaya CLI: IMAP/SMTP email from terminal.",
-      "name": "himalaya",
-      "path": "email/himalaya"
-    },
-    {
       "description": "Host modded Minecraft servers (CurseForge, Modrinth).",
       "name": "minecraft-modpack-server",
       "path": "gaming/minecraft-modpack-server"
@@ -258,34 +478,9 @@
       "path": "gaming/pokemon-player"
     },
     {
-      "description": "Inspect codebases w/ pygount: LOC, languages, ratios.",
-      "name": "codebase-inspection",
-      "path": "github/codebase-inspection"
-    },
-    {
-      "description": "GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login.",
-      "name": "github-auth",
-      "path": "github/github-auth"
-    },
-    {
-      "description": "Review PRs: diffs, inline comments via gh or REST.",
-      "name": "github-code-review",
-      "path": "github/github-code-review"
-    },
-    {
-      "description": "Create, triage, label, assign GitHub issues via gh or REST.",
-      "name": "github-issues",
-      "path": "github/github-issues"
-    },
-    {
-      "description": "GitHub PR lifecycle: branch, commit, open, CI, merge.",
-      "name": "github-pr-workflow",
-      "path": "github/github-pr-workflow"
-    },
-    {
-      "description": "Clone/create/fork repos; manage remotes, releases. For requests to house live runtime configuration or rebuild contracts in a repo, use the sanitized-template/manifest pattern in `references/sanitized-runtime-config-housing.md` and the rebuild-contract extension in `references/sanitized-runtime-rebuild-contract.md`: never copy private live config, secrets, personal metadata, live DBs, sessions, or delivery targets directly into Git.",
-      "name": "github-repo-management",
-      "path": "github/github-repo-management"
+      "description": "End-to-end GitHub work: auth, repository setup, codebase inspection, issues, PR lifecycle, CI, and review via gh/git/API.",
+      "name": "github-workflows",
+      "path": "github/github-workflows"
     },
     {
       "description": "Save media, documents, screenshots, PDFs, and supporting files into the Brain with privacy routing, manifests, local-only Kanban delegation, indexing policy, and verification.",
@@ -383,19 +578,9 @@
       "path": "mcp/native-mcp"
     },
     {
-      "description": "Search/download GIFs from Tenor via curl + jq.",
-      "name": "gif-search",
-      "path": "media/gif-search"
-    },
-    {
-      "description": "HeartMuLa: Suno-like song generation from lyrics + tags.",
-      "name": "heartmula",
-      "path": "media/heartmula"
-    },
-    {
-      "description": "Audio spectrograms/features (mel, chroma, MFCC) via CLI.",
-      "name": "songsee",
-      "path": "media/songsee"
+      "description": "Generate, transform, and analyze media: ASCII art/video, math animations, GIFs, YouTube transcripts, music prompts/generation, and audio features.",
+      "name": "media-generation-and-analysis",
+      "path": "media/media-generation-and-analysis"
     },
     {
       "description": "Spotify: play, search, queue, manage playlists and devices.",
@@ -403,34 +588,9 @@
       "path": "media/spotify"
     },
     {
-      "description": "YouTube transcripts to summaries, threads, blogs.",
-      "name": "youtube-content",
-      "path": "media/youtube-content"
-    },
-    {
       "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
       "name": "lm-evaluation-harness",
       "path": "mlops/evaluation/lm-evaluation-harness"
-    },
-    {
-      "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
-      "name": "weights-and-biases",
-      "path": "mlops/evaluation/weights-and-biases"
-    },
-    {
-      "description": "HuggingFace hf CLI: search/download/upload models, datasets.",
-      "name": "huggingface-hub",
-      "path": "mlops/huggingface-hub"
-    },
-    {
-      "description": "llama.cpp local GGUF inference + HF Hub model discovery.",
-      "name": "llama-cpp",
-      "path": "mlops/inference/llama-cpp"
-    },
-    {
-      "description": "OBLITERATUS: abliterate LLM refusals (diff-in-means).",
-      "name": "obliteratus",
-      "path": "mlops/inference/obliteratus"
     },
     {
       "description": "Outlines: structured JSON/regex/Pydantic LLM generation.",
@@ -441,6 +601,11 @@
       "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
       "name": "vllm",
       "path": "mlops/inference/vllm"
+    },
+    {
+      "description": "Model operations workflows: Hugging Face Hub, local llama.cpp inference, W&B evaluation/tracking, and model refusal/abliteration experiments.",
+      "name": "mlops-model-workflows",
+      "path": "mlops/mlops-model-workflows"
     },
     {
       "description": "AudioCraft: MusicGen text-to-music, AudioGen text-to-sound.",
@@ -498,24 +663,9 @@
       "path": "productivity/agent-led-call-planning"
     },
     {
-      "description": "Airtable REST API via curl. Records CRUD, filters, upserts.",
-      "name": "airtable",
-      "path": "productivity/airtable"
-    },
-    {
       "description": "Use when writing copy-pasteable prompts, commands, patches, Markdown, or chat messages that contain code blocks, especially when the output will be pasted into Telegram, Slack, Discord, another LLM, or a terminal. Prevent broken nested fences, mangled Markdown, and ambiguous handoff formatting.",
       "name": "copy-pasteable-code-blocks",
       "path": "productivity/copy-pasteable-code-blocks"
-    },
-    {
-      "description": "Prepare expense reports from banking/finance systems with strict credential hygiene, hard-private data handling, exports, receipts, and verification. Use for Mercury, bank CSVs/APIs, Expensify-ready reports, reimbursements, trip expense reconstruction, and finance data normalization.",
-      "name": "finance-expense-workflows",
-      "path": "productivity/finance-expense-workflows"
-    },
-    {
-      "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
-      "name": "google-workspace",
-      "path": "productivity/google-workspace"
     },
     {
       "description": "Import and process meeting transcripts/notes from Granola and Fathom exports or APIs, then fold into Brain/meeting pipelines.",
@@ -528,29 +678,9 @@
       "path": "productivity/linear"
     },
     {
-      "description": "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.",
-      "name": "maps",
-      "path": "productivity/maps"
-    },
-    {
-      "description": "Edit PDF text/typos/titles via nano-pdf CLI (NL prompts).",
-      "name": "nano-pdf",
-      "path": "productivity/nano-pdf"
-    },
-    {
-      "description": "Notion API + ntn CLI: pages, databases, markdown, Workers.",
-      "name": "notion",
-      "path": "productivity/notion"
-    },
-    {
-      "description": "Extract text from PDFs/scans (pymupdf, marker-pdf).",
-      "name": "ocr-and-documents",
-      "path": "productivity/ocr-and-documents"
-    },
-    {
-      "description": "Create, read, edit .pptx decks, slides, notes, templates.",
-      "name": "powerpoint",
-      "path": "productivity/powerpoint"
+      "description": "Operate productivity platforms and documents: email, Google Workspace, Airtable, Notion, PDF/OCR, PowerPoint, Teams meeting summaries, maps, and expenses.",
+      "name": "office-and-document-workflows",
+      "path": "productivity/office-and-document-workflows"
     },
     {
       "description": "Use when the user asks to premortem, stress-test, red-team, de-risk, or future-failure-analyze a plan, decision, launch, hire, partnership, project, commitment, or strategy before execution.",
@@ -568,16 +698,6 @@
       "path": "productivity/readwise"
     },
     {
-      "description": "Operate the Teams meeting summary pipeline via Hermes CLI \u2014 summarize meetings, inspect pipeline status, replay jobs, manage Microsoft Graph subscriptions.",
-      "name": "teams-meeting-pipeline",
-      "path": "productivity/teams-meeting-pipeline"
-    },
-    {
-      "description": "Set up and operate phone/SMS/AI voice agent integrations with Twilio, ElevenLabs, Vapi, Bland, and Hermes/Kublai bridge services.",
-      "name": "telephony-voice-agents",
-      "path": "productivity/telephony-voice-agents"
-    },
-    {
       "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
       "name": "godmode",
       "path": "red-teaming/godmode"
@@ -588,44 +708,24 @@
       "path": "research/apify"
     },
     {
-      "description": "Search arXiv papers by keyword, author, category, or ID.",
-      "name": "arxiv",
-      "path": "research/arxiv"
-    },
-    {
-      "description": "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.",
-      "name": "blogwatcher",
-      "path": "research/blogwatcher"
-    },
-    {
-      "description": "Karpathy's LLM Wiki: build/query interlinked markdown KB.",
-      "name": "llm-wiki",
-      "path": "research/llm-wiki"
-    },
-    {
-      "description": "Query Polymarket: markets, prices, orderbooks, history.",
-      "name": "polymarket",
-      "path": "research/polymarket"
-    },
-    {
       "description": "Operate and evaluate the operator's paper-only Polymarket daily temperature research engine, including simulated portfolio, training export, and goal tuning.",
       "name": "polymarket-weather-paper-engine",
       "path": "research/polymarket-weather-paper-engine"
     },
     {
-      "description": "End-to-end pipeline for writing ML/AI research papers \u2014 experiment design through submission. Covers NeurIPS, ICML, ICLR, ACL, AAAI, COLM.",
-      "name": "research-paper-writing",
-      "path": "research/research-paper-writing"
+      "description": "Research discovery and synthesis: arXiv, feeds/blogs, LLM wiki knowledge bases, research-paper writing, market/event research, and prediction-market data.",
+      "name": "research-intelligence-workflows",
+      "path": "research/research-intelligence-workflows"
     },
     {
-      "description": "Control Philips Hue lights, scenes, rooms via OpenHue CLI.",
-      "name": "openhue",
-      "path": "smart-home/openhue"
+      "description": "Operate personal device and smart-home APIs safely: Hue/OpenHue lights and read-only Tesla Fleet vehicle data.",
+      "name": "device-and-home-api-operations",
+      "path": "smart-home/device-and-home-api-operations"
     },
     {
-      "description": "Read-only Tesla Fleet API workflows for OAuth setup, vehicle inventory, and vehicle-data monitoring without control commands or secret leakage.",
-      "name": "tesla-fleet-api",
-      "path": "smart-home/tesla-fleet-api"
+      "description": "Operate external communication platforms: X/Twitter via xurl, Yuanbao groups, and telephony/SMS/voice-agent integrations.",
+      "name": "communication-platform-workflows",
+      "path": "social-media/communication-platform-workflows"
     },
     {
       "description": "Reddit public/OAuth research and account workflows via JSON/RSS/API; safe read-first market research.",
@@ -636,11 +736,6 @@
       "description": "Optimize X/Twitter content placement in the For You feed based on the open-sourced x-algorithm",
       "name": "x-content-optimization",
       "path": "social-media/x-content-optimization"
-    },
-    {
-      "description": "Interact with X/Twitter via xurl, the official X API CLI. Use for posting, replying, quoting, searching, timelines, mentions, likes, reposts, bookmarks, follows, DMs, media upload, raw v2 endpoint access, and Parse-safe research of individual X posts/articles. For Parse blocks, see references/parse-screening-safe-x-research.md; for browser-rendered X article/tweet fallback research when xurl/syndication/oEmbed/search fail, see references/x-article-research-fallbacks.md; for screened X Article research using FxTwitter metadata and paraphrased summaries, see references/parse-safe-x-article-research.md. For X Article research and agent-first content/doctrine analysis, see references/x-article-agent-first-research.md. For May 2026 single-post research patterns using sanitized metadata, reversed-token diagnostics, and browser-rendered image fallback, see references/parse-safe-individual-x-post-research-2026-05.md.",
-      "name": "xurl",
-      "path": "social-media/xurl"
     },
     {
       "description": "Use when an agent needs opt-in Browse CLI guidance for local, non-sensitive browser automation reconnaissance after Hermes built-in browser tools are insufficient.",
@@ -663,19 +758,9 @@
       "path": "software-development/debugging-hermes-tui-commands"
     },
     {
-      "description": "Author in-repo SKILL.md: frontmatter, validator, structure.",
-      "name": "hermes-agent-skill-authoring",
-      "path": "software-development/hermes-agent-skill-authoring"
-    },
-    {
       "description": "Modify, debug, or extend the s6-overlay supervision tree inside the Hermes Agent Docker image \u2014 adding new services, debugging profile gateways, understanding the Architecture B main-program pattern.",
       "name": "hermes-s6-container-supervision",
       "path": "software-development/hermes-s6-container-supervision"
-    },
-    {
-      "description": "Debug Node.js via --inspect + Chrome DevTools Protocol CLI.",
-      "name": "node-inspect-debugger",
-      "path": "software-development/node-inspect-debugger"
     },
     {
       "description": "Metadata receipt pattern for Hermes screened tool events.",
@@ -683,24 +768,9 @@
       "path": "software-development/parse-screening-recovery"
     },
     {
-      "description": "Plan mode: write markdown plan to .hermes/plans/, no exec.",
-      "name": "plan",
-      "path": "software-development/plan"
-    },
-    {
-      "description": "Debug Python: pdb REPL + debugpy remote (DAP).",
-      "name": "python-debugpy",
-      "path": "software-development/python-debugpy"
-    },
-    {
       "description": "'Repository workflow orchestration skill for staged implementation, locked artifacts, late-phase receipts, and durable memory maintenance. Use when executing recursive-mode runs, resuming a run, locking a phase, or verifying locks.'",
       "name": "recursive-mode",
       "path": "software-development/recursive-mode"
-    },
-    {
-      "description": "Pre-commit review: security scan, quality gates, auto-fix.",
-      "name": "requesting-code-review",
-      "path": "software-development/requesting-code-review"
     },
     {
       "description": "Write shell commands that don't trip Hermes's own security scanner. Avoid pipe-to-interpreter patterns and inline `-c` script execution when a direct-file read works.",
@@ -708,9 +778,9 @@
       "path": "software-development/shell-command-hygiene"
     },
     {
-      "description": "Throwaway experiments to validate an idea before build.",
-      "name": "spike",
-      "path": "software-development/spike"
+      "description": "Class-level software delivery workflow: planning, spikes, TDD, debugging, runtime debuggers, pre-commit review, and verification.",
+      "name": "software-delivery-workflows",
+      "path": "software-development/software-delivery-workflows"
     },
     {
       "description": "Wire, deploy, and verify live-data ingestion for static/SPAs that consume JSON snapshots or SSE-style live endpoints.",
@@ -721,16 +791,6 @@
       "description": "Execute plans via delegate_task subagents (2-stage review).",
       "name": "subagent-driven-development",
       "path": "software-development/subagent-driven-development"
-    },
-    {
-      "description": "4-phase root cause debugging: understand bugs before fixing.",
-      "name": "systematic-debugging",
-      "path": "software-development/systematic-debugging"
-    },
-    {
-      "description": "TDD: enforce RED-GREEN-REFACTOR, tests before code.",
-      "name": "test-driven-development",
-      "path": "software-development/test-driven-development"
     },
     {
       "description": "Use when you have a spec or requirements for a multi-step task. Creates comprehensive implementation plans with bite-sized tasks, exact file paths, and complete code examples.",
@@ -746,11 +806,6 @@
       "description": "Operate the meta-harness control plane: curator gate/co-judge behavior, harness controls, read-only evaluation mode, and operator safety boundaries.",
       "name": "meta-harness-operations",
       "path": "system/meta-harness-operations"
-    },
-    {
-      "description": "Yuanbao (\u5143\u5b9d) groups: @mention users, query info/members.",
-      "name": "yuanbao",
-      "path": "yuanbao"
     }
   ],
   "source": "~/.hermes/skills/**/SKILL.md"

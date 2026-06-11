@@ -19,13 +19,13 @@ Retrieval-facing knowledge should be folded into Tier 1 pages when it becomes du
 ## Dev commands
 
 ```bash
-PYTHONPATH=/Users/kublai/kurultai/kurultai-repo python -m kublai.retrieval_eval source-policy \
-  --brain-root /Users/kublai/brain \
+PYTHONPATH=/path/to/kurultai-repo python -m kublai.retrieval_eval source-policy \
+  --brain-root /path/to/brain \
   --report-json /tmp/brain-source-policy-report.json
 
-PYTHONPATH=/Users/kublai/kurultai/kurultai-repo python -m kublai.retrieval_eval replay \
+PYTHONPATH=/path/to/kurultai-repo python -m kublai.retrieval_eval replay \
   --fixtures tests/fixtures/retrieval_eval/public-smoke.ndjson \
-  --brain-root /Users/kublai/brain \
+  --brain-root /path/to/brain \
   --privacy-scope public \
   --k 10 \
   --report-json /tmp/retrieval-eval-report.json \

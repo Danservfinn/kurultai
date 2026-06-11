@@ -7,11 +7,15 @@
       "name": "_archive"
     },
     {
+      "markdown_files": 14,
+      "name": "_archive.pre-drive-migration-20260610"
+    },
+    {
       "markdown_files": 7,
       "name": "agents"
     },
     {
-      "markdown_files": 275,
+      "markdown_files": 281,
       "name": "analyses"
     },
     {
@@ -27,7 +31,7 @@
       "name": "captures"
     },
     {
-      "markdown_files": 35,
+      "markdown_files": 36,
       "name": "concepts"
     },
     {
@@ -35,7 +39,7 @@
       "name": "config"
     },
     {
-      "markdown_files": 119,
+      "markdown_files": 120,
       "name": "content"
     },
     {
@@ -43,7 +47,7 @@
       "name": "dashboards"
     },
     {
-      "markdown_files": 187,
+      "markdown_files": 196,
       "name": "docs"
     },
     {
@@ -91,7 +95,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 2393,
+      "markdown_files": 2411,
       "name": "operations"
     },
     {
@@ -99,7 +103,7 @@
       "name": "projects"
     },
     {
-      "markdown_files": 51,
+      "markdown_files": 53,
       "name": "proposals"
     },
     {
@@ -111,7 +115,7 @@
       "name": "queue"
     },
     {
-      "markdown_files": 161,
+      "markdown_files": 186,
       "name": "raw"
     },
     {
@@ -123,7 +127,7 @@
       "name": "references"
     },
     {
-      "markdown_files": 20,
+      "markdown_files": 21,
       "name": "research"
     },
     {
@@ -139,7 +143,7 @@
       "name": "status"
     },
     {
-      "markdown_files": 362,
+      "markdown_files": 366,
       "name": "synthesis"
     },
     {

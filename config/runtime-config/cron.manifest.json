@@ -1356,9 +1356,9 @@
         "times": 999999
       },
       "schedule": {
-        "display": "every 1m",
+        "display": "every 10m",
         "kind": "interval",
-        "minutes": 1
+        "minutes": 10
       },
       "script": "parse_paid_subscription_monitor.py",
       "skills": [],
@@ -1425,8 +1425,7 @@
       },
       "script": null,
       "skills": [
-        "kurultai-operations",
-        "github-pr-workflow"
+        "kurultai-operations"
       ],
       "state": "scheduled",
       "workdir": "${KURULTAI_HOME}/kurultai/kurultai-public-canonical"
@@ -1658,14 +1657,12 @@
         "times": 999999
       },
       "schedule": {
-        "display": "every 5m",
+        "display": "every 60m",
         "kind": "interval",
-        "minutes": 5
+        "minutes": 60
       },
       "script": "money_autonomy_context.py",
       "skills": [
-        "github-pr-workflow",
-        "github-issues",
         "kurultai-operations"
       ],
       "state": "scheduled",
@@ -1686,6 +1683,101 @@
         "minutes": 5
       },
       "script": "money_pr_monitor.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-082",
+      "name": "KurultaiVault mount/headroom canary",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "every 30m",
+        "kind": "interval",
+        "minutes": 30
+      },
+      "script": "kurultai_vault_canary.sh",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-083",
+      "name": "kurultai-action-yield-nightly",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "15 2 * * *",
+        "expr": "15 2 * * *",
+        "kind": "cron"
+      },
+      "script": "kurultai_action_yield.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-084",
+      "name": "kurultai-smoke-triplet-nightly",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "30 2 * * *",
+        "expr": "30 2 * * *",
+        "kind": "cron"
+      },
+      "script": "kurultai_smoke_triplet.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-085",
+      "name": "kurultai-money-attribution-daily",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "45 7 * * *",
+        "expr": "45 7 * * *",
+        "kind": "cron"
+      },
+      "script": "kurultai_money_attribution.py",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "local",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-086",
+      "name": "local-model-readiness-probe",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "*/15 * * * *",
+        "expr": "*/15 * * * *",
+        "kind": "cron"
+      },
+      "script": "local_model_readiness_probe.py",
       "skills": [],
       "state": "scheduled",
       "workdir": null
