@@ -493,6 +493,11 @@
       "path": "kurultai/brain-report-ingest-propose"
     },
     {
+      "description": "Produce the Brain Vault Loop weekly synthesis layer across daily briefs, Research Control Room outputs, signal metrics, graph/context refreshes, and recent Brain receipts without duplicating daily reports.",
+      "name": "brain-vault-weekly-synthesis",
+      "path": "kurultai/brain-vault-weekly-synthesis"
+    },
+    {
       "description": "Router for the operator's Brain wiki operations: context/search, durable writes, ingest, QMD/indexing, privacy boundaries, research capture, curation, and Brain-service maintenance.",
       "name": "brain-wiki-operations",
       "path": "kurultai/brain-wiki-operations"
