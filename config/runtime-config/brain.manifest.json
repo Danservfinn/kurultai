@@ -15,7 +15,7 @@
       "name": "agents"
     },
     {
-      "markdown_files": 295,
+      "markdown_files": 299,
       "name": "analyses"
     },
     {
@@ -39,7 +39,7 @@
       "name": "config"
     },
     {
-      "markdown_files": 125,
+      "markdown_files": 126,
       "name": "content"
     },
     {
@@ -47,7 +47,7 @@
       "name": "dashboards"
     },
     {
-      "markdown_files": 283,
+      "markdown_files": 331,
       "name": "docs"
     },
     {
@@ -67,7 +67,7 @@
       "name": "generated"
     },
     {
-      "markdown_files": 19,
+      "markdown_files": 21,
       "name": "graphify-out"
     },
     {
@@ -95,7 +95,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 2500,
+      "markdown_files": 2511,
       "name": "operations"
     },
     {
@@ -103,7 +103,7 @@
       "name": "projects"
     },
     {
-      "markdown_files": 64,
+      "markdown_files": 67,
       "name": "proposals"
     },
     {
@@ -115,7 +115,7 @@
       "name": "queue"
     },
     {
-      "markdown_files": 191,
+      "markdown_files": 192,
       "name": "raw"
     },
     {
