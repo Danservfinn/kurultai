@@ -38,6 +38,11 @@
       "path": ".archive/ascii-video"
     },
     {
+      "description": "",
+      "name": "audiocraft-audio-generation",
+      "path": ".archive/audiocraft-audio-generation"
+    },
+    {
       "description": "Infographics: 21 layouts x 21 styles (\u4fe1\u606f\u56fe, \u53ef\u89c6\u5316).",
       "name": "baoyu-infographic",
       "path": ".archive/baoyu-infographic"
@@ -76,6 +81,16 @@
       "description": "Author/validate/export Google's DESIGN.md token spec files.",
       "name": "design-md",
       "path": ".archive/design-md"
+    },
+    {
+      "description": "",
+      "name": "dogfood",
+      "path": ".archive/dogfood"
+    },
+    {
+      "description": "",
+      "name": "evaluating-llms-harness",
+      "path": ".archive/evaluating-llms-harness"
     },
     {
       "description": "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).",
@@ -123,6 +138,11 @@
       "path": ".archive/github-repo-management"
     },
     {
+      "description": "",
+      "name": "godmode",
+      "path": ".archive/godmode"
+    },
+    {
       "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
       "name": "google-workspace",
       "path": ".archive/google-workspace"
@@ -148,9 +168,24 @@
       "path": ".archive/huggingface-hub"
     },
     {
+      "description": "",
+      "name": "humanizer",
+      "path": ".archive/humanizer"
+    },
+    {
       "description": "Send and receive iMessages/SMS via the imsg CLI on macOS.",
       "name": "imessage",
       "path": ".archive/imessage"
+    },
+    {
+      "description": "",
+      "name": "jupyter-live-kernel",
+      "path": ".archive/jupyter-live-kernel"
+    },
+    {
+      "description": "",
+      "name": "kanban-orchestrator",
+      "path": ".archive/kanban-orchestrator"
     },
     {
       "description": "Pitfalls, examples, and edge cases for Hermes Kanban workers. The lifecycle itself is auto-injected into every worker's system prompt as KANBAN_GUIDANCE (from agent/prompt_builder.py); this skill is what you load when you want deeper detail on specific scenarios.",
@@ -206,6 +241,11 @@
       "description": "OBLITERATUS: abliterate LLM refusals (diff-in-means).",
       "name": "obliteratus",
       "path": ".archive/obliteratus"
+    },
+    {
+      "description": "",
+      "name": "obsidian",
+      "path": ".archive/obsidian"
     },
     {
       "description": "Extract text from PDFs/scans (pymupdf, marker-pdf).",
@@ -273,6 +313,16 @@
       "path": ".archive/research-paper-writing"
     },
     {
+      "description": "",
+      "name": "segment-anything-model",
+      "path": ".archive/segment-anything-model"
+    },
+    {
+      "description": "",
+      "name": "serving-llms-vllm",
+      "path": ".archive/serving-llms-vllm"
+    },
+    {
       "description": "Throwaway HTML mockups: 2-3 design variants to compare.",
       "name": "sketch",
       "path": ".archive/sketch"
@@ -316,6 +366,11 @@
       "description": "TDD: enforce RED-GREEN-REFACTOR, tests before code.",
       "name": "test-driven-development",
       "path": ".archive/test-driven-development"
+    },
+    {
+      "description": "",
+      "name": "touchdesigner-mcp",
+      "path": ".archive/touchdesigner-mcp"
     },
     {
       "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
@@ -403,29 +458,14 @@
       "path": "creative/creative-ideation"
     },
     {
-      "description": "Humanize text: strip AI-isms and add real voice.",
-      "name": "humanizer",
-      "path": "creative/humanizer"
-    },
-    {
       "description": "Pixel art w/ era palettes (NES, Game Boy, PICO-8).",
       "name": "pixel-art",
       "path": "creative/pixel-art"
     },
     {
-      "description": "Control a running TouchDesigner instance via twozero MCP \u2014 create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools.",
-      "name": "touchdesigner-mcp",
-      "path": "creative/touchdesigner-mcp"
-    },
-    {
       "description": "Create visual artifacts: diagrams, infographics, HTML mockups, p5.js sketches, design-system references, Excalidraw, and design specs.",
       "name": "visual-artifact-generation",
       "path": "creative/visual-artifact-generation"
-    },
-    {
-      "description": "Iterative Python via live Jupyter kernel (hamelnb).",
-      "name": "jupyter-live-kernel",
-      "path": "data-science/jupyter-live-kernel"
     },
     {
       "description": "Manage, measure, and reduce Hermes cron job token usage while preserving capability and safety.",
@@ -436,11 +476,6 @@
       "description": "Preserve interrupted, preempted, blocked, or concurrent work by routing it into Hermes Kanban tasks with context, receipts, exact completion reporting, and active blocker resolution.",
       "name": "kanban-interruption-handoff",
       "path": "devops/kanban-interruption-handoff"
-    },
-    {
-      "description": "Decomposition playbook + specialist-roster conventions + anti-temptation rules for an orchestrator profile routing work through Kanban. The \"don't do the work yourself\" rule and the basic lifecycle are auto-injected into every kanban worker's system prompt; this skill is the deeper playbook when you're specifically playing the orchestrator role. See references/kanban-delegation-pitfalls.md for workspace flag, dependency-link, dispatch-verification, and Parse-screening pitfalls. See references/codex-orchestration-routing.md for the convention that Codex-backed implementation work should be assigned to a real Kurultai profile (for example Chagatai) using `codex-implementation-orchestration`, not directly to a pseudo-profile named `codex`. See references/telegram-notification-subscriptions.md for the notification pitfall where direct CLI/DB task creation completes normally but does not notify Telegram unless a `kanban_notify_subs` row or manual completion synthesis is created.",
-      "name": "kanban-orchestrator",
-      "path": "devops/kanban-orchestrator"
     },
     {
       "description": "Use when the operator asks to send an implementation plan, recommendation bundle, or multi-task proposal to Hermes Kanban triage and shepherd it through.",
@@ -461,11 +496,6 @@
       "description": "Find and verify an x402 payment deposit/payTo address safely, without exposing private keys or secrets.",
       "name": "x402-payment-address-lookup",
       "path": "devops/x402-payment-address-lookup"
-    },
-    {
-      "description": "Exploratory QA of web apps: find bugs, evidence, reports.",
-      "name": "dogfood",
-      "path": "dogfood"
     },
     {
       "description": "Host modded Minecraft servers (CurseForge, Modrinth).",
@@ -593,34 +623,14 @@
       "path": "media/spotify"
     },
     {
-      "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
-      "name": "lm-evaluation-harness",
-      "path": "mlops/evaluation/lm-evaluation-harness"
-    },
-    {
       "description": "Outlines: structured JSON/regex/Pydantic LLM generation.",
       "name": "outlines",
       "path": "mlops/inference/outlines"
     },
     {
-      "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
-      "name": "vllm",
-      "path": "mlops/inference/vllm"
-    },
-    {
       "description": "Model operations workflows: Hugging Face Hub, local llama.cpp inference, W&B evaluation/tracking, and model refusal/abliteration experiments.",
       "name": "mlops-model-workflows",
       "path": "mlops/mlops-model-workflows"
-    },
-    {
-      "description": "AudioCraft: MusicGen text-to-music, AudioGen text-to-sound.",
-      "name": "audiocraft",
-      "path": "mlops/models/audiocraft"
-    },
-    {
-      "description": "SAM: zero-shot image segmentation via points, boxes, masks.",
-      "name": "segment-anything",
-      "path": "mlops/models/segment-anything"
     },
     {
       "description": "DSPy: declarative LM programs, auto-optimize prompts, RAG.",
@@ -641,11 +651,6 @@
       "description": "Unsloth: 2-5x faster LoRA/QLoRA fine-tuning, less VRAM.",
       "name": "unsloth",
       "path": "mlops/training/unsloth"
-    },
-    {
-      "description": "Read, search, create, and edit notes in the Obsidian vault.",
-      "name": "obsidian",
-      "path": "note-taking/obsidian"
     },
     {
       "description": "Build an Obsidian + Claude learning vault that turns study material into concept notes, non-obvious connections, active recall, spaced review, and synthesis documents.",
@@ -701,11 +706,6 @@
       "description": "Readwise Reader/highlights API workflows for search, export, and retrieval with safe token handling.",
       "name": "readwise",
       "path": "productivity/readwise"
-    },
-    {
-      "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
-      "name": "godmode",
-      "path": "red-teaming/godmode"
     },
     {
       "description": "Apify actor/dataset workflows for scraping and market research with cost and side-effect dry-run gates.",
@@ -781,6 +781,11 @@
       "description": "Write shell commands that don't trip Hermes's own security scanner. Avoid pipe-to-interpreter patterns and inline `-c` script execution when a direct-file read works.",
       "name": "shell-command-hygiene",
       "path": "software-development/shell-command-hygiene"
+    },
+    {
+      "description": "Parallel 3-agent cleanup of recent code changes.",
+      "name": "simplify-code",
+      "path": "software-development/simplify-code"
     },
     {
       "description": "Class-level software delivery workflow: planning, spikes, TDD, debugging, runtime debuggers, pre-commit review, and verification.",
