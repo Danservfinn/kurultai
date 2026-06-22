@@ -83,7 +83,7 @@
       "path": ".archive/design-md"
     },
     {
-      "description": "",
+      "description": "Exploratory QA of web apps: find bugs, evidence, reports.",
       "name": "dogfood",
       "path": ".archive/dogfood"
     },
@@ -138,7 +138,7 @@
       "path": ".archive/github-repo-management"
     },
     {
-      "description": "",
+      "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
       "name": "godmode",
       "path": ".archive/godmode"
     },
@@ -178,12 +178,12 @@
       "path": ".archive/imessage"
     },
     {
-      "description": "",
+      "description": "Iterative Python via live Jupyter kernel (hamelnb).",
       "name": "jupyter-live-kernel",
       "path": ".archive/jupyter-live-kernel"
     },
     {
-      "description": "",
+      "description": "Decomposition playbook + anti-temptation rules for an orchestrator profile routing work through Kanban. The \"don't do the work yourself\" rule and the basic lifecycle are auto-injected into every kanban worker's system prompt; this skill is the deeper playbook when you're specifically playing the orchestrator role.",
       "name": "kanban-orchestrator",
       "path": ".archive/kanban-orchestrator"
     },
@@ -228,6 +228,11 @@
       "path": ".archive/nano-pdf"
     },
     {
+      "description": "MCP client: connect servers, register tools (stdio/HTTP).",
+      "name": "native-mcp",
+      "path": ".archive/native-mcp"
+    },
+    {
       "description": "Debug Node.js via --inspect + Chrome DevTools Protocol CLI.",
       "name": "node-inspect-debugger",
       "path": ".archive/node-inspect-debugger"
@@ -243,7 +248,7 @@
       "path": ".archive/obliteratus"
     },
     {
-      "description": "",
+      "description": "Read, search, create, and edit notes in the Obsidian vault.",
       "name": "obsidian",
       "path": ".archive/obsidian"
     },
@@ -371,6 +376,11 @@
       "description": "",
       "name": "touchdesigner-mcp",
       "path": ".archive/touchdesigner-mcp"
+    },
+    {
+      "description": "Webhook subscriptions: event-driven agent runs.",
+      "name": "webhook-subscriptions",
+      "path": ".archive/webhook-subscriptions"
     },
     {
       "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
