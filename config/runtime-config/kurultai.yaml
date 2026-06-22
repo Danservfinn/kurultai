@@ -1,5 +1,7 @@
 kurultai:
   chair: kublai
+  chair_display_name: "${CHAIR_DISPLAY_NAME:-Kublai}"
+  identity_config: identity.yaml
   coordination_substrate: native-hermes
   task_router: native-kanban
   kanban_db: "~/.hermes/kanban.db"

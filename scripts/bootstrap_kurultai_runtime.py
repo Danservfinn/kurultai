@@ -10,6 +10,7 @@ CONFIG = ROOT / "config" / "runtime-config"
 DEFAULT_STAGING = Path.home() / ".kurultai-rebuild-staging"
 
 FILES = [
+    "identity.yaml",
     "hermes.template.yaml",
     "profiles.yaml",
     "kurultai.yaml",
@@ -20,6 +21,21 @@ FILES = [
     "skills.manifest.json",
     "kanban.schema.json",
     "brain.manifest.json",
+]
+
+BRAIN_DIRECTORIES = [
+    "entities",
+    "projects",
+    "infrastructure",
+    "concepts",
+    "analyses",
+    "docs/plans",
+    "raw/assets",
+    "queue",
+    "generated",
+    "receipts",
+    "operations",
+    "content/artifacts",
 ]
 
 
@@ -74,16 +90,12 @@ def main() -> None:
         hermes_home / "skills",
         hermes_home / "cron",
         brain_root,
-        brain_root / "entities",
-        brain_root / "projects",
-        brain_root / "infrastructure",
-        brain_root / "concepts",
-        brain_root / "analyses",
-        brain_root / "docs" / "plans",
-        brain_root / "raw" / "assets",
         staging,
     ]:
         ensure_dir(directory, args.dry_run)
+
+    for rel in BRAIN_DIRECTORIES:
+        ensure_dir(brain_root / rel, args.dry_run)
 
     for name in FILES:
         copy_file(CONFIG / name, staging / name, args.dry_run)

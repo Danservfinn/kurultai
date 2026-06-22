@@ -16,7 +16,7 @@ You are expected to know and execute these domains end-to-end:
 - Skill installation/reconciliation from `config/runtime-config/skills.manifest.json`.
 - Cron reconstruction from `config/runtime-config/cron.manifest.json`, preserving script-only jobs where possible.
 - Local LLM runtime selection for Tolui, including hardware-fit fallback.
-- Dual Telegram gateway setup: Kublai primary gateway and Ogedei operations/intake gateway.
+- Dual Telegram gateway setup: customizable main chair/Kublai primary gateway and Ogedei operations/intake gateway.
 - OS service installation on macOS, Linux, and Windows only after foreground smoke tests pass.
 - Secret hygiene, rollback, receipts, and final verification.
 
@@ -28,15 +28,16 @@ Before changing the host, read these files from the repo:
 2. `docs/operations/kurultai-rebuild-runbook.md`
 3. `docs/operations/full-installation-checklist.md`
 4. `docs/operations/fresh-install-agent-prompt.md`
-5. `config/runtime-config/hermes.template.yaml`
-6. `config/runtime-config/profiles.yaml`
-7. `config/runtime-config/kurultai.yaml`
-8. `config/runtime-config/brain.yaml`
-9. `config/runtime-config/gateways.yaml`
-10. `config/runtime-config/cron.manifest.json`
-11. `config/runtime-config/skills.manifest.json`
-12. `config/runtime-config/kanban.schema.json`
-13. `config/runtime-config/brain.manifest.json`
+5. `config/runtime-config/identity.yaml`
+6. `config/runtime-config/hermes.template.yaml`
+7. `config/runtime-config/profiles.yaml`
+8. `config/runtime-config/kurultai.yaml`
+9. `config/runtime-config/brain.yaml`
+10. `config/runtime-config/gateways.yaml`
+11. `config/runtime-config/cron.manifest.json`
+12. `config/runtime-config/skills.manifest.json`
+13. `config/runtime-config/kanban.schema.json`
+14. `config/runtime-config/brain.manifest.json`
 
 Quote the relevant contract line in your local receipt before applying a major phase.
 
@@ -74,7 +75,18 @@ Create a receipt outside the repository:
 
 Record commands/results, but redact secrets and account identifiers.
 
-### 3. Prerequisites and Hermes
+### 3. Identity and naming
+
+Ask for or read installer arguments for:
+
+- Operator name.
+- System name.
+- Main chair/Kublai user-visible display name.
+- Main chair BotFather display name.
+
+Run `python3 scripts/install_kurultai.py --doctor`, then `--dry-run` with the chosen names, then `--interactive` or `--apply`. Keep internal profile id `kublai` unless the operator explicitly asks for profile-id rename. Write names only into local generated identity/receipt files; they are not secrets, but live tokens and chat IDs remain private.
+
+### 4. Prerequisites and Hermes
 
 Install/verify prerequisites using the host's native package manager. Install Hermes using the official path when available. Verify:
 
@@ -88,7 +100,7 @@ hermes config check
 
 If a command differs, record the discovered equivalent.
 
-### 4. Frontier model configuration
+### 5. Frontier model configuration
 
 Configure and verify:
 
@@ -99,11 +111,11 @@ Configure and verify:
 
 Authenticate through OAuth or local secret store only. Do not write credentials into repo files.
 
-### 5. Brain
+### 6. Brain
 
 Create Brain directories from `brain.yaml` and `brain.manifest.json`. Seed `brain/AGENTS.md`, `brain/templates/page.md`, `home.md`, and `index.md` where absent. Write a harmless receipt proving the Brain is writable. If QMD is present, run update/embed; if absent, record as optional pending.
 
-### 6. Profiles
+### 7. Profiles
 
 Create/verify:
 
@@ -121,11 +133,11 @@ Create/verify:
 
 Apply role/model intent from `profiles.yaml`. Preserve existing private profile state.
 
-### 7. Local LLM lane
+### 8. Local LLM lane
 
 Inspect hardware and choose the strongest practical local model. Prefer the repo's Tolui target when feasible. Mark Tolui as lightweight/no-tool-call until tool-call behavior is verified. Run one harmless local prompt and record model/latency.
 
-### 8. Skills
+### 9. Skills
 
 Reconcile against `skills.manifest.json`:
 
@@ -134,24 +146,25 @@ Reconcile against `skills.manifest.json`:
 - List missing private skills as follow-up; do not silently skip.
 - Run `hermes skills list` or equivalent.
 
-### 9. Kanban
+### 10. Kanban
 
 Initialize native Hermes Kanban. Compare schema where possible. Run a harmless create/complete/cancel smoke test and record only the local test ID in the receipt.
 
-### 10. Cron
+### 11. Cron
 
 Recreate jobs from `cron.manifest.json` conservatively:
 
 - Restore redacted delivery targets only from local private configuration.
+- Create only jobs whose referenced scripts exist locally; record missing-script jobs from the public manifest as private follow-up instead of creating broken jobs.
 - Keep script-only/no-agent jobs script-only.
 - Prefer `deliver: local` until Telegram is verified.
 - Avoid high-frequency LLM jobs unless explicitly justified.
 
-### 11. Dual gateways
+### 12. Dual gateways
 
-Read `gateways.yaml`. Configure separate Telegram bots if credentials are supplied:
+Read `gateways.yaml` and the generated local identity file. Configure separate Telegram bots if credentials are supplied:
 
-- Kublai: `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`, profile `kublai`, service `hermes-gateway-kublai`.
+- Main chair/Kublai: generated chair env var, default `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`, default profile `kublai`, service `hermes-gateway-kublai`, user-visible display name chosen at install time.
 - Ogedei: `KURULTAI_OGEDEI_TELEGRAM_BOT_TOKEN`, profile `ogedei`, service `hermes-gateway-ogedei`.
 
 Rules:
@@ -162,7 +175,7 @@ Rules:
 - Only then install LaunchAgent/systemd/Scheduled Task service.
 - Verify each bot replies from the correct identity.
 
-### 12. Final verification matrix
+### 13. Final verification matrix
 
 Run or discover equivalents for:
 
@@ -178,6 +191,8 @@ hermes --profile ogedei config check
 hermes --profile kublai gateway status
 hermes --profile ogedei gateway status
 python3 tests/validate_public_repo.py
+python3 scripts/install_kurultai.py --doctor
+python3 scripts/install_kurultai.py --dry-run --chair-display-name "Smoke Chair"
 python3 scripts/bootstrap_kurultai_runtime.py --dry-run
 ```
 
@@ -215,7 +230,7 @@ Return a concise report with:
 - Kanban smoke result.
 - Cron recreation summary.
 - Local LLM lane status.
-- Kublai gateway status.
+- Main chair/Kublai gateway status and chosen display name.
 - Ogedei gateway status.
 - Human-only remaining gates.
 - Receipt file path.

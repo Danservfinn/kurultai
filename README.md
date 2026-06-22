@@ -24,12 +24,13 @@ Start by cloning or opening the repository, then read and follow these files in 
 2. agents/hermes-install-expert.md
 3. docs/operations/full-installation-checklist.md
 
-If scripts/install_kurultai.py exists, prefer it and run its doctor/dry-run/interactive flow before falling back to scripts/bootstrap_kurultai_runtime.py. If the installer is missing or incomplete, use docs/operations/interactive-installer-implementation-prompt.md to implement or repair it first.
+Run `scripts/install_kurultai.py` first: `--doctor`, then a personalized `--dry-run`, then `--interactive` or `--apply`. Use `scripts/bootstrap_kurultai_runtime.py` only as a lower-level staging fallback, and use `docs/operations/interactive-installer-implementation-prompt.md` if a coding agent needs to repair or extend the installer.
 
 Required behavior:
 - Detect macOS, Linux, or Windows and choose platform-appropriate commands.
 - Install and verify Hermes Agent.
 - Guide the human through provider auth, Telegram/BotFather setup, and any optional integration credentials.
+- Ask what user-visible name should be attributed to the main chair/Kublai surface; preserve `kublai` as the default internal profile id unless the human explicitly wants a profile-id rename.
 - Create or verify the Brain root, Kurultai profiles, native Hermes Kanban, skills, cron jobs, receipts, and gateway setup.
 - Keep private Brain contents, live Kanban data, sessions, tokens, chat IDs, OAuth credentials, cookies, and API keys out of git.
 - Run the repository validation and available tests before reporting success.
@@ -367,6 +368,7 @@ Kurultai separates durable public architecture from private runtime state.
 
 The Brain contains the long-term operating memory: plans, receipts, proposals, analyses, content artifacts, and status surfaces. This repository contains the **sanitized rebuild contract** for that system:
 
+- `config/runtime-config/identity.yaml` — public naming/customization contract for the main chair/Kublai surface.
 - `config/runtime-config/hermes.template.yaml` — non-secret Hermes runtime contract.
 - `config/runtime-config/profiles.yaml` — Kurultai profile roster and model map.
 - `config/runtime-config/kurultai.yaml` — native coordination contract.
@@ -386,10 +388,33 @@ A fresh user can clone this repository and paste a single prompt into Claude Cod
 ```bash
 git clone https://github.com/Danservfinn/kurultai.git
 cd kurultai
+python3 scripts/install_kurultai.py --doctor
+python3 scripts/install_kurultai.py --dry-run --chair-display-name "Sophia's chosen name"
+python3 scripts/install_kurultai.py --interactive
+```
+
+The installer is the preferred path. It creates the non-secret Hermes/Brain/Kurultai scaffold, writes a local `identity.generated.yaml`, stages sanitized runtime contracts, produces cron/skill reconciliation reports, and leaves receipts outside git. It also asks what user-visible name to attribute to the main chair/Kublai surface; the stable internal profile id can remain `kublai` unless the operator explicitly wants a Hermes profile-id rename.
+
+For a non-interactive/scripting install, pass explicit names and paths:
+
+```bash
+python3 scripts/install_kurultai.py \
+  --apply \
+  --home "$HOME/.hermes" \
+  --brain "$HOME/brain" \
+  --chair-display-name "Sophia's Main Guy" \
+  --chair-bot-display-name "Sophia's Kublai Bot" \
+  --operator-name "Sophia" \
+  --system-name "Sophia's Kurultai"
+```
+
+The older bootstrap helper remains available for staging-only rebuild checks:
+
+```bash
 python3 scripts/bootstrap_kurultai_runtime.py --home "$HOME/.hermes-kurultai" --brain "$HOME/brain-kurultai" --dry-run
 ```
 
-To implement or repair the full guided installer, paste this file into Claude Code or Codex:
+If the guided installer ever needs repair, paste this file into Claude Code or Codex:
 
 ```text
 docs/operations/interactive-installer-implementation-prompt.md
@@ -460,7 +485,7 @@ See `.gitignore`, `docs/operations/kurultai-rebuild-runbook.md`, and `config/run
 
 | Profile | Role | Default lane |
 |---|---|---|
-| `kublai` | caretaker / orchestrator / synthesis | frontier model |
+| `kublai` | caretaker / orchestrator / synthesis; default internal id for the main chair, with user-visible display name configurable by `scripts/install_kurultai.py` | frontier model |
 | `batu` | retrieval / research intake / return path | frontier model |
 | `chagatai` | research, writing, synthesis, content | frontier model |
 | `jochi` | analysis, audit, scouting, alternatives | frontier model |
@@ -481,7 +506,7 @@ brain/                      public Brain/wiki schema and page templates
 profiles/                   public profile role templates
 docs/operations/            rebuild runbooks and fresh-install prompt
 docs/assets/readme/         README diagrams
-scripts/                    manifest export and rebuild staging helpers
+scripts/                    installer, manifest export, and rebuild staging helpers
 tests/                      public hygiene and retrieval-eval tests
 ```
 
@@ -491,6 +516,8 @@ Useful commands:
 
 ```bash
 python3 tests/validate_public_repo.py
+python3 scripts/install_kurultai.py --doctor
+python3 scripts/install_kurultai.py --dry-run --chair-display-name "Test Chair"
 python3 scripts/bootstrap_kurultai_runtime.py --home /tmp/hermes-kurultai --brain /tmp/brain-kurultai --dry-run
 python3 scripts/export_runtime_config_manifest.py
 python3 scripts/export_rebuild_manifests.py

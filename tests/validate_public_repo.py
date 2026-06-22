@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 errors: list[str] = []
 required = [
     'README.md', 'LICENSE', 'CONTRIBUTING.md', '.gitignore',
+    'scripts/install_kurultai.py',
+    'config/runtime-config/identity.yaml',
     'config/runtime-config/hermes.template.yaml',
     'config/runtime-config/profiles.yaml',
     'config/runtime-config/brain.yaml',

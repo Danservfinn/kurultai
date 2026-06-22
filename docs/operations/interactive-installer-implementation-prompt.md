@@ -10,7 +10,7 @@ Compatibility target: macOS, Linux, and Windows-native PowerShell. Do not requir
 You are implementing the Kurultai interactive installer in this repository. Do the work, not just a plan. Inspect the existing repository first, then add code, docs, tests, and verification receipts.
 
 Goal:
-Create a guided, resumable, cross-platform installer/doctor that helps a new user install and authenticate everything needed for a fully functional Kurultai system across macOS, Linux, and Windows-native PowerShell, while preserving the repository's public/secret boundary.
+Create a guided, resumable, cross-platform installer/doctor that helps a new user install and authenticate everything needed for a fully functional Kurultai system across macOS, Linux, and Windows-native PowerShell, while preserving the repository's public/secret boundary. The installer must also let the operator choose the user-visible name attributed to the main chair/Kublai surface while keeping `kublai` as the default stable internal profile id unless explicitly renamed.
 
 Repository contract to honor:
 - This repo is a sanitized rebuild contract, not a private backup.
@@ -67,6 +67,7 @@ Phase 0 — repository and platform discovery
 - Read required files and fail with a helpful message if missing:
   - agents/hermes-install-expert.md
   - config/runtime-config/install-expert.yaml
+  - config/runtime-config/identity.yaml
   - config/runtime-config/hermes.template.yaml
   - config/runtime-config/profiles.yaml
   - config/runtime-config/kurultai.yaml
@@ -81,7 +82,14 @@ Phase 0 — repository and platform discovery
 - Detect OS, shell, CPU architecture, RAM if feasible, Python executable/version, Git, Node/npm, package manager, and whether Hermes is already installed.
 - Write a redacted local receipt.
 
-Phase 1 — prerequisite guidance
+Phase 1 — identity and naming
+- Read `config/runtime-config/identity.yaml`.
+- Prompt for or accept CLI flags for operator name, system name, main chair display name, and main chair BotFather display name.
+- Keep the internal chair profile id `kublai` unless the operator explicitly asks to rename the profile id and confirms config propagation.
+- Write a local generated identity file outside git or in the local staging directory; do not write secrets.
+- Use the chosen display name in generated next-step docs, profile description guidance, BotFather instructions, receipts, and final reports.
+
+Phase 2 — prerequisite guidance
 - Detect missing prerequisites:
   - git
   - Python 3.12+ or best available Python 3
@@ -97,7 +105,7 @@ Phase 1 — prerequisite guidance
 - In --interactive mode, ask before running package-manager install commands.
 - In --doctor/--dry-run, only report commands.
 
-Phase 2 — Hermes Agent installation and verification
+Phase 3 — Hermes Agent installation and verification
 - Detect hermes with shutil.which("hermes").
 - If absent, present the official install path from Hermes docs or the repository's existing install prompt.
 - In --interactive mode, ask before running a network installer.
@@ -108,7 +116,7 @@ Phase 2 — Hermes Agent installation and verification
   - hermes config check
 - Record pass/fail/non-blocking warnings.
 
-Phase 3 — frontier provider authentication/configuration
+Phase 4 — frontier provider authentication/configuration
 - Guide OpenAI Codex OAuth / provider setup.
 - Do not ask the user to paste secrets into tracked files.
 - Prefer Hermes commands when available; otherwise print exact manual steps.
@@ -120,7 +128,7 @@ Phase 3 — frontier provider authentication/configuration
   - compression.threshold: 0.25
 - Run hermes config check after changes when Hermes is available.
 
-Phase 4 — Brain setup
+Phase 5 — Brain setup
 - Default Brain root:
   - POSIX: ~/brain
   - Windows: %USERPROFILE%\brain
@@ -137,13 +145,14 @@ Phase 4 — Brain setup
 - If qmd is installed, offer qmd update/embed; otherwise mark qmd as optional pending.
 - Verify a harmless receipt write outside git or under the Brain receipts directory if appropriate.
 
-Phase 5 — apply sanitized runtime manifests
-- Reuse or call scripts/bootstrap_kurultai_runtime.py where helpful.
-- Stage sanitized config under ~/.kurultai-rebuild-staging or Windows equivalent.
+Phase 6 — apply sanitized runtime manifests
+- Prefer scripts/install_kurultai.py for doctor/dry-run/apply/interactive flows.
+- Reuse or call scripts/bootstrap_kurultai_runtime.py only for lower-level staging compatibility checks.
+- Stage sanitized config under ~/.kurultai-install/staging or Windows equivalent.
 - Do not blindly apply staged config over live private config.
 - Provide a merge checklist for local private config.
 
-Phase 6 — profiles
+Phase 7 — profiles
 - Ensure or guide creation of profiles:
   - kublai
   - batu
@@ -160,7 +169,7 @@ Phase 6 — profiles
 - Preserve existing profile-local config and secrets.
 - Verify profile list and profile config checks where available.
 
-Phase 7 — local LLM lane
+Phase 8 — local LLM lane
 - Detect feasible local model runtime:
   - Ollama
   - llama.cpp / llama-server
@@ -172,29 +181,30 @@ Phase 7 — local LLM lane
 - Configure Tolui as local lightweight triage/summarization/classification only until tool-calling is verified.
 - Run a one-sentence local smoke test if runtime is installed.
 
-Phase 8 — skills
+Phase 9 — skills
 - Read config/runtime-config/skills.manifest.json.
 - Reconcile installed skills with the manifest.
 - Clearly list missing private skills as follow-up; do not pretend they installed.
 - Do not copy private skills into git.
 
-Phase 9 — native Kanban
+Phase 10 — native Kanban
 - Initialize/verify native Hermes Kanban where supported.
 - Run harmless create/complete/cancel smoke test if Hermes commands are available.
 - Record only redacted/non-secret task evidence in the local receipt.
 
-Phase 10 — cron
+Phase 11 — cron
 - Read config/runtime-config/cron.manifest.json.
 - Recreate or print creation commands for jobs conservatively.
+- Do not create jobs whose referenced script is missing; record those as private follow-up in cron reconciliation.
 - Default delivery to local until Telegram is configured.
 - Preserve script-only/no_agent jobs as script-only to avoid token waste.
 - Do not create high-frequency LLM cron jobs unless the manifest explicitly requires it and the user approves.
 - Verify with hermes cron list --all when available.
 
-Phase 11 — Telegram dual gateway setup
+Phase 12 — Telegram dual gateway setup
 - Use config/runtime-config/gateways.yaml as the non-secret contract.
 - Guide the user through BotFather for two separate bots:
-  - Kublai primary operator/chair gateway.
+  - Main chair/Kublai primary operator gateway, using the chosen user-visible display and bot name.
   - Ogedei operations/intake gateway.
 - Store bot tokens only in local secret stores / untracked env files / profile-local secret storage.
 - Never print tokens back to the terminal or receipt.
@@ -203,7 +213,7 @@ Phase 11 — Telegram dual gateway setup
 - Verify each gateway independently with /start, /sethome if supported, /help or /status, and identity-specific response.
 - Ensure the root/default gateway does not also own the Ogedei token if a profile-local Ogedei gateway is installed.
 
-Phase 12 — optional integrations
+Phase 13 — optional integrations
 - Make integrations modular and explicitly gated:
   - GitHub
   - Google Workspace/Gmail
@@ -217,7 +227,7 @@ Phase 12 — optional integrations
 - For each integration, implement detect -> explain credential -> authenticate/guidance -> smoke test -> receipt.
 - Do not require optional integrations for the base install to pass.
 
-Phase 13 — final report
+Phase 14 — final report
 - Print a concise final report with pass/fail/pending statuses:
   - OS/platform
   - Hermes install

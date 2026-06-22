@@ -2,6 +2,8 @@ gateways:
   kublai:
     purpose: operator-facing chair gateway
     profile: kublai
+    display_name: "${CHAIR_DISPLAY_NAME:-Kublai}"
+    bot_display_name: "${CHAIR_BOT_DISPLAY_NAME:-Kurultai Kublai}"
     platforms:
       telegram:
         enabled: true

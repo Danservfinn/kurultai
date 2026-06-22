@@ -1,5 +1,7 @@
 runtime:
   identity: kublai
+  identity_display_name: "${CHAIR_DISPLAY_NAME:-Kublai}"
+  identity_config: identity.yaml
   default_provider: openai-codex
   default_model: gpt-5.5
   context_length: 1000000

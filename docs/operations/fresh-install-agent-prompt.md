@@ -17,6 +17,7 @@ Non-negotiable constraints:
 - Configure the frontier runtime as Hermes `openai-codex` / `gpt-5.5`, `model.context_length: 1000000`, and `compression.threshold: 0.25`.
 - Configure a local LLM lane for lightweight triage/Tolui. The system should choose the best local model it can run. Prefer Jackrong/Qwen3.5-9B-DeepSeek-V4-Flash-GGUF through a local OpenAI-compatible server or Ollama/HF GGUF import. If hardware cannot run it, choose the strongest local Qwen/Gemma-class model that fits memory, record the chosen model, and mark it as no-tool-call/lightweight-only until verified.
 - Telegram bot setup must be included and, when the user supplies the BotFather token, performed by you through Hermes gateway setup/configuration.
+- Ask the user what display name they want attributed to the main chair/Kublai surface. Use that name everywhere user-visible: BotFather display name, local generated identity config, profile description, receipts, and final report. Keep internal profile id `kublai` unless the user explicitly asks for a profile-id rename.
 - Windows installation must work. Use PowerShell equivalents and avoid Bash-only assumptions unless running under WSL2.
 
 Repository contract to honor:
@@ -25,19 +26,23 @@ Repository contract to honor:
 - Install expert manifest: `config/runtime-config/install-expert.yaml`.
 - Main rebuild guide: `docs/operations/kurultai-rebuild-runbook.md`.
 - Full completion checklist: `docs/operations/full-installation-checklist.md`.
-- Gateway contract: `config/runtime-config/gateways.yaml`; install Kublai and Ogedei as separate gateways when credentials are supplied.
+- Gateway contract: `config/runtime-config/gateways.yaml`; install the main chair/Kublai and Ogedei as separate gateways when credentials are supplied.
+- Identity/name contract: `config/runtime-config/identity.yaml`; write local generated identity config from the user's chosen display names.
 - This repo is a non-secret rebuild contract, not a private backup.
 - Brain wiki default root: `~/brain` on POSIX, `%USERPROFILE%\brain` on Windows.
 - Hermes home default: `~/.hermes` on POSIX, `%USERPROFILE%\.hermes` on Windows unless Hermes itself reports another path.
 
-Phase 0 — become the install expert, detect platform, and make a log
+Phase 0 — become the install expert, detect platform, choose names, and make a log
 0. Read `agents/hermes-install-expert.md` and adopt it as your operating contract for this install. Then read `config/runtime-config/install-expert.yaml` and confirm that the listed required-reading files exist.
 1. Detect OS, shell, CPU arch, RAM, GPU, Python version, Git, Node/npm, and whether the current directory is a git checkout.
-2. Create a local receipt directory outside git:
+2. Ask the user what display name should be attributed to the main chair/Kublai surface. If they do not care, default to `Kublai`. Also ask/derive the BotFather display name, operator name, and system name. Run the installer with those values, for example:
+   - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --dry-run --chair-display-name "<chosen name>" --operator-name "<operator>"`
+   - Windows PowerShell: `py -3 scripts\install_kurultai.py --dry-run --chair-display-name "<chosen name>" --operator-name "<operator>"`
+3. Create a local receipt directory outside git:
    - POSIX: `~/.kurultai-install/receipts/`
    - Windows: `$env:USERPROFILE\.kurultai-install\receipts\`
-3. Save all commands/results that do not contain secrets into an install receipt file named `install-YYYYMMDD-HHMMSS.md`.
-4. If existing Hermes/Brain/Kurultai data is present, back up before changing it:
+4. Save all commands/results that do not contain secrets into an install receipt file named `install-YYYYMMDD-HHMMSS.md`.
+5. If existing Hermes/Brain/Kurultai data is present, back up before changing it:
    - POSIX: `~/.hermes` → `~/.hermes.backup.<timestamp>` metadata-only if full copy is too large.
    - Windows: `%USERPROFILE%\.hermes` → `%USERPROFILE%\.hermes.backup.<timestamp>` metadata-only if full copy is too large.
 
@@ -101,27 +106,24 @@ Phase 4 — create Brain directories and indexes
 5. If `qmd` is absent, record it as pending and keep Brain directories usable.
 6. Brain canonical storage is Brain service, SQLite-compatible receipts, and QMD-style indexes.
 
-Phase 5 — apply sanitized runtime manifests and prefer the interactive installer when available
-1. If `scripts/install_kurultai.py` exists in this checkout, run its read-only checks first:
+Phase 5 — apply sanitized runtime manifests with the installer
+1. Run the installer's read-only checks first:
    - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --doctor`
    - Windows PowerShell: `py -3 scripts\install_kurultai.py --doctor` or `python scripts\install_kurultai.py --doctor`
-2. Then run its guided mode if available and appropriate:
-   - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --interactive`
-   - Windows PowerShell: `py -3 scripts\install_kurultai.py --interactive` or `python scripts\install_kurultai.py --interactive`
-3. If `scripts/install_kurultai.py` does not exist yet, implement it from `docs/operations/interactive-installer-implementation-prompt.md` or continue with the existing bootstrap script.
-4. Run the bootstrap script from this repository:
-   - POSIX/macOS/Linux: `python3 scripts/bootstrap_kurultai_runtime.py --dry-run`
-   - Windows PowerShell: `py -3 scripts\bootstrap_kurultai_runtime.py --dry-run` or `python scripts\bootstrap_kurultai_runtime.py --dry-run`
-5. If it looks correct, run the non-dry-run form:
-   - POSIX/macOS/Linux: `python3 scripts/bootstrap_kurultai_runtime.py`
-   - Windows PowerShell: `py -3 scripts\bootstrap_kurultai_runtime.py` or `python scripts\bootstrap_kurultai_runtime.py`
-6. Review staged files under `~/.kurultai-rebuild-staging/` or Windows equivalent if the script uses the current user's home.
-7. Use `config/runtime-config/hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
-8. Do not blindly overwrite a user's existing private config. Merge non-secret settings and preserve local credentials.
+2. Run a personalized dry-run with the chosen names:
+   - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --dry-run --chair-display-name "<chosen name>" --operator-name "<operator>"`
+   - Windows PowerShell: `py -3 scripts\install_kurultai.py --dry-run --chair-display-name "<chosen name>" --operator-name "<operator>"`
+3. Then run the guided or explicit apply mode:
+   - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --interactive` or `python3 scripts/install_kurultai.py --apply --chair-display-name "<chosen name>"`
+   - Windows PowerShell: `py -3 scripts\install_kurultai.py --interactive` or `py -3 scripts\install_kurultai.py --apply --chair-display-name "<chosen name>"`
+4. Review staged files under `~/.kurultai-install/staging/` or Windows equivalent.
+5. Use `config/runtime-config/identity.yaml`, `hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
+6. Do not blindly overwrite a user's existing private config. Merge non-secret settings and preserve local credentials.
+7. The older `scripts/bootstrap_kurultai_runtime.py` may be used for staging-only checks, but the guided installer is the preferred path.
 
 Phase 6 — create Kurultai Hermes profiles
 Create these Hermes profiles if missing, preserving existing profiles if present:
-- `kublai`: caretaker/orchestrator, provider `openai-codex`, model `gpt-5.5`.
+- `kublai`: default internal id for the main chair/caretaker/orchestrator, provider `openai-codex`, model `gpt-5.5`; user-visible display name comes from the installer's chosen `chair_display_name`.
 - `batu`: retrieval/research intake and return-path compilation, provider `openai-codex`, model `gpt-5.5`.
 - `chagatai`: research/writing/content synthesis, provider `openai-codex`, model `gpt-5.5`.
 - `jochi`: analysis/audit, provider `openai-codex`, model `gpt-5.5`.
@@ -188,12 +190,13 @@ Phase 9 — initialize native Kanban and process directories
 
 Phase 10 — recreate cron jobs from sanitized manifest
 1. Read `config/runtime-config/cron.manifest.json`.
-2. Recreate jobs with sanitized prompts/schedules and redacted delivery targets.
-3. For delivery:
+2. Recreate jobs with sanitized prompts/schedules and redacted delivery targets only when any referenced scripts exist locally.
+3. Jobs whose `script` file is absent from this public repo must be recorded as private-follow-up in `cron.reconciliation.json`; do not create broken cron jobs pointing at missing scripts.
+4. For delivery:
    - Use `local` by default until Telegram is configured.
    - Switch selected operator-facing jobs to Telegram only after `/sethome` or explicit target verification.
-4. Preserve script-only jobs as script-only where possible to reduce token usage.
-5. Include these operating patterns:
+5. Preserve script-only jobs as script-only where possible to reduce token usage.
+6. Include these operating patterns:
    - Frequent telemetry/canaries should be script-first and silent unless action is needed.
    - Token reduction is a primary goal: avoid high-frequency LLM cron unless there is a strong reason.
    - Compression-threshold drift monitor should verify `compression.threshold == 0.25` when main context is 1M and aux compression context is smaller.
@@ -202,7 +205,7 @@ Phase 10 — recreate cron jobs from sanitized manifest
 Phase 11 — Telegram bot setup and dual gateway configuration
 Do the setup if the user supplies the credentials. If they do not yet have bots, guide them through BotFather exactly and then continue. The target topology is two separate Hermes gateways:
 
-- Kublai gateway: primary operator/chair interface, profile `kublai`, separate Telegram bot credential.
+- Main chair/Kublai gateway: primary operator/chair interface, default profile `kublai`, separate Telegram bot credential, user-visible name from the installer's chosen `chair_display_name`.
 - Ogedei gateway: operations/intake interface, profile `ogedei`, separate Telegram bot credential.
 
 Read `config/runtime-config/gateways.yaml` before configuring either gateway.
@@ -210,7 +213,7 @@ Read `config/runtime-config/gateways.yaml` before configuring either gateway.
 BotFather directions for the user:
 1. Open Telegram and message `@BotFather`.
 2. Send `/newbot`.
-3. Create one bot for Kublai, e.g. display name `Kurultai Kublai`, username ending in `bot`.
+3. Create one bot for the main chair, using the chosen display name from `identity.generated.yaml`, e.g. `Sophia's Kublai Bot` or `Kurultai <chosen chair name>`, username ending in `bot`.
 4. Create a second bot for Ogedei, e.g. display name `Kurultai Ogedei`, username ending in `bot`.
 5. Copy each bot credential. Treat both as secrets. Do not paste them into the repo.
 6. Optional but recommended:
@@ -220,7 +223,7 @@ BotFather directions for the user:
    - `/setcommands` with at least: `help`, `status`, `restart`, `sethome`, `approve`, `deny`, `platforms` if Hermes supports them.
 
 Installer actions after credentials are available:
-1. Put the Kublai credential only into Hermes's local secret store (`hermes config env-path` / `.env`) or `hermes gateway setup`; never into git. Suggested env name: `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`.
+1. Put the main chair credential only into Hermes's local secret store (`hermes config env-path` / `.env`) or `hermes gateway setup`; never into git. Suggested env name defaults to `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`, or the env name generated in `identity.generated.yaml` if the profile id was renamed.
 2. Put the Ogedei credential only into Ogedei/profile-local secret storage or the local secret store; never into git. Suggested env name: `KURULTAI_OGEDEI_TELEGRAM_BOT_TOKEN`.
 3. Configure Telegram for profile `kublai` and profile `ogedei` separately. Use Hermes commands when available, for example `hermes --profile kublai gateway setup` and `hermes --profile ogedei gateway setup`, or directly edit the profile-local config paths after verifying them with Hermes docs/CLI.
 4. Prefer long polling for private fresh installs. Use webhook only if the machine has a stable public HTTPS endpoint and the user explicitly wants it.

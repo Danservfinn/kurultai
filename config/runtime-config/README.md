@@ -12,6 +12,7 @@ Live sources:
 
 Committed files:
 
+- `identity.yaml`: default public naming contract; the installer writes `identity.generated.yaml` locally so Sophia can attribute any user-visible name to the main chair/Kublai surface without committing private state.
 - `hermes.template.yaml`: sanitized Hermes runtime contract.
 - `profiles.yaml`: Kurultai profile roster and model/provider map.
 - `kurultai.yaml`: coordination contract.

@@ -1,0 +1,25 @@
+identity:
+  system_name: Kurultai
+  operator_name_placeholder: "local-operator"
+  naming_policy:
+    user_visible_names_are_customizable: true
+    stable_internal_profile_ids_are_allowed: true
+    installer_must_prompt_for_chair_display_name: true
+    installer_must_write_generated_local_identity: true
+  chair:
+    profile_id: kublai
+    display_name: Kublai
+    role_label: "main chair / caretaker / orchestrator"
+    bot_display_name: "Kurultai Kublai"
+    telegram_token_env: KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN
+    notes: "Fresh installs may keep profile_id=kublai while changing every user-visible attribution to the operator's chosen name. Rename the profile id only with explicit operator intent and config propagation."
+  operations_gateway:
+    profile_id: ogedei
+    display_name: Ogedei
+    role_label: "operations / intake gateway"
+    bot_display_name: "Kurultai Ogedei"
+    telegram_token_env: KURULTAI_OGEDEI_TELEGRAM_BOT_TOKEN
+  generated_local_files:
+    - "identity.generated.yaml"
+    - "INSTALL-NEXT-STEPS.md"
+  secret_boundary: "Names are public/non-secret. Bot tokens, chat IDs, OAuth files, sessions, private Brain indexes, and delivery targets remain local/private."

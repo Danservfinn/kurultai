@@ -12,17 +12,17 @@ Preferred installer implementation prompt:
 docs/operations/interactive-installer-implementation-prompt.md
 ```
 
-Preferred future command surface for a completed guided installer:
+Preferred guided installer command surface:
 
 ```bash
 python3 scripts/install_kurultai.py --doctor
-python3 scripts/install_kurultai.py --dry-run
+python3 scripts/install_kurultai.py --dry-run --chair-display-name "Sophia's chosen name"
 python3 scripts/install_kurultai.py --interactive
 python3 scripts/install_kurultai.py --resume
 python3 scripts/install_kurultai.py --write-plan
 ```
 
-Until that installer exists in the checkout, use `scripts/bootstrap_kurultai_runtime.py` plus `docs/operations/fresh-install-agent-prompt.md`.
+Use `scripts/bootstrap_kurultai_runtime.py` only as a lower-level staging helper or compatibility fallback.
 
 ## Completion definition
 
@@ -31,27 +31,29 @@ A host is fully installed when all of these are true:
 1. Hermes Agent is installed and `hermes doctor` / `hermes config check` pass or have documented non-blocking warnings.
 2. Frontier runtime is configured for `openai-codex` / `gpt-5.5`, 1M context, and compression threshold `0.25`.
 3. The Brain directory exists, contains the public schema/template files, and can accept a receipt write.
-4. Kurultai profiles exist: `kublai`, `batu`, `chagatai`, `jochi`, `temujin`, `coder`, `mongke`, `ogedei`, `subc`, `tolui`, and non-routable `codex` compatibility if supported by the installed Hermes version.
-5. Native Hermes Kanban is initialized and a harmless create/complete/cancel smoke test has run.
-6. Skills are installed or reconciled against `config/runtime-config/skills.manifest.json`; missing private skills are listed as private follow-up rather than silently skipped.
-7. Cron jobs are recreated from `config/runtime-config/cron.manifest.json` with redacted delivery targets restored only from local private configuration.
-8. The local LLM lane for Tolui is installed or explicitly deferred with hardware reason and a selected fallback plan.
-9. Two Hermes Telegram gateways are configured when bot credentials are supplied:
-   - Kublai primary operator gateway.
-   - Ogedei dedicated operations/intake gateway.
-10. Verification receipts are written outside git and contain no secrets.
+4. The main chair profile exists with the operator's chosen user-visible name applied from `config/runtime-config/identity.yaml` / local `identity.generated.yaml`; the default stable internal profile id is `kublai` unless explicitly renamed.
+5. Kurultai profiles exist: `kublai`, `batu`, `chagatai`, `jochi`, `temujin`, `coder`, `mongke`, `ogedei`, `subc`, `tolui`, and non-routable `codex` compatibility if supported by the installed Hermes version.
+6. Native Hermes Kanban is initialized and a harmless create/complete/cancel smoke test has run.
+7. Skills are installed or reconciled against `config/runtime-config/skills.manifest.json`; missing private skills are listed as private follow-up rather than silently skipped.
+8. Cron jobs are recreated from `config/runtime-config/cron.manifest.json` only when any referenced scripts exist locally; missing-script jobs are listed as private follow-up rather than created broken.
+9. The local LLM lane for Tolui is installed or explicitly deferred with hardware reason and a selected fallback plan.
+10. Two Hermes Telegram gateways are configured when bot credentials are supplied:
+    - Main chair/Kublai primary operator gateway, using the operator's chosen display/bot name.
+    - Ogedei dedicated operations/intake gateway.
+11. Verification receipts are written outside git and contain no secrets.
 
 ## Gateway installation contract
 
-Use `config/runtime-config/gateways.yaml` as the non-secret contract.
+Use `config/runtime-config/gateways.yaml` and `config/runtime-config/identity.yaml` as the non-secret contract. The default internal chair profile id is `kublai`, but the user-visible chair name and BotFather display name are installer inputs.
 
-### Kublai gateway
+### Main chair/Kublai gateway
 
-- Profile: `kublai`.
+- Profile: `kublai` by default, or the explicitly selected chair profile id if the operator intentionally renames it.
+- User-visible attribution: chosen through `scripts/install_kurultai.py --chair-display-name ...` or `--interactive`.
 - Telegram bot: separate BotFather bot for the chair/operator interface.
-- Secret environment variable name: `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`.
-- Service name suggestion: `hermes-gateway-kublai`.
-- Foreground smoke command shape: `hermes --profile kublai gateway run`.
+- Secret environment variable name: generated from the selected profile id, default `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`.
+- Service name suggestion: `hermes-gateway-kublai` unless the profile id is renamed.
+- Foreground smoke command shape: `hermes --profile kublai gateway run` or the selected profile id equivalent.
 
 ### Ogedei gateway
 
@@ -95,19 +97,20 @@ Start with a foreground PowerShell smoke test. Only after it works, create a Sch
 
 ## Agent execution order
 
-1. Read `agents/hermes-install-expert.md`, `config/runtime-config/install-expert.yaml`, `config/runtime-config/*.yaml`, `*.json`, this checklist, and `fresh-install-agent-prompt.md`.
+1. Read `agents/hermes-install-expert.md`, `config/runtime-config/install-expert.yaml`, `config/runtime-config/identity.yaml`, `config/runtime-config/*.yaml`, `*.json`, this checklist, and `fresh-install-agent-prompt.md`.
 2. Detect host OS and write a receipt path outside git.
-3. Install prerequisites and Hermes.
-4. Configure frontier model and compression.
-5. Create Brain directories and indexes.
-6. Create profiles and role templates.
-7. Install/reconcile skills.
-8. Initialize Kanban and receipts.
-9. Configure local LLM lane.
-10. Recreate cron jobs conservatively; keep delivery local until Telegram targets are verified.
-11. Configure Kublai gateway if the Kublai bot credential is available.
-12. Configure Ogedei gateway if the Ogedei bot credential is available.
-13. Run all canaries and write the final receipt.
+3. Ask or accept CLI args for the main chair's user-visible display name, BotFather display name, operator name, and system name; write only non-secret generated identity files outside git.
+4. Install prerequisites and Hermes.
+5. Configure frontier model and compression.
+6. Create Brain directories and indexes.
+7. Create profiles and role templates.
+8. Install/reconcile skills.
+9. Initialize Kanban and receipts.
+10. Configure local LLM lane.
+11. Recreate cron jobs conservatively; keep delivery local until Telegram targets are verified, and do not create jobs whose scripts are missing.
+12. Configure the main chair gateway if the chair bot credential is available.
+13. Configure Ogedei gateway if the Ogedei bot credential is available.
+14. Run all canaries and write the final receipt.
 
 ## Required verification commands
 

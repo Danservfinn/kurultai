@@ -6,6 +6,7 @@ install_expert:
     - docs/operations/kurultai-rebuild-runbook.md
     - docs/operations/full-installation-checklist.md
     - docs/operations/fresh-install-agent-prompt.md
+    - config/runtime-config/identity.yaml
     - config/runtime-config/hermes.template.yaml
     - config/runtime-config/profiles.yaml
     - config/runtime-config/kurultai.yaml

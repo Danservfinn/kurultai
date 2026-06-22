@@ -3,6 +3,7 @@ profiles:
     role: caretaker_orchestrator
     provider: openai-codex
     model: gpt-5.5
+    notes: "Default internal id for the main chair; user-visible display name is chosen during install via identity.yaml / identity.generated.yaml."
   batu:
     role: research_retrieval_intake
     provider: openai-codex
