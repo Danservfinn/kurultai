@@ -22,11 +22,13 @@ DEFAULT_RECEIPTS = Path.home() / ".kurultai-install" / "receipts"
 
 CONFIG_FILES = [
     "identity.yaml",
+    "agent-integration.yaml",
     "hermes.template.yaml",
     "profiles.yaml",
     "kurultai.yaml",
     "brain.yaml",
     "gateways.yaml",
+    "radar.yaml",
     "install-expert.yaml",
     "cron.manifest.json",
     "skills.manifest.json",
@@ -47,6 +49,9 @@ BRAIN_DIRECTORIES = [
     "projects",
     "infrastructure",
     "concepts",
+    "status",
+    "status/radar",
+    "status/radar/runs",
     "raw/assets",
 ]
 
@@ -76,6 +81,9 @@ class Identity:
     ogedei_bot_display_name: str
     operator_name: str
     system_name: str
+    existing_agent_name: str | None = None
+    existing_agent_profile_id: str | None = None
+    existing_agent_mode: str = "chair_profile"
 
     @property
     def chair_secret_env(self) -> str:
@@ -85,7 +93,7 @@ class Identity:
     def ogedei_secret_env(self) -> str:
         return f"KURULTAI_{env_slug('ogedei')}_TELEGRAM_BOT_TOKEN"
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "chair_profile_id": self.chair_profile_id,
             "chair_display_name": self.chair_display_name,
@@ -96,6 +104,9 @@ class Identity:
             "system_name": self.system_name,
             "chair_secret_env": self.chair_secret_env,
             "ogedei_secret_env": self.ogedei_secret_env,
+            "existing_agent_name": self.existing_agent_name,
+            "existing_agent_profile_id": self.existing_agent_profile_id,
+            "existing_agent_mode": self.existing_agent_mode,
         }
 
 
@@ -127,8 +138,24 @@ def validate_profile_id(value: str) -> str:
 
 
 def build_identity(args: argparse.Namespace) -> Identity:
+    existing_agent_name = validate_label("existing agent name", args.existing_agent_name) if args.existing_agent_name else None
+    if args.existing_agent_profile_id:
+        existing_agent_profile_id = validate_profile_id(args.existing_agent_profile_id)
+    elif existing_agent_name:
+        existing_agent_profile_id = validate_profile_id(env_slug(existing_agent_name).lower())
+    else:
+        existing_agent_profile_id = None
+    existing_agent_mode = validate_label("existing agent mode", args.existing_agent_mode)
+
     chair_profile_id = validate_profile_id(args.chair_profile_id)
-    chair_display_name = validate_label("chair display name", args.chair_display_name)
+    if existing_agent_profile_id and chair_profile_id == "kublai" and existing_agent_mode == "chair_profile":
+        chair_profile_id = existing_agent_profile_id
+
+    chair_display_name_value = args.chair_display_name
+    if existing_agent_name and args.chair_display_name == "Kublai" and existing_agent_mode == "chair_profile":
+        chair_display_name_value = existing_agent_name
+    chair_display_name = validate_label("chair display name", chair_display_name_value)
+
     default_bot_name = args.chair_bot_display_name or f"Kurultai {chair_display_name}"
     return Identity(
         chair_profile_id=chair_profile_id,
@@ -138,6 +165,9 @@ def build_identity(args: argparse.Namespace) -> Identity:
         ogedei_bot_display_name=validate_label("Ogedei bot display name", args.ogedei_bot_display_name),
         operator_name=validate_label("operator name", args.operator_name),
         system_name=validate_label("system name", args.system_name),
+        existing_agent_name=existing_agent_name,
+        existing_agent_profile_id=existing_agent_profile_id,
+        existing_agent_mode=existing_agent_mode,
     )
 
 
@@ -233,6 +263,34 @@ def brain_contract() -> dict[str, Any]:
     }
 
 
+def agent_integration_contract(identity: Identity) -> dict[str, Any]:
+    return {
+        "schema": "kurultai.agent-integration.v1",
+        "existing_agent_name": identity.existing_agent_name,
+        "existing_agent_profile_id": identity.existing_agent_profile_id,
+        "existing_agent_mode": identity.existing_agent_mode,
+        "policy": "Preserve existing agent memory/config; merge Kurultai role/config only after backup and operator approval for destructive changes.",
+        "example": "Sophia can map Cerberus to the chair profile with --existing-agent-name Cerberus --existing-agent-profile-id cerberus.",
+    }
+
+
+def radar_contract() -> dict[str, Any]:
+    return {
+        "schema": "kurultai.radar.v1",
+        "featured_skill": "radar",
+        "packet_schema": "RADAR_PACKET/v1",
+        "schema_version": "1.1",
+        "brain_paths": {
+            "latest_packet": "${BRAIN_ROOT}/status/radar/latest.json",
+            "run_packet": "${BRAIN_ROOT}/status/radar/runs/<run_id>/packet.json",
+            "run_brief": "${BRAIN_ROOT}/status/radar/runs/<run_id>/brief.md",
+            "run_receipts": "${BRAIN_ROOT}/status/radar/runs/<run_id>/receipts.md",
+        },
+        "max_authority_default": "draft_only",
+        "care_buckets": ["protect", "prepare", "propose", "close_loops"],
+    }
+
+
 def doctor_report(identity: Identity) -> dict[str, Any]:
     required_files = [str(Path("config/runtime-config") / name) for name in CONFIG_FILES]
     missing_required = [rel for rel in required_files if not (ROOT / rel).exists()]
@@ -252,7 +310,9 @@ def doctor_report(identity: Identity) -> dict[str, Any]:
         },
         "commands": {name: command_summary(name) for name in ["git", "python3", "hermes", "qmd", "node", "npm"]},
         "identity": identity.as_dict(),
+        "agent_integration": agent_integration_contract(identity),
         "brain": brain_contract(),
+        "radar": radar_contract(),
         "cron": reconcile_cron(),
         "skills": reconcile_skills(),
         "human_gates": [
@@ -303,6 +363,11 @@ def identity_yaml(identity: Identity) -> str:
             f"    display_name: {yaml_quote(identity.ogedei_display_name)}",
             f"    bot_display_name: {yaml_quote(identity.ogedei_bot_display_name)}",
             f"    telegram_token_env: {yaml_quote(identity.ogedei_secret_env)}",
+            "  agent_integration:",
+            f"    existing_agent_name: {yaml_quote(identity.existing_agent_name or '')}",
+            f"    existing_agent_profile_id: {yaml_quote(identity.existing_agent_profile_id or '')}",
+            f"    mode: {yaml_quote(identity.existing_agent_mode)}",
+            "    preserve_existing_private_state: true",
             "  naming_policy:",
             "    internal_profile_ids_may_remain_stable: true",
             "    user_visible_names_are_customizable: true",
@@ -334,11 +399,17 @@ def next_steps_markdown(identity: Identity, paths: dict[str, Path], cron: dict[s
 
         The profile id may stay `{identity.chair_profile_id}` while every user-visible attribution says `{identity.chair_display_name}`. If the operator wants the actual Hermes profile id renamed too, use `hermes profile rename kublai <new-slug>` only after updating the generated local config and gateway commands.
 
+        ## Existing agent integration
+
+        Existing agent: {identity.existing_agent_name or 'not declared'}
+
+        If `{identity.chair_profile_id}` already exists as a local Hermes profile or external agent identity, back it up and merge Kurultai settings into it. Do **not** replace existing Cerberus/agent memories, private prompts, sessions, credentials, or local tools. Use `staging/agent-integration.yaml` as the merge policy and record any manual/private steps in the local receipt.
+
         ## Brain installation/configuration
 
         Brain root: `{paths['brain_root']}`
 
-        The installer creates the Brain root plus `queue`, `generated`, `receipts`, `docs/plans`, `operations`, `analyses`, `content/artifacts`, `entities`, `projects`, `infrastructure`, `concepts`, and `raw/assets`.
+        The installer creates the Brain root plus `queue`, `generated`, `receipts`, `docs/plans`, `operations`, `analyses`, `content/artifacts`, `entities`, `projects`, `infrastructure`, `concepts`, `status/radar`, and `raw/assets`.
 
         If QMD is available, run from the host where Brain is installed:
 
@@ -390,12 +461,18 @@ def next_steps_markdown(identity: Identity, paths: dict[str, Path], cron: dict[s
         hermes --profile ogedei gateway run
         ```
 
+        ## Radar care layer
+
+        Radar is the featured care-layer/chief-of-staff skill for top-of-mind protection, preparation, proposals, and loop closure. The installer stages `radar.yaml`, creates `status/radar/`, and keeps Radar in draft-only/local mode until source credentials, delivery targets, and approval authority are verified.
+
+        Required local artifact shape comes from `staging/radar.yaml` and uses `RADAR_PACKET/v1` packets under `Brain/status/radar/`.
+
         ## Cron and skills reconciliation
 
         The public repo intentionally does not include private runtime artifacts. The installer will not pretend those are installed.
 
         - `{missing_cron}` missing cron scripts are recorded in `cron.reconciliation.json` as private-follow-up. Jobs with missing scripts must **not** be created until local copies exist.
-        - `{missing_skills}` missing skill paths are recorded in `skills.reconciliation.json` as private/external follow-up. Missing skills must be listed, not silently skipped.
+        - `{missing_skills}` skills have no repo-local body in this public checkout and are recorded in `skills.reconciliation.json` as private/external follow-up. The manifest still preserves their names/descriptions so a full Kurultai install can reconcile them from Hermes' public skill library or private backups instead of silently dropping them.
 
         ## Human-only gates
 
@@ -420,6 +497,8 @@ def receipt_markdown(identity: Identity, paths: dict[str, Path], actions: list[s
         - Main chair profile id: `{identity.chair_profile_id}`
         - Main chair display name: {identity.chair_display_name}
         - Main chair bot display name: {identity.chair_bot_display_name}
+        - Existing agent: {identity.existing_agent_name or 'not declared'}
+        - Existing agent mode: {identity.existing_agent_mode}
 
         ## Paths
 
@@ -430,12 +509,16 @@ def receipt_markdown(identity: Identity, paths: dict[str, Path], actions: list[s
 
         ## Brain
 
-        Brain directory scaffold and receipt path were created. QMD commands remain `qmd update -c brain` and `qmd embed -c brain` when QMD is installed.
+        Brain directory scaffold and receipt path were created, including `status/radar` for Radar packets/briefs/receipts. QMD commands remain `qmd update -c brain` and `qmd embed -c brain` when QMD is installed.
+
+        ## Radar
+
+        Radar config was staged from `radar.yaml`; keep it draft-only until source auth and approval authority are verified.
 
         ## Reconciliation
 
         - Cron jobs: {cron['job_count']} total; {cron['missing_script_jobs']} jobs blocked on missing cron scripts; missing-script jobs were not created.
-        - Skills: {skills['entry_count']} total; {skills['missing_path_entries']} missing repo paths; missing skills were not silently marked installed.
+        - Skills: {skills['entry_count']} total; {skills['missing_path_entries']} without repo-local bodies; those skills remain manifest follow-up instead of being silently marked installed.
 
         ## Actions
 
@@ -456,6 +539,8 @@ def install_plan_markdown(identity: Identity, paths: dict[str, Path], report: di
         - Main chair profile id: `{identity.chair_profile_id}`
         - Main chair display name: {identity.chair_display_name}
         - Main chair bot display name: {identity.chair_bot_display_name}
+        - Existing agent: {identity.existing_agent_name or 'not declared'}
+        - Existing agent mode: {identity.existing_agent_mode}
 
         ## Target paths
 
@@ -472,8 +557,9 @@ def install_plan_markdown(identity: Identity, paths: dict[str, Path], report: di
         4. Configure Brain/QMD and verify receipt writes.
         5. Restore only cron jobs whose scripts exist; keep {report['cron']['missing_script_jobs']} missing-script jobs as follow-up.
         6. Install/reconcile skills; keep {report['skills']['missing_path_entries']} missing paths as follow-up.
-        7. Configure BotFather/gateways using the generated display names.
-        8. Run final canaries and leave a local receipt outside git.
+        7. Configure Radar as a draft-only/local care layer under Brain `status/radar` and verify the `radar` skill is present or explicitly listed as follow-up.
+        8. Configure BotFather/gateways using the generated display names.
+        9. Run final canaries and leave a local receipt outside git.
         """
     ).strip() + "\n"
 
@@ -519,6 +605,13 @@ def apply_scaffold(identity: Identity, paths: dict[str, Path], dry_run: bool) ->
         copy_file(ROOT / "brain" / "templates" / "page.md", paths["brain_root"] / "home.md", dry_run, actions)
     if not (paths["brain_root"] / "index.md").exists() or dry_run:
         write_text(paths["brain_root"] / "index.md", "# Brain Index\n", dry_run, actions)
+    if not (paths["brain_root"] / "status" / "radar" / "README.md").exists() or dry_run:
+        write_text(
+            paths["brain_root"] / "status" / "radar" / "README.md",
+            "# Radar Status\n\nLocal Radar packets, briefs, receipts, source coverage, and feedback live here. Keep private source details and credentials out of git.\n",
+            dry_run,
+            actions,
+        )
 
     write_text(paths["staging"] / "identity.generated.yaml", identity_yaml(identity), dry_run, actions)
     write_text(
@@ -560,7 +653,10 @@ def apply_interactive_defaults(args: argparse.Namespace) -> None:
         raise SystemExit("--interactive requires a TTY; use --apply with explicit --chair-display-name/paths for non-interactive installs")
     args.operator_name = prompt_default("Operator name", args.operator_name)
     args.system_name = prompt_default("System name", args.system_name)
-    args.chair_display_name = prompt_default("Main chair display name", args.chair_display_name)
+    args.existing_agent_name = prompt_default("Existing agent name, if any", args.existing_agent_name or "") or None
+    if args.existing_agent_name and not args.existing_agent_profile_id:
+        args.existing_agent_profile_id = prompt_default("Existing agent profile id", env_slug(args.existing_agent_name).lower())
+    args.chair_display_name = prompt_default("Main chair display name", args.existing_agent_name or args.chair_display_name)
     args.chair_bot_display_name = prompt_default("Main chair Telegram bot display name", args.chair_bot_display_name or f"Kurultai {args.chair_display_name}")
     args.ogedei_display_name = prompt_default("Operations gateway display name", args.ogedei_display_name)
     args.ogedei_bot_display_name = prompt_default("Operations Telegram bot display name", args.ogedei_bot_display_name)
@@ -574,11 +670,14 @@ def print_human_summary(result: dict[str, Any], mode: str) -> None:
     print(f"Operator: {identity['operator_name']}")
     print(f"Main chair: {identity['chair_display_name']} (profile {identity['chair_profile_id']})")
     print(f"Main chair bot: {identity['chair_bot_display_name']}")
+    if identity.get("existing_agent_name"):
+        print(f"Existing agent: {identity['existing_agent_name']} ({identity.get('existing_agent_mode')})")
+    print("Radar: staged as draft-only care layer under Brain status/radar")
     print(f"Brain root: {paths['brain_root']}")
     print(f"Staging: {paths['staging']}")
     print(f"Cron: {result['cron']['job_count']} jobs, {result['cron']['missing_script_jobs']} blocked by missing cron scripts")
-    print(f"Skills: {result['skills']['entry_count']} entries, {result['skills']['missing_path_entries']} missing skill paths")
-    print("Jobs with missing scripts and skills with missing paths are recorded as follow-up, not silently installed.")
+    print(f"Skills: {result['skills']['entry_count']} entries, {result['skills']['missing_path_entries']} without repo-local skill bodies")
+    print("Missing cron scripts and skills without repo-local bodies are recorded as follow-up, not silently installed.")
     if result.get("dry_run"):
         print("Dry run only; no files were written.")
     else:
@@ -596,12 +695,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     mode.add_argument("--resume", action="store_true", help="show the latest local plan/receipt and rerun doctor")
     parser.add_argument("--json", action="store_true", help="emit JSON for --doctor or --resume")
     parser.add_argument("--home", default=str(Path.home() / ".hermes"), help="target Hermes home")
-    parser.add_argument("--brain", default=str(Path.home() / "brain"), help="target Brain root")
+    parser.add_argument("--brain", default=None, help="target Brain root (auto-detected: prefers ~/Brain over ~/brain)")
     parser.add_argument("--staging", default=str(DEFAULT_STAGING), help="local staging directory for sanitized/generated config")
     parser.add_argument("--receipt-dir", default=str(DEFAULT_RECEIPTS), help="local receipt/plan directory outside git")
     parser.add_argument("--public-index-dir", default=str(Path.home() / ".brain-index"), help="Brain public index directory")
     parser.add_argument("--private-index-dir", default=str(Path.home() / ".kublai" / "brain-index-private"), help="Brain private index directory")
     parser.add_argument("--chair-profile-id", default="kublai", help="Hermes-safe internal profile id for the main chair")
+    parser.add_argument("--existing-agent-name", default=None, help="name of an existing local agent to attach to this Kurultai install, e.g. Cerberus")
+    parser.add_argument("--existing-agent-profile-id", default=None, help="Hermes-safe profile id for the existing agent, e.g. cerberus")
+    parser.add_argument("--existing-agent-mode", default="chair_profile", choices=["chair_profile", "peer_profile", "external_adapter"], help="how to attach the existing agent to Kurultai")
     parser.add_argument("--chair-display-name", default="Kublai", help="user-visible name for the main chair/main guy")
     parser.add_argument("--chair-bot-display-name", default=None, help="BotFather display name for the main chair Telegram bot")
     parser.add_argument("--ogedei-display-name", default="Ogedei", help="user-visible name for the operations gateway")
@@ -611,8 +713,62 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def detect_brain_root() -> Path:
+    """Auto-detect canonical Brain root. Prefer ~/Brain (capitalised) over ~/brain."""
+    home = Path.home()
+    brain_env = os.environ.get("BRAIN_ROOT")
+    if brain_env:
+        p = Path(brain_env).expanduser()
+        if p.is_dir():
+            return p
+    # Prefer capitalised Brain
+    for candidate in [home / "Brain", home / "brain"]:
+        if candidate.is_dir():
+            return candidate
+    # Neither exists — default to ~/brain (backwards compatible)
+    return home / "brain"
+
+
+def load_install_state(receipt_dir: Path) -> dict[str, Any] | None:
+    """Load the latest install state for --resume identity preservation."""
+    state_file = Path.home() / ".kurultai-install" / "install-state.json"
+    if state_file.exists():
+        try:
+            return json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    # Fallback: try to read identity.generated.yaml from staging
+    staging = Path.home() / ".kurultai-install" / "staging"
+    identity_gen = staging / "identity.generated.yaml"
+    if identity_gen.exists():
+        try:
+            import yaml as _yaml
+            return _yaml.safe_load(identity_gen.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return None
+
+
+def save_install_state(identity: Identity, paths: dict[str, Path]) -> None:
+    """Persist install state so --resume doesn't lose personalised identity."""
+    state_dir = Path.home() / ".kurultai-install"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_file = state_dir / "install-state.json"
+    state = {
+        "saved_at": dt.datetime.now().isoformat(),
+        "identity": identity.as_dict(),
+        "paths": {k: str(v) for k, v in paths.items()},
+    }
+    state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+
+    # Auto-detect Brain root if not explicitly set
+    if args.brain is None:
+        args.brain = str(detect_brain_root())
+
     if args.interactive:
         apply_interactive_defaults(args)
     identity = build_identity(args)
@@ -639,6 +795,25 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.resume:
+        # Load saved identity state so --resume doesn't lose personalised context
+        saved_state = load_install_state(paths["receipt_dir"])
+        if saved_state and "identity" in saved_state:
+            saved_id = saved_state["identity"]
+            identity = Identity(
+                chair_profile_id=saved_id.get("chair_profile_id", identity.chair_profile_id),
+                chair_display_name=saved_id.get("chair_display_name", identity.chair_display_name),
+                chair_bot_display_name=saved_id.get("chair_bot_display_name", identity.chair_bot_display_name),
+                ogedei_display_name=saved_id.get("ogedei_display_name", identity.ogedei_display_name),
+                ogedei_bot_display_name=saved_id.get("ogedei_bot_display_name", identity.ogedei_bot_display_name),
+                operator_name=saved_id.get("operator_name", identity.operator_name),
+                system_name=saved_id.get("system_name", identity.system_name),
+                existing_agent_name=saved_id.get("existing_agent_name"),
+                existing_agent_profile_id=saved_id.get("existing_agent_profile_id"),
+                existing_agent_mode=saved_id.get("existing_agent_mode", "chair_profile"),
+            )
+            # Also restore saved paths if available
+            if "paths" in saved_state and "brain_root" in saved_state["paths"]:
+                paths["brain_root"] = Path(saved_state["paths"]["brain_root"])
         report = doctor_report(identity)
         receipts = sorted(paths["receipt_dir"].glob("install-*.md")) if paths["receipt_dir"].exists() else []
         plans = sorted(paths["receipt_dir"].glob("install-plan-*.md")) if paths["receipt_dir"].exists() else []
@@ -672,6 +847,11 @@ def main(argv: list[str] | None = None) -> int:
 
     dry_run = args.dry_run or not args.apply and not args.interactive
     result = apply_scaffold(identity, paths, dry_run=dry_run)
+
+    # Save install state for --resume identity preservation (only on actual apply)
+    if not dry_run:
+        save_install_state(identity, paths)
+
     print_human_summary(result, "dry-run" if dry_run else "apply")
     return 0
 

@@ -28,7 +28,31 @@ def sanitize_text(value: str) -> str:
     )
 
 
-def parse_skill_header(path: Path) -> dict[str, Any]:
+def candidate_skill_roots() -> list[Path]:
+    roots: list[Path] = []
+    selected_profile = os.environ.get("HERMES_PROFILE") or os.environ.get("KURULTAI_PROFILE")
+    if selected_profile:
+        roots.append(HOME / ".hermes" / "profiles" / selected_profile / "skills")
+
+    profiles_root = HOME / ".hermes" / "profiles"
+    if profiles_root.exists():
+        roots.extend(sorted(path for path in profiles_root.glob("*/skills") if path.is_dir()))
+
+    roots.append(HOME / ".hermes" / "skills")
+
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        resolved = root.expanduser()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if resolved.exists():
+            unique.append(resolved)
+    return unique
+
+
+def parse_skill_header(path: Path, root: Path) -> dict[str, Any]:
     text = path.read_text(errors="ignore")
     description = ""
     if text.startswith("---"):
@@ -39,7 +63,7 @@ def parse_skill_header(path: Path) -> dict[str, Any]:
                 if line.strip().startswith("description:"):
                     description = sanitize_text(line.split(":", 1)[1].strip().strip('"'))
                     break
-    rel = path.parent.relative_to(HOME / ".hermes" / "skills")
+    rel = path.parent.relative_to(root)
     return {
         "name": path.parent.name,
         "path": str(rel),
@@ -48,15 +72,17 @@ def parse_skill_header(path: Path) -> dict[str, Any]:
 
 
 def export_skills() -> None:
-    root = HOME / ".hermes" / "skills"
-    skills = []
-    if root.exists():
+    skills_by_path: dict[str, dict[str, Any]] = {}
+    roots = candidate_skill_roots()
+    for root in roots:
         for md in sorted(root.glob("**/SKILL.md")):
-            skills.append(parse_skill_header(md))
+            entry = parse_skill_header(md, root)
+            skills_by_path.setdefault(entry["path"], entry)
+    skills = sorted(skills_by_path.values(), key=lambda item: (item["path"], item["name"]))
     write_json("skills.manifest.json", {
         "schema": "kurultai.skills-manifest.v1",
-        "source": "~/.hermes/skills/**/SKILL.md",
-        "note": "Names, relative paths, and descriptions only. Skill bodies are intentionally not exported by this manifest.",
+        "source": ["~/.hermes/profiles/*/skills/**/SKILL.md", "~/.hermes/skills/**/SKILL.md"],
+        "note": "Names, relative paths, and descriptions only. Skill bodies are intentionally not exported by this manifest. Profile-local skills are included when present so Radar and operator-specific Kurultai systems are not dropped from rebuild manifests.",
         "skills": skills,
     })
 

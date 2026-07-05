@@ -1,0 +1,60 @@
+schema: kurultai.radar.v1
+name: Radar
+featured_skill: radar
+purpose: "Care-layer / chief-of-staff Radar for top-of-mind protection, preparation, proposals, loop closure, and approval-gated actions."
+artifact_contract:
+  packet_schema: RADAR_PACKET/v1
+  schema_version: "1.1"
+  local_paths:
+    latest_packet: "${BRAIN_ROOT}/status/radar/latest.json"
+    run_packet: "${BRAIN_ROOT}/status/radar/runs/<run_id>/packet.json"
+    run_brief: "${BRAIN_ROOT}/status/radar/runs/<run_id>/brief.md"
+    run_receipts: "${BRAIN_ROOT}/status/radar/runs/<run_id>/receipts.md"
+    source_coverage: "${BRAIN_ROOT}/status/radar/runs/<run_id>/source-coverage.json"
+    feedback: "${BRAIN_ROOT}/status/radar/runs/<run_id>/feedback.jsonl"
+care_state:
+  verdicts:
+    - clear
+    - mostly_clear
+    - needs_attention
+    - fire_drill
+    - blocked
+  buckets:
+    - protect
+    - prepare
+    - propose
+    - close_loops
+default_authority:
+  max_authority: draft_only
+  external_sends_require_approval: true
+  runtime_mutations_require_receipts: true
+  financial_or_legal_actions_require_manual_handoff: true
+source_domains:
+  - brain
+  - finance
+  - job_apps
+  - email
+  - messages
+  - calendar
+  - repos
+  - travel
+  - research
+  - relationship
+  - personal
+  - kurultai
+install_contract:
+  directories:
+    - status/radar
+    - status/radar/runs
+  required_skill_names:
+    - radar
+    - personal-radar
+  scheduler_policy: "Start local/draft-only until source auth, delivery targets, and authority profile are explicitly verified."
+  receipt_policy: "Every Radar run writes packet/brief/receipts/source coverage locally; public validation repos may contain sanitized samples only."
+secret_boundary:
+  - "Radar source credentials, raw emails/messages/calendar contents, private finance data, chat IDs, and delivery targets stay outside git."
+  - "Public artifacts may include only redacted sample refs and sanitized receipts."
+verification:
+  - "Brain status/radar directories exist and are writable."
+  - "The radar skill is present or listed as explicit follow-up in skills reconciliation."
+  - "A dry-run packet can be generated with max_authority=draft_only before any source writes or sends are enabled."

@@ -13,11 +13,13 @@ Live sources:
 Committed files:
 
 - `identity.yaml`: default public naming contract; the installer writes `identity.generated.yaml` locally so Sophia can attribute any user-visible name to the main chair/Kublai surface without committing private state.
+- `agent-integration.yaml`: merge policy for attaching an operator's existing agent (for example Sophia's Cerberus) without overwriting private memory or credentials.
 - `hermes.template.yaml`: sanitized Hermes runtime contract.
 - `profiles.yaml`: Kurultai profile roster and model/provider map.
 - `kurultai.yaml`: coordination contract.
-- `brain.yaml`: Brain root, index, and gateway contract.
-- `gateways.yaml`: Kublai and Ogedei Hermes gateway contract without bot credentials or chat IDs.
+- `brain.yaml`: Brain root, index, gateway, and Radar status directory contract.
+- `gateways.yaml`: Kublai/Cerberus-style chair gateway and Ogedei Hermes gateway contract without bot credentials or chat IDs.
+- `radar.yaml`: Radar care-layer artifact and authority contract.
 - `install-expert.yaml`: install expert prompt manifest, required reading, mastery domains, and human-only gates.
 - `cron.manifest.json`: sanitized cron jobs.
 - `skills.manifest.json`: skill inventory without skill bodies.
@@ -29,6 +31,6 @@ Refresh manifests from a live host with:
 - `python3 scripts/export_runtime_config_manifest.py`
 - `python3 scripts/export_rebuild_manifests.py`
 
-For a fresh machine, paste `agents/hermes-install-expert.md` and `docs/operations/fresh-install-agent-prompt.md` into Claude Code or Codex. The prompt tells the local agent to perform the cross-platform install, including Windows-native setup, Hermes/Brain/Kurultai configuration, local LLM selection, two Telegram gateways (Kublai primary plus Ogedei operations/intake), verification, and secret-safe receipts. Use `docs/operations/full-installation-checklist.md` as the completion definition.
+For a fresh machine, paste `agents/hermes-install-expert.md` and `docs/operations/fresh-install-agent-prompt.md` into Claude Code or Codex. The prompt tells the local agent to perform the cross-platform install, including Windows-native setup, Hermes/Brain/Kurultai configuration, existing-agent merge (for example Sophia's Cerberus), local LLM selection, Radar draft-only care layer, two Telegram gateways (chair primary plus Ogedei operations/intake), verification, and secret-safe receipts. Use `docs/operations/full-installation-checklist.md` as the completion definition.
 
 See `docs/operations/kurultai-rebuild-runbook.md` for the full rebuild procedure.

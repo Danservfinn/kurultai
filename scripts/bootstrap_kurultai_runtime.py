@@ -11,11 +11,13 @@ DEFAULT_STAGING = Path.home() / ".kurultai-rebuild-staging"
 
 FILES = [
     "identity.yaml",
+    "agent-integration.yaml",
     "hermes.template.yaml",
     "profiles.yaml",
     "kurultai.yaml",
     "brain.yaml",
     "gateways.yaml",
+    "radar.yaml",
     "install-expert.yaml",
     "cron.manifest.json",
     "skills.manifest.json",
@@ -30,6 +32,9 @@ BRAIN_DIRECTORIES = [
     "concepts",
     "analyses",
     "docs/plans",
+    "status",
+    "status/radar",
+    "status/radar/runs",
     "raw/assets",
     "queue",
     "generated",

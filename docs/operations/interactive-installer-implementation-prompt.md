@@ -68,11 +68,13 @@ Phase 0 — repository and platform discovery
   - agents/hermes-install-expert.md
   - config/runtime-config/install-expert.yaml
   - config/runtime-config/identity.yaml
+  - config/runtime-config/agent-integration.yaml
   - config/runtime-config/hermes.template.yaml
   - config/runtime-config/profiles.yaml
   - config/runtime-config/kurultai.yaml
   - config/runtime-config/brain.yaml
   - config/runtime-config/gateways.yaml
+  - config/runtime-config/radar.yaml
   - config/runtime-config/cron.manifest.json
   - config/runtime-config/skills.manifest.json
   - config/runtime-config/kanban.schema.json
@@ -84,8 +86,9 @@ Phase 0 — repository and platform discovery
 
 Phase 1 — identity and naming
 - Read `config/runtime-config/identity.yaml`.
-- Prompt for or accept CLI flags for operator name, system name, main chair display name, and main chair BotFather display name.
-- Keep the internal chair profile id `kublai` unless the operator explicitly asks to rename the profile id and confirms config propagation.
+- Read `config/runtime-config/agent-integration.yaml`.
+- Prompt for or accept CLI flags for operator name, system name, main chair display name, main chair BotFather display name, existing agent name, existing agent profile id, and existing agent mode.
+- Keep the internal chair profile id `kublai` unless the operator explicitly asks to rename the profile id, or maps an existing agent such as Sophia's Cerberus to the chair profile with `--existing-agent-name` / `--existing-agent-profile-id`.
 - Write a local generated identity file outside git or in the local staging directory; do not write secrets.
 - Use the chosen display name in generated next-step docs, profile description guidance, BotFather instructions, receipts, and final reports.
 
@@ -141,6 +144,8 @@ Phase 5 — Brain setup
   - analyses
   - content
   - content/artifacts
+  - status/radar
+  - status/radar/runs
 - Copy public templates where appropriate without overwriting existing user pages.
 - If qmd is installed, offer qmd update/embed; otherwise mark qmd as optional pending.
 - Verify a harmless receipt write outside git or under the Brain receipts directory if appropriate.
@@ -149,12 +154,13 @@ Phase 6 — apply sanitized runtime manifests
 - Prefer scripts/install_kurultai.py for doctor/dry-run/apply/interactive flows.
 - Reuse or call scripts/bootstrap_kurultai_runtime.py only for lower-level staging compatibility checks.
 - Stage sanitized config under ~/.kurultai-install/staging or Windows equivalent.
+- Stage `agent-integration.yaml` and `radar.yaml` alongside the existing runtime contracts.
 - Do not blindly apply staged config over live private config.
 - Provide a merge checklist for local private config.
 
 Phase 7 — profiles
 - Ensure or guide creation of profiles:
-  - kublai
+  - kublai or selected existing-agent chair id such as cerberus
   - batu
   - chagatai
   - jochi
@@ -166,7 +172,7 @@ Phase 7 — profiles
   - tolui
   - codex compatibility profile if supported
 - Use Hermes profile commands when available.
-- Preserve existing profile-local config and secrets.
+- Preserve existing profile-local config, memories, prompts, sessions, credentials, and tools; back up before merging Kurultai contracts into an existing agent profile.
 - Verify profile list and profile config checks where available.
 
 Phase 8 — local LLM lane
@@ -181,9 +187,12 @@ Phase 8 — local LLM lane
 - Configure Tolui as local lightweight triage/summarization/classification only until tool-calling is verified.
 - Run a one-sentence local smoke test if runtime is installed.
 
-Phase 9 — skills
+Phase 9 — skills and Radar
 - Read config/runtime-config/skills.manifest.json.
+- Read config/runtime-config/radar.yaml.
 - Reconcile installed skills with the manifest.
+- Verify `radar` is installed or listed as explicit follow-up; `personal-radar` is compatibility only.
+- Stage Radar as draft-only/local under Brain `status/radar` and verify the local packet/brief/receipt path is writable before enabling sources or sends.
 - Clearly list missing private skills as follow-up; do not pretend they installed.
 - Do not copy private skills into git.
 
@@ -204,7 +213,7 @@ Phase 11 — cron
 Phase 12 — Telegram dual gateway setup
 - Use config/runtime-config/gateways.yaml as the non-secret contract.
 - Guide the user through BotFather for two separate bots:
-  - Main chair/Kublai primary operator gateway, using the chosen user-visible display and bot name.
+  - Main chair/Kublai primary operator gateway, using the chosen user-visible display and bot name, or the selected existing-agent chair profile such as Cerberus.
   - Ogedei operations/intake gateway.
 - Store bot tokens only in local secret stores / untracked env files / profile-local secret storage.
 - Never print tokens back to the terminal or receipt.
@@ -235,6 +244,7 @@ Phase 14 — final report
   - Brain
   - profiles
   - skills
+  - Radar
   - Kanban
   - cron
   - local LLM/Tolui
@@ -255,6 +265,8 @@ Testing requirements:
   - receipt path/state path resolution
   - dry-run makes no filesystem changes outside a temp dir
   - required repository files are checked
+  - existing-agent flags map Cerberus to profile `cerberus` without writing secrets
+  - Radar config and Brain `status/radar` directories are staged/created
   - missing command detection works
   - Windows path handling where feasible from a non-Windows host
 - Run:

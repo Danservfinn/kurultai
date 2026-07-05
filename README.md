@@ -31,7 +31,8 @@ Required behavior:
 - Install and verify Hermes Agent.
 - Guide the human through provider auth, Telegram/BotFather setup, and any optional integration credentials.
 - Ask what user-visible name should be attributed to the main chair/Kublai surface; preserve `kublai` as the default internal profile id unless the human explicitly wants a profile-id rename.
-- Create or verify the Brain root, Kurultai profiles, native Hermes Kanban, skills, cron jobs, receipts, and gateway setup.
+- If the human already has an agent (for example Sophia's Cerberus), attach it through `--existing-agent-name` / `--existing-agent-profile-id`, back it up, and merge Kurultai settings without overwriting private agent memory or credentials.
+- Create or verify the Brain root, Kurultai profiles, native Hermes Kanban, skills, cron jobs, receipts, Radar, and gateway setup.
 - Keep private Brain contents, live Kanban data, sessions, tokens, chat IDs, OAuth credentials, cookies, and API keys out of git.
 - Run the repository validation and available tests before reporting success.
 - Finish with a concise install receipt: what was installed, what was verified, what remains gated on human auth, and exact next commands.
@@ -42,7 +43,8 @@ Required behavior:
 ## What Kurultai provides
 
 - **Hermes-native multi-agent coordination** — profiles, tools, skills, sessions, gateway, cron, and native Kanban remain the runtime substrate.
-- **Kublai as chair** — Kublai routes work, keeps synthesis coherent, verifies receipts, and reports one concise operator-facing result.
+- **Kublai as chair** — Kublai routes work, keeps synthesis coherent, verifies receipts, and reports one concise operator-facing result. On third-party installs this chair surface can be mapped to an existing agent such as Sophia's Cerberus without copying private state.
+- **Radar care layer** — Radar is the chief-of-staff/top-of-mind surface for protection, preparation, proposals, and loop closure; it starts draft-only/local until sources and authority are verified.
 - **Specialist profiles** — Batu, Chagatai, Jochi, Temujin, Coder, Mongke, Ogedei, Subc, and Tolui handle retrieval, research, analysis, implementation, review, operations, background signal detection, and local lightweight triage. `codex` is included as a non-routable compatibility profile for explicit Codex CLI flows.
 - **Brain wiki** — durable plans, receipts, research, synthesis, operations notes, and public/private index contracts.
 - **Rebuildable configuration** — sanitized templates and manifests describe how to recreate the system without publishing secrets or live private state.
@@ -51,6 +53,24 @@ Required behavior:
 ## Systems in detail
 
 Kurultai is not just a profile roster. It is a set of cooperating systems around Hermes Agent: some run continuously, some are invoked by Kublai, and some are rebuild/install contracts. The public repository contains the safe contracts, manifests, prompts, templates, diagrams, and runbooks for these systems. It intentionally excludes live secrets, private Brain contents, live Kanban databases, sessions, chat IDs, OAuth tokens, and private runtime state.
+
+### Radar care layer
+
+Radar is Kurultai's chief-of-staff/care-layer surface. It answers “what needs attention?”, protects focus, prepares upcoming work, proposes bounded next moves, and closes loops without taking external action on its own.
+
+How it works:
+
+1. Read-only source checks gather bounded packets from approved local sources such as Brain, calendar, messages, email, repos, finance/admin surfaces, research queues, and open loops.
+2. Radar classifies the care state (`clear`, `mostly_clear`, `needs_attention`, `fire_drill`, or `blocked`) and groups output into `protect`, `prepare`, `propose`, and `close_loops` buckets.
+3. Every run writes `RADAR_PACKET/v1` artifacts under `Brain/status/radar/` with briefs, receipts, source coverage, and feedback hooks.
+4. Draft-only authority is the default. Sends, purchases, external changes, or durable workflow mutations require explicit approval and receipts.
+5. `personal-radar` is kept only as a compatibility shim; new installs should use `radar`.
+
+Public rebuild artifacts:
+
+- `config/runtime-config/radar.yaml` — Radar artifact, source, and authority contract.
+- `config/runtime-config/skills.manifest.json` — includes `radar` and the `personal-radar` compatibility shim when profile-local skills are available.
+- `config/runtime-config/brain.yaml` — `status/radar` Brain paths.
 
 ### Dreamer / Subconscious (`subc`)
 
@@ -369,11 +389,13 @@ Kurultai separates durable public architecture from private runtime state.
 The Brain contains the long-term operating memory: plans, receipts, proposals, analyses, content artifacts, and status surfaces. This repository contains the **sanitized rebuild contract** for that system:
 
 - `config/runtime-config/identity.yaml` — public naming/customization contract for the main chair/Kublai surface.
+- `config/runtime-config/agent-integration.yaml` — existing-agent merge policy for installs such as Sophia + Cerberus.
 - `config/runtime-config/hermes.template.yaml` — non-secret Hermes runtime contract.
 - `config/runtime-config/profiles.yaml` — Kurultai profile roster and model map.
 - `config/runtime-config/kurultai.yaml` — native coordination contract.
 - `config/runtime-config/brain.yaml` — Brain root, index, and gateway contract.
 - `config/runtime-config/gateways.yaml` — Kublai primary gateway plus Ogedei operations/intake gateway contract.
+- `config/runtime-config/radar.yaml` — Radar care-layer artifact and authority contract.
 - `config/runtime-config/cron.manifest.json` — sanitized cron manifest.
 - `config/runtime-config/skills.manifest.json` — skill inventory without secret-bearing state.
 - `config/runtime-config/kanban.schema.json` — Kanban schema only, not live tasks.
@@ -392,6 +414,24 @@ python3 scripts/install_kurultai.py --doctor
 python3 scripts/install_kurultai.py --dry-run --chair-display-name "Sophia's chosen name"
 python3 scripts/install_kurultai.py --interactive
 ```
+
+If Sophia already has Cerberus and wants Cerberus to be the main Kurultai chair surface, use the existing-agent flags instead of creating a separate chair persona:
+
+```bash
+python3 scripts/install_kurultai.py --dry-run \
+  --operator-name "Sophia" \
+  --system-name "Sophia's Kurultai" \
+  --existing-agent-name "Cerberus" \
+  --existing-agent-profile-id cerberus
+
+python3 scripts/install_kurultai.py --apply \
+  --operator-name "Sophia" \
+  --system-name "Sophia's Kurultai" \
+  --existing-agent-name "Cerberus" \
+  --existing-agent-profile-id cerberus
+```
+
+Those flags make `cerberus` the generated chair profile id, set the visible chair name to `Cerberus`, derive a `KURULTAI_CERBERUS_TELEGRAM_BOT_TOKEN` placeholder, and write merge instructions that preserve Cerberus's existing private state.
 
 The installer is the preferred path. It creates the non-secret Hermes/Brain/Kurultai scaffold, writes a local `identity.generated.yaml`, stages sanitized runtime contracts, produces cron/skill reconciliation reports, and leaves receipts outside git. It also asks what user-visible name to attribute to the main chair/Kublai surface; the stable internal profile id can remain `kublai` unless the operator explicitly wants a Hermes profile-id rename.
 
@@ -437,8 +477,10 @@ The install prompts cover:
 - macOS, Linux, and Windows-native PowerShell installation.
 - Hermes Agent installation and verification.
 - frontier model configuration for Kublai and tool-capable profiles.
-- Brain directory creation and index setup.
+- Brain directory creation and index setup, including `status/radar`.
+- Existing-agent merge for operators who already have an agent (for example Sophia's Cerberus).
 - Kurultai profile creation.
+- Radar draft-only care-layer setup.
 - local LLM lane selection for Tolui.
 - Telegram BotFather and Hermes gateway setup.
 - second Hermes gateway setup for Ogedei operations/intake.

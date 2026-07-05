@@ -1,5 +1,5 @@
 {
-  "note": "Names, relative paths, and descriptions only. Skill bodies are intentionally not exported by this manifest.",
+  "note": "Names, relative paths, and descriptions only. Skill bodies are intentionally not exported by this manifest. Profile-local skills are included when present so Radar and operator-specific Kurultai systems are not dropped from rebuild manifests.",
   "schema": "kurultai.skills-manifest.v1",
   "skills": [
     {
@@ -38,6 +38,11 @@
       "path": ".archive/ascii-video"
     },
     {
+      "description": "AudioCraft: MusicGen text-to-music, AudioGen text-to-sound.",
+      "name": "audiocraft",
+      "path": ".archive/audiocraft"
+    },
+    {
       "description": "",
       "name": "audiocraft-audio-generation",
       "path": ".archive/audiocraft-audio-generation"
@@ -58,6 +63,11 @@
       "path": ".archive/brain-optimizer"
     },
     {
+      "description": "Use when an agent needs opt-in Browse CLI guidance for local, non-sensitive browser automation reconnaissance after Hermes built-in browser tools are insufficient.",
+      "name": "browse-cli",
+      "path": ".archive/browse-cli"
+    },
+    {
       "description": "Delegate coding to Claude Code CLI (features, PRs).",
       "name": "claude-code",
       "path": ".archive/claude-code"
@@ -76,6 +86,16 @@
       "description": "Delegate coding to OpenAI Codex CLI (features, PRs).",
       "name": "codex",
       "path": ".archive/codex"
+    },
+    {
+      "description": "Use Codex as a bulk coding worker while Hermes acts as reviewer, verifier, and safety gate for multi-phase implementation work. In Kanban contexts, assign the task to a real accountable Kurultai profile (for example Chagatai) and have that profile use this skill; do not assign the task directly to a pseudo-profile named `codex`. See references/kanban-ownership.md.",
+      "name": "codex-implementation-orchestration",
+      "path": ".archive/codex-implementation-orchestration"
+    },
+    {
+      "description": "Generate images, video, and audio with ComfyUI \u2014 install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution.",
+      "name": "comfyui",
+      "path": ".archive/comfyui"
     },
     {
       "description": "Author/validate/export Google's DESIGN.md token spec files.",
@@ -153,9 +173,24 @@
       "path": ".archive/heartmula"
     },
     {
+      "description": "Configure, extend, or contribute to Hermes Agent.",
+      "name": "hermes-agent",
+      "path": ".archive/hermes-agent"
+    },
+    {
       "description": "Author in-repo SKILL.md: frontmatter, validator, structure.",
       "name": "hermes-agent-skill-authoring",
       "path": ".archive/hermes-agent-skill-authoring"
+    },
+    {
+      "description": "Archived absorbed package stub: command troubleshooting for Hermes Gateway slash/native command availability across messaging platforms. Content absorbed into hermes-messaging-platform-setup.",
+      "name": "hermes-gateway-command-troubleshooting",
+      "path": ".archive/hermes-gateway-command-troubleshooting"
+    },
+    {
+      "description": "Archived absorbed package stub: latency triage for Hermes Gateway and Telegram-style messaging responses. Content absorbed into hermes-messaging-platform-setup.",
+      "name": "hermes-gateway-latency-troubleshooting",
+      "path": ".archive/hermes-gateway-latency-troubleshooting"
     },
     {
       "description": "Himalaya CLI: IMAP/SMTP email from terminal.",
@@ -168,9 +203,14 @@
       "path": ".archive/huggingface-hub"
     },
     {
-      "description": "",
+      "description": "Humanize text: strip AI-isms and add real voice.",
       "name": "humanizer",
       "path": ".archive/humanizer"
+    },
+    {
+      "description": "Generate project ideas via creative constraints.",
+      "name": "ideation",
+      "path": ".archive/ideation"
     },
     {
       "description": "Send and receive iMessages/SMS via the imsg CLI on macOS.",
@@ -208,6 +248,11 @@
       "path": ".archive/llm-wiki"
     },
     {
+      "description": "Research and recommend cheap, compatible local storage for Macs, agent systems, Brain/Kurultai-style knowledge bases, backups, and future-upgrade paths.",
+      "name": "local-storage-procurement",
+      "path": ".archive/local-storage-procurement"
+    },
+    {
       "description": "|",
       "name": "macos-computer-use",
       "path": ".archive/macos-computer-use"
@@ -221,6 +266,11 @@
       "description": "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.",
       "name": "maps",
       "path": ".archive/maps"
+    },
+    {
+      "description": "Archived absorbed package stub: durable linked-device/auth setup and recovery for Hermes messaging gateways. Content absorbed into hermes-messaging-platform-setup.",
+      "name": "messaging-gateway-auth-resilience",
+      "path": ".archive/messaging-gateway-auth-resilience"
     },
     {
       "description": "Edit PDF text/typos/titles via nano-pdf CLI (NL prompts).",
@@ -373,7 +423,7 @@
       "path": ".archive/test-driven-development"
     },
     {
-      "description": "",
+      "description": "Control a running TouchDesigner instance via twozero MCP \u2014 create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools.",
       "name": "touchdesigner-mcp",
       "path": ".archive/touchdesigner-mcp"
     },
@@ -408,12 +458,72 @@
       "path": "apple/apple-local-automation"
     },
     {
+      "description": "Operate macOS and Apple apps safely from Hermes: background computer control, Apple Notes, Reminders, Find My, Messages-adjacent workflows, local CLI prerequisites, privacy prompts, and readback verification.",
+      "name": "apple-macos-automation",
+      "path": "apple/apple-macos-automation"
+    },
+    {
+      "description": "Manage Apple Notes via memo CLI: create, search, edit.",
+      "name": "apple-notes",
+      "path": "apple/apple-notes"
+    },
+    {
+      "description": "Apple Reminders via remindctl: add, list, complete.",
+      "name": "apple-reminders",
+      "path": "apple/apple-reminders"
+    },
+    {
+      "description": "Track Apple devices/AirTags via FindMy.app on macOS.",
+      "name": "findmy",
+      "path": "apple/findmy"
+    },
+    {
+      "description": "Recommend and troubleshoot Mac hardware accessories (storage enclosures, cables, docks) with compatibility verification, live system checks, and direct product URLs.",
+      "name": "hardware-accessory-recommendations",
+      "path": "apple/hardware-accessory-recommendations"
+    },
+    {
+      "description": "Send and receive iMessages/SMS via the imsg CLI on macOS.",
+      "name": "imessage",
+      "path": "apple/imessage"
+    },
+    {
+      "description": "|",
+      "name": "macos-computer-use",
+      "path": "apple/macos-computer-use"
+    },
+    {
+      "description": "Operate Apple/macOS local apps and desktop automation safely: Notes, Reminders, Messages, Find My, and background GUI control.",
+      "name": "macos-local-automation",
+      "path": "apple/macos-local-automation"
+    },
+    {
+      "description": "Diagnose macOS/APFS disk-space usage on internal or external volumes with read-only-first evidence, hidden/system checks, runaway process detection, and cleanup options that require explicit approval.",
+      "name": "macos-storage-diagnostics",
+      "path": "apple/macos-storage-diagnostics"
+    },
+    {
       "description": "Route coding work to Claude Code, Codex, OpenCode, or other CLI agents while Hermes orchestrates scope, verification, and handoff.",
       "name": "autonomous-coding-agents",
       "path": "autonomous-ai-agents/autonomous-coding-agents"
     },
     {
-      "description": "Compact router for using and extending Hermes Agent \u2014 load when configuring, troubleshooting, developing, or operating Hermes. The full historical reference is preserved in references/full-hermes-agent-reference-2026-05-15.md; load only the focused reference needed for the task. For Bitwarden Secrets Manager setup/free-tier questions, load references/bitwarden-secrets-manager.md; for users who authenticated with normal bw CLI and ask what remains, load references/bitwarden-cli-vs-secrets-manager-2026-05-25.md. For OpenAI Codex auth vs GPT Image 2 / Hermes image_gen confusion, load references/openai-codex-auth-gpt-image2.md. For Objective Runner Telegram `/objective` operations, load references/objective-runner-telegram-operations.md.",
+      "description": "Delegate coding to Claude Code CLI (features, PRs).",
+      "name": "claude-code",
+      "path": "autonomous-ai-agents/claude-code"
+    },
+    {
+      "description": "Delegate coding to OpenAI Codex CLI (features, PRs).",
+      "name": "codex",
+      "path": "autonomous-ai-agents/codex"
+    },
+    {
+      "description": "Delegate coding work to autonomous coding agents and coordinate Claude Code, Codex, OpenCode, subagents, and Kanban lanes.",
+      "name": "coding-agent-workflows",
+      "path": "autonomous-ai-agents/coding-agent-workflows"
+    },
+    {
+      "description": "Configure, extend, or contribute to Hermes Agent.",
       "name": "hermes-agent",
       "path": "autonomous-ai-agents/hermes-agent"
     },
@@ -421,6 +531,21 @@
       "description": "Use when a Hermes Kanban worker wants to run Codex CLI as an isolated implementation lane while Hermes keeps ownership of task lifecycle, reconciliation, testing, and handoff.",
       "name": "kanban-codex-lane",
       "path": "autonomous-ai-agents/kanban-codex-lane"
+    },
+    {
+      "description": "Delegate coding to OpenCode CLI (features, PR review).",
+      "name": "opencode",
+      "path": "autonomous-ai-agents/opencode"
+    },
+    {
+      "description": "Build, patch, and verify public-source-grounded character/persona agent profiles with review-gated SOUL/config edits, natural voice constraints, and deterministic anti-regression evals.",
+      "name": "persona-profile-engineering",
+      "path": "autonomous-ai-agents/persona-profile-engineering"
+    },
+    {
+      "description": "Use when operating in an unfamiliar digital environment, evaluating agent frameworks, or turning source-backed agent doctrine into executable Hermes/Kurultai workflows. Applies the universal-agent loop: perceive, map tools and boundaries, build missing adapters, act in verified steps, and record reusable boundary knowledge.",
+      "name": "universal-agent-loop",
+      "path": "autonomous-ai-agents/universal-agent-loop"
     },
     {
       "description": "Create executable go-to-market plans with autonomous operating loops, ICP, channels, metrics, and approval gates.",
@@ -448,6 +573,26 @@
       "path": "business/stripe"
     },
     {
+      "description": "|",
+      "name": "computer-use",
+      "path": "computer-use"
+    },
+    {
+      "description": "Dark-themed SVG architecture/cloud/infra diagrams as HTML.",
+      "name": "architecture-diagram",
+      "path": "creative/architecture-diagram"
+    },
+    {
+      "description": "ASCII art: pyfiglet, cowsay, boxes, image-to-ascii.",
+      "name": "ascii-art",
+      "path": "creative/ascii-art"
+    },
+    {
+      "description": "ASCII video: convert video/audio to colored ASCII MP4/GIF.",
+      "name": "ascii-video",
+      "path": "creative/ascii-video"
+    },
+    {
       "description": "Article illustrations: type \u00d7 style \u00d7 palette consistency.",
       "name": "baoyu-article-illustrator",
       "path": "creative/baoyu-article-illustrator"
@@ -458,9 +603,24 @@
       "path": "creative/baoyu-comic"
     },
     {
+      "description": "Infographics: 21 layouts x 21 styles (\u4fe1\u606f\u56fe, \u53ef\u89c6\u5316).",
+      "name": "baoyu-infographic",
+      "path": "creative/baoyu-infographic"
+    },
+    {
+      "description": "Design one-off HTML artifacts (landing, deck, prototype).",
+      "name": "claude-design",
+      "path": "creative/claude-design"
+    },
+    {
       "description": "Generate images, video, and audio with ComfyUI \u2014 install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution.",
       "name": "comfyui",
       "path": "creative/comfyui"
+    },
+    {
+      "description": "Create visual, interactive, written, audio, and design artifacts using the right medium-specific workflow and verification loop.",
+      "name": "creative-artifact-generation",
+      "path": "creative/creative-artifact-generation"
     },
     {
       "description": "Generate project ideas via creative constraints.",
@@ -468,9 +628,84 @@
       "path": "creative/creative-ideation"
     },
     {
+      "description": "Class-level workflows for creative ideation, prose humanization, generative media pipelines, and live visual tool integrations.",
+      "name": "creative-production-workflows",
+      "path": "creative/creative-production-workflows"
+    },
+    {
+      "description": "Generate images, video, and audio with ComfyUI \u2014 install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution.",
+      "name": "comfyui",
+      "path": "creative/creative-production-workflows/references/absorbed-packages/comfyui"
+    },
+    {
+      "description": "Humanize text: strip AI-isms and add real voice.",
+      "name": "humanizer",
+      "path": "creative/creative-production-workflows/references/absorbed-packages/humanizer"
+    },
+    {
+      "description": "Generate project ideas via creative constraints.",
+      "name": "ideation",
+      "path": "creative/creative-production-workflows/references/absorbed-packages/ideation"
+    },
+    {
+      "description": "Control a running TouchDesigner instance via twozero MCP \u2014 create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools.",
+      "name": "touchdesigner-mcp",
+      "path": "creative/creative-production-workflows/references/absorbed-packages/touchdesigner-mcp"
+    },
+    {
+      "description": "Author/validate/export Google's DESIGN.md token spec files.",
+      "name": "design-md",
+      "path": "creative/design-md"
+    },
+    {
+      "description": "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).",
+      "name": "excalidraw",
+      "path": "creative/excalidraw"
+    },
+    {
+      "description": "Humanize text: strip AI-isms and add real voice.",
+      "name": "humanizer",
+      "path": "creative/humanizer"
+    },
+    {
+      "description": "Manim CE animations: 3Blue1Brown math/algo videos.",
+      "name": "manim-video",
+      "path": "creative/manim-video"
+    },
+    {
+      "description": "p5.js sketches: gen art, shaders, interactive, 3D.",
+      "name": "p5js",
+      "path": "creative/p5js"
+    },
+    {
       "description": "Pixel art w/ era palettes (NES, Game Boy, PICO-8).",
       "name": "pixel-art",
       "path": "creative/pixel-art"
+    },
+    {
+      "description": "54 real design systems (Stripe, Linear, Vercel) as HTML/CSS.",
+      "name": "popular-web-designs",
+      "path": "creative/popular-web-designs"
+    },
+    {
+      "description": "Use when building creative browser demos with @chenglou/pretext \u2014 DOM-free text layout for ASCII art, typographic flow around obstacles, text-as-geometry games, kinetic typography, and text-powered generative art. Produces single-file HTML demos by default.",
+      "name": "pretext",
+      "path": "creative/pretext"
+    },
+    {
+      "description": "Throwaway HTML mockups: 2-3 design variants to compare.",
+      "name": "sketch",
+      "path": "creative/sketch"
+    },
+    {
+      "description": "Songwriting craft and Suno AI music prompts.",
+      "name": "songwriting-and-ai-music",
+      "path": "creative/songwriting-and-ai-music"
+    },
+    {
+      "description": "Control a running TouchDesigner instance via twozero MCP \u2014 create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools.",
+      "name": "touchdesigner-mcp",
+      "path": "creative/touchdesigner-mcp"
     },
     {
       "description": "Create visual artifacts: diagrams, infographics, HTML mockups, p5.js sketches, design-system references, Excalidraw, and design specs.",
@@ -478,9 +713,59 @@
       "path": "creative/visual-artifact-generation"
     },
     {
+      "description": "Iterative Python via live Jupyter kernel (hamelnb).",
+      "name": "jupyter-live-kernel",
+      "path": "data-science/jupyter-live-kernel"
+    },
+    {
+      "description": "Class-level workflows for filesystem notes, Obsidian vault operations, and iterative notebook-style data exploration.",
+      "name": "knowledge-and-data-workflows",
+      "path": "data-science/knowledge-and-data-workflows"
+    },
+    {
+      "description": "Iterative Python via live Jupyter kernel (hamelnb).",
+      "name": "jupyter-live-kernel",
+      "path": "data-science/knowledge-and-data-workflows/references/absorbed-packages/jupyter-live-kernel"
+    },
+    {
+      "description": "Read, search, create, and edit notes in the Obsidian vault.",
+      "name": "obsidian",
+      "path": "data-science/knowledge-and-data-workflows/references/absorbed-packages/obsidian"
+    },
+    {
+      "description": "Use when inspecting, troubleshooting, or explaining Hermes cron scheduler health across profiles. Distinguishes scheduler liveness from job presence, summarizes job state safely, and checks profile-scoped cron stores without confusing one profile for another.",
+      "name": "hermes-cron-operations",
+      "path": "devops/hermes-cron-operations"
+    },
+    {
       "description": "Manage, measure, and reduce Hermes cron job token usage while preserving capability and safety.",
       "name": "hermes-cron-optimization",
       "path": "devops/hermes-cron-optimization"
+    },
+    {
+      "description": "Class-level workflows for Hermes event integrations, MCP servers, and external systems that trigger or extend agent runs.",
+      "name": "hermes-integration-automation",
+      "path": "devops/hermes-integration-automation"
+    },
+    {
+      "description": "MCP client: connect servers, register tools (stdio/HTTP).",
+      "name": "native-mcp",
+      "path": "devops/hermes-integration-automation/references/absorbed-packages/native-mcp"
+    },
+    {
+      "description": "Webhook subscriptions: event-driven agent runs.",
+      "name": "webhook-subscriptions",
+      "path": "devops/hermes-integration-automation/references/absorbed-packages/webhook-subscriptions"
+    },
+    {
+      "description": "Configure and operate Hermes integration surfaces: MCP tool servers, webhook subscriptions, external event triggers, and safe integration troubleshooting.",
+      "name": "hermes-integration-operations",
+      "path": "devops/hermes-integration-operations"
+    },
+    {
+      "description": "Diagnose slow Hermes Agent responses across gateway, model provider, context/compression, tool loops, cron/background load, and local system pressure; produce evidence-backed latency receipts and safe remediation options.",
+      "name": "hermes-latency-troubleshooting",
+      "path": "devops/hermes-latency-troubleshooting"
     },
     {
       "description": "Preserve interrupted, preempted, blocked, or concurrent work by routing it into Hermes Kanban tasks with context, receipts, exact completion reporting, and active blocker resolution.",
@@ -488,14 +773,49 @@
       "path": "devops/kanban-interruption-handoff"
     },
     {
+      "description": "Decomposition playbook + anti-temptation rules for an orchestrator profile routing work through Kanban. The \"don't do the work yourself\" rule and the basic lifecycle are auto-injected into every kanban worker's system prompt; this skill is the deeper playbook when you're specifically playing the orchestrator role.",
+      "name": "kanban-orchestrator",
+      "path": "devops/kanban-orchestrator"
+    },
+    {
       "description": "Use when the operator asks to send an implementation plan, recommendation bundle, or multi-task proposal to Hermes Kanban triage and shepherd it through.",
       "name": "kanban-plan-shepherding",
       "path": "devops/kanban-plan-shepherding"
     },
     {
-      "description": "Use when deciding whether work should become a Hermes Kanban task, choosing the right Kurultai assignee, dispatching it, monitoring it to completion, and actively managing blockers or follow-up work.",
+      "description": "Use when deciding whether work should become a Hermes Kanban task, choosing the right Kurultai assignee, dispatching it, monitoring it to completion, and actively managing blockers or follow-up work. For live task health checks and dead-PID crash loops, see references/running-task-crash-loop-triage.md. For orphan run-row repair, notification subscriptions, and recurring health probes, see references/kanban-health-monitoring-and-notifications.md. For gateway-origin auto-subscribe notification repair, see references/gateway-origin-notifications.md.",
       "name": "kanban-task-lifecycle",
       "path": "devops/kanban-task-lifecycle"
+    },
+    {
+      "description": "Pitfalls, examples, and edge cases for Hermes Kanban workers. The lifecycle itself is auto-injected into every worker's system prompt as KANBAN_GUIDANCE (from agent/prompt_builder.py); this skill is what you load when you want deeper detail on specific scenarios.",
+      "name": "kanban-worker",
+      "path": "devops/kanban-worker"
+    },
+    {
+      "description": "Holistic read-only Kurultai hourly reviews that gather supported evidence, suppress duplicate improvement ideas through the shared reservation ledger, and submit exactly one actionable Kanban triage plan when warranted.",
+      "name": "kurultai-hourly-review",
+      "path": "devops/kurultai-hourly-review"
+    },
+    {
+      "description": "Class-level buying and compatibility guidance for local storage, backup media, enclosures, and small-agent-system infrastructure.",
+      "name": "local-infrastructure-procurement",
+      "path": "devops/local-infrastructure-procurement"
+    },
+    {
+      "description": "Research and recommend cheap, compatible local storage for Macs, agent systems, Brain/Kurultai-style knowledge bases, backups, and future-upgrade paths.",
+      "name": "local-storage-procurement",
+      "path": "devops/local-infrastructure-procurement/references/absorbed-packages/local-storage-procurement"
+    },
+    {
+      "description": "Diagnose and repair SSH/Tailscale/Termius remote-access failures with transport/auth/session-layer separation and verified end-to-end probes.",
+      "name": "remote-access-troubleshooting",
+      "path": "devops/remote-access-troubleshooting"
+    },
+    {
+      "description": "Run proposal-only SaaS readiness cron loops: collect read-only product/admin evidence, dedupe recent proposals, and create at most one approval-gated improvement proposal.",
+      "name": "saas-improvement-proposal-loop",
+      "path": "devops/saas-improvement-proposal-loop"
     },
     {
       "description": "Webhook subscriptions: event-driven agent runs.",
@@ -508,6 +828,26 @@
       "path": "devops/x402-payment-address-lookup"
     },
     {
+      "description": "Exploratory QA of web apps: find bugs, evidence, reports.",
+      "name": "dogfood",
+      "path": "dogfood"
+    },
+    {
+      "description": "Himalaya CLI: IMAP/SMTP email from terminal.",
+      "name": "himalaya",
+      "path": "email/himalaya"
+    },
+    {
+      "description": "Operate game-related workflows: modded Minecraft server hosting and headless/emulator play automation with verification and user-facing safety.",
+      "name": "game-automation-and-servers",
+      "path": "gaming/game-automation-and-servers"
+    },
+    {
+      "description": "Set up, configure, operate, and automate gaming workflows including servers, modpacks, emulators, and gameplay agents.",
+      "name": "gaming-operations",
+      "path": "gaming/gaming-operations"
+    },
+    {
       "description": "Host modded Minecraft servers (CurseForge, Modrinth).",
       "name": "minecraft-modpack-server",
       "path": "gaming/minecraft-modpack-server"
@@ -518,9 +858,54 @@
       "path": "gaming/pokemon-player"
     },
     {
+      "description": "Inspect codebases w/ pygount: LOC, languages, ratios.",
+      "name": "codebase-inspection",
+      "path": "github/codebase-inspection"
+    },
+    {
+      "description": "GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login.",
+      "name": "github-auth",
+      "path": "github/github-auth"
+    },
+    {
+      "description": "Review PRs: diffs, inline comments via gh or REST.",
+      "name": "github-code-review",
+      "path": "github/github-code-review"
+    },
+    {
+      "description": "Create, triage, label, assign GitHub issues via gh or REST.",
+      "name": "github-issues",
+      "path": "github/github-issues"
+    },
+    {
+      "description": "Operate GitHub repositories end-to-end with gh, git, and REST/GraphQL: auth, repository setup, issue triage, codebase inspection, PR creation/review, CI repair, merge, and safe publication workflows.",
+      "name": "github-operations",
+      "path": "github/github-operations"
+    },
+    {
+      "description": "GitHub PR lifecycle: branch, commit, open, CI, merge.",
+      "name": "github-pr-workflow",
+      "path": "github/github-pr-workflow"
+    },
+    {
+      "description": "Clone/create/fork repos; manage remotes, releases.",
+      "name": "github-repo-management",
+      "path": "github/github-repo-management"
+    },
+    {
+      "description": "Operate GitHub repositories end-to-end: auth, repo setup, issues, PRs, reviews, CI, releases, and codebase inspection.",
+      "name": "github-repository-workflows",
+      "path": "github/github-repository-workflows"
+    },
+    {
       "description": "End-to-end GitHub work: auth, repository setup, codebase inspection, issues, PR lifecycle, CI, and review via gh/git/API.",
       "name": "github-workflows",
       "path": "github/github-workflows"
+    },
+    {
+      "description": "First-principles, code-first Karpathy-inspired teaching voice for the andrej-karpathy profile.",
+      "name": "karpathy-mode",
+      "path": "karpathy-mode"
     },
     {
       "description": "Save media, documents, screenshots, PDFs, and supporting files into the Brain with privacy routing, manifests, local-only Kanban delegation, indexing policy, and verification.",
@@ -538,7 +923,7 @@
       "path": "kurultai/brain-vault-weekly-synthesis"
     },
     {
-      "description": "Router for the operator's Brain wiki operations: context/search, durable writes, ingest, QMD/indexing, privacy boundaries, research capture, curation, and Brain-service maintenance.",
+      "description": "Operate and maintain the operator's brain wiki: context, search, save, ingest, sync, research, fold/archive, graph/API maintenance, and skill parity.",
       "name": "brain-wiki-operations",
       "path": "kurultai/brain-wiki-operations"
     },
@@ -553,12 +938,12 @@
       "path": "kurultai/buildroom-operations"
     },
     {
-      "description": "Route the operator's Content OS work: inbox processing, connection mining, briefs, drafting, publishing gates, return path, and performance review.",
+      "description": "Operate the operator's Content OS end-to-end: inbox processing, connection mining, brief generation, drafting, return path, and performance review.",
       "name": "content-os-workflows",
       "path": "kurultai/content-os-workflows"
     },
     {
-      "description": "Operate, extend, debug, and deploy the operator's fantasy sumo league site without spoilers",
+      "description": "Operate, extend, and deploy the fantasy sumo league site",
       "name": "fantasy-sumo-operations",
       "path": "kurultai/fantasy-sumo-operations"
     },
@@ -578,19 +963,34 @@
       "path": "kurultai/kurultai-agent-health"
     },
     {
-      "description": "Router for current Kurultai/Hermes operations: diagnose live queues, Brain, cron, gateways, profiles, AGI harness, proposals, public rebuilds, and operational substrate while keeping decommissioned OpenClaw/Telegram procedures historical.",
+      "description": "Always-on Kurultai architecture capsule for current-state-aware answers, /study relevance checks, and agent-loop decisions.",
+      "name": "kurultai-living-architecture",
+      "path": "kurultai/kurultai-living-architecture"
+    },
+    {
+      "description": "Operate, diagnose, and improve Kurultai/OpenClaw: queues, runtime config housing (see `references/runtime-config-repo-housing.md`), routing, proposals, caretaker/improver loops, auth/rate limits, dashboards, and model policy.",
       "name": "kurultai-operations",
       "path": "kurultai/kurultai-operations"
     },
     {
-      "description": "Route meaningful Kurultai experience into memory, class-level skills, Brain doctrine, Kanban follow-ups, receipts/regressions/canaries, or explicit no-op rationale without creating dated skill bloat.",
+      "description": "Run a post-task retro/learn pass that compiles meaningful work into memory, skills, Brain doctrine, Kanban follow-up, receipts, regressions, canaries, or explicit no-op rationale.",
       "name": "kurultai-retro-learn",
       "path": "kurultai/kurultai-retro-learn"
+    },
+    {
+      "description": "Deprecated forwarding shim for the Kurultai system-audit workflow; use kurultai-operations instead.",
+      "name": "kurultai-system-audit",
+      "path": "kurultai/kurultai-system-audit"
     },
     {
       "description": "Convert broad money-dashboard security/audit bounty signals into concrete public/local research passes with ledger receipts.",
       "name": "money-security-bounty-triage",
       "path": "kurultai/money-security-bounty-triage"
+    },
+    {
+      "description": "Use when operating the internal-only Elon profile with Kurultai Brain receipts, Brain lookup/write discipline, and Kanban-safe execution boundaries.",
+      "name": "musk-brain-native",
+      "path": "kurultai/musk-brain-native"
     },
     {
       "description": "Configure, upgrade, and debug OpenClaw/Hermes integration surfaces including Telegram channels, Parse screening cleanup, CLI/gateway upgrades, and imported helper workflows.",
@@ -603,7 +1003,12 @@
       "path": "kurultai/persona-agent-gateway-creation"
     },
     {
-      "description": "Use when the operator asks for reusable or durable research-return workflows: route substantial article/media/social/source research through Batu Kanban by default, verify/synthesize with Kublai, and turn findings into Brain artifacts, proposal dispositions, skills, tasks, reports, or explicit no-ops. Skip for casual one-off factual answers unless they become reusable research workflow work.",
+      "description": "Extract distilled, hard-private contact knowledge from local Messages and Signal communication history, storing synthesized profiles on the external KurultaiVault only.",
+      "name": "private-contact-communication-profile-extraction",
+      "path": "kurultai/private-contact-communication-profile-extraction"
+    },
+    {
+      "description": "Default workflow for turning the operator-requested article/media/social research into reusable outputs: Brain artifacts, content angles, doctrine, proposals, skills, Kanban tasks, or explicit no-op decisions.",
       "name": "research-return-path",
       "path": "kurultai/research-return-path"
     },
@@ -618,9 +1023,49 @@
       "path": "kurultai/skill-library-operations"
     },
     {
+      "description": "Route meaningful Kurultai/source experience into Brain, memory, skills, Kanban follow-ups, receipts/regressions/canaries, or explicit no-op rationale without hijacking official /learn.",
+      "name": "study",
+      "path": "kurultai/study"
+    },
+    {
+      "description": "Discover, find, compare, audit, repair, adapt, craft, run, debrief, and prepare repeatable AI-agent loops for publication.",
+      "name": "loopy",
+      "path": "loopy"
+    },
+    {
+      "description": "Marc Andreessen persona voice discipline for normal chat: public-record techno-optimist, builder-first, no report voice, no fake identity or investing authority.",
+      "name": "marc-mode",
+      "path": "marc-mode"
+    },
+    {
       "description": "MCP client: connect servers, register tools (stdio/HTTP).",
       "name": "native-mcp",
       "path": "mcp/native-mcp"
+    },
+    {
+      "description": "Create, analyze, and troubleshoot music/audio artifacts: songwriting prompts, Suno-like generation, MusicGen/AudioCraft, spectrogram/audio-feature inspection, and end-to-end file verification.",
+      "name": "audio-generation-and-music",
+      "path": "media/audio-generation-and-music"
+    },
+    {
+      "description": "Search/download GIFs from Tenor via curl + jq.",
+      "name": "gif-search",
+      "path": "media/gif-search"
+    },
+    {
+      "description": "HeartMuLa: Suno-like song generation from lyrics + tags.",
+      "name": "heartmula",
+      "path": "media/heartmula"
+    },
+    {
+      "description": "Use when creating voice notes for the operator/Kublai, especially Signal or direct-send audio messages. Preserve Kublai as the speaker/persona while using the operator's preferred Marcus-the-worm cadence and warmth without mentioning the prompt, request, cadence, or style instructions. For approved user-supplied audio that must go to both Signal and Messages/iMessage, use the dual-send workflow in references/approved-voice-audio-dual-send-signal-imessage.md.",
+      "name": "kublai-voice-notes",
+      "path": "media/kublai-voice-notes"
+    },
+    {
+      "description": "Search, analyze, generate, transform, summarize, and control media across YouTube, GIFs, music, audio features, and playback.",
+      "name": "media-content-workflows",
+      "path": "media/media-content-workflows"
     },
     {
       "description": "Generate, transform, and analyze media: ASCII art/video, math animations, GIFs, YouTube transcripts, music prompts/generation, and audio features.",
@@ -628,9 +1073,44 @@
       "path": "media/media-generation-and-analysis"
     },
     {
+      "description": "Audio spectrograms/features (mel, chroma, MFCC) via CLI.",
+      "name": "songsee",
+      "path": "media/songsee"
+    },
+    {
       "description": "Spotify: play, search, queue, manage playlists and devices.",
       "name": "spotify",
       "path": "media/spotify"
+    },
+    {
+      "description": "YouTube transcripts to summaries, threads, blogs.",
+      "name": "youtube-content",
+      "path": "media/youtube-content"
+    },
+    {
+      "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
+      "name": "lm-evaluation-harness",
+      "path": "mlops/evaluation/lm-evaluation-harness"
+    },
+    {
+      "description": "W&B: log ML experiments, sweeps, model registry, dashboards.",
+      "name": "weights-and-biases",
+      "path": "mlops/evaluation/weights-and-biases"
+    },
+    {
+      "description": "HuggingFace hf CLI: search/download/upload models, datasets.",
+      "name": "huggingface-hub",
+      "path": "mlops/huggingface-hub"
+    },
+    {
+      "description": "llama.cpp local GGUF inference + HF Hub model discovery.",
+      "name": "llama-cpp",
+      "path": "mlops/inference/llama-cpp"
+    },
+    {
+      "description": "OBLITERATUS: abliterate LLM refusals (diff-in-means).",
+      "name": "obliteratus",
+      "path": "mlops/inference/obliteratus"
     },
     {
       "description": "Outlines: structured JSON/regex/Pydantic LLM generation.",
@@ -638,9 +1118,34 @@
       "path": "mlops/inference/outlines"
     },
     {
+      "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
+      "name": "vllm",
+      "path": "mlops/inference/vllm"
+    },
+    {
       "description": "Model operations workflows: Hugging Face Hub, local llama.cpp inference, W&B evaluation/tracking, and model refusal/abliteration experiments.",
       "name": "mlops-model-workflows",
       "path": "mlops/mlops-model-workflows"
+    },
+    {
+      "description": "Operate ML/AI model workflows across hubs, inference servers, local runners, evaluation, experiment tracking, research frameworks, and specialist models.",
+      "name": "model-operations-workflows",
+      "path": "mlops/model-operations-workflows"
+    },
+    {
+      "description": "AudioCraft: MusicGen text-to-music, AudioGen text-to-sound.",
+      "name": "audiocraft",
+      "path": "mlops/models/audiocraft"
+    },
+    {
+      "description": "SAM: zero-shot image segmentation via points, boxes, masks.",
+      "name": "segment-anything",
+      "path": "mlops/models/segment-anything"
+    },
+    {
+      "description": "Operate OpenRouter-backed LLM workflows: credits, API-key-safe live model smoke tests, roster validation, and provider quirks.",
+      "name": "openrouter-operations",
+      "path": "mlops/openrouter-operations"
     },
     {
       "description": "DSPy: declarative LM programs, auto-optimize prompts, RAG.",
@@ -663,6 +1168,21 @@
       "path": "mlops/training/unsloth"
     },
     {
+      "description": "Use for Elon-style project review, war-room, design review, production hell, Mars mode, and brutal audits while preserving conversational voice.",
+      "name": "musk-mode",
+      "path": "musk-mode"
+    },
+    {
+      "description": "Safely read/search the operator's Brain and prepare public-safe proposal/dry-run updates without crossing hard-private/privacy boundaries.",
+      "name": "brain-wiki-operations",
+      "path": "note-taking/brain-wiki-operations"
+    },
+    {
+      "description": "Read, search, create, and edit notes in the Obsidian vault.",
+      "name": "obsidian",
+      "path": "note-taking/obsidian"
+    },
+    {
       "description": "Build an Obsidian + Claude learning vault that turns study material into concept notes, non-obvious connections, active recall, spaced review, and synthesis documents.",
       "name": "obsidian-claude-learning-vault",
       "path": "note-taking/obsidian-claude-learning-vault"
@@ -678,9 +1198,34 @@
       "path": "openclaw-imports/kublai-task-workflows"
     },
     {
+      "description": "Pay HTTP 402 APIs via Machine Payments Protocol (MPP).",
+      "name": "mpp-agent",
+      "path": "payments/mpp-agent"
+    },
+    {
+      "description": "Agent payments via Stripe Link \u2014 cards, SPT, approvals.",
+      "name": "stripe-link-cli",
+      "path": "payments/stripe-link-cli"
+    },
+    {
+      "description": "Provision SaaS services + sync creds via Stripe Projects.",
+      "name": "stripe-projects",
+      "path": "payments/stripe-projects"
+    },
+    {
       "description": "Use when the operator asks Kublai/Hermes to call a human for a purpose. Build an objective-led call plan before dialing, lead the conversation toward that outcome, collect only consented necessary facts, and close with receipts/follow-ups.",
       "name": "agent-led-call-planning",
       "path": "productivity/agent-led-call-planning"
+    },
+    {
+      "description": "Airtable REST API via curl. Records CRUD, filters, upserts.",
+      "name": "airtable",
+      "path": "productivity/airtable"
+    },
+    {
+      "description": "Personalized career relocation recommendations using Brain context, role-market fit, partner constraints, local economics, and validation plans.",
+      "name": "career-relocation-analysis",
+      "path": "productivity/career-relocation-analysis"
     },
     {
       "description": "Use when writing copy-pasteable prompts, commands, patches, Markdown, or chat messages that contain code blocks, especially when the output will be pasted into Telegram, Slack, Discord, another LLM, or a terminal. Prevent broken nested fences, mangled Markdown, and ambiguous handoff formatting.",
@@ -688,9 +1233,24 @@
       "path": "productivity/copy-pasteable-code-blocks"
     },
     {
+      "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
+      "name": "google-workspace",
+      "path": "productivity/google-workspace"
+    },
+    {
       "description": "Import and process meeting transcripts/notes from Granola and Fathom exports or APIs, then fold into Brain/meeting pipelines.",
       "name": "granola-fathom",
       "path": "productivity/granola-fathom"
+    },
+    {
+      "description": "Handle shared/group chat contexts without being noisy; decide when to respond, when to stay silent, and how to acknowledge routing or mention preferences.",
+      "name": "group-chat-etiquette",
+      "path": "productivity/group-chat-etiquette"
+    },
+    {
+      "description": "Tailor resumes and submit job applications.",
+      "name": "job-application-loop",
+      "path": "productivity/job-application-loop"
     },
     {
       "description": "Linear: manage issues, projects, teams via GraphQL + curl.",
@@ -698,14 +1258,64 @@
       "path": "productivity/linear"
     },
     {
+      "description": "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.",
+      "name": "maps",
+      "path": "productivity/maps"
+    },
+    {
+      "description": "Build an N8N + Obsidian business brain: local Markdown vault as memory, N8N as automation/nervous system, LLM API as intelligence layer, with core workflows for briefs, meetings, customers, competitors, decisions, reviews, patterns, and financial intelligence.",
+      "name": "n8n-obsidian-business-brain",
+      "path": "productivity/n8n-obsidian-business-brain"
+    },
+    {
+      "description": "Edit PDF text/typos/titles via nano-pdf CLI (NL prompts).",
+      "name": "nano-pdf",
+      "path": "productivity/nano-pdf"
+    },
+    {
+      "description": "Notion API + ntn CLI: pages, databases, markdown, Workers.",
+      "name": "notion",
+      "path": "productivity/notion"
+    },
+    {
+      "description": "Extract text from PDFs/scans (pymupdf, marker-pdf).",
+      "name": "ocr-and-documents",
+      "path": "productivity/ocr-and-documents"
+    },
+    {
       "description": "Operate productivity platforms and documents: email, Google Workspace, Airtable, Notion, PDF/OCR, PowerPoint, Teams meeting summaries, maps, and expenses.",
       "name": "office-and-document-workflows",
       "path": "productivity/office-and-document-workflows"
     },
     {
+      "description": "Deprecated compatibility shim. Use only when an old prompt, cron job, or operator note still references personal-radar; immediately load and use radar instead.",
+      "name": "personal-radar",
+      "path": "productivity/personal-radar"
+    },
+    {
+      "description": "Install and select animated petdex mascots for Hermes.",
+      "name": "petdex",
+      "path": "productivity/petdex"
+    },
+    {
+      "description": "Create, read, edit .pptx decks, slides, notes, templates.",
+      "name": "powerpoint",
+      "path": "productivity/powerpoint"
+    },
+    {
       "description": "Use when the user asks to premortem, stress-test, red-team, de-risk, or future-failure-analyze a plan, decision, launch, hire, partnership, project, commitment, or strategy before execution.",
       "name": "premortem",
       "path": "productivity/premortem"
+    },
+    {
+      "description": "Operate productivity platforms and documents: email, Google Workspace, Notion, Airtable, Linear, PDFs, slides, maps, and meeting pipelines.",
+      "name": "productivity-platform-operations",
+      "path": "productivity/productivity-platform-operations"
+    },
+    {
+      "description": "Use when the operator asks for Radar, top-of-mind, what needs attention, daily/weekly brief, deep-work shield, chief-of-staff/care-layer sweep, approval queue, or a recurring assistant loop that protects, prepares, proposes, and closes loops across Brain, projects, finance/admin, email, calendar, messages, travel, repos, research, relationships, and tracked systems.",
+      "name": "radar",
+      "path": "productivity/radar"
     },
     {
       "description": "Use when the operator asks to book a Raleigh Sauna House appointment for a given date/time; navigate Boulevard booking, optionally use SMS login code, and stop before final appointment submission for approval.",
@@ -718,9 +1328,64 @@
       "path": "productivity/readwise"
     },
     {
+      "description": "Tailor a canonical resume/CV to a specific job posting using source-backed profile materials, role-keyword mapping, ATS-friendly structure, and verifiable exported artifacts.",
+      "name": "role-tailored-resumes",
+      "path": "productivity/role-tailored-resumes"
+    },
+    {
+      "description": "Operate the Teams meeting summary pipeline via Hermes CLI \u2014 summarize meetings, inspect pipeline status, replay jobs, manage Microsoft Graph subscriptions.",
+      "name": "teams-meeting-pipeline",
+      "path": "productivity/teams-meeting-pipeline"
+    },
+    {
+      "description": "Credential-gated Twilio SMS/calls and Bland outbound AI calling workflows for Hermes, with dry-run-first side effects.",
+      "name": "telephony",
+      "path": "productivity/telephony"
+    },
+    {
+      "description": "Research hotel stays, booking prices, availability, and travel logistics across official sites and aggregators with source-aware caveats.",
+      "name": "travel-booking-research",
+      "path": "productivity/travel-booking-research"
+    },
+    {
+      "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
+      "name": "godmode",
+      "path": "red-teaming/godmode"
+    },
+    {
+      "description": "Class-level workflows for model refusal testing, jailbreak research, multi-model racing, and prompt-level red-team experiments.",
+      "name": "model-red-teaming-workflows",
+      "path": "red-teaming/model-red-teaming-workflows"
+    },
+    {
+      "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
+      "name": "godmode",
+      "path": "red-teaming/model-red-teaming-workflows/references/absorbed-packages/godmode"
+    },
+    {
       "description": "Apify actor/dataset workflows for scraping and market research with cost and side-effect dry-run gates.",
       "name": "apify",
       "path": "research/apify"
+    },
+    {
+      "description": "Search arXiv papers by keyword, author, category, or ID.",
+      "name": "arxiv",
+      "path": "research/arxiv"
+    },
+    {
+      "description": "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.",
+      "name": "blogwatcher",
+      "path": "research/blogwatcher"
+    },
+    {
+      "description": "Karpathy's LLM Wiki: build/query interlinked markdown KB.",
+      "name": "llm-wiki",
+      "path": "research/llm-wiki"
+    },
+    {
+      "description": "Query Polymarket: markets, prices, orderbooks, history.",
+      "name": "polymarket",
+      "path": "research/polymarket"
     },
     {
       "description": "Operate and evaluate the operator's paper-only Polymarket daily temperature research engine, including simulated portfolio, training export, and goal tuning.",
@@ -728,14 +1393,49 @@
       "path": "research/polymarket-weather-paper-engine"
     },
     {
+      "description": "Estimate resale value and optimal selling timing for consumer goods, collectibles, merch, apparel, and bundles using marketplace comps, condition assessment, and demand seasonality.",
+      "name": "resale-market-valuation",
+      "path": "research/resale-market-valuation"
+    },
+    {
+      "description": "Run research discovery, monitoring, synthesis, paper writing, market intelligence, and knowledge-base workflows with source-grounded outputs.",
+      "name": "research-intelligence-operations",
+      "path": "research/research-intelligence-operations"
+    },
+    {
       "description": "Research discovery and synthesis: arXiv, feeds/blogs, LLM wiki knowledge bases, research-paper writing, market/event research, and prediction-market data.",
       "name": "research-intelligence-workflows",
       "path": "research/research-intelligence-workflows"
     },
     {
+      "description": "Write ML papers for NeurIPS/ICML/ICLR: design\u2192submit.",
+      "name": "research-paper-writing",
+      "path": "research/research-paper-writing"
+    },
+    {
       "description": "Operate personal device and smart-home APIs safely: Hue/OpenHue lights and read-only Tesla Fleet vehicle data.",
       "name": "device-and-home-api-operations",
       "path": "smart-home/device-and-home-api-operations"
+    },
+    {
+      "description": "Control Philips Hue lights, scenes, rooms via OpenHue CLI.",
+      "name": "openhue",
+      "path": "smart-home/openhue"
+    },
+    {
+      "description": "Connect health/home devices such as Nest Thermostat, Eight Sleep, and Oura to Hermes via Home Assistant and token-based APIs, with safe credential boundaries and verification scripts.",
+      "name": "smart-health-home-integrations",
+      "path": "smart-home/smart-health-home-integrations"
+    },
+    {
+      "description": "Control and verify smart-home devices, rooms, scenes, lights, switches, and related personal device APIs safely.",
+      "name": "smart-home-operations",
+      "path": "smart-home/smart-home-operations"
+    },
+    {
+      "description": "Operate social and messaging platforms such as X/Twitter and Yuanbao groups with explicit targets, safe posting, and verified delivery.",
+      "name": "communication-platform-operations",
+      "path": "social-media/communication-platform-operations"
     },
     {
       "description": "Operate external communication platforms: X/Twitter via xurl, Yuanbao groups, and telephony/SMS/voice-agent integrations.",
@@ -753,9 +1453,39 @@
       "path": "social-media/x-content-optimization"
     },
     {
+      "description": "Interact with X/Twitter via xurl, the official X API CLI. Use for posting, replying, quoting, searching, timelines, mentions, likes, reposts, bookmarks, follows, DMs, media upload, raw v2 endpoint access, and Parse-safe research of individual X posts/articles.",
+      "name": "xurl",
+      "path": "social-media/xurl"
+    },
+    {
+      "description": "Plan and build agent-native CLI toolbelts from APIs, SaaS dashboards, local state, and recurring workflows; especially Printing Press-style local-first CLIs with compound commands and MCP surfaces.",
+      "name": "agent-native-cli-toolbelt",
+      "path": "software-development/agent-native-cli-toolbelt"
+    },
+    {
+      "description": "Apply Dave Blundin DB2 Stack Part 7 / CLAUDE.md-style operating discipline for multi-agent coding and experiments: preserve data, use right tools, smoke-test before spend, document results, and coordinate safely.",
+      "name": "agent-operating-discipline-db2",
+      "path": "software-development/agent-operating-discipline-db2"
+    },
+    {
       "description": "Use when an agent needs opt-in Browse CLI guidance for local, non-sensitive browser automation reconnaissance after Hermes built-in browser tools are insufficient.",
       "name": "browse-cli",
       "path": "software-development/browse-cli"
+    },
+    {
+      "description": "Class-level workflows for browser reconnaissance, exploratory web QA, and safe opt-in browser automation tooling.",
+      "name": "browser-automation-and-qa",
+      "path": "software-development/browser-automation-and-qa"
+    },
+    {
+      "description": "Use when an agent needs opt-in Browse CLI guidance for local, non-sensitive browser automation reconnaissance after Hermes built-in browser tools are insufficient.",
+      "name": "browse-cli",
+      "path": "software-development/browser-automation-and-qa/references/absorbed-packages/browse-cli"
+    },
+    {
+      "description": "Exploratory QA of web apps: find bugs, evidence, reports.",
+      "name": "dogfood",
+      "path": "software-development/browser-automation-and-qa/references/absorbed-packages/dogfood"
     },
     {
       "description": "Direct browser control via CDP connected to the user's real Chrome. Use when the user wants to automate, scrape, test, or interact with web pages. Installed at ~/Developer/browser-harness.",
@@ -768,9 +1498,29 @@
       "path": "software-development/codex-implementation-orchestration"
     },
     {
-      "description": "Debug Hermes slash commands across Python registry, gateway/Telegram, TUI, and Ink UI.",
+      "description": "Debug Hermes TUI slash commands: Python, gateway, Ink UI.",
       "name": "debugging-hermes-tui-commands",
       "path": "software-development/debugging-hermes-tui-commands"
+    },
+    {
+      "description": "First-principles preflight for agent work: clarify desired reality, assumptions, smallest safe action, and outcome evidence before building the expected artifact.",
+      "name": "first-principles-preflight",
+      "path": "software-development/first-principles-preflight"
+    },
+    {
+      "description": "Act as the independent verifier for a gated implementation plan. A separate implementer session (usually Claude Code, often 'Kublai') writes code, runs gates, and commits; this profile independently reproduces each gate's evidence using fresh Claude Code print-mode runs, guards a never-move invariant, pre-checks privileged operator scripts before the human runs them, and posts GATE CLR / GATE HOLD verdicts. Use whenever the operator asks for verification of a gated plan, a HANDOFF.md exists, or an implementer signals GATE REQ. This is one of this profile's primary roles.",
+      "name": "gated-implementation-verifier",
+      "path": "software-development/gated-implementation-verifier"
+    },
+    {
+      "description": "Author in-repo SKILL.md: frontmatter, validator, structure.",
+      "name": "hermes-agent-skill-authoring",
+      "path": "software-development/hermes-agent-skill-authoring"
+    },
+    {
+      "description": "Set up and troubleshoot Hermes Gateway messaging-platform adapters such as Signal, Telegram, Discord, Slack, and similar chat bridges; focus on platform account linking, local CLI/daemon state, gateway config, and verification before telling the user the platform is ready.",
+      "name": "hermes-messaging-platform-setup",
+      "path": "software-development/hermes-messaging-platform-setup"
     },
     {
       "description": "Modify, debug, or extend the s6-overlay supervision tree inside the Hermes Agent Docker image \u2014 adding new services, debugging profile gateways, understanding the Architecture B main-program pattern.",
@@ -778,14 +1528,39 @@
       "path": "software-development/hermes-s6-container-supervision"
     },
     {
+      "description": "Debug Node.js via --inspect + Chrome DevTools Protocol CLI.",
+      "name": "node-inspect-debugger",
+      "path": "software-development/node-inspect-debugger"
+    },
+    {
+      "description": "Evidence-first operational assessment of a project, loop, service, control plane, or automation system. Use when the user asks to assess/evaluate/audit something like a live agent loop, repo, service, Brain control-plane artifact, public repo, or operational claim.",
+      "name": "operational-assessment",
+      "path": "software-development/operational-assessment"
+    },
+    {
       "description": "Metadata receipt pattern for Hermes screened tool events.",
       "name": "parse-screening-recovery",
       "path": "software-development/parse-screening-recovery"
     },
     {
+      "description": "Plan mode: write markdown plan to .hermes/plans/, no exec.",
+      "name": "plan",
+      "path": "software-development/plan"
+    },
+    {
+      "description": "Debug Python: pdb REPL + debugpy remote (DAP).",
+      "name": "python-debugpy",
+      "path": "software-development/python-debugpy"
+    },
+    {
       "description": "'Repository workflow orchestration skill for staged implementation, locked artifacts, late-phase receipts, and durable memory maintenance. Use when executing recursive-mode runs, resuming a run, locking a phase, or verifying locks.'",
       "name": "recursive-mode",
       "path": "software-development/recursive-mode"
+    },
+    {
+      "description": "Pre-commit review: security scan, quality gates, auto-fix.",
+      "name": "requesting-code-review",
+      "path": "software-development/requesting-code-review"
     },
     {
       "description": "Write shell commands that don't trip Hermes's own security scanner. Avoid pipe-to-interpreter patterns and inline `-c` script execution when a direct-file read works.",
@@ -798,9 +1573,24 @@
       "path": "software-development/simplify-code"
     },
     {
+      "description": "Plan, spike, implement, test, debug, review, and hand off software changes with verified execution evidence.",
+      "name": "software-delivery-operations",
+      "path": "software-development/software-delivery-operations"
+    },
+    {
       "description": "Class-level software delivery workflow: planning, spikes, TDD, debugging, runtime debuggers, pre-commit review, and verification.",
       "name": "software-delivery-workflows",
       "path": "software-development/software-delivery-workflows"
+    },
+    {
+      "description": "Route product/code work through a GStack-inspired software-factory loop: office-hours discovery, plan review, implementation, report-only QA, fix, review, ship/canary, and closeout.",
+      "name": "software-factory-lifecycle",
+      "path": "software-development/software-factory-lifecycle"
+    },
+    {
+      "description": "Throwaway experiments to validate an idea before build.",
+      "name": "spike",
+      "path": "software-development/spike"
     },
     {
       "description": "Wire, deploy, and verify live-data ingestion for static/SPAs that consume JSON snapshots or SSE-style live endpoints.",
@@ -813,7 +1603,17 @@
       "path": "software-development/subagent-driven-development"
     },
     {
-      "description": "Use when you have a spec or requirements for a multi-step task. Creates comprehensive implementation plans with bite-sized tasks, exact file paths, and complete code examples.",
+      "description": "4-phase root cause debugging: understand bugs before fixing.",
+      "name": "systematic-debugging",
+      "path": "software-development/systematic-debugging"
+    },
+    {
+      "description": "TDD: enforce RED-GREEN-REFACTOR, tests before code.",
+      "name": "test-driven-development",
+      "path": "software-development/test-driven-development"
+    },
+    {
+      "description": "Write implementation plans: bite-sized tasks, paths, code.",
       "name": "writing-plans",
       "path": "software-development/writing-plans"
     },
@@ -826,7 +1626,20 @@
       "description": "Operate the meta-harness control plane: curator gate/co-judge behavior, harness controls, read-only evaluation mode, and operator safety boundaries.",
       "name": "meta-harness-operations",
       "path": "system/meta-harness-operations"
+    },
+    {
+      "description": "Senior UI/UX Engineer. Architect digital interfaces overriding default LLM biases. Enforces metric-based rules, strict component architecture, CSS hardware acceleration, and balanced design engineering.",
+      "name": "taste-skill",
+      "path": "taste-skill"
+    },
+    {
+      "description": "Yuanbao (\u5143\u5b9d) groups: @mention users, query info/members.",
+      "name": "yuanbao",
+      "path": "yuanbao"
     }
   ],
-  "source": "~/.hermes/skills/**/SKILL.md"
+  "source": [
+    "~/.hermes/profiles/*/skills/**/SKILL.md",
+    "~/.hermes/skills/**/SKILL.md"
+  ]
 }

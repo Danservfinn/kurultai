@@ -1,19 +1,19 @@
 gateways:
   kublai:
     purpose: operator-facing chair gateway
-    profile: kublai
+    profile: "${CHAIR_PROFILE_ID:-kublai}"
     display_name: "${CHAIR_DISPLAY_NAME:-Kublai}"
     bot_display_name: "${CHAIR_BOT_DISPLAY_NAME:-Kurultai Kublai}"
     platforms:
       telegram:
         enabled: true
-        bot_secret_env: KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN
+        bot_secret_env: "${CHAIR_TELEGRAM_BOT_TOKEN_ENV:-KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN}"
         home_chat: redacted-local-only
         mode: long-polling-by-default
     install:
-      service_name: hermes-gateway-kublai
-      command: hermes --profile kublai gateway run
-      notes: "Primary operator interface. Store all bot credentials in the local Hermes secret store or .env, never in git."
+      service_name: "${CHAIR_GATEWAY_SERVICE_NAME:-hermes-gateway-kublai}"
+      command: "hermes --profile ${CHAIR_PROFILE_ID:-kublai} gateway run"
+      notes: "Primary operator interface. On existing-agent installs, substitute the generated chair profile id (for example cerberus) from identity.generated.yaml. Store all bot credentials in the local Hermes secret store or .env, never in git."
   ogedei:
     purpose: dedicated operations/intake gateway
     profile: ogedei

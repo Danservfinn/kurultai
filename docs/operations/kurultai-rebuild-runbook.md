@@ -9,6 +9,8 @@ This is not a secret backup. Live tokens, private chat targets, session logs, pr
 A rebuilt host should provide these capabilities:
 
 - Hermes runtime for the main chair/Kublai surface, with user-visible display name chosen at install time.
+- Existing-agent attachment for operators who already have an agent, e.g. Sophia can map Cerberus to the Kurultai chair profile without copying private state.
+- Radar care-layer/chief-of-staff surface staged as draft-only under Brain `status/radar`.
 - Kurultai Hermes profile roster, including optional/internal agent lanes such as Batu, Coder, Subc, and non-routable Codex compatibility.
 - Native Hermes Kanban with the expected schema.
 - Brain wiki at the configured path, with QMD indexing.
@@ -23,11 +25,13 @@ A rebuilt host should provide these capabilities:
 ## Repository surfaces
 
 - `config/runtime-config/identity.yaml`: customizable public naming contract for the main chair/Kublai surface and gateway display names.
+- `config/runtime-config/agent-integration.yaml`: existing-agent merge policy for Sophia/Cerberus-style installs.
 - `config/runtime-config/hermes.template.yaml`: sanitized Hermes runtime contract.
 - `config/runtime-config/profiles.yaml`: Kurultai profiles and roles.
 - `config/runtime-config/kurultai.yaml`: native coordination contract.
-- `config/runtime-config/brain.yaml`: Brain wiki and index contract.
-- `config/runtime-config/gateways.yaml`: Kublai and Ogedei gateway contract.
+- `config/runtime-config/brain.yaml`: Brain wiki, index, and Radar status directory contract.
+- `config/runtime-config/gateways.yaml`: Kublai/chair and Ogedei gateway contract.
+- `config/runtime-config/radar.yaml`: Radar artifact, authority, and source-boundary contract.
 - `config/runtime-config/install-expert.yaml`: installing-agent expertise contract and required-reading manifest.
 - `config/runtime-config/cron.manifest.json`: sanitized cron manifest.
 - `config/runtime-config/skills.manifest.json`: skill names, relative paths, descriptions.
@@ -51,15 +55,16 @@ Use placeholders and environment-variable names in repo files.
 
 1. Install host prerequisites: Python, Git, Node/npm where needed, Hermes Agent CLI, QMD, and provider/tool CLIs.
 2. Clone this repository.
-3. Run `python3 scripts/install_kurultai.py --doctor`, then a personalized dry-run/apply or `--interactive` flow. Choose the main chair's user-visible display name during this step; the default internal profile id can remain `kublai`.
+3. Run `python3 scripts/install_kurultai.py --doctor`, then a personalized dry-run/apply or `--interactive` flow. Choose the main chair's user-visible display name during this step; the default internal profile id can remain `kublai`, or an existing agent can be selected with `--existing-agent-name` / `--existing-agent-profile-id`.
 4. Review staged config under `~/.kurultai-install/staging/` and merge sanitized Hermes settings with local private values.
-5. Recreate Hermes profiles from `profiles.yaml` and apply the generated main-chair display-name guidance from `identity.generated.yaml`.
+5. Recreate Hermes profiles from `profiles.yaml` and apply the generated main-chair display-name guidance from `identity.generated.yaml`; if an existing agent profile is selected, back it up and merge without overwriting private memories, prompts, sessions, credentials, or tools.
 6. Initialize native Hermes Kanban and compare its schema to `kanban.schema.json`.
 7. Mount or clone the Brain wiki at the configured path and refresh QMD indexes.
 8. Recreate only cron jobs from `cron.manifest.json` whose scripts exist locally; keep missing-script jobs as private follow-up and restore redacted delivery targets only from local private config.
-9. Restore skills from source repositories or private skill backups using `skills.manifest.json` as the checklist; keep missing paths as explicit follow-up.
-10. Configure the main chair gateway and, if the Ogedei bot credential is available, the separate Ogedei gateway from `gateways.yaml`.
-11. Verify canaries: Hermes config check, profile startup, Kanban create/complete, Brain search/indexing, one safe cron run, main chair gateway reply, Ogedei gateway reply when configured, receipt write/index, and repo secret scan.
+9. Restore skills from source repositories or private skill backups using `skills.manifest.json` as the checklist; verify `radar` is present or explicitly listed as follow-up.
+10. Stage Radar from `radar.yaml`, create `Brain/status/radar`, and keep `max_authority=draft_only` until source credentials, delivery targets, and approvals are verified.
+11. Configure the main chair gateway and, if the Ogedei bot credential is available, the separate Ogedei gateway from `gateways.yaml`.
+12. Verify canaries: Hermes config check, profile startup, Kanban create/complete, Brain search/indexing, Radar local packet/receipt path, one safe cron run, main chair gateway reply, Ogedei gateway reply when configured, receipt write/index, and repo secret scan.
 
 ## Drift rule
 

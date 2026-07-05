@@ -1,0 +1,38 @@
+schema: kurultai.agent-integration.v1
+purpose: "Attach an operator's existing agent to a fresh Kurultai install without copying private runtime state."
+examples:
+  sophia_cerberus:
+    operator_name: Sophia
+    existing_agent_name: Cerberus
+    recommended_chair_profile_id: cerberus
+    chair_bot_display_name: "Kurultai Cerberus"
+    system_name: "Sophia's Kurultai"
+installer_flags:
+  existing_agent_name: "--existing-agent-name Cerberus"
+  existing_agent_profile_id: "--existing-agent-profile-id cerberus"
+  chair_profile_id: "--chair-profile-id cerberus"
+  chair_display_name: "--chair-display-name Cerberus"
+  chair_bot_display_name: "--chair-bot-display-name 'Kurultai Cerberus'"
+policy:
+  preserve_existing_agent_memory: true
+  preserve_existing_profile_config: true
+  backup_before_merge: true
+  do_not_overwrite_private_state_without_approval: true
+  default_mode: chair_profile
+  supported_modes:
+    chair_profile: "Use the existing agent as the main Kurultai chair/operator surface."
+    peer_profile: "Keep the existing agent as a separate peer while retaining kublai as chair."
+    external_adapter: "Record a local adapter/handoff for an agent that is not a Hermes profile yet."
+secret_boundary:
+  - "Existing agent prompts, memories, session logs, cookies, OAuth files, API keys, Telegram tokens, chat IDs, and private Brain contents remain local/private."
+  - "This repo stores only names, profile ids, merge policy, and generated non-secret next steps."
+merge_steps:
+  - "Run installer doctor and personalized dry-run before touching private state."
+  - "If the target profile id already exists, inspect and back it up before adding Kurultai role/config."
+  - "Merge skills, toolsets, model settings, gateway settings, and Brain paths; do not replace the existing agent's private identity or memories."
+  - "Record any manual/private follow-up in local receipts outside git."
+verification:
+  - "Existing agent profile starts under Hermes after the merge."
+  - "The generated identity file shows the intended visible agent name and token env placeholder."
+  - "The gateway, if configured, replies from the intended bot identity."
+  - "No secrets are written to tracked files."

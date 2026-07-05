@@ -17,6 +17,7 @@ Preferred guided installer command surface:
 ```bash
 python3 scripts/install_kurultai.py --doctor
 python3 scripts/install_kurultai.py --dry-run --chair-display-name "Sophia's chosen name"
+python3 scripts/install_kurultai.py --dry-run --operator-name "Sophia" --system-name "Sophia's Kurultai" --existing-agent-name "Cerberus" --existing-agent-profile-id cerberus
 python3 scripts/install_kurultai.py --interactive
 python3 scripts/install_kurultai.py --resume
 python3 scripts/install_kurultai.py --write-plan
@@ -30,25 +31,26 @@ A host is fully installed when all of these are true:
 
 1. Hermes Agent is installed and `hermes doctor` / `hermes config check` pass or have documented non-blocking warnings.
 2. Frontier runtime is configured for `openai-codex` / `gpt-5.5`, 1M context, and compression threshold `0.25`.
-3. The Brain directory exists, contains the public schema/template files, and can accept a receipt write.
-4. The main chair profile exists with the operator's chosen user-visible name applied from `config/runtime-config/identity.yaml` / local `identity.generated.yaml`; the default stable internal profile id is `kublai` unless explicitly renamed.
+3. The Brain directory exists, contains the public schema/template files, includes `status/radar`, and can accept a receipt write.
+4. The main chair profile exists with the operator's chosen user-visible name applied from `config/runtime-config/identity.yaml` / local `identity.generated.yaml`; the default stable internal profile id is `kublai` unless explicitly renamed or mapped to an existing agent such as Sophia's `cerberus` profile.
 5. Kurultai profiles exist: `kublai`, `batu`, `chagatai`, `jochi`, `temujin`, `coder`, `mongke`, `ogedei`, `subc`, `tolui`, and non-routable `codex` compatibility if supported by the installed Hermes version.
 6. Native Hermes Kanban is initialized and a harmless create/complete/cancel smoke test has run.
 7. Skills are installed or reconciled against `config/runtime-config/skills.manifest.json`; missing private skills are listed as private follow-up rather than silently skipped.
-8. Cron jobs are recreated from `config/runtime-config/cron.manifest.json` only when any referenced scripts exist locally; missing-script jobs are listed as private follow-up rather than created broken.
-9. The local LLM lane for Tolui is installed or explicitly deferred with hardware reason and a selected fallback plan.
-10. Two Hermes Telegram gateways are configured when bot credentials are supplied:
+8. Radar is staged from `config/runtime-config/radar.yaml`, `radar` is installed or explicitly listed as follow-up, and authority remains draft-only/local until sources and approvals are verified.
+9. Cron jobs are recreated from `config/runtime-config/cron.manifest.json` only when any referenced scripts exist locally; missing-script jobs are listed as private follow-up rather than created broken.
+10. The local LLM lane for Tolui is installed or explicitly deferred with hardware reason and a selected fallback plan.
+11. Two Hermes Telegram gateways are configured when bot credentials are supplied:
     - Main chair/Kublai primary operator gateway, using the operator's chosen display/bot name.
     - Ogedei dedicated operations/intake gateway.
-11. Verification receipts are written outside git and contain no secrets.
+12. Verification receipts are written outside git and contain no secrets.
 
 ## Gateway installation contract
 
-Use `config/runtime-config/gateways.yaml` and `config/runtime-config/identity.yaml` as the non-secret contract. The default internal chair profile id is `kublai`, but the user-visible chair name and BotFather display name are installer inputs.
+Use `config/runtime-config/gateways.yaml`, `config/runtime-config/identity.yaml`, and `config/runtime-config/agent-integration.yaml` as the non-secret contract. The default internal chair profile id is `kublai`, but the user-visible chair name and BotFather display name are installer inputs; an existing agent can be selected as the chair profile.
 
 ### Main chair/Kublai gateway
 
-- Profile: `kublai` by default, or the explicitly selected chair profile id if the operator intentionally renames it.
+- Profile: `kublai` by default, or the selected existing-agent/renamed chair profile id such as `cerberus`.
 - User-visible attribution: chosen through `scripts/install_kurultai.py --chair-display-name ...` or `--interactive`.
 - Telegram bot: separate BotFather bot for the chair/operator interface.
 - Secret environment variable name: generated from the selected profile id, default `KURULTAI_KUBLAI_TELEGRAM_BOT_TOKEN`.
@@ -97,14 +99,14 @@ Start with a foreground PowerShell smoke test. Only after it works, create a Sch
 
 ## Agent execution order
 
-1. Read `agents/hermes-install-expert.md`, `config/runtime-config/install-expert.yaml`, `config/runtime-config/identity.yaml`, `config/runtime-config/*.yaml`, `*.json`, this checklist, and `fresh-install-agent-prompt.md`.
+1. Read `agents/hermes-install-expert.md`, `config/runtime-config/install-expert.yaml`, `config/runtime-config/identity.yaml`, `config/runtime-config/agent-integration.yaml`, `config/runtime-config/radar.yaml`, `config/runtime-config/*.yaml`, `*.json`, this checklist, and `fresh-install-agent-prompt.md`.
 2. Detect host OS and write a receipt path outside git.
-3. Ask or accept CLI args for the main chair's user-visible display name, BotFather display name, operator name, and system name; write only non-secret generated identity files outside git.
+3. Ask or accept CLI args for the main chair's user-visible display name, BotFather display name, operator name, system name, and any existing agent (e.g. Sophia's Cerberus); write only non-secret generated identity files outside git.
 4. Install prerequisites and Hermes.
 5. Configure frontier model and compression.
 6. Create Brain directories and indexes.
 7. Create profiles and role templates.
-8. Install/reconcile skills.
+8. Install/reconcile skills and stage Radar draft-only under Brain `status/radar`.
 9. Initialize Kanban and receipts.
 10. Configure local LLM lane.
 11. Recreate cron jobs conservatively; keep delivery local until Telegram targets are verified, and do not create jobs whose scripts are missing.

@@ -10,10 +10,12 @@ You are expected to know and execute these domains end-to-end:
 
 - Hermes Agent installation, diagnosis, config paths, environment paths, and version checks.
 - Profile-local Hermes configuration and profile creation.
+- Existing-agent integration that preserves private agent memory/config while merging Kurultai runtime contracts.
 - Frontier provider setup for `openai-codex` / `gpt-5.5` without committing secrets.
 - Brain wiki directory creation, schema seeding, receipt writes, and optional QMD indexing.
 - Native Hermes Kanban initialization and smoke testing.
 - Skill installation/reconciliation from `config/runtime-config/skills.manifest.json`.
+- Radar setup as a draft-only care-layer/chief-of-staff surface under Brain `status/radar`.
 - Cron reconstruction from `config/runtime-config/cron.manifest.json`, preserving script-only jobs where possible.
 - Local LLM runtime selection for Tolui, including hardware-fit fallback.
 - Dual Telegram gateway setup: customizable main chair/Kublai primary gateway and Ogedei operations/intake gateway.
@@ -29,15 +31,17 @@ Before changing the host, read these files from the repo:
 3. `docs/operations/full-installation-checklist.md`
 4. `docs/operations/fresh-install-agent-prompt.md`
 5. `config/runtime-config/identity.yaml`
-6. `config/runtime-config/hermes.template.yaml`
-7. `config/runtime-config/profiles.yaml`
-8. `config/runtime-config/kurultai.yaml`
-9. `config/runtime-config/brain.yaml`
-10. `config/runtime-config/gateways.yaml`
-11. `config/runtime-config/cron.manifest.json`
-12. `config/runtime-config/skills.manifest.json`
-13. `config/runtime-config/kanban.schema.json`
-14. `config/runtime-config/brain.manifest.json`
+6. `config/runtime-config/agent-integration.yaml`
+7. `config/runtime-config/hermes.template.yaml`
+8. `config/runtime-config/profiles.yaml`
+9. `config/runtime-config/kurultai.yaml`
+10. `config/runtime-config/brain.yaml`
+11. `config/runtime-config/gateways.yaml`
+12. `config/runtime-config/radar.yaml`
+13. `config/runtime-config/cron.manifest.json`
+14. `config/runtime-config/skills.manifest.json`
+15. `config/runtime-config/kanban.schema.json`
+16. `config/runtime-config/brain.manifest.json`
 
 Quote the relevant contract line in your local receipt before applying a major phase.
 
@@ -75,16 +79,28 @@ Create a receipt outside the repository:
 
 Record commands/results, but redact secrets and account identifiers.
 
-### 3. Identity and naming
+### 3. Identity, existing agent, and naming
 
 Ask for or read installer arguments for:
 
 - Operator name.
 - System name.
+- Existing agent name/profile id, if the operator already has one (for example Sophia's Cerberus).
+- Existing agent integration mode: chair profile, peer profile, or external adapter.
 - Main chair/Kublai user-visible display name.
 - Main chair BotFather display name.
 
-Run `python3 scripts/install_kurultai.py --doctor`, then `--dry-run` with the chosen names, then `--interactive` or `--apply`. Keep internal profile id `kublai` unless the operator explicitly asks for profile-id rename. Write names only into local generated identity/receipt files; they are not secrets, but live tokens and chat IDs remain private.
+For Sophia/Cerberus, the recommended first dry-run is:
+
+```bash
+python3 scripts/install_kurultai.py --dry-run \
+  --operator-name "Sophia" \
+  --system-name "Sophia's Kurultai" \
+  --existing-agent-name "Cerberus" \
+  --existing-agent-profile-id cerberus
+```
+
+Run `python3 scripts/install_kurultai.py --doctor`, then `--dry-run` with the chosen names, then `--interactive` or `--apply`. Keep internal profile id `kublai` unless the operator wants the existing agent to be the chair profile or explicitly asks for profile-id rename. Write names only into local generated identity/receipt files; they are not secrets, but live tokens and chat IDs remain private.
 
 ### 4. Prerequisites and Hermes
 
@@ -115,7 +131,9 @@ Authenticate through OAuth or local secret store only. Do not write credentials 
 
 Create Brain directories from `brain.yaml` and `brain.manifest.json`. Seed `brain/AGENTS.md`, `brain/templates/page.md`, `home.md`, and `index.md` where absent. Write a harmless receipt proving the Brain is writable. If QMD is present, run update/embed; if absent, record as optional pending.
 
-### 7. Profiles
+### 7. Existing agent and profiles
+
+Before creating a new chair profile, inspect whether the selected `existing_agent_profile_id` already exists. If it does, back it up and merge Kurultai role/config into that profile without replacing private memories, prompts, sessions, credentials, or local tools. Use `config/runtime-config/agent-integration.yaml` as the policy. If the existing agent should stay separate, keep it as a peer profile and preserve `kublai` as chair.
 
 Create/verify:
 
@@ -137,14 +155,17 @@ Apply role/model intent from `profiles.yaml`. Preserve existing private profile 
 
 Inspect hardware and choose the strongest practical local model. Prefer the repo's Tolui target when feasible. Mark Tolui as lightweight/no-tool-call until tool-call behavior is verified. Run one harmless local prompt and record model/latency.
 
-### 9. Skills
+### 9. Skills and Radar
 
 Reconcile against `skills.manifest.json`:
 
 - Install public/available skills.
 - Copy private backups only if the operator provides them.
 - List missing private skills as follow-up; do not silently skip.
+- Verify `radar` is installed or explicitly listed as a follow-up; `personal-radar` is only a compatibility shim.
 - Run `hermes skills list` or equivalent.
+
+Configure Radar from `config/runtime-config/radar.yaml` as draft-only/local by default. Create `Brain/status/radar/` and verify a local packet/brief/receipt path can be written before enabling sources, delivery targets, or authority beyond drafts.
 
 ### 10. Kanban
 

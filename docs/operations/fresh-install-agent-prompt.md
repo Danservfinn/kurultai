@@ -18,6 +18,8 @@ Non-negotiable constraints:
 - Configure a local LLM lane for lightweight triage/Tolui. The system should choose the best local model it can run. Prefer Jackrong/Qwen3.5-9B-DeepSeek-V4-Flash-GGUF through a local OpenAI-compatible server or Ollama/HF GGUF import. If hardware cannot run it, choose the strongest local Qwen/Gemma-class model that fits memory, record the chosen model, and mark it as no-tool-call/lightweight-only until verified.
 - Telegram bot setup must be included and, when the user supplies the BotFather token, performed by you through Hermes gateway setup/configuration.
 - Ask the user what display name they want attributed to the main chair/Kublai surface. Use that name everywhere user-visible: BotFather display name, local generated identity config, profile description, receipts, and final report. Keep internal profile id `kublai` unless the user explicitly asks for a profile-id rename.
+- If the user already has an agent (for example Sophia's Cerberus), ask whether that agent should become the Kurultai chair profile, a peer profile, or an external adapter. Preserve its existing private memory, prompts, sessions, credentials, and tools; merge Kurultai contracts only after backup.
+- Configure Radar as a draft-only care-layer/chief-of-staff surface under Brain `status/radar` before enabling sources, sends, or authority beyond drafts.
 - Windows installation must work. Use PowerShell equivalents and avoid Bash-only assumptions unless running under WSL2.
 
 Repository contract to honor:
@@ -28,6 +30,8 @@ Repository contract to honor:
 - Full completion checklist: `docs/operations/full-installation-checklist.md`.
 - Gateway contract: `config/runtime-config/gateways.yaml`; install the main chair/Kublai and Ogedei as separate gateways when credentials are supplied.
 - Identity/name contract: `config/runtime-config/identity.yaml`; write local generated identity config from the user's chosen display names.
+- Existing-agent contract: `config/runtime-config/agent-integration.yaml`; use it when attaching Sophia's Cerberus or another pre-existing agent.
+- Radar contract: `config/runtime-config/radar.yaml`; stage it and create writable Brain `status/radar` paths.
 - This repo is a non-secret rebuild contract, not a private backup.
 - Brain wiki default root: `~/brain` on POSIX, `%USERPROFILE%\brain` on Windows.
 - Hermes home default: `~/.hermes` on POSIX, `%USERPROFILE%\.hermes` on Windows unless Hermes itself reports another path.
@@ -35,9 +39,10 @@ Repository contract to honor:
 Phase 0 — become the install expert, detect platform, choose names, and make a log
 0. Read `agents/hermes-install-expert.md` and adopt it as your operating contract for this install. Then read `config/runtime-config/install-expert.yaml` and confirm that the listed required-reading files exist.
 1. Detect OS, shell, CPU arch, RAM, GPU, Python version, Git, Node/npm, and whether the current directory is a git checkout.
-2. Ask the user what display name should be attributed to the main chair/Kublai surface. If they do not care, default to `Kublai`. Also ask/derive the BotFather display name, operator name, and system name. Run the installer with those values, for example:
+2. Ask the user what display name should be attributed to the main chair/Kublai surface. If they do not care, default to `Kublai`. Also ask/derive the BotFather display name, operator name, system name, and whether an existing agent should be attached. For Sophia + Cerberus, prefer `--existing-agent-name "Cerberus" --existing-agent-profile-id cerberus` so the generated chair profile, env placeholders, and receipts use Cerberus without copying private state. Run the installer with those values, for example:
    - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --dry-run --chair-display-name "<chosen name>" --operator-name "<operator>"`
    - Windows PowerShell: `py -3 scripts\install_kurultai.py --dry-run --chair-display-name "<chosen name>" --operator-name "<operator>"`
+   - Sophia/Cerberus POSIX: `python3 scripts/install_kurultai.py --dry-run --operator-name "Sophia" --system-name "Sophia's Kurultai" --existing-agent-name "Cerberus" --existing-agent-profile-id cerberus`
 3. Create a local receipt directory outside git:
    - POSIX: `~/.kurultai-install/receipts/`
    - Windows: `$env:USERPROFILE\.kurultai-install\receipts\`
@@ -94,7 +99,7 @@ Phase 4 — create Brain directories and indexes
 1. Create the Brain root:
    - POSIX: `~/brain`
    - Windows: `$env:USERPROFILE\brain`
-2. Create at least these directories: `queue`, `generated`, `receipts`, `docs/plans`, `operations`, `analyses`, `content`, `content/artifacts`.
+2. Create at least these directories: `queue`, `generated`, `receipts`, `docs/plans`, `operations`, `analyses`, `content`, `content/artifacts`, `status/radar`, and `status/radar/runs`.
 3. Create public/private index directories:
    - POSIX public: `~/.brain-index/`
    - POSIX private: `~/.kublai/brain-index-private/`
@@ -117,13 +122,14 @@ Phase 5 — apply sanitized runtime manifests with the installer
    - POSIX/macOS/Linux: `python3 scripts/install_kurultai.py --interactive` or `python3 scripts/install_kurultai.py --apply --chair-display-name "<chosen name>"`
    - Windows PowerShell: `py -3 scripts\install_kurultai.py --interactive` or `py -3 scripts\install_kurultai.py --apply --chair-display-name "<chosen name>"`
 4. Review staged files under `~/.kurultai-install/staging/` or Windows equivalent.
-5. Use `config/runtime-config/identity.yaml`, `hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
+5. Use `config/runtime-config/identity.yaml`, `agent-integration.yaml`, `hermes.template.yaml`, `profiles.yaml`, `kurultai.yaml`, `brain.yaml`, `gateways.yaml`, `radar.yaml`, `cron.manifest.json`, `skills.manifest.json`, `kanban.schema.json`, and `brain.manifest.json` as the contract.
 6. Do not blindly overwrite a user's existing private config. Merge non-secret settings and preserve local credentials.
 7. The older `scripts/bootstrap_kurultai_runtime.py` may be used for staging-only checks, but the guided installer is the preferred path.
 
 Phase 6 — create Kurultai Hermes profiles
-Create these Hermes profiles if missing, preserving existing profiles if present:
-- `kublai`: default internal id for the main chair/caretaker/orchestrator, provider `openai-codex`, model `gpt-5.5`; user-visible display name comes from the installer's chosen `chair_display_name`.
+Create these Hermes profiles if missing, preserving existing profiles if present. If an existing agent was declared, back up and merge into that profile according to `agent-integration.yaml`; do not overwrite its private state.
+
+- `kublai` or the selected existing-agent chair profile id (for example `cerberus`): default internal id for the main chair/caretaker/orchestrator, provider `openai-codex`, model `gpt-5.5`; user-visible display name comes from the installer's chosen `chair_display_name` or existing agent name.
 - `batu`: retrieval/research intake and return-path compilation, provider `openai-codex`, model `gpt-5.5`.
 - `chagatai`: research/writing/content synthesis, provider `openai-codex`, model `gpt-5.5`.
 - `jochi`: analysis/audit, provider `openai-codex`, model `gpt-5.5`.
@@ -161,10 +167,11 @@ Phase 7 — configure local LLM lane with automatic model selection
 6. Run a one-sentence local test prompt and record latency/model name.
 7. Do not assign local Tolui to tasks requiring Hermes tool calls until tool-call behavior has been explicitly tested. Mark local lane as `lightweight_triage`, `summarization`, `classification`, and `receipt prefilter` by default.
 
-Phase 8 — install skills and integrations
+Phase 8 — install skills, Radar, and integrations
 1. Use `config/runtime-config/skills.manifest.json` as the checklist.
 2. Ensure these Kurultai-critical skills are available if this install has access to the same skill library:
    - `hermes-agent`
+   - `radar`
    - `kurultai-operations`
    - `brain-wiki-operations`
    - `kurultai-retro-learn`
@@ -179,7 +186,8 @@ Phase 8 — install skills and integrations
    - `readwise`
    - `granola-fathom`
 3. Install skills with `hermes skills install`, copying private skill backups, or source checkout as appropriate. Do not invent secrets for integrations; use env placeholders.
-4. Run `hermes skills list` and save the result to the receipt.
+4. Configure Radar from `config/runtime-config/radar.yaml` as draft-only/local. Verify `Brain/status/radar/` is writable and record whether `radar` is installed or listed as follow-up.
+5. Run `hermes skills list` and save the result to the receipt.
 
 Phase 9 — initialize native Kanban and process directories
 1. Initialize/verify native Hermes Kanban.
@@ -205,7 +213,7 @@ Phase 10 — recreate cron jobs from sanitized manifest
 Phase 11 — Telegram bot setup and dual gateway configuration
 Do the setup if the user supplies the credentials. If they do not yet have bots, guide them through BotFather exactly and then continue. The target topology is two separate Hermes gateways:
 
-- Main chair/Kublai gateway: primary operator/chair interface, default profile `kublai`, separate Telegram bot credential, user-visible name from the installer's chosen `chair_display_name`.
+- Main chair/Kublai gateway: primary operator/chair interface, default profile `kublai` or the selected existing-agent profile such as `cerberus`, separate Telegram bot credential, user-visible name from the installer's chosen `chair_display_name` / existing agent name.
 - Ogedei gateway: operations/intake interface, profile `ogedei`, separate Telegram bot credential.
 
 Read `config/runtime-config/gateways.yaml` before configuring either gateway.

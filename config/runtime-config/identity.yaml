@@ -21,5 +21,16 @@ identity:
     telegram_token_env: KURULTAI_OGEDEI_TELEGRAM_BOT_TOKEN
   generated_local_files:
     - "identity.generated.yaml"
+    - "agent-integration.yaml"
+    - "radar.yaml"
     - "INSTALL-NEXT-STEPS.md"
+  existing_agent_integration:
+    supported: true
+    default_mode: chair_profile
+    example:
+      operator: Sophia
+      agent_name: Cerberus
+      profile_id: cerberus
+      installer_flags: "--existing-agent-name Cerberus --existing-agent-profile-id cerberus"
+    preservation_policy: "Back up and merge into existing agent/profile state; never replace private memories, prompts, sessions, credentials, or local tools without explicit approval."
   secret_boundary: "Names are public/non-secret. Bot tokens, chat IDs, OAuth files, sessions, private Brain indexes, and delivery targets remain local/private."
