@@ -81,7 +81,7 @@ def _review_state(review: dict[str, Any]) -> str:
 def _search_resource_ceiling(plan: dict[str, Any]) -> str:
     if plan.get("status") == "search_exhausted":
         return "exhausted"
-    if plan.get("status") in {"resolved", "no_admissible_plan"}:
+    if plan.get("status") == "resolved":
         return "within_bounds"
     return "unknown"
 
@@ -114,8 +114,8 @@ def translate_buildroom_shadow_case(
         "correct_no_plan": review.get("correct_no_plan", "unknown"),
         "false_rejection": review.get("false_rejection", "unknown"),
         "proof_debt": review.get("proof_debt", "unknown"),
-        "deterministic_replay": review.get("deterministic_replay", deterministic_replay),
-        "search_resource_ceiling": review.get("search_resource_ceiling", _search_resource_ceiling(plan)),
+        "deterministic_replay": deterministic_replay,
+        "search_resource_ceiling": _search_resource_ceiling(plan),
         "post_build_verification_agreement": review.get("post_build_verification_agreement", "unknown"),
     }
     extra = {
@@ -143,6 +143,32 @@ def translate_buildroom_shadow_case(
     )
 
 
+def _validate_shadow_case_metrics(case: dict[str, Any]) -> None:
+    case_id = case.get("case_id", "<unknown>")
+    plan_status = case.get("plan_status")
+    simulation_status = case.get("simulation_status")
+    review = case.get("review", {})
+    if not isinstance(review, dict):
+        raise ContractError(f"shadow case {case_id} review contract is invalid")
+
+    if plan_status == "resolved":
+        if simulation_status == "not_simulated":
+            raise ContractError(f"shadow case {case_id} resolved plan_status requires simulation_status pass or fail")
+        if review.get("search_resource_ceiling") != "within_bounds":
+            raise ContractError(f"shadow case {case_id} resolved plan_status requires search_resource_ceiling within_bounds")
+        return
+
+    if simulation_status != "not_simulated":
+        raise ContractError(f"shadow case {case_id} unresolved plan_status requires simulation_status not_simulated")
+    if review.get("deterministic_replay") != "unknown":
+        raise ContractError(f"shadow case {case_id} not_simulated requires deterministic_replay unknown")
+    expected_resource_ceiling = "exhausted" if plan_status == "search_exhausted" else "unknown"
+    if review.get("search_resource_ceiling") != expected_resource_ceiling:
+        raise ContractError(
+            f"shadow case {case_id} {plan_status} requires search_resource_ceiling {expected_resource_ceiling}"
+        )
+
+
 def validate_shadow_corpus(corpus: dict[str, Any]) -> dict[str, Any]:
     cases = corpus.get("cases", [])
     case_ids = [case.get("case_id") for case in cases if isinstance(case, dict)]
@@ -155,6 +181,8 @@ def validate_shadow_corpus(corpus: dict[str, Any]) -> dict[str, Any]:
     target = corpus["case_target"]
     if target != {"minimum": 25, "maximum": 50}:
         raise ContractError("shadow corpus target must remain 25-50 reviewed cases")
+    for case in corpus["cases"]:
+        _validate_shadow_case_metrics(case)
     return corpus
 
 

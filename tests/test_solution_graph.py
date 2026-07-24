@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+import solution_graph.buildroom as buildroom_module
+
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = ROOT / "solution_graph" / "fixtures"
 TRANSCRIPTION = FIXTURE_ROOT / "transcription"
@@ -867,6 +869,150 @@ def test_buildroom_shadow_translation_projects_into_existing_receipt_and_delta_r
     assert projection["evaluation"]["search_resource_ceiling"] == "within_bounds"
     assert "shadow-case:case_research_digest_shadow_001" in projection["links"]
     validate_contract_schema(projection)
+
+
+def test_shadow_translation_uses_resolver_metrics_over_unresolved_review_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = {
+        "schema": "ResolutionPlan/v2",
+        "plan_id": "plan_" + "1" * 20,
+        "plan_digest": "sha256:" + "1" * 64,
+        "status": "search_exhausted",
+        "selected_artifacts": [],
+        "reason_codes": ["search_exhausted"],
+    }
+    case = {
+        "case_id": "case_search_exhausted_shadow",
+        "room_id": "room:search-exhausted",
+        "source_refs": {
+            "operator_summary": "buildroom:room/search-exhausted/operator-summary",
+            "implementation_receipt": "buildroom:room/search-exhausted/implementation-receipt",
+            "verification_delta": "buildroom:room/search-exhausted/verification-delta",
+            "trust_report": "buildroom:room/search-exhausted/trust-report",
+            "retention_review": "buildroom:room/search-exhausted/retention-review",
+        },
+        "review": {
+            "acceptance": "not_yet_reviewed",
+            "override": "unknown",
+            "correct_no_plan": "unknown",
+            "false_rejection": "unknown",
+            "proof_debt": "unknown",
+            "deterministic_replay": "pass",
+            "search_resource_ceiling": "within_bounds",
+            "post_build_verification_agreement": "not_yet_reviewed",
+        },
+    }
+    monkeypatch.setattr(buildroom_module, "resolve_objective", lambda *_args: deepcopy(plan))
+
+    projection = translate_buildroom_shadow_case(case=case, objective={}, environment={}, registry={})
+
+    assert projection["simulation_status"] == "not_simulated"
+    assert projection["evaluation"]["deterministic_replay"] == "unknown"
+    assert projection["evaluation"]["search_resource_ceiling"] == "exhausted"
+    assert projection["authority"] == "none"
+    assert projection["dispatch_allowed"] is False
+    assert projection["requires_operator_approval"] is True
+
+
+def _shadow_corpus_with_case(case: dict) -> dict:
+    return {
+        "schema": "ShadowEvaluationCorpus/v1",
+        "corpus_id": "shadow-corpus:solution-graph-phase-2-5/test",
+        "phase": "2.5",
+        "mode": "shadow_dogfood",
+        "case_target": {"minimum": 25, "maximum": 50},
+        "cases": [case],
+        "operational_gates": ["Accumulate 25-50 reviewed shadow cases before any authority-bearing phase."],
+    }
+
+
+def _shadow_case(*, plan_status: str, simulation_status: str, deterministic_replay: str, search_resource_ceiling: str) -> dict:
+    return {
+        "case_id": f"case_{plan_status}_metrics",
+        "room_id": f"room:{plan_status}",
+        "objective_ref": "fixture:test/objective.json",
+        "environment_ref": "fixture:test/environment.json",
+        "registry_ref": "fixture:test",
+        "plan_digest": "sha256:" + "2" * 64,
+        "plan_status": plan_status,
+        "simulation_status": simulation_status,
+        "source_refs": {
+            "operator_summary": "buildroom:room/test/operator-summary",
+            "implementation_receipt": "buildroom:room/test/implementation-receipt",
+            "verification_delta": "buildroom:room/test/verification-delta",
+            "trust_report": "buildroom:room/test/trust-report",
+            "retention_review": "buildroom:room/test/retention-review",
+        },
+        "review": {
+            "acceptance": "not_yet_reviewed",
+            "override": "unknown",
+            "correct_no_plan": "unknown",
+            "false_rejection": "unknown",
+            "proof_debt": "unknown",
+            "deterministic_replay": deterministic_replay,
+            "search_resource_ceiling": search_resource_ceiling,
+            "post_build_verification_agreement": "not_yet_reviewed",
+        },
+        "notes": ["Synthetic test case."],
+    }
+
+
+def test_shadow_corpus_rejects_no_admissible_plan_with_replay_success() -> None:
+    corpus = _shadow_corpus_with_case(
+        _shadow_case(
+            plan_status="no_admissible_plan",
+            simulation_status="not_simulated",
+            deterministic_replay="pass",
+            search_resource_ceiling="within_bounds",
+        )
+    )
+
+    with pytest.raises(ContractError, match="deterministic_replay"):
+        validate_shadow_corpus(corpus)
+
+
+def test_shadow_corpus_rejects_no_admissible_plan_with_resource_success() -> None:
+    corpus = _shadow_corpus_with_case(
+        _shadow_case(
+            plan_status="no_admissible_plan",
+            simulation_status="not_simulated",
+            deterministic_replay="unknown",
+            search_resource_ceiling="within_bounds",
+        )
+    )
+
+    with pytest.raises(ContractError, match="search_resource_ceiling"):
+        validate_shadow_corpus(corpus)
+
+
+def test_shadow_corpus_rejects_search_exhausted_with_resource_success() -> None:
+    corpus = _shadow_corpus_with_case(
+        _shadow_case(
+            plan_status="search_exhausted",
+            simulation_status="not_simulated",
+            deterministic_replay="unknown",
+            search_resource_ceiling="within_bounds",
+        )
+    )
+
+    with pytest.raises(ContractError, match="search_resource_ceiling"):
+        validate_shadow_corpus(corpus)
+
+
+def test_shadow_corpus_accepts_planned_simulated_review_metrics() -> None:
+    corpus = _shadow_corpus_with_case(
+        _shadow_case(
+            plan_status="resolved",
+            simulation_status="pass",
+            deterministic_replay="pass",
+            search_resource_ceiling="within_bounds",
+        )
+    )
+
+    validate_shadow_corpus(corpus)
+    metrics = evaluate_shadow_corpus(corpus)
+
+    assert metrics["deterministic_replay"] == {"pass": 1, "fail": 0, "unknown": 0}
+    assert metrics["search_resource_ceiling"] == {"within_bounds": 1, "exhausted": 0, "unknown": 0}
 
 
 def test_shadow_corpus_is_append_only_bounded_and_tracks_unknowns_without_false_zeroes() -> None:
