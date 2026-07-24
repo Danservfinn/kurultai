@@ -1,0 +1,244 @@
+{
+  "$id": "https://kurult.ai/schemas/artifact-manifest-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "pattern": "^artifact:",
+      "type": "string"
+    },
+    "capabilities": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "type": "string"
+          },
+          "input_schema": {
+            "type": "string"
+          },
+          "output_schema": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "input_schema",
+          "output_schema"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "description": {
+      "type": "string"
+    },
+    "digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "environment_constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "runtimes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "os",
+        "arch",
+        "runtimes"
+      ],
+      "type": "object"
+    },
+    "environments": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "invocation": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "const": "argv/v1"
+        },
+        "argv_template": {
+          "items": {
+            "pattern": "^(?:--[a-z0-9][a-z0-9-]*|\\{(?:input|output):[a-z0-9_-]+\\})$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "adapter",
+        "argv_template"
+      ],
+      "type": "object"
+    },
+    "known_failures": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "blocking": {
+            "type": "boolean"
+          },
+          "failure_id": {
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]*:[A-Za-z0-9._/@:+-]+$",
+            "type": "string"
+          },
+          "scope": {
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]*:[A-Za-z0-9._/@:+-]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "failure_id",
+          "scope",
+          "blocking"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "license_class": {
+      "type": "string"
+    },
+    "network": {
+      "additionalProperties": false,
+      "properties": {
+        "destinations": {
+          "items": {
+            "pattern": "^[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "deny",
+            "allowlist"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "destinations"
+      ],
+      "type": "object"
+    },
+    "permissions": {
+      "items": {
+        "enum": [
+          "read-only",
+          "local-read",
+          "sandbox-local-write",
+          "host-write",
+          "external-effect"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "prerequisites": {
+      "items": {
+        "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "resource_estimate": {
+      "additionalProperties": false,
+      "properties": {
+        "max_cost_usd": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "max_runtime_seconds": {
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "max_runtime_seconds",
+        "max_cost_usd"
+      ],
+      "type": "object"
+    },
+    "rollback": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "ArtifactManifest/v1"
+    },
+    "secret_slots": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "source_refs": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "verifier_ref": {
+      "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "artifact_id",
+    "version",
+    "digest",
+    "capabilities",
+    "environments",
+    "environment_constraints",
+    "permissions",
+    "network",
+    "secret_slots",
+    "license_class",
+    "prerequisites",
+    "resource_estimate",
+    "invocation",
+    "verifier_ref",
+    "rollback",
+    "known_failures"
+  ],
+  "title": "artifact-manifest-v1",
+  "type": "object"
+}

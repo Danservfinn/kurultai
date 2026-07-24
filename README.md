@@ -49,6 +49,7 @@ Required behavior:
 - **Brain wiki** — durable plans, receipts, research, synthesis, operations notes, and public/private index contracts.
 - **Rebuildable configuration** — sanitized templates and manifests describe how to recreate the system without publishing secrets or live private state.
 - **Recovery loop** — canaries, drift checks, low-token monitors, and review gates keep the system moving without turning automation into recklessness.
+- **Solution Graph** — an offline, deterministic, read-only capability resolver under [`solution_graph/`](solution_graph/) that emits inspectable plans without installing or executing artifacts.
 
 ## Systems in detail
 

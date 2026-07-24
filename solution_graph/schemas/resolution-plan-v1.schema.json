@@ -1,0 +1,242 @@
+{
+  "$id": "https://kurult.ai/schemas/resolution-plan-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agent_context_packet": {
+      "type": "object"
+    },
+    "alternatives": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "pattern": "^artifact:",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "evidence_source_class": {
+            "type": "string"
+          },
+          "evidence_state": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "number"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "version",
+          "digest",
+          "evidence_source_class",
+          "evidence_state",
+          "rank",
+          "capabilities"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "constraints_snapshot": {
+      "type": "object"
+    },
+    "eliminated_candidates": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "environment_ref": {
+      "type": "string"
+    },
+    "environment_snapshot": {
+      "type": "object"
+    },
+    "network_plan": {
+      "additionalProperties": false,
+      "properties": {
+        "destinations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "deny",
+            "allowlist"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "destinations"
+      ],
+      "type": "object"
+    },
+    "objective_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "permission_union": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "plan_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^plan_",
+      "type": "string"
+    },
+    "policy_version": {
+      "type": "string"
+    },
+    "prerequisites": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "registry_snapshot": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "rollback": {
+      "type": "object"
+    },
+    "schema": {
+      "const": "ResolutionPlan/v1"
+    },
+    "scoring_version": {
+      "type": "string"
+    },
+    "secret_slot_plan": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "selected_artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "pattern": "^artifact:",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "evidence_source_class": {
+            "type": "string"
+          },
+          "evidence_state": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "number"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "version",
+          "digest",
+          "evidence_source_class",
+          "evidence_state",
+          "rank",
+          "capabilities"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "resolved",
+        "no_admissible_plan"
+      ],
+      "type": "string"
+    },
+    "unresolved_unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "verifier_dag": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "plan_id",
+    "objective_digest",
+    "registry_snapshot",
+    "policy_version",
+    "scoring_version",
+    "environment_ref",
+    "environment_snapshot",
+    "constraints_snapshot",
+    "status",
+    "selected_artifacts",
+    "alternatives",
+    "eliminated_candidates",
+    "permission_union",
+    "network_plan",
+    "secret_slot_plan",
+    "prerequisites",
+    "verifier_dag",
+    "rollback",
+    "assumptions",
+    "unresolved_unknowns",
+    "reason_codes",
+    "plan_digest"
+  ],
+  "title": "resolution-plan-v1",
+  "type": "object"
+}

@@ -1,0 +1,38 @@
+{
+  "assumptions": [
+    "English speech"
+  ],
+  "constraints": {
+    "license_allow": [
+      "permissive",
+      "internal-approved"
+    ],
+    "max_cost_usd": 0,
+    "max_permission_class": "sandbox-local-write",
+    "max_runtime_seconds": 1800,
+    "network": "deny",
+    "network_allowlist": [],
+    "secret_policy": "none"
+  },
+  "inputs": [
+    {
+      "media_type": "video/mp4",
+      "ref": "input:video",
+      "sensitivity": "private"
+    }
+  ],
+  "objective_id": "obj_local_mp4_transcription",
+  "outcome": {
+    "description": "Convert one local English MP4 to timestamped Markdown and SRT",
+    "done_when": [
+      "verifier:transcript-bundle/v1"
+    ],
+    "output_schema": "TranscriptBundle/v1"
+  },
+  "required_capabilities": [
+    "media.transcribe.local",
+    "transcript.package.markdown-srt"
+  ],
+  "schema": "ObjectiveSpec/v1",
+  "unresolved_unknowns": []
+}

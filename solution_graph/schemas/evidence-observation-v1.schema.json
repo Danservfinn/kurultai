@@ -1,0 +1,150 @@
+{
+  "$id": "https://kurult.ai/schemas/evidence-observation-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "claim": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]+$",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "fixture_outcome",
+            "runtime_observation",
+            "incident"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability_id",
+        "type"
+      ],
+      "type": "object"
+    },
+    "compatibility_state": {
+      "enum": [
+        "unknown",
+        "declared",
+        "observed-pass",
+        "observed-fail",
+        "stale",
+        "conflicted",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "environment_ref": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "fixture_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "observation_id": {
+      "pattern": "^obs_[A-Za-z0-9_-]+$",
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string"
+    },
+    "result": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "schema": {
+      "const": "EvidenceObservation/v1"
+    },
+    "source_class": {
+      "enum": [
+        "publisher_declaration",
+        "publisher_self_test",
+        "registry_static_validation",
+        "registry_sandbox_fixture",
+        "independent_verifier",
+        "tenant_observed_run",
+        "receiver_attested_external_effect",
+        "incident"
+      ],
+      "type": "string"
+    },
+    "subject": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "supersedes": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "pattern": "^obs_[A-Za-z0-9_-]+$",
+          "type": "string"
+        }
+      ]
+    },
+    "verifier_ref": {
+      "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "observation_id",
+    "subject",
+    "claim",
+    "source_class",
+    "verifier_ref",
+    "fixture_digest",
+    "environment_ref",
+    "result",
+    "compatibility_state",
+    "observed_at",
+    "expires_at",
+    "evidence_refs",
+    "limitations",
+    "supersedes"
+  ],
+  "title": "evidence-observation-v1",
+  "type": "object"
+}

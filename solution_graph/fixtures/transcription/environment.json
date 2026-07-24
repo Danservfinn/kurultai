@@ -1,0 +1,22 @@
+{
+  "arch": "arm64",
+  "available_prerequisites": [
+    "ffmpeg@7",
+    "whisper.cpp@1.7",
+    "python@3.14",
+    "torch@2",
+    "local-asr-model@1",
+    "unobserved-model@1"
+  ],
+  "environment_id": "env:macos-arm64-py314",
+  "evaluation_time": "2026-07-24T00:00:00Z",
+  "installed_artifacts": [
+    "artifact:whisper-cpp-local"
+  ],
+  "network": "deny",
+  "os": "macos",
+  "runtimes": {
+    "python": "3.14"
+  },
+  "schema": "EnvironmentProfile/v1"
+}

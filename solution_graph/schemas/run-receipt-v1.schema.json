@@ -1,0 +1,88 @@
+{
+  "$id": "https://kurult.ai/schemas/run-receipt-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_digests": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "environment_ref": {
+      "type": "string"
+    },
+    "external_effect_refs": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "finished_at": {
+      "type": "string"
+    },
+    "grant_ref": {
+      "type": "string"
+    },
+    "output_refs": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "plan_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "receipt_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "RunReceipt/v1"
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "partial",
+        "cancelled"
+      ],
+      "type": "string"
+    },
+    "verifier_refs": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "run_id",
+    "grant_ref",
+    "plan_digest",
+    "artifact_digests",
+    "environment_ref",
+    "started_at",
+    "finished_at",
+    "status",
+    "output_refs",
+    "verifier_refs",
+    "external_effect_refs",
+    "receipt_digest"
+  ],
+  "title": "run-receipt-v1",
+  "type": "object"
+}

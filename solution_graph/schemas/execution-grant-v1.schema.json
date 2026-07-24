@@ -1,0 +1,74 @@
+{
+  "$id": "https://kurult.ai/schemas/execution-grant-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_digests": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "grant_id": {
+      "type": "string"
+    },
+    "issuer_ref": {
+      "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+      "type": "string"
+    },
+    "network_mode": {
+      "enum": [
+        "deny",
+        "allowlist"
+      ],
+      "type": "string"
+    },
+    "permission_ceiling": {
+      "enum": [
+        "read-only",
+        "local-read",
+        "sandbox-local-write",
+        "host-write",
+        "external-effect"
+      ],
+      "type": "string"
+    },
+    "plan_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "ExecutionGrant/v1"
+    },
+    "secret_slot_names": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "signature_ref": {
+      "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "grant_id",
+    "plan_digest",
+    "artifact_digests",
+    "permission_ceiling",
+    "network_mode",
+    "secret_slot_names",
+    "expires_at",
+    "issuer_ref",
+    "signature_ref"
+  ],
+  "title": "execution-grant-v1",
+  "type": "object"
+}

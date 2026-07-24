@@ -1,0 +1,63 @@
+{
+  "$id": "https://kurult.ai/schemas/capability-contract-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capability_id": {
+      "type": "string"
+    },
+    "environment_refs": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "input_schema": {
+      "type": "string"
+    },
+    "network_mode": {
+      "enum": [
+        "deny",
+        "allowlist"
+      ],
+      "type": "string"
+    },
+    "output_schema": {
+      "type": "string"
+    },
+    "permission_classes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schema": {
+      "const": "CapabilityContract/v1"
+    },
+    "secret_slots": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "verifier_ref": {
+      "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "capability_id",
+    "input_schema",
+    "output_schema",
+    "environment_refs",
+    "permission_classes",
+    "network_mode",
+    "secret_slots",
+    "verifier_ref"
+  ],
+  "title": "capability-contract-v1",
+  "type": "object"
+}

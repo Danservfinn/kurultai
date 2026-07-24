@@ -1,0 +1,93 @@
+{
+  "$id": "https://kurult.ai/schemas/verification-delta-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "delta_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "environment_ref": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "new_state": {
+      "enum": [
+        "unknown",
+        "declared",
+        "observed-pass",
+        "observed-fail",
+        "stale",
+        "conflicted",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string"
+    },
+    "previous_state": {
+      "enum": [
+        "unknown",
+        "declared",
+        "observed-pass",
+        "observed-fail",
+        "stale",
+        "conflicted",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schema": {
+      "const": "VerificationDelta/v1"
+    },
+    "subject": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version",
+        "digest"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "subject",
+    "environment_ref",
+    "previous_state",
+    "new_state",
+    "reason_codes",
+    "evidence_refs",
+    "observed_at",
+    "delta_digest"
+  ],
+  "title": "verification-delta-v1",
+  "type": "object"
+}

@@ -1,0 +1,229 @@
+{
+  "observations": [
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_whisper_pass"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_whisper_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:whisper-cpp-local",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_python_pass"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_python_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:python-asr-local",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-fail",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_broken_fail"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_broken_fail",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "fail",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:local-asr-broken",
+        "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_conflict_pass"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_conflict_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:local-asr-conflicted",
+        "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-fail",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_conflict_fail"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_conflict_fail",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "fail",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:local-asr-conflicted",
+        "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "stale",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_stale_scope"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_stale_scope",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:historical-stale",
+        "digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "unknown",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_unknown_scope"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_unknown_scope",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "unknown",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:unknown-scope",
+        "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "media.transcribe.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "revoked",
+      "environment_ref": "env:macos-arm64-py314",
+      "evidence_refs": [
+        "receipt:fixture/obs_revoked_scope"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "limitations": [
+        "synthetic fixture"
+      ],
+      "observation_id": "obs_revoked_scope",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "fail",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:revoked-scope",
+        "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:transcript-bundle/v1"
+    }
+  ],
+  "schema": "EvidenceFixtureSet/v1"
+}

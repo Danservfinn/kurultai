@@ -1,0 +1,62 @@
+{
+  "$id": "https://kurult.ai/schemas/environment-profile-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "arch": {
+      "type": "string"
+    },
+    "available_prerequisites": {
+      "items": {
+        "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._+-]+$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "environment_id": {
+      "type": "string"
+    },
+    "evaluation_time": {
+      "type": "string"
+    },
+    "installed_artifacts": {
+      "items": {
+        "pattern": "^artifact:",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "network": {
+      "enum": [
+        "deny",
+        "allowlist"
+      ],
+      "type": "string"
+    },
+    "os": {
+      "type": "string"
+    },
+    "runtimes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "schema": {
+      "const": "EnvironmentProfile/v1"
+    }
+  },
+  "required": [
+    "schema",
+    "environment_id",
+    "os",
+    "arch",
+    "runtimes",
+    "installed_artifacts",
+    "network",
+    "evaluation_time",
+    "available_prerequisites"
+  ],
+  "title": "environment-profile-v1",
+  "type": "object"
+}

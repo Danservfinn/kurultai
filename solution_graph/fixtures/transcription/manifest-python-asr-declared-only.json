@@ -1,0 +1,65 @@
+{
+  "artifact_id": "artifact:python-asr-declared-only",
+  "capabilities": [
+    {
+      "capability_id": "media.transcribe.local",
+      "input_schema": "LocalMP4/v1",
+      "output_schema": "TimedSegments/v1"
+    },
+    {
+      "capability_id": "transcript.package.markdown-srt",
+      "input_schema": "TimedSegments/v1",
+      "output_schema": "TranscriptBundle/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "environment_constraints": {
+    "arch": "arm64",
+    "os": "macos",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:macos-arm64-py314"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:video}",
+      "--output",
+      "{output:bundle}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "permissive",
+  "network": {
+    "destinations": [],
+    "mode": "deny"
+  },
+  "permissions": [
+    "local-read",
+    "sandbox-local-write"
+  ],
+  "prerequisites": [
+    "python@3.14",
+    "unobserved-model@1"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0,
+    "max_runtime_seconds": 1200
+  },
+  "rollback": {
+    "mode": "delete-staged-output"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [],
+  "source_refs": [
+    "source:fixture/python-asr-declared-only"
+  ],
+  "verifier_ref": "verifier:transcript-bundle/v1",
+  "version": "1.0.0"
+}

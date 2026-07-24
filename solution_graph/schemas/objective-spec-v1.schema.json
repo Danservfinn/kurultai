@@ -1,0 +1,158 @@
+{
+  "$id": "https://kurult.ai/schemas/objective-spec-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "license_allow": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "max_cost_usd": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "max_permission_class": {
+          "enum": [
+            "read-only",
+            "local-read",
+            "sandbox-local-write",
+            "host-write",
+            "external-effect"
+          ],
+          "type": "string"
+        },
+        "max_runtime_seconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "network": {
+          "enum": [
+            "deny",
+            "allowlist"
+          ],
+          "type": "string"
+        },
+        "network_allowlist": {
+          "items": {
+            "pattern": "^[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "secret_policy": {
+          "enum": [
+            "none",
+            "brokered"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "network",
+        "network_allowlist",
+        "secret_policy",
+        "license_allow",
+        "max_runtime_seconds",
+        "max_cost_usd",
+        "max_permission_class"
+      ],
+      "type": "object"
+    },
+    "inputs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "media_type": {
+            "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$",
+            "type": "string"
+          },
+          "ref": {
+            "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+            "type": "string"
+          },
+          "sensitivity": {
+            "enum": [
+              "public",
+              "private",
+              "hard-private"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "media_type",
+          "sensitivity"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "objective_id": {
+      "type": "string"
+    },
+    "outcome": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "done_when": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "output_schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "output_schema",
+        "done_when"
+      ],
+      "type": "object"
+    },
+    "required_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schema": {
+      "const": "ObjectiveSpec/v1"
+    },
+    "unresolved_unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "objective_id",
+    "outcome",
+    "inputs",
+    "required_capabilities",
+    "constraints"
+  ],
+  "title": "objective-spec-v1",
+  "type": "object"
+}
