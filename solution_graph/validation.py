@@ -52,6 +52,16 @@ _SOURCE_CLASSES = {
     "registry_sandbox_fixture", "independent_verifier", "tenant_observed_run",
     "receiver_attested_external_effect", "incident",
 }
+_SOURCE_AUTHORITY = {
+    "publisher_declaration": 0.55,
+    "publisher_self_test": 0.70,
+    "registry_static_validation": 0.75,
+    "registry_sandbox_fixture": 0.85,
+    "independent_verifier": 0.95,
+    "tenant_observed_run": 0.95,
+    "receiver_attested_external_effect": 0.98,
+    "incident": 1.0,
+}
 _PERMISSION_CLASSES = {"read-only", "local-read", "sandbox-local-write", "host-write", "external-effect"}
 
 
@@ -406,6 +416,10 @@ def validate_fixture(registry: dict[str, Any]) -> dict[str, Any]:
             raise ContractError("supersedes must reference an observation in the registry snapshot")
         if not _same_observation_scope(observation, previous):
             raise ContractError("supersedes must preserve observation subject, claim, and environment scope")
+        if _timestamp(observation["observed_at"], "observed_at") < _timestamp(previous["observed_at"], "observed_at"):
+            raise ContractError("supersedes must be chronological")
+        if _SOURCE_AUTHORITY[observation["source_class"]] < _SOURCE_AUTHORITY[previous["source_class"]]:
+            raise ContractError("supersedes cannot reduce evidence source authority")
     for observation_id in by_observation_id:
         seen: set[str] = set()
         current_id: str | None = observation_id

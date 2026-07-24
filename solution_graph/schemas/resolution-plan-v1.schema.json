@@ -4,7 +4,7 @@
   "additionalProperties": false,
   "properties": {
     "agent_context_packet": {
-      "type": "object"
+      "$ref": "https://kurult.ai/schemas/agent-context-packet-v1.schema.json"
     },
     "alternatives": {
       "items": {

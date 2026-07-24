@@ -68,9 +68,9 @@ Harden the published offline resolver with complete runtime enforcement of its s
 
 ## Verification record
 
-- Full Python 3.14 suite: 42 passed.
-- Fresh virtual environment from `solution_graph/requirements.txt`: 23 focused tests passed.
+- Full Python 3.14 suite: 45 passed.
+- Fresh virtual environment from `solution_graph/requirements.txt`: 27 focused tests passed.
 - Draft 2020-12 schema checks: 18 schemas valid; all references package-local.
 - Deterministic replay probe: 100/100 identical plans and zero-invocation simulations.
 - Public-repository privacy/secret validation, `compileall`, and `git diff --check`: passed.
-- Two independent Codex reviews completed; four findings were remediated (RFC 3339 fallback, acyclic evidence supersession, IPv4-only loopback contract, and symlink-root rejection). Final review reported no actionable regressions.
+- Independent adversarial reviews identified and drove remediation of strict RFC 3339 fallback, acyclic and authority-preserving chronological evidence supersession, closed nested v1 context contracts, IPv4-only loopback behavior, and registry-root symlink rejection. The final post-remediation Codex review reported no introduced correctness, security, or maintainability issues.

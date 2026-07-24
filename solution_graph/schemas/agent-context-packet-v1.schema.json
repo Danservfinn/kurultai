@@ -36,15 +36,62 @@
       "type": "string"
     },
     "invocation": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "const": "argv/v1"
+        },
+        "argv_template": {
+          "items": {
+            "pattern": "^(?:--[a-z0-9][a-z0-9-]*|\\{(?:input|output):[a-z0-9_-]+\\})$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "adapter",
+        "argv_template"
+      ],
       "type": "object"
     },
     "network": {
+      "additionalProperties": false,
+      "properties": {
+        "destinations": {
+          "items": {
+            "pattern": "^[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "deny",
+            "allowlist"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "destinations"
+      ],
       "type": "object"
     },
     "permissions": {
       "items": {
+        "enum": [
+          "read-only",
+          "local-read",
+          "sandbox-local-write",
+          "host-write",
+          "external-effect"
+        ],
         "type": "string"
       },
+      "minItems": 1,
       "type": "array"
     },
     "plan_ref": {
@@ -53,6 +100,7 @@
     },
     "prerequisites": {
       "items": {
+        "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._+-]+$",
         "type": "string"
       },
       "type": "array"
@@ -62,6 +110,7 @@
     },
     "secret_slots": {
       "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
         "type": "string"
       },
       "type": "array"
