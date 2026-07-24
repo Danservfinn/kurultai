@@ -12,23 +12,24 @@ Validated source
 - Checkpoint target for this gate: 10 strict genuine non-demo completed Buildroom cases with independent review
 
 Counts
-- Total corpus rows: 8
+- Total corpus rows: 1
 - Independently reviewed corpus rows: 0
-- Strict genuine non-demo completed Buildroom candidate rows: 6
+- Strict genuine non-demo completed Buildroom candidate rows: 0
 - Independently reviewed strict rows counted toward the 10-case checkpoint: 0
-- Strict candidate shortfall to 10: 4
+- Strict candidate shortfall to 10: 10
 - Independently reviewed checkpoint shortfall to 10: 10
-- Post-build verification agreement counts: agree=0, disagree=0, not_yet_reviewed=8, unknown=0
-- Acceptance counts: accepted=0, overridden=0, rejected=0, unknown_or_not_yet_reviewed=8
-- Soak gate: `insufficient_reviewed_cases`
+- Post-build verification agreement counts: agree=0, disagree=0, not_yet_reviewed=1, unknown=0
+- Acceptance counts: accepted=0, overridden=0, rejected=0, unknown_or_not_yet_reviewed=1
+- 25-reviewed soak gate: `insufficient_reviewed_cases`
+- First-10 checkpoint gate: `blocked_pending_genuine_reviewed_cases`
 
 Why blocked
-- Six current rows are public-safe strict genuine non-demo completed Buildroom candidates with all five required reference types; one additional row is a demo and one is the public research-digest bootstrap fixture.
-- Every row conservatively retains `acceptance=not_yet_reviewed`, `override=unknown`, `proof_debt=unknown`, and `post_build_verification_agreement=not_yet_reviewed`. None counts as independently reviewed or successful.
+- The validated corpus is the byte-identical origin/main bootstrap fixture, containing only the public research-digest bootstrap row. It is not a strict genuine non-demo completed Buildroom case and does not satisfy the first-10 checkpoint.
+- The row conservatively retains `acceptance=not_yet_reviewed`, `override=unknown`, `proof_debt=unknown`, and `post_build_verification_agreement=not_yet_reviewed`. It does not count as independently reviewed or successful.
 - No private/raw Buildroom payloads, operator-identifying data, runtime/service/cron changes, dispatch enablement, execution authority, or artifact invocation are required or included by this receipt.
 
 Next safe intake trigger
-- Resume checkpoint assembly after at least four additional public-safe, strict genuine non-demo completed Buildroom cases are available, bringing the candidate set from six to ten.
+- Resume checkpoint assembly after at least ten public-safe, strict genuine non-demo completed Buildroom cases are available.
 - Each intake case must include the five required reference types: operator summary, implementation receipt, verification delta, trust report, and retention review.
 - All ten cases must have independent, non-contradictory reviewed outcomes recorded before any row can count toward the reviewed checkpoint.
 - Exclude raw/private payloads, duplicate cases, demo cases, extrapolated outcomes, unreviewed assumptions, and any case whose acceptance/proof-debt/post-build-verification state is contradictory.
