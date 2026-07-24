@@ -1,0 +1,48 @@
+{
+  "case_target": {
+    "maximum": 50,
+    "minimum": 25
+  },
+  "cases": [
+    {
+      "case_id": "case_research_digest_shadow_001",
+      "environment_ref": "fixture:research_digest/environment.json",
+      "notes": [
+        "Bootstrapped from the public research_digest Solution Graph fixture as a genuine available Buildroom-shaped example.",
+        "No operator acceptance, override, implementation result, or post-build outcome has been reviewed yet."
+      ],
+      "objective_ref": "fixture:research_digest/objective.json",
+      "plan_digest": "sha256:efb772a7660eee11dd0ae28a3675672a5b993de192ec44a6b95f7789f33a6d70",
+      "plan_status": "resolved",
+      "registry_ref": "fixture:research_digest",
+      "review": {
+        "acceptance": "not_yet_reviewed",
+        "correct_no_plan": "unknown",
+        "deterministic_replay": "pass",
+        "false_rejection": "unknown",
+        "override": "unknown",
+        "post_build_verification_agreement": "not_yet_reviewed",
+        "proof_debt": "unknown",
+        "search_resource_ceiling": "within_bounds"
+      },
+      "room_id": "room:research-digest",
+      "simulation_status": "pass",
+      "source_refs": {
+        "implementation_receipt": "buildroom:room/research-digest/implementation-receipt",
+        "operator_summary": "buildroom:room/research-digest/operator-summary",
+        "retention_review": "buildroom:room/research-digest/retention-review",
+        "trust_report": "buildroom:room/research-digest/trust-report",
+        "verification_delta": "buildroom:room/research-digest/verification-delta"
+      }
+    }
+  ],
+  "corpus_id": "shadow-corpus:solution-graph-phase-2-5/bootstrap",
+  "mode": "shadow_dogfood",
+  "operational_gates": [
+    "Accumulate 25-50 reviewed shadow cases before any authority-bearing phase.",
+    "Do not treat not_yet_reviewed or unknown as zero defects, acceptance, or correctness.",
+    "Only append cases from public-safe Buildroom summaries, receipts, verification deltas, trust reports, and retention reviews."
+  ],
+  "phase": "2.5",
+  "schema": "ShadowEvaluationCorpus/v1"
+}

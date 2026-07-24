@@ -14,14 +14,17 @@
     },
     "links": {
       "items": {
-        "pattern": "^solution-graph:plan_[0-9a-f]{20}@sha256:[0-9a-f]{64}$",
+        "pattern": "^(solution-graph:plan_[0-9a-f]{20}@sha256:[0-9a-f]{64}|shadow-case:case_[A-Za-z0-9_-]+)$",
         "type": "string"
       },
-      "maxItems": 1,
+      "maxItems": 2,
       "type": "array"
     },
     "mode": {
-      "const": "recommendation_only"
+      "enum": [
+        "recommendation_only",
+        "shadow_dogfood"
+      ]
     },
     "operator_decisions_needed": {
       "items": {
@@ -62,6 +65,48 @@
       "maxLength": 128,
       "minLength": 1,
       "type": "string"
+    },
+    "buildroom_refs": {
+      "additionalProperties": false,
+      "properties": {
+        "implementation_receipt": {"pattern": "^buildroom:", "type": "string"},
+        "operator_summary": {"pattern": "^buildroom:", "type": "string"},
+        "retention_review": {"pattern": "^buildroom:", "type": "string"},
+        "trust_report": {"pattern": "^buildroom:", "type": "string"},
+        "verification_delta": {"pattern": "^buildroom:", "type": "string"}
+      },
+      "required": [
+        "operator_summary",
+        "implementation_receipt",
+        "verification_delta",
+        "trust_report",
+        "retention_review"
+      ],
+      "type": "object"
+    },
+    "evaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {"enum": ["accepted", "overridden", "rejected", "not_yet_reviewed", "unknown"], "type": "string"},
+        "correct_no_plan": {"enum": ["yes", "no", "not_applicable", "unknown"], "type": "string"},
+        "deterministic_replay": {"enum": ["pass", "fail", "unknown"], "type": "string"},
+        "false_rejection": {"enum": ["yes", "no", "not_applicable", "unknown"], "type": "string"},
+        "post_build_verification_agreement": {"enum": ["agree", "disagree", "not_yet_reviewed", "unknown"], "type": "string"},
+        "proof_debt": {"enum": ["none", "low", "medium", "high", "unknown"], "type": "string"},
+        "review_state": {"enum": ["reviewed", "not_yet_reviewed", "unknown"], "type": "string"},
+        "search_resource_ceiling": {"enum": ["within_bounds", "exhausted", "unknown"], "type": "string"}
+      },
+      "required": [
+        "review_state",
+        "acceptance",
+        "correct_no_plan",
+        "false_rejection",
+        "proof_debt",
+        "deterministic_replay",
+        "search_resource_ceiling",
+        "post_build_verification_agreement"
+      ],
+      "type": "object"
     },
     "schema": {
       "const": "BuildroomRecommendationProjection/v1"

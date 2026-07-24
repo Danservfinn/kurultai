@@ -30,6 +30,12 @@ Both surfaces bind one registry at startup. Request bodies may contain inline ob
 
 Dogfood via `BuildroomRecommendationProjection/v1`, a pure stdout/in-memory projection over the exact resolver plan and simulation status. It carries `authority=none`, `dispatch_allowed=false`, and `requires_operator_approval=true`. It is not a receipt, creates no proof file, writes no ledger, and does not dispatch or mutate Buildroom state.
 
+### Phase 2.5 shadow dogfood
+
+Phase 2.5 may translate existing Buildroom-shaped operator summaries, implementation receipts, verification deltas, trust reports, and retention reviews into a `shadow_dogfood` recommendation projection. The projection remains read-only and authority-free, links back to the shadow case, and records review fields as `unknown` or `not_yet_reviewed` until an operator records a reviewed outcome. Unknowns are never counted as zero defects or acceptance.
+
+Shadow evaluation uses `ShadowEvaluationCorpus/v1`, an append-only public-safe corpus with unique `case_id` values and a fixed 25-50 reviewed-case soak target before any authority-bearing phase can be considered. Bootstrap cases may be fewer than 25 only while the soak gate reports `insufficient_reviewed_cases`.
+
 ## Threat model and controls
 
 | Threat | Control |
@@ -41,6 +47,7 @@ Dogfood via `BuildroomRecommendationProjection/v1`, a pure stdout/in-memory proj
 | Adapter becomes public service | Loopback-only host allowlist; MCP is stdio |
 | Hidden execution | Empty `resolution-only/v1` argv for composition; simulation reports zero invocations |
 | Grant/task authority confusion | Projection authority is `none`; dispatch is false; operator approval required |
+| Shadow metrics false confidence | Unknown and not-yet-reviewed fields are counted separately; the soak gate requires 25-50 reviewed cases |
 | Registry mutation | Defensive deep copies and read-only loaders |
 | Secret leakage | Secret values rejected by validation; no credential surface |
 | Digest-only trust | Documentation states digest proves integrity, not provenance/authority |

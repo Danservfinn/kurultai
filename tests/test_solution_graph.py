@@ -16,7 +16,12 @@ RESEARCH_DIGEST = FIXTURE_ROOT / "research_digest"
 ADVERSARIAL_NO_PLAN = FIXTURE_ROOT / "adversarial_no_plan"
 SCHEMAS = ROOT / "solution_graph" / "schemas"
 
-from solution_graph.buildroom import recommend_for_buildroom
+from solution_graph.buildroom import (
+    evaluate_shadow_corpus,
+    recommend_for_buildroom,
+    translate_buildroom_shadow_case,
+    validate_shadow_corpus,
+)
 from solution_graph.canonical import canonical_digest, canonical_json
 from solution_graph.mcp_adapter import handle_mcp_request
 from solution_graph.registry import load_fixture_registry
@@ -71,6 +76,7 @@ def test_all_contract_schemas_are_present_and_runtime_checked() -> None:
         "resolution-plan-v1.schema.json",
         "resolution-plan-v2.schema.json",
         "run-receipt-v1.schema.json",
+        "shadow-evaluation-corpus-v1.schema.json",
         "validation-result-v1.schema.json",
         "verification-delta-v1.schema.json",
     }
@@ -92,6 +98,7 @@ def test_all_contract_schemas_are_present_and_runtime_checked() -> None:
         "ResolutionPlan/v1",
         "ResolutionPlan/v2",
         "RunReceipt/v1",
+        "ShadowEvaluationCorpus/v1",
         "ValidationResult/v1",
         "VerificationDelta/v1",
     }
@@ -817,3 +824,129 @@ def test_buildroom_projection_is_recommendation_only_stdout_and_no_proof_receipt
     generated = json.loads(proc.stdout)
     assert generated["schema"] == "BuildroomRecommendationProjection/v1"
     assert generated["authority"] == "none"
+
+
+def test_buildroom_shadow_translation_projects_into_existing_receipt_and_delta_refs() -> None:
+    case = {
+        "case_id": "case_research_digest_shadow_001",
+        "room_id": "room:research-digest",
+        "source_refs": {
+            "operator_summary": "buildroom:room/research-digest/operator-summary",
+            "implementation_receipt": "buildroom:room/research-digest/implementation-receipt",
+            "verification_delta": "buildroom:room/research-digest/verification-delta",
+            "trust_report": "buildroom:room/research-digest/trust-report",
+            "retention_review": "buildroom:room/research-digest/retention-review",
+        },
+        "review": {
+            "acceptance": "not_yet_reviewed",
+            "override": "unknown",
+            "correct_no_plan": "unknown",
+            "false_rejection": "unknown",
+            "post_build_verification_agreement": "not_yet_reviewed",
+        },
+    }
+    projection = translate_buildroom_shadow_case(
+        case=case,
+        objective=load(RESEARCH_DIGEST, "objective.json"),
+        environment=load(RESEARCH_DIGEST, "environment.json"),
+        registry=load_fixture_registry(RESEARCH_DIGEST),
+    )
+
+    assert projection["schema"] == "BuildroomRecommendationProjection/v1"
+    assert projection["mode"] == "shadow_dogfood"
+    assert projection["authority"] == "none"
+    assert projection["dispatch_allowed"] is False
+    assert projection["requires_operator_approval"] is True
+    assert projection["artifact_invocation_count"] == 0
+    assert projection["buildroom_refs"] == case["source_refs"]
+    assert projection["evaluation"]["review_state"] == "not_yet_reviewed"
+    assert projection["evaluation"]["acceptance"] == "not_yet_reviewed"
+    assert projection["evaluation"]["post_build_verification_agreement"] == "not_yet_reviewed"
+    assert projection["evaluation"]["deterministic_replay"] == "pass"
+    assert projection["evaluation"]["proof_debt"] == "unknown"
+    assert projection["evaluation"]["search_resource_ceiling"] == "within_bounds"
+    assert "shadow-case:case_research_digest_shadow_001" in projection["links"]
+    validate_contract_schema(projection)
+
+
+def test_shadow_corpus_is_append_only_bounded_and_tracks_unknowns_without_false_zeroes() -> None:
+    corpus = {
+        "schema": "ShadowEvaluationCorpus/v1",
+        "corpus_id": "shadow-corpus:solution-graph-phase-2-5/bootstrap",
+        "phase": "2.5",
+        "mode": "shadow_dogfood",
+        "case_target": {"minimum": 25, "maximum": 50},
+        "cases": [
+            {
+                "case_id": "case_research_digest_shadow_001",
+                "room_id": "room:research-digest",
+                "objective_ref": "fixture:research_digest/objective.json",
+                "environment_ref": "fixture:research_digest/environment.json",
+                "registry_ref": "fixture:research_digest",
+                "plan_digest": "sha256:" + "0" * 64,
+                "plan_status": "resolved",
+                "simulation_status": "pass",
+                "source_refs": {
+                    "operator_summary": "buildroom:room/research-digest/operator-summary",
+                    "implementation_receipt": "buildroom:room/research-digest/implementation-receipt",
+                    "verification_delta": "buildroom:room/research-digest/verification-delta",
+                    "trust_report": "buildroom:room/research-digest/trust-report",
+                    "retention_review": "buildroom:room/research-digest/retention-review",
+                },
+                "review": {
+                    "acceptance": "not_yet_reviewed",
+                    "override": "unknown",
+                    "correct_no_plan": "unknown",
+                    "false_rejection": "unknown",
+                    "proof_debt": "unknown",
+                    "deterministic_replay": "pass",
+                    "search_resource_ceiling": "within_bounds",
+                    "post_build_verification_agreement": "not_yet_reviewed",
+                },
+                "notes": ["Bootstrapped from public fixture; no real-world outcome is claimed."],
+            }
+        ],
+        "operational_gates": [
+            "Accumulate 25-50 reviewed shadow cases before any authority-bearing phase.",
+            "Do not treat not_yet_reviewed or unknown as zero defects or acceptance.",
+        ],
+    }
+    validate_shadow_corpus(corpus)
+    metrics = evaluate_shadow_corpus(corpus)
+
+    assert metrics == {
+        "schema": "ShadowEvaluationSummary/v1",
+        "case_count": 1,
+        "reviewed_case_count": 0,
+        "soak_gate": "insufficient_reviewed_cases",
+        "acceptance": {"accepted": 0, "overridden": 0, "rejected": 0, "unknown": 1},
+        "correct_no_plan": {"yes": 0, "no": 0, "not_applicable": 0, "unknown": 1},
+        "false_rejection": {"yes": 0, "no": 0, "not_applicable": 0, "unknown": 1},
+        "proof_debt": {"none": 0, "low": 0, "medium": 0, "high": 0, "unknown": 1},
+        "deterministic_replay": {"pass": 1, "fail": 0, "unknown": 0},
+        "search_resource_ceiling": {"within_bounds": 1, "exhausted": 0, "unknown": 0},
+        "post_build_verification_agreement": {"agree": 0, "disagree": 0, "not_yet_reviewed": 1, "unknown": 0},
+    }
+
+    duplicate = deepcopy(corpus)
+    duplicate["cases"].append(deepcopy(duplicate["cases"][0]))
+    with pytest.raises(ContractError, match="append-only case_id"):
+        validate_shadow_corpus(duplicate)
+
+    oversized = deepcopy(corpus)
+    base = oversized["cases"][0]
+    oversized["cases"] = [dict(base, case_id=f"case_bootstrap_{index:03d}") for index in range(51)]
+    with pytest.raises(ContractError, match="25-50"):
+        validate_shadow_corpus(oversized)
+
+
+def test_bootstrap_shadow_corpus_fixture_is_public_safe_and_truthfully_unreviewed() -> None:
+    corpus = load(ROOT / "solution_graph" / "fixtures" / "buildroom_shadow", "shadow-corpus.json")
+    validate_shadow_corpus(corpus)
+    assert len(corpus["cases"]) >= 1
+    assert all(case["review"]["acceptance"] == "not_yet_reviewed" for case in corpus["cases"])
+    assert evaluate_shadow_corpus(corpus)["soak_gate"] == "insufficient_reviewed_cases"
+    serialized = canonical_json(corpus)
+    assert "/Users/" not in serialized
+    assert "sk-" not in serialized
+    assert "Bearer " not in serialized

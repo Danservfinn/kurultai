@@ -37,6 +37,7 @@ _SCHEMA_FILES = (
     "resolution-plan-v1.schema.json",
     "resolution-plan-v2.schema.json",
     "run-receipt-v1.schema.json",
+    "shadow-evaluation-corpus-v1.schema.json",
     "validation-result-v1.schema.json",
     "verification-delta-v1.schema.json",
 )

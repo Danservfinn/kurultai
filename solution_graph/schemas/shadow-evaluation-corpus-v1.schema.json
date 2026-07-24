@@ -1,0 +1,93 @@
+{
+  "$id": "https://kurult.ai/schemas/shadow-evaluation-corpus-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "case_target": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum": {"const": 50},
+        "minimum": {"const": 25}
+      },
+      "required": ["minimum", "maximum"],
+      "type": "object"
+    },
+    "cases": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {"pattern": "^case_[A-Za-z0-9_-]+$", "type": "string"},
+          "environment_ref": {"pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$", "type": "string"},
+          "notes": {"items": {"maxLength": 512, "type": "string"}, "maxItems": 8, "type": "array"},
+          "objective_ref": {"pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$", "type": "string"},
+          "plan_digest": {"pattern": "^sha256:[0-9a-f]{64}$", "type": "string"},
+          "plan_status": {"enum": ["resolved", "no_admissible_plan", "search_exhausted"], "type": "string"},
+          "registry_ref": {"pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$", "type": "string"},
+          "review": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance": {"enum": ["accepted", "overridden", "rejected", "not_yet_reviewed", "unknown"], "type": "string"},
+              "correct_no_plan": {"enum": ["yes", "no", "not_applicable", "unknown"], "type": "string"},
+              "deterministic_replay": {"enum": ["pass", "fail", "unknown"], "type": "string"},
+              "false_rejection": {"enum": ["yes", "no", "not_applicable", "unknown"], "type": "string"},
+              "override": {"enum": ["yes", "no", "unknown"], "type": "string"},
+              "post_build_verification_agreement": {"enum": ["agree", "disagree", "not_yet_reviewed", "unknown"], "type": "string"},
+              "proof_debt": {"enum": ["none", "low", "medium", "high", "unknown"], "type": "string"},
+              "search_resource_ceiling": {"enum": ["within_bounds", "exhausted", "unknown"], "type": "string"}
+            },
+            "required": [
+              "acceptance",
+              "override",
+              "correct_no_plan",
+              "false_rejection",
+              "proof_debt",
+              "deterministic_replay",
+              "search_resource_ceiling",
+              "post_build_verification_agreement"
+            ],
+            "type": "object"
+          },
+          "room_id": {"maxLength": 128, "minLength": 1, "type": "string"},
+          "simulation_status": {"enum": ["pass", "fail", "not_simulated"], "type": "string"},
+          "source_refs": {
+            "additionalProperties": false,
+            "properties": {
+              "implementation_receipt": {"pattern": "^buildroom:", "type": "string"},
+              "operator_summary": {"pattern": "^buildroom:", "type": "string"},
+              "retention_review": {"pattern": "^buildroom:", "type": "string"},
+              "trust_report": {"pattern": "^buildroom:", "type": "string"},
+              "verification_delta": {"pattern": "^buildroom:", "type": "string"}
+            },
+            "required": ["operator_summary", "implementation_receipt", "verification_delta", "trust_report", "retention_review"],
+            "type": "object"
+          }
+        },
+        "required": [
+          "case_id",
+          "room_id",
+          "objective_ref",
+          "environment_ref",
+          "registry_ref",
+          "plan_digest",
+          "plan_status",
+          "simulation_status",
+          "source_refs",
+          "review",
+          "notes"
+        ],
+        "type": "object"
+      },
+      "maxItems": 50,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "corpus_id": {"pattern": "^shadow-corpus:[A-Za-z0-9._/@:+-]+$", "type": "string"},
+    "mode": {"const": "shadow_dogfood"},
+    "operational_gates": {"items": {"maxLength": 512, "type": "string"}, "minItems": 1, "maxItems": 8, "type": "array"},
+    "phase": {"const": "2.5"},
+    "schema": {"const": "ShadowEvaluationCorpus/v1"}
+  },
+  "required": ["schema", "corpus_id", "phase", "mode", "case_target", "cases", "operational_gates"],
+  "title": "shadow-evaluation-corpus-v1",
+  "type": "object"
+}
