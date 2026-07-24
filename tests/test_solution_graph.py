@@ -5,6 +5,7 @@ import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -925,7 +926,26 @@ def _shadow_corpus_with_case(case: dict) -> dict:
     }
 
 
-def _shadow_case(*, plan_status: str, simulation_status: str, deterministic_replay: str, search_resource_ceiling: str) -> dict:
+def _shadow_case(
+    *,
+    plan_status: str,
+    simulation_status: str,
+    deterministic_replay: str,
+    search_resource_ceiling: str,
+    review_overrides: Optional[dict] = None,
+) -> dict:
+    review = {
+        "acceptance": "not_yet_reviewed",
+        "override": "unknown",
+        "correct_no_plan": "unknown",
+        "false_rejection": "unknown",
+        "proof_debt": "unknown",
+        "deterministic_replay": deterministic_replay,
+        "search_resource_ceiling": search_resource_ceiling,
+        "post_build_verification_agreement": "not_yet_reviewed",
+    }
+    if review_overrides:
+        review.update(review_overrides)
     return {
         "case_id": f"case_{plan_status}_metrics",
         "room_id": f"room:{plan_status}",
@@ -942,18 +962,114 @@ def _shadow_case(*, plan_status: str, simulation_status: str, deterministic_repl
             "trust_report": "buildroom:room/test/trust-report",
             "retention_review": "buildroom:room/test/retention-review",
         },
-        "review": {
-            "acceptance": "not_yet_reviewed",
-            "override": "unknown",
-            "correct_no_plan": "unknown",
-            "false_rejection": "unknown",
-            "proof_debt": "unknown",
-            "deterministic_replay": deterministic_replay,
-            "search_resource_ceiling": search_resource_ceiling,
-            "post_build_verification_agreement": "not_yet_reviewed",
-        },
+        "review": review,
         "notes": ["Synthetic test case."],
     }
+
+
+@pytest.mark.parametrize("acceptance", ["not_yet_reviewed", "unknown"])
+@pytest.mark.parametrize("agreement", ["agree", "disagree"])
+def test_shadow_corpus_rejects_unreviewed_acceptance_with_reviewed_agreement(acceptance: str, agreement: str) -> None:
+    corpus = _shadow_corpus_with_case(
+        _shadow_case(
+            plan_status="resolved",
+            simulation_status="pass",
+            deterministic_replay="pass",
+            search_resource_ceiling="within_bounds",
+            review_overrides={
+                "acceptance": acceptance,
+                "post_build_verification_agreement": agreement,
+            },
+        )
+    )
+
+    with pytest.raises(ContractError, match="acceptance.*post_build_verification_agreement"):
+        validate_shadow_corpus(corpus)
+
+
+@pytest.mark.parametrize("acceptance", ["not_yet_reviewed", "unknown"])
+@pytest.mark.parametrize("agreement", ["agree", "disagree"])
+def test_shadow_translation_rejects_unreviewed_acceptance_with_reviewed_agreement(
+    acceptance: str, agreement: str
+) -> None:
+    case = _shadow_case(
+        plan_status="resolved",
+        simulation_status="pass",
+        deterministic_replay="pass",
+        search_resource_ceiling="within_bounds",
+        review_overrides={
+            "acceptance": acceptance,
+            "post_build_verification_agreement": agreement,
+        },
+    )
+
+    with pytest.raises(ContractError, match="acceptance.*post_build_verification_agreement"):
+        translate_buildroom_shadow_case(
+            case=case,
+            objective=load(RESEARCH_DIGEST, "objective.json"),
+            environment=load(RESEARCH_DIGEST, "environment.json"),
+            registry=load_fixture_registry(RESEARCH_DIGEST),
+        )
+
+
+def test_shadow_evaluation_rejects_contradictory_review_before_counting() -> None:
+    valid = _shadow_case(
+        plan_status="resolved",
+        simulation_status="pass",
+        deterministic_replay="pass",
+        search_resource_ceiling="within_bounds",
+        review_overrides={
+            "acceptance": "accepted",
+            "post_build_verification_agreement": "agree",
+            "proof_debt": "none",
+        },
+    )
+    contradictory = _shadow_case(
+        plan_status="resolved",
+        simulation_status="pass",
+        deterministic_replay="pass",
+        search_resource_ceiling="within_bounds",
+        review_overrides={"post_build_verification_agreement": "disagree"},
+    )
+    contradictory["case_id"] = "case_contradictory_review_metrics"
+    corpus = _shadow_corpus_with_case(valid)
+    corpus["cases"].append(contradictory)
+
+    with pytest.raises(ContractError, match="case_contradictory_review_metrics"):
+        evaluate_shadow_corpus(corpus)
+
+
+@pytest.mark.parametrize(
+    ("acceptance", "agreement", "reviewed_count", "agreement_counts"),
+    [
+        ("accepted", "agree", 1, {"agree": 1, "disagree": 0, "not_yet_reviewed": 0, "unknown": 0}),
+        ("overridden", "disagree", 1, {"agree": 0, "disagree": 1, "not_yet_reviewed": 0, "unknown": 0}),
+        ("rejected", "unknown", 1, {"agree": 0, "disagree": 0, "not_yet_reviewed": 0, "unknown": 1}),
+        ("not_yet_reviewed", "not_yet_reviewed", 0, {"agree": 0, "disagree": 0, "not_yet_reviewed": 1, "unknown": 0}),
+        ("unknown", "unknown", 0, {"agree": 0, "disagree": 0, "not_yet_reviewed": 0, "unknown": 1}),
+    ],
+)
+def test_shadow_corpus_accepts_consistent_review_state_combinations(
+    acceptance: str, agreement: str, reviewed_count: int, agreement_counts: dict
+) -> None:
+    corpus = _shadow_corpus_with_case(
+        _shadow_case(
+            plan_status="resolved",
+            simulation_status="pass",
+            deterministic_replay="pass",
+            search_resource_ceiling="within_bounds",
+            review_overrides={
+                "acceptance": acceptance,
+                "post_build_verification_agreement": agreement,
+                "proof_debt": "none" if reviewed_count else "unknown",
+            },
+        )
+    )
+
+    metrics = evaluate_shadow_corpus(corpus)
+
+    assert metrics["reviewed_case_count"] == reviewed_count
+    assert metrics["post_build_verification_agreement"] == agreement_counts
 
 
 def test_shadow_corpus_rejects_no_admissible_plan_with_replay_success() -> None:

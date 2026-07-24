@@ -78,6 +78,16 @@ def _review_state(review: dict[str, Any]) -> str:
     return "unknown"
 
 
+def _validate_shadow_review_consistency(*, case_id: str, review: dict[str, Any]) -> None:
+    acceptance = review.get("acceptance", "unknown")
+    agreement = review.get("post_build_verification_agreement", "unknown")
+    if acceptance in {"not_yet_reviewed", "unknown"} and agreement in {"agree", "disagree"}:
+        raise ContractError(
+            f"shadow case {case_id} acceptance {acceptance} cannot pair with "
+            f"post_build_verification_agreement {agreement}"
+        )
+
+
 def _search_resource_ceiling(plan: dict[str, Any]) -> str:
     if plan.get("status") == "search_exhausted":
         return "exhausted"
@@ -108,6 +118,9 @@ def translate_buildroom_shadow_case(
         simulation_status = "not_simulated"
         deterministic_replay = "unknown"
     review = deepcopy(case.get("review", {}))
+    if not isinstance(review, dict):
+        raise ContractError(f"shadow case {case.get('case_id', '<unknown>')} review contract is invalid")
+    _validate_shadow_review_consistency(case_id=case.get("case_id", "<unknown>"), review=review)
     evaluation = {
         "review_state": _review_state(review),
         "acceptance": review.get("acceptance", "unknown"),
@@ -150,6 +163,7 @@ def _validate_shadow_case_metrics(case: dict[str, Any]) -> None:
     review = case.get("review", {})
     if not isinstance(review, dict):
         raise ContractError(f"shadow case {case_id} review contract is invalid")
+    _validate_shadow_review_consistency(case_id=case_id, review=review)
 
     if plan_status == "resolved":
         if simulation_status == "not_simulated":
