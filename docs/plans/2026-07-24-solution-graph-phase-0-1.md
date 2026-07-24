@@ -3,11 +3,11 @@
 **Date:** 2026-07-24
 **Owner:** Kublai
 **Status:** completed
-**Source PRD:** `/Users/kublai/brain/docs/plans/2026-07-24-agent-first-executable-directory-prd.md`
+**Source PRD:** private Brain plan (not included in this public repository)
 
 ## Code-root decision
 
-Implement in `/Users/kublai/kurultai/kurultai-repo/solution_graph/` with a thin entry point at `scripts/ksg.py`.
+Implement in `solution_graph/` with a thin entry point at `scripts/ksg.py`.
 
 Why:
 

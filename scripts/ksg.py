@@ -12,14 +12,20 @@ if str(ROOT) not in sys.path:
 
 from solution_graph.registry import load_fixture_registry
 from solution_graph.resolver import resolve_objective, simulate_plan
+from solution_graph.schema_runtime import load_json_file, validate_contract_schema
 from solution_graph.validation import ContractError, validate_fixture, validate_manifest
 
 
 def read_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    value = load_json_file(path)
+    if not isinstance(value, dict):
+        raise ContractError("JSON document must be an object")
+    return value
 
 
 def emit(value: dict) -> None:
+    if isinstance(value.get("schema"), str):
+        validate_contract_schema(value)
     print(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True))
 
 

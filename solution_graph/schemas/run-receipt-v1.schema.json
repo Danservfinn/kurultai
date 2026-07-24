@@ -22,6 +22,7 @@
       "type": "array"
     },
     "finished_at": {
+      "format": "date-time",
       "type": "string"
     },
     "grant_ref": {
@@ -49,6 +50,7 @@
       "const": "RunReceipt/v1"
     },
     "started_at": {
+      "format": "date-time",
       "type": "string"
     },
     "status": {

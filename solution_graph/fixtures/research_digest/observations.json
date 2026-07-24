@@ -1,0 +1,61 @@
+{
+  "observations": [
+    {
+      "claim": {
+        "capability_id": "research.normalize.bookmarks",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:fixture-linux-x86-research",
+      "evidence_refs": [
+        "receipt:fixture/research-digest/bookmark-normalizer"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:3434343434343434343434343434343434343434343434343434343434343434",
+      "limitations": [
+        "synthetic offline fixture"
+      ],
+      "observation_id": "obs_bookmark_normalizer_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:bookmark-normalizer",
+        "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:research-cards/v1"
+    },
+    {
+      "claim": {
+        "capability_id": "research.synthesize.evidence-memo",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:fixture-linux-x86-research",
+      "evidence_refs": [
+        "receipt:fixture/research-digest/evidence-memo-writer"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:3434343434343434343434343434343434343434343434343434343434343434",
+      "limitations": [
+        "synthetic offline fixture"
+      ],
+      "observation_id": "obs_evidence_memo_writer_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:evidence-memo-writer",
+        "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:evidence-memo/v1"
+    }
+  ],
+  "schema": "EvidenceFixtureSet/v1"
+}

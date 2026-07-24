@@ -3,4 +3,4 @@
 from .resolver import resolve_objective, simulate_plan
 
 __all__ = ["resolve_objective", "simulate_plan"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

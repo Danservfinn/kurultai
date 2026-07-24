@@ -1,0 +1,18 @@
+{
+  "arch": "arm64",
+  "available_prerequisites": [
+    "pii-patterns@1",
+    "python@3.14"
+  ],
+  "environment_id": "env:fixture-macos-arm64-redaction",
+  "evaluation_time": "2026-07-24T00:00:00Z",
+  "installed_artifacts": [
+    "artifact:local-markdown-redactor"
+  ],
+  "network": "deny",
+  "os": "macos",
+  "runtimes": {
+    "python": "3.14"
+  },
+  "schema": "EnvironmentProfile/v1"
+}

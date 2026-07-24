@@ -1,0 +1,33 @@
+{
+  "observations": [
+    {
+      "claim": {
+        "capability_id": "vault.summarize.local",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:fixture-macos-arm64-adversarial",
+      "evidence_refs": [
+        "receipt:fixture/adversarial-no-plan/local-vault-summarizer"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:5656565656565656565656565656565656565656565656565656565656565656",
+      "limitations": [
+        "synthetic offline fixture"
+      ],
+      "observation_id": "obs_local_vault_summary_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:local-vault-summarizer",
+        "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:vault-summary/v1"
+    }
+  ],
+  "schema": "EvidenceFixtureSet/v1"
+}

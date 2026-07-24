@@ -1,0 +1,33 @@
+{
+  "observations": [
+    {
+      "claim": {
+        "capability_id": "text.redact.pii",
+        "type": "fixture_outcome"
+      },
+      "compatibility_state": "observed-pass",
+      "environment_ref": "env:fixture-macos-arm64-redaction",
+      "evidence_refs": [
+        "receipt:fixture/document-redaction/local-markdown-redactor"
+      ],
+      "expires_at": "2026-10-24T00:00:00Z",
+      "fixture_digest": "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+      "limitations": [
+        "synthetic offline fixture"
+      ],
+      "observation_id": "obs_redactor_pass",
+      "observed_at": "2026-07-24T00:00:00Z",
+      "result": "pass",
+      "schema": "EvidenceObservation/v1",
+      "source_class": "independent_verifier",
+      "subject": {
+        "artifact_id": "artifact:local-markdown-redactor",
+        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "version": "1.0.0"
+      },
+      "supersedes": null,
+      "verifier_ref": "verifier:redacted-markdown-bundle/v1"
+    }
+  ],
+  "schema": "EvidenceFixtureSet/v1"
+}

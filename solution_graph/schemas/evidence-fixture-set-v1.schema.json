@@ -1,0 +1,23 @@
+{
+  "$id": "https://kurult.ai/schemas/evidence-fixture-set-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "observations": {
+      "items": {
+        "$ref": "https://kurult.ai/schemas/evidence-observation-v1.schema.json"
+      },
+      "maxItems": 512,
+      "type": "array"
+    },
+    "schema": {
+      "const": "EvidenceFixtureSet/v1"
+    }
+  },
+  "required": [
+    "schema",
+    "observations"
+  ],
+  "title": "evidence-fixture-set-v1",
+  "type": "object"
+}

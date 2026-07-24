@@ -1,0 +1,19 @@
+{
+  "arch": "x86_64",
+  "available_prerequisites": [
+    "jq@1.7",
+    "markdownlint@0.37",
+    "python@3.14"
+  ],
+  "environment_id": "env:fixture-linux-x86-research",
+  "evaluation_time": "2026-07-24T00:00:00Z",
+  "installed_artifacts": [
+    "artifact:bookmark-normalizer"
+  ],
+  "network": "deny",
+  "os": "linux",
+  "runtimes": {
+    "python": "3.14"
+  },
+  "schema": "EnvironmentProfile/v1"
+}

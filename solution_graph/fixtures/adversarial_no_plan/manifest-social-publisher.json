@@ -1,0 +1,62 @@
+{
+  "artifact_id": "artifact:social-publisher",
+  "capabilities": [
+    {
+      "capability_id": "social.publish.recommendation",
+      "input_schema": "VaultSummary/v1",
+      "output_schema": "PublishedPostReceipt/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+  "environment_constraints": {
+    "arch": "arm64",
+    "os": "macos",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-macos-arm64-adversarial"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:vault_summary}",
+      "--output",
+      "{output:published_receipt}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "permissive",
+  "network": {
+    "destinations": [
+      "social.example.invalid"
+    ],
+    "mode": "allowlist"
+  },
+  "permissions": [
+    "external-effect"
+  ],
+  "prerequisites": [
+    "social-cli@1"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0,
+    "max_runtime_seconds": 60
+  },
+  "rollback": {
+    "mode": "delete-post-if-authorized"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [
+    "SOCIAL_API_KEY"
+  ],
+  "source_refs": [
+    "source:fixture/adversarial-no-plan/social-publisher"
+  ],
+  "verifier_ref": "verifier:published-post-receipt/v1",
+  "version": "1.0.0"
+}

@@ -1,0 +1,193 @@
+{
+  "$id": "https://kurult.ai/schemas/objective-spec-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assumptions": {
+      "items": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    },
+    "constraints": {
+      "$ref": "#/$defs/constraints"
+    },
+    "inputs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "media_type": {
+            "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$",
+            "type": "string"
+          },
+          "ref": {
+            "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+            "type": "string"
+          },
+          "schema_ref": {
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]*/v[0-9]+$",
+            "type": "string"
+          },
+          "sensitivity": {
+            "enum": [
+              "public",
+              "private",
+              "hard-private"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "media_type",
+          "sensitivity",
+          "schema_ref"
+        ],
+        "type": "object"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "type": "array"
+    },
+    "objective_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^obj_[A-Za-z0-9_-]+$",
+      "type": "string"
+    },
+    "outcome": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        "done_when": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "output_schema": {
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*/v[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "output_schema",
+        "done_when"
+      ],
+      "type": "object"
+    },
+    "required_capabilities": {
+      "items": {
+        "pattern": "^[a-z0-9][a-z0-9._-]+$",
+        "type": "string"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema": {
+      "const": "ObjectiveSpec/v2"
+    },
+    "unresolved_unknowns": {
+      "items": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "objective_id",
+    "outcome",
+    "inputs",
+    "required_capabilities",
+    "constraints"
+  ],
+  "title": "objective-spec-v2",
+  "type": "object",
+  "$defs": {
+    "constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "license_allow": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "max_cost_usd": {
+          "maximum": 1000000,
+          "minimum": 0,
+          "type": "number"
+        },
+        "max_permission_class": {
+          "enum": [
+            "read-only",
+            "local-read",
+            "sandbox-local-write",
+            "host-write",
+            "external-effect"
+          ],
+          "type": "string"
+        },
+        "max_runtime_seconds": {
+          "maximum": 604800,
+          "minimum": 0,
+          "type": "number"
+        },
+        "network": {
+          "enum": [
+            "deny",
+            "allowlist"
+          ],
+          "type": "string"
+        },
+        "network_allowlist": {
+          "items": {
+            "pattern": "^[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "secret_policy": {
+          "enum": [
+            "none",
+            "brokered"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "network",
+        "network_allowlist",
+        "secret_policy",
+        "license_allow",
+        "max_runtime_seconds",
+        "max_cost_usd",
+        "max_permission_class"
+      ],
+      "type": "object"
+    }
+  }
+}

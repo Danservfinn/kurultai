@@ -1,0 +1,60 @@
+{
+  "artifact_id": "artifact:bookmark-normalizer",
+  "capabilities": [
+    {
+      "capability_id": "research.normalize.bookmarks",
+      "input_schema": "BookmarkExport/v1",
+      "output_schema": "ResearchCards/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "environment_constraints": {
+    "arch": "x86_64",
+    "os": "linux",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-linux-x86-research"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:bookmarks}",
+      "--output",
+      "{output:cards}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "permissive",
+  "network": {
+    "destinations": [],
+    "mode": "deny"
+  },
+  "permissions": [
+    "local-read",
+    "sandbox-local-write"
+  ],
+  "prerequisites": [
+    "jq@1.7",
+    "python@3.14"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0,
+    "max_runtime_seconds": 120
+  },
+  "rollback": {
+    "mode": "delete-staged-output"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [],
+  "source_refs": [
+    "source:fixture/research-digest/bookmark-normalizer"
+  ],
+  "verifier_ref": "verifier:research-cards/v1",
+  "version": "1.0.0"
+}

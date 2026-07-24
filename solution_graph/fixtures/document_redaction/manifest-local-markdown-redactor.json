@@ -1,0 +1,60 @@
+{
+  "artifact_id": "artifact:local-markdown-redactor",
+  "capabilities": [
+    {
+      "capability_id": "text.redact.pii",
+      "input_schema": "MarkdownDocument/v1",
+      "output_schema": "RedactedMarkdownBundle/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "environment_constraints": {
+    "arch": "arm64",
+    "os": "macos",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-macos-arm64-redaction"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:markdown_note}",
+      "--output",
+      "{output:redacted_bundle}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "internal-approved",
+  "network": {
+    "destinations": [],
+    "mode": "deny"
+  },
+  "permissions": [
+    "local-read",
+    "sandbox-local-write"
+  ],
+  "prerequisites": [
+    "pii-patterns@1",
+    "python@3.14"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0,
+    "max_runtime_seconds": 180
+  },
+  "rollback": {
+    "mode": "delete-staged-output"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [],
+  "source_refs": [
+    "source:fixture/document-redaction/local-markdown-redactor"
+  ],
+  "verifier_ref": "verifier:redacted-markdown-bundle/v1",
+  "version": "1.0.0"
+}

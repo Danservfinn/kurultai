@@ -1,0 +1,41 @@
+{
+  "assumptions": [
+    "This fixture deliberately asks for a policy-denied publication shape."
+  ],
+  "constraints": {
+    "license_allow": [
+      "permissive",
+      "internal-approved"
+    ],
+    "max_cost_usd": 0,
+    "max_permission_class": "read-only",
+    "max_runtime_seconds": 300,
+    "network": "deny",
+    "network_allowlist": [],
+    "secret_policy": "none"
+  },
+  "inputs": [
+    {
+      "media_type": "application/json",
+      "ref": "input:vault_export",
+      "schema_ref": "VaultExport/v1",
+      "sensitivity": "hard-private"
+    }
+  ],
+  "objective_id": "obj_adversarial_publish_from_private_vault",
+  "outcome": {
+    "description": "Attempt to turn private vault contents into a published-post receipt.",
+    "done_when": [
+      "verifier:published-post-receipt/v1"
+    ],
+    "output_schema": "PublishedPostReceipt/v1"
+  },
+  "required_capabilities": [
+    "vault.summarize.local",
+    "social.publish.recommendation"
+  ],
+  "schema": "ObjectiveSpec/v2",
+  "unresolved_unknowns": [
+    "Publication authority is intentionally absent."
+  ]
+}

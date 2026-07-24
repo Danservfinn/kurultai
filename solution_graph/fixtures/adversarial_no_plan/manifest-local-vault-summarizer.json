@@ -1,0 +1,59 @@
+{
+  "artifact_id": "artifact:local-vault-summarizer",
+  "capabilities": [
+    {
+      "capability_id": "vault.summarize.local",
+      "input_schema": "VaultExport/v1",
+      "output_schema": "VaultSummary/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+  "environment_constraints": {
+    "arch": "arm64",
+    "os": "macos",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-macos-arm64-adversarial"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:vault_export}",
+      "--output",
+      "{output:vault_summary}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "internal-approved",
+  "network": {
+    "destinations": [],
+    "mode": "deny"
+  },
+  "permissions": [
+    "read-only"
+  ],
+  "prerequisites": [
+    "python@3.14",
+    "vault-index@1"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0,
+    "max_runtime_seconds": 120
+  },
+  "rollback": {
+    "mode": "not-applicable-read-only-resolution"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [],
+  "source_refs": [
+    "source:fixture/adversarial-no-plan/local-vault-summarizer"
+  ],
+  "verifier_ref": "verifier:vault-summary/v1",
+  "version": "1.0.0"
+}

@@ -1,0 +1,19 @@
+{
+  "arch": "arm64",
+  "available_prerequisites": [
+    "python@3.14",
+    "social-cli@1",
+    "vault-index@1"
+  ],
+  "environment_id": "env:fixture-macos-arm64-adversarial",
+  "evaluation_time": "2026-07-24T00:00:00Z",
+  "installed_artifacts": [
+    "artifact:local-vault-summarizer"
+  ],
+  "network": "deny",
+  "os": "macos",
+  "runtimes": {
+    "python": "3.14"
+  },
+  "schema": "EnvironmentProfile/v1"
+}

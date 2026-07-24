@@ -1,0 +1,51 @@
+{
+  "$id": "https://kurult.ai/schemas/validation-result-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "artifact_id": {
+      "pattern": "^artifact:",
+      "type": "string"
+    },
+    "detail": {
+      "maxLength": 512,
+      "type": "string"
+    },
+    "digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "pattern": "^[a-z0-9_:-]+$",
+        "type": "string"
+      },
+      "maxItems": 8,
+      "type": "array"
+    },
+    "schema": {
+      "const": "ValidationResult/v1"
+    },
+    "snapshot_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "valid",
+        "invalid"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status"
+  ],
+  "title": "validation-result-v1",
+  "type": "object"
+}

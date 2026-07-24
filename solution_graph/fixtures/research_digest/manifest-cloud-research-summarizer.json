@@ -1,0 +1,69 @@
+{
+  "artifact_id": "artifact:cloud-research-summarizer",
+  "capabilities": [
+    {
+      "capability_id": "research.normalize.bookmarks",
+      "input_schema": "BookmarkExport/v1",
+      "output_schema": "ResearchCards/v1"
+    },
+    {
+      "capability_id": "research.synthesize.evidence-memo",
+      "input_schema": "ResearchCards/v1",
+      "output_schema": "EvidenceMemo/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+  "environment_constraints": {
+    "arch": "x86_64",
+    "os": "linux",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-linux-x86-research"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:bookmarks}",
+      "--output",
+      "{output:memo}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "permissive",
+  "network": {
+    "destinations": [
+      "research.example.invalid"
+    ],
+    "mode": "allowlist"
+  },
+  "permissions": [
+    "local-read",
+    "sandbox-local-write",
+    "external-effect"
+  ],
+  "prerequisites": [
+    "cloud-account@1"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 1,
+    "max_runtime_seconds": 180
+  },
+  "rollback": {
+    "mode": "not-applicable-external-service"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [
+    "RESEARCH_API_KEY"
+  ],
+  "source_refs": [
+    "source:fixture/research-digest/cloud-research-summarizer"
+  ],
+  "verifier_ref": "verifier:evidence-memo/v1",
+  "version": "1.0.0"
+}

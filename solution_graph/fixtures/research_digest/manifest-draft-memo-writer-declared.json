@@ -1,0 +1,59 @@
+{
+  "artifact_id": "artifact:draft-memo-writer-declared",
+  "capabilities": [
+    {
+      "capability_id": "research.synthesize.evidence-memo",
+      "input_schema": "ResearchCards/v1",
+      "output_schema": "DraftMemo/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+  "environment_constraints": {
+    "arch": "x86_64",
+    "os": "linux",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-linux-x86-research"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:cards}",
+      "--output",
+      "{output:memo}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "permissive",
+  "network": {
+    "destinations": [],
+    "mode": "deny"
+  },
+  "permissions": [
+    "local-read",
+    "sandbox-local-write"
+  ],
+  "prerequisites": [
+    "python@3.14"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0,
+    "max_runtime_seconds": 240
+  },
+  "rollback": {
+    "mode": "delete-staged-output"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [],
+  "source_refs": [
+    "source:fixture/research-digest/draft-memo-writer-declared"
+  ],
+  "verifier_ref": "verifier:draft-memo/v1",
+  "version": "1.0.0"
+}

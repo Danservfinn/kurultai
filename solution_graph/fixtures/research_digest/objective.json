@@ -1,0 +1,39 @@
+{
+  "assumptions": [
+    "Bookmark export is already present locally."
+  ],
+  "constraints": {
+    "license_allow": [
+      "permissive",
+      "internal-approved"
+    ],
+    "max_cost_usd": 0,
+    "max_permission_class": "sandbox-local-write",
+    "max_runtime_seconds": 900,
+    "network": "deny",
+    "network_allowlist": [],
+    "secret_policy": "none"
+  },
+  "inputs": [
+    {
+      "media_type": "application/ndjson",
+      "ref": "input:bookmarks",
+      "schema_ref": "BookmarkExport/v1",
+      "sensitivity": "public"
+    }
+  ],
+  "objective_id": "obj_public_bookmarks_to_evidence_memo",
+  "outcome": {
+    "description": "Normalize a public bookmark export into research cards and synthesize an evidence memo.",
+    "done_when": [
+      "verifier:evidence-memo/v1"
+    ],
+    "output_schema": "EvidenceMemo/v1"
+  },
+  "required_capabilities": [
+    "research.normalize.bookmarks",
+    "research.synthesize.evidence-memo"
+  ],
+  "schema": "ObjectiveSpec/v2",
+  "unresolved_unknowns": []
+}

@@ -12,6 +12,7 @@
       "type": "array"
     },
     "expires_at": {
+      "format": "date-time",
       "type": "string"
     },
     "grant_id": {

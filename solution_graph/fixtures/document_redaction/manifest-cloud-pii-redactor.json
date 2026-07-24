@@ -1,0 +1,63 @@
+{
+  "artifact_id": "artifact:cloud-pii-redactor",
+  "capabilities": [
+    {
+      "capability_id": "text.redact.pii",
+      "input_schema": "MarkdownDocument/v1",
+      "output_schema": "RedactedMarkdownBundle/v1"
+    }
+  ],
+  "description": "Structured fixture candidate.",
+  "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "environment_constraints": {
+    "arch": "arm64",
+    "os": "macos",
+    "runtimes": {
+      "python": "3.14"
+    }
+  },
+  "environments": [
+    "env:fixture-macos-arm64-redaction"
+  ],
+  "invocation": {
+    "adapter": "argv/v1",
+    "argv_template": [
+      "--input",
+      "{input:markdown_note}",
+      "--output",
+      "{output:redacted_bundle}"
+    ]
+  },
+  "known_failures": [],
+  "license_class": "permissive",
+  "network": {
+    "destinations": [
+      "pii.example.invalid"
+    ],
+    "mode": "allowlist"
+  },
+  "permissions": [
+    "local-read",
+    "sandbox-local-write"
+  ],
+  "prerequisites": [
+    "cloud-account@1"
+  ],
+  "publisher": "fixture-publisher",
+  "resource_estimate": {
+    "max_cost_usd": 0.2,
+    "max_runtime_seconds": 120
+  },
+  "rollback": {
+    "mode": "delete-staged-output"
+  },
+  "schema": "ArtifactManifest/v1",
+  "secret_slots": [
+    "PII_API_KEY"
+  ],
+  "source_refs": [
+    "source:fixture/document-redaction/cloud-pii-redactor"
+  ],
+  "verifier_ref": "verifier:redacted-markdown-bundle/v1",
+  "version": "1.0.0"
+}

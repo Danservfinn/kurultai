@@ -47,6 +47,7 @@
       "type": "array"
     },
     "expires_at": {
+      "format": "date-time",
       "type": "string"
     },
     "fixture_digest": {
@@ -64,6 +65,7 @@
       "type": "string"
     },
     "observed_at": {
+      "format": "date-time",
       "type": "string"
     },
     "result": {

@@ -1,0 +1,139 @@
+{
+  "$id": "https://kurult.ai/schemas/agent-context-packet-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authority": {
+      "const": "none"
+    },
+    "content_trust": {
+      "const": "untrusted-structured-data"
+    },
+    "failure_behavior": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "invocations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter": {
+            "const": "resolution-only/v1"
+          },
+          "argv_template": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0,
+            "type": "array"
+          },
+          "step_id": {
+            "pattern": "^step_[0-9]{4}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "adapter",
+          "argv_template"
+        ],
+        "type": "object"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "type": "array"
+    },
+    "plan_ref": {
+      "pattern": "^plan_[0-9a-f]{20}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "AgentContextPacket/v2"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/context_step"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "plan_ref",
+    "steps",
+    "invocations",
+    "failure_behavior",
+    "content_trust",
+    "authority"
+  ],
+  "title": "agent-context-packet-v2",
+  "type": "object",
+  "$defs": {
+    "context_step": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "capability_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9._-]+$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^step_[0-9]{4}$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "type": "array"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "input_schema": {
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*/v[0-9]+$",
+          "type": "string"
+        },
+        "output_schema": {
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*/v[0-9]+$",
+          "type": "string"
+        },
+        "step_id": {
+          "pattern": "^step_[0-9]{4}$",
+          "type": "string"
+        },
+        "verifier_ref": {
+          "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "artifact_id",
+        "version",
+        "digest",
+        "capability_ids",
+        "input_schema",
+        "output_schema",
+        "depends_on",
+        "verifier_ref"
+      ],
+      "type": "object"
+    }
+  }
+}

@@ -17,6 +17,7 @@
       "type": "string"
     },
     "evaluation_time": {
+      "format": "date-time",
       "type": "string"
     },
     "installed_artifacts": {

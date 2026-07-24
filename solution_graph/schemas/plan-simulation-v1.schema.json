@@ -1,0 +1,112 @@
+{
+  "$id": "https://kurult.ai/schemas/plan-simulation-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_invocation_count": {
+      "const": 0
+    },
+    "checks": {
+      "additionalProperties": false,
+      "properties": {
+        "dependency_closure": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "network_policy": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "permission_ceiling": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "plan_contract": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "plan_digest": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "resolution_replay": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "secret_slots": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "verifier_available": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_contract",
+        "plan_digest",
+        "resolution_replay",
+        "dependency_closure",
+        "network_policy",
+        "permission_ceiling",
+        "secret_slots",
+        "verifier_available"
+      ],
+      "type": "object"
+    },
+    "plan_digest": {
+      "oneOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema": {
+      "const": "PlanSimulation/v1"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "artifact_invocation_count",
+    "checks",
+    "plan_digest"
+  ],
+  "title": "plan-simulation-v1",
+  "type": "object"
+}

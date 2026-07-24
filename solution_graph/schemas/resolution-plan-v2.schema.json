@@ -1,0 +1,482 @@
+{
+  "$id": "https://kurult.ai/schemas/resolution-plan-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agent_context_packet": {
+      "$ref": "https://kurult.ai/schemas/agent-context-packet-v2.schema.json"
+    },
+    "alternatives": {
+      "items": {
+        "$ref": "#/$defs/artifact_record"
+      },
+      "maxItems": 128,
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    },
+    "composition_path": {
+      "items": {
+        "$ref": "#/$defs/path_step"
+      },
+      "maxItems": 8,
+      "type": "array"
+    },
+    "constraints_snapshot": {
+      "$ref": "https://kurult.ai/schemas/objective-spec-v2.schema.json#/$defs/constraints"
+    },
+    "eliminated_candidates": {
+      "items": {
+        "$ref": "#/$defs/eliminated_record"
+      },
+      "maxItems": 128,
+      "type": "array"
+    },
+    "environment_ref": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "environment_snapshot": {
+      "$ref": "#/$defs/environment_snapshot"
+    },
+    "network_plan": {
+      "$ref": "#/$defs/network_plan"
+    },
+    "objective_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "permission_union": {
+      "items": {
+        "enum": [
+          "read-only",
+          "local-read",
+          "sandbox-local-write",
+          "host-write",
+          "external-effect"
+        ],
+        "type": "string"
+      },
+      "maxItems": 5,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "plan_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^plan_[0-9a-f]{20}$",
+      "type": "string"
+    },
+    "policy_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "prerequisites": {
+      "items": {
+        "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._+-]+$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "reason_codes": {
+      "items": {
+        "pattern": "^[a-z0-9_:-]+$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "registry_snapshot": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "rollback": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "ResolutionPlan/v2"
+    },
+    "scoring_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "secret_slot_plan": {
+      "items": {
+        "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "selected_artifacts": {
+      "items": {
+        "$ref": "#/$defs/artifact_record"
+      },
+      "maxItems": 3,
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "resolved",
+        "no_admissible_plan",
+        "search_exhausted"
+      ],
+      "type": "string"
+    },
+    "unresolved_unknowns": {
+      "items": {
+        "maxLength": 512,
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array"
+    },
+    "verifier_dag": {
+      "items": {
+        "$ref": "#/$defs/verifier_step"
+      },
+      "maxItems": 8,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "plan_id",
+    "objective_digest",
+    "registry_snapshot",
+    "policy_version",
+    "scoring_version",
+    "environment_ref",
+    "environment_snapshot",
+    "constraints_snapshot",
+    "status",
+    "selected_artifacts",
+    "alternatives",
+    "eliminated_candidates",
+    "composition_path",
+    "permission_union",
+    "network_plan",
+    "secret_slot_plan",
+    "prerequisites",
+    "verifier_dag",
+    "rollback",
+    "assumptions",
+    "unresolved_unknowns",
+    "reason_codes",
+    "plan_digest"
+  ],
+  "title": "resolution-plan-v2",
+  "type": "object",
+  "$defs": {
+    "artifact_record": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "capabilities": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9._-]+$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "evidence_source_class": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "evidence_state": {
+          "enum": [
+            "unknown",
+            "declared",
+            "observed-pass",
+            "observed-fail",
+            "stale",
+            "conflicted",
+            "revoked"
+          ],
+          "type": "string"
+        },
+        "rank": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version",
+        "digest",
+        "evidence_source_class",
+        "evidence_state",
+        "rank",
+        "capabilities"
+      ],
+      "type": "object"
+    },
+    "eliminated_record": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "evidence_source_class": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "evidence_state": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "pattern": "^[a-z0-9_:-]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "version",
+        "reason_codes",
+        "evidence_state",
+        "evidence_source_class"
+      ],
+      "type": "object"
+    },
+    "environment_snapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "available_prerequisites": {
+          "items": {
+            "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._+-]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "os": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "runtimes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "digest",
+        "os",
+        "arch",
+        "runtimes",
+        "available_prerequisites"
+      ],
+      "type": "object"
+    },
+    "network_plan": {
+      "additionalProperties": false,
+      "properties": {
+        "destinations": {
+          "items": {
+            "pattern": "^[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mode": {
+          "enum": [
+            "deny",
+            "allowlist"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "destinations"
+      ],
+      "type": "object"
+    },
+    "path_step": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "capability_ids": {
+          "items": {
+            "pattern": "^[a-z0-9][a-z0-9._-]+$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^step_[0-9]{4}$",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "type": "array"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "evidence_source_class": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "evidence_state": {
+          "enum": [
+            "unknown",
+            "declared",
+            "observed-pass",
+            "observed-fail",
+            "stale",
+            "conflicted",
+            "revoked"
+          ],
+          "type": "string"
+        },
+        "input_schema": {
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*/v[0-9]+$",
+          "type": "string"
+        },
+        "observation_ids": {
+          "items": {
+            "pattern": "^obs_[A-Za-z0-9_-]+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "output_schema": {
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*/v[0-9]+$",
+          "type": "string"
+        },
+        "step_id": {
+          "pattern": "^step_[0-9]{4}$",
+          "type": "string"
+        },
+        "verifier_ref": {
+          "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "artifact_id",
+        "version",
+        "digest",
+        "capability_ids",
+        "input_schema",
+        "output_schema",
+        "depends_on",
+        "verifier_ref",
+        "evidence_state",
+        "evidence_source_class",
+        "evidence_refs",
+        "observation_ids"
+      ],
+      "type": "object"
+    },
+    "verifier_step": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^artifact:",
+          "type": "string"
+        },
+        "step": {
+          "const": "verify-output"
+        },
+        "step_id": {
+          "pattern": "^step_[0-9]{4}$",
+          "type": "string"
+        },
+        "verifier_ref": {
+          "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._/@:+-]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step",
+        "step_id",
+        "artifact_id",
+        "verifier_ref"
+      ],
+      "type": "object"
+    }
+  }
+}

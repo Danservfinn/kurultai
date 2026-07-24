@@ -1,0 +1,37 @@
+{
+  "assumptions": [
+    "The input is a single Markdown note."
+  ],
+  "constraints": {
+    "license_allow": [
+      "permissive",
+      "internal-approved"
+    ],
+    "max_cost_usd": 0,
+    "max_permission_class": "sandbox-local-write",
+    "max_runtime_seconds": 300,
+    "network": "deny",
+    "network_allowlist": [],
+    "secret_policy": "none"
+  },
+  "inputs": [
+    {
+      "media_type": "text/markdown",
+      "ref": "input:markdown_note",
+      "sensitivity": "private"
+    }
+  ],
+  "objective_id": "obj_private_markdown_redaction",
+  "outcome": {
+    "description": "Produce a redacted Markdown bundle from one private note.",
+    "done_when": [
+      "verifier:redacted-markdown-bundle/v1"
+    ],
+    "output_schema": "RedactedMarkdownBundle/v1"
+  },
+  "required_capabilities": [
+    "text.redact.pii"
+  ],
+  "schema": "ObjectiveSpec/v1",
+  "unresolved_unknowns": []
+}
