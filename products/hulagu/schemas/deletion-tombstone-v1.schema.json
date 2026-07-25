@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/deletion-tombstone-v1.schema.json",
+  "title": "DeletionTombstone/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subject_digest", "key_id", "deleted_at", "expires_at"],
+  "properties": {
+    "schema_version": {"const": "DeletionTombstone/v1"},
+    "subject_digest": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "key_id": {"type":"string","minLength":1,"maxLength":64},
+    "deleted_at": {"type":"string","format":"date-time"},
+    "expires_at": {"type":"string","format":"date-time"}
+  },
+  "examples": [{"schema_version":"DeletionTombstone/v1","subject_digest":"0000000000000000000000000000000000000000000000000000000000000000","key_id":"synthetic-subject-v1","deleted_at":"2030-01-01T00:00:00Z","expires_at":"2031-01-01T00:00:00Z"}]
+}

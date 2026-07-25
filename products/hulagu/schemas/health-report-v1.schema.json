@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/health-report-v1.schema.json",
+  "title": "HealthReport/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mode", "checks", "runtime", "mutation_performed"],
+  "properties": {
+    "schema_version": {"const":"health-report/v1"},
+    "mode": {"const":"observation_only"},
+    "checks": {"type":"object","additionalProperties":{"type":"object","additionalProperties":false,"required":["status","reasons"],"properties":{"status":{"enum":["pass","fail","not_evaluated"]},"reasons":{"type":"array","items":{"type":"string"}}}}},
+    "runtime": {"type":"object","additionalProperties":false,"required":["postgresql","container"],"properties":{"postgresql":{"const":"not_evaluated"},"container":{"const":"not_evaluated"}}},
+    "mutation_performed": {"const":false}
+  },
+  "examples": [{"schema_version":"health-report/v1","mode":"observation_only","checks":{"vault":{"status":"pass","reasons":[]}},"runtime":{"postgresql":"not_evaluated","container":"not_evaluated"},"mutation_performed":false}]
+}

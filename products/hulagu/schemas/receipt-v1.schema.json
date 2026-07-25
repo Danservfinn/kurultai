@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/receipt-v1.schema.json",
+  "title": "Receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "event_class", "occurred_at", "outcome", "correlation_id"],
+  "properties": {
+    "schema_version": {"const":"Receipt/v1"},
+    "receipt_id": {"type":"string","format":"uuid"},
+    "event_class": {"type":"string","pattern":"^[a-z][a-z0-9_]{1,63}$"},
+    "occurred_at": {"type":"string","format":"date-time"},
+    "outcome": {"enum":["succeeded","failed","delivery_unknown","not_evaluated"]},
+    "correlation_id": {"type":"string","minLength":1,"maxLength":128}
+  },
+  "examples": [{"schema_version":"Receipt/v1","receipt_id":"00000000-0000-4000-8000-000000000008","event_class":"synthetic_check","occurred_at":"2030-01-01T00:00:00Z","outcome":"not_evaluated","correlation_id":"synthetic-001"}]
+}

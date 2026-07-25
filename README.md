@@ -547,11 +547,16 @@ config/runtime-config/      sanitized runtime templates and manifests
 agents/                    installer-agent prompts and operating contracts
 brain/                      public Brain/wiki schema and page templates
 profiles/                   public profile role templates
+products/hulagu/            Hulagu source-only product contracts
+docs/architecture/hulagu.md Hulagu source/runtime/data home architecture
+docs/adr/                   architecture decision records
 docs/operations/            rebuild runbooks and fresh-install prompt
 docs/assets/readme/         README diagrams
 scripts/                    installer, manifest export, and rebuild staging helpers
 tests/                      public hygiene and retrieval-eval tests
 ```
+
+Hulagu starts at the [source/runtime/data-home architecture](docs/architecture/hulagu.md) and the [dedicated Telegram control-plane ADR](docs/adr/2026-07-25-hulagu-dedicated-telegram-control-plane.md).
 
 ## Development
 

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/telegram-update-v1.schema.json",
+  "title": "TelegramUpdate/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "bot_id", "update_id", "actor_id", "chat_id", "chat_type", "message_kind"],
+  "properties": {
+    "schema_version": {"const":"TelegramUpdate/v1"},
+    "bot_id": {"type":"integer","minimum":1},
+    "update_id": {"type":"integer","minimum":0},
+    "actor_id": {"type":"integer","minimum":1},
+    "chat_id": {"type":"integer","minimum":1},
+    "chat_type": {"const":"private"},
+    "message_kind": {"enum":["command","text","document","callback"]},
+    "text": {"type":"string","maxLength":4096}
+  },
+  "examples": [{"schema_version":"TelegramUpdate/v1","bot_id":100000001,"update_id":1,"actor_id":200000001,"chat_id":200000001,"chat_type":"private","message_kind":"command","text":"/start"}]
+}

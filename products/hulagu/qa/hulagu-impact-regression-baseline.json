@@ -1,0 +1,154 @@
+{
+  "schema_version": "hulagu-impact-regression-baseline/v1",
+  "generated_at": "2026-07-25T00:00:00Z",
+  "source_repository": {
+    "path": "/Users/kublai/kurultai/kurultai-repo",
+    "commit": "c10e2bdc0374cc00bc8faf82b23f67933226d670",
+    "clean_worktree_proof": {
+      "command": "git status --porcelain=v1",
+      "observed_line_count": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "clean_at_baseline"
+    }
+  },
+  "root_test": {
+    "command": "/opt/homebrew/bin/python3 -m pytest tests/ -q",
+    "status": "pass",
+    "passed": 67,
+    "failed": 0,
+    "per_test_outcome_encoding": "sorted pytest nodeid, TAB, passed, LF",
+    "per_test_outcome_sha256": "9da0d8c3fae4856d421c0a5f0d50ef411ca556715a24a4d17d7b5493864ded7b"
+  },
+  "hulagu_test_commands": [
+    {
+      "command": "uv run pytest tests/contract tests/integration/test_vault_preflight.py -vv",
+      "status": "not_present"
+    },
+    {
+      "command": "uv run pytest tests/integration/test_container_mount_probe.py -vv",
+      "status": "not_present"
+    }
+  ],
+  "qa_tracker": {
+    "path": "/Users/kublai/brain/docs/qa/kurultai-system-feature-status.csv",
+    "tracker_sha256": "4fe11fed6d97bd6ece1b89d4e3ea2729a092d531dd68912b133d5b214cc04637",
+    "selection_rule": "Only direct rows covering existing Hermes gateway ownership/launchd, Brain public/private surfaces, vault storage, launchd inventory, and secret exposure.",
+    "selected_rows": [
+      {
+        "id": "SYS-001",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-system-surface-coverage.json",
+        "evidence_sha256": "f6d774ac3a57341f884e73ef80619067f6dcba1798542b196096c113c0d4aae0",
+        "accountable_owner": "Kublai scope/routing owner",
+        "required_g3_status": "PASS"
+      },
+      {
+        "id": "SYS-004",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-disk-remediation-dry-run.json",
+        "evidence_sha256": "62bd9e2ad245751a2b411e29c5f558e9c855933a0a661a1787c92e8659b9016e",
+        "accountable_owner": "storage implementation owner",
+        "required_g3_status": "PASS"
+      },
+      {
+        "id": "HERMES-003",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-hermes-gateway-topology.json",
+        "evidence_sha256": "3c811d03ee594020ace5a058227fd084fdedf7caaa97dbb81e45e17bbe9264aa",
+        "accountable_owner": "Kublai scope/routing owner",
+        "required_g3_status": "PASS"
+      },
+      {
+        "id": "HERMES-004",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-hermes-gateway-topology.json",
+        "evidence_sha256": "3c811d03ee594020ace5a058227fd084fdedf7caaa97dbb81e45e17bbe9264aa",
+        "accountable_owner": "Kublai scope/routing owner",
+        "required_g3_status": "PASS"
+      },
+      {
+        "id": "BRAIN-001",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-brain-reconciliation.json",
+        "evidence_sha256": "2b4cb97d0aa30fa345929df701257cd3006ef32fbee63d36bf414c626978d503",
+        "accountable_owner": "Brain boundary owner",
+        "required_g3_status": "PASS"
+      },
+      {
+        "id": "BRAIN-004",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-brain-reconciliation.json",
+        "evidence_sha256": "2b4cb97d0aa30fa345929df701257cd3006ef32fbee63d36bf414c626978d503",
+        "accountable_owner": "Brain boundary owner",
+        "required_g3_status": "PASS"
+      },
+      {
+        "id": "SEC-003",
+        "status": "PASS",
+        "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-secret-exposure.json",
+        "evidence_sha256": "2170f7ebfb50119caac7668ee0412ad028abc7850fa6b9d3ecf7d19109f519da",
+        "accountable_owner": "security implementation owner",
+        "required_g3_status": "PASS"
+      }
+    ],
+    "coverage_gaps": [
+      {
+        "surface": "native PostgreSQL",
+        "status": "not_evaluated",
+        "reason": "canonical tracker has no direct native-PostgreSQL row; G2/G3 proof required"
+      },
+      {
+        "surface": "Colima/container runtime",
+        "status": "not_evaluated",
+        "reason": "canonical tracker has no direct Colima/container row; G2/G3 proof required"
+      },
+      {
+        "surface": "backup/restore",
+        "status": "not_evaluated",
+        "reason": "canonical tracker has no direct backup/restore row; G3 proof required"
+      },
+      {
+        "surface": "Hulagu-dedicated Telegram ownership",
+        "status": "not_evaluated",
+        "reason": "existing Hermes rows cover current gateway only; dedicated bot proof is G4"
+      }
+    ]
+  },
+  "plan_gate": {
+    "gate": "G1",
+    "canonical_plan_path": "/Users/kublai/brain/docs/plans/2026-07-25-kublai-hulagu-job-search-agent-implementation-plan-v3.md",
+    "plan_sha256": "07e885de133fc742d33b8a2f8bae25ce25d1d0da5c5efbbaf0d56f38bb3a0ac9",
+    "brain_commit": "96e42974b105a60e401a0f7ab7f7843f466d12ed",
+    "g0_record": {
+      "status": "verified_existing_record",
+      "retroactive_approval": false
+    },
+    "independent_receipt": {
+      "path": "/Users/kublai/brain/docs/plans/reviews/2026-07-25-kublai-hulagu-job-search-agent-v3-freeze-receipt.md",
+      "sha256": "5f8fb719039880cbe8d71f448c55796d11536d4b717e17bbb4ce1b12b1e2a6cc",
+      "reviewer_identity": "Hermes Agent focused subagent; 2026-07-25T15:13:03Z",
+      "verdict": "APPROVE_FOR_G0",
+      "reviewer_role": "independent_reviewer",
+      "implementation_role": "implementation_author",
+      "independent_of_plan_author": true
+    },
+    "proof_debt": [
+      {"item": "vault/APFS write and identity proof", "owner": "storage implementation owner", "closure_gate": "G2/G3"},
+      {"item": "native PostgreSQL topology and restore", "owner": "database implementation owner", "closure_gate": "G2/G3"},
+      {"item": "absolute container executable/socket and effective sandbox", "owner": "runner implementation owner", "closure_gate": "G2/G3"},
+      {"item": "Keychain reader separation and rotation", "owner": "security implementation owner", "closure_gate": "G3"},
+      {"item": "dedicated Telegram identity/token", "owner": "product owner", "closure_gate": "G4"},
+      {"item": "backup destination and retention", "owner": "human owner with security reviewer", "closure_gate": "G3/G5"}
+    ],
+    "waived_safety_failures": []
+  },
+  "generation": {
+    "command": "git -C /Users/kublai/kurultai/kurultai-repo status --porcelain=v1; /opt/homebrew/bin/python3 -m pytest tests/ -q; shasum -a 256 /Users/kublai/brain/docs/qa/kurultai-system-feature-status.csv /Users/kublai/brain/docs/qa/kurultai-system-surface-coverage.json /Users/kublai/brain/docs/qa/kurultai-disk-remediation-dry-run.json /Users/kublai/brain/docs/qa/kurultai-hermes-gateway-topology.json /Users/kublai/brain/docs/qa/kurultai-brain-reconciliation.json /Users/kublai/brain/docs/qa/kurultai-secret-exposure.json",
+    "version": "hulagu-task0-baseline-generator/v1",
+    "independent_verifier_identity": {
+      "role": "non_author_task0_spec_reviewer",
+      "status": "request_changes_issued",
+      "identity": "delegation:deleg_29b20c77"
+    }
+  }
+}

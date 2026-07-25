@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/search-plan-v1.schema.json",
+  "title": "SearchPlan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "profile_version", "queries", "budgets"],
+  "properties": {
+    "schema_version": {"const":"SearchPlan/v1"},
+    "run_id": {"type":"string","format":"uuid"},
+    "profile_version": {"type":"integer","minimum":1},
+    "queries": {"type":"array","minItems":1,"maxItems":20,"items":{"type":"string","minLength":1,"maxLength":500}},
+    "budgets": {"type":"object","additionalProperties":false,"required":["provider_requests","results","wall_seconds"],"properties":{"provider_requests":{"type":"integer","minimum":1,"maximum":100},"results":{"type":"integer","minimum":1,"maximum":1000},"wall_seconds":{"type":"integer","minimum":1,"maximum":3600}}}
+  },
+  "examples": [{"schema_version":"SearchPlan/v1","run_id":"00000000-0000-4000-8000-000000000009","profile_version":1,"queries":["synthetic engineer remote"],"budgets":{"provider_requests":2,"results":20,"wall_seconds":60}}]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/wiki-manifest-v1.schema.json",
+  "title": "WikiManifest/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generation_id", "created_at", "files"],
+  "properties": {
+    "schema_version": {"const":"WikiManifest/v1"},
+    "generation_id": {"type":"string","format":"uuid"},
+    "created_at": {"type":"string","format":"date-time"},
+    "files": {"type":"array","minItems":1,"maxItems":1000,"items":{"type":"object","additionalProperties":false,"required":["name","sha256","bytes"],"properties":{"name":{"type":"string","pattern":"^[A-Za-z0-9._-]+\\.md$"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},"bytes":{"type":"integer","minimum":0,"maximum":10485760}}}}
+  },
+  "examples": [{"schema_version":"WikiManifest/v1","generation_id":"00000000-0000-4000-8000-000000000010","created_at":"2030-01-01T00:00:00Z","files":[{"name":"index.md","sha256":"0000000000000000000000000000000000000000000000000000000000000000","bytes":64}]}]
+}

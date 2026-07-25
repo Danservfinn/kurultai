@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/durable-event-v1.schema.json",
+  "title": "DurableEvent/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "aggregate_id", "event_type", "occurred_at", "payload"],
+  "properties": {
+    "schema_version": {"const":"DurableEvent/v1"},
+    "event_id": {"type":"string","format":"uuid"},
+    "aggregate_id": {"type":"string","format":"uuid"},
+    "event_type": {"type":"string","pattern":"^[a-z][a-z0-9_]{1,63}$"},
+    "occurred_at": {"type":"string","format":"date-time"},
+    "payload": {"type":"object","maxProperties":32,"additionalProperties":{"type":["string","number","integer","boolean","null"]}}
+  },
+  "examples": [{"schema_version":"DurableEvent/v1","event_id":"00000000-0000-4000-8000-000000000005","aggregate_id":"00000000-0000-4000-8000-000000000006","event_type":"synthetic_created","occurred_at":"2030-01-01T00:00:00Z","payload":{"fixture":true}}]
+}

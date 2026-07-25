@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/provider-response-v1.schema.json",
+  "title": "ProviderResponse/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "provider", "outcome", "results", "charged_units"],
+  "properties": {
+    "schema_version": {"const":"ProviderResponse/v1"},
+    "request_id": {"type":"string","format":"uuid"},
+    "provider": {"type":"string","pattern":"^[a-z0-9_-]{1,64}$"},
+    "outcome": {"enum":["succeeded","failed","delivery_unknown"]},
+    "results": {"type":"array","maxItems":100,"items":{"type":"object","additionalProperties":false,"required":["title","url","snippet"],"properties":{"title":{"type":"string","maxLength":200},"url":{"type":"string","format":"uri","maxLength":2048},"snippet":{"type":"string","maxLength":2000}}}},
+    "charged_units": {"type":"integer","minimum":0,"maximum":10000}
+  },
+  "examples": [{"schema_version":"ProviderResponse/v1","request_id":"00000000-0000-4000-8000-000000000007","provider":"synthetic_fixture","outcome":"succeeded","results":[{"title":"Synthetic role","url":"https://example.invalid/jobs/1","snippet":"fixture only"}],"charged_units":1}]
+}

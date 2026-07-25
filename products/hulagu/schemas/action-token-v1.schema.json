@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kurultai.local/hulagu/action-token-v1.schema.json",
+  "title": "ActionToken/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action_id", "action", "nonce", "expires_at", "key_id", "signature"],
+  "properties": {
+    "schema_version": {"const": "ActionToken/v1"},
+    "action_id": {"type": "string", "format": "uuid"},
+    "action": {"enum": ["consent", "confirm_profile", "pause", "resume", "cancel", "delete"]},
+    "nonce": {"type": "string", "minLength": 16, "maxLength": 128},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "key_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "signature": {"type": "string", "minLength": 32, "maxLength": 256}
+  },
+  "examples": [{"schema_version":"ActionToken/v1","action_id":"00000000-0000-4000-8000-000000000001","action":"consent","nonce":"synthetic-nonce-0001","expires_at":"2030-01-01T00:00:00Z","key_id":"synthetic-v1","signature":"synthetic-signature-not-a-secret-0001"}]
+}
