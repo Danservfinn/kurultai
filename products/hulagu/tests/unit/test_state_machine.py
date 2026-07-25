@@ -159,6 +159,18 @@ def test_profile_confirmation_rejects_legacy_three_field_subset() -> None:
     assert REQUIRED_PROFILE_FIELD_IDS - set(unchanged.profile_answers)
 
 
+def test_repeated_profile_after_confirmation_is_idempotent() -> None:
+    state = CustomerState.initial()
+    for event in ["start", "consent", "profile", "profile"]:
+        state = _apply_symbolic_event(state, event)
+
+    repeated, result = confirm_profile(state)
+
+    assert result.code == "profile_already_confirmed"
+    assert repeated == state
+    assert state.profile_status is ProfileStatus.CONFIRMED
+
+
 def test_pause_resume_before_any_run_returns_no_active_run() -> None:
     confirmed, _ = confirm_profile(_answered_required(_consented_state()))
 
@@ -322,6 +334,8 @@ def _apply_symbolic_event(state: CustomerState, event: str) -> CustomerState:
     if event == "consent":
         return consent(state, notice_version="v1", action_nonce="n1")[0]
     if event == "profile" and state.tenant_created and not state.deleted:
+        if state.profile_status is ProfileStatus.CONFIRMED:
+            return confirm_profile(state)[0]
         return confirm_profile(_answered_required(state))[0]
     if event == "search":
         return request_search(state, run_id="run-1")[0]

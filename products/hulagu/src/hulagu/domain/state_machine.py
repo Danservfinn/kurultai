@@ -268,6 +268,8 @@ def skip_question(state: CustomerState, question_id: str) -> tuple[CustomerState
 def confirm_profile(state: CustomerState) -> tuple[CustomerState, TransitionResult]:
     if state.deleted or not state.tenant_created:
         return _unchanged(state, "tenant_required")
+    if state.profile_status is ProfileStatus.CONFIRMED:
+        return _unchanged(state, "profile_already_confirmed")
     missing = required_question_ids() - set(state.profile_answers)
     if state.cv_document_id is None:
         missing = missing | frozenset({"cv_document"})

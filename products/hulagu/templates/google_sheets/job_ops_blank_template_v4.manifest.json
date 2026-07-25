@@ -1,0 +1,51 @@
+{
+  "allowed_write_set": [
+    "Create a blank tenant spreadsheet from this header-only template.",
+    "Populate only server-derived tenant candidate/result fields after tenant-principal checks.",
+    "Share only to the customer-confirmed Google account after readback gates pass.",
+    "Write redacted receipts under the tenant root and approved aggregate operator projection."
+  ],
+  "canonical_reference_spreadsheet_id": "1-mLmR6UfYp9F8Ks6gT4ob_sf0JVuesIM7YaU5y2nGEs",
+  "created_utc": "2026-07-25T00:00:00Z",
+  "derivation_mode": "domain-structural only; no live cell, sheet, ACL, formula, note, comment, hidden-sheet, named-range, history, or file metadata read/copy",
+  "schema_version": "hulagu.google_sheets_blank_template_manifest.v4",
+  "sheet_contract": {
+    "blank_template_columns": [
+      "candidate_id",
+      "tenant_local_sequence",
+      "candidate_status",
+      "role_title",
+      "company_name",
+      "location_text",
+      "remote_policy",
+      "employment_type",
+      "compensation_public_text",
+      "source_name",
+      "source_url",
+      "source_retrieved_at",
+      "fit_score_bucket",
+      "fit_rationale_public_facts",
+      "customer_action",
+      "customer_note",
+      "last_synced_at",
+      "row_version"
+    ],
+    "forbidden_template_contents": [
+      "live rows",
+      "comments",
+      "notes",
+      "hidden sheets",
+      "formulas",
+      "named ranges",
+      "private values",
+      "ACLs",
+      "revision history",
+      "Drive metadata copied from canonical spreadsheet"
+    ],
+    "one_google_spreadsheet_per_tenant": true,
+    "one_primary_sheet_tab_per_tenant": true,
+    "tab_name_pattern": "Job Ops - <tenant_display_alias>"
+  },
+  "template_artifact": "products/hulagu/templates/google_sheets/job_ops_blank_template_v4.csv",
+  "template_sha256": "bf7f0ad57a3cccf4c019c32d31961aa970d57085970f62bdfc67a5f6e59e38e5"
+}
