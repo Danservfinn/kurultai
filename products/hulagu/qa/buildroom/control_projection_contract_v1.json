@@ -1,0 +1,32 @@
+{
+  "allowed_fields": [
+    "gate_id",
+    "gate_state",
+    "evidence_digest",
+    "proof_debt_id",
+    "stop_state",
+    "data_admission_state",
+    "projection_freshness",
+    "policy_id"
+  ],
+  "authority": "machine_policy_only",
+  "dispatch_allowed": false,
+  "forbidden_fields": [
+    "tenant_uuid",
+    "cv_text",
+    "profile_answer",
+    "draft_text",
+    "destination_id",
+    "chat_payload",
+    "session_id",
+    "message_id"
+  ],
+  "gate_id": "G0",
+  "implementation_authorized": false,
+  "implementation_state": "NOT_IMPLEMENTED_FAIL_CLOSED",
+  "policy_admission_sha256": null,
+  "policy_id": "hulagu.autonomous-authority.v1",
+  "requires_policy_admission": true,
+  "schema_version": "hulagu-control-projection-contract-v2",
+  "source_plan_sha256": "6e33bfd952e34b6578f2118c5592128bd40db5a72d8b0e37eac27b85633e8a19"
+}

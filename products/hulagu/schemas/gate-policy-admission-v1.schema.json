@@ -1,0 +1,130 @@
+{
+  "$id": "https://kurult.ai/schemas/gate-policy-admission-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "base_commit": "2f10cb9351cfae554a74e98ee6894240670b5275",
+      "base_tree": "1b86294560ff700f83657c3f18f05bff153da084",
+      "candidate_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "decision": "ADMIT",
+      "decision_id": "hulagu.G0.example.v1",
+      "expires_at": "2026-07-26T20:00:00Z",
+      "gate_id": "G0",
+      "independent_review_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "independent_verifier_identity": "agent:claude-code:verifier:v1",
+      "issued_at": "2026-07-26T19:00:00Z",
+      "nonce": "33333333333333333333333333333333",
+      "policy_compiler_identity": "service:hulagu-policy-compiler:v1",
+      "policy_id": "hulagu.autonomous-authority.v1",
+      "predicate_results": {
+        "base_commit_exact": true
+      },
+      "prior_closure_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "producer_identity": "agent:kublai:producer:v1",
+      "requested_surfaces": [],
+      "schema_version": "hulagu-gate-policy-admission-v1"
+    }
+  ],
+  "properties": {
+    "base_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "base_tree": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "candidate_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "ADMIT",
+        "DENY"
+      ]
+    },
+    "decision_id": {
+      "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "gate_id": {
+      "pattern": "^G(?:0|1|2|3A|3B|3C|3D|3E|4|5|6|7|8|9|10|11)$",
+      "type": "string"
+    },
+    "independent_review_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "independent_verifier_identity": {
+      "minLength": 8,
+      "type": "string"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "nonce": {
+      "pattern": "^[0-9a-f]{32,64}$",
+      "type": "string"
+    },
+    "policy_compiler_identity": {
+      "const": "service:hulagu-policy-compiler:v1"
+    },
+    "policy_id": {
+      "const": "hulagu.autonomous-authority.v1"
+    },
+    "predicate_results": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "prior_closure_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "producer_identity": {
+      "minLength": 8,
+      "type": "string"
+    },
+    "requested_surfaces": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema_version": {
+      "const": "hulagu-gate-policy-admission-v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "decision_id",
+    "gate_id",
+    "policy_id",
+    "candidate_manifest_sha256",
+    "independent_review_sha256",
+    "base_commit",
+    "base_tree",
+    "prior_closure_sha256",
+    "producer_identity",
+    "independent_verifier_identity",
+    "policy_compiler_identity",
+    "issued_at",
+    "expires_at",
+    "nonce",
+    "decision",
+    "predicate_results",
+    "requested_surfaces"
+  ],
+  "title": "Hulagu machine-policy admission v1",
+  "type": "object"
+}

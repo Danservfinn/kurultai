@@ -1,0 +1,30 @@
+{
+  "added_count": 19,
+  "base_count": 98,
+  "expected_total": 117,
+  "removed_count": 0,
+  "schema_nodes": [
+    "products/hulagu/tests/contract/test_schema_examples.py::test_schema_embedded_examples_validate[gate-evidence-v1.schema.json]",
+    "products/hulagu/tests/contract/test_schema_examples.py::test_schema_embedded_examples_validate[gate-policy-admission-v1.schema.json]",
+    "products/hulagu/tests/contract/test_schema_examples.py::test_schema_embedded_examples_validate[pilot-consent-v1.schema.json]"
+  ],
+  "schema_version": "hulagu-g0-test-node-delta-v2",
+  "successor_nodes": [
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_plan_copy_matches_autonomy_freeze",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_source_inventory_is_closed_and_tree_bound",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_predecessor_authority_map_is_total",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_predecessor_baseline_dispositions_are_total",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_named_identities_are_distinct",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_g0_allowed_write_set_is_exact",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_policy_admission_precedes_mutation",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_policy_compiler_denies_invalid_evidence",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_payload_and_evidence_commits_are_acyclic",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_protected_ref_reproduces_in_clean_clone",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_g0_static_control_room_projection_fails_closed",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_historical_v3_authority_bytes_are_unchanged",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_g0_chain_rejects_any_mutated_byte",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_permanent_forbidden_surfaces_are_global",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_pilot_consent_never_auto_invites",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py::test_g1_g11_controller_contract_is_policy_bound"
+  ]
+}

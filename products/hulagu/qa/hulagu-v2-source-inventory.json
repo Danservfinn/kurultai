@@ -1,0 +1,1002 @@
+{
+  "autonomous_authority_policy_id": "hulagu.autonomous-authority.v1",
+  "base_commit": "2f10cb9351cfae554a74e98ee6894240670b5275",
+  "base_tree": "1b86294560ff700f83657c3f18f05bff153da084",
+  "canonical_plan": {
+    "path": "/Users/kublai/brain/docs/plans/2026-07-25-hulagu-full-hermes-instance-v2-revised-plan.md",
+    "sha256": "6e33bfd952e34b6578f2118c5592128bd40db5a72d8b0e37eac27b85633e8a19"
+  },
+  "closed_world": true,
+  "historical_correction_overlay_preserved": true,
+  "normative_sources": [
+    {
+      "disposition": "PRESERVED",
+      "implementation_gate": "G0",
+      "negative_test_id": "test_source_inventory_is_closed_and_tree_bound",
+      "path": "docs/architecture/hulagu.md",
+      "successor_section": "2/4/5/19"
+    },
+    {
+      "disposition": "PRESERVED_AS_HISTORICAL",
+      "implementation_gate": "G0",
+      "negative_test_id": "test_historical_v3_authority_bytes_are_unchanged",
+      "path": "docs/hulagu/THREAT-MODEL.md",
+      "successor_section": "successor THREAT-MODEL-v2"
+    },
+    {
+      "disposition": "STRENGTHENED",
+      "implementation_gate": "G0",
+      "negative_test_id": "test_predecessor_authority_map_is_total",
+      "path": "docs/adr/2026-07-25-hulagu-dedicated-brain-hard-tenant-isolation.md",
+      "successor_section": "successor ADR incorporation clause"
+    },
+    {
+      "disposition": "PRESERVED",
+      "implementation_gate": "G8",
+      "negative_test_id": "test_predecessor_authority_map_is_total",
+      "path": "docs/adr/2026-07-25-hulagu-v4-google-sheets-deliverable-amendment.md",
+      "successor_section": "Sections 8/10/G8"
+    },
+    {
+      "disposition": "PRESERVED_AS_V3_BASELINE",
+      "implementation_gate": "G0",
+      "negative_test_id": "test_predecessor_baseline_dispositions_are_total",
+      "path": "products/hulagu/qa/hulagu-impact-regression-baseline.json",
+      "successor_section": "Section 2 predecessor baseline"
+    }
+  ],
+  "payload_paths": [
+    "docs/plans/2026-07-25-hulagu-full-hermes-instance-v2-revised-plan.md",
+    "docs/adr/2026-07-25-hulagu-full-hermes-brokered-capsules.md",
+    "docs/hulagu/THREAT-MODEL-v2.md",
+    "products/hulagu/README.md",
+    "products/hulagu/qa/hulagu-v2-source-inventory.json",
+    "products/hulagu/qa/hulagu-v2-predecessor-authority-map.json",
+    "products/hulagu/qa/hulagu-v2-impact-regression-baseline.json",
+    "products/hulagu/qa/buildroom/control_projection_contract_v1.json",
+    "products/hulagu/qa/g0-predecessor-test-nodes-v1.json",
+    "products/hulagu/qa/g0-test-node-delta-v1.json",
+    "products/hulagu/qa/g0-identity-map-v1.json",
+    "products/hulagu/gates/registry.yaml",
+    "products/hulagu/gates/allowed-write-sets/G0.yaml",
+    "products/hulagu/policies/autonomous-authority-v1.json",
+    "products/hulagu/schemas/gate-evidence-v1.schema.json",
+    "products/hulagu/schemas/gate-policy-admission-v1.schema.json",
+    "products/hulagu/schemas/pilot-consent-v1.schema.json",
+    "products/hulagu/src/hulagu/__init__.py",
+    "products/hulagu/deploy/scripts/gates/compile_gate_policy_admission.py",
+    "products/hulagu/deploy/scripts/gates/verify_g0_successor_freeze.py",
+    "products/hulagu/tests/gates/test_g0_successor_freeze.py",
+    "products/hulagu/tests/contract/test_schema_examples.py",
+    ".github/workflows/hulagu-v2-gate.yml"
+  ],
+  "repository_plan_copy": {
+    "path": "docs/plans/2026-07-25-hulagu-full-hermes-instance-v2-revised-plan.md",
+    "sha256": "6e33bfd952e34b6578f2118c5592128bd40db5a72d8b0e37eac27b85633e8a19"
+  },
+  "schema_version": "hulagu-v2-autonomous-source-inventory-v2",
+  "tracked_file_count_at_base": 184,
+  "tracked_files": [
+    {
+      "git_object": "a52825e12c9f1767de201b5560edb79a4874d101",
+      "path": ".github/workflows/validate.yml",
+      "sha256": "80306572fa6eb9b0c9907acb1a2621fab56b7296da95f1a08064c9b41dee5773"
+    },
+    {
+      "git_object": "0102692461e5943e6dc527e92527ca00d7b5bfc5",
+      "path": ".gitignore",
+      "sha256": "9e03e4c281a21f243b3316217fcb1d40bb2a48b23d6a1b16becc67e5a974e19e"
+    },
+    {
+      "git_object": "4dd982e24ed2efc8ebe6b54a4c1807cd903a487b",
+      "path": "CONTRIBUTING.md",
+      "sha256": "fd5dbe0a214befc9d3dfa01030e71a4914ecc4e80e8ca00f957b5dfcee4314e6"
+    },
+    {
+      "git_object": "84fd54a0c2a2eec3ca0fb4b95400c0f306eceda0",
+      "path": "LICENSE",
+      "sha256": "267c13cb9618e078e8336069d7edcb6b53a24cfc0d1604a28ff8de6387f59cc4"
+    },
+    {
+      "git_object": "de590367d69d54648564036e5bd51980213e1b8b",
+      "path": "README.md",
+      "sha256": "a3b9606e4fe3d970004c55121a7d0a2e044ace607d9a61f6b699f64371ba3ae2"
+    },
+    {
+      "git_object": "ed5c3eb7c37851c7f598001809e6b6a102c30241",
+      "path": "agents/README.md",
+      "sha256": "a4e040699bc91978b7affcce2541483eaf2527d55effe39aaa46bdb2981036be"
+    },
+    {
+      "git_object": "d37deecad046f76d4bd911ce42a53ca6dfb2e347",
+      "path": "agents/hermes-install-expert.md",
+      "sha256": "e4a3c97654182309b07b238397428843b7540f89d43acefc236d9f8973196993"
+    },
+    {
+      "git_object": "cc8b6b8aaebafbc4f149865b5d085efff4edc115",
+      "path": "brain/AGENTS.md",
+      "sha256": "996fafbbe4f8d84a99b617fec0248ee94f7ddd0b75fa05dfc185331baecdd6ad"
+    },
+    {
+      "git_object": "dfb615dcce6b45f372f133952fa76c6d7ca84478",
+      "path": "brain/README.md",
+      "sha256": "92a40bab6d4fa949bf678b16898e897ade9fda81537421e711d84b6df5e5b33e"
+    },
+    {
+      "git_object": "2504300b49363e2e57bf0079b11a908ae7c99281",
+      "path": "brain/templates/page.md",
+      "sha256": "0cd91e9c708c9a308f3143031adc26b7ea00666427095adb7d151bd33c318b5b"
+    },
+    {
+      "git_object": "366bc1934daa01a920b33f6adf117ad7e679958c",
+      "path": "config/runtime-config/README.md",
+      "sha256": "c904d5cfadce0aee699f15efae99f90a90f668d8835f8d17923a6c1eb34765b3"
+    },
+    {
+      "git_object": "cd2c9a3a9b6d74eecd108cdbab4ca2513117d1d4",
+      "path": "config/runtime-config/agent-integration.yaml",
+      "sha256": "e78247e9fcf66e36d87afc33da93bcb0cf0ed3ebc9f8338b69d2042f630236ad"
+    },
+    {
+      "git_object": "7a2bb5b6542cec7665130ebe1ea1686d06fac947",
+      "path": "config/runtime-config/brain.manifest.json",
+      "sha256": "24538c3580e8521d2c7e7175224c9f6dde2133733d06d4d608733cd86e3bf09f"
+    },
+    {
+      "git_object": "5f7d461b98c38a55382305839d01b230f712314d",
+      "path": "config/runtime-config/brain.yaml",
+      "sha256": "5f3af6358c99c5f33158f7dad5c36c75d8d884db05e62e69d592ad5cd831cd7b"
+    },
+    {
+      "git_object": "1664474e61746ea8d97ad20d4b34cdfd490b68f7",
+      "path": "config/runtime-config/cron.manifest.json",
+      "sha256": "d5a8964e4c19e193ebbbee195533c2551869bfb29b9cedd0f58bcd0bb0ac55c0"
+    },
+    {
+      "git_object": "d7696cc7b58ca52f84bfa7c0c1af1a8216080663",
+      "path": "config/runtime-config/gateways.yaml",
+      "sha256": "b3a9cc2efc468fdae0f2f01af070e33a7e3abf8dc30215ee1621ba3b8ee6499c"
+    },
+    {
+      "git_object": "fb9c72ee2047851cbd59bc889886b99480c797fe",
+      "path": "config/runtime-config/hermes.template.yaml",
+      "sha256": "e8e4a0584a9aa4744615df723f52bfcf707a037dc8694913376443ed04689a94"
+    },
+    {
+      "git_object": "ce4998f23764c9a808d4540f6b5cf7f7124b84f2",
+      "path": "config/runtime-config/identity.yaml",
+      "sha256": "9e8a3f47ce163a3af02fb83aac82b3c7bfb4867515f385655c0c77fb382e9ecf"
+    },
+    {
+      "git_object": "d0462bd31f9cae47c3e96b0e158a57e4849e3707",
+      "path": "config/runtime-config/install-expert.yaml",
+      "sha256": "dba35cfac14425c31ebb01bf3b845347edd44a1f5a2fa0b249039e09779ab8c7"
+    },
+    {
+      "git_object": "8cbf00a674450b26ef2d4343e594dc0478e52d38",
+      "path": "config/runtime-config/kanban.schema.json",
+      "sha256": "eaf828ad57768df404f6754095dd788ab68626c478261ae07e91ac4a10690532"
+    },
+    {
+      "git_object": "205ef9c14132d65d782a7a65d527f0d9bc7224fa",
+      "path": "config/runtime-config/kurultai.yaml",
+      "sha256": "b5b9c53227b880df635df5ca1984567ffd4d73744c81d9b07cc4054d87c4b276"
+    },
+    {
+      "git_object": "61ad89c703ffe2c54c432a1f3767c5711f8907bc",
+      "path": "config/runtime-config/profiles.yaml",
+      "sha256": "450eee31299adb3b65a7ef67bfb236d0852b5993434f39080b2e57af590a060c"
+    },
+    {
+      "git_object": "a0806684a57cd2827e3fd2da38f1c0857ad2bd56",
+      "path": "config/runtime-config/radar.yaml",
+      "sha256": "10c47ac805ffc6c802017bf7341ae23e89ef0fa72d569090dac9824892daa3f4"
+    },
+    {
+      "git_object": "84acd93ef65293e892e3971b7f339be04eb7a742",
+      "path": "config/runtime-config/skills.manifest.json",
+      "sha256": "857b6569e32c5bf3420778725ea946e48acd8273466896303ec5485b25c5b3cc"
+    },
+    {
+      "git_object": "ce314e051e9cb96e6f1f64d8139a3055619bcf3a",
+      "path": "docs/adr/2026-07-24-solution-graph-phase-0-1.md",
+      "sha256": "f66783482a8195fefc8ab24c2e65069c30b52b47f28c7dd06744e3e5a9c4a01b"
+    },
+    {
+      "git_object": "cb0eef4fa7621713420914a89b20386ea7993c79",
+      "path": "docs/adr/2026-07-24-solution-graph-phase-2.md",
+      "sha256": "3d27c9880c1175dcbf83a409a166e6347b3e32146cb1eaef17218144a8d9b9ab"
+    },
+    {
+      "git_object": "077b707a4e728d0df36c663742cc9fc11a46ee5b",
+      "path": "docs/adr/2026-07-25-hulagu-dedicated-brain-hard-tenant-isolation.md",
+      "sha256": "6b82c574d47139ee849b02b3b6b4c3cae3dd08d8f9237c9ef303c0d3d136f8a2"
+    },
+    {
+      "git_object": "69445372e6dbce7caeb0860c5ab27ebda60aeb2e",
+      "path": "docs/adr/2026-07-25-hulagu-dedicated-telegram-control-plane.md",
+      "sha256": "0b496bba29b224f1a0d35305ff686eb45644327a99596c19114eb4caf3208315"
+    },
+    {
+      "git_object": "657d361d0d1d3b314a9546a5c6da9e229859417e",
+      "path": "docs/adr/2026-07-25-hulagu-v4-google-sheets-deliverable-amendment.md",
+      "sha256": "270cef99d010de63290e315c03ab4d21e119befd816102d67baa48a211126184"
+    },
+    {
+      "git_object": "9afa94aef712ea9ed25db13afc9a94d5e2b8a9da",
+      "path": "docs/architecture/hulagu.md",
+      "sha256": "3f0c1a8a4ed0ee54817349e7f369145f9232fa1fc518d624b79597e4bdc576b8"
+    },
+    {
+      "git_object": "02985002b9f53a2c624d84e871c7c1f6a4fa4776",
+      "path": "docs/assets/readme/01-kurultai-overview.png",
+      "sha256": "c4a153c40f4e8ae8b40030578cd0722f17961932d6a6f094e97394042a5ec804"
+    },
+    {
+      "git_object": "ad548f9c7be2729238a275cff8fb25592e28b4a9",
+      "path": "docs/assets/readme/01-kurultai-overview.svg",
+      "sha256": "586c2d78d8b26c0a6716adb5d3860bb87d8e12e6d8b316b0f107ec3919a87066"
+    },
+    {
+      "git_object": "1498dbfbbca4ed856aab49dcbfc47c47e4bcd6d9",
+      "path": "docs/assets/readme/02-native-kanban-flow.png",
+      "sha256": "6844190679ae1e1cbfbdb744df54c8b2d27a77a8b58c2dbeacbe7f06511762c0"
+    },
+    {
+      "git_object": "819c8fc73138191351ee7ee0b2280b2a5be1d1b5",
+      "path": "docs/assets/readme/02-native-kanban-flow.svg",
+      "sha256": "a0ec7a09f1d253850240c152b7d96decd66ce28860e523884bc981fa62b3046d"
+    },
+    {
+      "git_object": "f4137abf8ab0f843e94660ca68699494bda7ad19",
+      "path": "docs/assets/readme/03-brain-memory-contract.png",
+      "sha256": "ecd8d6cdbdf123f8073d0cdf44b2c61f23be7ed14efb1757bfb98901afb69866"
+    },
+    {
+      "git_object": "ec3e231774fa4937f4bfd4776e7d347cd3237171",
+      "path": "docs/assets/readme/03-brain-memory-contract.svg",
+      "sha256": "9c1f1bd861277e0aeb3144e433407d5c760cd64f1649dae822d2588793bb3b99"
+    },
+    {
+      "git_object": "af7bbd80c5be4aeff2e635ab5512c1c9ca23de36",
+      "path": "docs/assets/readme/04-fresh-install-path.png",
+      "sha256": "418ad2f1669d648480531f28a82d094f91856017ba36e6563518341227e74fb7"
+    },
+    {
+      "git_object": "0f7b6f8b6e44e066bb76abed4d633a90082cc79f",
+      "path": "docs/assets/readme/04-fresh-install-path.svg",
+      "sha256": "2a009cd49c27e924bdeb0d9f212bcff4bffd8af9b6468bf839ac90e7b6092711"
+    },
+    {
+      "git_object": "d04f62e5b73a0d98c58db9145ae8725f3b02b34b",
+      "path": "docs/assets/readme/05-open-source-boundary.png",
+      "sha256": "81b5b2b6273cdc805a7697369bcfca6c983450ffc7c0dfb66f3de0de8561ab76"
+    },
+    {
+      "git_object": "d9afa3eddf77c8ad7e6eb10f2a7ef4f81d68471d",
+      "path": "docs/assets/readme/05-open-source-boundary.svg",
+      "sha256": "6a51869951719210e037f1c849bc2994b1825c85bc537e359332b9e21b585ea9"
+    },
+    {
+      "git_object": "2dcef2225de7d910c7c140756bef3ff5faad931a",
+      "path": "docs/assets/workflows/01-dreamer-subconscious.png",
+      "sha256": "596954b0f634a5e514255fda7ac52b2243ee7717d1dfbeeddf72897c462aff35"
+    },
+    {
+      "git_object": "a3b0ae2d3652ff610a401afccc722b0cff4387d4",
+      "path": "docs/assets/workflows/02-agi-caretaker-harness.png",
+      "sha256": "30c39d603655e847f5bc802187a1bdb78d51b31d10fe65359c5d2eda421ad2e0"
+    },
+    {
+      "git_object": "71fef7e09082527ac3550e72f2bfd1b307a70c87",
+      "path": "docs/assets/workflows/03-buildroom-auto-build.png",
+      "sha256": "9366bd4713644eed74752efe27571fb64876116dd82a1b445a25a4915a69f13a"
+    },
+    {
+      "git_object": "72fcdce4653b80c9e191f08fb8ecc4e5dd332d6c",
+      "path": "docs/assets/workflows/04-auto-research-signal-intake.png",
+      "sha256": "20806bf248be50633174793b016e429ec829acc91b565518301bada41ab5b7ba"
+    },
+    {
+      "git_object": "171676136e2d47fe29e5658ac124bc0a6e49390f",
+      "path": "docs/assets/workflows/05-native-hermes-kanban.png",
+      "sha256": "ff8c85a075b6c36cb7a9d13ef234216a01c3b11e37f1488dd0fa3e63868a0b55"
+    },
+    {
+      "git_object": "f6505886a7731ec983b315f28838c0f310915b39",
+      "path": "docs/assets/workflows/06-brain-memory-layer.png",
+      "sha256": "fbed39ea774a0e9ccd7f7941e46a7767dd820600681b2353be05105990618ca6"
+    },
+    {
+      "git_object": "5cbaed58b9b0945fd3615c124a839a454c00df17",
+      "path": "docs/assets/workflows/07-receipts-recovery-loop.png",
+      "sha256": "2b324409b3093b996c6202b6d193879a656337826cc73edeb3e011eb9936a65a"
+    },
+    {
+      "git_object": "7de728e2d1f1a18b07abc0509874595b8f86c86b",
+      "path": "docs/assets/workflows/08-gateway-intake-layer.png",
+      "sha256": "f6526e67f61a52e7270a5dce74dcc8a219ee7eb1e0ca2ebddc04a1d93d5c7838"
+    },
+    {
+      "git_object": "f043dbd279500d7ba3fc9f0d47ed5f799b5b5bad",
+      "path": "docs/assets/workflows/09-local-model-lane-tolui.png",
+      "sha256": "eef3a72668361bf7dcd8d0f6198a27b94c1d450c5a5dfe23c8fb9de8cec67bd1"
+    },
+    {
+      "git_object": "349dad1b871c594dc75a59db750cc8b6bcf5cd5b",
+      "path": "docs/assets/workflows/10-agentic-foundation.png",
+      "sha256": "b924bb0902d8b7a8897085f2025a3a852ba21f4a8cbf16639473257770717de4"
+    },
+    {
+      "git_object": "cc27669d8eace4732db59e6ad8efc67059ecc385",
+      "path": "docs/assets/workflows/11-dashboards-control-rooms.png",
+      "sha256": "5447b0f2b5e2ad9110ec3fc58d7ce27e1b2b2320ec8df2f6eb29498cc3dff7bd"
+    },
+    {
+      "git_object": "676f6ee86545e14551cd6949846ae75c28499263",
+      "path": "docs/assets/workflows/12-fresh-install-rebuild.png",
+      "sha256": "3d50a3f17b803ece3251abdae17615161f95d1bc9a65b976ec196adeb1ca22ab"
+    },
+    {
+      "git_object": "30bf5eb65e10e27994c88c22f2a73b82cd2cc1ed",
+      "path": "docs/hulagu/THREAT-MODEL.md",
+      "sha256": "8499bf3ba9e56ecdc0a736edc381e250a5b82effd870c2314a6de7927a4390ba"
+    },
+    {
+      "git_object": "699b2812f1b859196c9fa335e9a73b6bd7d84f8d",
+      "path": "docs/operations/brain-source-policy.md",
+      "sha256": "ae93d85b2b9951ba5a188f31dcb14058a739ae44d3959f27703b1bb696e3aff2"
+    },
+    {
+      "git_object": "b526b2bcc17536bd88784607c6709ad950aea0ab",
+      "path": "docs/operations/fresh-install-agent-prompt.md",
+      "sha256": "a005d8ed066523b03b32c7672b4c040af41bd1941371ea592e6c444415e4ded0"
+    },
+    {
+      "git_object": "f8dbfde1259a7d35116d6022de18c214391809de",
+      "path": "docs/operations/full-installation-checklist.md",
+      "sha256": "2733fc671fb35d61000aff23fd50a8f8b5338721d9cecf0f455363a3ca64f47b"
+    },
+    {
+      "git_object": "35cbd2368dbd56bc01aeba558858762f299dd63f",
+      "path": "docs/operations/interactive-installer-implementation-prompt.md",
+      "sha256": "03babf494828cdc927ab5967d62868c56303b53cf806a0e3c15f4d09bda480f8"
+    },
+    {
+      "git_object": "5f105acc17fea5f6886ee111bc1821128987a825",
+      "path": "docs/operations/kurultai-rebuild-runbook.md",
+      "sha256": "dfbd1ceda6e9906faba7221df44c08873b8d66408af8a7ca0c10fb4a823f11e3"
+    },
+    {
+      "git_object": "ccca56a472435b4af0481b7134d9a946d6b67cd8",
+      "path": "docs/operations/retrieval-eval-harness.md",
+      "sha256": "8ffb95b6d6618e5823c7f9fe1a045ee34d740f253b11b9a4337448960c514e3a"
+    },
+    {
+      "git_object": "e188e7be540712db6e3a28fff57c30bd5c9d5224",
+      "path": "docs/plans/2026-07-24-solution-graph-phase-0-1.md",
+      "sha256": "c6268ec889140e2e3b48866bc7e32ef47833e939138e8abed783a914383a6845"
+    },
+    {
+      "git_object": "dcb1d482e525a0fe57d5e3acaf48addbf72da588",
+      "path": "docs/plans/2026-07-24-solution-graph-phase-2.md",
+      "sha256": "6ba18c5d54391f348d244b106efbf5104f2a737e375ee8bed31c3b8e87e4cdab"
+    },
+    {
+      "git_object": "df9a9db72783195e1842db0561e93c28e9f8dc62",
+      "path": "kublai/__init__.py",
+      "sha256": "fc34631f3f8ae3127cc9e00a0561ecad3cfeaf52431876c62113a512f7c9c178"
+    },
+    {
+      "git_object": "0e042b2fcd15b1678217cf722c94b2b463a9615a",
+      "path": "kublai/retrieval_eval.py",
+      "sha256": "d049e9b510042ff51ad8cf2f6d7c4542fca75d1f4ac054439ba53044e290839b"
+    },
+    {
+      "git_object": "9beb85a81b075ddd1ed79a3358bb476c2c5c6cce",
+      "path": "package-lock.json",
+      "sha256": "c761d7ddc3b176c8c62db65b1c708f33c29f5ee132197247a67c556a75d60a84"
+    },
+    {
+      "git_object": "b849f5c4bd3100144850d7571ef64ec4cd46caeb",
+      "path": "package.json",
+      "sha256": "083eb64e9b84b6fa4d6be6f4baab1007bb7e3f4df00cab9c712d63a693996a1c"
+    },
+    {
+      "git_object": "18cd157d96142cf434ff4a94ca8db393aeae0608",
+      "path": "products/hulagu/Makefile",
+      "sha256": "1b3d734dfc60e61efe5a448377427acb70c8486f54efdcbb151e9f09f218bf81"
+    },
+    {
+      "git_object": "e5f5379890c0fbec6a82b052bf8cfb78e1f0456f",
+      "path": "products/hulagu/README.md",
+      "sha256": "a52b0967238ef5002bbcac9f339a17f5e493bc8177ac13247b06b7b8e4ae98ab"
+    },
+    {
+      "git_object": "7b0e5f66643155a93ea011ed916afe38c91ba413",
+      "path": "products/hulagu/deploy/scripts/doctor.py",
+      "sha256": "c495d16ebd87a247b1478dbd4037cbbccc0f8590439706a1460162862967d750"
+    },
+    {
+      "git_object": "d4af54d858f688044854921e330e41c7e3178599",
+      "path": "products/hulagu/deploy/scripts/verify_plan_gate.py",
+      "sha256": "b8233ccfad56a5b002ea08b841df7b4102de82cd5e50cd37d5ec424c3d0b41f2"
+    },
+    {
+      "git_object": "6fcb36870f1a3fdbf7144bc5e8ae36c76bab6ce3",
+      "path": "products/hulagu/pyproject.toml",
+      "sha256": "f26564d22700524aa133f181d01c401bb5ecc6727c3e3785507f41cf951ee60a"
+    },
+    {
+      "git_object": "f48280e7fdfdbf8ca2b7a4ce52a63137553ec3b5",
+      "path": "products/hulagu/qa/hulagu-impact-regression-baseline.json",
+      "sha256": "0e58777e4792ae4ba642c969e196c5b3883c1ab43621c622c89a4d69d05fa14c"
+    },
+    {
+      "git_object": "9e5d35d30032dda8a2a5b2f58f0b0019f0c8c4b2",
+      "path": "products/hulagu/schemas/action-token-v1.schema.json",
+      "sha256": "b31515c9a8bab8912605fa5a0c45a9a4f8fc081190b72d2021af97338df6c37e"
+    },
+    {
+      "git_object": "d01445655b7c0f75df8aa2ed851544be1dd70b6c",
+      "path": "products/hulagu/schemas/backup-manifest-v1.schema.json",
+      "sha256": "33c71e29e40a66ed452139ed8cb6ce65ca8e204db76b41fe082317a0184381a5"
+    },
+    {
+      "git_object": "1b0f86a592af76743e56942da89355cd3d3d395f",
+      "path": "products/hulagu/schemas/candidate-bundle-v1.schema.json",
+      "sha256": "1dac6d8a0d2a1d31848c6eb6aa2305c4cd911feae82ce167650b133834e2a5b5"
+    },
+    {
+      "git_object": "8b3163eb903d4fd81663d59855775f82bb4884be",
+      "path": "products/hulagu/schemas/deletion-tombstone-v1.schema.json",
+      "sha256": "836534bad879b1fed8634cce1e068aa3e4ff06cdd2d7ccc37922e41ad13e6ff8"
+    },
+    {
+      "git_object": "60f427a36a6f2c04ff0324602a6e54f5f574e6af",
+      "path": "products/hulagu/schemas/durable-event-v1.schema.json",
+      "sha256": "b1341c1d7293edef42f9bc80d8597da8424a322fe27489ef7025e7d498a12b3c"
+    },
+    {
+      "git_object": "a7e6480a6b1bc450634fb27939353ab08c7ce906",
+      "path": "products/hulagu/schemas/health-report-v1.schema.json",
+      "sha256": "763eb0d144c2a644fad5af3889a5a95dc8f4bdebfa4e89ceb969f04be15ccd22"
+    },
+    {
+      "git_object": "8139d48579490418614a1b6d4cc334d73a31b348",
+      "path": "products/hulagu/schemas/parsed-cv-v1.schema.json",
+      "sha256": "8126ff9cb4da5e9efb98258c3ae5a6807b10214d48114e72ddd180d115afbd56"
+    },
+    {
+      "git_object": "9c44dd555248c23a7e0af720e06713e8400a1400",
+      "path": "products/hulagu/schemas/provider-response-v1.schema.json",
+      "sha256": "69f08b6a34a6e53e856e416d8102add922087e14c80fb0be18f08ab587bdae56"
+    },
+    {
+      "git_object": "787c753eb9548c5fd9331714de60a89689959f3d",
+      "path": "products/hulagu/schemas/receipt-v1.schema.json",
+      "sha256": "08e2153497e9b80bdab446ca1c6aaf3fbffa12ab3ff5efaf61c378df1371d588"
+    },
+    {
+      "git_object": "99b51deb4365f015e2c7950504e7258d987ee1ab",
+      "path": "products/hulagu/schemas/search-plan-v1.schema.json",
+      "sha256": "6db08dac62161e7c99f706e08e5d8467aebe1b625c440c04a6b79a554edfd938"
+    },
+    {
+      "git_object": "56c21222f855702c00828c5795346f2d9e8299e6",
+      "path": "products/hulagu/schemas/telegram-update-v1.schema.json",
+      "sha256": "6eb701b352f7b00f73738c1e673cc22bb66bcbfa8a9ef8889ad3f132d1f63722"
+    },
+    {
+      "git_object": "4e665f94970346079e9e5bcce137de6ffb4ca8b9",
+      "path": "products/hulagu/schemas/wiki-manifest-v1.schema.json",
+      "sha256": "5d84912fd9f442a1962af6882f272bca6b11694719ef9b0ed18df5292e1b39fd"
+    },
+    {
+      "git_object": "690e42d4b43094aadf76d3c1512cafde6259668b",
+      "path": "products/hulagu/src/hulagu/__init__.py",
+      "sha256": "1ad3e11026153f04aaf2d52d4b1444b2836f62a91fa36176f619fe912161ba7a"
+    },
+    {
+      "git_object": "924027a4a11668ecfe2b360754f616628ab3d959",
+      "path": "products/hulagu/src/hulagu/config.py",
+      "sha256": "8ecf74c9d65d6aaa3a2adc54cc29ed806001c519965d7d8eca5d8b0ab43960e3"
+    },
+    {
+      "git_object": "b6b9fb9cc038ed99bd98c03926d5aef02b77839f",
+      "path": "products/hulagu/src/hulagu/domain/events.py",
+      "sha256": "5dbb924e9e89375225fe5ecda5e948aa10dde710e7a56b6b17e2af186a6d77ba"
+    },
+    {
+      "git_object": "6d776691b89dfbae8ae477ed307b40e284df9d82",
+      "path": "products/hulagu/src/hulagu/domain/profile.py",
+      "sha256": "6c209e2e617113092d4cd10ecf7c4164ac3fb0bbacb0c54bd6be07b23601fd83"
+    },
+    {
+      "git_object": "f99eb2eca3877dc6e41e1e29824648faa53665ce",
+      "path": "products/hulagu/src/hulagu/domain/sheets_delivery.py",
+      "sha256": "469cbf7af8781622649ddf30b07574805161b184ee7bc4b54de5f0b618a49d96"
+    },
+    {
+      "git_object": "279e7c9279c0f3db9ded5d1ea8c37fba369a7a87",
+      "path": "products/hulagu/src/hulagu/domain/state_machine.py",
+      "sha256": "bbfccbc1c7cb524f4e04ef8160ecac8c59bd56c9aa15d2a8df3d8a2bf16e475d"
+    },
+    {
+      "git_object": "b7e1596b22257d0a2f75cce50abd6d6edea64ca3",
+      "path": "products/hulagu/src/hulagu/domain/tenant_isolation.py",
+      "sha256": "feb44fd14074fc51860227f0d600be91cfb0fca5da508414e4c1e861fb4fab30"
+    },
+    {
+      "git_object": "008dba288ebd67e762a44e0cef025bb3d8d19e91",
+      "path": "products/hulagu/templates/google_sheets/job_ops_blank_template_v4.csv",
+      "sha256": "bf7f0ad57a3cccf4c019c32d31961aa970d57085970f62bdfc67a5f6e59e38e5"
+    },
+    {
+      "git_object": "fbdd8bbba516236c76a6219cbd3661ec057ed5e3",
+      "path": "products/hulagu/templates/google_sheets/job_ops_blank_template_v4.manifest.json",
+      "sha256": "c32a9314137c3634dae11aa4a5d5ae12bac93e2674a478ae0ba342bd99fc42e8"
+    },
+    {
+      "git_object": "e6c99d1f1248ab3e6486066a46f5ffd2794390d3",
+      "path": "products/hulagu/tests/contract/test_plan_gate_contract.py",
+      "sha256": "25966b5761e6bd78b3c25f4fe811b560628da87460c5d7177edaa957355b1d47"
+    },
+    {
+      "git_object": "befd527af60e4a3f6049e94ffe44ce358bc57f12",
+      "path": "products/hulagu/tests/contract/test_schema_examples.py",
+      "sha256": "266d3b3427653e78a9a34a68490588af87d13bb1167860df99458e4e8975162c"
+    },
+    {
+      "git_object": "72234f78f5eee7134adb52e8ac713695af9be0b2",
+      "path": "products/hulagu/tests/contract/test_threat_model_contract.py",
+      "sha256": "0c6c0f51a5094d7e1747534e351dd218e035487a1ca3983b6b4bf8a0b0671950"
+    },
+    {
+      "git_object": "c48d9b3e25b0ac7b6c274cbeb0f186f940f84638",
+      "path": "products/hulagu/tests/integration/test_container_mount_probe.py",
+      "sha256": "77e6ee20cd5d40b2c094c82ee5721c2dd33e9d1be4de31a42bcdee50f3e03ea0"
+    },
+    {
+      "git_object": "5e5ff66acc524318e3e4a3f4c856aff8b9f9ea03",
+      "path": "products/hulagu/tests/integration/test_vault_preflight.py",
+      "sha256": "317f8141372344979ed0f94f8b23a037f4570d26e98fb1e3c6c2bb149f040a4c"
+    },
+    {
+      "git_object": "18e626b19975453cdfe717016c304768840cffe1",
+      "path": "products/hulagu/tests/unit/test_hard_tenant_isolation.py",
+      "sha256": "37982605ea916b02f4e415243fdcdb8133d46faa880113af53a421155b6dc70e"
+    },
+    {
+      "git_object": "d13eb1879ac75ac79a3aeb3c63bf14c6017edc64",
+      "path": "products/hulagu/tests/unit/test_profile_questions.py",
+      "sha256": "0cc983079ad3f6ee3e9d3ec067966561ee5d1ca12b30c736f8673c78eccb6132"
+    },
+    {
+      "git_object": "6e6ace57d791447ed97f301c5f5bf398afe421c1",
+      "path": "products/hulagu/tests/unit/test_state_machine.py",
+      "sha256": "99348fa887c6bbabbe46c08569139ea5d745da19184e796f89e4549daa469f22"
+    },
+    {
+      "git_object": "9a08c3aba88afc82411b5f2fdb70d199566490a6",
+      "path": "products/hulagu/tests/unit/test_v4_sheets_delivery.py",
+      "sha256": "f4fb2d11fe059011912cc76c0d3ef2c03a08ea1526e0b8bc10b90bde351c2cf4"
+    },
+    {
+      "git_object": "35e23425a3c8a684c7bc70067cde04a229781071",
+      "path": "products/hulagu/uv.lock",
+      "sha256": "7f6fbff2e155ad50856d883f6678624c62a89dc6ffe66c3c1d6c67de4eab05b5"
+    },
+    {
+      "git_object": "16449b71ee2f0b0abc7dae54603e6570102a4a58",
+      "path": "profiles/README.md",
+      "sha256": "3bd4759bffaa2bef0294a6fdb230bcd8455e24cb11eea91f598c3b89c27473e9"
+    },
+    {
+      "git_object": "ca469c46c4490ccf3c8e550acd53c5a5cb51d623",
+      "path": "profiles/templates/SOUL.profile.md",
+      "sha256": "819d7996701e0b9a27d8e8544cf748343b6d469cd56a7e3aaa030e133f1b036e"
+    },
+    {
+      "git_object": "e1f706b972492aee4ddeaf8f0094117f4edf2b62",
+      "path": "scripts/bootstrap_kurultai_runtime.py",
+      "sha256": "ce1f41fa60f610b6b2b219114d0a7fde812fa39eaee4a28e4bd21f14f62f57bf"
+    },
+    {
+      "git_object": "a0b39fdd4fd86d12c16f1d08ae37eb347e6182d0",
+      "path": "scripts/export_rebuild_manifests.py",
+      "sha256": "853e58b726ddb6b8f4ac138baaa90e67e99c62f926f3d7a3f710f85f367198ba"
+    },
+    {
+      "git_object": "18423c386b4118ab753aaf2ca5aab0dae0764d00",
+      "path": "scripts/export_runtime_config_manifest.py",
+      "sha256": "998224e029352095f5d7c99a8860c421d5f3bf925ef2ca5a96b336fc6a85168e"
+    },
+    {
+      "git_object": "39aa318d8fe1da5f0e8bed09978545ae00ec7deb",
+      "path": "scripts/install_kurultai.py",
+      "sha256": "23c4df08482b16fb90e665c20336dd50436735abc0f2de1bdd4e87524184ad67"
+    },
+    {
+      "git_object": "f66a53479990e3b117763ba0556a26866794c09a",
+      "path": "scripts/ksg.py",
+      "sha256": "e367e95d72c556efaee906c238d8bf8403faf066b3629b18c3af365935912937"
+    },
+    {
+      "git_object": "871091b075e6edc37140fd84874e0274c5f815e5",
+      "path": "scripts/ksg_buildroom_recommend.py",
+      "sha256": "0cd763ccc604c8127646c6bba2567eb8f038daf4e87de1398bf6ea0265c4209f"
+    },
+    {
+      "git_object": "d664ba83c0851b60f67e67fda1d82e1b13aba44d",
+      "path": "scripts/ksg_mcp.py",
+      "sha256": "284165f676e806f30f911375f37a43d5ab6691d02b6cdd179b00a592cc4d69b4"
+    },
+    {
+      "git_object": "9f0bae99e2fe1d9734fcd1fdb146b595a384b1d2",
+      "path": "scripts/ksg_rest.py",
+      "sha256": "ff01c734c05f4fee3bcd3540ada3a727a16145f37e17cae0a6203aa9211c325e"
+    },
+    {
+      "git_object": "69e935f09bc8254efbc2071c692adacc85c3d882",
+      "path": "solution_graph/README.md",
+      "sha256": "9d9af6a5d28aaf915e6a47493a47ecf13b3eb263750613945f0eb9a17ada715e"
+    },
+    {
+      "git_object": "b6bdbec1fdeb0a2da374d6cf58777d842e7ec07a",
+      "path": "solution_graph/__init__.py",
+      "sha256": "4a6290f472ea4ecb2f2a46e55c3e043f7b25668c8280c48b82865a6360e0ad3a"
+    },
+    {
+      "git_object": "21f138765efc69a1c41c0cdeae71dd167c5e6a65",
+      "path": "solution_graph/buildroom.py",
+      "sha256": "002b6ca0e11226b22c80ea6ba7a424cea6ea1885faaa5b61fba0b60ba0c9b754"
+    },
+    {
+      "git_object": "0cdd4799827f019881280c31b219f2041322ff25",
+      "path": "solution_graph/canonical.py",
+      "sha256": "7b8850af88d67b41e4a85278add13c83baae8f83d38119568f90abb6350e9430"
+    },
+    {
+      "git_object": "486306edcd7782b43c0b4a5452318b692fef71e2",
+      "path": "solution_graph/fixtures/adversarial_no_plan/UNTRUSTED_README.md",
+      "sha256": "22abb125dbed9c00a1783cc73f0c3abfdee73413efe9e84c68c35da305ac5335"
+    },
+    {
+      "git_object": "2a355af2451b9c08ba44f5d521cb251c06a73263",
+      "path": "solution_graph/fixtures/adversarial_no_plan/environment.json",
+      "sha256": "171998c6d1babfe2e3c1debd9fd5193f0bc076631537f69eb92cfa12042e3c9b"
+    },
+    {
+      "git_object": "7586ce26db0964b0177139e8be8e209e3dbe4c92",
+      "path": "solution_graph/fixtures/adversarial_no_plan/manifest-cloud-vault-summarizer.json",
+      "sha256": "6aa54d76566e59ef789e0f631d09382be1fb181d9476d861749a9f16448893e6"
+    },
+    {
+      "git_object": "3ac39e858bbbd64306e65c221c071711604ea00a",
+      "path": "solution_graph/fixtures/adversarial_no_plan/manifest-local-vault-summarizer.json",
+      "sha256": "381dbff8f760b5fd969be83259b522306f175c32fb057ca84b9c8cee19967bcd"
+    },
+    {
+      "git_object": "2e7e9f2704c1335d8f53e8d2417f21d328396bd9",
+      "path": "solution_graph/fixtures/adversarial_no_plan/manifest-social-publisher.json",
+      "sha256": "ba7739de106d3d6a5ff90885acaabc99d601af7c8b2556913c49b5aacb89c043"
+    },
+    {
+      "git_object": "a3ac52b44c4d268b546c8229d869aec1087b8657",
+      "path": "solution_graph/fixtures/adversarial_no_plan/objective.json",
+      "sha256": "4d422b8bbb50ccbd76761545a0c98c62838d2e39513f493930b90fb928a90bf0"
+    },
+    {
+      "git_object": "56c4d96030ccb50ebdd92bcbffab724d268e5f73",
+      "path": "solution_graph/fixtures/adversarial_no_plan/observations.json",
+      "sha256": "011d388953bc363844e6059689cc39563a9785f115c80cf46efbfc82b434d4ec"
+    },
+    {
+      "git_object": "8a939d55ed1e352096fa0730479068a58006a53c",
+      "path": "solution_graph/fixtures/buildroom_shadow/phase-2-5-checkpoint-001-blocked-receipt.md",
+      "sha256": "a26fd8eb91e5fd71c32ae96b2e761e7712ed1dbb9e7e5e1cd19e6dab4f4ad1e0"
+    },
+    {
+      "git_object": "791897eb5e6d8561f926f55715a00bd7bb0b6dfe",
+      "path": "solution_graph/fixtures/buildroom_shadow/shadow-corpus.json",
+      "sha256": "fc2a0ac281402d2deb4ae880c411fb67eaa6862eb21d05bc41b1d43d56959163"
+    },
+    {
+      "git_object": "318e61615bb8957031f368c79a04c9568b06504f",
+      "path": "solution_graph/fixtures/document_redaction/environment.json",
+      "sha256": "cd24e636fe75562fa4f89e49cb260aea4fa0fd223e8fc0a28a134eddd0ded334"
+    },
+    {
+      "git_object": "5c0e583e8a5ba03ae99cf400d3b75399a0148134",
+      "path": "solution_graph/fixtures/document_redaction/manifest-cloud-pii-redactor.json",
+      "sha256": "f48d5e1a01702139b8a338c66740047be7d923008f67969df76742c34edc872d"
+    },
+    {
+      "git_object": "b090588765e86ae30107ed474352e6f9a465d421",
+      "path": "solution_graph/fixtures/document_redaction/manifest-local-markdown-redactor.json",
+      "sha256": "bb92bef452365310fee50f87d93c278f2b983e2b61e665f566693b291af91a0a"
+    },
+    {
+      "git_object": "12cbcb94bc315dc8eb53268eaa31e327edf41dbf",
+      "path": "solution_graph/fixtures/document_redaction/manifest-rules-only-redactor.json",
+      "sha256": "3d6ed21597863809d6b8eeb0298c3ce970197ab0089322f5c5d4feb662cfa1c9"
+    },
+    {
+      "git_object": "888f60b61f0aaf4b9aa99556f253b3d05d969465",
+      "path": "solution_graph/fixtures/document_redaction/objective.json",
+      "sha256": "1812d8e583149f7d4500180805d037a5c887b88c5d6efd058d14d87a576c5531"
+    },
+    {
+      "git_object": "aae43d5ffa80980eb50d9fe407ef704163fcc422",
+      "path": "solution_graph/fixtures/document_redaction/observations.json",
+      "sha256": "d7abc5862d59500e94b04fd8de43f2ab60cad62d2846512a05be549786448f1f"
+    },
+    {
+      "git_object": "bfce0b0d7899c8565d5240cb71b7e7bf94875bc7",
+      "path": "solution_graph/fixtures/research_digest/environment.json",
+      "sha256": "b1c2191c810a7bcd1ddfedc7c986933cc22a199c97c264f109416d4b52c2123d"
+    },
+    {
+      "git_object": "4a88d8b0305b46ca4db6887b7db053f87d0a9a3d",
+      "path": "solution_graph/fixtures/research_digest/manifest-bookmark-normalizer.json",
+      "sha256": "295f46d28dd5a8ed67748eb312a509367da6a3d7da71d65e7d0637d50c9eb929"
+    },
+    {
+      "git_object": "e96d6769d0561e548f6885a06ee94d16c5fab27a",
+      "path": "solution_graph/fixtures/research_digest/manifest-cloud-research-summarizer.json",
+      "sha256": "3fd2999a3574871cd7234fdf18a4683dda3ccb289ceb980885429ecb2bba0347"
+    },
+    {
+      "git_object": "64967e44130fe6fbfc4f49af4a9e33872f3cd003",
+      "path": "solution_graph/fixtures/research_digest/manifest-draft-memo-writer-declared.json",
+      "sha256": "93a1fd22d53a1f85906867330dd10c3815c1dbf3dc29911a5c7ba2b75c78241d"
+    },
+    {
+      "git_object": "68c6132db6ed9b1119033a51e88a01fffc52107d",
+      "path": "solution_graph/fixtures/research_digest/manifest-evidence-memo-writer.json",
+      "sha256": "1f6db554fe3b4f817fd387da0d517e675561c614a9913ba09ed014cf862cd285"
+    },
+    {
+      "git_object": "3aeef48498853401ebe0de99f82623875c93522f",
+      "path": "solution_graph/fixtures/research_digest/objective.json",
+      "sha256": "1b0221491e2b314460317a720b920c00f189ce9056022fe3ed8e887ae680b85f"
+    },
+    {
+      "git_object": "3cf035e662b05e1e2e4182cc8227022bd623cf51",
+      "path": "solution_graph/fixtures/research_digest/observations.json",
+      "sha256": "8191d27f802a6196b99a55ec02f351bacd29ad517635defd3de7af5474099aea"
+    },
+    {
+      "git_object": "01cd41c6e2ab86c370e7ceb9b4c03a8486ca56bf",
+      "path": "solution_graph/fixtures/transcription/UNTRUSTED_README.md",
+      "sha256": "b6d6cb5d4feadd6903d6d6cbdc26f68b54de8ad03338d1ec7129394aec423739"
+    },
+    {
+      "git_object": "ac35b9522029b6bfbd60431d67cb276a85c991df",
+      "path": "solution_graph/fixtures/transcription/environment.json",
+      "sha256": "c312676ecdab2925828196ac62d33d034e95851f2ca7c96603157587b3815a62"
+    },
+    {
+      "git_object": "a902c445d4a16554de0e1121eeb4ef1fc4fc469c",
+      "path": "solution_graph/fixtures/transcription/manifest-cloud-asr.json",
+      "sha256": "561792c566262ca9390c3e2238e7b61b218c065044a20b1a6f7aa9c59624653a"
+    },
+    {
+      "git_object": "0f15fd699a83456b4fee30907c514b37e1cecdbd",
+      "path": "solution_graph/fixtures/transcription/manifest-local-asr-broken.json",
+      "sha256": "9055c27de3c1f077fc1bb1ff0dd0e80c1b96dffc710b8daf76cfacfc9afdd450"
+    },
+    {
+      "git_object": "c35564aa37e1c4b96ad966e9fcf01c9db471bb3a",
+      "path": "solution_graph/fixtures/transcription/manifest-local-asr-conflicted.json",
+      "sha256": "958928fbd313077b7331e5e696309442bcbf185b90407c1b4ca9e9add293b8cc"
+    },
+    {
+      "git_object": "94d4d2e8c091fbea0062f2afbf7702043ee5812c",
+      "path": "solution_graph/fixtures/transcription/manifest-python-asr-declared-only.json",
+      "sha256": "77bba77955f3f59fbf03d036c7845decb888e0fd08e59bd27e366d93b412a15d"
+    },
+    {
+      "git_object": "d1c663d69335abdfff0739b8eab9d799a1f2ed98",
+      "path": "solution_graph/fixtures/transcription/manifest-python-asr-x86-only.json",
+      "sha256": "5aa08c979868fd6e3ff6880a398cb95e61c5d830ee2aa243618f4413bba19833"
+    },
+    {
+      "git_object": "a3c0f8a487c5f5e16c17f8361358ffd97aac35d8",
+      "path": "solution_graph/fixtures/transcription/manifest-python-asr.json",
+      "sha256": "f46978bab9ab5be1de9ee45c29ba87fc4412e4f89d356fc5bd2d90dcd38b175d"
+    },
+    {
+      "git_object": "fcf84803a58e6a23d1f94218543190f8f07918ee",
+      "path": "solution_graph/fixtures/transcription/manifest-whisper-cpp.json",
+      "sha256": "ac758d7492d104d102f0e6f9a6fc135d8c46820ba489ea43164682b35ed68264"
+    },
+    {
+      "git_object": "65c5aa1fad23b8e4c1148d00239e41f893d435a4",
+      "path": "solution_graph/fixtures/transcription/objective.json",
+      "sha256": "5c6bf2d392276c4db07925dc4512e5895f6c003051ab8bcfd20aec8e86d4e9e3"
+    },
+    {
+      "git_object": "cbeb683722d000364300086e4c31ca4a4ec51b89",
+      "path": "solution_graph/fixtures/transcription/observations.json",
+      "sha256": "aced37e6b464555e818f2f2fc9b5796196c35efc34bf11f8c79a95db99c49c57"
+    },
+    {
+      "git_object": "360c7e5e63b8237c66b5192c2a957afee83eb952",
+      "path": "solution_graph/mcp_adapter.py",
+      "sha256": "1e9ca976d8296613e9086ccd0b030c0597224de269f1fbcd7510e4fd907685c1"
+    },
+    {
+      "git_object": "0b32684f88bd7475933f7df263f2d99ee914d922",
+      "path": "solution_graph/registry.py",
+      "sha256": "902b148b98417e0ff3daa30b6a35fdbbe1bf50a78215fddb4d9a2d836d24b4c7"
+    },
+    {
+      "git_object": "8790ebe281089c679686d0689ecd59080899c3cb",
+      "path": "solution_graph/requirements.txt",
+      "sha256": "9cba6d4508d006391ab899893990d5ac5d03b4811a0f71f152c5883897ee8120"
+    },
+    {
+      "git_object": "5df5c7c88fcc53be4081a81b3110241c5cb7da90",
+      "path": "solution_graph/resolver.py",
+      "sha256": "44bd6c63e036f0b37d5f0a44b7a6821a4fb68f0df6823753e4830d9ec62a4ba1"
+    },
+    {
+      "git_object": "fe4a700998ff501cdd5ca733aef3dd9bcacc6545",
+      "path": "solution_graph/rest_adapter.py",
+      "sha256": "c82da124fbde8ac355e640a3e50698b95668ae4c71f96ab2e75d1b844d0fdd73"
+    },
+    {
+      "git_object": "1ae5bf2a45fd09f17ad588bf433f82452b5de43a",
+      "path": "solution_graph/schema_runtime.py",
+      "sha256": "a29081a305ba3c849ebb64e473c422f55bb51c2f2ebb62a12db8b630af0a210e"
+    },
+    {
+      "git_object": "83e243b4776d4fffd6dc1a322c556d7933930385",
+      "path": "solution_graph/schemas/agent-context-packet-v1.schema.json",
+      "sha256": "88628aeebbc96871aa29508b4237642cf3cc5f78e95797b6d87ba57dae0c310c"
+    },
+    {
+      "git_object": "3466aca1f692799cceaedcd6438885eb37c41430",
+      "path": "solution_graph/schemas/agent-context-packet-v2.schema.json",
+      "sha256": "ea3e28ebff6b7cc9b2c82b49626122406d74bf9b62cee43befc6a17ec4360c58"
+    },
+    {
+      "git_object": "ea6c0cb4e1c855a7e1bd57a168f5f1b577291771",
+      "path": "solution_graph/schemas/artifact-manifest-v1.schema.json",
+      "sha256": "9af1a5e31899f80fe27671b88a144747705060001efbf86c5d023bd87586fb42"
+    },
+    {
+      "git_object": "176222b5ba1edd959dd3644c393df8fde3522799",
+      "path": "solution_graph/schemas/buildroom-recommendation-projection-v1.schema.json",
+      "sha256": "406104f221237df3e726078838a33d751d6b64de479285d51cad7aa8b88049b3"
+    },
+    {
+      "git_object": "9b8b291fa33f900b9ade9de809d95f55405b8432",
+      "path": "solution_graph/schemas/capability-contract-v1.schema.json",
+      "sha256": "ccee8512f89d40a9e9f7203532520b7ab424b2159ab6247d368b28de0ff97b1d"
+    },
+    {
+      "git_object": "3a082a8a8e64693be4cbe0be62efcd1b7184f65d",
+      "path": "solution_graph/schemas/environment-profile-v1.schema.json",
+      "sha256": "e7e506ee82abe9f392bb3490b0b13ac2d41be1f988f111ee276bfd71933a7d77"
+    },
+    {
+      "git_object": "7e28a7b6027cffdf3d625cbaa483cef3eab0f184",
+      "path": "solution_graph/schemas/evidence-fixture-set-v1.schema.json",
+      "sha256": "7adce749e5ce299d57bf403e014db57528ebd225dbc6be72e6409d1207d7c19e"
+    },
+    {
+      "git_object": "75d97e45002765ec92b9a0f298f6a940352a8df9",
+      "path": "solution_graph/schemas/evidence-observation-v1.schema.json",
+      "sha256": "2b656449bd8651e7c67885ef51f6e8dc073b28dd5437b2490218a644734fcb2f"
+    },
+    {
+      "git_object": "73fb111865747599bbfa96cefa35d32bc2bb6a7f",
+      "path": "solution_graph/schemas/execution-grant-v1.schema.json",
+      "sha256": "083e9adf1dcc5a4860e31b73e19c49159ce499e35bcde0acaf96a918de229791"
+    },
+    {
+      "git_object": "2d686cae36a0942a9fe73e2636c5a4419ca388a1",
+      "path": "solution_graph/schemas/fixture-registry-v1.schema.json",
+      "sha256": "5cdd85afc7c96edf4c899ec49ff29aea62ae9ff4873a72ef3108211fa56258a9"
+    },
+    {
+      "git_object": "cd4a6a98306ae2ed027a42de83df3d9fb68f2aa6",
+      "path": "solution_graph/schemas/objective-spec-v1.schema.json",
+      "sha256": "4915f5d9640ef67a134598d95ebc93986d4230fa2e477a37f5e8eb61297ca252"
+    },
+    {
+      "git_object": "608edeaff475105b59cc64e155af3a1919c25844",
+      "path": "solution_graph/schemas/objective-spec-v2.schema.json",
+      "sha256": "0644b6f8c4ad067d8e2c1c754c591179a05dca3998aa8f2e4ce5e780ae12530c"
+    },
+    {
+      "git_object": "64ab6107d4c80b1e6e56ca5349ab53008797faf0",
+      "path": "solution_graph/schemas/plan-simulation-v1.schema.json",
+      "sha256": "c2fae61ed871f67590d2ad2f2f5159a3bf8b85c57fef847fec1cf0449f72af80"
+    },
+    {
+      "git_object": "d5b7982e4ae337830fd4546c47e597e341d7dc1d",
+      "path": "solution_graph/schemas/resolution-plan-v1.schema.json",
+      "sha256": "5692174f3c6f110fdbcea2eb36302c1609a85f5dbb89bc3e4f7d7c767106b2b9"
+    },
+    {
+      "git_object": "71f4fc04fbd65c9729f283aef0b93633c7617fe0",
+      "path": "solution_graph/schemas/resolution-plan-v2.schema.json",
+      "sha256": "7ddcb88c96bb2783ee9866d323b572cb32b02afbee50a3316230b9810df9bf56"
+    },
+    {
+      "git_object": "ae2dd5884cb81f70642907c17f90d303fdd57b5e",
+      "path": "solution_graph/schemas/run-receipt-v1.schema.json",
+      "sha256": "7d53839fc9838348ef7fc94f8a36117cf1e23f4cf34a26a19b67d553c196f23b"
+    },
+    {
+      "git_object": "6991b6c2eb94d87829f7495f5089b2329d75c2c0",
+      "path": "solution_graph/schemas/shadow-evaluation-corpus-v1.schema.json",
+      "sha256": "2234b7aa262aa0556b4be530fb479855866dd4d2792023666ec3879adf9b2e20"
+    },
+    {
+      "git_object": "3413f4ee2b21e39769d48708593facb4efb41f79",
+      "path": "solution_graph/schemas/validation-result-v1.schema.json",
+      "sha256": "9e175ce35d26b2e7c5d2da526c3ad5b4c680ab45c257b1c34b13a78836e673a6"
+    },
+    {
+      "git_object": "b9725bd1026e279c85c6800ba5167e19777325b0",
+      "path": "solution_graph/schemas/verification-delta-v1.schema.json",
+      "sha256": "604293ca5b4b01f9778101a2b36979f345e7db5cee2b0480f8ae72546a5c68da"
+    },
+    {
+      "git_object": "78338c99e7f8ef278c5e3afcdea230bff9cd7b62",
+      "path": "solution_graph/service.py",
+      "sha256": "1d8566683e10ad0d6d90407ac87455d6d4d61ed56a32c954d14a4352052fdc1a"
+    },
+    {
+      "git_object": "3ef70f2b7bf3d12b6013539cd2877a83674b8b57",
+      "path": "solution_graph/validation.py",
+      "sha256": "5ea9d3aa073b70e0a892433d3d680cbc09ef586db2c0c9b2dc96243aebfe2a17"
+    },
+    {
+      "git_object": "b98a561d27f7707a4bc1bd8f81d9339911710415",
+      "path": "tests/fixtures/retrieval_eval/public-smoke.manifest.json",
+      "sha256": "a2bcd2c29c4fe78f80a61406b0bb118a9d15698526b9f108a3649b7ec1f809e0"
+    },
+    {
+      "git_object": "5eb9c192ba0805d13e0a66de6360191756a1281c",
+      "path": "tests/fixtures/retrieval_eval/public-smoke.ndjson",
+      "sha256": "f4a787e9ab6984acff957048877a000bb7e730099327a8ea326c4405f9864597"
+    },
+    {
+      "git_object": "57004c5c87756f97a57dece9ece3fc40393def25",
+      "path": "tests/fixtures/retrieval_eval/source-policy.manifest.json",
+      "sha256": "23a9261ae1774ecd4a8a459556afe6658ff89f883bb39114ebaf71547e1041b4"
+    },
+    {
+      "git_object": "6c43694ff816e3203ba2e7f2c013b5f7c31bd1dd",
+      "path": "tests/fixtures/retrieval_eval/source-policy.ndjson",
+      "sha256": "270f7c868321a7537aa554fcdb9a02c2c1e241589ec7c6e173ce805a30a13e68"
+    },
+    {
+      "git_object": "ada42388908633f636a06497a16a1687c6bd2809",
+      "path": "tests/test_install_kurultai.py",
+      "sha256": "77d1940416926e914aff4ca78e936408e039b7b597ce9557ee975710d98f1a63"
+    },
+    {
+      "git_object": "3d37e1520197f279057376cf116eb00b38f4e1da",
+      "path": "tests/test_retrieval_eval.py",
+      "sha256": "c081bc99dd602e586555f15f7e9a86a326c16e60190b5230c5e1f2dbb3744872"
+    },
+    {
+      "git_object": "4c7d808020d75ade87a2896936bb07f2d727e966",
+      "path": "tests/test_solution_graph.py",
+      "sha256": "1c4af2715e67a62f7804fef3d7a4511ea1aac0a7308464796b11e473e72b8739"
+    },
+    {
+      "git_object": "1743261fd7f87fa56c86ec81f246c5de88f4efd5",
+      "path": "tests/validate_public_repo.py",
+      "sha256": "1f0fd4c2569b5fbba26a19700d4dcda660c71ec7dcfa71f38b52599d0045b0ab"
+    }
+  ],
+  "tracked_files_sha256": "b9ed6ec65c5c9341f8112aedae7626bbe640302222f16cf9a574ae4ace095d1d"
+}

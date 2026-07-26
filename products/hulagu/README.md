@@ -19,11 +19,22 @@ uv sync --frozen
 uv run pytest tests/contract tests/integration/test_vault_preflight.py -vv
 uv run pytest tests/integration/test_container_mount_probe.py -vv
 uv run hulagu-verify-plan-gate
-uv run hulagu-doctor --config /absolute/path/to/owner-authorized-install-record.json
+uv run hulagu-doctor --config /absolute/path/to/policy-admitted-install-record.json
 ```
 
-`hulagu-doctor` is observation-only and has no `--apply` option. The authorized JSON record must name the exact `/Volumes/KurultaiVault` mount, enrolled volume UUID, absolute container CLI and socket paths, and the owner-approved lowercase SHA-256 of the CLI executable (`approved_cli_sha256`). The doctor never searches `PATH` or executes the container CLI. At G1 it reports PostgreSQL and container runtime execution as `not_evaluated`. Tests use only synthetic temporary fixtures.
+`hulagu-doctor` is observation-only and has no `--apply` option. The authorized JSON record must name the exact `/Volumes/KurultaiVault` mount, enrolled volume UUID, absolute container CLI and socket paths, and the policy-admitted lowercase SHA-256 of the CLI executable (`approved_cli_sha256`). The doctor never searches `PATH` or executes the container CLI. At G1 it reports PostgreSQL and container runtime execution as `not_evaluated`. Tests use only synthetic temporary fixtures.
 
 ## Boundaries
 
 No credentials, live customer data, private CVs, Telegram IDs, database dumps, generated wikis, or runtime installation records belong in this tree. G1 does not run PostgreSQL, a container, a provider, a bot, a vault write, a network request, or any runtime service mutation.
+
+## Hulagu v2 autonomous G0 successor freeze
+
+- Canonical v2 plan path: `/Users/kublai/brain/docs/plans/2026-07-25-hulagu-full-hermes-instance-v2-revised-plan.md`
+- Canonical v2 plan SHA-256: `6e33bfd952e34b6578f2118c5592128bd40db5a72d8b0e37eac27b85633e8a19`
+- Required base commit: `2f10cb9351cfae554a74e98ee6894240670b5275`
+- Required base tree: `1b86294560ff700f83657c3f18f05bff153da084`
+- Authority policy: `hulagu.autonomous-authority.v1`
+- Implementation authorized: `false` pending exact-hash independent policy review.
+
+This candidate preserves historical v3 authority evidence while removing future human runtime start and closure gates. It adds 16 successor-freeze tests, 3 schema nodes, and a closed 23-path payload. The accountable operator is provenance only; no human assent is an admission predicate. Run `python deploy/scripts/gates/verify_g0_successor_freeze.py`, then the focused tests, the product-local 117-test suite, and the repository-wide 184-test command suite in a detached checkout.

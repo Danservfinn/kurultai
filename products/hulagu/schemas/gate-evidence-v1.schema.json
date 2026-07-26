@@ -1,0 +1,58 @@
+{
+  "$id": "https://kurult.ai/schemas/gate-evidence-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "closure_envelope_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "gate_id": "G0",
+      "independent_review_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "payload_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "policy_admission_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "result": "PASS",
+      "schema_version": "hulagu-gate-evidence-v1"
+    }
+  ],
+  "properties": {
+    "closure_envelope_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "gate_id": {
+      "pattern": "^G(?:0|1|2|3A|3B|3C|3D|3E|4|5|6|7|8|9|10|11)$",
+      "type": "string"
+    },
+    "independent_review_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "payload_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "policy_admission_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "schema_version": {
+      "const": "hulagu-gate-evidence-v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "gate_id",
+    "result",
+    "payload_manifest_sha256",
+    "independent_review_sha256",
+    "policy_admission_sha256",
+    "closure_envelope_sha256"
+  ],
+  "title": "Hulagu gate evidence v1",
+  "type": "object"
+}

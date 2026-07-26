@@ -1,0 +1,27 @@
+{
+  "policy_id": "hulagu.autonomous-authority.v1",
+  "roles": {
+    "accountable_operator_provenance": {
+      "identity": "human:danny:hulagu-operator:v1",
+      "identity_type": "human_provenance",
+      "runtime_decision_authority": false
+    },
+    "evidence_producer": {
+      "identity": "agent:kublai:gate-producer:v1",
+      "identity_type": "isolated_agent",
+      "runtime_decision_authority": false
+    },
+    "independent_verifier": {
+      "identity": "agent:claude-code:independent-verifier:v1",
+      "identity_type": "isolated_agent",
+      "runtime_decision_authority": false
+    },
+    "policy_compiler": {
+      "identity": "service:hulagu-policy-compiler:v1",
+      "identity_type": "deterministic_service",
+      "runtime_decision_authority": true
+    }
+  },
+  "schema_version": "hulagu-g0-role-separation-v2",
+  "separation_rule": "producer, verifier, and policy compiler identities must be pairwise distinct; operator assent is not a predicate"
+}

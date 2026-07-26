@@ -1,0 +1,30 @@
+schema_version: hulagu-allowed-write-set-v2
+gate_id: G0
+state: ACTIVE
+base_commit: 2f10cb9351cfae554a74e98ee6894240670b5275
+base_tree: 1b86294560ff700f83657c3f18f05bff153da084
+admission_policy_id: hulagu.autonomous-authority.v1
+payload_paths:
+  - docs/plans/2026-07-25-hulagu-full-hermes-instance-v2-revised-plan.md
+  - docs/adr/2026-07-25-hulagu-full-hermes-brokered-capsules.md
+  - docs/hulagu/THREAT-MODEL-v2.md
+  - products/hulagu/README.md
+  - products/hulagu/qa/hulagu-v2-source-inventory.json
+  - products/hulagu/qa/hulagu-v2-predecessor-authority-map.json
+  - products/hulagu/qa/hulagu-v2-impact-regression-baseline.json
+  - products/hulagu/qa/buildroom/control_projection_contract_v1.json
+  - products/hulagu/qa/g0-predecessor-test-nodes-v1.json
+  - products/hulagu/qa/g0-test-node-delta-v1.json
+  - products/hulagu/qa/g0-identity-map-v1.json
+  - products/hulagu/gates/registry.yaml
+  - products/hulagu/gates/allowed-write-sets/G0.yaml
+  - products/hulagu/policies/autonomous-authority-v1.json
+  - products/hulagu/schemas/gate-evidence-v1.schema.json
+  - products/hulagu/schemas/gate-policy-admission-v1.schema.json
+  - products/hulagu/schemas/pilot-consent-v1.schema.json
+  - products/hulagu/src/hulagu/__init__.py
+  - products/hulagu/deploy/scripts/gates/compile_gate_policy_admission.py
+  - products/hulagu/deploy/scripts/gates/verify_g0_successor_freeze.py
+  - products/hulagu/tests/gates/test_g0_successor_freeze.py
+  - products/hulagu/tests/contract/test_schema_examples.py
+  - .github/workflows/hulagu-v2-gate.yml

@@ -1,0 +1,219 @@
+{
+  "default_decision": "DENY",
+  "gates": {
+    "G0": {
+      "depends_on": null,
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "source_closed",
+        "policy_review_exact",
+        "forbidden_surface_empty"
+      ],
+      "slug": "g0_autonomous_source_freeze"
+    },
+    "G1": {
+      "depends_on": "G0",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "prior_closure_exact",
+        "write_set_exact",
+        "tests_green"
+      ],
+      "slug": "g1_source_contracts"
+    },
+    "G10": {
+      "depends_on": "G9",
+      "pilot_evidence_gate": true,
+      "required_predicates": [
+        "pilot_consent_valid",
+        "communication_permission_valid",
+        "budget_green"
+      ],
+      "slug": "g10_single_consented_pilot"
+    },
+    "G11": {
+      "depends_on": "G10",
+      "pilot_evidence_gate": true,
+      "required_predicates": [
+        "all_consents_valid",
+        "cohort_cap_green",
+        "exit_receipts_exact"
+      ],
+      "slug": "g11_bounded_consented_cohort"
+    },
+    "G2": {
+      "depends_on": "G1",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "isolation_live",
+        "credential_scope_exact",
+        "negative_probes_green"
+      ],
+      "slug": "g2_identity_confinement"
+    },
+    "G3A": {
+      "depends_on": "G2",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "volume_exact",
+        "capacity_green",
+        "inventory_reconciled"
+      ],
+      "slug": "g3a_storage_inventory"
+    },
+    "G3B": {
+      "depends_on": "G3A",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "empty_authority",
+        "recovery_kill_matrix",
+        "projection_bounded"
+      ],
+      "slug": "g3b_durable_authority"
+    },
+    "G3C": {
+      "depends_on": "G3B",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "read_only_source",
+        "quarantine_only",
+        "reconciliation_exact"
+      ],
+      "slug": "g3c_quarantine_migration"
+    },
+    "G3D": {
+      "depends_on": "G3C",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "restore_tuple_exact",
+        "ledger_head_current",
+        "kill_matrix_green"
+      ],
+      "slug": "g3d_restore_drill"
+    },
+    "G3E": {
+      "depends_on": "G3D",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "generation_exact",
+        "legacy_revoked",
+        "data_fuse_policy_admitted"
+      ],
+      "slug": "g3e_data_promotion"
+    },
+    "G4": {
+      "depends_on": "G3E",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "api_nonoverlap",
+        "egress_policy_exact",
+        "effect_readback"
+      ],
+      "slug": "g4_broker_effects"
+    },
+    "G5": {
+      "depends_on": "G4",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "runtime_digest_exact",
+        "tool_surface_closed",
+        "hard_delete_denied"
+      ],
+      "slug": "g5_profile_runtime"
+    },
+    "G6": {
+      "depends_on": "G5",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "public_only",
+        "archive_replay_exact",
+        "tenant_canary_absent"
+      ],
+      "slug": "g6_public_research"
+    },
+    "G7": {
+      "depends_on": "G6",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "one_tenant_epoch",
+        "capability_exact",
+        "teardown_zero_residue"
+      ],
+      "slug": "g7_capsule_integration"
+    },
+    "G8": {
+      "depends_on": "G7",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "synthetic_only",
+        "effects_preauthorized",
+        "readback_exact"
+      ],
+      "slug": "g8_synthetic_e2e"
+    },
+    "G9": {
+      "depends_on": "G8",
+      "pilot_evidence_gate": false,
+      "required_predicates": [
+        "cron_policy_exact",
+        "shadow_green",
+        "no_unapproved_outbound"
+      ],
+      "slug": "g9_cron_shadow"
+    }
+  },
+  "implementation_completion_gate": "G9",
+  "operator_provenance": {
+    "identity": "human:danny:hulagu-operator:v1",
+    "purposes": [
+      "provenance",
+      "emergency observation",
+      "post-hoc audit"
+    ],
+    "runtime_decision_authority": false
+  },
+  "permanent_forbidden_surfaces": [
+    "payments",
+    "public_posting",
+    "identity_or_soul_changes",
+    "hard_deletes",
+    "unapproved_outbound_email_or_chat"
+  ],
+  "pilot_policy": {
+    "auto_invite": false,
+    "communication_permission_required": true,
+    "consent_schema": "pilot-consent-v1",
+    "gates": [
+      "G10",
+      "G11"
+    ],
+    "missing_eligible_participant_state": "PILOT_EVIDENCE_PENDING",
+    "preexisting_consent_required": true
+  },
+  "policy_id": "hulagu.autonomous-authority.v1",
+  "schema_version": "hulagu-autonomous-authority-policy-v1",
+  "universal_predicates": [
+    "base_commit_exact",
+    "base_tree_exact",
+    "prior_closure_exact",
+    "policy_digest_exact",
+    "candidate_manifest_exact",
+    "independent_review_exact",
+    "review_has_no_blocker_or_high",
+    "producer_verifier_distinct",
+    "allowed_write_set_exact",
+    "command_packet_exact",
+    "payload_manifest_exact",
+    "red_observed",
+    "green_observed",
+    "full_suite_exact",
+    "review_fresh",
+    "decision_unexpired",
+    "nonce_unused",
+    "forbidden_surface_empty",
+    "credential_scope_isolated",
+    "credentials_absent_from_logs",
+    "external_effect_preauthorized_or_none"
+  ],
+  "unknown_fields": "DENY"
+}

@@ -1,0 +1,24 @@
+name: hulagu-v2-autonomous-gate
+
+on:
+  pull_request:
+    paths:
+      - "products/hulagu/**"
+      - "docs/plans/2026-07-25-hulagu-full-hermes-instance-v2-revised-plan.md"
+      - "docs/adr/2026-07-25-hulagu-full-hermes-brokered-capsules.md"
+      - "docs/hulagu/THREAT-MODEL-v2.md"
+      - ".github/workflows/hulagu-v2-gate.yml"
+  workflow_dispatch:
+
+jobs:
+  g0-autonomous-source-freeze:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv --directory products/hulagu sync --frozen
+      - run: uv --directory products/hulagu run pytest -q tests/gates/test_g0_successor_freeze.py
+      - run: |
+          uv --directory products/hulagu run pytest -q                 'tests/contract/test_schema_examples.py::test_schema_embedded_examples_validate[gate-evidence-v1.schema.json]'                 'tests/contract/test_schema_examples.py::test_schema_embedded_examples_validate[gate-policy-admission-v1.schema.json]'                 'tests/contract/test_schema_examples.py::test_schema_embedded_examples_validate[pilot-consent-v1.schema.json]'
+      - run: uv --directory products/hulagu run pytest --collect-only -q | grep -E '^117 tests collected in '
+      - run: uv --directory products/hulagu run pytest -q | grep -E '^117 passed in '

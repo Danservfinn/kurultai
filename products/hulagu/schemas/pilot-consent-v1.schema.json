@@ -1,0 +1,71 @@
+{
+  "$id": "https://kurult.ai/schemas/pilot-consent-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "auto_invited": false,
+      "communication_permission_ref": "permission:existing:001",
+      "expires_at": "2026-08-02T19:00:00Z",
+      "gate_id": "G10",
+      "issued_at": "2026-07-26T19:00:00Z",
+      "participant_id": "opaque:participant:001",
+      "revocation_head_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_version": "hulagu-pilot-consent-v1",
+      "scope": "single_bounded_pilot"
+    }
+  ],
+  "properties": {
+    "auto_invited": {
+      "const": false
+    },
+    "communication_permission_ref": {
+      "pattern": "^[A-Za-z0-9._:/-]{8,256}$",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "gate_id": {
+      "enum": [
+        "G10",
+        "G11"
+      ]
+    },
+    "issued_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "participant_id": {
+      "pattern": "^[A-Za-z0-9._:-]{8,128}$",
+      "type": "string"
+    },
+    "revocation_head_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "hulagu-pilot-consent-v1"
+    },
+    "scope": {
+      "enum": [
+        "single_bounded_pilot",
+        "bounded_consented_cohort"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "participant_id",
+    "gate_id",
+    "scope",
+    "communication_permission_ref",
+    "issued_at",
+    "expires_at",
+    "revocation_head_sha256",
+    "auto_invited"
+  ],
+  "title": "Hulagu preexisting pilot consent v1",
+  "type": "object"
+}

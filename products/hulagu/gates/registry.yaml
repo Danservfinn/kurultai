@@ -1,0 +1,249 @@
+schema_version: hulagu-gate-registry-v2
+policy_id: hulagu.autonomous-authority.v1
+default_decision: DENY
+protected_ref_required: true
+clean_clone_reproduction_required: true
+operator_provenance:
+  identity: human:danny:hulagu-operator:v1
+  runtime_decision_authority: false
+gates:
+  G0:
+    state: ACTIVE
+    depends_on: null
+    slug: g0_autonomous_source_freeze
+    proof_directory: products/hulagu/qa/gates/G0-g0_autonomous_source_freeze
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - source_closed
+      - policy_review_exact
+      - forbidden_surface_empty
+  G1:
+    state: DECLARED_INACTIVE
+    depends_on: G0
+    slug: g1_source_contracts
+    proof_directory: products/hulagu/qa/gates/G1-g1_source_contracts
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - prior_closure_exact
+      - write_set_exact
+      - tests_green
+  G2:
+    state: DECLARED_INACTIVE
+    depends_on: G1
+    slug: g2_identity_confinement
+    proof_directory: products/hulagu/qa/gates/G2-g2_identity_confinement
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - isolation_live
+      - credential_scope_exact
+      - negative_probes_green
+  G3A:
+    state: DECLARED_INACTIVE
+    depends_on: G2
+    slug: g3a_storage_inventory
+    proof_directory: products/hulagu/qa/gates/G3A-g3a_storage_inventory
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - volume_exact
+      - capacity_green
+      - inventory_reconciled
+  G3B:
+    state: DECLARED_INACTIVE
+    depends_on: G3A
+    slug: g3b_durable_authority
+    proof_directory: products/hulagu/qa/gates/G3B-g3b_durable_authority
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - empty_authority
+      - recovery_kill_matrix
+      - projection_bounded
+  G3C:
+    state: DECLARED_INACTIVE
+    depends_on: G3B
+    slug: g3c_quarantine_migration
+    proof_directory: products/hulagu/qa/gates/G3C-g3c_quarantine_migration
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - read_only_source
+      - quarantine_only
+      - reconciliation_exact
+  G3D:
+    state: DECLARED_INACTIVE
+    depends_on: G3C
+    slug: g3d_restore_drill
+    proof_directory: products/hulagu/qa/gates/G3D-g3d_restore_drill
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - restore_tuple_exact
+      - ledger_head_current
+      - kill_matrix_green
+  G3E:
+    state: DECLARED_INACTIVE
+    depends_on: G3D
+    slug: g3e_data_promotion
+    proof_directory: products/hulagu/qa/gates/G3E-g3e_data_promotion
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - generation_exact
+      - legacy_revoked
+      - data_fuse_policy_admitted
+  G4:
+    state: DECLARED_INACTIVE
+    depends_on: G3E
+    slug: g4_broker_effects
+    proof_directory: products/hulagu/qa/gates/G4-g4_broker_effects
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - api_nonoverlap
+      - egress_policy_exact
+      - effect_readback
+  G5:
+    state: DECLARED_INACTIVE
+    depends_on: G4
+    slug: g5_profile_runtime
+    proof_directory: products/hulagu/qa/gates/G5-g5_profile_runtime
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - runtime_digest_exact
+      - tool_surface_closed
+      - hard_delete_denied
+  G6:
+    state: DECLARED_INACTIVE
+    depends_on: G5
+    slug: g6_public_research
+    proof_directory: products/hulagu/qa/gates/G6-g6_public_research
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - public_only
+      - archive_replay_exact
+      - tenant_canary_absent
+  G7:
+    state: DECLARED_INACTIVE
+    depends_on: G6
+    slug: g7_capsule_integration
+    proof_directory: products/hulagu/qa/gates/G7-g7_capsule_integration
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - one_tenant_epoch
+      - capability_exact
+      - teardown_zero_residue
+  G8:
+    state: DECLARED_INACTIVE
+    depends_on: G7
+    slug: g8_synthetic_e2e
+    proof_directory: products/hulagu/qa/gates/G8-g8_synthetic_e2e
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - synthetic_only
+      - effects_preauthorized
+      - readback_exact
+  G9:
+    state: DECLARED_INACTIVE
+    depends_on: G8
+    slug: g9_cron_shadow
+    proof_directory: products/hulagu/qa/gates/G9-g9_cron_shadow
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - cron_policy_exact
+      - shadow_green
+      - no_unapproved_outbound
+  G10:
+    state: DECLARED_INACTIVE
+    depends_on: G9
+    slug: g10_single_consented_pilot
+    proof_directory: products/hulagu/qa/gates/G10-g10_single_consented_pilot
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - pilot_consent_valid
+      - communication_permission_valid
+      - budget_green
+  G11:
+    state: DECLARED_INACTIVE
+    depends_on: G10
+    slug: g11_bounded_consented_cohort
+    proof_directory: products/hulagu/qa/gates/G11-g11_bounded_consented_cohort
+    admission_policy_id: hulagu.autonomous-authority.v1
+    producer_identity: agent:kublai:gate-producer:v1
+    independent_verifier_identity: agent:claude-code:independent-verifier:v1
+    policy_compiler_identity: service:hulagu-policy-compiler:v1
+    closure_receipt_type: hulagu-gate-evidence-v1
+    protected_ref_required: true
+    admission_predicates:
+      - all_consents_valid
+      - cohort_cap_green
+      - exit_receipts_exact
