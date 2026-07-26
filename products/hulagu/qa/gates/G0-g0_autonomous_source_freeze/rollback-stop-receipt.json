@@ -1,0 +1,14 @@
+{
+  "closure_digest": "a751eb138580abee4a0a64323b272555922de5ff718ef85541f0a983184043f6",
+  "forbidden_runtime_surfaces_remain_denied": [
+    "payments",
+    "public_posting",
+    "identity_or_soul_changes",
+    "hard_deletes",
+    "unapproved_outbound_email_or_chat"
+  ],
+  "rollback": "delete the closure-digest ref only; do not mutate G0 payload commit",
+  "schema_version": "hulagu-g0-stop-rollback-receipt-v1",
+  "stop_controls": "deny future gate progression if closure ref readback, parent commit, tree, payload hash, A5 decision, or tests drift",
+  "task_id": "t_0e6f1348"
+}
