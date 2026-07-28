@@ -1,0 +1,56 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/providerresponse-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "error_class": null,
+      "outcome": "succeeded",
+      "request_id": "provider_synthetic_01",
+      "response_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "schema_version": "ProviderResponse/v1"
+    }
+  ],
+  "properties": {
+    "error_class": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "pending",
+        "succeeded",
+        "failed",
+        "delivery_unknown"
+      ]
+    },
+    "request_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "response_digest": {
+      "oneOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema_version": {
+      "const": "ProviderResponse/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request_id",
+    "outcome",
+    "response_digest"
+  ],
+  "title": "ProviderResponse/v1",
+  "type": "object"
+}

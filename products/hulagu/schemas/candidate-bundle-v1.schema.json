@@ -1,0 +1,67 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/candidatebundle-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "candidates": [
+        {
+          "candidate_id": "candidate_synthetic_01",
+          "fit_score": 82,
+          "listing_url": "https://example.test/jobs/1"
+        }
+      ],
+      "profile_version": 1,
+      "run_id": "run_synthetic_01",
+      "schema_version": "CandidateBundle/v1"
+    }
+  ],
+  "properties": {
+    "candidates": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "fit_score": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "listing_url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "listing_url",
+          "fit_score"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "profile_version": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "run_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "CandidateBundle/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "profile_version",
+    "candidates"
+  ],
+  "title": "CandidateBundle/v1",
+  "type": "object"
+}

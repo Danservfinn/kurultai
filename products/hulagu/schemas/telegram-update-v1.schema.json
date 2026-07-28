@@ -1,0 +1,64 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/telegramupdate-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "actor_id": 300001,
+      "bot_id": 100001,
+      "callback_query_id": null,
+      "chat_id": 300001,
+      "chat_type": "private",
+      "message_id": 400001,
+      "schema_version": "TelegramUpdate/v1",
+      "update_id": 200001
+    }
+  ],
+  "properties": {
+    "actor_id": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "bot_id": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "callback_query_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "chat_id": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "chat_type": {
+      "const": "private"
+    },
+    "message_id": {
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "const": "TelegramUpdate/v1"
+    },
+    "update_id": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "bot_id",
+    "update_id",
+    "chat_id",
+    "chat_type",
+    "actor_id"
+  ],
+  "title": "TelegramUpdate/v1",
+  "type": "object"
+}

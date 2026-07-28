@@ -1,0 +1,50 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/actiontoken-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "action": "confirm_profile",
+      "expires_at": "2026-07-28T00:00:00Z",
+      "object_id": "profile_synthetic_01",
+      "object_version": 1,
+      "schema_version": "ActionToken/v1",
+      "token_id": "act_synthetic_01"
+    }
+  ],
+  "properties": {
+    "action": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "object_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "object_version": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "ActionToken/v1"
+    },
+    "token_id": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "token_id",
+    "action",
+    "object_id",
+    "object_version",
+    "expires_at"
+  ],
+  "title": "ActionToken/v1",
+  "type": "object"
+}

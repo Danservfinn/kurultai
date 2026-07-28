@@ -1,0 +1,133 @@
+{
+  "schema_version": "hulagu-impact-regression-baseline/v1",
+  "source_commit": "c10e2bdc0374cc00bc8faf82b23f67933226d670",
+  "source_branch": "main",
+  "clean_worktree_proof": {
+    "command": "git status --short",
+    "outcome": "empty",
+    "observed_before_task_0_changes": true
+  },
+  "root_test_baseline": {
+    "command": "PYTHONPATH=. uv run --with pytest --with jsonschema pytest tests -q --junitxml=/tmp/hulagu-root-baseline.xml",
+    "outcome": "67 passed",
+    "per_test_outcome_digest_algorithm": "sha256(sorted(classname::name:outcome))",
+    "per_test_outcome_sha256": "e641143af3a67437e7d9d82ded3ca3d15a6683b9aaef81d405801c01d1d87ad0"
+  },
+  "hulagu_test_baseline": {
+    "state_at_source_commit": "not_present",
+    "commands": [
+      "cd /Users/kublai/kurultai/kurultai-repo/products/hulagu && uv sync --frozen",
+      "cd /Users/kublai/kurultai/kurultai-repo/products/hulagu && uv run pytest tests/contract tests/integration/test_vault_preflight.py -vv",
+      "cd /Users/kublai/kurultai/kurultai-repo/products/hulagu && uv run pytest tests/integration/test_container_mount_probe.py -vv"
+    ]
+  },
+  "canonical_tracker": {
+    "path": "/Users/kublai/brain/docs/qa/kurultai-system-feature-status.csv",
+    "sha256": "4fe11fed6d97bd6ece1b89d4e3ea2729a092d531dd68912b133d5b214cc04637"
+  },
+  "selected_rows": [
+    {
+      "id": "SYS-001",
+      "touches": ["launchd"],
+      "current_status": "PASS",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-system-surface-coverage.json",
+      "evidence_sha256": "f6d774ac3a57341f884e73ef80619067f6dcba1798542b196096c113c0d4aae0",
+      "accountable_owner_role": "Kublai scope owner",
+      "required_g3_status": "PASS"
+    },
+    {
+      "id": "SYS-004",
+      "touches": ["vault", "APFS storage"],
+      "current_status": "PASS",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-system-surface-coverage.json",
+      "evidence_sha256": "f6d774ac3a57341f884e73ef80619067f6dcba1798542b196096c113c0d4aae0",
+      "accountable_owner_role": "Kublai scope owner",
+      "required_g3_status": "PASS"
+    },
+    {
+      "id": "HERMES-009",
+      "touches": ["Hermes Telegram ownership"],
+      "current_status": "DEGRADED",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-hermes-profile-config.json",
+      "evidence_sha256": "618634dc6d984e33c1a037a7354c9bafc09ce58b99f9bc2e9a5942cdcf2eeddf",
+      "accountable_owner_role": "Kublai Hermes topology owner",
+      "required_g3_status": "PASS_GATED",
+      "gate_relation": "Existing Hermes profile-fleet topology is unrelated to Hulagu's separate owner-gated bot identity; any Hulagu-caused regression still blocks."
+    },
+    {
+      "id": "BRAIN-001",
+      "touches": ["Brain public boundary"],
+      "current_status": "PASS",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-brain-reconciliation.json",
+      "evidence_sha256": "2b4cb97d0aa30fa345929df701257cd3006ef32fbee63d36bf414c626978d503",
+      "accountable_owner_role": "Brain service owner",
+      "required_g3_status": "PASS"
+    },
+    {
+      "id": "BRAIN-004",
+      "touches": ["Brain private boundary"],
+      "current_status": "PASS",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-brain-reconciliation.json",
+      "evidence_sha256": "2b4cb97d0aa30fa345929df701257cd3006ef32fbee63d36bf414c626978d503",
+      "accountable_owner_role": "Brain service owner",
+      "required_g3_status": "PASS"
+    },
+    {
+      "id": "QA-047",
+      "touches": ["launchd"],
+      "current_status": "PASS",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-launchd-health-matrix.json",
+      "evidence_sha256": "4b1798a8bf07b559bb7f9cade6f093939e44dad431f61f2895107a41a8ce2a7d",
+      "accountable_owner_role": "Kublai QA owner",
+      "required_g3_status": "PASS"
+    },
+    {
+      "id": "QA-051",
+      "touches": ["secret exposure"],
+      "current_status": "PASS",
+      "evidence_path": "/Users/kublai/brain/docs/qa/kurultai-secret-exposure.json",
+      "evidence_sha256": "2170f7ebfb50119caac7668ee0412ad028abc7850fa6b9d3ecf7d19109f519da",
+      "accountable_owner_role": "security verifier",
+      "required_g3_status": "PASS"
+    }
+  ],
+  "proof_debt": [
+    {
+      "item": "No canonical tracker row directly covers native PostgreSQL for Hulagu",
+      "owner": "implementation owner",
+      "closure_gate": "G2/G3"
+    },
+    {
+      "item": "No canonical tracker row directly covers Colima/container runtime isolation for Hulagu",
+      "owner": "implementation and security owners",
+      "closure_gate": "G2/G3"
+    },
+    {
+      "item": "No canonical tracker row directly covers Hulagu backup/restore",
+      "owner": "backup/restore owner and independent verifier",
+      "closure_gate": "G3"
+    },
+    {
+      "item": "Dedicated Hulagu Telegram bot identity is not provisioned or tested",
+      "owner": "product owner and Telegram owner",
+      "closure_gate": "G4"
+    },
+    {
+      "item": "Provider privacy and credential lifecycle evidence is absent",
+      "owner": "product owner and privacy reviewer",
+      "closure_gate": "G5"
+    }
+  ],
+  "safety_waivers": [],
+  "thresholds": {
+    "g1_g2": "zero new root-test failures, selected-row regressions, or secret/privacy/isolation failures",
+    "g3": "all Hulagu-owned tests green and each selected row PASS or PASS_GATED only for a gate unrelated to Hulagu code",
+    "baseline_change": "independent diff review and owner approval required"
+  },
+  "implementation_owner_role": "hulagu-task-0-implementer",
+  "generation": {
+    "command": "Task 0 manual frozen-baseline capture using pytest JUnit normalization and SHA-256 readback",
+    "version": "hulagu-impact-regression-baseline/v1; Python 3.11.14; uv 0.10.7",
+    "independent_verifier_identity": "Mongke task t_fb2c4101 (pending review; no approval claimed in this baseline)"
+  }
+}

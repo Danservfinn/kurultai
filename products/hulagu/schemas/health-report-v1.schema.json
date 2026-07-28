@@ -1,0 +1,74 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/healthreport-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "checked_at": "2026-07-27T00:00:00Z",
+      "checks": {
+        "postgresql": {
+          "reasons": [],
+          "status": "not_evaluated"
+        },
+        "vault": {
+          "reasons": [
+            "vault_uuid_unenrolled"
+          ],
+          "status": "fail"
+        }
+      },
+      "schema_version": "HealthReport/v1",
+      "status": "degraded"
+    }
+  ],
+  "properties": {
+    "checked_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "checks": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "not_evaluated"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reasons"
+        ],
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "HealthReport/v1"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "degraded"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "checked_at",
+    "status",
+    "checks"
+  ],
+  "title": "HealthReport/v1",
+  "type": "object"
+}

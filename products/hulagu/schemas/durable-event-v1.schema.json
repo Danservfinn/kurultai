@@ -1,0 +1,70 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/durableevent-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "event_id": "event_synthetic_01",
+      "event_type": "ConsentAccepted",
+      "occurred_at": "2026-07-27T00:00:00Z",
+      "payload": {
+        "notice_version": "synthetic-v1"
+      },
+      "schema_version": "DurableEvent/v1"
+    }
+  ],
+  "properties": {
+    "event_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "event_type": {
+      "enum": [
+        "ConsentAccepted",
+        "ConsentDeclined",
+        "CvReceived",
+        "CvParsed",
+        "CvParseFailed",
+        "AnswerSubmitted",
+        "OptionalFieldSkipped",
+        "FieldEdited",
+        "ProfileConfirmed",
+        "SearchRequested",
+        "RunPaused",
+        "RunResumed",
+        "RunCancelled",
+        "ProviderRequestRecorded",
+        "ProviderResponseRecorded",
+        "AttemptClaimed",
+        "AttemptCompleted",
+        "AttemptExpired",
+        "PublicationActivated",
+        "CandidateSaved",
+        "CandidateRejected",
+        "DeleteRequested",
+        "DeleteConfirmed",
+        "DeleteCancelled"
+      ],
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "DurableEvent/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "payload"
+  ],
+  "title": "DurableEvent/v1",
+  "type": "object"
+}

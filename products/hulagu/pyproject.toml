@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hulagu"
+version = "0.1.0"
+description = "Private, deterministic job-search product contracts for Kurultai"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "Kurultai contributors" }]
+dependencies = []
+
+[project.scripts]
+hulagu-doctor = "hulagu.config:doctor_main"
+hulagu-verify-plan-gate = "hulagu.config:verify_plan_gate_main"
+
+[dependency-groups]
+dev = [
+  "bandit>=1.8,<2",
+  "jsonschema[format]>=4.25,<5",
+  "mypy>=1.17,<2",
+  "pytest>=8.4,<10",
+  "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hulagu"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]

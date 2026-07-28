@@ -1,0 +1,50 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/receipt-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "correlation_id": "corr_synthetic_01",
+      "event_type": "vault_preflight",
+      "occurred_at": "2026-07-27T00:00:00Z",
+      "receipt_id": "receipt_synthetic_01",
+      "redacted": {
+        "status": "fail"
+      },
+      "schema_version": "Receipt/v1"
+    }
+  ],
+  "properties": {
+    "correlation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "event_type": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "receipt_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "redacted": {
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "Receipt/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "event_type",
+    "occurred_at",
+    "redacted"
+  ],
+  "title": "Receipt/v1",
+  "type": "object"
+}

@@ -1,0 +1,79 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/searchplan-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "budgets": {
+        "max_queries": 3,
+        "max_results": 25,
+        "max_retries": 2,
+        "max_seconds": 120
+      },
+      "plan_id": "plan_synthetic_01",
+      "profile_version": 1,
+      "queries": [
+        "synthetic software engineer"
+      ],
+      "schema_version": "SearchPlan/v1"
+    }
+  ],
+  "properties": {
+    "budgets": {
+      "additionalProperties": false,
+      "properties": {
+        "max_queries": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_results": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_retries": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_seconds": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_queries",
+        "max_results",
+        "max_seconds",
+        "max_retries"
+      ],
+      "type": "object"
+    },
+    "plan_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "profile_version": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "queries": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "SearchPlan/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "plan_id",
+    "profile_version",
+    "queries",
+    "budgets"
+  ],
+  "title": "SearchPlan/v1",
+  "type": "object"
+}

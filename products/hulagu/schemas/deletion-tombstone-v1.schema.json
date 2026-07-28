@@ -1,0 +1,44 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/deletiontombstone-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "created_at": "2026-07-27T00:00:00Z",
+      "expires_at": "2027-07-27T00:00:00Z",
+      "key_version": 1,
+      "schema_version": "DeletionTombstone/v1",
+      "subject_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "key_version": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "DeletionTombstone/v1"
+    },
+    "subject_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "subject_digest",
+    "key_version",
+    "created_at",
+    "expires_at"
+  ],
+  "title": "DeletionTombstone/v1",
+  "type": "object"
+}

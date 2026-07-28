@@ -50,10 +50,17 @@ Required behavior:
 - **Rebuildable configuration** — sanitized templates and manifests describe how to recreate the system without publishing secrets or live private state.
 - **Recovery loop** — canaries, drift checks, low-token monitors, and review gates keep the system moving without turning automation into recklessness.
 - **Solution Graph** — an offline, deterministic, read-only capability resolver under [`solution_graph/`](solution_graph/) that emits inspectable plans without installing or executing artifacts.
+- **Hulagu V2 contracts** — a dedicated private Telegram job-search product under [`products/hulagu/`](products/hulagu/) with a documented [architecture](docs/architecture/hulagu.md) and [dedicated-control-plane ADR](docs/adr/2026-07-25-hulagu-dedicated-telegram-control-plane.md). Task 0 is source-only at G1; no customer runtime is installed or running.
 
 ## Systems in detail
 
 Kurultai is not just a profile roster. It is a set of cooperating systems around Hermes Agent: some run continuously, some are invoked by Kublai, and some are rebuild/install contracts. The public repository contains the safe contracts, manifests, prompts, templates, diagrams, and runbooks for these systems. It intentionally excludes live secrets, private Brain contents, live Kanban databases, sessions, chat IDs, OAuth tokens, and private runtime state.
+
+### Hulagu V2 product contracts
+
+Hulagu V2 is a dedicated deterministic Telegram product, not a general Hermes profile. Its Git-visible home is [`products/hulagu/`](products/hulagu/); its source/runtime/customer-data/credential/operator-projection boundaries are frozen in the [architecture document](docs/architecture/hulagu.md), the choice of a standalone Telegram control plane is recorded in the [ADR](docs/adr/2026-07-25-hulagu-dedicated-telegram-control-plane.md), and security scope is enumerated in the [threat model](docs/hulagu/THREAT-MODEL.md).
+
+The current Task 0 surface contains documentation, schemas, toolchain metadata, static contract tests, and read-only gate/environment checks only. PostgreSQL, containers, providers, bots, credentials, vault writes, customer data, deployment, and pilot evidence remain later-gated and are not implied by the presence of these files.
 
 ### Radar care layer
 

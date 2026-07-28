@@ -1,0 +1,92 @@
+{
+  "$id": "https://kurult.ai/hulagu/schemas/parsedcv-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "examples": [
+    {
+      "document_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "fields": [
+        {
+          "confidence": 0.8,
+          "field_id": "target_role",
+          "source": "cv",
+          "source_span": "page 1",
+          "value": "Synthetic Engineer"
+        }
+      ],
+      "schema_version": "ParsedCv/v1"
+    }
+  ],
+  "properties": {
+    "document_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "fields": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "field_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source": {
+            "const": "cv"
+          },
+          "source_span": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              {
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            ]
+          }
+        },
+        "required": [
+          "field_id",
+          "value",
+          "source",
+          "confidence"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "ParsedCv/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "document_sha256",
+    "fields"
+  ],
+  "title": "ParsedCv/v1",
+  "type": "object"
+}
