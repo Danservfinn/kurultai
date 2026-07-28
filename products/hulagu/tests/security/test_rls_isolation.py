@@ -63,8 +63,8 @@ def test_tenant_storage_references_are_confined_and_cross_tenant_outbox_is_hidde
         assert bad.returncode != 0
         psql(
             dsn,
-            f"INSERT INTO hulagu.outbox_messages(tenant_id,id,kind,payload,lifecycle_epoch,work_epoch,state) "
-            f"VALUES ('{TENANT_B}',gen_random_uuid(),'ordinary','{{}}',0,0,'pending')",
+            f"INSERT INTO hulagu.outbox_messages(tenant_id,id,kind,payload,lifecycle_epoch,work_epoch,state,delivery_key) "
+            f"VALUES ('{TENANT_B}',gen_random_uuid(),'ordinary','{{}}',0,0,'pending','security-test:cross-tenant')",
         )
         assert app_sql(dsn, "SELECT count(*) FROM hulagu.outbox_messages").stdout.strip() == "0"
 
@@ -78,9 +78,9 @@ def test_outbox_and_retention_claims_derive_authority_from_installed_context() -
         retention_b = "40000000-0000-4000-8000-00000000000b"
         psql(
             dsn,
-            f"INSERT INTO hulagu.outbox_messages(tenant_id,id,kind,payload,lifecycle_epoch,work_epoch,state) VALUES "
-            f"('{TENANT_A}','{outbox_a}','ordinary','{{}}',0,0,'pending'),"
-            f"('{TENANT_B}','{outbox_b}','ordinary','{{}}',0,0,'pending');"
+            f"INSERT INTO hulagu.outbox_messages(tenant_id,id,kind,payload,lifecycle_epoch,work_epoch,state,delivery_key) VALUES "
+            f"('{TENANT_A}','{outbox_a}','ordinary','{{}}',0,0,'pending','security-test:claim-a'),"
+            f"('{TENANT_B}','{outbox_b}','ordinary','{{}}',0,0,'pending','security-test:claim-b');"
             f"INSERT INTO hulagu.retention_jobs(tenant_id,id,scope,state,lifecycle_epoch) VALUES "
             f"('{TENANT_A}','{retention_a}','receipt','pending',0),"
             f"('{TENANT_B}','{retention_b}','receipt','pending',0);",
@@ -91,3 +91,35 @@ def test_outbox_and_retention_claims_derive_authority_from_installed_context() -
         assert retention == [retention_a]
         forged = app_sql(dsn, f"SELECT hulagu_api.claim_outbox('{TENANT_B}',10)", check=False)
         assert forged.returncode != 0
+
+
+def test_telegram_ingress_authority_rejects_forged_subject_and_search_path_shadowing() -> None:
+    with postgres_cluster() as dsn:
+        psql(
+            dsn,
+            "CREATE SCHEMA attacker;"
+            "CREATE TABLE attacker.telegram_polling_offsets(bot_id bigint,next_update_id bigint);"
+            "INSERT INTO attacker.telegram_polling_offsets VALUES(7,999);",
+        )
+        assert psql(
+            dsn,
+            "SET search_path=attacker,public; SELECT hulagu_api.telegram_polling_offset(7)",
+            user="hulagu_app",
+        ).stdout.strip() == "0"
+
+        forged = psql(
+            dsn,
+            "SELECT hulagu_api.persist_telegram_ingress("
+            "7,1,NULL,2,repeat('9',64),'processed',now()+interval '1 day')",
+            user="hulagu_app",
+            check=False,
+        )
+        assert forged.returncode != 0
+        assert psql(dsn, "SELECT count(*) FROM hulagu.inbound_updates").stdout.strip() == "0"
+        assert psql(dsn, "SELECT count(*) FROM hulagu.telegram_polling_offsets").stdout.strip() == "0"
+        assert psql(
+            dsn,
+            "SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='hulagu_app' "
+            "AND table_schema='hulagu' AND table_name IN "
+            "('enrollments','identity_bindings','inbound_updates','telegram_polling_offsets')",
+        ).stdout.strip() == "0"
