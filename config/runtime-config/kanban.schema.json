@@ -600,6 +600,34 @@
           "not_null": false,
           "primary_key": false,
           "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "project_id",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "block_kind",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": "0",
+          "name": "block_recurrences",
+          "not_null": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        {
+          "default": null,
+          "name": "verdict",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
         }
       ],
       "name": "tasks",

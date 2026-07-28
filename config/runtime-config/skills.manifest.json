@@ -503,6 +503,11 @@
       "path": "apple/macos-storage-diagnostics"
     },
     {
+      "description": "|",
+      "name": "macos-vision-image-analysis",
+      "path": "apple/macos-vision-image-analysis"
+    },
+    {
       "description": "Route coding work to Claude Code, Codex, OpenCode, or other CLI agents while Hermes orchestrates scope, verification, and handoff.",
       "name": "autonomous-coding-agents",
       "path": "autonomous-ai-agents/autonomous-coding-agents"
@@ -521,6 +526,11 @@
       "description": "Delegate coding work to autonomous coding agents and coordinate Claude Code, Codex, OpenCode, subagents, and Kanban lanes.",
       "name": "coding-agent-workflows",
       "path": "autonomous-ai-agents/coding-agent-workflows"
+    },
+    {
+      "description": "Configure, upgrade, resume, and verify third-party Claude Code deep-research harnesses with source-first model/profile fidelity and artifact-level receipts.",
+      "name": "deep-research-harness-operations",
+      "path": "autonomous-ai-agents/deep-research-harness-operations"
     },
     {
       "description": "Configure, extend, or contribute to Hermes Agent.",
@@ -733,6 +743,26 @@
       "path": "data-science/knowledge-and-data-workflows/references/absorbed-packages/obsidian"
     },
     {
+      "description": "Turn a messy problem into an answer-first recommendation by independently analyzing it top-down from principles/options and bottom-up from evidence, then comparing convergence, conflicts, and evidence gaps. Use for decisions, memos, strategy recommendations, prioritization, and situations where analysis keeps expanding without landing. Do not use when the user needs a full issue tree, root-cause diagnosis, or open-ended problem framing instead of a decision.",
+      "name": "structure-problem",
+      "path": "decision-making/structure-problem"
+    },
+    {
+      "description": "Read, write, and diff structured per-cron state files so each scheduled run is strictly smarter than the last. Every cron job maintains a state.md recording what was done, what's queued next, and a comparable score across runs.",
+      "name": "cron-state-files",
+      "path": "devops/cron-state-files"
+    },
+    {
+      "description": "Scan project dependencies for CVEs, rank by actual reachability (not just CVSS), patch the highest-risk reachable finding with the smallest credible change, and verify before continuing. Never silence findings without evidence.",
+      "name": "dependency-cve-burndown",
+      "path": "devops/dependency-cve-burndown"
+    },
+    {
+      "description": "Investigate Hermes delegated-agent and background-worker lifecycle failures by identifying the exact worker, timeout boundary, progress state, profile-scoped configuration, and smallest evidence-backed correction.",
+      "name": "hermes-background-worker-operations",
+      "path": "devops/hermes-background-worker-operations"
+    },
+    {
       "description": "Use when inspecting, troubleshooting, or explaining Hermes cron scheduler health across profiles. Distinguishes scheduler liveness from job presence, summarizes job state safely, and checks profile-scoped cron stores without confusing one profile for another.",
       "name": "hermes-cron-operations",
       "path": "devops/hermes-cron-operations"
@@ -766,6 +796,11 @@
       "description": "Diagnose slow Hermes Agent responses across gateway, model provider, context/compression, tool loops, cron/background load, and local system pressure; produce evidence-backed latency receipts and safe remediation options.",
       "name": "hermes-latency-troubleshooting",
       "path": "devops/hermes-latency-troubleshooting"
+    },
+    {
+      "description": "Troubleshoot and configure Hermes inference-provider authentication, especially OAuth/API-key credential precedence, remote browser OAuth, profile-scoped auth state, xAI/Grok recovery, Anthropic/Claude OAuth, OpenAI Codex OAuth, and credential pools.",
+      "name": "hermes-provider-auth-troubleshooting",
+      "path": "devops/hermes-provider-auth-troubleshooting"
     },
     {
       "description": "Preserve interrupted, preempted, blocked, or concurrent work by routing it into Hermes Kanban tasks with context, receipts, exact completion reporting, and active blocker resolution.",
@@ -808,9 +843,19 @@
       "path": "devops/local-infrastructure-procurement/references/absorbed-packages/local-storage-procurement"
     },
     {
+      "description": "Design recurring autonomous loops (cron jobs, improvement cycles, monitoring pipelines) using a proven checklist that prevents the common failure modes of loops that do too much per run, never terminate, or repeat work. Apply when creating any new scheduled job, improvement loop, or recurring agent task.",
+      "name": "loop-design-checklist",
+      "path": "devops/loop-design-checklist"
+    },
+    {
       "description": "Diagnose and repair SSH/Tailscale/Termius remote-access failures with transport/auth/session-layer separation and verified end-to-end probes.",
       "name": "remote-access-troubleshooting",
       "path": "devops/remote-access-troubleshooting"
+    },
+    {
+      "description": "Create a restartable handoff at session boundaries \u2014 records current goal, verified evidence, untouched scope, risks, and exactly one safe next action so any human or agent can resume without guessing.",
+      "name": "restartable-handoff",
+      "path": "devops/restartable-handoff"
     },
     {
       "description": "Run proposal-only SaaS readiness cron loops: collect read-only product/admin evidence, dedupe recent proposals, and create at most one approval-gated improvement proposal.",
@@ -958,6 +1003,11 @@
       "path": "kurultai/improve"
     },
     {
+      "description": "Use when the operator invokes /intercom, asks an agent to check shared agent communications, or when a Kurultai agent must read or append a signed inter-agent message. Verify the append-only ledger, decide whether a material response is necessary, and sign any response with the current stable agent identity.",
+      "name": "intercom",
+      "path": "kurultai/intercom"
+    },
+    {
       "description": "Monitor Kurultai agent profile health: session activity, error rates, model config, cron status. Cross-profile visibility into all 6 agents.",
       "name": "kurultai-agent-health",
       "path": "kurultai/kurultai-agent-health"
@@ -1026,6 +1076,11 @@
       "description": "Route meaningful Kurultai/source experience into Brain, memory, skills, Kanban follow-ups, receipts/regressions/canaries, or explicit no-op rationale without hijacking official /learn.",
       "name": "study",
       "path": "kurultai/study"
+    },
+    {
+      "description": "Run the Andrej/Kurultai Brain knowledge synthesis loop on demand: review completed `/study` artifacts, extract novel cross-source mechanisms, write bounded synthesis packets or no-op receipts, and preserve public/runtime approval boundaries.",
+      "name": "synthesis",
+      "path": "kurultai/synthesis"
     },
     {
       "description": "Discover, find, compare, audit, repair, adapt, craft, run, debrief, and prepare repeatable AI-agent loops for publication.",
@@ -1248,7 +1303,12 @@
       "path": "productivity/group-chat-etiquette"
     },
     {
-      "description": "Tailor resumes and submit job applications.",
+      "description": "Research, verify, and prepare source-backed Hulagu Job Ops enrichment or net-new opportunity batches, then perform deterministic review and separately authorized exact-range Sheet delivery with server-side readback.",
+      "name": "hulagu-job-ops-research",
+      "path": "productivity/hulagu-job-ops-research"
+    },
+    {
+      "description": "Tailor resumes, complete job applications, and prepare verified contact-specific LinkedIn outreach.",
       "name": "job-application-loop",
       "path": "productivity/job-application-loop"
     },
@@ -1301,6 +1361,11 @@
       "description": "Create, read, edit .pptx decks, slides, notes, templates.",
       "name": "powerpoint",
       "path": "productivity/powerpoint"
+    },
+    {
+      "description": "Pre-publish verification loop \u2014 inventories every checkable claim in a draft, traces each to a primary source, labels it supported/outdated/misattributed/unsupported/unverifiable, and repairs high-risk mismatches before anything goes live.",
+      "name": "pre-publish-source-check",
+      "path": "productivity/pre-publish-source-check"
     },
     {
       "description": "Use when the user asks to premortem, stress-test, red-team, de-risk, or future-failure-analyze a plan, decision, launch, hire, partnership, project, commitment, or strategy before execution.",
@@ -1378,9 +1443,24 @@
       "path": "research/blogwatcher"
     },
     {
+      "description": "Structured reasoning loop for hard decisions \u2014 separates facts from assumptions, builds falsifiable hypotheses, runs the highest-information test, updates an evidence ledger, and subjects the leading model to adversarial critique.",
+      "name": "epistemic-frontier",
+      "path": "research/epistemic-frontier"
+    },
+    {
+      "description": "DOI-verified literature search that deduplicates across PubMed/Semantic Scholar, verifies metadata via Crossref, applies a fixed relevance rubric, and produces an auditable CSV with honest terminal verdict (success/needs-review/blocked/exhausted).",
+      "name": "literature-search-verification",
+      "path": "research/literature-search-verification"
+    },
+    {
       "description": "Karpathy's LLM Wiki: build/query interlinked markdown KB.",
       "name": "llm-wiki",
       "path": "research/llm-wiki"
+    },
+    {
+      "description": "Assess whether the operator should buy, hold, or sell a personal public-market position using evidence-first market data, company filings/news, position sizing, and decision rules rather than generic investment commentary.",
+      "name": "personal-investment-assessment",
+      "path": "research/personal-investment-assessment"
     },
     {
       "description": "Query Polymarket: markets, prices, orderbooks, history.",
@@ -1411,6 +1491,21 @@
       "description": "Write ML papers for NeurIPS/ICML/ICLR: design\u2192submit.",
       "name": "research-paper-writing",
       "path": "research/research-paper-writing"
+    },
+    {
+      "description": "Operate, troubleshoot, extend, and verify Cloudflare Access authentication for self-hosted applications, including One-Time PIN, identity providers, service tokens, policy repair, and origin-mediated browser key login.",
+      "name": "cloudflare-access-operations",
+      "path": "security/cloudflare-access-operations"
+    },
+    {
+      "description": "Design, install, and verify durable OAuth 2.0 user-token lifecycles with secure secret storage, automatic refresh, expiry monitoring, and human reauthorization handoffs. Use for LinkedIn and other 3-legged OAuth integrations where tokens expire or refresh availability is conditional.",
+      "name": "oauth-lifecycle-operations",
+      "path": "security/oauth-lifecycle-operations"
+    },
+    {
+      "description": "Autonomously remove your info from data-broker sites.",
+      "name": "unbroker",
+      "path": "security/unbroker"
     },
     {
       "description": "Operate personal device and smart-home APIs safely: Hue/OpenHue lights and read-only Tesla Fleet vehicle data.",
@@ -1503,6 +1598,21 @@
       "path": "software-development/debugging-hermes-tui-commands"
     },
     {
+      "description": "Build-worker procedure for Finn Loop Kanban tasks; implement only the scoped spec, commit, and hand off to review without merging.",
+      "name": "finn-loop-build",
+      "path": "software-development/finn-loop-build"
+    },
+    {
+      "description": "Independent review-worker procedure for Finn Loop tasks; verify build output, create PR/preview when possible, and produce the operator approval card.",
+      "name": "finn-loop-review",
+      "path": "software-development/finn-loop-review"
+    },
+    {
+      "description": "Turn a rough the operator/Kublai idea into a Finn Loop Kanban build + review chain using the profile-local finn_loop.py wrapper.",
+      "name": "finn-loop-spec",
+      "path": "software-development/finn-loop-spec"
+    },
+    {
       "description": "First-principles preflight for agent work: clarify desired reality, assumptions, smallest safe action, and outcome evidence before building the expected artifact.",
       "name": "first-principles-preflight",
       "path": "software-development/first-principles-preflight"
@@ -1511,6 +1621,11 @@
       "description": "Act as the independent verifier for a gated implementation plan. A separate implementer session (usually Claude Code, often 'Kublai') writes code, runs gates, and commits; this profile independently reproduces each gate's evidence using fresh Claude Code print-mode runs, guards a never-move invariant, pre-checks privileged operator scripts before the human runs them, and posts GATE CLR / GATE HOLD verdicts. Use whenever the operator asks for verification of a gated plan, a HANDOFF.md exists, or an implementer signals GATE REQ. This is one of this profile's primary roles.",
       "name": "gated-implementation-verifier",
       "path": "software-development/gated-implementation-verifier"
+    },
+    {
+      "description": "Use when starting or reviewing a complex implementation where the user wants an agent to interrogate the plan against docs/source evidence, surface unknown unknowns, and avoid rushing into build mode. Combines docs-grounded grilling with a map-vs-territory unknowns pass.",
+      "name": "grill-for-unknowns",
+      "path": "software-development/grill-for-unknowns"
     },
     {
       "description": "Author in-repo SKILL.md: frontmatter, validator, structure.",
@@ -1538,14 +1653,39 @@
       "path": "software-development/operational-assessment"
     },
     {
+      "description": "Run a bounded concurrent swarm of Parse beta tester agents from Telegram via /parse_beta_swarm; executes multiple live beta Sentinel probes against parsethis.ai and summarizes controlled-beta readiness without claiming open-launch readiness.",
+      "name": "parse-beta-swarm",
+      "path": "software-development/parse-beta-swarm"
+    },
+    {
+      "description": "Run the Parse Beta Tester/Sentinel on demand and report controlled-beta readiness from live parsethis.ai probes. Use from Telegram as /parse_beta_tester.",
+      "name": "parse-beta-tester",
+      "path": "software-development/parse-beta-tester"
+    },
+    {
+      "description": "Develop and maintain the Parse for Agents product (parsethis.ai). Covers repo layout, SSR landing page editing, API route structure, and deployment for the Hono + TypeScript codebase at ~/parse-for-agents-live.",
+      "name": "parse-for-agents-dev",
+      "path": "software-development/parse-for-agents-dev"
+    },
+    {
       "description": "Metadata receipt pattern for Hermes screened tool events.",
       "name": "parse-screening-recovery",
       "path": "software-development/parse-screening-recovery"
     },
     {
+      "description": "Develop and maintain the parsethe.media web app \u2014 the operator's 12-agent AI media analysis platform (Next.js, React, Prisma, BullMQ). Covers repo layout, pricing config, landing-page copy, tier data flow, and frontend editing patterns.",
+      "name": "parsethe-media-dev",
+      "path": "software-development/parsethe-media-dev"
+    },
+    {
       "description": "Plan mode: write markdown plan to .hermes/plans/, no exec.",
       "name": "plan",
       "path": "software-development/plan"
+    },
+    {
+      "description": "Verify model/provider capability claims across user-facing labels, local normalization, endpoint wire values, and live behavior before changing adapters or opening upstream PRs.",
+      "name": "provider-capability-verification",
+      "path": "software-development/provider-capability-verification"
     },
     {
       "description": "Debug Python: pdb REPL + debugpy remote (DAP).",
@@ -1561,6 +1701,11 @@
       "description": "Pre-commit review: security scan, quality gates, auto-fix.",
       "name": "requesting-code-review",
       "path": "software-development/requesting-code-review"
+    },
+    {
+      "description": "Design, implement, review, and canary-test state-changing chat controls such as acknowledge, approve, snooze, retry, and dismiss buttons across Telegram, Slack, Discord, and similar adapters.",
+      "name": "secure-chat-interactions",
+      "path": "software-development/secure-chat-interactions"
     },
     {
       "description": "Write shell commands that don't trip Hermes's own security scanner. Avoid pipe-to-interpreter patterns and inline `-c` script execution when a direct-file read works.",

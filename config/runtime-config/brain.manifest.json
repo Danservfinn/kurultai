@@ -15,7 +15,7 @@
       "name": "agents"
     },
     {
-      "markdown_files": 319,
+      "markdown_files": 463,
       "name": "analyses"
     },
     {
@@ -31,7 +31,7 @@
       "name": "captures"
     },
     {
-      "markdown_files": 36,
+      "markdown_files": 39,
       "name": "concepts"
     },
     {
@@ -39,24 +39,36 @@
       "name": "config"
     },
     {
-      "markdown_files": 132,
+      "markdown_files": 168,
       "name": "content"
+    },
+    {
+      "markdown_files": 24,
+      "name": "crates"
     },
     {
       "markdown_files": 0,
       "name": "dashboards"
     },
     {
-      "markdown_files": 365,
+      "markdown_files": 4,
+      "name": "desktop"
+    },
+    {
+      "markdown_files": 500,
       "name": "docs"
     },
     {
-      "markdown_files": 8,
+      "markdown_files": 9,
       "name": "entities"
     },
     {
       "markdown_files": 6,
       "name": "experiments"
+    },
+    {
+      "markdown_files": 4,
+      "name": "fixtures"
     },
     {
       "markdown_files": 1,
@@ -67,7 +79,11 @@
       "name": "generated"
     },
     {
-      "markdown_files": 21,
+      "markdown_files": 2,
+      "name": "githooks"
+    },
+    {
+      "markdown_files": 25,
       "name": "graphify-out"
     },
     {
@@ -75,7 +91,7 @@
       "name": "inbox"
     },
     {
-      "markdown_files": 25,
+      "markdown_files": 28,
       "name": "infrastructure"
     },
     {
@@ -91,19 +107,23 @@
       "name": "methodology"
     },
     {
-      "markdown_files": 0,
+      "markdown_files": 2,
       "name": "migrations"
     },
     {
-      "markdown_files": 2537,
+      "markdown_files": 3439,
       "name": "operations"
     },
     {
-      "markdown_files": 47,
+      "markdown_files": 18,
+      "name": "products"
+    },
+    {
+      "markdown_files": 64,
       "name": "projects"
     },
     {
-      "markdown_files": 80,
+      "markdown_files": 86,
       "name": "proposals"
     },
     {
@@ -115,16 +135,20 @@
       "name": "queue"
     },
     {
-      "markdown_files": 198,
+      "markdown_files": 630,
       "name": "raw"
     },
     {
-      "markdown_files": 20,
+      "markdown_files": 23,
       "name": "receipts"
     },
     {
       "markdown_files": 1,
       "name": "references"
+    },
+    {
+      "markdown_files": 0,
+      "name": "reports"
     },
     {
       "markdown_files": 23,
@@ -135,24 +159,52 @@
       "name": "runbooks"
     },
     {
-      "markdown_files": 1,
-      "name": "scripts"
-    },
-    {
-      "markdown_files": 6,
-      "name": "status"
-    },
-    {
-      "markdown_files": 366,
-      "name": "synthesis"
+      "markdown_files": 2,
+      "name": "schemas"
     },
     {
       "markdown_files": 2,
+      "name": "scratchpad"
+    },
+    {
+      "markdown_files": 2,
+      "name": "scripts"
+    },
+    {
+      "markdown_files": 2,
+      "name": "skills"
+    },
+    {
+      "markdown_files": 4,
+      "name": "src"
+    },
+    {
+      "markdown_files": 207,
+      "name": "status"
+    },
+    {
+      "markdown_files": 367,
+      "name": "synthesis"
+    },
+    {
+      "markdown_files": 15,
       "name": "tests"
+    },
+    {
+      "markdown_files": 0,
+      "name": "tmp"
     },
     {
       "markdown_files": 5,
       "name": "tools"
+    },
+    {
+      "markdown_files": 2,
+      "name": "travel"
+    },
+    {
+      "markdown_files": 25,
+      "name": "whitepapers"
     },
     {
       "markdown_files": 47,
