@@ -91,5 +91,5 @@ def test_two_synchronized_migrators_serialize_the_whole_run() -> None:
         assert [result.returncode for result in results] == [0, 0]
         assert sorted(result.stdout.strip() for result in results) == [
             "migration succeeded: applied=0",
-            "migration succeeded: applied=13",
+            "migration succeeded: applied=14",
         ]

@@ -31,6 +31,7 @@ EXPECTED_MIGRATIONS = [
     "0011_telegram_runtime_durability.sql",
     "0012_encrypted_ordinary_routes.sql",
     "0013_storage_quota_backup_coordination.sql",
+    "0014_parser_job_queue.sql",
 ]
 
 
@@ -129,7 +130,7 @@ def test_exact_ordered_forward_only_migration_set_exists() -> None:
 def test_migrations_apply_exactly_once_and_create_required_catalog() -> None:
     with postgres_cluster() as dsn:
         run_migrator(dsn)
-        assert psql(dsn, "SELECT count(*) FROM public.hulagu_schema_migrations WHERE status = 'succeeded'").stdout.strip() == "13"
+        assert psql(dsn, "SELECT count(*) FROM public.hulagu_schema_migrations WHERE status = 'succeeded'").stdout.strip() == "14"
         required = {
             "tenants", "enrollments", "identity_bindings", "inbound_updates", "customer_profiles",
             "profile_answers", "source_documents", "search_runs", "job_attempts", "provider_requests",
@@ -137,6 +138,7 @@ def test_migrations_apply_exactly_once_and_create_required_catalog() -> None:
             "deletion_jobs", "deletion_tombstones", "deletion_receipts", "retention_jobs", "global_storage_state",
             "telegram_polling_offsets", "telegram_preconsent_windows", "tenant_storage_state",
             "tenant_storage_reservations", "backup_coordination", "backup_generations",
+            "parser_jobs",
         }
         rows = psql(dsn, "SELECT tablename FROM pg_tables WHERE schemaname='hulagu'").stdout.splitlines()
         assert required <= set(rows)
@@ -764,12 +766,13 @@ def test_runtime_roles_and_rls_catalog_fail_closed() -> None:
             "WHERE n.nspname='hulagu' AND c.relname IN "
             "('tenants','identity_bindings','customer_profiles','profile_answers','source_documents','search_runs',"
             "'job_attempts','provider_requests','search_candidates','candidate_decisions','wiki_publications',"
-            "'outbox_messages','receipts','retention_jobs','tenant_storage_state','tenant_storage_reservations') "
+            "'outbox_messages','receipts','retention_jobs','tenant_storage_state','tenant_storage_reservations',"
+            "'parser_jobs') "
             "AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity)",
         ).stdout.strip()
         assert missing_force == "0"
         policies = psql(dsn, "SELECT count(*) FROM pg_policies WHERE schemaname='hulagu' AND qual IS NOT NULL AND with_check IS NOT NULL").stdout.strip()
-        assert int(policies) >= 16
+        assert int(policies) >= 17
 
 
 def test_security_definer_routines_are_hardened() -> None:

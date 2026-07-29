@@ -298,7 +298,7 @@ def test_forward_upgrade_normalizes_legacy_sent_outbox_rows(tmp_path: Path) -> N
         )
 
         migrator.MIGRATIONS_DIR = MIGRATIONS
-        assert migrator.migrate(dsn) == 3
+        assert migrator.migrate(dsn) == 4
         assert psql(
             dsn,
             "SELECT state || ':' || attempt_count || ':' || max_attempts || ':' || "
