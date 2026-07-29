@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import signal
 import subprocess  # nosec B404
+import threading
 from pathlib import Path
-from typing import Protocol
+from typing import IO, Protocol
 
 from .policy import ContainerEffectiveState, EngineEnrollment, ParserInvocation, safe_container_name
 
@@ -19,6 +22,7 @@ _ALLOWED_ENVIRONMENT_KEYS = {
 }
 _CONTAINER_TMP = "/" + "tmp"
 _CONTAINER_TMPFS = _CONTAINER_TMP + ":rw,noexec,nosuid,nodev,size=67108864"
+_STREAM_LIMIT_BYTES = 1_048_576
 
 
 class ContainerExecutionError(RuntimeError):
@@ -47,18 +51,79 @@ class DockerCliBackend:
     ) -> subprocess.CompletedProcess[bytes]:
         command = (str(self._enrollment.cli_path), "-H", self._enrollment.endpoint, *arguments)
         try:
-            return subprocess.run(  # nosec B603
+            process = subprocess.Popen(  # nosec B603
                 command,
-                check=True,
-                capture_output=True,
-                input=input_payload,
-                timeout=timeout,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 env={"PATH": "/usr/bin:/bin"},
+                start_new_session=True,
             )
+            if process.stdin is None or process.stdout is None or process.stderr is None:
+                raise ContainerExecutionError("missing process stream")
+            stdin = process.stdin
+            stdout = process.stdout
+            stderr = process.stderr
+            buffers = {"stdout": bytearray(), "stderr": bytearray()}
+            violation: list[str] = []
+            lock = threading.Lock()
+
+            def terminate() -> None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except OSError:
+                    process.kill()
+
+            def drain(stream: IO[bytes], name: str) -> None:
+                while True:
+                    chunk = stream.read(65_536)
+                    if not chunk:
+                        return
+                    with lock:
+                        remaining = _STREAM_LIMIT_BYTES - len(buffers[name])
+                        buffers[name].extend(chunk[:remaining])
+                        if len(chunk) > remaining and not violation:
+                            violation.append(name)
+                            terminate()
+                            return
+
+            def write_input() -> None:
+                try:
+                    stdin.write(input_payload or b"")
+                    stdin.flush()
+                except BrokenPipeError:
+                    pass
+                finally:
+                    stdin.close()
+
+            threads = [
+                threading.Thread(target=drain, args=(stdout, "stdout"), daemon=True),
+                threading.Thread(target=drain, args=(stderr, "stderr"), daemon=True),
+                threading.Thread(target=write_input, daemon=True),
+            ]
+            for thread in threads:
+                thread.start()
+            try:
+                return_code = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                terminate()
+                process.wait()
+                raise
+            finally:
+                for thread in threads:
+                    thread.join(timeout=1)
+            if violation:
+                raise ContainerExecutionError(f"{violation[0]} output limit")
+            if return_code != 0:
+                raise subprocess.CalledProcessError(return_code, command)
+            return subprocess.CompletedProcess(command, return_code, bytes(buffers["stdout"]), bytes(buffers["stderr"]))
+        except ContainerExecutionError:
+            raise
         except (subprocess.SubprocessError, OSError) as error:
             raise ContainerExecutionError(type(error).__name__) from None
 
     def create_parser(self, invocation: ParserInvocation) -> str:
+        script = "/sandbox/parse_cv.py" if invocation.job_kind == "parser" else "/sandbox/rank_candidates.py"
         result = self._invoke(
             (
                 "create",
@@ -87,9 +152,8 @@ class DockerCliBackend:
                 "--entrypoint",
                 "/usr/local/bin/python",
                 invocation.image,
-                "/sandbox/parse_cv.py",
-                "-",
-                f"{_CONTAINER_TMP}/result.json",
+                script,
+                *(("-", f"{_CONTAINER_TMP}/result.json") if invocation.job_kind == "parser" else ()),
             )
         )
         container_id = result.stdout.decode("ascii", "strict").strip()
@@ -150,17 +214,23 @@ class ParserContainerExecutor:
         self._enrollment = enrollment.validate()
         self._backend = backend or DockerCliBackend(self._enrollment)
 
-    def execute(self, input_payload: bytes, *, expected_digest: str) -> bytes:
+    def execute(self, input_payload: bytes, *, expected_digest: str, job_kind: str = "parser") -> bytes:
         if hashlib.sha256(input_payload).hexdigest() != expected_digest:
             raise ContainerExecutionError("invalid verified parser input")
-        invocation = ParserInvocation(self._enrollment.image, safe_container_name(expected_digest))
+        if job_kind not in {"parser", "ranker"}:
+            raise ContainerExecutionError("unsupported sandbox job kind")
+        invocation = ParserInvocation(
+            self._enrollment.image,
+            safe_container_name(expected_digest, job_kind),
+            job_kind,
+        )
         container_id = self._backend.create_parser(invocation)
         try:
             effective = self._backend.inspect(container_id)
             self._validate_effective(effective, invocation)
             payload = self._backend.start(container_id, 30, input_payload)
-            if len(payload) > 1_048_576:
-                raise ContainerExecutionError("parser output limit")
+            if len(payload) > _STREAM_LIMIT_BYTES:
+                raise ContainerExecutionError(f"{job_kind} output limit")
             return payload
         finally:
             self._backend.remove(container_id)

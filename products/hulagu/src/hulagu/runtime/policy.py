@@ -56,6 +56,7 @@ class EngineEnrollment:
 class ParserInvocation:
     image: str
     name: str
+    job_kind: str = "parser"
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,5 +273,7 @@ def _redact_secret(value: str) -> str:
     return "[REDACTED]" if _contains_secret_marker(value) else value
 
 
-def safe_container_name(digest: str) -> str:
-    return f"hulagu-parser-{digest[:12]}-{os.getpid()}"
+def safe_container_name(digest: str, job_kind: str = "parser") -> str:
+    if job_kind not in {"parser", "ranker"}:
+        raise ValueError("unsupported sandbox job kind")
+    return f"hulagu-{job_kind}-{digest[:12]}-{os.getpid()}"

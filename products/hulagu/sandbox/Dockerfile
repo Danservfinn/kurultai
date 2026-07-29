@@ -4,6 +4,9 @@ FROM scratch
 COPY --from=python-runtime /lib /lib
 COPY --from=python-runtime /usr/lib /usr/lib
 COPY --from=python-runtime /usr/local /usr/local
-COPY --chown=65532:65532 --chmod=0555 parse_cv.py /sandbox/parse_cv.py
+COPY --chown=65532:65532 --chmod=0555 sandbox/parse_cv.py /sandbox/parse_cv.py
+COPY --chown=65532:65532 --chmod=0555 sandbox/rank_candidates.py /sandbox/rank_candidates.py
+COPY --chown=65532:65532 --chmod=0555 src/hulagu/domain/ranking.py /sandbox/hulagu/domain/ranking.py
+COPY --chown=65532:65532 --chmod=0555 src/hulagu/search/schemas.py /sandbox/hulagu/search/schemas.py
 USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/python", "/sandbox/parse_cv.py"]
