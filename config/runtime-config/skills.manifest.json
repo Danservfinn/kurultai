@@ -1033,7 +1033,7 @@
       "path": "kurultai/kurultai-system-audit"
     },
     {
-      "description": "Convert broad money-dashboard security/audit bounty signals into concrete public/local research passes with ledger receipts.",
+      "description": "Convert broad money-dashboard security/audit bounty signals into concrete public/local research passes with ledger receipts, and manage submitted bounty PR lifecycle (CI triage, competitive analysis, merge blocker identification).",
       "name": "money-security-bounty-triage",
       "path": "kurultai/money-security-bounty-triage"
     },
