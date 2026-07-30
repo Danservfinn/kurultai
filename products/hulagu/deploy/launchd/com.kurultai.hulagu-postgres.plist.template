@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.kurultai.hulagu-postgres</string>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/opt/postgresql@16/bin/postgres</string>
+    <string>-D</string><string>/Volumes/KurultaiVault/hulagu/postgres</string>
+    <string>-c</string><string>listen_addresses=</string>
+    <string>-c</string><string>unix_socket_directories=/Volumes/KurultaiVault/hulagu/run/postgres</string>
+  </array>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>StandardOutPath</key><string>/Volumes/KurultaiVault/hulagu/logs/postgres.log</string>
+  <key>StandardErrorPath</key><string>/Volumes/KurultaiVault/hulagu/logs/postgres.err.log</string>
+</dict></plist>

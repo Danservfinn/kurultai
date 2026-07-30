@@ -266,7 +266,7 @@ class RouteBindingValidator:
         self,
         keys: Mapping[int, bytes],
         *,
-        lookup: Callable[[str], RouteBindingRecord | None],
+        lookup: Callable[[str, int], RouteBindingRecord | None],
     ) -> None:
         validated = _validate_keys(keys)
         if validated is None:
@@ -285,7 +285,7 @@ class RouteBindingValidator:
             or request.template_version != "deletion-complete-v1"
         ):
             raise PermissionError("invalid deletion binding authority")
-        record = self._lookup(request.deletion_id)
+        record = self._lookup(request.deletion_id, request.route_generation)
         if record is None or record.route_generation != request.route_generation:
             raise PermissionError("deletion route binding validation failed")
         key = self._keys.get(record.key_version)

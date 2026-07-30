@@ -35,6 +35,7 @@ EXPECTED_MIGRATIONS = [
     "0013_storage_quota_backup_coordination.sql",
     "0014_parser_job_queue.sql",
     "0015_deletion_single_use_tombstone_contract.sql",
+    "0016_app_deletion_route_binding_lookup.sql",
 ]
 
 
@@ -133,7 +134,7 @@ def test_exact_ordered_forward_only_migration_set_exists() -> None:
 def test_migrations_apply_exactly_once_and_create_required_catalog() -> None:
     with postgres_cluster() as dsn:
         run_migrator(dsn)
-        assert psql(dsn, "SELECT count(*) FROM public.hulagu_schema_migrations WHERE status = 'succeeded'").stdout.strip() == "15"
+        assert psql(dsn, "SELECT count(*) FROM public.hulagu_schema_migrations WHERE status = 'succeeded'").stdout.strip() == "16"
         required = {
             "tenants", "enrollments", "identity_bindings", "inbound_updates", "customer_profiles",
             "profile_answers", "source_documents", "search_runs", "job_attempts", "provider_requests",
@@ -1132,6 +1133,51 @@ def test_deletion_workflow_orders_erasure_before_claim_and_persists_exact_outcom
         ).stdout.strip() == "failed"
 
 
+def test_app_role_reads_only_live_deletion_binding_through_bounded_function() -> None:
+    tenant_id = "74000000-0000-4000-8000-000000000016"
+    nonce_hash = hashlib.sha256(b"app-binding-lookup-nonce").hexdigest()
+    erasure_token = "synthetic-app-binding-erasure-token"
+    erasure_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
+    delivery_hash = hashlib.sha256(b"synthetic-app-binding-delivery-token").hexdigest()
+    with postgres_cluster() as dsn:
+        _seed_single_use_deletion_tenant(dsn, tenant_id, epoch=6, nonce_hash=nonce_hash)
+        deletion_id = psql(dsn, _request_deletion_sql(tenant_id, nonce_hash), user="hulagu_app").stdout.strip()
+        psql(
+            dsn,
+            f"SELECT hulagu_api.claim_deletion_erasure('{deletion_id}','{erasure_hash}');"
+            f"SELECT hulagu_api.complete_deletion_erasure('{deletion_id}','{erasure_token}');"
+            f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{delivery_hash}');",
+            user="hulagu_deletion",
+        )
+
+        assert psql(
+            dsn,
+            f"SELECT route_key_version || '|' || route_binding_digest "
+            f"FROM hulagu_api.app_deletion_route_binding('{deletion_id}')",
+            user="hulagu_app",
+        ).stdout.strip() == "1|" + "c" * 64
+        assert psql(
+            dsn,
+            "SELECT count(*) FROM hulagu_api.app_deletion_route_binding("
+            "'74000000-0000-4000-8000-000000000099')",
+            user="hulagu_app",
+        ).stdout.strip() == "0"
+        privileges = psql(
+            dsn,
+            "SELECT has_function_privilege('public','hulagu_api.app_deletion_route_binding(uuid)','EXECUTE') || ':' || "
+            "has_function_privilege('hulagu_app','hulagu_api.app_deletion_route_binding(uuid)','EXECUTE') || ':' || "
+            "has_function_privilege('hulagu_runner','hulagu_api.app_deletion_route_binding(uuid)','EXECUTE') || ':' || "
+            "has_function_privilege('hulagu_deletion','hulagu_api.app_deletion_route_binding(uuid)','EXECUTE') || ':' || "
+            "has_function_privilege('hulagu_readonly','hulagu_api.app_deletion_route_binding(uuid)','EXECUTE')",
+        ).stdout.strip()
+        assert privileges == "false:true:false:false:false"
+        assert psql(
+            dsn,
+            "SELECT count(*) FROM information_schema.role_table_grants "
+            "WHERE grantee='hulagu_app' AND table_schema='hulagu' AND table_name='deletion_jobs'",
+        ).stdout.strip() == "0"
+
+
 def test_committed_delivery_claim_restarts_as_durable_unknown_without_second_projection() -> None:
     tenant_id = "74000000-0000-4000-8000-000000000005"
     nonce_hash = hashlib.sha256(b"restart-deletion-nonce").hexdigest()
@@ -1178,7 +1224,8 @@ def test_committed_delivery_claim_restarts_as_durable_unknown_without_second_pro
 
 def test_0015_fails_closed_before_mutation_when_0014_deletion_is_active() -> None:
     with postgres_cluster(migrate=False) as dsn:
-        for filename in EXPECTED_MIGRATIONS[:-1]:
+        migration_0015 = EXPECTED_MIGRATIONS.index("0015_deletion_single_use_tombstone_contract.sql")
+        for filename in EXPECTED_MIGRATIONS[:migration_0015]:
             psql(dsn, (MIGRATIONS / filename).read_text())
         psql(
             dsn,
@@ -1187,7 +1234,7 @@ def test_0015_fails_closed_before_mutation_when_0014_deletion_is_active() -> Non
             "('74000000-0000-4000-8000-000000000006',repeat('a',64),'route',repeat('b',64),"
             "'delivery_pending',now()+interval '1 day')",
         )
-        result = psql(dsn, (MIGRATIONS / EXPECTED_MIGRATIONS[-1]).read_text(), check=False)
+        result = psql(dsn, (MIGRATIONS / EXPECTED_MIGRATIONS[migration_0015]).read_text(), check=False)
 
         assert result.returncode != 0
         assert "active pre-0015 deletion jobs require authenticated completion" in result.stderr
@@ -1200,7 +1247,8 @@ def test_0015_fails_closed_before_mutation_when_0014_deletion_is_active() -> Non
 
 def test_0015_fails_closed_when_legacy_plaintext_tombstones_exist() -> None:
     with postgres_cluster(migrate=False) as dsn:
-        for filename in EXPECTED_MIGRATIONS[:-1]:
+        migration_0015 = EXPECTED_MIGRATIONS.index("0015_deletion_single_use_tombstone_contract.sql")
+        for filename in EXPECTED_MIGRATIONS[:migration_0015]:
             psql(dsn, (MIGRATIONS / filename).read_text())
         psql(
             dsn,
@@ -1210,7 +1258,7 @@ def test_0015_fails_closed_when_legacy_plaintext_tombstones_exist() -> None:
 
         result = psql(
             dsn,
-            (MIGRATIONS / EXPECTED_MIGRATIONS[-1]).read_text(),
+            (MIGRATIONS / EXPECTED_MIGRATIONS[migration_0015]).read_text(),
             check=False,
         )
 

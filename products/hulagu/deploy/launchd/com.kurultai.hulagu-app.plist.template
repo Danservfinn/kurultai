@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.kurultai.hulagu-app</string>
+  <key>ProgramArguments</key><array>
+    <string>/Users/kublai/kurultai/kurultai-repo/products/hulagu/.venv/bin/python</string>
+    <string>-m</string><string>hulagu.launchd_runtime</string><string>app</string>
+    <string>--pg-isready</string><string>/opt/homebrew/opt/postgresql@16/bin/pg_isready</string>
+    <string>--postgres-socket</string><string>/Volumes/KurultaiVault/hulagu/run/postgres</string>
+    <string>--app-socket</string><string>/Volumes/KurultaiVault/hulagu/run/deletion-send.sock</string>
+    <string>--pinned-bot-id</string><string>__HULAGU_PINNED_BOT_ID__</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/usr/bin:/bin</string>
+    <key>HULAGU_TELEGRAM_KEYCHAIN_ITEM</key><string>com.kurultai.hulagu.telegram-bot-token.v1</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+</dict></plist>

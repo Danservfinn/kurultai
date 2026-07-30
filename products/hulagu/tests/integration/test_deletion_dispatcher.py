@@ -135,7 +135,10 @@ def test_actual_unix_socket_authenticates_peer_and_app_validates_binding_hmac(tm
         key_version=2,
         binding_digest=route_binding_digest(binding_key, bot_id=777, route=12345, generation=4),
     )
-    validator = RouteBindingValidator({2: binding_key}, lookup=lambda candidate: binding if candidate == deletion_id else None)
+    validator = RouteBindingValidator(
+        {2: binding_key},
+        lookup=lambda candidate, _generation: binding if candidate == deletion_id else None,
+    )
     sent: list[FixedCompletionRequest] = []
     socket_path = Path("/tmp") / f"hulagu-deletion-{uuid4().hex}.sock"
     server = UnixDeletionCompletionServer(

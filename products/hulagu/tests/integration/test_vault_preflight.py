@@ -26,6 +26,8 @@ def valid_config(module: ModuleType):
         enrolled_volume_uuid=EXPECTED_UUID,
         container_cli_path=Path("/opt/approved/bin/docker"),
         container_socket_path=Path("/Users/operator/.approved/docker.sock"),
+        enrolled_cli_sha256="sha256:" + "d" * 64,
+        enrolled_cli_version="engine-v1",
     )
 
 
@@ -38,6 +40,9 @@ def valid_observation(module: ModuleType):
         container_cli_approved=True,
         container_socket_present=True,
         container_socket_approved=True,
+        container_cli_sha256="sha256:" + "d" * 64,
+        container_cli_version="engine-v1",
+        effective_state_inspected=True,
     )
 
 
@@ -82,6 +87,9 @@ def test_g1_reports_runtime_services_not_evaluated() -> None:
         ({"container_cli_approved": False}, "container_cli_unapproved"),
         ({"container_socket_present": False}, "container_socket_absent"),
         ({"container_socket_approved": False}, "container_socket_unapproved"),
+        ({"container_cli_sha256": "sha256:" + "e" * 64}, "container_cli_digest_drift"),
+        ({"container_cli_version": "engine-v2"}, "container_cli_version_drift"),
+        ({"effective_state_inspected": False}, "container_effective_state_unavailable"),
     ],
 )
 def test_absolute_container_install_state_is_reported(changes: dict[str, object], code: str) -> None:
@@ -99,3 +107,26 @@ def test_observer_does_not_search_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shutil, "which", lambda *_: (_ for _ in ()).throw(AssertionError("PATH searched")))
     observation = module.observe_environment(valid_config(module))
     assert observation.container_cli_present is False
+
+
+def test_observer_rejects_symlink_cli_and_regular_file_socket(tmp_path: Path) -> None:
+    module = load_doctor()
+    target = tmp_path / "engine-real"
+    target.write_text("#!/bin/sh\nexit 0\n")
+    target.chmod(0o700)
+    symlink = tmp_path / "engine"
+    symlink.symlink_to(target)
+    regular_file = tmp_path / "engine.sock"
+    regular_file.touch()
+    config = module.DoctorConfig(
+        vault_path=tmp_path / "missing-vault",
+        enrolled_volume_uuid=EXPECTED_UUID,
+        container_cli_path=symlink,
+        container_socket_path=regular_file,
+        enrolled_cli_sha256="sha256:" + "d" * 64,
+        enrolled_cli_version="engine-v1",
+    )
+    report = module.evaluate_environment(config, module.observe_environment(config))
+    assert report["container_install"]["status"] == "fail"
+    assert "container_cli_absent" in report["container_install"]["reasons"]
+    assert "container_socket_absent" in report["container_install"]["reasons"]

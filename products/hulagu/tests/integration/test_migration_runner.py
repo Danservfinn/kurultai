@@ -66,7 +66,7 @@ def test_runner_rerun_after_0015_is_idempotent() -> None:
         ).stdout.splitlines()
 
         assert result.stdout.strip() == "migration succeeded: applied=0"
-        assert len(after) == 15
+        assert len(after) == 16
         assert after == before
 
 
@@ -108,5 +108,5 @@ def test_two_synchronized_migrators_serialize_the_whole_run() -> None:
         assert [result.returncode for result in results] == [0, 0]
         assert sorted(result.stdout.strip() for result in results) == [
             "migration succeeded: applied=0",
-            "migration succeeded: applied=15",
+            "migration succeeded: applied=16",
         ]
