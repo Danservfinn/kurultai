@@ -528,6 +528,11 @@
       "path": "autonomous-ai-agents/coding-agent-workflows"
     },
     {
+      "description": "|",
+      "name": "computer-use",
+      "path": "autonomous-ai-agents/computer-use"
+    },
+    {
       "description": "Configure, upgrade, resume, and verify third-party Claude Code deep-research harnesses with source-first model/profile fidelity and artifact-level receipts.",
       "name": "deep-research-harness-operations",
       "path": "autonomous-ai-agents/deep-research-harness-operations"
@@ -1093,6 +1098,11 @@
       "path": "marc-mode"
     },
     {
+      "description": "Design, implement, harden, test, and package MCP servers with exact capability boundaries, safe transports, durable local state, and side-effect-free mutation testing.",
+      "name": "mcp-server-development",
+      "path": "mcp/mcp-server-development"
+    },
+    {
       "description": "MCP client: connect servers, register tools (stdio/HTTP).",
       "name": "native-mcp",
       "path": "mcp/native-mcp"
@@ -1144,6 +1154,11 @@
     },
     {
       "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
+      "name": "evaluating-llms-harness",
+      "path": "mlops/evaluation/evaluating-llms-harness"
+    },
+    {
+      "description": "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).",
       "name": "lm-evaluation-harness",
       "path": "mlops/evaluation/lm-evaluation-harness"
     },
@@ -1171,6 +1186,11 @@
       "description": "Outlines: structured JSON/regex/Pydantic LLM generation.",
       "name": "outlines",
       "path": "mlops/inference/outlines"
+    },
+    {
+      "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
+      "name": "serving-llms-vllm",
+      "path": "mlops/inference/serving-llms-vllm"
     },
     {
       "description": "vLLM: high-throughput LLM serving, OpenAI API, quantization.",
@@ -1283,9 +1303,24 @@
       "path": "productivity/career-relocation-analysis"
     },
     {
+      "description": "Use and manage personal health data in ChatGPT.",
+      "name": "chatgpt-health",
+      "path": "productivity/chatgpt-health"
+    },
+    {
       "description": "Use when writing copy-pasteable prompts, commands, patches, Markdown, or chat messages that contain code blocks, especially when the output will be pasted into Telegram, Slack, Discord, another LLM, or a terminal. Prevent broken nested fences, mangled Markdown, and ambiguous handoff formatting.",
       "name": "copy-pasteable-code-blocks",
       "path": "productivity/copy-pasteable-code-blocks"
+    },
+    {
+      "description": "Create, read, edit Word .docx documents and templates.",
+      "name": "docx",
+      "path": "productivity/docx"
+    },
+    {
+      "description": "Assess an employer and a specific job opportunity using source-ranked company, funding, legal, reputation, employee-review, compensation, and recruiter-authenticity evidence.",
+      "name": "employer-opportunity-due-diligence",
+      "path": "productivity/employer-opportunity-due-diligence"
     },
     {
       "description": "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.",
@@ -1346,6 +1381,11 @@
       "description": "Operate productivity platforms and documents: email, Google Workspace, Airtable, Notion, PDF/OCR, PowerPoint, Teams meeting summaries, maps, and expenses.",
       "name": "office-and-document-workflows",
       "path": "productivity/office-and-document-workflows"
+    },
+    {
+      "description": "Create, merge, split, fill, and secure PDF files.",
+      "name": "pdf",
+      "path": "productivity/pdf"
     },
     {
       "description": "Deprecated compatibility shim. Use only when an old prompt, cron job, or operator note still references personal-radar; immediately load and use radar instead.",
@@ -1413,6 +1453,11 @@
       "path": "productivity/travel-booking-research"
     },
     {
+      "description": "Create, read, edit Excel .xlsx spreadsheets and CSVs.",
+      "name": "xlsx",
+      "path": "productivity/xlsx"
+    },
+    {
       "description": "Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.",
       "name": "godmode",
       "path": "red-teaming/godmode"
@@ -1473,6 +1518,11 @@
       "path": "research/polymarket-weather-paper-engine"
     },
     {
+      "description": "Verify whether a public person, representative, business, or social account is who it claims to be; establish affiliation or public principals using source-ranked evidence and calibrated reporting without contacting anyone.",
+      "name": "public-identity-affiliation-verification",
+      "path": "research/public-identity-affiliation-verification"
+    },
+    {
       "description": "Estimate resale value and optimal selling timing for consumer goods, collectibles, merch, apparel, and bundles using marketplace comps, condition assessment, and demand seasonality.",
       "name": "resale-market-valuation",
       "path": "research/resale-market-valuation"
@@ -1518,7 +1568,7 @@
       "path": "smart-home/openhue"
     },
     {
-      "description": "Connect health/home devices such as Nest Thermostat, Eight Sleep, and Oura to Hermes via Home Assistant and token-based APIs, with safe credential boundaries and verification scripts.",
+      "description": "Connect health and home devices to Hermes through direct APIs, local MCP, or Home Assistant with credential isolation and acceptance testing.",
       "name": "smart-health-home-integrations",
       "path": "smart-home/smart-health-home-integrations"
     },
@@ -1633,6 +1683,11 @@
       "path": "software-development/hermes-agent-skill-authoring"
     },
     {
+      "description": "Build, launch, configure, and troubleshoot Hermes Desktop safely across profiles, custom source trees, backend resolution, Electron state, voice, and wake-word features.",
+      "name": "hermes-desktop-operations",
+      "path": "software-development/hermes-desktop-operations"
+    },
+    {
       "description": "Set up and troubleshoot Hermes Gateway messaging-platform adapters such as Signal, Telegram, Discord, Slack, and similar chat bridges; focus on platform account linking, local CLI/daemon state, gateway config, and verification before telling the user the platform is ready.",
       "name": "hermes-messaging-platform-setup",
       "path": "software-development/hermes-messaging-platform-setup"
@@ -1641,6 +1696,11 @@
       "description": "Modify, debug, or extend the s6-overlay supervision tree inside the Hermes Agent Docker image \u2014 adding new services, debugging profile gateways, understanding the Architecture B main-program pattern.",
       "name": "hermes-s6-container-supervision",
       "path": "software-development/hermes-s6-container-supervision"
+    },
+    {
+      "description": "Read the live Hermes desktop DOM/CSS over CDP.",
+      "name": "inspecting-hermes-desktop-dom",
+      "path": "software-development/inspecting-hermes-desktop-dom"
     },
     {
       "description": "Debug Node.js via --inspect + Chrome DevTools Protocol CLI.",

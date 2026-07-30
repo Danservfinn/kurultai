@@ -60,6 +60,20 @@
           "not_null": false,
           "primary_key": false,
           "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "chat_type",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "delivery_metadata",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
         }
       ],
       "name": "kanban_notify_subs",
@@ -625,6 +639,13 @@
         {
           "default": null,
           "name": "verdict",
+          "not_null": false,
+          "primary_key": false,
+          "type": "TEXT"
+        },
+        {
+          "default": null,
+          "name": "provider_override",
           "not_null": false,
           "primary_key": false,
           "type": "TEXT"

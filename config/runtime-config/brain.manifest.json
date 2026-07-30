@@ -3,7 +3,11 @@
   "schema": "kurultai.brain-manifest.v1",
   "top_level_directories": [
     {
-      "markdown_files": 14,
+      "markdown_files": 2,
+      "name": "$HOME"
+    },
+    {
+      "markdown_files": 19,
       "name": "_archive"
     },
     {
@@ -15,7 +19,7 @@
       "name": "agents"
     },
     {
-      "markdown_files": 466,
+      "markdown_files": 475,
       "name": "analyses"
     },
     {
@@ -39,7 +43,7 @@
       "name": "config"
     },
     {
-      "markdown_files": 168,
+      "markdown_files": 169,
       "name": "content"
     },
     {
@@ -55,7 +59,7 @@
       "name": "desktop"
     },
     {
-      "markdown_files": 501,
+      "markdown_files": 504,
       "name": "docs"
     },
     {
@@ -91,7 +95,7 @@
       "name": "inbox"
     },
     {
-      "markdown_files": 28,
+      "markdown_files": 29,
       "name": "infrastructure"
     },
     {
@@ -111,7 +115,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 3440,
+      "markdown_files": 3460,
       "name": "operations"
     },
     {
@@ -119,11 +123,11 @@
       "name": "products"
     },
     {
-      "markdown_files": 64,
+      "markdown_files": 63,
       "name": "projects"
     },
     {
-      "markdown_files": 86,
+      "markdown_files": 88,
       "name": "proposals"
     },
     {
@@ -135,7 +139,7 @@
       "name": "queue"
     },
     {
-      "markdown_files": 630,
+      "markdown_files": 641,
       "name": "raw"
     },
     {
@@ -179,7 +183,7 @@
       "name": "src"
     },
     {
-      "markdown_files": 209,
+      "markdown_files": 214,
       "name": "status"
     },
     {
