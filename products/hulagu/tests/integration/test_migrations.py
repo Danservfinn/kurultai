@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import getpass
+import hashlib
 import importlib.util
+import json
 import os
 import shutil
 import socket
@@ -32,6 +34,7 @@ EXPECTED_MIGRATIONS = [
     "0012_encrypted_ordinary_routes.sql",
     "0013_storage_quota_backup_coordination.sql",
     "0014_parser_job_queue.sql",
+    "0015_deletion_single_use_tombstone_contract.sql",
 ]
 
 
@@ -130,7 +133,7 @@ def test_exact_ordered_forward_only_migration_set_exists() -> None:
 def test_migrations_apply_exactly_once_and_create_required_catalog() -> None:
     with postgres_cluster() as dsn:
         run_migrator(dsn)
-        assert psql(dsn, "SELECT count(*) FROM public.hulagu_schema_migrations WHERE status = 'succeeded'").stdout.strip() == "14"
+        assert psql(dsn, "SELECT count(*) FROM public.hulagu_schema_migrations WHERE status = 'succeeded'").stdout.strip() == "15"
         required = {
             "tenants", "enrollments", "identity_bindings", "inbound_updates", "customer_profiles",
             "profile_answers", "source_documents", "search_runs", "job_attempts", "provider_requests",
@@ -792,6 +795,431 @@ def test_security_definer_routines_are_hardened() -> None:
         ).stdout
         assert "hulagu." in definitions
         assert "EXECUTE " not in definitions.upper()
+
+
+def _seed_single_use_deletion_tenant(dsn: str, tenant_id: str, *, epoch: int, nonce_hash: str) -> None:
+    psql(
+        dsn,
+        f"INSERT INTO hulagu.tenants(id,state,lifecycle_epoch,deletion_nonce_hash) "
+        f"VALUES('{tenant_id}','READY',{epoch},'{nonce_hash}');"
+        "INSERT INTO hulagu.identity_bindings(tenant_id,subject_digest,subject_fence_digest) "
+        f"VALUES('{tenant_id}',repeat('a',64),repeat('b',64));",
+    )
+
+
+def _request_deletion_sql(tenant_id: str, nonce_hash: str) -> str:
+    return (
+        "BEGIN;"
+        f"SET LOCAL app.tenant_id='{tenant_id}';"
+        f"SELECT hulagu_api.request_deletion('{nonce_hash}','encrypted-route-envelope',repeat('c',64));"
+        "COMMIT;"
+    )
+
+
+def test_deletion_request_consumes_nonce_once_and_removes_two_argument_bypass() -> None:
+    tenant_id = "74000000-0000-4000-8000-000000000001"
+    nonce_hash = hashlib.sha256(b"single-use-deletion-nonce").hexdigest()
+    with postgres_cluster() as dsn:
+        _seed_single_use_deletion_tenant(dsn, tenant_id, epoch=7, nonce_hash=nonce_hash)
+
+        assert psql(
+            dsn,
+            "SELECT pg_catalog.to_regprocedure('hulagu_api.request_deletion(text,text)') IS NULL",
+        ).stdout.strip() == "t"
+        assert psql(
+            dsn,
+            "SELECT pg_catalog.to_regprocedure('hulagu_api.request_deletion(text,text,text)') IS NOT NULL",
+        ).stdout.strip() == "t"
+        assert psql(
+            dsn,
+            f"BEGIN;SET LOCAL app.tenant_id='{tenant_id}';"
+            "SELECT hulagu_api.request_deletion('encrypted-route-envelope',repeat('c',64));COMMIT;",
+            user="hulagu_app",
+            check=False,
+        ).returncode != 0
+
+        forged = psql(
+            dsn,
+            _request_deletion_sql(tenant_id, "0" * 64),
+            user="hulagu_app",
+            check=False,
+        )
+        assert forged.returncode != 0
+        assert psql(
+            dsn,
+            f"SELECT state || ':' || lifecycle_epoch || ':' || (deletion_nonce_hash='{nonce_hash}') "
+            f"FROM hulagu.tenants WHERE id='{tenant_id}'",
+        ).stdout.strip() == "READY:7:true"
+
+        deletion_id = psql(
+            dsn,
+            _request_deletion_sql(tenant_id, nonce_hash),
+            user="hulagu_app",
+        ).stdout.strip()
+        assert deletion_id
+        replay = psql(
+            dsn,
+            _request_deletion_sql(tenant_id, nonce_hash),
+            user="hulagu_app",
+            check=False,
+        )
+        assert replay.returncode != 0
+        assert psql(
+            dsn,
+            f"SELECT state || ':' || lifecycle_epoch || ':' || (deletion_nonce_hash IS NULL) "
+            f"FROM hulagu.tenants WHERE id='{tenant_id}'",
+        ).stdout.strip() == "DELETING:8:true"
+        assert psql(
+            dsn,
+            f"SELECT count(*) || ':' || bool_and(deletion_epoch=8) || ':' || "
+            f"bool_and(encrypted_subject_digest LIKE 'hts1.%') || ':' || "
+            f"bool_and(encrypted_subject_digest NOT LIKE '%' || repeat('b',64) || '%') "
+            f"FROM hulagu.deletion_jobs WHERE target_tenant_id='{tenant_id}'",
+        ).stdout.strip() == "1:true:true:true"
+
+        direct_duplicate = psql(
+            dsn,
+            "INSERT INTO hulagu.deletion_jobs("
+            "target_tenant_id,encrypted_subject_digest,deletion_epoch,encrypted_route,"
+            "route_binding_digest,state,expires_at) "
+            "SELECT target_tenant_id,encrypted_subject_digest,deletion_epoch,"
+            "'other-route',repeat('d',64),'pending',now()+interval '1 day' "
+            f"FROM hulagu.deletion_jobs WHERE deletion_id='{deletion_id}'",
+            check=False,
+        )
+        assert direct_duplicate.returncode != 0
+        assert "deletion_jobs_one_active_target_idx" in direct_duplicate.stderr
+
+        privileges = psql(
+            dsn,
+            "SELECT has_function_privilege('public','hulagu_api.request_deletion(text,text,text)','EXECUTE') || ':' || "
+            "has_function_privilege('hulagu_app','hulagu_api.request_deletion(text,text,text)','EXECUTE') || ':' || "
+            "has_function_privilege('hulagu_deletion','hulagu_api.request_deletion(text,text,text)','EXECUTE')",
+        ).stdout.strip()
+        assert privileges == "false:true:false"
+        assert psql(
+            dsn,
+            "SELECT count(*) FROM information_schema.role_table_grants "
+            "WHERE grantee IN ('hulagu_app','hulagu_runner','hulagu_deletion','hulagu_readonly') "
+            "AND table_schema='hulagu' "
+            "AND table_name IN ('deletion_tombstones','tombstone_fence_keys')",
+        ).stdout.strip() == "0"
+
+
+def test_real_random_port_postgres_serializes_concurrent_deletion_requests() -> None:
+    tenant_id = "74000000-0000-4000-8000-000000000002"
+    nonce_hash = hashlib.sha256(b"concurrent-deletion-nonce").hexdigest()
+    with postgres_cluster() as dsn:
+        _seed_single_use_deletion_tenant(dsn, tenant_id, epoch=11, nonce_hash=nonce_hash)
+        locker = subprocess.Popen(
+            ["/opt/homebrew/bin/psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", dsn],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        assert locker.stdin is not None and locker.stdout is not None
+        try:
+            locker.stdin.write(
+                f"BEGIN; SELECT id FROM hulagu.tenants WHERE id='{tenant_id}' FOR UPDATE; SELECT 'locked';\n"
+            )
+            locker.stdin.flush()
+            while locker.stdout.readline().strip() != "locked":
+                pass
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [
+                    executor.submit(
+                        psql,
+                        dsn,
+                        _request_deletion_sql(tenant_id, nonce_hash),
+                        user="hulagu_app",
+                        check=False,
+                    )
+                    for _ in range(2)
+                ]
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    waiters = psql(
+                        dsn,
+                        "SELECT count(*) FROM pg_stat_activity "
+                        "WHERE wait_event_type='Lock' AND query LIKE '%hulagu_api.request_deletion%'",
+                    ).stdout.strip()
+                    if int(waiters) >= 2:
+                        break
+                    time.sleep(0.05)
+                else:
+                    raise AssertionError("concurrent requests did not reach the tenant-row lock")
+
+                locker.stdin.write("COMMIT; \\q\n")
+                locker.stdin.flush()
+                results = [future.result() for future in futures]
+        finally:
+            if locker.poll() is None:
+                locker.kill()
+            locker.communicate(timeout=5)
+
+        assert sorted(result.returncode == 0 for result in results) == [False, True]
+        assert psql(
+            dsn,
+            f"SELECT state || ':' || lifecycle_epoch FROM hulagu.tenants WHERE id='{tenant_id}'",
+        ).stdout.strip() == "DELETING:12"
+        assert psql(
+            dsn,
+            f"SELECT count(*) FROM hulagu.deletion_jobs WHERE target_tenant_id='{tenant_id}'",
+        ).stdout.strip() == "1"
+
+
+def test_deletion_claim_and_finalize_replay_create_one_terminal_effect() -> None:
+    tenant_id = "74000000-0000-4000-8000-000000000003"
+    nonce_hash = hashlib.sha256(b"terminal-deletion-nonce").hexdigest()
+    delivery_token = "synthetic-terminal-delivery-token"
+    delivery_token_hash = hashlib.sha256(delivery_token.encode()).hexdigest()
+    erasure_token = "synthetic-terminal-erasure-token"
+    erasure_token_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
+    with postgres_cluster() as dsn:
+        _seed_single_use_deletion_tenant(dsn, tenant_id, epoch=2, nonce_hash=nonce_hash)
+        deletion_id = psql(
+            dsn,
+            _request_deletion_sql(tenant_id, nonce_hash),
+            user="hulagu_app",
+        ).stdout.strip()
+
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.claim_deletion_erasure('{deletion_id}','{erasure_token_hash}')",
+            user="hulagu_deletion",
+        ).stdout.strip() == tenant_id
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_erasure('{deletion_id}','{erasure_token}')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "t"
+        claimed = json.loads(
+            psql(
+                dsn,
+                f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{delivery_token_hash}')",
+                user="hulagu_deletion",
+            ).stdout
+        )
+        assert claimed == {"status": "claimed", "encrypted_route": "encrypted-route-envelope"}
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{delivery_token_hash}') IS NULL",
+            user="hulagu_deletion",
+        ).stdout.strip() == "f"
+
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_delivery('{deletion_id}','{delivery_token}','delivered')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "delivered"
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.finalize_deletion('{deletion_id}','{delivery_token}','failed')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "delivered"
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_delivery('{deletion_id}','{delivery_token}','delivery_unknown')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "delivered"
+
+        assert psql(
+            dsn,
+            f"SELECT count(*) FROM hulagu.deletion_receipts WHERE deletion_id='{deletion_id}'",
+        ).stdout.strip() == "1"
+        assert psql(dsn, "SELECT count(*) FROM hulagu.deletion_tombstones").stdout.strip() == "1"
+        assert psql(
+            dsn,
+            "SELECT string_agg(column_name,',' ORDER BY ordinal_position) "
+            "FROM information_schema.columns "
+            "WHERE table_schema='hulagu' AND table_name='deletion_tombstones'",
+        ).stdout.strip() == (
+            "schema_version,encrypted_subject_digest,deletion_epoch,completed_at,"
+            "backup_expiry_horizon,rekey_state"
+        )
+        assert psql(
+            dsn,
+            f"SELECT state || ':' || (target_tenant_id IS NULL) || ':' || "
+            f"(encrypted_route IS NULL) || ':' || (encrypted_subject_digest IS NULL) "
+            f"FROM hulagu.deletion_jobs WHERE deletion_id='{deletion_id}'",
+        ).stdout.strip() == "complete:true:true:true"
+        assert psql(dsn, f"SELECT count(*) FROM hulagu.tenants WHERE id='{tenant_id}'").stdout.strip() == "0"
+
+        blocked = psql(
+            dsn,
+            "SELECT hulagu_api.resolve_enrollment("
+            "repeat('d',64),repeat('b',64),'notice-v1',repeat('e',64),now()+interval '10 minutes')",
+            user="hulagu_app",
+            check=False,
+        )
+        assert blocked.returncode != 0
+        assert "re-enrollment barred" in blocked.stderr
+
+        psql(
+            dsn,
+            "UPDATE hulagu.deletion_tombstones "
+            "SET encrypted_subject_digest = "
+            "left(encrypted_subject_digest,length(encrypted_subject_digest)-1) || "
+            "CASE right(encrypted_subject_digest,1) WHEN 'A' THEN 'B' ELSE 'A' END",
+        )
+        tampered = psql(
+            dsn,
+            "SELECT hulagu_api.resolve_enrollment("
+            "repeat('f',64),repeat('b',64),'notice-v1',repeat('e',64),now()+interval '10 minutes')",
+            user="hulagu_app",
+            check=False,
+        )
+        assert tampered.returncode != 0
+        assert "invalid authenticated deletion tombstone" in tampered.stderr
+
+
+def test_deletion_workflow_orders_erasure_before_claim_and_persists_exact_outcome() -> None:
+    tenant_id = "74000000-0000-4000-8000-000000000004"
+    nonce_hash = hashlib.sha256(b"ordered-deletion-nonce").hexdigest()
+    erasure_token = "synthetic-erasure-token"
+    erasure_token_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
+    delivery_token = "synthetic-delivery-token"
+    delivery_token_hash = hashlib.sha256(delivery_token.encode()).hexdigest()
+    with postgres_cluster() as dsn:
+        _seed_single_use_deletion_tenant(dsn, tenant_id, epoch=4, nonce_hash=nonce_hash)
+        deletion_id = psql(dsn, _request_deletion_sql(tenant_id, nonce_hash), user="hulagu_app").stdout.strip()
+        assert psql(
+            dsn,
+            f"SELECT state FROM hulagu.deletion_jobs WHERE deletion_id='{deletion_id}'",
+        ).stdout.strip() == "pending"
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.claim_deletion_erasure('{deletion_id}','{erasure_token_hash}')",
+            user="hulagu_deletion",
+        ).stdout.strip() == tenant_id
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_erasure('{deletion_id}','{erasure_token}')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "t"
+        assert psql(
+            dsn,
+            f"SELECT state || ':' || (target_tenant_id IS NULL) FROM hulagu.deletion_jobs WHERE deletion_id='{deletion_id}'",
+        ).stdout.strip() == "delivery_pending:true"
+
+        claimed = json.loads(
+            psql(
+                dsn,
+                f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{delivery_token_hash}')",
+                user="hulagu_deletion",
+            ).stdout
+        )
+        assert claimed == {"status": "claimed", "encrypted_route": "encrypted-route-envelope"}
+        assert psql(
+            dsn,
+            f"SELECT encrypted_route IS NULL FROM hulagu.deletion_jobs WHERE deletion_id='{deletion_id}'",
+        ).stdout.strip() == "t"
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_delivery('{deletion_id}','{delivery_token}','failed')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "failed"
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.deletion_delivery_outcome('{deletion_id}')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "failed"
+        assert psql(
+            dsn,
+            f"SELECT outcome FROM hulagu.deletion_receipts WHERE deletion_id='{deletion_id}'",
+        ).stdout.strip() == "failed"
+
+
+def test_committed_delivery_claim_restarts_as_durable_unknown_without_second_projection() -> None:
+    tenant_id = "74000000-0000-4000-8000-000000000005"
+    nonce_hash = hashlib.sha256(b"restart-deletion-nonce").hexdigest()
+    erasure_token = "synthetic-restart-erasure-token"
+    erasure_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
+    delivery_token = "synthetic-restart-delivery-token"
+    delivery_hash = hashlib.sha256(delivery_token.encode()).hexdigest()
+    with postgres_cluster() as dsn:
+        _seed_single_use_deletion_tenant(dsn, tenant_id, epoch=5, nonce_hash=nonce_hash)
+        deletion_id = psql(dsn, _request_deletion_sql(tenant_id, nonce_hash), user="hulagu_app").stdout.strip()
+        psql(
+            dsn,
+            f"SELECT hulagu_api.claim_deletion_erasure('{deletion_id}','{erasure_hash}');"
+            f"SELECT hulagu_api.complete_deletion_erasure('{deletion_id}','{erasure_token}');",
+            user="hulagu_deletion",
+        )
+        first = json.loads(
+            psql(
+                dsn,
+                f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{delivery_hash}')",
+                user="hulagu_deletion",
+            ).stdout
+        )
+        restarted = json.loads(
+            psql(
+                dsn,
+                f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{delivery_hash}')",
+                user="hulagu_deletion",
+            ).stdout
+        )
+        assert first["status"] == "claimed"
+        assert restarted == {"status": "ambiguous"}
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_delivery('{deletion_id}','{delivery_token}','delivery_unknown')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "delivery_unknown"
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_delivery('{deletion_id}','{delivery_token}','delivered')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "delivery_unknown"
+
+
+def test_0015_fails_closed_before_mutation_when_0014_deletion_is_active() -> None:
+    with postgres_cluster(migrate=False) as dsn:
+        for filename in EXPECTED_MIGRATIONS[:-1]:
+            psql(dsn, (MIGRATIONS / filename).read_text())
+        psql(
+            dsn,
+            "INSERT INTO hulagu.deletion_jobs(target_tenant_id,subject_fence_digest,encrypted_route,"
+            "route_binding_digest,state,expires_at) VALUES"
+            "('74000000-0000-4000-8000-000000000006',repeat('a',64),'route',repeat('b',64),"
+            "'delivery_pending',now()+interval '1 day')",
+        )
+        result = psql(dsn, (MIGRATIONS / EXPECTED_MIGRATIONS[-1]).read_text(), check=False)
+
+        assert result.returncode != 0
+        assert "active pre-0015 deletion jobs require authenticated completion" in result.stderr
+        assert psql(
+            dsn,
+            "SELECT count(*) FROM information_schema.columns WHERE table_schema='hulagu' "
+            "AND table_name='tenants' AND column_name='deletion_nonce_hash'",
+        ).stdout.strip() == "0"
+
+
+def test_0015_fails_closed_when_legacy_plaintext_tombstones_exist() -> None:
+    with postgres_cluster(migrate=False) as dsn:
+        for filename in EXPECTED_MIGRATIONS[:-1]:
+            psql(dsn, (MIGRATIONS / filename).read_text())
+        psql(
+            dsn,
+            "INSERT INTO hulagu.deletion_tombstones(subject_fence_digest,key_version,barred_until) "
+            "VALUES(repeat('f',64),1,now()+interval '1 day')",
+        )
+
+        result = psql(
+            dsn,
+            (MIGRATIONS / EXPECTED_MIGRATIONS[-1]).read_text(),
+            check=False,
+        )
+
+        assert result.returncode != 0
+        assert "unsafe legacy plaintext deletion tombstones" in result.stderr
+        assert psql(
+            dsn,
+            "SELECT subject_fence_digest FROM hulagu.deletion_tombstones",
+        ).stdout.strip() == "f" * 64
 
 
 def test_no_ephemeral_cluster_leaks_from_helper() -> None:

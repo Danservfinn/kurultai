@@ -4,40 +4,58 @@
   "additionalProperties": false,
   "examples": [
     {
-      "created_at": "2026-07-27T00:00:00Z",
-      "expires_at": "2027-07-27T00:00:00Z",
-      "key_version": 1,
-      "schema_version": "DeletionTombstone/v1",
-      "subject_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      "backup_expiry_horizon": "2026-11-03T00:00:00Z",
+      "completed_at": "2026-07-29T00:00:00Z",
+      "deletion_epoch": 8,
+      "encrypted_subject_digest": "hts1.AAAAAdCfrXatw2sBXOdM-or_Zfe9-b78pv2HCbB0DM0K_I3Bwu6Ci0ycIcRlK9AFO4TXqxB1OOO5qXQMW9XZBrBdHbc1f6761uv8H2vKjR4PYoiZ",
+      "rekey_state": "current",
+      "schema_version": "DeletionTombstone/v1"
     }
   ],
   "properties": {
-    "created_at": {
+    "backup_expiry_horizon": {
       "format": "date-time",
       "type": "string"
     },
-    "expires_at": {
+    "completed_at": {
       "format": "date-time",
       "type": "string"
     },
-    "key_version": {
+    "deletion_epoch": {
       "minimum": 1,
       "type": "integer"
     },
+    "encrypted_subject_digest": {
+      "maxLength": 4096,
+      "minLength": 117,
+      "oneOf": [
+        {
+          "pattern": "^hts1\\.[A-Za-z0-9_-]{112,}={0,2}$"
+        },
+        {
+          "pattern": "^hts1\\.[1-9][0-9]*\\.[a-f0-9]{64}\\.[A-Za-z0-9_-]{112,}={0,2}$"
+        }
+      ],
+      "type": "string"
+    },
+    "rekey_state": {
+      "enum": [
+        "current",
+        "pending"
+      ],
+      "type": "string"
+    },
     "schema_version": {
       "const": "DeletionTombstone/v1"
-    },
-    "subject_digest": {
-      "pattern": "^[a-f0-9]{64}$",
-      "type": "string"
     }
   },
   "required": [
     "schema_version",
-    "subject_digest",
-    "key_version",
-    "created_at",
-    "expires_at"
+    "encrypted_subject_digest",
+    "deletion_epoch",
+    "completed_at",
+    "backup_expiry_horizon",
+    "rekey_state"
   ],
   "title": "DeletionTombstone/v1",
   "type": "object"

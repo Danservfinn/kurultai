@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -27,22 +28,42 @@ def create_tenant(dsn: str, subject: str = SUBJECT, fence: str = FENCE) -> str:
 
 
 def request_deletion(dsn: str, tenant: str) -> str:
+    nonce_hash = hashlib.sha256(f"delete:{tenant}".encode()).hexdigest()
+    psql(dsn, f"UPDATE hulagu.tenants SET deletion_nonce_hash='{nonce_hash}' WHERE id='{tenant}'")
     return scalar(
         dsn,
         "BEGIN; "
         f"SET LOCAL app.tenant_id='{tenant}'; SET LOCAL app.actor='telegram-customer'; "
         "SET LOCAL app.correlation_id='delete'; "
-        "SELECT hulagu_api.request_deletion('ciphertext','route-binding-v1'); COMMIT;",
+        f"SELECT hulagu_api.request_deletion('{nonce_hash}','ciphertext',repeat('b',64)); COMMIT;",
     )
 
 
 def claim_deletion(dsn: str, deletion_id: str, token: str = "delete-token") -> str:
+    erasure_token = "erase-token"
+    erasure_token_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
+    target = scalar(
+        dsn,
+        f"SELECT hulagu_api.claim_deletion_erasure('{deletion_id}','{erasure_token_hash}')",
+        user="hulagu_deletion",
+    )
+    if not target:
+        return ""
+    if scalar(
+        dsn,
+        f"SELECT hulagu_api.complete_deletion_erasure('{deletion_id}','{erasure_token}')",
+        user="hulagu_deletion",
+    ) != "t":
+        return ""
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    return scalar(
+    claim = scalar(
         dsn,
         f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{token_hash}')",
         user="hulagu_deletion",
     )
+    if not claim:
+        return ""
+    return str(json.loads(claim).get("encrypted_route", ""))
 
 
 def test_preconsent_resolution_cannot_create_tenant_and_promotion_is_single_authority() -> None:
@@ -75,9 +96,9 @@ def test_deletion_global_state_survives_tenant_erasure_and_minimizes_receipt() -
         deletion_id = request_deletion(dsn, tenant)
         token = "delete-token"
         assert claim_deletion(dsn, deletion_id, token) == "ciphertext"
-        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','forged-token')", user="hulagu_deletion") == "f"
-        assert psql(dsn, f"SELECT count(*) FROM hulagu.tenants WHERE id='{tenant}'").stdout.strip() == "1"
-        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','{token}')", user="hulagu_deletion") == "t"
+        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','forged-token','delivered')", user="hulagu_deletion") == ""
+        assert psql(dsn, f"SELECT count(*) FROM hulagu.tenants WHERE id='{tenant}'").stdout.strip() == "0"
+        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','{token}','delivered')", user="hulagu_deletion") == "delivered"
         assert psql(dsn, f"SELECT count(*) FROM hulagu.tenants WHERE id='{tenant}'").stdout.strip() == "0"
         assert psql(dsn, f"SELECT target_tenant_id IS NULL AND encrypted_route IS NULL FROM hulagu.deletion_jobs WHERE deletion_id='{deletion_id}'").stdout.strip() == "t"
         columns = set(psql(dsn, "SELECT column_name FROM information_schema.columns WHERE table_schema='hulagu' AND table_name='deletion_receipts'").stdout.splitlines())
@@ -90,7 +111,7 @@ def test_barred_subject_is_rejected_before_enrollment_state_is_created() -> None
         tenant = create_tenant(dsn)
         deletion_id = request_deletion(dsn, tenant)
         assert claim_deletion(dsn, deletion_id) == "ciphertext"
-        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','delete-token')", user="hulagu_deletion") == "t"
+        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','delete-token','delivered')", user="hulagu_deletion") == "delivered"
         rotated_subject = "d" * 64
         blocked = psql(
             dsn,
@@ -110,8 +131,10 @@ def test_deletion_preserves_stable_fence_across_subject_key_rotation() -> None:
         psql(dsn, f"UPDATE hulagu.identity_bindings SET subject_digest='{rotated_subject}' WHERE tenant_id='{tenant}'")
         deletion_id = request_deletion(dsn, tenant)
         assert claim_deletion(dsn, deletion_id) == "ciphertext"
-        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','delete-token')", user="hulagu_deletion") == "t"
-        assert psql(dsn, "SELECT subject_fence_digest FROM hulagu.deletion_tombstones").stdout.strip() == FENCE
+        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','delete-token','delivered')", user="hulagu_deletion") == "delivered"
+        assert psql(dsn, f"SELECT hulagu_api.subject_fence_is_barred('{FENCE}')").stdout.strip() == "t"
+        encrypted = psql(dsn, "SELECT encrypted_subject_digest FROM hulagu.deletion_tombstones").stdout.strip()
+        assert encrypted.startswith("hts1.") and FENCE not in encrypted
 
 
 def test_expired_deletion_authority_cannot_disclose_route_or_erase_tenant() -> None:
@@ -120,16 +143,22 @@ def test_expired_deletion_authority_cannot_disclose_route_or_erase_tenant() -> N
         deletion_id = request_deletion(dsn, tenant)
         psql(dsn, f"UPDATE hulagu.deletion_jobs SET expires_at=now()-interval '1 second' WHERE deletion_id='{deletion_id}'")
         assert claim_deletion(dsn, deletion_id) == ""
-        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','delete-token')", user="hulagu_deletion") == "f"
+        assert scalar(dsn, f"SELECT hulagu_api.finalize_deletion('{deletion_id}','delete-token','expired')", user="hulagu_deletion") == ""
         assert psql(dsn, f"SELECT count(*) FROM hulagu.tenants WHERE id='{tenant}'").stdout.strip() == "1"
 
         active_tenant = create_tenant(dsn, "e" * 64, "f" * 64)
         active_deletion = request_deletion(dsn, active_tenant)
-        assert claim_deletion(dsn, active_deletion) == "ciphertext"
+        erasure_token = "active-erase-token"
+        erasure_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
+        assert scalar(
+            dsn,
+            f"SELECT hulagu_api.claim_deletion_erasure('{active_deletion}','{erasure_hash}')",
+            user="hulagu_deletion",
+        ) == active_tenant
         psql(dsn, f"UPDATE hulagu.deletion_jobs SET expires_at=now()-interval '1 second' WHERE deletion_id='{active_deletion}'")
         assert scalar(
             dsn,
-            f"SELECT hulagu_api.finalize_deletion('{active_deletion}','delete-token')",
+            f"SELECT hulagu_api.complete_deletion_erasure('{active_deletion}','{erasure_token}')",
             user="hulagu_deletion",
         ) == "f"
         assert psql(dsn, f"SELECT count(*) FROM hulagu.tenants WHERE id='{active_tenant}'").stdout.strip() == "1"

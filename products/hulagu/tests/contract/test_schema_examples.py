@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import base64
 import copy
+import hashlib
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import jsonschema
 import pytest
+
+from hulagu.domain.deletion import MemoryDeletionWorkflow, TombstoneFence
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas"
 EXPECTED_SCHEMAS = {
@@ -104,3 +110,95 @@ def test_parsed_cv_rejects_nested_array_items(invalid_item: object) -> None:
     parsed_cv["fields"][0]["value"] = [invalid_item]
     with pytest.raises(jsonschema.ValidationError):
         validator_for("parsed-cv-v1.schema.json").validate(parsed_cv)
+
+
+def test_deletion_tombstone_accepts_only_exact_encrypted_six_field_contract() -> None:
+    example = first_example("deletion-tombstone-v1.schema.json")
+    assert set(example) == {
+        "schema_version",
+        "encrypted_subject_digest",
+        "deletion_epoch",
+        "completed_at",
+        "backup_expiry_horizon",
+        "rekey_state",
+    }
+    validator_for("deletion-tombstone-v1.schema.json").validate(example)
+
+
+def test_deletion_tombstone_embedded_example_is_an_authenticated_synthetic_envelope() -> None:
+    example = first_example("deletion-tombstone-v1.schema.json")
+    fence = TombstoneFence({1: b"synthetic-tombstone-schema-key"}, active_version=1)
+    assert fence.matches(example, 777, 888, now=datetime(2026, 7, 29, tzinfo=UTC))
+
+
+def test_deletion_tombstone_rejects_legacy_plaintext_five_field_contract() -> None:
+    legacy = {
+        "schema_version": "DeletionTombstone/v1",
+        "subject_digest": "b" * 64,
+        "key_version": 1,
+        "created_at": "2026-07-27T00:00:00Z",
+        "expires_at": "2027-07-27T00:00:00Z",
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        validator_for("deletion-tombstone-v1.schema.json").validate(legacy)
+
+
+@pytest.mark.parametrize(
+    "unsafe_value",
+    [
+        "b" * 64,
+        base64.urlsafe_b64encode(b"b" * 64).decode("ascii"),
+        "hts1." + base64.urlsafe_b64encode(b"b" * 64).decode("ascii"),
+    ],
+)
+def test_deletion_tombstone_rejects_plaintext_and_trivially_reversible_subject_values(unsafe_value: str) -> None:
+    tombstone = {
+        "schema_version": "DeletionTombstone/v1",
+        "encrypted_subject_digest": unsafe_value,
+        "deletion_epoch": 8,
+        "completed_at": "2026-07-29T00:00:00Z",
+        "backup_expiry_horizon": "2026-11-03T00:00:00Z",
+        "rekey_state": "current",
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        validator_for("deletion-tombstone-v1.schema.json").validate(tombstone)
+
+
+def test_persisted_memory_deletion_workflow_tombstone_validates_and_hides_subject_digest(tmp_path: Path) -> None:
+    tenant_id = UUID("90000000-0000-4000-8000-000000000099")
+    now = datetime(2026, 7, 29, tzinfo=UTC)
+    bot_id = 777
+    actor_id = 888
+    state_path = tmp_path / "state.json"
+    tenants_root = tmp_path / "tenants"
+    fence = TombstoneFence({1: b"synthetic-tombstone-contract-key"}, active_version=1)
+    workflow = MemoryDeletionWorkflow(state_path, tenants_root, tombstone_fence=fence)
+    workflow.seed_tenant(
+        tenant_id,
+        lifecycle_epoch=7,
+        nonce="single-use",
+        bot_id=bot_id,
+        actor_id=actor_id,
+        encrypted_route="synthetic-encrypted-route",
+        route_generation=3,
+        route_binding_digest="c" * 64,
+        rows={},
+        ordinary_outbox=(),
+        active_work=(),
+    )
+    job = workflow.confirm(tenant_id, nonce="single-use", expected_epoch=7, now=now)
+    for _ in range(3):
+        workflow.advance(job.deletion_id, now=now)
+    workflow.record_delivery(job.deletion_id, "delivered", now=now)
+    workflow.advance(job.deletion_id, now=now)
+
+    restored = MemoryDeletionWorkflow.open(state_path, tenants_root, tombstone_fence=fence)
+    tombstone = restored.tombstone(job.deletion_id)
+    validator_for("deletion-tombstone-v1.schema.json").validate(tombstone)
+
+    encrypted = str(tombstone["encrypted_subject_digest"])
+    assert encrypted.startswith("hts1.")
+    packed = base64.urlsafe_b64decode(encrypted.removeprefix("hts1."))
+    subject_digest = hashlib.sha256(f"hulagu.deletion-subject.v1\0{bot_id}\0{actor_id}".encode()).digest()
+    assert subject_digest not in packed
+    assert tombstone["backup_expiry_horizon"] == (now + timedelta(days=97)).isoformat()

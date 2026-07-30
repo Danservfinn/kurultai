@@ -360,12 +360,14 @@ def test_publication_claim_is_refused_while_backup_lock_is_held() -> None:
 def test_deletion_claim_is_refused_while_backup_lock_is_held() -> None:
     token_hash = hashlib.sha256(b"backup-token").hexdigest()
     delivery_hash = hashlib.sha256(b"delivery-token").hexdigest()
+    nonce_hash = hashlib.sha256(b"backup-lock-deletion-nonce").hexdigest()
     with postgres_cluster() as dsn:
         tenant_id = _tenant(dsn, "d")
+        psql(dsn, f"UPDATE hulagu.tenants SET deletion_nonce_hash='{nonce_hash}' WHERE id='{tenant_id}'")
         deletion_id = _app(
             dsn,
             tenant_id,
-            "SELECT hulagu_api.request_deletion('ciphertext','route-binding')",
+            f"SELECT hulagu_api.request_deletion('{nonce_hash}','ciphertext',repeat('b',64))",
         ).stdout.strip()
         _begin_backup(dsn, token_hash)
 

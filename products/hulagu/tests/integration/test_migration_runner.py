@@ -53,6 +53,23 @@ def test_runner_uses_postgresql_advisory_lock() -> None:
     assert "pg_advisory" in source
 
 
+def test_runner_rerun_after_0015_is_idempotent() -> None:
+    with postgres_cluster() as dsn:
+        before = psql(
+            dsn,
+            "SELECT version || ':' || checksum FROM public.hulagu_schema_migrations ORDER BY version",
+        ).stdout.splitlines()
+        result = run_migrator(dsn)
+        after = psql(
+            dsn,
+            "SELECT version || ':' || checksum FROM public.hulagu_schema_migrations ORDER BY version",
+        ).stdout.splitlines()
+
+        assert result.stdout.strip() == "migration succeeded: applied=0"
+        assert len(after) == 15
+        assert after == before
+
+
 def test_two_synchronized_migrators_serialize_the_whole_run() -> None:
     with postgres_cluster(migrate=False) as dsn:
         locker = subprocess.Popen(
@@ -91,5 +108,5 @@ def test_two_synchronized_migrators_serialize_the_whole_run() -> None:
         assert [result.returncode for result in results] == [0, 0]
         assert sorted(result.stdout.strip() for result in results) == [
             "migration succeeded: applied=0",
-            "migration succeeded: applied=14",
+            "migration succeeded: applied=15",
         ]

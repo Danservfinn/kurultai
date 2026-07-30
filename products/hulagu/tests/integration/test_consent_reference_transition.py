@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 from test_migrations import postgres_cluster, psql
 
@@ -133,29 +134,46 @@ def test_deletion_terminalizes_promoted_start_before_tenant_erasure() -> None:
             f"SELECT hulagu_api.promote_consented_enrollment('{enrollment_id}','notice-v1',repeat('c',64))",
             user="hulagu_app",
         ).stdout.strip()
+        nonce_hash = hashlib.sha256(b"delete-promoted-start-nonce").hexdigest()
+        psql(dsn, f"UPDATE hulagu.tenants SET deletion_nonce_hash='{nonce_hash}' WHERE id='{tenant_id}'")
         deletion_id = psql(
             dsn,
             "BEGIN;"
             f"SET LOCAL app.tenant_id='{tenant_id}';"
             "SET LOCAL app.actor='telegram-customer';"
             "SET LOCAL app.correlation_id='delete-promoted-start';"
-            "SELECT hulagu_api.request_deletion('ciphertext','route-binding-v1');"
+            f"SELECT hulagu_api.request_deletion('{nonce_hash}','ciphertext',repeat('b',64));"
             "COMMIT;",
             user="hulagu_app",
         ).stdout.strip()
         token = "delete-token"
         token_hash = hashlib.sha256(token.encode()).hexdigest()
+        erasure_token = "delete-erasure-token"
+        erasure_hash = hashlib.sha256(erasure_token.encode()).hexdigest()
         assert psql(
             dsn,
-            f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{token_hash}')",
+            f"SELECT hulagu_api.claim_deletion_erasure('{deletion_id}','{erasure_hash}')",
             user="hulagu_deletion",
-        ).stdout.strip() == "ciphertext"
+        ).stdout.strip() == tenant_id
+        assert psql(
+            dsn,
+            f"SELECT hulagu_api.complete_deletion_erasure('{deletion_id}','{erasure_token}')",
+            user="hulagu_deletion",
+        ).stdout.strip() == "t"
+        claimed = json.loads(
+            psql(
+                dsn,
+                f"SELECT hulagu_api.claim_deletion_delivery('{deletion_id}','{token_hash}')",
+                user="hulagu_deletion",
+            ).stdout
+        )
+        assert claimed == {"status": "claimed", "encrypted_route": "ciphertext"}
 
         assert psql(
             dsn,
-            f"SELECT hulagu_api.finalize_deletion('{deletion_id}','{token}')",
+            f"SELECT hulagu_api.finalize_deletion('{deletion_id}','{token}','delivered')",
             user="hulagu_deletion",
-        ).stdout.strip() == "t"
+        ).stdout.strip() == "delivered"
         assert psql(dsn, "SELECT count(*) FROM hulagu.tenants").stdout.strip() == "0"
         assert psql(
             dsn,
