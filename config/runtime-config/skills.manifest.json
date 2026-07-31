@@ -1523,7 +1523,7 @@
       "path": "research/public-identity-affiliation-verification"
     },
     {
-      "description": "Estimate resale value and optimal selling timing for consumer goods, collectibles, merch, apparel, and bundles using marketplace comps, condition assessment, and demand seasonality.",
+      "description": "Estimate resale and private-sale value for vehicles, consumer goods, collectibles, merch, apparel, and bundles using marketplace comps, condition assessment, and demand seasonality.",
       "name": "resale-market-valuation",
       "path": "research/resale-market-valuation"
     },
