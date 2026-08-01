@@ -498,7 +498,7 @@
       "path": "apple/macos-local-automation"
     },
     {
-      "description": "Diagnose macOS/APFS disk-space usage on internal or external volumes with read-only-first evidence, hidden/system checks, runaway process detection, and cleanup options that require explicit approval.",
+      "description": "Diagnose macOS resource pressure \u2014 disk-space usage (APFS, snapshots, Time Machine), RAM/swap exhaustion, Spotlight reindexing storms, and high CPU load \u2014 with read-only-first evidence, runaway process detection, and staged cleanup options that require explicit approval.",
       "name": "macos-storage-diagnostics",
       "path": "apple/macos-storage-diagnostics"
     },
@@ -746,6 +746,11 @@
       "description": "Read, search, create, and edit notes in the Obsidian vault.",
       "name": "obsidian",
       "path": "data-science/knowledge-and-data-workflows/references/absorbed-packages/obsidian"
+    },
+    {
+      "description": "Find the root-cause crux in strategy problems.",
+      "name": "find-the-strategic-crux",
+      "path": "decision-making/find-the-strategic-crux"
     },
     {
       "description": "Turn a messy problem into an answer-first recommendation by independently analyzing it top-down from principles/options and bottom-up from evidence, then comparing convergence, conflicts, and evidence gaps. Use for decisions, memos, strategy recommendations, prioritization, and situations where analysis keeps expanding without landing. Do not use when the user needs a full issue tree, root-cause diagnosis, or open-ended problem framing instead of a decision.",
@@ -1038,7 +1043,7 @@
       "path": "kurultai/kurultai-system-audit"
     },
     {
-      "description": "Convert broad money-dashboard security/audit bounty signals into concrete public/local research passes with ledger receipts, and manage submitted bounty PR lifecycle (CI triage, competitive analysis, merge blocker identification).",
+      "description": "Convert broad money-dashboard security/audit bounty signals into concrete public/local research passes with ledger receipts, discover and exploit fresh bug-bounty clusters on established repos, and manage submitted bounty PR lifecycle (CI triage, competitive analysis, merge blocker identification).",
       "name": "money-security-bounty-triage",
       "path": "kurultai/money-security-bounty-triage"
     },
@@ -1576,6 +1581,11 @@
       "description": "Control and verify smart-home devices, rooms, scenes, lights, switches, and related personal device APIs safely.",
       "name": "smart-home-operations",
       "path": "smart-home/smart-home-operations"
+    },
+    {
+      "description": "Connect Hermes to Buzz and send media attachments.",
+      "name": "buzz-integration",
+      "path": "social-media/buzz-integration"
     },
     {
       "description": "Operate social and messaging platforms such as X/Twitter and Yuanbao groups with explicit targets, safe posting, and verified delivery.",
