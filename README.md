@@ -43,6 +43,7 @@ Required behavior:
 ## What Kurultai provides
 
 - **Hermes-native multi-agent coordination** — profiles, tools, skills, sessions, gateway, cron, and native Kanban remain the runtime substrate.
+- **Private Buzz buildrooms** — selected feature, bug, and incident tasks can receive idempotent ephemeral Buzz rooms with bounded rosters, privacy-safe kickoffs, read-only search, and terminal receipts while Kanban remains canonical. See [`docs/operations/buzz-ephemeral-buildrooms.md`](docs/operations/buzz-ephemeral-buildrooms.md).
 - **Kublai as chair** — Kublai routes work, keeps synthesis coherent, verifies receipts, and reports one concise operator-facing result. On third-party installs this chair surface can be mapped to an existing agent such as Sophia's Cerberus without copying private state.
 - **Radar care layer** — Radar is the chief-of-staff/top-of-mind surface for protection, preparation, proposals, and loop closure; it starts draft-only/local until sources and authority are verified.
 - **Specialist profiles** — Batu, Chagatai, Jochi, Temujin, Coder, Mongke, Ogedei, Subc, and Tolui handle retrieval, research, analysis, implementation, review, operations, background signal detection, and local lightweight triage. `codex` is included as a non-routable compatibility profile for explicit Codex CLI flows.
