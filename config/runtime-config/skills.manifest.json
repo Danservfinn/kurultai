@@ -1358,6 +1358,11 @@
       "path": "productivity/linear"
     },
     {
+      "description": "Research and recommend price-sensitive local services by combining exact-location routing, live listing comparisons, requirement-fit filters, direct offer verification, and total-cost caveats.",
+      "name": "local-service-recommendations",
+      "path": "productivity/local-service-recommendations"
+    },
+    {
       "description": "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.",
       "name": "maps",
       "path": "productivity/maps"

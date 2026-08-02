@@ -272,7 +272,7 @@
       "workdir": null
     },
     {
-      "deliver": "origin",
+      "deliver": "local",
       "enabled": true,
       "enabled_toolsets": [
         "file",
@@ -1279,7 +1279,7 @@
       "workdir": null
     },
     {
-      "deliver": "origin",
+      "deliver": "local",
       "enabled": true,
       "enabled_toolsets": null,
       "job_id": "job-063",
@@ -1298,7 +1298,7 @@
       "workdir": null
     },
     {
-      "deliver": "origin",
+      "deliver": "local",
       "enabled": true,
       "enabled_toolsets": [
         "terminal",
@@ -1643,7 +1643,7 @@
       "workdir": null
     },
     {
-      "deliver": "origin",
+      "deliver": "local",
       "enabled": true,
       "enabled_toolsets": [
         "terminal",
