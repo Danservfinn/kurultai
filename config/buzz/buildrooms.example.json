@@ -1,0 +1,43 @@
+{
+  "schema": "kurultai.buzz-buildrooms.v1",
+  "profile": "kublai",
+  "buzz_cli": "~/.local/bin/buzz",
+  "hermes_cli": "hermes",
+  "relay_url": "http://127.0.0.1:3000",
+  "state_path": "~/.hermes/profiles/kublai/cron/state/buzz-buildrooms.json",
+  "secret_env_file": "~/.hermes/profiles/kublai/.env",
+  "activation_not_before": 0,
+  "max_creations_per_tick": 1,
+  "eligible_statuses": [
+    "ready",
+    "running"
+  ],
+  "automatic_title_patterns": [
+    "^(feat|feature|bug|fix|incident|security)[: -]"
+  ],
+  "explicit_opt_in_markers": [
+    "[buzz-buildroom]",
+    "Buzz buildroom: true"
+  ],
+  "explicit_opt_out_markers": [
+    "Buzz buildroom: false"
+  ],
+  "templates": {
+    "feature": {
+      "ttl_seconds": 604800,
+      "channel_prefix": "build"
+    },
+    "bug": {
+      "ttl_seconds": 259200,
+      "channel_prefix": "bug"
+    },
+    "incident": {
+      "ttl_seconds": 0,
+      "channel_prefix": "incident"
+    }
+  },
+  "members": {},
+  "always_include_members": [],
+  "default_reviewer": "kublai",
+  "archive_on_done": true
+}
