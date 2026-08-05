@@ -1658,6 +1658,11 @@
       "path": "software-development/codex-implementation-orchestration"
     },
     {
+      "description": "Verify agent work with computer use: reproduce and confirm.",
+      "name": "computer-use-verification",
+      "path": "software-development/computer-use-verification"
+    },
+    {
       "description": "Debug Hermes TUI slash commands: Python, gateway, Ink UI.",
       "name": "debugging-hermes-tui-commands",
       "path": "software-development/debugging-hermes-tui-commands"
