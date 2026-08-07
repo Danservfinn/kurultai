@@ -1653,6 +1653,11 @@
       "path": "software-development/browser-harness"
     },
     {
+      "description": "Screenshot and extract HTML via Cloudflare's agent browser.",
+      "name": "cloudflare-kitesurf",
+      "path": "software-development/cloudflare-kitesurf"
+    },
+    {
       "description": "Use Codex as a bulk coding worker while Hermes acts as reviewer, verifier, and safety gate for multi-phase implementation work. In Kanban contexts, assign the task to a real accountable Kurultai profile (for example Chagatai) and have that profile use this skill; do not assign the task directly to a pseudo-profile named `codex`. See references/kanban-ownership.md.",
       "name": "codex-implementation-orchestration",
       "path": "software-development/codex-implementation-orchestration"
