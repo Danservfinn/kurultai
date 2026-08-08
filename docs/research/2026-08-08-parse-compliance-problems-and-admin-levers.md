@@ -205,7 +205,11 @@ Phases: **P1** = developer self-serve (Free/Pro), **P2** = team tier, **P3** = e
 | Agent-to-agent trust threshold | Minimum trust-verification score before delegated calls are honored (uses existing 6-layer `verifyTrust`) | D9, S5 | P2 |
 | On-behalf-of attribution requirement | Require `agent_id` + acting-user identity on every call, so downstream actions are attributable at the boundary | D16, C13, V10 | P2 |
 | Credential scoping & TTL | Max lifetime/scopes for agent credentials; stale-permission report and one-click prune | C9, S3, S7 | P3 |
+| Credential custody (managed provider keys) | Provider API keys live in Parse's vault; agents hold only Parse-issued virtual keys, so model calls cannot skip screening — enforcement by key possession, not convention | D2, C5, S3 | P2 (opt-in) / P3 (required) |
+| Gateway mode dial (off → available → required) | Routes model traffic through Parse's screening proxy via a one-line base-URL swap; at `required`, paired with provider-side IP/egress pinning so off-path keys are useless | D2, C5, X5 | P2 (available) / P3 (required) |
 | Kill switch | Freeze one agent / team / all agents. Big red lever; every use audited; unfreeze requires reason | C12, V7 | P1 (per-key) / P3 (org-wide) |
+
+The custody + gateway pair is the prevention-grade enforcement path — the only levers that make screening physically unskippable rather than merely audited. Full mechanics, costs (inline latency, fail posture, C17 blast radius), and the build-vs-partner question are in [[2026-08-08-parse-enforcement-architecture]].
 
 #### D. Policy lifecycle levers — how rules change
 
@@ -279,14 +283,14 @@ Ship: per-source toggles, thresholds, enforcement dial, sandbox toggle, output s
 
 ### Phase P2 — Teams (+3 → +9 months; Team tier, $199)
 
-Ship: environment pinning/promotion, agent registration dial, tool allowlists, trust thresholds, attribution requirement, quarantine, approval routing, SIEM forwarding, alert routing, redaction levels, compliance regression gate, framework coverage view, policy-as-code export.
+Ship: environment pinning/promotion, agent registration dial, tool allowlists, trust thresholds, attribution requirement, opt-in gateway mode (credential custody + one-line base-URL swap), quarantine, approval routing, SIEM forwarding, alert routing, redaction levels, compliance regression gate, framework coverage view, policy-as-code export.
 
 - This is where the left column of §2 gets fully closed: teammates' changes are versioned, environments can't drift, agents are enumerable, actions are attributable.
 - The **framework coverage view and SIEM forwarding are deliberately in P2, not P3**: they're the artifacts a developer forwards to their own security team — the internal-champion flywheel. The CISO's first contact with Parse should be a Splunk event and a coverage report that already exist.
 
 ### Phase P3 — Enterprise (+9 → +18 months; Compliance $999 / Enterprise $5K+)
 
-Ship: org hierarchy + inheritance, RBAC, SSO/SCIM, org-wide kill switch, credential scoping, data-classification routing, exception workflow, four-eyes, break-glass, approval friction budget, scheduled evidence export, retention dial, residency, DSR console, shadow discovery + enrollment, per-employee policy, legal hold, framework mode bundles.
+Ship: org hierarchy + inheritance, RBAC, SSO/SCIM, org-wide kill switch, gateway-required enforcement (credential custody + provider-side egress pinning), credential scoping, data-classification routing, exception workflow, four-eyes, break-glass, approval friction budget, scheduled evidence export, retention dial, residency, DSR console, shadow discovery + enrollment, per-employee policy, legal hold, framework mode bundles.
 
 - Entry mechanism: **org claim**. A CISO discovers (via SIEM events, expense reports, or the coverage report a developer forwarded) that N teams already run Parse. Domain-verified claim converts those API-key-scoped views into one org scope with inheritance — land-and-expand where the landing already happened, and the enterprise sale starts with a populated dashboard instead of an empty one.
 - Gate P3 spend on the pivot assessment's condition: 3+ design partners pulled from existing P1/P2 customers before building the long tail (residency, DSR, legal hold on demand-evidence only).
@@ -319,4 +323,4 @@ Ship: org hierarchy + inheritance, RBAC, SSO/SCIM, org-wide kill switch, credent
 
 ---
 
-*Authored 2026-08-08. Companion to [[2026-08-08-enterprise-ai-agent-problem-graph]], [[2026-08-08-parse-enterprise-compliance-pivot-assessment]], and [[2026-08-08-parse-compliance-control-panel-build]].*
+*Authored 2026-08-08. Companion to [[2026-08-08-enterprise-ai-agent-problem-graph]], [[2026-08-08-parse-enterprise-compliance-pivot-assessment]], [[2026-08-08-parse-compliance-control-panel-build]], and [[2026-08-08-parse-enforcement-architecture]].*
