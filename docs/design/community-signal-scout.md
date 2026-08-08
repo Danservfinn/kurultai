@@ -3,6 +3,9 @@
 **Status:** Draft for review
 **Date:** 2026-08-08
 **Author:** Kurultai design pass
+**Companion:** [`identity-monitoring-agent.md`](identity-monitoring-agent.md) — the
+self-monitoring (`keshig`) design, which shares this document's growth-invariant pattern
+and its capability-contract enforcement gap.
 **Supersedes / relates to:** Extends "Auto research and signal intake" (README) and the Brain retrieval source policy (`docs/operations/brain-source-policy.md`).
 
 > This document is the **compliant** replacement for an earlier request to build a
