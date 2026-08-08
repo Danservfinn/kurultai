@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Agent Compliance — Implementation Plan v2</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --heading: #f0f6fc;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --code-bg: #1c2128;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .hero {
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 32px;
+    text-align: center;
+  }
+  .hero h1 { color: var(--heading); font-size: 28px; margin-bottom: 12px; }
+  .hero p { color: var(--accent); font-size: 14px; }
+  .meta { display: flex; justify-content: center; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+  .meta-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  .meta-item strong { color: var(--heading); }
+  .container { padding: 32px; }
+  blockquote {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+  }
+  .callout {
+    border: 1px solid rgba(188, 140, 255, 0.4);
+    background: rgba(188, 140, 255, 0.08);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .callout strong { color: var(--purple); }
+  h2 {
+    color: var(--heading);
+    font-size: 22px;
+    margin-top: 48px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { color: var(--accent); font-size: 17px; margin-top: 32px; margin-bottom: 8px; }
+  h4 {
+    color: var(--purple);
+    font-size: 14px;
+    margin-top: 16px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  p { margin-bottom: 12px; }
+  ul, ol { margin-left: 24px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--purple);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  pre code { background: none; padding: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th {
+    background: var(--surface);
+    color: var(--heading);
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td { padding: 8px 12px; border: 1px solid var(--border); }
+  tr:nth-child(even) { background: rgba(22, 27, 34, 0.5); }
+  .task {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-phase { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid rgba(88, 166, 255, 0.3); }
+  .badge-new { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid rgba(188, 140, 255, 0.3); }
+  .badge-updated { background: rgba(210, 153, 34, 0.15); color: var(--yellow); border: 1px solid rgba(210, 153, 34, 0.3); }
+  .dep-graph {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text);
+  }
+  .section-divider { height: 1px; background: var(--border); margin: 40px 0; }
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: #6e7681;
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+  }
+  .status-built { color: var(--green); }
+  .status-partial { color: var(--yellow); }
+  .status-missing { color: var(--red); }
+  strong { color: var(--heading); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Enterprise Agent Compliance — Implementation Plan v2</h1>
+  <p>Transform Parse into the agent-native compliance platform — now closing the enforcement, lever, attribution, trust, and action-governance gaps</p>
+  <div class="meta">
+    <div class="meta-item"><strong>12</strong> Phases</div>
+    <div class="meta-item"><strong>35</strong> Tasks</div>
+    <div class="meta-item"><strong>5</strong> Frameworks</div>
+    <div class="meta-item"><strong>Hybrid</strong> Architecture</div>
+    <div class="meta-item"><strong>v2</strong> — Aug 8, 2026</div>
+  </div>
+</div>
+
+<div class="container">
+
+<blockquote>
+<strong>For Kanban:</strong> Each task is a discrete card with clear acceptance criteria, dependency edges, and verification probes. Dependencies follow the problem graph's root-cause analysis: V1 (Agent Inventory) → G1 (Policy Definition) → G2 (Enforcement Layer) → V2 (Audit Trail) → G5 (Regulatory Mapping) → V6 (Compliance Reporting).
+</blockquote>
+
+<div class="callout">
+<strong>What v2 adds.</strong> v1's 17 tasks stand (5 of them updated in place, marked <span class="badge badge-updated">UPDATED</span>). v2 adds 18 tasks (marked <span class="badge badge-new">NEW</span>) across five new/extended phases that close the five gaps identified in the v1 review: <strong>(1)</strong> enforcement assurance (Phase 9), <strong>(2)</strong> missing adoption levers (Tasks 1.4, 2.3–2.5, 3.3), <strong>(3)</strong> audit-grade attribution (Phase 10), <strong>(4)</strong> security-review readiness / C17 (Phase 11), <strong>(5)</strong> action &amp; data governance (Phase 8). Phase 8 also implements the standing admin requirement: <strong>Parse admins control which volumes of data each agent can access, how much of it the agent can move, and what may be shared externally.</strong> See the Gap Closure Map at the bottom.
+</div>
+
+<h4>Goal</h4>
+<p>Transform Parse from a developer-facing prompt security API into the agent-native compliance platform — adding organization/governance/visibility layers on top of the existing detection engine.</p>
+
+<h4>Architecture</h4>
+<p>Hybrid model per the strategic assessment — developer API remains the wedge; compliance features are additive layers (schema migrations, reporting endpoints, SIEM forwarding, framework crosswalks, custom policy engine). No rewrite.</p>
+
+<h4>Repo</h4>
+<p><code>/Users/kublai/parse-for-agents-live</code></p>
+
+<h4>Current State</h4>
+<p>Compliance Control Panel v1 is built (5 Prisma models, framework crosswalk, SIEM forwarder, 9 compliance API endpoints, 6-tab dashboard). Type-checks pass, builds clean. NOT yet migrated to production DB, NOT yet deployed.</p>
+
+<!-- ============ PHASE 0 ============ -->
+<h2>Phase 0: Production Readiness (Prerequisites)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 0.1: Prisma Migration — Deploy Compliance Schema</h3>
+    <span class="badge badge-phase">Phase 0</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin (implementation) &nbsp; <strong>Depends on:</strong> Nothing &nbsp; <strong>Blocks:</strong> All Phase 1+ tasks</p>
+  <p><strong>Objective:</strong> Create and apply the Prisma migration for the 5 new models (Organization, AgentRegistry, PolicyRevision, SIEMConfig, ComplianceExport). v2 models (DataSource, AgentDataGrant, EgressRule, VolumeBudget, AlertRoute, AgentKeypair) are added in their owning tasks as separate migrations.</p>
+  <h4>Steps</h4>
+  <ol>
+    <li><code>npx prisma migrate dev --name add_compliance_models</code></li>
+    <li>Verify migration SQL — check foreign keys, indexes, cascade rules</li>
+    <li>Test rollback: <code>npx prisma migrate reset</code> (dev only)</li>
+    <li>Verify generated client: <code>npx prisma generate</code></li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Migration applied to local PG@15432</li>
+    <li><code>npx prisma migrate status</code> shows no pending migrations</li>
+    <li>All 5 tables exist in information_schema</li>
+    <li>Build passes: <code>npm run build</code></li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 0.2: Clean Temp Files</h3>
+    <span class="badge badge-phase">Phase 0</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Nothing</p>
+  <p><strong>Objective:</strong> Remove <code>scripts_tmp_check.ts</code> (untracked temp file from prior debugging).</p>
+  <p><strong>Acceptance:</strong> <code>git status</code> clean except intended changes.</p>
+</div>
+
+<!-- ============ PHASE 1 ============ -->
+<h2>Phase 1: Agent Inventory &amp; Lifecycle (V1 — Root Cause)</h2>
+<blockquote>
+<strong>Why first:</strong> V1 gates V2 (Audit Trail), V3 (Monitoring), V9 (Usage Analytics), and G1 (Policy Definition). It is one of three root nodes. The <code>AgentRegistry</code> model exists but has no CRUD API or self-registration flow.
+</blockquote>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 1.1: Agent Registry CRUD API</h3>
+    <span class="badge badge-updated">UPDATED</span>
+    <span class="badge badge-phase">Phase 1</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 0.1</p>
+  <p><strong>Objective:</strong> Build REST endpoints for agent lifecycle management.</p>
+  <h4>Endpoints</h4>
+<pre><code>POST   /v1/agents                 — Register a new agent
+GET    /v1/agents                  — List agents (paginated, filterable)
+GET    /v1/agents/:id              — Get agent detail (incl. last 10 screenings)
+PUT    /v1/agents/:id              — Update agent metadata
+DELETE /v1/agents/:id              — Decommission agent (soft delete)
+POST   /v1/agents/:id/heartbeat    — Agent heartbeat (updates lastSeenAt)</code></pre>
+  <h4>Steps</h4>
+  <ol>
+    <li>Write failing tests for each endpoint (TDD)</li>
+    <li>Implement route handlers using Prisma <code>AgentRegistry</code> model</li>
+    <li><strong>v2:</strong> reads use <code>authMiddleware("evaluate")</code>; <strong>writes (register/update/decommission) require the <code>compliance_admin</code> scope</strong> (introduced here, hardened in Task 11.1) and are rate-limited (default 30 writes/min/key)</li>
+    <li>On register: create <code>AuditEvent</code> with action <code>agent.registered</code></li>
+    <li>On decommission: create <code>AuditEvent</code> with action <code>agent.decommissioned</code></li>
+    <li>Add to <code>src/app.ts</code> route mounting</li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>All 6 endpoints return correct HTTP status codes</li>
+    <li>Agent is scoped to <code>apiKeyId</code> (no cross-key leakage)</li>
+    <li>Write endpoints reject keys lacking <code>compliance_admin</code>; rate limit enforced</li>
+    <li>Audit events created for register/decommission</li>
+    <li><code>npx tsc --noEmit</code> passes</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 1.2: Agent Dashboard Tab</h3>
+    <span class="badge badge-phase">Phase 1</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai (frontend/research) &nbsp; <strong>Depends on:</strong> Task 1.1</p>
+  <p><strong>Objective:</strong> Add "Agents" tab to the compliance dashboard.</p>
+  <h4>Features</h4>
+  <ul>
+    <li>Agent table: name, status badge, risk level badge, tools count, data access count, last seen</li>
+    <li>Click agent → detail drawer with screening history</li>
+    <li>"Register Agent" button → inline form</li>
+    <li>"Decommission" action per agent</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Tab renders with real data from <code>/v1/agents</code></li>
+    <li>Empty state shows CTA to register first agent</li>
+    <li>Risk level badges use color coding (green/yellow/orange/red)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 1.3: Auto-Registration from Screening Events</h3>
+    <span class="badge badge-updated">UPDATED</span>
+    <span class="badge badge-phase">Phase 1</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 1.1</p>
+  <p><strong>Objective:</strong> When a screening event includes an <code>agent_id</code> that doesn't exist in the registry, auto-register it with a "discovered" status.</p>
+<pre><code>if (agent_id in metadata && !exists in AgentRegistry) {
+  create AgentRegistry entry with:
+    status: "discovered"
+    name: agent_id
+    tools: metadata.tool_permissions
+    dataAccess: metadata.data_classification
+    riskLevel: "unscored"        // v2: no single-event derivation
+    firstSeenAt: now
+}</code></pre>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>New agents from screening events appear in registry within 1 request</li>
+    <li>"Discovered" status is visually distinct from explicitly registered agents</li>
+    <li>No duplicate agents created — <strong>v2:</strong> unique DB index on <code>(apiKeyId, agentId)</code>, not just app-level upsert</li>
+    <li><strong>v2 (hot path):</strong> existence check served from an in-process known-agent cache (TTL 60s); no synchronous registry read per screening event at steady state</li>
+    <li><strong>v2 (risk):</strong> <code>riskLevel</code> is computed by a rolling 30-day aggregation job (p95 risk score + blocked ratio), never derived from a single event</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 1.4: Kill Switch (Agent / Key Freeze)</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 1</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 1.1 &nbsp; <strong>Gap:</strong> #2 (adoption levers) — closes C12/V7 containment</p>
+  <p><strong>Objective:</strong> One lever that instantly stops a compromised or misbehaving agent. Frozen agents receive an immediate <code>block</code> verdict on every screening call via a fast path that skips the pipeline.</p>
+  <h4>Endpoints</h4>
+<pre><code>POST /v1/agents/:id/freeze        — { "reason": "required" } → status: frozen
+POST /v1/agents/:id/unfreeze      — { "reason": "required" }
+POST /v1/keys/self/freeze-all     — freeze every agent under this API key</code></pre>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Frozen agent's screening calls return <code>verdict: block, reason: agent_frozen</code> in &lt;10ms (fast path, no pipeline)</li>
+    <li>Freeze/unfreeze require <code>compliance_admin</code> scope and a non-empty reason; both create <code>AuditEvent</code>s</li>
+    <li>Dashboard: freeze action on the Agents tab + "Freeze all" on Overview with confirm step</li>
+    <li>Freeze state survives restart (persisted, cached with 5s TTL)</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 2 ============ -->
+<h2>Phase 2: Policy Versioning, Levers &amp; Enforcement (G1, G2)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 2.1: Policy Revision API</h3>
+    <span class="badge badge-phase">Phase 2</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 0.1</p>
+  <p><strong>Objective:</strong> Every policy change creates a <code>PolicyRevision</code> with the old/new diff and a change reason.</p>
+  <h4>Logic</h4>
+  <ol>
+    <li>On <code>PUT /v1/policy</code>: fetch current policy, compute diff, store as PolicyRevision</li>
+    <li><code>GET /v1/compliance/policy-history</code> already exists — verify it reads from PolicyRevision table</li>
+    <li>Add <code>changeReason</code> field to PUT request body (optional)</li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Every PUT creates a PolicyRevision row</li>
+    <li>Diff is human-readable JSON (field: {old, new})</li>
+    <li>Policy history endpoint returns chronological revisions</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 2.2: Custom Rule Engine (JSON Rule DSL v1)</h3>
+    <span class="badge badge-updated">UPDATED</span>
+    <span class="badge badge-phase">Phase 2</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 2.1</p>
+  <p><strong>Objective:</strong> Allow organizations to define custom compliance rules beyond the built-in patterns. Evaluate rules in the screening pipeline. <strong>v2 retitle:</strong> v1 ships the JSON rule DSL below; Cedar/OPA is a separate v2 decision spike, scheduled only when customers articulate rules the DSL cannot express.</p>
+  <h4>JSON Rule DSL (v1)</h4>
+<pre><code>{
+  "name": "block-ssn-in-prompt",
+  "condition": {
+    "field": "prompt",
+    "match": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+    "type": "regex"
+  },
+  "action": "block",
+  "reason": "SSN detected in agent prompt"
+}</code></pre>
+  <p>Evaluate after Phase 3 (LLM analysis), before returning final verdict. Log custom rule hits in ScreeningEvent metadata.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Custom rules can be created, listed, updated, deleted; scoped to API key / organization</li>
+    <li>Rules are evaluated in the screening pipeline; hits appear in audit trail with rule name and reason</li>
+    <li><strong>v2 (ReDoS hardening):</strong> customer regex compiled with a linear-time engine (RE2 or equivalent) — no backtracking engine ever evaluates customer patterns</li>
+    <li><strong>v2:</strong> per-rule evaluation timeout ≤ 5ms; max 100 rules per key; rules rejected at create time if they fail compile or exceed complexity limits</li>
+    <li><strong>v2:</strong> total custom-rule stage adds ≤ 10ms p95 to the pipeline (load-tested in acceptance)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 2.3: Enforcement Dial (monitor → warn → block)</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 2</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 2.1 &nbsp; <strong>Gap:</strong> #2 — the X5 monitor→enforce chasm; the single highest-leverage lever in the plan</p>
+  <p><strong>Objective:</strong> Add <code>enforcementMode: monitor | warn | block</code> to <code>ScreeningPolicy</code>. In <code>monitor</code>, the full pipeline runs and verdicts are recorded but nothing is blocked; in <code>warn</code>, responses carry the verdict annotation; in <code>block</code>, current behavior. Every event in monitor/warn records the counterfactual <code>wouldBlock: true/false</code> so customers can see exactly what blocking would have done <em>before</em> they turn it on.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Mode honored end-to-end (pattern, structural, LLM, custom-rule, and Phase 8 governance verdicts all respect the dial)</li>
+    <li>Migration: existing keys default to <code>block</code> (preserves current behavior); newly created keys default to <code>monitor</code></li>
+    <li><code>ScreeningEvent</code> gains <code>wouldBlock</code> + <code>enforcementMode</code> columns; API responses include both</li>
+    <li>Dashboard Overview: dial control + "would have blocked N in last 7d" counter + estimated false-positive rate (from override/feedback signals)</li>
+    <li>Dial changes create PolicyRevision + AuditEvent</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 2.4: Per-Environment Policy Pinning</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 2</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Tasks 2.1, 2.3 &nbsp; <strong>Gap:</strong> #2 — closes D3 (environment drift)</p>
+  <p><strong>Objective:</strong> Policies carry an <code>environment</code> (<code>development | staging | production</code>, default <code>production</code>). Requests select environment via <code>X-Parse-Environment</code> header or key-level binding. Promotion copies a policy across environments with an explicit diff.</p>
+  <h4>Endpoints</h4>
+<pre><code>GET  /v1/policy?environment=staging
+POST /v1/policy/promote            — { "from": "staging", "to": "production" }
+                                      → returns diff, requires { "confirm": true }</code></pre>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Same key can hold distinct dev/staging/prod policies; events tag their environment</li>
+    <li>Promote returns the diff and refuses without confirm; promotion creates PolicyRevision with <code>changeReason: "promoted from staging"</code></li>
+    <li>Strictness advisory: dashboard warns when production is looser than staging (threshold higher, dial lower, screening toggles off)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 2.5: Active Holes Panel &amp; Bypass Expiry</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 2</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin + Chagatai (UI) &nbsp; <strong>Depends on:</strong> Task 2.1 &nbsp; <strong>Gap:</strong> #2 — closes D4/D15/C8 (bypass creep, unaudited overrides, exception sprawl)</p>
+  <p><strong>Objective:</strong> Every hole in enforcement is temporary and visible. Bypass codewords require a TTL at creation; all live holes aggregate into one panel.</p>
+  <h4>Logic</h4>
+  <ul>
+    <li>Bypass creation requires <code>expiresAt</code> (max 72h) + reason; creation and every use are audit-logged</li>
+    <li>Migration: existing bypasses without expiry get a 7-day sunset and appear flagged</li>
+    <li><code>GET /v1/policy/holes</code> aggregates: live bypass codewords, scopes still in <code>monitor</code> mode, screening toggles that are off, and (after Phase 8) agents with unrestricted data grants</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>No bypass can be created without expiry; expired bypasses stop working without a deploy (checked at evaluation time)</li>
+    <li>Dashboard Overview shows the Active Holes panel with countdown badges; empty state reads "no active holes"</li>
+    <li>Hole count is exported in <code>/v1/compliance/summary</code> so it lands in evidence packs</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 3 ============ -->
+<h2>Phase 3: SIEM Forwarding &amp; Alerting (V3, V7)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 3.1: SIEM Forwarding — End-to-End Test &amp; Bug Fixes</h3>
+    <span class="badge badge-phase">Phase 3</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 0.1</p>
+  <p><strong>Objective:</strong> The SIEM forwarder code exists but has never been tested with real SIEM endpoints. Test, fix bugs, verify delivery.</p>
+  <h4>Test Scenarios</h4>
+  <ol>
+    <li>Splunk HEC — mock HEC endpoint, verify CEF event delivery</li>
+    <li>Datadog — verify JSON event delivery with API key auth</li>
+    <li>Generic webhook — verify event delivery</li>
+    <li>Connection test — verify latency measurement</li>
+    <li>Event type filtering — verify only subscribed types forwarded</li>
+    <li>Failure retry — verify retry logic on 500 responses</li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>All SIEM format adapters produce valid output (CEF, LEEF, JSON)</li>
+    <li>Events delivered within 5 seconds of creation</li>
+    <li>Failed deliveries retried with exponential backoff</li>
+    <li>SIEM config changes are audit-logged</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 3.2: Real-Time SIEM Forwarding Worker</h3>
+    <span class="badge badge-phase">Phase 3</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 3.1</p>
+  <p><strong>Objective:</strong> Add a BullMQ worker that forwards screening events to configured SIEM endpoints in real-time.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Events forwarded within 2 seconds of creation</li>
+    <li>Worker handles SIEM endpoint down gracefully (retry queue)</li>
+    <li>Worker is graceful-shutdown aware (drains queue on SIGTERM)</li>
+    <li>No event loss on restart</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 3.3: Alert Routing Rules</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 3</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 3.2 &nbsp; <strong>Gap:</strong> #2 — closes D12 (alert fatigue); protects SOC goodwill on first contact</p>
+  <p><strong>Objective:</strong> Not every event deserves a page. <code>AlertRoute</code> model: (scope, min severity, categories[], channel: webhook | slack | email | pagerduty, target, dedupe window). Evaluated post-screening; forwards only matching events to notification channels (SIEM forwarding remains the firehose; alert routes are the human channel).</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>CRUD for alert routes (scoped, <code>compliance_admin</code> to write); test-fire endpoint per route</li>
+    <li>Duplicate suppression: identical (agent, category, severity) alerts collapse within the dedupe window (default 15 min)</li>
+    <li>Kill-switch use, freeze events, and volume-budget breaches (8.4) always route regardless of severity filter</li>
+    <li>Route delivery uses the 3.2 worker infrastructure (retry, no loss)</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 4 ============ -->
+<h2>Phase 4: Compliance Reporting &amp; Evidence (V6, V8, V10)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 4.1: Evidence Pack Generator</h3>
+    <span class="badge badge-phase">Phase 4</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Tasks 0.1, 1.1</p>
+  <p><strong>Objective:</strong> Enhance <code>POST /v1/compliance/export</code> to produce a structured evidence pack with framework-specific sections.</p>
+  <h4>Evidence Pack Structure</h4>
+<pre><code>{
+  "generatedAt": "ISO-8601",
+  "period": { "from": "date", "to": "date" },
+  "framework": "owasp-llm|nist-ai-rmf|eu-ai-act|iso-42001|soc2",
+  "summary": { "totalEvents": N, "blockedCount": N, "topRiskCategories": [...] },
+  "controlMappings": [
+    { "controlId": "LLM01", "controlName": "...", "evidence": [...], "status": "satisfied|partial|gap" }
+  ],
+  "integrityHash": "SHA-256"
+}</code></pre>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 4.2: Compliance Reporting Templates</h3>
+    <span class="badge badge-phase">Phase 4</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai &nbsp; <strong>Depends on:</strong> Task 4.1</p>
+  <h4>Templates</h4>
+  <ol>
+    <li><strong>SOC 2 Quarterly Review</strong> — screening events, policy changes, access reviews</li>
+    <li><strong>EU AI Act Risk Assessment</strong> — agent inventory, risk classifications, human oversight</li>
+    <li><strong>OWASP Top 10 Coverage</strong> — detection coverage per vulnerability class</li>
+    <li><strong>Incident Response</strong> — time-bounded event export for post-incident analysis</li>
+  </ol>
+</div>
+
+<!-- ============ PHASE 5 ============ -->
+<h2>Phase 5: Organization &amp; Multi-Tenancy (G1 scope)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 5.1: Organization Model Activation</h3>
+    <span class="badge badge-updated">UPDATED</span>
+    <span class="badge badge-phase">Phase 5</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 0.1</p>
+  <h4>Endpoints</h4>
+<pre><code>POST   /v1/orgs                  — Create organization
+GET    /v1/orgs/:id              — Get org detail
+POST   /v1/orgs/:id/invite       — Invite member
+GET    /v1/orgs/:id/members      — List members
+PUT    /v1/orgs/:id/members/:uid — Update member role
+DELETE /v1/orgs/:id/members/:uid — Remove member
+POST   /v1/orgs/:id/claim-keys   — v2: link existing API keys into the org (org claim)</code></pre>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Org creation works, returns org ID</li>
+    <li>API keys can be linked to org — <strong>v2:</strong> the <code>claim-keys</code> flow is the explicit backfill step: it re-scopes the claimed keys' existing screening events, audit events, and registry rows to the org in a batched migration job (progress reported; unclaimed keys remain key-scoped)</li>
+    <li>Screening events, audit events, and agent registry are org-scoped after claim</li>
+    <li>Cross-org data isolation verified (automated test: org A cannot read org B via any compliance endpoint)</li>
+    <li><strong>v2:</strong> the User/membership model is designed against the WorkOS object model (org, membership, directory user) so Task 6.1 links rather than rebuilds</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 5.2: RBAC Roles</h3>
+    <span class="badge badge-phase">Phase 5</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 5.1</p>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Permissions</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>org_admin</code></td><td>Everything: members, policies, agents, SIEM, exports, data grants, freeze</td></tr>
+      <tr><td><code>security_analyst</code></td><td>View audit trail, run exports, manage SIEM/alert routes, manage agents, freeze agents</td></tr>
+      <tr><td><code>auditor</code></td><td>Read-only: audit trail, exports, frameworks, policy history, holes panel</td></tr>
+      <tr><td><code>developer</code></td><td>Manage own agents, view own screening events, no policy or grant changes</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============ PHASE 6 ============ -->
+<h2>Phase 6: Identity Integration (SSO)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 6.1: SSO Integration (WorkOS/Clerk)</h3>
+    <span class="badge badge-phase">Phase 6</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin (or external) &nbsp; <strong>Depends on:</strong> Task 5.2</p>
+  <p><strong>Objective:</strong> Add SSO/SAML for enterprise customers.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>SAML login flow works with test IdP</li>
+    <li>SSO users are linked to org memberships</li>
+    <li>API key auth and SSO auth coexist</li>
+    <li>Session tokens have appropriate TTL</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 7 ============ -->
+<h2>Phase 7: Deployment &amp; Go-Live</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 7.1: Deploy Compliance Migration to Production</h3>
+    <span class="badge badge-phase">Phase 7</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin/Kublai &nbsp; <strong>Depends on:</strong> All Phase 0-1 tasks</p>
+  <h4>Steps</h4>
+  <ol>
+    <li>Backup production DB</li>
+    <li><code>npx prisma migrate deploy</code> against production</li>
+    <li>Restart parse-for-agents service</li>
+    <li>Verify: <code>curl localhost:3001/v1/compliance/summary?key=...</code></li>
+    <li>Verify dashboard: <code>curl localhost:3001/dashboard/compliance</code></li>
+    <li>Smoke test: create agent, update policy, trigger export</li>
+  </ol>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 7.2: Documentation Update</h3>
+    <span class="badge badge-phase">Phase 7</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai &nbsp; <strong>Depends on:</strong> Task 7.1</p>
+  <ul>
+    <li>Compliance quickstart (how to use the dashboard)</li>
+    <li>Framework mapping guide (OWASP/NIST/EU AI Act)</li>
+    <li>SIEM integration guide (Splunk/Datadog setup)</li>
+    <li>Evidence export guide</li>
+    <li>Agent registry guide</li>
+    <li><strong>v2:</strong> data governance guide (grants, egress rules, volume budgets), enforcement dial guide, SDK wrapper quickstart</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 7.3: Pricing Tier Activation</h3>
+    <span class="badge badge-updated">UPDATED</span>
+    <span class="badge badge-phase">Phase 7</span>
+  </div>
+  <p><strong>Assignee:</strong> Kublai &nbsp; <strong>Depends on:</strong> Task 7.1 <strong>+ v2 feature checklist below</strong></p>
+  <ul>
+    <li>Create Stripe product for Compliance tier ($999/mo)</li>
+    <li>Add <code>compliance</code> to <code>PLAN_LIMITS</code></li>
+    <li>Update pricing page</li>
+    <li>API enforces compliance-tier feature gates</li>
+  </ul>
+  <h4>v2 Acceptance — Feature Checklist Gate</h4>
+  <ul>
+    <li>The tier is not purchasable until these are live in production: custom rules (2.2), enforcement dial (2.3), org model (5.1), RBAC (5.2), data grants (8.1), egress rules (8.3)</li>
+    <li>If launched earlier for pipeline reasons, the tier is labeled "Early Access" with the live-feature list shown at checkout</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 8 ============ -->
+<h2>Phase 8: Data Access &amp; Egress Governance (G4, S2, C11) <span class="badge badge-new">NEW</span></h2>
+
+<div class="callout">
+<strong>Standing admin requirement (implemented by this phase):</strong> Parse admins control <strong>(a) which volumes of data each agent can access</strong> — Task 8.1 registers data sources with classifications and grants per-agent access; <strong>(b) how much data an agent can move</strong> — Task 8.4 caps records/bytes per request and per day; <strong>(c) what may be shared externally</strong> — Task 8.3 evaluates every egress against destination allowlists and a classification × destination matrix. All three enforce through the Task 2.3 dial (monitor first, then block), so admins can observe impact before flipping enforcement on.
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 8.1: Data Source Registry &amp; Per-Agent Access Grants</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 8</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Tasks 1.1, 2.3 &nbsp; <strong>Gap:</strong> #5 + admin data requirement — G4 foundation</p>
+  <p><strong>Objective:</strong> Admins register the data volumes agents may touch and grant access per agent. Ungranted access is a policy violation enforced through the dial.</p>
+  <h4>Models</h4>
+<pre><code>DataSource      — id, name, kind (filesystem | database | api |
+                  vector_store | document_collection),
+                  classification (public | internal | confidential | restricted),
+                  owner, orgId/apiKeyId
+AgentDataGrant  — agentId, dataSourceId, access (read | write | readwrite),
+                  grantedBy, expiresAt (optional TTL)</code></pre>
+  <h4>Enforcement</h4>
+  <ul>
+    <li>Screening requests carry <code>data_sources: []</code> in metadata (SDK auto-tags known sources; manual tagging documented)</li>
+    <li>Referenced source not granted to the agent → <code>data_access_violation</code> flag; verdict follows the enforcement dial (monitor: recorded; block: request blocked)</li>
+    <li>Unknown/unregistered source IDs → <code>unregistered_data_source</code> flag (surfaced in Active Holes)</li>
+    <li>Expired grants stop working at evaluation time; grants and revocations create AuditEvents</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>CRUD for data sources and grants (<code>compliance_admin</code> to write); grants visible per agent and per source</li>
+    <li>Violation events appear in the audit trail with source, classification, and agent</li>
+    <li>Grant checks add ≤ 3ms p95 (cached grant table, 30s TTL)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 8.2: Tool Allowlist Enforcement</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 8</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Tasks 1.1, 2.3 &nbsp; <strong>Gap:</strong> #5 — turns registry tool lists from inventory into enforcement</p>
+  <p><strong>Objective:</strong> When <code>enforceToolAllowlist</code> is on, <code>AgentRegistry.tools</code> is the allowlist: screening requests whose <code>tool_permissions</code> or intended tool call reference a tool outside the agent's list get a <code>tool_violation</code> flag, enforced through the dial.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Per-agent toggle + org/key default; violations recorded with tool name</li>
+    <li>Dashboard: tool grant editor on the agent detail drawer (add/remove tools = audited registry updates)</li>
+    <li>"Discovered" agents (1.3) start with allowlist enforcement off + a prompt to review their observed tools</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 8.3: Egress Destination &amp; External Sharing Controls</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 8</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 8.1 &nbsp; <strong>Gap:</strong> #5 + admin data requirement — the "share externally" half; S2 egress control</p>
+  <p><strong>Objective:</strong> Admins define where data may go. Every output/intended action with an external destination is evaluated against egress rules before the verdict.</p>
+  <h4>Model</h4>
+<pre><code>EgressRule — scope (org | key | agent), destinationPattern (domain, email
+             domain, webhook URL prefix, or "*"),
+             maxClassification (public | internal | confidential | restricted),
+             action (allow | require_approval | block), priority</code></pre>
+  <h4>Logic</h4>
+  <ul>
+    <li>Destination extracted from <code>intended_action</code> metadata and screen-output content (URLs, email addresses)</li>
+    <li>Data classification of the flow = max(classification of granted sources touched this session, content-detected sensitivity from the existing sensitive-data layer)</li>
+    <li>First matching rule wins by priority; default templates shipped: <em>"restricted never leaves"</em> (restricted → any external = block), <em>"confidential needs approval"</em> (confidential → require_approval via existing approval workflow)</li>
+    <li><code>require_approval</code> uses the existing HMAC approval flow; approvals route via 3.3 channels</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>CRUD for egress rules (<code>compliance_admin</code>); rule test endpoint ("would this destination + classification pass?")</li>
+    <li>Egress verdicts enforced through the dial; blocked/approval-pending egress visible in audit trail with destination + classification</li>
+    <li>Default templates installable in one click from the dashboard</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 8.4: Data Volume Budgets &amp; Bulk-Movement Detection</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 8</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 8.1 &nbsp; <strong>Gap:</strong> #5 + admin data requirement — the "how much" dimension; closes C11 (agent-scale insider misuse)</p>
+  <p><strong>Objective:</strong> Caps on data quantity, because an agent that may read a source may still not siphon it. Budgets per (agent × data source) and per agent overall: <code>maxRecordsPerRequest</code>, <code>maxRecordsPerDay</code>, <code>maxBytesPerDay</code>.</p>
+  <h4>Logic</h4>
+  <ul>
+    <li>Requests report <code>records_accessed</code> / <code>bytes_accessed</code> in metadata (SDK auto-fills for wrapped tool calls where countable; self-reported otherwise — v1 honesty note documented)</li>
+    <li>Sliding-window counters in Redis (reuses the BullMQ Redis); 80% of budget → alert via 3.3; 100% → verdict per dial</li>
+    <li>Budget breaches always alert regardless of severity filters (wired in 3.3)</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Budgets configurable per agent and per (agent × source); current usage visible via API and dashboard bars</li>
+    <li>Counter accuracy verified under concurrent load; counters survive restart</li>
+    <li>Breach events carry agent, source, window usage, and budget in the audit trail and SIEM stream</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 8.5: Action Approval Matrix</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 8</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Tasks 8.1, 3.3 &nbsp; <strong>Gap:</strong> #5 — completes V5 (HITL) from primitive to framework</p>
+  <p><strong>Objective:</strong> A matrix of <code>actionType × dataClassification → allow | require_approval | block</code> that routes the existing approval workflow. Action types v1: <code>send_external</code>, <code>write_data</code>, <code>delete_data</code>, <code>execute_code</code>, <code>financial</code>.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Matrix editable per org/key (<code>compliance_admin</code>); default template shipped (e.g., delete_data × confidential+ → require_approval)</li>
+    <li><code>require_approval</code> cells create approval requests (existing HMAC/TTL flow) routed via 3.3 channels</li>
+    <li>Matrix decisions logged with cell coordinates (actionType, classification) for evidence packs</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 8.6: Data Governance Dashboard Tab</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 8</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai &nbsp; <strong>Depends on:</strong> Tasks 8.1–8.5</p>
+  <p><strong>Objective:</strong> One tab where an admin answers: "what can this agent touch, how much, and where can it send things?"</p>
+  <h4>Features</h4>
+  <ul>
+    <li>Grants matrix: agents × data sources with access level + expiry chips</li>
+    <li>Egress rules editor with rule tester; approval matrix grid editor</li>
+    <li>Volume budget sliders with live usage bars (green/yellow/red at 80/100%)</li>
+    <li>Per-agent governance summary on the agent detail drawer (sources, tools, budgets, egress exposure)</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>All controls call the real 8.1–8.5 APIs (no decorative levers); every change audit-logged</li>
+    <li>Read-only rendering for <code>auditor</code> role</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 9 ============ -->
+<h2>Phase 9: Enforcement Assurance — Coverage You Can Prove (Gap #1) <span class="badge badge-new">NEW</span></h2>
+<blockquote>
+Everything in Phases 0–8 governs traffic that <em>voluntarily</em> reaches Parse. Phase 9 makes omission visible and expensive: one-line SDK coverage, CI gates that fail unscreened builds, and a coverage number that answers C3 ("prove no agent touched restricted data") with a denominator. Prevention-rung enforcement (gateway/credential custody) remains deferred — see the enforcement architecture doc — but Phase 10's receipts open that door.
+</blockquote>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 9.1: SDK Interceptors — parse.wrap()</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 9</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 7.1 (live API)</p>
+  <p><strong>Objective:</strong> TypeScript + Python packages that wrap OpenAI/Anthropic clients so every call site inherits screening from one init line — closing D2 (missed call sites) inside a codebase.</p>
+<pre><code>// TS
+import { wrap } from "@parse-agents/sdk";
+const openai = wrap(new OpenAI(), { agentId: "billing-bot", environment: "production" });
+
+# Python
+from parse_agents import wrap
+client = wrap(Anthropic(), agent_id="billing-bot", environment="production")</code></pre>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Wrapped clients screen input pre-call and output post-call; verdicts honored per the dial</li>
+    <li>Fail posture configurable: <code>fail_open</code> (default, with loud local logging + telemetry event) or <code>fail_closed</code></li>
+    <li>Auto-tags <code>agent_id</code>, <code>environment</code>, <code>data_sources</code> (from config), and per-call token counts (feeds 9.2)</li>
+    <li>Published to npm + PyPI with integration tests against the live API; overhead ≤ 1 network round-trip per call</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 9.2: Coverage Attestation</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 9</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 9.1</p>
+  <p><strong>Objective:</strong> Reconcile total LLM usage against screened traffic to compute the number that sells the platform: <em>"N% of your LLM traffic is screened; here's the unscreened surface."</em></p>
+  <h4>Sources</h4>
+  <ul>
+    <li>SDK telemetry: wrapped-call counts + token counts per key/agent (from 9.1)</li>
+    <li>Optional provider usage import: org-level usage/admin APIs or CSV export (Anthropic/OpenAI), imported per period</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li><code>GET /v1/compliance/coverage-attestation</code> returns screened vs. total (per key, per agent, per period) with method disclosed (sdk-only vs provider-reconciled)</li>
+    <li>Overview tab shows the coverage stat; drop &gt; 10 points period-over-period fires an alert route</li>
+    <li>Unscreened surface listed by source where identifiable (keys/services with provider usage but no screening events)</li>
+    <li>Honesty rule: when only SDK telemetry is available, the UI labels coverage "of instrumented traffic" — no fabricated denominators</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 9.3: CI Gates — Lint Rule + Compliance Regression</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 9</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Depends on:</strong> Task 9.1</p>
+  <p><strong>Objective:</strong> Make unscreened code fail the build, and make policy/model changes prove they still block what they should.</p>
+  <h4>Deliverables</h4>
+  <ul>
+    <li><code>eslint-plugin-parse-agents</code> + <code>ruff</code>/flake8 rule: flags raw OpenAI/Anthropic client construction not passed through <code>wrap()</code></li>
+    <li><code>parse ci regress</code>: replays a golden set of should-block / should-allow prompts against the live policy (and current model config); exits non-zero on drift — closes D10 (model updates silently changing behavior)</li>
+    <li>Golden set: Parse ships a starter corpus; customers add their own cases (customer-owned, per the corpus-ownership decision)</li>
+    <li>GitHub Action recipe documented (runs on policy change + weekly)</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 10 ============ -->
+<h2>Phase 10: Audit-Grade Attribution (Gap #3) <span class="badge badge-new">NEW</span></h2>
+<blockquote>
+Every compliance claim in Phases 1–8 currently rests on caller-supplied <code>agent_id</code>. Phase 10 makes identity verifiable: signed requests turn the registry from self-reported to attested, and screening receipts let any internal resource demand proof-of-screening — the first prevention-rung primitive.
+</blockquote>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 10.1: Signed Agent Identity</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 10</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Reviewer:</strong> Mongke (crypto review) &nbsp; <strong>Depends on:</strong> Tasks 1.1, 9.1</p>
+  <p><strong>Objective:</strong> Registration issues an ed25519 keypair per agent. The SDK signs each request (timestamp + body hash); Parse verifies and stamps events <code>attributionVerified: true</code>. Spoofed <code>agent_id</code>s become detectable instead of silent.</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Keypair issued at registration; private key delivered once, never stored server-side; rotation endpoint (<code>POST /v1/agents/:id/rotate-key</code>)</li>
+    <li>Signature verification adds ≤ 2ms p95; clock-skew window ±60s; replay rejected (nonce cache)</li>
+    <li>Registry and audit trail visually distinguish <em>verified</em> vs <em>self-reported</em> agents; policy option: treat unverified agents per the dial</li>
+    <li>Events from a registered-but-unsigned agent_id raise an <code>attribution_mismatch</code> flag (possible spoof) and always alert</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 10.2: Screening Receipts v1</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 10</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin &nbsp; <strong>Reviewer:</strong> Mongke &nbsp; <strong>Depends on:</strong> Task 10.1 (signing infra); builds on existing approvals HMAC/TTL machinery</p>
+  <p><strong>Objective:</strong> Screening responses can include a short-TTL signed receipt binding verdict → action hash → agent → policy revision. Downstream resources verify receipts and refuse unscreened requests — enforcement distributed to the things worth protecting.</p>
+  <h4>Receipt Claims</h4>
+<pre><code>{ "sub": agentId, "act": sha256(canonicalized action/input),
+  "verdict": "allow", "policyRev": revisionId, "mode": "block",
+  "iat": ..., "exp": iat + 60, "sig": ed25519 }</code></pre>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Receipts issued on request (<code>include_receipt: true</code>); JWKS endpoint publishes verification keys (asymmetric — verifiers never hold signing secrets)</li>
+    <li>Verifier middleware shipped for Express + FastAPI (~50 lines each, MIT-licensed) + an MCP-server wrapper demo that rejects tool calls without a valid receipt</li>
+    <li>Receipt verification is fully offline (no callback to Parse) — verify sig, hash match, freshness, verdict</li>
+    <li>Docs: "lock a resource behind proof-of-screening" quickstart</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 11 ============ -->
+<h2>Phase 11: Security-Review Readiness (Gap #4 — C17) <span class="badge badge-new">NEW</span></h2>
+<blockquote>
+Phases 5–7 create a product sold to security teams — who send questionnaires before purchase orders. The control plane must out-comply its customers. This phase runs in parallel from the moment Phase 5 starts.
+</blockquote>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 11.1: Platform Hardening</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 11</span>
+  </div>
+  <p><strong>Assignee:</strong> Ogedei (ops) + Temujin &nbsp; <strong>Reviewer:</strong> Mongke &nbsp; <strong>Depends on:</strong> Tasks 1.1, 2.2, 5.1</p>
+  <h4>Deliverables</h4>
+  <ul>
+    <li><code>compliance_admin</code> scope enforced across all write surfaces added by this plan (registry, rules, SIEM/alert config, grants, egress, budgets, freeze); scope audit test that walks every mutating route</li>
+    <li>Rate limits on all new write endpoints; request-size caps on rule/grant bodies</li>
+    <li>Verify 2.2's RE2/timeout guarantees under adversarial rule corpus (ReDoS test suite in CI)</li>
+    <li>Retention config per event class (screening, audit, exports) + scheduled purge job with purge receipts; default retention documented per framework (e.g., EU AI Act Art. 12 logging windows)</li>
+    <li>Row-level org isolation test suite (runs in CI against every compliance endpoint)</li>
+    <li>Dependency audit + secret scanning in CI; log redaction check: screening events never persist raw matched secrets (store hash + span offsets)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 11.2: Trust Package &amp; SOC 2 Kickoff</h3>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-phase">Phase 11</span>
+  </div>
+  <p><strong>Assignee:</strong> Kublai + Chagatai &nbsp; <strong>Depends on:</strong> Task 11.1</p>
+  <h4>Deliverables</h4>
+  <ul>
+    <li>Public trust page: architecture, data flows, what Parse stores vs. discards, retention defaults, subprocessors, fail-posture options, vulnerability disclosure policy</li>
+    <li>Security questionnaire pack: pre-filled CAIQ-lite/SIG-lite answers maintained as versioned docs</li>
+    <li>Third-party pen test scheduled against the compliance surface (registry, grants, receipts, dashboard authz)</li>
+    <li>SOC 2 Type II: auditor selected, evidence collection started (runs 6–12 months in parallel; explicitly non-blocking for GTM, but the kickoff is no longer deferred)</li>
+  </ul>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ============ DEPENDENCY GRAPH ============ -->
+<h2>Kanban Dependency Graph (v2)</h2>
+<div class="dep-graph">Phase 0 (Prerequisites)
+  0.1 Migration ──┬──→ 1.1 Agent CRUD ──┬──→ 1.2 Dashboard Tab
+                  │                     ├──→ 1.3 Auto-Registration
+                  │                     ├──→ 1.4 Kill Switch ★
+                  │                     └──→ 10.1 Signed Identity ──→ 10.2 Receipts
+                  ├──→ 2.1 Policy Revisions ──┬──→ 2.2 Rules DSL (RE2)
+                  │                           ├──→ 2.3 Enforcement Dial ★ ──→ 2.4 Env Pinning
+                  │                           │         └──→ 8.1 Data Grants ──┬──→ 8.2 Tool Allowlist
+                  │                           │                                ├──→ 8.3 Egress Rules
+                  │                           │                                ├──→ 8.4 Volume Budgets
+                  │                           │                                └──→ 8.5 Approval Matrix
+                  │                           │                                        └──→ 8.6 Data Gov Tab
+                  │                           └──→ 2.5 Active Holes
+                  ├──→ 3.1 SIEM Testing ──→ 3.2 SIEM Worker ──→ 3.3 Alert Routing
+                  ├──→ 4.1 Evidence Pack ──→ 4.2 Report Templates
+                  └──→ 5.1 Org Model (+claim/backfill) ──→ 5.2 RBAC ──→ 6.1 SSO
+                                                     └──→ 11.1 Hardening ──→ 11.2 Trust Pack + SOC 2
+
+Phase 7 (Deploy)                         Phase 9 (Assurance, post-deploy)
+  7.1 Prod Deploy ←── Phases 0-1           9.1 parse.wrap() ←── 7.1
+  7.2 Docs        ←── 7.1                  9.2 Coverage Attestation ←── 9.1
+  7.3 Pricing     ←── 7.1 + checklist      9.3 CI Gates ←── 9.1
+                       (2.2, 2.3, 5.1,
+                        5.2, 8.1, 8.3)
+  ★ = highest adoption leverage</div>
+
+<!-- ============ ASSIGNMENT STRATEGY ============ -->
+<h2>Recommended Kanban Assignment Strategy (v2)</h2>
+<table>
+  <thead>
+    <tr><th>Phase</th><th>Primary</th><th>Reviewer</th><th>Rationale</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0 (Migration)</td><td>Temujin</td><td>Mongke</td><td>Schema changes need review</td></tr>
+    <tr><td>1 (Inventory + Kill Switch)</td><td>Temujin + Chagatai</td><td>Mongke</td><td>V1 is root node — high priority</td></tr>
+    <tr><td>2 (Policy Levers)</td><td>Temujin</td><td>Mongke</td><td>G1/G2 — critical path; dial touches the pipeline</td></tr>
+    <tr><td>3 (SIEM + Alerting)</td><td>Temujin</td><td>Kublai</td><td>Integration testing</td></tr>
+    <tr><td>4 (Reporting)</td><td>Temujin + Chagatai</td><td>Mongke</td><td>V6 — compliance value</td></tr>
+    <tr><td>5 (Org Model)</td><td>Temujin</td><td>Mongke</td><td>Multi-tenancy + backfill migration</td></tr>
+    <tr><td>6 (SSO)</td><td>Temujin</td><td>Kublai</td><td>External integration</td></tr>
+    <tr><td>7 (Deploy)</td><td>Kublai</td><td>—</td><td>Production gate</td></tr>
+    <tr><td>8 (Data Governance)</td><td>Temujin + Chagatai</td><td>Mongke</td><td>The admin data-control requirement; enforcement in hot path</td></tr>
+    <tr><td>9 (Assurance)</td><td>Temujin</td><td>Kublai</td><td>Public SDKs/packages — external surface</td></tr>
+    <tr><td>10 (Attribution)</td><td>Temujin</td><td>Mongke</td><td>Cryptographic review required</td></tr>
+    <tr><td>11 (Trust)</td><td>Ogedei + Kublai</td><td>Mongke</td><td>Ops hardening + external trust artifacts</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ PRIORITY RANKING ============ -->
+<h2>Priority Ranking (v2, by problem-graph impact × adoption leverage)</h2>
+<ol>
+  <li><strong>Task 0.1</strong> — Unblocks everything</li>
+  <li><strong>Task 1.1</strong> — V1 root node; gates V2, V3, G1</li>
+  <li><strong>Task 2.3</strong> — Enforcement dial; nothing else gets turned on without it (X5)</li>
+  <li><strong>Task 1.3</strong> — Auto-registration turns every screening event into inventory</li>
+  <li><strong>Task 1.4</strong> — Kill switch; small build, always demanded, C12/V7</li>
+  <li><strong>Task 2.1</strong> — Policy versioning gates the dial, holes, and env pinning</li>
+  <li><strong>Task 8.1</strong> — Data grants; the admin data-access requirement starts here</li>
+  <li><strong>Task 3.1</strong> — SIEM makes agent activity visible to SOC (V3)</li>
+  <li><strong>Task 8.3</strong> — Egress rules; the "share externally" control</li>
+  <li><strong>Task 7.1</strong> — Deploy so real customers can use it</li>
+  <li><strong>Task 4.1</strong> — Evidence export (V6 terminal node)</li>
+  <li><strong>Task 9.1/9.2</strong> — Coverage attestation; converts the enforcement gap into a sales stat</li>
+  <li><strong>Task 5.1</strong> — Org model + claim flow unlocks enterprise tier</li>
+  <li><strong>Task 2.2</strong> — Custom rules; premium differentiator</li>
+  <li><strong>Task 10.1</strong> — Signed identity; makes every claim above audit-grade</li>
+  <li><strong>Task 6.1</strong> — SSO for enterprise sales (long pole)</li>
+</ol>
+
+<!-- ============ COVERAGE MAP ============ -->
+<h2>Problem Graph → Task Coverage Map (v2, honestly graded)</h2>
+<table>
+  <thead>
+    <tr><th>Problem Node</th><th>Covered By</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>V1 (Agent Inventory)</td><td>1.1, 1.3, 10.1</td><td><span class="status-partial">🚧 API + auto-reg; verified identity in 10.1</span></td></tr>
+    <tr><td>V2 (Audit Trail)</td><td>Existing + 2.1, 2.5</td><td><span class="status-built">✅ For screening decisions & policy changes</span></td></tr>
+    <tr><td>V3 (Real-Time Monitoring)</td><td>3.1, 3.2, 3.3</td><td><span class="status-partial">🚧 Forwarder built; worker + routing needed</span></td></tr>
+    <tr><td>V4 (Risk Scoring)</td><td>Existing + 1.3 rolling agg</td><td><span class="status-built">✅ Built</span></td></tr>
+    <tr><td>V5 (HITL Framework)</td><td>Existing approvals + 8.5, 3.3</td><td><span class="status-partial">🚧 Primitive built; matrix + routing = framework</span></td></tr>
+    <tr><td>V6 (Compliance Reporting)</td><td>4.1, 4.2</td><td><span class="status-partial">🚧 Basic built; evidence packs enhance</span></td></tr>
+    <tr><td>V7 (Agent IR)</td><td>1.4 (containment)</td><td><span class="status-partial">🚧 Kill switch = containment; playbook deferred</span></td></tr>
+    <tr><td>V8 (DSR Handling)</td><td>Deferred</td><td><span class="status-missing">❌ Deferred until EU customers</span></td></tr>
+    <tr><td>V10 (Accountability)</td><td>5.2, 10.1</td><td><span class="status-partial">🚧 RBAC + verified attribution</span></td></tr>
+    <tr><td>G1 (Policy Definition)</td><td>2.1, 2.2, 2.4</td><td><span class="status-partial">🚧 Versioning + DSL + environments</span></td></tr>
+    <tr><td>G2 (Enforcement Layer)</td><td>2.3, 8.1–8.5, 9.x, 10.2</td><td><span class="status-partial">🚧 Within screened perimeter; assurance measures the rest; gateway/custody deferred</span></td></tr>
+    <tr><td>G3 (Tool Attestation)</td><td>8.2 (allowlists, not signing)</td><td><span class="status-partial">🚧 Allowlist enforcement; signed tools deferred</span></td></tr>
+    <tr><td>G4 (Data Classification Routing)</td><td>8.1, 8.3, 8.4</td><td><span class="status-partial">🚧 Grants + egress + budgets (routing to models deferred)</span></td></tr>
+    <tr><td>G5 (Regulatory Mapping)</td><td>Existing crosswalk</td><td><span class="status-built">✅ Built</span></td></tr>
+    <tr><td>G6 (Shadow Discovery)</td><td>1.3, 9.2</td><td><span class="status-partial">🚧 Within-perimeter discovery + coverage deltas only</span></td></tr>
+    <tr><td>S1 (Prompt Injection)</td><td>Existing 3-layer pipeline</td><td><span class="status-built">✅ Built</span></td></tr>
+    <tr><td>S2 (Data Exfiltration)</td><td>Detection + 8.3, 8.4</td><td><span class="status-partial">🚧 Detection built; egress + volume controls close the action side</span></td></tr>
+    <tr><td>S3 (Credential Exposure)</td><td>Secret detection in output screening</td><td><span class="status-partial">🚧 Detection only; vaulting out of scope</span></td></tr>
+    <tr><td>S4 (Supply Chain)</td><td>Exposure evaluation (existing)</td><td><span class="status-partial">🚧 Evaluation only; attestation deferred (G3)</span></td></tr>
+    <tr><td>S5 (Agent Spoofing)</td><td>Trust pipeline + 10.1</td><td><span class="status-built">✅ Detection + signed identity</span></td></tr>
+    <tr><td>S6 (Malicious Tool Exec)</td><td>Sandbox exec + 8.2</td><td><span class="status-built">✅ Sandbox + allowlists</span></td></tr>
+    <tr><td>S7 (Lateral Movement)</td><td>8.1 grants w/ TTL</td><td><span class="status-partial">🚧 Grant expiry prunes accumulation; IAM out of scope</span></td></tr>
+    <tr><td>S8 (PII in Context)</td><td>Detection + 8.3 egress</td><td><span class="status-partial">🚧 Detection + egress gating; provider-side handling out of scope</span></td></tr>
+    <tr><td>S9 (Output Poisoning)</td><td>—</td><td><span class="status-missing">❌ Not addressed (RAG integrity out of scope)</span></td></tr>
+    <tr><td>S10 (Untrusted Content)</td><td>Existing ingestion screening</td><td><span class="status-built">✅ Built</span></td></tr>
+    <tr><td>S11 (Shadow Agents)</td><td>9.2 (coverage deltas)</td><td><span class="status-missing">❌ Outside perimeter; endpoint/CASB territory</span></td></tr>
+    <tr><td>S12 (Hallucination Damage)</td><td>8.5 approval matrix</td><td><span class="status-partial">🚧 High-risk actions gated by approvals</span></td></tr>
+    <tr><td>S13 (Memory Poisoning)</td><td>—</td><td><span class="status-missing">❌ Not addressed</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ============ GAP CLOSURE MAP ============ -->
+<h2>v1 Review Gap → v2 Closure Map</h2>
+<table>
+  <thead>
+    <tr><th>#</th><th>Gap (from v1 review)</th><th>Closed By</th><th>Residual</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>Enforcement gap — everything voluntary, no coverage denominator</td><td>Phase 9 (9.1 wrap SDKs, 9.2 coverage attestation, 9.3 CI gates); 10.2 receipts open the prevention rung</td><td>Gateway/credential custody deliberately deferred (see enforcement architecture doc)</td></tr>
+    <tr><td>2</td><td>Missing adoption levers — dial, kill switch, holes, env pinning, alert routing</td><td>2.3 dial + counterfactuals, 1.4 kill switch, 2.5 active holes + bypass expiry, 2.4 env pinning, 3.3 alert routing</td><td>Org-hierarchy inheritance of levers arrives with Phase 5 scoping</td></tr>
+    <tr><td>3</td><td>Attribution self-reported — spoofable agent_id under every claim</td><td>10.1 signed identity, 10.2 receipts; attribution_mismatch alerting</td><td>Unsigned/legacy agents remain self-reported (visibly labeled)</td></tr>
+    <tr><td>4</td><td>Selling to security buyers without the C17 story</td><td>11.1 hardening (scopes, rate limits, ReDoS suite, retention, isolation tests), 11.2 trust page + questionnaire pack + pen test + SOC 2 kickoff</td><td>SOC 2 Type II report itself takes 6–12 months</td></tr>
+    <tr><td>5</td><td>Content governed more than action — tools/egress/quantity/approvals</td><td>Phase 8: 8.1 data grants, 8.2 tool allowlists, 8.3 egress rules, 8.4 volume budgets, 8.5 approval matrix, 8.6 admin tab</td><td>Model-routing by classification (full G4) deferred</td></tr>
+    <tr><td>—</td><td><strong>Admin requirement: control data volumes accessed &amp; shared externally</strong></td><td><strong>8.1 (which volumes), 8.4 (how much), 8.3 (where it may go)</strong> — all enforced through the 2.3 dial</td><td>Quantity metering is SDK/self-reported in v1 (documented honestly)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ DEFERRED ============ -->
+<h2>What's Intentionally Deferred (v2)</h2>
+<ul>
+  <li><strong>Gateway mode / credential custody / egress pinning</strong> — prevention-rung enforcement; build-vs-partner decision required first (enforcement architecture doc, open question 5)</li>
+  <li><strong>G3 (Tool Attestation/signing)</strong> — 8.2 ships allowlists; signed tool attestation defers until enterprise demand</li>
+  <li><strong>V8 (DSR Handling)</strong> — GDPR data subject rights; defer until EU customers</li>
+  <li><strong>Full V7 IR playbook</strong> — 1.4 ships containment; forensic playbook defers to SOC 2 pursuit</li>
+  <li><strong>S9 (RAG/output poisoning), S13 (memory poisoning)</strong> — research-stage; not claimable</li>
+  <li><strong>SOC 2 Type II report</strong> — kickoff moved into 11.2; the report itself remains a 6–12 month parallel process</li>
+</ul>
+
+</div>
+
+<div class="footer">
+  Kurultai · Parse for Agents · Enterprise Agent Compliance Implementation Plan v2 (gap closure + data governance) · August 8, 2026
+</div>
+
+</body>
+</html>
