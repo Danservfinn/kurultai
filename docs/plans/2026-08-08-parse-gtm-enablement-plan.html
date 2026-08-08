@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parse GTM Enablement — Implementation Plan (v2.1 Extension)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --heading: #f0f6fc;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --code-bg: #1c2128;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .hero {
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 32px;
+    text-align: center;
+  }
+  .hero h1 { color: var(--heading); font-size: 28px; margin-bottom: 12px; }
+  .hero p { color: var(--accent); font-size: 14px; }
+  .meta { display: flex; justify-content: center; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+  .meta-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  .meta-item strong { color: var(--heading); }
+  .container { padding: 32px; }
+  blockquote {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+  }
+  .callout {
+    border: 1px solid rgba(188, 140, 255, 0.4);
+    background: rgba(188, 140, 255, 0.08);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .callout strong { color: var(--purple); }
+  h2 {
+    color: var(--heading);
+    font-size: 22px;
+    margin-top: 48px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { color: var(--accent); font-size: 17px; margin-top: 32px; margin-bottom: 8px; }
+  h4 {
+    color: var(--purple);
+    font-size: 14px;
+    margin-top: 16px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  p { margin-bottom: 12px; }
+  ul, ol { margin-left: 24px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--purple);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  pre code { background: none; padding: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th {
+    background: var(--surface);
+    color: var(--heading);
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: rgba(22, 27, 34, 0.5); }
+  .task {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-phase { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid rgba(88, 166, 255, 0.3); }
+  .badge-build { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid rgba(63, 185, 80, 0.3); }
+  .badge-auto { background: rgba(188, 140, 255, 0.15); color: var(--purple); border: 1px solid rgba(188, 140, 255, 0.3); }
+  .badge-manual { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid rgba(248, 81, 73, 0.3); }
+  .dep-graph {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text);
+  }
+  .section-divider { height: 1px; background: var(--border); margin: 40px 0; }
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: #6e7681;
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+  }
+  strong { color: var(--heading); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Parse GTM Enablement — Implementation Plan</h1>
+  <p>Extension of Compliance Plan v2.1 (Phases 13–15) — everything the platform, funnel, and operator need so the GTM plan can execute</p>
+  <div class="meta">
+    <div class="meta-item"><strong>3</strong> New Phases (13–15)</div>
+    <div class="meta-item"><strong>18</strong> New Tasks</div>
+    <div class="meta-item"><strong>~28</strong> Person-Days</div>
+    <div class="meta-item"><strong>Combined:</strong> 59 tasks / 16 phases</div>
+    <div class="meta-item"><strong>Aug 8, 2026</strong></div>
+  </div>
+</div>
+
+<div class="container">
+
+<blockquote>
+<strong>Relationship to other plans:</strong> This extends <em>Enterprise Agent Compliance — Implementation Plan v2.1</em> (41 tasks, Phases 0–12) with the build the <em>Parse GTM Plan</em> (Lieben-framework, agency wedge) requires. Task numbering continues v2.1 (13.x–15.x) so both merge into one Kanban. Dependencies reference v2.1 tasks and milestone gates (M1–M4) directly. The design rule throughout: <strong>GTM build must not touch Temujin's critical path</strong> — every card here lands in the Chagatai / Ogedei / Batu / Kublai / operator lanes, with Temujin limited to reviews, one migration, and the product-facts extension (~3–4 days total).
+</blockquote>
+
+<div class="callout">
+<strong>Three amendments from the GTM review are enforced by this plan, not just recommended:</strong> (1) <em>sell-only-what's-shipped</em> becomes an automated claims gate (13.7); (2) the trust package's public half is pulled forward out of Task 11.2 into 13.6 because the GTM targets compliance officers from week 1; (3) HIPAA/FedRAMP language is removed from the tier sheet and replaced with "SOC 2-aligned controls / custom frameworks" (13.7). Two GTM-plan features are deliberately <strong>not built</strong>: agency multi-client console and x402 rev-share ledger — both have zero-build v1 workarounds (one org/key per client held by the agency; agency invoices its own markup) documented in 13.8 and deferred to Phase 16 pending demand.
+</div>
+
+<h4>Timeline Alignment</h4>
+<table>
+  <thead><tr><th>GTM Plan Phase</th><th>Needs From This Plan</th><th>Needs From v2.1 Board</th></tr></thead>
+  <tbody>
+    <tr><td>Phase 1 — Foundation &amp; Wedge (wk 1–4)</td><td>15.1–15.3 (operator unblocks), 13.1 scoping form, 13.2 quotes, 13.6 trust page, 13.7 claims gate, 14.1–14.2 content/monitoring crons</td><td>M1 (registry, dial, kill switch) — ~day 9</td></tr>
+    <tr><td>Phase 2 — Productize &amp; Inbound (wk 5–10)</td><td>13.3 nurture, 13.4 lead magnet, 13.5 demo tenant, 13.8 delivery kit, 14.3–14.4 funnel metrics/targets, 15.4 x402, 15.5 partner terms</td><td>M2 (SIEM, org, deploy) — ~wk 5</td></tr>
+    <tr><td>Phase 3 — Design Partners &amp; Revenue (wk 11–18)</td><td>14.5 outreach list executes; demo tenant enriched post-M3; delivery kit caps concurrency at 3</td><td>M3 (data governance, hardening) — ~wk 7</td></tr>
+    <tr><td>Phase 4 — Platform &amp; Scale (wk 19+)</td><td>Phase 16 (deferred): partner console, rev-share ledger, certified implementers</td><td>M4 (assurance, gateway)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ PHASE 13 ============ -->
+<h2>Phase 13: GTM Platform Build (Parse repo)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.1: Scoping Form &amp; Lead Intake (<code>/implement</code>)</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai (UI/copy) + Temujin (schema review only) &nbsp; <strong>Reviewer:</strong> Mongke &nbsp; <strong>Depends on:</strong> 0.1 (migration infra) &nbsp; <strong>Est:</strong> 4d</p>
+  <p><strong>Objective:</strong> The GTM plan's single-input qualification tool: a public SSR intake form whose output feeds both the proposal and the eventual Parse configuration.</p>
+  <h4>Models (new migration)</h4>
+<pre><code>Lead              — id, email, name, company, source (form | magnet | manual),
+                    status (new | nurturing | call_booked | scoped | quoted |
+                    won | lost | unsubscribed), createdAt
+ScopingSubmission — leadId, agentsInUse (claude_code | openclaw | hermes |
+                    langchain | crewai | custom)[], agentCount, endpointCount,
+                    toolsCallable[], dataSensitivity (public | internal |
+                    confidential | regulated), complianceStandards[],
+                    siemPlatform, timeline, budgetBand, notes</code></pre>
+  <h4>Steps</h4>
+  <ol>
+    <li>SSR page in <code>src/routes/public.ts</code> pattern at <code>/implement</code> — form mirrors the GTM scope factors table exactly</li>
+    <li>Honeypot field + per-IP rate limit (5/hr) + server-side validation; no CAPTCHA (agencies hate friction)</li>
+    <li>On submit: persist Lead + ScopingSubmission, fire operator notification through the existing gateway (Telegram), create AuditEvent <code>lead.scoping_submitted</code></li>
+    <li>Confirmation page sets expectations: "implementation plan + quote within 1 business day"</li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Form live and mobile-usable; submission → operator notification in &lt; 60s</li>
+    <li>Spam controls verified (honeypot drops, rate limit 429s)</li>
+    <li>No compliance standard implies certification: form copy says "standards you need to align to," never "we are certified"</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.2: Quote &amp; Proposal Generator</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai + Temujin (pricing-table review) &nbsp; <strong>Depends on:</strong> 13.1 &nbsp; <strong>Est:</strong> 3d</p>
+  <p><strong>Objective:</strong> Deterministic pricing engine over ScopingSubmission → draft implementation proposal + quote. Operator reviews before anything is sent — the generator drafts, never sends.</p>
+  <h4>Logic</h4>
+  <ul>
+    <li>Tier mapping from the GTM scope-factor table (agents, endpoints, tools, standard, SIEM count) → $3K / $8K / $15K band + line items; config lives in <code>src/lib/product-facts.ts</code> so pricing has one source of truth</li>
+    <li>Proposal draft (markdown → SSR/PDF): scope, deliverables per 13.8 runbook stages, timeline, required subscription attach (Team now; Compliance tier when 7.3 gates pass), assumptions, exclusions (explicitly: no HIPAA/FedRAMP certification claims)</li>
+    <li>Quote states the v1 multi-client pattern: one Parse org/API key per end-client, held by the agency</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Same submission always produces same quote (deterministic, versioned pricing config)</li>
+    <li>Operator approval step recorded via AuditEvent before any proposal is marked sent</li>
+    <li>Lead status transitions (scoped → quoted) tracked for 14.3 funnel metrics</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.3: ESP Integration + Nurture Sequence</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Ogedei &nbsp; <strong>Reviewer:</strong> Mongke (deliverability + compliance) &nbsp; <strong>Depends on:</strong> 13.1, 15.2 (domain auth) &nbsp; <strong>Est:</strong> 5d</p>
+  <p><strong>Objective:</strong> The autonomous middle of the funnel: transactional + nurture email with real deliverability and real consent hygiene.</p>
+  <h4>Steps</h4>
+  <ol>
+    <li>ESP integration (Resend-class API) behind a thin <code>src/lib/email/</code> adapter; all sends through BullMQ (reuses 3.2 worker patterns: retry, no loss, graceful shutdown)</li>
+    <li>Double opt-in for magnet downloads; <code>List-Unsubscribe</code> + one-click unsubscribe; suppression list enforced at the adapter layer (nothing can email a suppressed address)</li>
+    <li>5-email nurture from the GTM plan (prompt injection 101 → why compliance blocks agents → how Parse works → case study → book a call), sent 2–3 days apart; templates versioned in repo</li>
+    <li><code>EmailEvent</code> model: queued/delivered/opened/clicked/unsubscribed per lead, feeding 14.3</li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Test lead traverses the full sequence on staging with correct spacing; unsubscribe halts sequence within one send cycle</li>
+    <li>SPF/DKIM/DMARC verified passing on the sending subdomain before first real send</li>
+    <li>Volume ramp respects the 15.2 warm-up schedule (hard cap per day, config-driven)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.4: Lead Magnet — Agent Security Readiness Checklist</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai (content) + Ogedei (wiring) &nbsp; <strong>Depends on:</strong> 13.3 &nbsp; <strong>Est:</strong> 2d</p>
+  <p><strong>Objective:</strong> Email-gated PDF that starts the nurture sequence. Content derived from the enterprise problem graph + brainstorm docs — a 20-item checklist across visibility ("can you list your agents?"), control ("can you stop one right now?"), and evidence ("can you export proof?").</p>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Gated download at <code>/readiness</code>; download → Lead (source: magnet) → nurture trigger, end-to-end verified</li>
+    <li>Checklist items map to real Parse features or honest "not yet" framing — passes the 13.7 claims gate</li>
+    <li>PDF carries trust-page URL and scoping-form CTA on the closing page</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.5: Demo Tenant with Labeled Synthetic Data</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Ogedei &nbsp; <strong>Depends on:</strong> 1.1, 2.3 (M1); enrichment after 8.1–8.5 (M3) &nbsp; <strong>Est:</strong> 2d + 1d enrichment</p>
+  <p><strong>Objective:</strong> Every sales demo runs on a deterministic, clearly-labeled synthetic tenant — preserving the repo's non-claimable-metrics discipline while giving the "show, don't tell" dashboard moment.</p>
+  <h4>Steps</h4>
+  <ol>
+    <li>Seed script: demo org, 7 registered agents (incl. one OpenClaw instance and one Hermes profile fleet), ~2,000 screening events across categories/verdicts/trends, 2 frozen-agent incidents, active-holes examples</li>
+    <li>UI banner on demo org: "SYNTHETIC DEMO DATA" — non-removable for that org id</li>
+    <li>Nightly reset cron; deterministic seed so screenshots/recordings stay reproducible</li>
+    <li>Post-M3 enrichment: data grants matrix, egress rule hits, volume-budget breach, approval-matrix pending item</li>
+  </ol>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>One command rebuilds the tenant; dashboard walkthrough script (13.8) runs against it without manual setup</li>
+    <li>Demo data never mingles with real metrics endpoints (org-scoped isolation test)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.6: Trust Page + Security Questionnaire Pack (11.2 pull-forward)</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Kublai (content authority) + Chagatai (page) &nbsp; <strong>Depends on:</strong> none for content; publishes after 15.1 (DNS) &nbsp; <strong>Est:</strong> 3d</p>
+  <p><strong>Objective:</strong> The GTM sells to compliance officers from week 1 — the security-questionnaire wall arrives at deal #1, so the public half of Task 11.2 moves here. Task 11.2 in v2.1 re-scopes to: pen test execution, SOC 2 evidence collection, questionnaire maintenance.</p>
+  <h4>Deliverables</h4>
+  <ul>
+    <li><code>/trust</code> SSR page: architecture + data-flow diagram, what Parse stores vs. discards (the live SHA-256 prompt redaction is the headline), retention defaults, subprocessors, fail-posture options, vulnerability disclosure policy, SOC 2 status stated honestly as "Type II in progress — kickoff scheduled"</li>
+    <li>CAIQ-lite / SIG-lite answer doc, versioned in-repo, exportable as PDF on request</li>
+    <li>Landing page + proposal template link to <code>/trust</code></li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>Every claim on the page traces to a shipped feature or is explicitly future-tense — passes 13.7 gate</li>
+    <li>A test security questionnaire (any standard SIG-lite) can be answered ≥ 80% from the pack alone</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.7: Claims-Truth Gate + Pricing Ladder Reconciliation</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Temujin (product-facts + CI) + Chagatai (copy sweep) &nbsp; <strong>Depends on:</strong> none &nbsp; <strong>Est:</strong> 2d</p>
+  <p><strong>Objective:</strong> Make "sell only what's shipped" mechanical instead of aspirational, and end the three-way pricing inconsistency.</p>
+  <h4>Steps</h4>
+  <ol>
+    <li>Extend <code>src/lib/product-facts.ts</code> with <code>FEATURE_STATUS</code>: every marketable feature → <code>shipped | building | planned</code>, updated as v2.1 tasks close</li>
+    <li>Landing, pricing, tier sheets, and proposal templates render feature lists from FEATURE_STATUS — <code>building</code>/<code>planned</code> features render with an explicit "in development" tag or not at all</li>
+    <li>CI check: marketing/SSR pages fail build if they hard-code a feature string absent from FEATURE_STATUS (grep-based lint over page templates)</li>
+    <li>Copy sweep: remove HIPAA/FedRAMP from all surfaces → "SOC 2-aligned controls; custom framework mapping"; "compliance signs off" → "the boundary compliance can approve"</li>
+    <li>Publish the reconciled ladder (below) as the single pricing source</li>
+  </ol>
+  <h4>Reconciled Pricing Ladder</h4>
+  <table>
+    <thead><tr><th>Tier</th><th>Price</th><th>Gate</th></tr></thead>
+    <tbody>
+      <tr><td>Free</td><td>$0</td><td>Live</td></tr>
+      <tr><td>Pro</td><td>$49/mo</td><td>Live</td></tr>
+      <tr><td>Team</td><td>$199/mo</td><td>Live — <strong>mandatory attach on every implementation</strong></td></tr>
+      <tr><td>Compliance</td><td>$999/mo</td><td>Purchasable only when 7.3 feature checklist passes (2.2, 2.3, 5.1, 5.2, 8.1, 8.3 live); implementations upgraded on release</td></tr>
+      <tr><td>Implementation</td><td>$3K–$15K one-time</td><td>Scoped by 13.2; always bundles Team-or-higher subscription</td></tr>
+      <tr><td>Enterprise</td><td>Custom ($5K+/mo)</td><td>Post-M4, design-partner-validated only (GTM Phase 4)</td></tr>
+    </tbody>
+  </table>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>CI claims check green; one deliberately-planted unshipped claim fails the build (test fixture)</li>
+    <li>No page, PDF, or template anywhere states HIPAA/FedRAMP/certified; grep proves it</li>
+  </ul>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 13.8: Implementation Delivery Kit</h3>
+    <span class="badge badge-build">BUILD</span>
+    <span class="badge badge-phase">Phase 13</span>
+  </div>
+  <p><strong>Assignee:</strong> Kublai + Chagatai &nbsp; <strong>Depends on:</strong> 13.2; runbook stages reference M1–M2 features &nbsp; <strong>Est:</strong> 2d</p>
+  <p><strong>Objective:</strong> The $3K–15K engagement as a repeatable, cappable process — the Lieben "cap parallel builds" principle applied to Parse itself.</p>
+  <h4>Deliverables</h4>
+  <ul>
+    <li>Delivery runbook per tier: kickoff → client org + API keys created (one org per end-client, agency-held — the documented v1 multi-client pattern) → agent registration → policy config → dial staged (monitor, counterfactual review with client, then block) → SIEM connect → CISO dashboard walkthrough (against 13.5 script) → handoff doc + first evidence export</li>
+    <li>Concurrency policy: <strong>max 3 concurrent implementations</strong>; queue beyond that with stated lead times</li>
+    <li>Handoff template: what was configured, what the client owns, upgrade path (Compliance tier, org claim)</li>
+    <li>Case-study capture step baked into the final milestone (metrics snapshot + quote request)</li>
+  </ul>
+  <h4>Acceptance</h4>
+  <ul>
+    <li>A full dry-run delivery executed against the 13.5 demo tenant end-to-end from the runbook alone</li>
+    <li>Each stage has a time budget; bottom-tier total ≤ 5 working days of effort (validates the margin claim or corrects it with data)</li>
+  </ul>
+</div>
+
+<!-- ============ PHASE 14 ============ -->
+<h2>Phase 14: Funnel Automation (Kurultai/Hermes side)</h2>
+<blockquote>
+These cards live in Kurultai's existing cron + agent infrastructure, not the Parse repo — draft-only authority per Kurultai norms: crons draft, the operator approves anything outbound. This is the "autonomous GTM" half of the GTM plan made concrete.
+</blockquote>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 14.1: Content Pipeline Crons</h3>
+    <span class="badge badge-auto">SEMI-AUTO</span>
+    <span class="badge badge-phase">Phase 14</span>
+  </div>
+  <p><strong>Assignee:</strong> Chagatai (content) + Ogedei (cron wiring) &nbsp; <strong>Depends on:</strong> 15.1 (publish target live) &nbsp; <strong>Est:</strong> 2d setup</p>
+  <ul>
+    <li>Weekly blog-draft cron drawing on the 24-post library + problem-graph angles; drafts land in the operator approval queue via the gateway</li>
+    <li>On publish: auto-draft 1 X thread + 1 LinkedIn post per article for approval — cadence targets from the GTM plan (1 blog/wk, 3 threads/wk, 2 LinkedIn/wk) tracked in 14.3, not assumed</li>
+    <li>First content out the door is the Lieben-reply thread series (time-sensitive; draft in week 1 even if DNS is pending — the thread links can follow)</li>
+  </ul>
+  <p><strong>Acceptance:</strong> Two full cycles (draft → approve → publish → repurpose) completed; approval queue never auto-publishes.</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 14.2: Competitor &amp; Demand-Signal Monitoring</h3>
+    <span class="badge badge-auto">AUTONOMOUS</span>
+    <span class="badge badge-phase">Phase 14</span>
+  </div>
+  <p><strong>Assignee:</strong> Ogedei &nbsp; <strong>Depends on:</strong> none &nbsp; <strong>Est:</strong> 1d</p>
+  <ul>
+    <li>Daily cron watching mentions of Lakera, Prompt Security, Protect AI, <strong>Pangea</strong> (restored from the memo's landscape), plus demand phrases ("client won't approve", "compliance blocked our agent", "Claude Code compliance")</li>
+    <li>Relevant hits → operator alert with suggested engagement angle; never auto-replies</li>
+  </ul>
+  <p><strong>Acceptance:</strong> One week of runs with &lt; 5 alerts/day after tuning (precision over volume — the D12 lesson applies to GTM too).</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 14.3: Funnel Metrics Dashboard</h3>
+    <span class="badge badge-auto">AUTONOMOUS</span>
+    <span class="badge badge-phase">Phase 14</span>
+  </div>
+  <p><strong>Assignee:</strong> Ogedei &nbsp; <strong>Depends on:</strong> 13.1, 13.3 (event sources) &nbsp; <strong>Est:</strong> 2d</p>
+  <ul>
+    <li>Weekly report over Lead/EmailEvent/ScopingSubmission状态 transitions: visits → magnet downloads → nurture completion → calls → scoping forms → quotes → won/lost, against 14.4 targets</li>
+    <li>Also tracks the PLG flywheel metrics that the GTM motion must not abandon: % keys past monitor mode, coverage-attestation adoption (post-9.2) — these feed the org-claim/enterprise story</li>
+    <li>Renders in the Parse admin surface + weekly operator digest</li>
+  </ul>
+  <p><strong>Acceptance:</strong> First weekly report generated from real events; every GTM claim of progress cites this dashboard.</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 14.4: Funnel Math &amp; Targets</h3>
+    <span class="badge badge-manual">KUBLAI</span>
+    <span class="badge badge-phase">Phase 14</span>
+  </div>
+  <p><strong>Assignee:</strong> Kublai &nbsp; <strong>Depends on:</strong> none &nbsp; <strong>Est:</strong> 1d</p>
+  <p><strong>Objective:</strong> The GTM plan's missing arithmetic, written down and reviewed monthly.</p>
+  <ul>
+    <li>Initial model (revise with data): 3 Lieben-reply threads + weekly content + 50-target outreach → 300 site visits/wk by wk 6 → 8% magnet conversion → 24 leads/wk → 15% to scoping call → ~3 calls/wk → 5 design-partner applications by wk 12 → <strong>3–5 partners enrolled, 2 paid implementations closed by wk 14–16</strong></li>
+    <li>North-star event: <em>one design partner closes a client deal because Parse was in the stack</em> — the wedge validation metric, tracked explicitly</li>
+    <li>Kill criteria: if &lt; 5 scoping submissions by week 8, the content-led motion is under-powered → shift budget to direct outreach volume (14.5) and community/podcast distribution</li>
+  </ul>
+  <p><strong>Acceptance:</strong> Model documented with assumptions; 14.3 dashboard renders actuals against it.</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 14.5: Design-Partner Outreach Target List</h3>
+    <span class="badge badge-manual">OPERATOR-GATED</span>
+    <span class="badge badge-phase">Phase 14</span>
+  </div>
+  <p><strong>Assignee:</strong> Batu (research/retrieval) &nbsp; <strong>Gate:</strong> operator sends every message personally &nbsp; <strong>Depends on:</strong> 15.5 (program terms) &nbsp; <strong>Est:</strong> 2d</p>
+  <ul>
+    <li>Research list of 50 agencies/consultancies publicly working with Claude Code / OpenClaw / Clay for clients (X, LinkedIn, community posts) — with the evidence link per row and a personalization hook</li>
+    <li>Qualification pre-screen matches GTM Phase 3a: shipped agent work for clients, plausibly hit the &gt;50-employee compliance wall</li>
+    <li>Per the autonomy register: <strong>no automated outreach</strong> — Hermes drafts, operator sends, ≤ 10/week</li>
+  </ul>
+  <p><strong>Acceptance:</strong> 50 rows with evidence links; zero messages sent by automation (verified by process, not promise).</p>
+</div>
+
+<!-- ============ PHASE 15 ============ -->
+<h2>Phase 15: Operator Unblocks &amp; Launch Gates</h2>
+<blockquote>
+Hours of work, but they gate everything customer-facing. All five are operator-manual with runbooks prepared by the team. Target: 15.1–15.3 complete in week 1.
+</blockquote>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 15.1: DNS Cutover (GoDaddy → Cloudflare)</h3>
+    <span class="badge badge-manual">OPERATOR</span>
+    <span class="badge badge-phase">Phase 15</span>
+  </div>
+  <p><strong>Runbook by:</strong> Ogedei &nbsp; <strong>Est:</strong> 0.5d &nbsp; <strong>Gates:</strong> all public URLs (13.1, 13.4, 13.6, 14.1 links)</p>
+  <ul>
+    <li>Lower TTLs first; migrate zone to Cloudflare; point apex + www at the tunnel; verify TLS, redirects, and every existing route (blog, dashboard, MCP endpoint, <code>llms.txt</code>) post-cutover</li>
+    <li>Rollback plan documented (re-point nameservers) before starting</li>
+  </ul>
+  <p><strong>Acceptance:</strong> <code>parsethis.ai</code> resolves and serves; old tunnel hostname 301s to the real domain.</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 15.2: Email Domain Authentication + Warm-Up</h3>
+    <span class="badge badge-manual">OPERATOR + OGEDEI</span>
+    <span class="badge badge-phase">Phase 15</span>
+  </div>
+  <p><strong>Est:</strong> 0.5d setup + weeks of passive warm-up &nbsp; <strong>Gates:</strong> 13.3 first send</p>
+  <ul>
+    <li>Sending subdomain (<code>mail.parsethis.ai</code>), SPF/DKIM/DMARC (start <code>p=none</code>, monitor, tighten), ESP account provisioned</li>
+    <li>Warm-up schedule config: capped daily volume ramp over 3–4 weeks — <strong>started in week 1</strong> even though nurture launches in GTM Phase 2, because deliverability is calendar time that can't be compressed later</li>
+  </ul>
+  <p><strong>Acceptance:</strong> Auth records verified; warm-up cron running; DMARC reports arriving.</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 15.3: Stripe Live Keys + Implementation Invoicing</h3>
+    <span class="badge badge-manual">OPERATOR + TEMUJIN VERIFY</span>
+    <span class="badge badge-phase">Phase 15</span>
+  </div>
+  <p><strong>Est:</strong> 0.5d &nbsp; <strong>Gates:</strong> any revenue (subscriptions and implementations)</p>
+  <ul>
+    <li>Operator provides live keys; existing <code>billing.ts</code> checkout verified in test mode then live for Pro/Team</li>
+    <li>Implementation invoicing runbook: Stripe invoice template, 50% deposit on signature / 50% on handoff, Team-tier subscription attached at kickoff per 13.7 ladder</li>
+  </ul>
+  <p><strong>Acceptance:</strong> One live test transaction each: subscription checkout and manual invoice (then refunded via the published refund policy).</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 15.4: x402 Wallet Enablement (USDC on Base)</h3>
+    <span class="badge badge-manual">OPERATOR + TEMUJIN</span>
+    <span class="badge badge-phase">Phase 15</span>
+  </div>
+  <p><strong>Est:</strong> 0.5d &nbsp; <strong>Gates:</strong> pay-per-call motion only — <em>not</em> a launch gate</p>
+  <ul>
+    <li>Wallet provisioned; <code>X402_ENABLED=true</code> on staging → verify $0.005/screen flow → enable in production behind the flag</li>
+    <li>GTM copy constraint (claims gate): x402 is "pay-per-call for autonomous agents." The "agency gets 20%" rev-share is <strong>Phase 16 roadmap</strong> — until the ledger exists, agencies monetize via markup in their own invoicing</li>
+  </ul>
+  <p><strong>Acceptance:</strong> One paid screen call settles end-to-end on Base; revenue-monitor cron sees it.</p>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <h3>Task 15.5: Design-Partner Program Terms</h3>
+    <span class="badge badge-manual">KUBLAI</span>
+    <span class="badge badge-phase">Phase 15</span>
+  </div>
+  <p><strong>Est:</strong> 0.5d &nbsp; <strong>Gates:</strong> 14.5 outreach</p>
+  <ul>
+    <li>One-pager: free implementation ($3K value) in exchange for case study + testimonial + logo rights; <strong>capped at 5 partners</strong>, application window closes when filled or at week 14; qualification requires having lost (or actively risking) a deal to a client-compliance objection</li>
+    <li>Ring-fence rule: free-tier scope = bottom tier only; anything larger converts to a paid implementation with the case-study discount stated explicitly — prevents the free program from cannibalizing paid deals</li>
+  </ul>
+  <p><strong>Acceptance:</strong> Terms published at <code>/partners</code> (behind claims gate); application field added to scoping form.</p>
+</div>
+
+<!-- ============ PHASE 16 (DEFERRED) ============ -->
+<h2>Phase 16: Deferred — Demand-Gated (GTM Phase 4)</h2>
+<table>
+  <thead><tr><th>Item</th><th>Pull Signal</th><th>Sketch</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Agency partner console</strong> (multi-client management under one login)</td><td>≥ 3 agencies each managing ≥ 3 client orgs via the v1 key-per-client pattern</td><td>Partner account linking multiple Organizations; per-client dashboards; builds on 5.1/5.2</td></tr>
+    <tr><td><strong>x402 rev-share ledger</strong> ("agency gets 20%")</td><td>x402 volume from agency-attributed clients materializes</td><td>Partner code on API keys; monthly settlement report; payout runbook</td></tr>
+    <tr><td><strong>Certified implementer program</strong></td><td>≥ 5 delivered implementations + delivery kit stable across 2 revisions</td><td>Certification checklist from 13.8; directory page; co-marketing terms</td></tr>
+    <tr><td><strong>Implementation templates marketplace</strong> (Lieben's free-templates play)</td><td>Recurring scoping patterns visible in 13.1 data</td><td>Public policy-pack gallery (extends 9.5 packs); free templates, paid setup</td></tr>
+  </tbody>
+</table>
+
+<div class="section-divider"></div>
+
+<!-- ============ DEP GRAPH ============ -->
+<h2>Dependency Graph</h2>
+<div class="dep-graph">Operator gates (week 1)
+  15.1 DNS ──┬──→ 13.6 Trust Page (publish) ──→ landing/proposals link it
+             ├──→ 14.1 Content Crons (publish target)
+             └──→ 13.1 Scoping Form (public URL)
+  15.2 Email Auth ──→ 13.3 ESP + Nurture ──→ 13.4 Lead Magnet
+  15.3 Stripe ──→ first revenue (subscriptions + invoices)
+  15.4 x402 ──→ pay-per-call (optional, non-gating)
+  15.5 Partner Terms ──→ 14.5 Outreach List ──→ GTM Phase 3 execution
+
+Build chain (Parse repo)
+  0.1 ──→ 13.1 Scoping Form ──→ 13.2 Quote Generator ──→ 13.8 Delivery Kit
+  M1 (1.1 + 2.3) ──→ 13.5 Demo Tenant ──(enrich after M3: 8.1–8.5)
+  13.7 Claims Gate ←── gates ALL public copy: 13.1, 13.4, 13.6, 14.1, 15.5
+
+Funnel loop
+  14.1 Content ──→ 13.4 Magnet ──→ 13.3 Nurture ──→ scoping call ──→ 13.1 Form
+      ──→ 13.2 Quote ──→ 13.8 Delivery ──→ case study ──→ 14.1 Content
+  14.3 Metrics observes every arrow; 14.4 sets the targets</div>
+
+<!-- ============ ASSIGNMENT & EFFORT ============ -->
+<h2>Assignment &amp; Effort Summary</h2>
+<table>
+  <thead><tr><th>Lane</th><th>Tasks</th><th>Est. Days</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>Chagatai</td><td>13.1, 13.2, 13.4, 13.6 (page), 13.7 (copy), 13.8, 14.1</td><td>~12d</td><td>Primary GTM-build lane — has slack per the v2.1 board</td></tr>
+    <tr><td>Ogedei</td><td>13.3, 13.5, 14.2, 14.3, runbooks for 15.1/15.2</td><td>~10d</td><td>Fits ops remit; sequence after the Tier-1 delegations from the v2.1 bottleneck plan</td></tr>
+    <tr><td>Temujin</td><td>Reviews + 13.7 product-facts/CI + 15.3/15.4 verify</td><td>~3–4d</td><td><strong>Deliberately minimal — critical path untouched</strong></td></tr>
+    <tr><td>Kublai</td><td>13.6 content, 13.8, 14.4, 15.5, all approvals</td><td>~4d</td><td>Plus scoping calls once the funnel produces them</td></tr>
+    <tr><td>Batu</td><td>14.5 research</td><td>2d</td><td>First appearance in the plan roster — research is its native role</td></tr>
+    <tr><td>Operator (Danny)</td><td>15.1–15.4 actions, outreach sends, content approvals</td><td>~2d + ongoing</td><td>Week-1 gates: 15.1, 15.2, 15.3</td></tr>
+    <tr><td>Mongke</td><td>Reviews: 13.1 schema, 13.3 deliverability/consent, 13.7 claims</td><td>review only</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h2>Milestone Gates</h2>
+<table>
+  <thead><tr><th>Gate</th><th>Target</th><th>Exit Criteria</th></tr></thead>
+  <tbody>
+    <tr><td><strong>G1 — Public &amp; Claim-Clean</strong></td><td>End of week 2</td><td>DNS live · scoping form live · trust page live · claims gate green in CI · Lieben-reply thread published · email warm-up running</td></tr>
+    <tr><td><strong>G2 — Funnel Armed</strong></td><td>End of week 6</td><td>Nurture + magnet live · demo tenant walkthrough works · delivery kit dry-run complete · funnel targets set and dashboard reporting · Stripe live</td></tr>
+    <tr><td><strong>G3 — Revenue Motion</strong></td><td>Week 11+ (with v2.1 M2/M3)</td><td>Partner terms published · outreach executing (operator-sent) · first design partners enrolled · first paid implementation invoiced · north-star event tracked: a partner closes a client deal because Parse was in the stack</td></tr>
+  </tbody>
+</table>
+
+<h2>Risks</h2>
+<ul>
+  <li><strong>Operator availability is the true week-1 critical path</strong> — 15.1–15.3 are hours of work but gate everything; schedule them before any build celebration.</li>
+  <li><strong>Deliverability is calendar time</strong> — if 15.2 slips two weeks, nurture slips two weeks, no engineering can recover it.</li>
+  <li><strong>Claims drift</strong> — the gate (13.7) protects pages it renders; ad-hoc social posts remain human-reviewed by policy (14.1 approval queue is the control).</li>
+  <li><strong>Services load vs. M3/M4 build</strong> — the 13.8 concurrency cap (3) is the guard; if implementation demand exceeds it, that's a pricing signal (raise the band), not a reason to break the cap.</li>
+  <li><strong>Funnel model is assumption-stacked</strong> — 14.4's kill criteria exist so week 8 produces a decision, not a debate.</li>
+</ul>
+
+</div>
+
+<div class="footer">
+  Kurultai · Parse for Agents · GTM Enablement Implementation Plan (extends Compliance Plan v2.1 → combined 59 tasks / 16 phases) · August 8, 2026
+</div>
+
+</body>
+</html>
