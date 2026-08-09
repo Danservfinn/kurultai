@@ -323,6 +323,16 @@
       "path": ".archive/p5js"
     },
     {
+      "description": "Run a bounded concurrent swarm of Parse beta tester agents from Telegram via /parse_beta_swarm; executes multiple live beta Sentinel probes against parsethis.ai and summarizes controlled-beta readiness without claiming open-launch readiness.",
+      "name": "parse-beta-swarm",
+      "path": ".archive/parse-beta-swarm"
+    },
+    {
+      "description": "Run the Parse Beta Tester/Sentinel on demand and report controlled-beta readiness from live parsethis.ai probes. Use from Telegram as /parse_beta_tester.",
+      "name": "parse-beta-tester",
+      "path": ".archive/parse-beta-tester"
+    },
+    {
       "description": "Plan mode: write an actionable markdown plan to .hermes/plans/, no execution. Bite-sized tasks, exact paths, complete code.",
       "name": "plan",
       "path": ".archive/plan"
@@ -963,6 +973,11 @@
       "path": "karpathy-mode"
     },
     {
+      "description": "Use when publishing papers to blog.kurult.ai.",
+      "name": "blog-publication-operations",
+      "path": "kurultai/blog-publication-operations"
+    },
+    {
       "description": "Save media, documents, screenshots, PDFs, and supporting files into the Brain with privacy routing, manifests, local-only Kanban delegation, indexing policy, and verification.",
       "name": "brain-media-doc-intake",
       "path": "kurultai/brain-media-doc-intake"
@@ -1066,6 +1081,11 @@
       "description": "Extract distilled, hard-private contact knowledge from local Messages and Signal communication history, storing synthesized profiles on the external KurultaiVault only.",
       "name": "private-contact-communication-profile-extraction",
       "path": "kurultai/private-contact-communication-profile-extraction"
+    },
+    {
+      "description": "Build and operate a private, auto-synthesized insight blog (life.kurult.ai) that exports personal data (iMessage, Signal, Hermes conversations, contacts, health, finance) to a secure KurultaiVault data lake, builds a private knowledge graph, and generates candid insight papers every 4 hours via GLM-5.2 with no quality gates.",
+      "name": "private-insight-blog-operations",
+      "path": "kurultai/private-insight-blog-operations"
     },
     {
       "description": "Default workflow for turning the operator-requested article/media/social research into reusable outputs: Brain artifacts, content angles, doctrine, proposals, skills, Kanban tasks, or explicit no-op decisions.",
@@ -1291,6 +1311,11 @@
       "description": "Provision SaaS services + sync creds via Stripe Projects.",
       "name": "stripe-projects",
       "path": "payments/stripe-projects"
+    },
+    {
+      "description": "Continuously categorize, enrich, and infer relationships in the Kurultai private knowledge graph. Designed for autonomous dreamer invocation. Handles person classification, topic inference, community detection, temporal clustering, relationship scoring, and new-node discovery from raw data lake sources.",
+      "name": "kurultai-graph-categorizer",
+      "path": "private-lake/kurultai-graph-categorizer"
     },
     {
       "description": "Use when the operator asks Kublai/Hermes to call a human for a purpose. Build an objective-led call plan before dialing, lead the conversation toward that outcome, collect only consented necessary facts, and close with receipts/follow-ups.",
@@ -1573,6 +1598,11 @@
       "path": "smart-home/device-and-home-api-operations"
     },
     {
+      "description": "Install, configure, and manage self-hosted media servers (Jellyfin, Plex, Emby) on macOS with hardware-accelerated transcoding, launchd auto-start, media library setup via API, and client device optimization for smart TVs.",
+      "name": "home-media-server",
+      "path": "smart-home/home-media-server"
+    },
+    {
       "description": "Control Philips Hue lights, scenes, rooms via OpenHue CLI.",
       "name": "openhue",
       "path": "smart-home/openhue"
@@ -1738,17 +1768,7 @@
       "path": "software-development/operational-assessment"
     },
     {
-      "description": "Run a bounded concurrent swarm of Parse beta tester agents from Telegram via /parse_beta_swarm; executes multiple live beta Sentinel probes against parsethis.ai and summarizes controlled-beta readiness without claiming open-launch readiness.",
-      "name": "parse-beta-swarm",
-      "path": "software-development/parse-beta-swarm"
-    },
-    {
-      "description": "Run the Parse Beta Tester/Sentinel on demand and report controlled-beta readiness from live parsethis.ai probes. Use from Telegram as /parse_beta_tester.",
-      "name": "parse-beta-tester",
-      "path": "software-development/parse-beta-tester"
-    },
-    {
-      "description": "Develop and maintain the Parse for Agents product (parsethis.ai). Covers repo layout, SSR landing page editing, API route structure, and deployment for the Hono + TypeScript codebase at ~/parse-for-agents-live.",
+      "description": "Develop and maintain Parse for Agents (parsethis.ai). Covers repo layout, compliance API (Phases 0-12), GTM plan (Phases 13-18), SSR pages, deployment, tunnel ops, subagent patterns. See references/ for GTM docs, operator gates, and SSR patterns.",
       "name": "parse-for-agents-dev",
       "path": "software-development/parse-for-agents-dev"
     },

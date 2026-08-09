@@ -1243,135 +1243,10 @@
     {
       "deliver": "origin",
       "enabled": true,
-      "enabled_toolsets": null,
+      "enabled_toolsets": [
+        "terminal"
+      ],
       "job_id": "job-061",
-      "name": "Parse production quiet canary",
-      "repeat": {
-        "times": null
-      },
-      "schedule": {
-        "display": "*/30 * * * *",
-        "expr": "*/30 * * * *",
-        "kind": "cron"
-      },
-      "script": "parse_production_canary.py",
-      "skills": [],
-      "state": "scheduled",
-      "workdir": null
-    },
-    {
-      "deliver": "origin",
-      "enabled": true,
-      "enabled_toolsets": null,
-      "job_id": "job-062",
-      "name": "Parse admin anomaly watchdog",
-      "repeat": {
-        "times": null
-      },
-      "schedule": {
-        "display": "every 60m",
-        "kind": "interval",
-        "minutes": 60
-      },
-      "script": "parse_admin_anomaly_watch.py",
-      "skills": [],
-      "state": "scheduled",
-      "workdir": null
-    },
-    {
-      "deliver": "local",
-      "enabled": true,
-      "enabled_toolsets": null,
-      "job_id": "job-063",
-      "name": "Parse admin daily digest",
-      "repeat": {
-        "times": null
-      },
-      "schedule": {
-        "display": "0 9 * * *",
-        "expr": "0 9 * * *",
-        "kind": "cron"
-      },
-      "script": "parse_admin_daily_digest.py",
-      "skills": [],
-      "state": "scheduled",
-      "workdir": null
-    },
-    {
-      "deliver": "local",
-      "enabled": true,
-      "enabled_toolsets": [
-        "terminal",
-        "file",
-        "web"
-      ],
-      "job_id": "job-064",
-      "name": "Parse business state morning report",
-      "repeat": {
-        "times": null
-      },
-      "schedule": {
-        "display": "0 8 * * *",
-        "expr": "0 8 * * *",
-        "kind": "cron"
-      },
-      "script": "parse_business_state_context.py",
-      "skills": [
-        "parse-business-state-report",
-        "parse-admin-operations"
-      ],
-      "state": "scheduled",
-      "workdir": null
-    },
-    {
-      "deliver": "origin",
-      "enabled": true,
-      "enabled_toolsets": [
-        "terminal"
-      ],
-      "job_id": "job-065",
-      "name": "Parse support email monitor",
-      "repeat": {
-        "times": 999999
-      },
-      "schedule": {
-        "display": "every 15m",
-        "kind": "interval",
-        "minutes": 15
-      },
-      "script": "parse_support_email_monitor.py",
-      "skills": [],
-      "state": "scheduled",
-      "workdir": null
-    },
-    {
-      "deliver": "origin",
-      "enabled": true,
-      "enabled_toolsets": [
-        "terminal"
-      ],
-      "job_id": "job-066",
-      "name": "Parse paid subscription purchase alert",
-      "repeat": {
-        "times": 999999
-      },
-      "schedule": {
-        "display": "every 10m",
-        "kind": "interval",
-        "minutes": 10
-      },
-      "script": "parse_paid_subscription_monitor.py",
-      "skills": [],
-      "state": "scheduled",
-      "workdir": null
-    },
-    {
-      "deliver": "origin",
-      "enabled": true,
-      "enabled_toolsets": [
-        "terminal"
-      ],
-      "job_id": "job-067",
       "name": "Objective Runner autonomous tick",
       "repeat": {
         "times": null
@@ -1390,7 +1265,7 @@
       "deliver": "origin",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-068",
+      "job_id": "job-062",
       "name": "Dreamer Kanban triage gate",
       "repeat": {
         "times": null
@@ -1413,7 +1288,7 @@
         "file",
         "skills"
       ],
-      "job_id": "job-069",
+      "job_id": "job-063",
       "name": "kurultai-public-repo-nightly-config-sync",
       "repeat": {
         "times": null
@@ -1437,7 +1312,7 @@
         "terminal",
         "cronjob"
       ],
-      "job_id": "job-070",
+      "job_id": "job-064",
       "name": "Shepherd Ogedei improvement Kanban graph",
       "repeat": {
         "times": 12
@@ -1459,7 +1334,7 @@
         "terminal",
         "cronjob"
       ],
-      "job_id": "job-071",
+      "job_id": "job-065",
       "name": "Shepherd Kanban review-required semantics graph",
       "repeat": {
         "times": 12
@@ -1482,7 +1357,7 @@
         "file",
         "cronjob"
       ],
-      "job_id": "job-072",
+      "job_id": "job-066",
       "name": "shepherd-elon-brain-native-plan",
       "repeat": {
         "times": 12
@@ -1503,7 +1378,7 @@
       "enabled_toolsets": [
         "terminal"
       ],
-      "job_id": "job-073",
+      "job_id": "job-067",
       "name": "shepherd-p0-kurultai-audit-repairs-20260531",
       "repeat": {
         "times": 8
@@ -1522,7 +1397,7 @@
       "deliver": "local",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-074",
+      "job_id": "job-068",
       "name": "cron-output-retention",
       "repeat": {
         "times": null
@@ -1544,30 +1419,8 @@
         "terminal",
         "file"
       ],
-      "job_id": "job-075",
+      "job_id": "job-069",
       "name": "shepherd-elon-kurultai-followups",
-      "repeat": {
-        "times": 12
-      },
-      "schedule": {
-        "display": "every 30m",
-        "kind": "interval",
-        "minutes": 30
-      },
-      "script": null,
-      "skills": [],
-      "state": "paused",
-      "workdir": null
-    },
-    {
-      "deliver": "origin",
-      "enabled": false,
-      "enabled_toolsets": [
-        "terminal",
-        "cronjob"
-      ],
-      "job_id": "job-076",
-      "name": "Shepherd Parse first-mile repair graph",
       "repeat": {
         "times": 12
       },
@@ -1589,7 +1442,7 @@
         "file",
         "cronjob"
       ],
-      "job_id": "job-077",
+      "job_id": "job-070",
       "name": "shepherd-kurultai-amended-remediation-20260601",
       "repeat": {
         "times": 12
@@ -1608,7 +1461,7 @@
       "deliver": "origin",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-078",
+      "job_id": "job-071",
       "name": "awm-money-watchdog",
       "repeat": {
         "times": null
@@ -1627,7 +1480,7 @@
       "deliver": "origin",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-079",
+      "job_id": "job-072",
       "name": "paid-task-watchdog",
       "repeat": {
         "times": null
@@ -1651,7 +1504,7 @@
         "web",
         "skills"
       ],
-      "job_id": "job-080",
+      "job_id": "job-073",
       "name": "money-autonomy-operator-first-dollar-continuous",
       "repeat": {
         "times": 999999
@@ -1672,7 +1525,7 @@
       "deliver": "origin",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-081",
+      "job_id": "job-074",
       "name": "money-pr-monitor",
       "repeat": {
         "times": null
@@ -1691,7 +1544,7 @@
       "deliver": "origin",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-082",
+      "job_id": "job-075",
       "name": "KurultaiVault mount/headroom canary",
       "repeat": {
         "times": null
@@ -1710,7 +1563,7 @@
       "deliver": "local",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-083",
+      "job_id": "job-076",
       "name": "kurultai-action-yield-nightly",
       "repeat": {
         "times": null
@@ -1729,7 +1582,7 @@
       "deliver": "local",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-084",
+      "job_id": "job-077",
       "name": "kurultai-smoke-triplet-nightly",
       "repeat": {
         "times": null
@@ -1748,7 +1601,7 @@
       "deliver": "local",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-085",
+      "job_id": "job-078",
       "name": "kurultai-money-attribution-daily",
       "repeat": {
         "times": null
@@ -1767,7 +1620,7 @@
       "deliver": "local",
       "enabled": true,
       "enabled_toolsets": null,
-      "job_id": "job-086",
+      "job_id": "job-079",
       "name": "local-model-readiness-probe",
       "repeat": {
         "times": null
