@@ -778,6 +778,11 @@
       "path": "devops/dependency-cve-burndown"
     },
     {
+      "description": "Operate the Kurultai Skill Miner \u2014 an autonomous 8-stage pipeline that discovers reusable AI workflows on GitHub, extracts their patterns via LLM, generates Hermes SKILL.md packages, reviews them with a second model, and publishes PRs to a staging repo for human approval. Use when running the miner, debugging a stage, tuning thresholds, or extending the pipeline.",
+      "name": "github-skill-miner",
+      "path": "devops/github-skill-miner"
+    },
+    {
       "description": "Investigate Hermes delegated-agent and background-worker lifecycle failures by identifying the exact worker, timeout boundary, progress state, profile-scoped configuration, and smallest evidence-backed correction.",
       "name": "hermes-background-worker-operations",
       "path": "devops/hermes-background-worker-operations"
@@ -1881,6 +1886,11 @@
       "description": "Senior UI/UX Engineer. Architect digital interfaces overriding default LLM biases. Enforces metric-based rules, strict component architecture, CSS hardware acceleration, and balanced design engineering.",
       "name": "taste-skill",
       "path": "taste-skill"
+    },
+    {
+      "description": "Launch Claude Code with --model fable when the user says \"use fable",
+      "name": "use-fable-claude-code",
+      "path": "use-fable-claude-code"
     },
     {
       "description": "Yuanbao (\u5143\u5b9d) groups: @mention users, query info/members.",
