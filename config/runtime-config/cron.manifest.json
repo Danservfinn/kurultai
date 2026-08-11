@@ -227,7 +227,7 @@
     },
     {
       "deliver": "local",
-      "enabled": true,
+      "enabled": false,
       "enabled_toolsets": null,
       "job_id": "job-012",
       "name": "kurultai-research-hourly-summary",
@@ -241,7 +241,7 @@
       },
       "script": "kurultai_research_hourly_urgent_silent.py",
       "skills": [],
-      "state": "scheduled",
+      "state": "paused",
       "workdir": null
     },
     {
@@ -1143,7 +1143,7 @@
     },
     {
       "deliver": "local",
-      "enabled": true,
+      "enabled": false,
       "enabled_toolsets": [
         "terminal"
       ],
@@ -1159,12 +1159,12 @@
       },
       "script": "research_proposal_compiler_cron.py",
       "skills": [],
-      "state": "scheduled",
+      "state": "paused",
       "workdir": null
     },
     {
       "deliver": "local",
-      "enabled": true,
+      "enabled": false,
       "enabled_toolsets": null,
       "job_id": "job-057",
       "name": "research-control-room",
@@ -1178,7 +1178,7 @@
       },
       "script": "research_control_room_cron.py",
       "skills": [],
-      "state": "scheduled",
+      "state": "paused",
       "workdir": null
     },
     {

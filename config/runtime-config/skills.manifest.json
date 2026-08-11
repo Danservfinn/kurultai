@@ -548,6 +548,11 @@
       "path": "autonomous-ai-agents/deep-research-harness-operations"
     },
     {
+      "description": "Hermes+Pi dual-kernel multi-agent collaborative workspace",
+      "name": "frakio-work-multi-agent",
+      "path": "autonomous-ai-agents/frakio-work-multi-agent"
+    },
+    {
       "description": "Configure, extend, or contribute to Hermes Agent.",
       "name": "hermes-agent",
       "path": "autonomous-ai-agents/hermes-agent"
@@ -561,6 +566,11 @@
       "description": "Delegate coding to OpenCode CLI (features, PR review).",
       "name": "opencode",
       "path": "autonomous-ai-agents/opencode"
+    },
+    {
+      "description": "Parallel Claude Code/Codex via git-worktree isolation",
+      "name": "operator-oss-parallel-agents",
+      "path": "autonomous-ai-agents/operator-oss-parallel-agents"
     },
     {
       "description": "Build, patch, and verify public-source-grounded character/persona agent profiles with review-gated SOUL/config edits, natural voice constraints, and deterministic anti-regression evals.",
@@ -778,7 +788,7 @@
       "path": "devops/dependency-cve-burndown"
     },
     {
-      "description": "Operate the Kurultai Skill Miner \u2014 an autonomous 8-stage pipeline that discovers reusable AI workflows on GitHub, extracts their patterns via LLM, generates Hermes SKILL.md packages, reviews them with a second model, and publishes PRs to a staging repo for human approval. Use when running the miner, debugging a stage, tuning thresholds, or extending the pipeline.",
+      "description": "Operate the Kurultai Skill Miner \u2014 an autonomous multi-source pipeline that discovers reusable AI workflows from GitHub repos AND Discord conversations (Nous Research, forum threads), extracts their patterns via LLM, generates Hermes SKILL.md packages, reviews them with a second model, and publishes PRs to a staging repo for human approval. Use when running the miner, debugging a stage, tuning thresholds, extending the pipeline, or configuring new content sources.",
       "name": "github-skill-miner",
       "path": "devops/github-skill-miner"
     },
@@ -908,6 +918,61 @@
       "path": "email/himalaya"
     },
     {
+      "description": "Run mock drafts, graded reports, strategy tournament.",
+      "name": "draft-report-and-grading",
+      "path": "fantasy-football/draft-report-and-grading"
+    },
+    {
+      "description": "Monitor Instagram fantasy football creators (currently @upperhandfantasy and @leahc.ammarano), download Reels via instaloader, transcribe with faster-whisper, extract claims tagged by format and scoring. Run when Kanban dispatches an Instagram collection task.",
+      "name": "fantasy-miner-collect-instagram",
+      "path": "fantasy-miner-collect-instagram"
+    },
+    {
+      "description": "Fetch new issues of The FF Newsletter from Substack RSS, parse HTML content, extract fantasy claims tagged by format and scoring. Run when Kanban dispatches a newsletter collection task.",
+      "name": "fantasy-miner-collect-newsletter",
+      "path": "fantasy-miner-collect-newsletter"
+    },
+    {
+      "description": "Search X for fantasy football posts across all formats (best ball, redraft, dynasty) and scoring systems (PPR, 0.5 PPR, standard). Extract testable claims tagged by format and scoring. Run when Kanban dispatches a social collection task.",
+      "name": "fantasy-miner-collect-social",
+      "path": "fantasy-miner-collect-social"
+    },
+    {
+      "description": "Collect daily fantasy football stats from Sleeper, FantasyPros, FFC, and nflverse across all formats (best ball, redraft, dynasty) and scoring systems (PPR, 0.5 PPR, standard). Run when the Kanban daemon dispatches a stats collection task.",
+      "name": "fantasy-miner-collect-stats",
+      "path": "fantasy-miner-collect-stats"
+    },
+    {
+      "description": "Discover, download, and transcribe fantasy football YouTube videos across all formats (best ball, redraft, dynasty) and scoring systems (PPR, 0.5 PPR, standard) using yt-dlp and faster-whisper. Extract claims tagged by format and scoring.",
+      "name": "fantasy-miner-collect-video",
+      "path": "fantasy-miner-collect-video"
+    },
+    {
+      "description": "Cross-reference extracted claims with latest stats data, compute market gaps, score and triage. Claims tagged by format (best_ball, dynasty, redraft, all, multi) and scoring (ppr, half_ppr, standard, any).",
+      "name": "fantasy-miner-process-claims",
+      "path": "fantasy-miner-process-claims"
+    },
+    {
+      "description": "Recompute accuracy grades for all tracked fantasy football sources based on verified claims. Rank analysts by prediction accuracy per format and scoring. Run weekly.",
+      "name": "fantasy-miner-source-grading",
+      "path": "fantasy-miner-source-grading"
+    },
+    {
+      "description": "Auto-discover new fantasy football content sources across X, YouTube, Instagram, and Substack. Register them in the sources table and recompute grades. Run weekly.",
+      "name": "fantasy-miner-source-scout",
+      "path": "fantasy-miner-source-scout"
+    },
+    {
+      "description": "Verify resolved claims against season outcomes across all formats (best ball, redraft, dynasty) and scoring systems (PPR, 0.5 PPR, standard). Runs weekly to close the feedback loop on analyst predictions.",
+      "name": "fantasy-miner-verify-claims",
+      "path": "fantasy-miner-verify-claims"
+    },
+    {
+      "description": "Synthesize weekly claims, market movements, and video insights into a markdown research brief organized by fantasy format (best ball, redraft, dynasty) and scoring (PPR, 0.5 PPR, standard). Delivered via Telegram.",
+      "name": "fantasy-miner-weekly-digest",
+      "path": "fantasy-miner-weekly-digest"
+    },
+    {
       "description": "Operate game-related workflows: modded Minecraft server hosting and headless/emulator play automation with verification and user-facing safety.",
       "name": "game-automation-and-servers",
       "path": "gaming/game-automation-and-servers"
@@ -1016,6 +1081,16 @@
       "description": "Operate the operator's Content OS end-to-end: inbox processing, connection mining, brief generation, drafting, return path, and performance review.",
       "name": "content-os-workflows",
       "path": "kurultai/content-os-workflows"
+    },
+    {
+      "description": "Ingest external memory exports (ChatGPT, Claude, Notion, Obsidian vaults, other LLM chat histories) into the operator's brain knowledge graph at ~/brain with provenance discipline, entity/project/entity creation, wikilink wiring, and source/raw archival.",
+      "name": "external-memory-graph-ingest",
+      "path": "kurultai/external-memory-graph-ingest"
+    },
+    {
+      "description": "Build, operate, and extend the Fantasy Data Miner \u2014 an autonomous multi-source pipeline that mines fantasy football intelligence from social media (X), video (YouTube), Instagram (@upperhandfantasy), and newsletters (The FF Newsletter), extracts testable claims tagged by format (best_ball, dynasty, redraft) and scoring (PPR, half PPR, standard), stores them in a SQLite claims database, and produces weekly research briefs. Covers collector architecture, claim extraction, format/scoring detection, cron/Kanban dispatch, and known gotchas.",
+      "name": "fantasy-data-pipeline",
+      "path": "kurultai/fantasy-data-pipeline"
     },
     {
       "description": "Operate, extend, and deploy the fantasy sumo league site",
@@ -1301,6 +1376,11 @@
       "description": "Build, route, and report Kublai/Kurultai task packets optimized for agent-aware execution and completion reporting.",
       "name": "kublai-task-workflows",
       "path": "openclaw-imports/kublai-task-workflows"
+    },
+    {
+      "description": "Autonomous roster management for Sleeper fantasy leagues. Two layers \u2014 read-only data via public API (api.sleeper.app) and write actions via browser automation through a SQLite-backed action queue with priority, retry, and human-review gates. Breaking news detection via RSS + Sleeper transaction monitoring with per-league autonomy policies.",
+      "name": "sleeper-roster-manager",
+      "path": "ops-automation/sleeper-roster-manager"
     },
     {
       "description": "Pay HTTP 402 APIs via Machine Payments Protocol (MPP).",

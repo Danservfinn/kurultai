@@ -19,7 +19,7 @@
       "name": "agents"
     },
     {
-      "markdown_files": 526,
+      "markdown_files": 534,
       "name": "analyses"
     },
     {
@@ -35,7 +35,7 @@
       "name": "captures"
     },
     {
-      "markdown_files": 40,
+      "markdown_files": 41,
       "name": "concepts"
     },
     {
@@ -71,6 +71,10 @@
       "name": "experiments"
     },
     {
+      "markdown_files": 172,
+      "name": "fantasy-graph"
+    },
+    {
       "markdown_files": 4,
       "name": "fixtures"
     },
@@ -87,7 +91,7 @@
       "name": "githooks"
     },
     {
-      "markdown_files": 27,
+      "markdown_files": 29,
       "name": "graphify-out"
     },
     {
@@ -115,7 +119,7 @@
       "name": "migrations"
     },
     {
-      "markdown_files": 4064,
+      "markdown_files": 4068,
       "name": "operations"
     },
     {
@@ -123,11 +127,11 @@
       "name": "products"
     },
     {
-      "markdown_files": 76,
+      "markdown_files": 90,
       "name": "projects"
     },
     {
-      "markdown_files": 109,
+      "markdown_files": 112,
       "name": "proposals"
     },
     {
@@ -155,7 +159,7 @@
       "name": "reports"
     },
     {
-      "markdown_files": 29,
+      "markdown_files": 30,
       "name": "research"
     },
     {
@@ -183,7 +187,7 @@
       "name": "src"
     },
     {
-      "markdown_files": 270,
+      "markdown_files": 274,
       "name": "status"
     },
     {
@@ -207,7 +211,7 @@
       "name": "travel"
     },
     {
-      "markdown_files": 47,
+      "markdown_files": 49,
       "name": "whitepapers"
     },
     {
