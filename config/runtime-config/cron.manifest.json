@@ -1634,6 +1634,44 @@
       "skills": [],
       "state": "scheduled",
       "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-080",
+      "name": "RDE Fast Signals",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "*/15 * * * *",
+        "expr": "*/15 * * * *",
+        "kind": "cron"
+      },
+      "script": "rde_fast_signals.sh",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
+    },
+    {
+      "deliver": "origin",
+      "enabled": true,
+      "enabled_toolsets": null,
+      "job_id": "job-081",
+      "name": "RDE Intel Grading",
+      "repeat": {
+        "times": null
+      },
+      "schedule": {
+        "display": "0 6 * * 2",
+        "expr": "0 6 * * 2",
+        "kind": "cron"
+      },
+      "script": "rde_intel_grading.sh",
+      "skills": [],
+      "state": "scheduled",
+      "workdir": null
     }
   ],
   "schema": "kurultai.cron-manifest.v1"

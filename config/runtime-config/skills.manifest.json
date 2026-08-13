@@ -923,7 +923,22 @@
       "path": "fantasy-football/draft-report-and-grading"
     },
     {
-      "description": "Monitor Instagram fantasy football creators (currently @upperhandfantasy and @leahc.ammarano), download Reels via instaloader, transcribe with faster-whisper, extract claims tagged by format and scoring. Run when Kanban dispatches an Instagram collection task.",
+      "description": "Run draft strategy tournament and interpret leaderboard.",
+      "name": "draft-strategy-tournament-runner",
+      "path": "fantasy-football/draft-strategy-tournament-runner"
+    },
+    {
+      "description": "Autonomous draft execution with Fable on live Sleeper.",
+      "name": "fable-draft",
+      "path": "fantasy-football/fable-draft"
+    },
+    {
+      "description": "Autonomously draft on Underdog Fantasy best-ball rooms via browser automation. Uses Fable (Claude Code) for pick decisioning by default, with the RDE engine for valuation. Drives the live Underdog draft room UI through computer_use.",
+      "name": "underdog-draft",
+      "path": "fantasy-football/underdog-draft"
+    },
+    {
+      "description": "Monitor 17 Instagram fantasy football creator accounts (brands + individual analysts), download Reels via instaloader, transcribe with faster-whisper, extract regex claims AND GLM-5.2 intelligence signals. Run when Kanban dispatches an Instagram collection task.",
       "name": "fantasy-miner-collect-instagram",
       "path": "fantasy-miner-collect-instagram"
     },
@@ -943,7 +958,7 @@
       "path": "fantasy-miner-collect-stats"
     },
     {
-      "description": "Discover, download, and transcribe fantasy football YouTube videos across all formats (best ball, redraft, dynasty) and scoring systems (PPR, 0.5 PPR, standard) using yt-dlp and faster-whisper. Extract claims tagged by format and scoring.",
+      "description": "Discover, download, and transcribe fantasy football YouTube videos from 33 tracked channels across all formats (best ball, redraft, dynasty) and scoring systems. Transcribe with faster-whisper, extract regex claims AND GLM-5.2 intelligence signals (role projections, volatility, verdicts).",
       "name": "fantasy-miner-collect-video",
       "path": "fantasy-miner-collect-video"
     },
@@ -953,7 +968,7 @@
       "path": "fantasy-miner-process-claims"
     },
     {
-      "description": "Recompute accuracy grades for all tracked fantasy football sources based on verified claims. Rank analysts by prediction accuracy per format and scoring. Run weekly.",
+      "description": "Two-layer accuracy grading for fantasy football analysts. Layer 1 resolves regex-extracted claims via state.py. Layer 2 grades GLM-5.2 intelligence verdicts (buy/sell/hold/avoid/fade/target) via grade_accuracy.py with dynamic author discovery and per-verdict breakdowns. Run weekly.",
       "name": "fantasy-miner-source-grading",
       "path": "fantasy-miner-source-grading"
     },
@@ -1151,6 +1166,11 @@
       "description": "Configure, upgrade, and debug OpenClaw/Hermes integration surfaces including Telegram channels, Parse screening cleanup, CLI/gateway upgrades, and imported helper workflows.",
       "name": "openclaw-operations",
       "path": "kurultai/openclaw-operations"
+    },
+    {
+      "description": "Prospect walkthrough of parsethis.ai with an HTML report.",
+      "name": "parse-prospect",
+      "path": "kurultai/parse-prospect"
     },
     {
       "description": "Create high-fidelity Hermes persona agents with dedicated Telegram gateways, OpenAI Codex OAuth routing, Brain wiring, profile-local voice skills, Turing-style identity/voice regressions, receipts, and rollback paths \u2014 the Elon-agent pattern generalized.",
@@ -1853,7 +1873,7 @@
       "path": "software-development/operational-assessment"
     },
     {
-      "description": "Develop and maintain Parse for Agents (parsethis.ai). Covers repo layout, compliance API (Phases 0-12), GTM plan (Phases 13-18), SSR pages, deployment, tunnel ops, subagent patterns. See references/ for GTM docs, operator gates, and SSR patterns.",
+      "description": "Develop and maintain Parse for Agents (parsethis.ai). Covers repo layout, compliance API (Phases 0-12), GTM plan (Phases 13-18), SSR pages, deployment, tunnel ops, subagent patterns. See references/ for GTM docs, operator gates, SSR patterns, and intent false-positive narrowing patterns.",
       "name": "parse-for-agents-dev",
       "path": "software-development/parse-for-agents-dev"
     },

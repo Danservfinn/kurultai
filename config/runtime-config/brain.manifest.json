@@ -3,7 +3,7 @@
   "schema": "kurultai.brain-manifest.v1",
   "top_level_directories": [
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "$HOME"
     },
     {
@@ -19,11 +19,11 @@
       "name": "agents"
     },
     {
-      "markdown_files": 534,
+      "markdown_files": 540,
       "name": "analyses"
     },
     {
-      "markdown_files": 1,
+      "markdown_files": 0,
       "name": "apps"
     },
     {
@@ -43,11 +43,11 @@
       "name": "config"
     },
     {
-      "markdown_files": 180,
+      "markdown_files": 181,
       "name": "content"
     },
     {
-      "markdown_files": 24,
+      "markdown_files": 12,
       "name": "crates"
     },
     {
@@ -55,15 +55,15 @@
       "name": "dashboards"
     },
     {
-      "markdown_files": 4,
+      "markdown_files": 2,
       "name": "desktop"
     },
     {
-      "markdown_files": 517,
+      "markdown_files": 519,
       "name": "docs"
     },
     {
-      "markdown_files": 15,
+      "markdown_files": 14,
       "name": "entities"
     },
     {
@@ -71,11 +71,11 @@
       "name": "experiments"
     },
     {
-      "markdown_files": 172,
+      "markdown_files": 176,
       "name": "fantasy-graph"
     },
     {
-      "markdown_files": 4,
+      "markdown_files": 2,
       "name": "fixtures"
     },
     {
@@ -87,7 +87,7 @@
       "name": "generated"
     },
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "githooks"
     },
     {
@@ -107,7 +107,7 @@
       "name": "knowledge"
     },
     {
-      "markdown_files": 1,
+      "markdown_files": 0,
       "name": "kublai"
     },
     {
@@ -115,15 +115,15 @@
       "name": "methodology"
     },
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "migrations"
     },
     {
-      "markdown_files": 4068,
+      "markdown_files": 4082,
       "name": "operations"
     },
     {
-      "markdown_files": 18,
+      "markdown_files": 9,
       "name": "products"
     },
     {
@@ -131,7 +131,7 @@
       "name": "projects"
     },
     {
-      "markdown_files": 112,
+      "markdown_files": 7,
       "name": "proposals"
     },
     {
@@ -143,7 +143,7 @@
       "name": "queue"
     },
     {
-      "markdown_files": 909,
+      "markdown_files": 911,
       "name": "raw"
     },
     {
@@ -167,27 +167,27 @@
       "name": "runbooks"
     },
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "schemas"
     },
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "scratchpad"
     },
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "scripts"
     },
     {
-      "markdown_files": 2,
+      "markdown_files": 1,
       "name": "skills"
     },
     {
-      "markdown_files": 4,
+      "markdown_files": 2,
       "name": "src"
     },
     {
-      "markdown_files": 274,
+      "markdown_files": 282,
       "name": "status"
     },
     {
@@ -195,7 +195,7 @@
       "name": "synthesis"
     },
     {
-      "markdown_files": 15,
+      "markdown_files": 11,
       "name": "tests"
     },
     {
@@ -211,7 +211,7 @@
       "name": "travel"
     },
     {
-      "markdown_files": 49,
+      "markdown_files": 50,
       "name": "whitepapers"
     },
     {
