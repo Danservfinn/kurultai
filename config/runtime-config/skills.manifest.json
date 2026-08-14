@@ -583,6 +583,11 @@
       "path": "autonomous-ai-agents/universal-agent-loop"
     },
     {
+      "description": "Design, build, and operate evidence-first, approval-gated GTM agents and pipelines that move from ICP and public research through signals, drafts, channel approvals, reply-stop handling, and measurable learning without inventing buyer pain or prematurely automating outreach.",
+      "name": "evidence-first-gtm-operations",
+      "path": "business/evidence-first-gtm-operations"
+    },
+    {
       "description": "Create executable go-to-market plans with autonomous operating loops, ICP, channels, metrics, and approval gates.",
       "name": "go-to-market-planning",
       "path": "business/go-to-market-planning"
@@ -601,6 +606,11 @@
       "description": "Attribute Parse subscription tiers to email addresses/users on the operator's command, including custom pricing, $0 grants, and free trial/free-period overrides.",
       "name": "parse-subscription-attribution",
       "path": "business/parse-subscription-attribution"
+    },
+    {
+      "description": "Walk any platform as a realistic prospect and deliver an HTML feedback report.",
+      "name": "prospect",
+      "path": "business/prospect"
     },
     {
       "description": "Stripe REST API workflows for customers, payments, subscriptions, refunds, and churn research with strict side-effect gates.",
@@ -1053,6 +1063,11 @@
       "path": "github/github-workflows"
     },
     {
+      "description": "Operate Guyuk\u2019s evidence-first, approval-gated Parse design-partner pipeline: foundation checks, public account research, three-signal qualification, review cards, per-channel approvals, reply-first stop, and weekly learning.",
+      "name": "guyuk-gtm",
+      "path": "guyuk-gtm"
+    },
+    {
       "description": "First-principles, code-first Karpathy-inspired teaching voice for the andrej-karpathy profile.",
       "name": "karpathy-mode",
       "path": "karpathy-mode"
@@ -1211,6 +1226,11 @@
       "description": "Run the Andrej/Kurultai Brain knowledge synthesis loop on demand: review completed `/study` artifacts, extract novel cross-source mechanisms, write bounded synthesis packets or no-op receipts, and preserve public/runtime approval boundaries.",
       "name": "synthesis",
       "path": "kurultai/synthesis"
+    },
+    {
+      "description": "Synthesize novel learnings from Brain knowledge and chat history into a whitepaper, run an adversarial revision loop, and publish a verified self-contained HTML deliverable. Supports topic targeting via /synthesize <topic>.",
+      "name": "synthesize",
+      "path": "kurultai/synthesize"
     },
     {
       "description": "Discover, find, compare, audit, repair, adapt, craft, run, debrief, and prepare repeatable AI-agent loops for publication.",
@@ -1626,6 +1646,11 @@
       "description": "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.",
       "name": "blogwatcher",
       "path": "research/blogwatcher"
+    },
+    {
+      "description": "Investigate whether recurring consumer harms can support practical individual claims, demand letters, regulatory complaints, small-claims actions, or attorney referral. Use for telemarketing/TCPA, spam texts, debt collection, privacy, warranty, billing, and similar statutory-damages questions.",
+      "name": "consumer-claims-research",
+      "path": "research/consumer-claims-research"
     },
     {
       "description": "Structured reasoning loop for hard decisions \u2014 separates facts from assumptions, builds falsifiable hypotheses, runs the highest-information test, updates an evidence ledger, and subjects the leading model to adversarial critique.",
